@@ -24,7 +24,13 @@ fn current_mapping_parses_without_warnings() {
     let parsed = parse_mapping(include_str!("../../../../formal/MAPPING.md"));
 
     assert!(parsed.warnings.is_empty(), "{:?}", parsed.warnings);
-    assert_eq!(parsed.rows.len(), 104);
+    assert_eq!(parsed.rows.len(), 112);
+    for property in [
+        "verify_captured_invocation_count_monotonic",
+        "verify_replay_fingerprint_uniqueness",
+    ] {
+        assert!(parsed.rows.iter().any(|row| row.property == property));
+    }
 }
 
 #[test]
@@ -259,6 +265,7 @@ fn nonexistent_kani_crate_fails_closed() {
         lane: "pr".to_string(),
         notes: String::new(),
         primary_rust_symbol: None,
+        open_residual: None,
     }];
     let workspace_members = BTreeSet::from(["chio-core".to_string()]);
 
@@ -340,6 +347,7 @@ fn unmapped_kani_fallback_is_limited_to_known_receipt_harnesses() {
         lane: "pr".to_string(),
         notes: String::new(),
         primary_rust_symbol: None,
+        open_residual: None,
     };
     let receipt = KaniHarness {
         crate_name: "chio-kernel-core".to_string(),
@@ -347,6 +355,7 @@ fn unmapped_kani_fallback_is_limited_to_known_receipt_harnesses() {
         lane: "pr".to_string(),
         notes: String::new(),
         primary_rust_symbol: None,
+        open_residual: None,
     };
 
     assert_eq!(
@@ -864,3 +873,5 @@ fn refinement_registry_schema_and_fields_are_exact() {
 
 mod aeneas;
 mod mutation;
+
+mod open_residual;

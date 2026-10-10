@@ -141,6 +141,7 @@ fn budget_op_strategy() -> impl Strategy<Value = BudgetOp> {
 fn error_kind(error: &BudgetStoreError) -> &'static str {
     match error {
         BudgetStoreError::Overflow(_) => "overflow",
+        BudgetStoreError::Clock(_) => "clock",
         BudgetStoreError::Fenced { .. } => "fenced",
         BudgetStoreError::Invariant(_) => "invariant",
         BudgetStoreError::Sqlite(_) => "sqlite",
@@ -200,8 +201,8 @@ fn financial_receipt_carries_hold_lineage_and_guarantee_level() {
         grant_index: 0,
         cost_charged: 75,
         currency: "USD".to_string(),
-        budget_remaining: 925,
-        budget_total: 1_000,
+        budget_remaining: Some(925),
+        budget_total: Some(1_000),
         delegation_depth: 1,
         root_budget_holder: "agent-root-001".to_string(),
         payment_reference: None,

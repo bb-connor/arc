@@ -18,6 +18,7 @@ pub mod capture;
 pub mod config;
 pub mod frame;
 pub mod mode;
+mod observation_input;
 pub mod persist;
 pub mod redact;
 pub mod runner;

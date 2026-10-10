@@ -11,7 +11,14 @@ use syn::{Attribute, ExprBinary, ExprCall, ExprMethodCall, ExprPath, ItemImpl};
 
 use crate::{display_path, workspace_root, XtaskError};
 
+mod constructors;
+mod source;
+
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
+const MCP_LAUNCH_SOURCE: &str =
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
+const MAINTENANCE_SUPERVISION_SOURCE: &str =
+    "crates/products/chio-api-protect/src/proxy/state/admission_maintenance.rs";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,6 +27,9 @@ struct SourceInventory {
     crate_name_markers: Vec<String>,
     explicit_roots: Vec<String>,
     contract_sources: Vec<String>,
+    constructor_sites: Vec<constructors::Site>,
+    #[serde(default)]
+    dispatch_sites: Vec<constructors::Site>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,7 +63,7 @@ struct CallFact {
 
 #[derive(Clone, Debug)]
 struct FunctionFacts {
-    compatibility_surface: bool,
+    statements: Vec<String>,
     calls: Vec<CallFact>,
     paths: BTreeSet<String>,
     binaries: Vec<String>,
@@ -63,6 +73,7 @@ struct FunctionFacts {
 #[derive(Clone, Debug, Default)]
 struct SourceFacts {
     functions: BTreeMap<String, FunctionFacts>,
+    includes: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -72,17 +83,46 @@ struct ExceptionRule {
     kind: DangerousKind,
     receiver: Option<&'static str>,
     class: &'static str,
-    compatibility_only: bool,
 }
 
 const EXCEPTION_RULES: &[ExceptionRule] = &[
+    ExceptionRule {
+        path: MAINTENANCE_SUPERVISION_SOURCE,
+        function: "AdmissionMaintenance::spawn",
+        kind: DangerousKind::Spawn,
+        receiver: Some(
+            "thread::Builder::new().name(\"chio-protect-admission-maintenance\".into())",
+        ),
+        class: "API-protect original-kernel maintenance supervision",
+    },
+    // These exact thread builders supervise an already admitted process. Their
+    // closures are still visited, so this does not authorize nested tool launches.
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stdin\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stderr\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stdout\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-child\".to_string())",
+    ),
     ExceptionRule {
         path: "crates/protocol/chio-acp-proxy/src/transport.rs",
         function: "AcpTransport::spawn",
         kind: DangerousKind::CommandNew,
         receiver: None,
         class: "ACP agent process lifecycle",
-        compatibility_only: false,
     },
     ExceptionRule {
         path: "crates/protocol/chio-acp-proxy/src/transport.rs",
@@ -90,49 +130,29 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         kind: DangerousKind::Spawn,
         receiver: Some("cmd"),
         class: "ACP agent process lifecycle",
-        compatibility_only: false,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs",
-        function: "StdioMcpTransport::spawn",
-        kind: DangerousKind::CommandNew,
-        receiver: None,
-        class: "MCP server process lifecycle",
-        compatibility_only: false,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs",
-        function: "StdioMcpTransport::spawn",
-        kind: DangerousKind::Spawn,
-        receiver: Some("child_command"),
-        class: "MCP server process lifecycle",
-        compatibility_only: false,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-a2a-edge/src/edge.rs",
-        function: "ChioA2aEdge::handle_send_message_passthrough",
-        kind: DangerousKind::Invoke,
-        receiver: Some("server"),
-        class: "A2A compatibility-only passthrough",
-        compatibility_only: true,
     },
     ExceptionRule {
         path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::invoke_passthrough",
-        kind: DangerousKind::Invoke,
-        receiver: Some("server"),
-        class: "ACP compatibility-only passthrough",
-        compatibility_only: true,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::handle_jsonrpc",
+        function: "ChioAcpEdge::handle_jsonrpc_value",
         kind: DangerousKind::Invoke,
         receiver: Some("self"),
         class: "ACP authoritative dispatch into the kernel-backed invoke method",
-        compatibility_only: false,
     },
 ];
+
+const fn mcp_thread_rule(
+    path: &'static str,
+    function: &'static str,
+    receiver: &'static str,
+) -> ExceptionRule {
+    ExceptionRule {
+        path,
+        function,
+        kind: DangerousKind::Spawn,
+        receiver: Some(receiver),
+        class: "MCP admitted-process supervision thread",
+    }
+}
 
 #[derive(Clone, Copy)]
 struct CallContract {
@@ -144,15 +164,138 @@ struct CallContract {
 
 const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
-        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
-        function: "ChioMcpEdge::evaluate_tool_call_operation",
-        target: "self.kernel.evaluate_session_operation",
+        path: "crates/kernel/chio-kernel/src/provider_verdict.rs",
+        function: "build_tool_call_request",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-openai-adapter/src/lib.rs",
+        function: "ChioOpenAiAdapter::execute_tool_call",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-openai-adapter/src/lib.rs",
+        function: "ChioOpenAiAdapter::execute_tool_call",
+        target: "kernel.evaluate_tool_call_blocking_with_metadata",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-tower/src/kernel_service.rs",
+        function: "<KernelService as Service<KernelRequest>>::call",
+        target: "req.call.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-tower/src/kernel_service.rs",
+        function: "<KernelService as Service<KernelRequest>>::call",
+        target: "kernel.evaluate_tool_call",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-a2a-edge/src/edge.rs",
+        function: "validate_execution_context",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-acp-edge/src/edge.rs",
+        function: "validate_execution_context",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "crate::validation::validate_execution_request_boundary",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security_and_security_context",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "<OpenAiTargetExecutor as TargetProtocolExecutor>::execute",
+        target: "evaluate_bound_kernel_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/orchestrator.rs",
+        function: "CrossProtocolOrchestrator::execute_target",
+        target: "evaluate_bound_kernel_request",
         minimum: 1,
     },
     CallContract {
         path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
-        function: "ChioMcpEdge::evaluate_tool_call_operation_with_transport",
-        target: "self.kernel.evaluate_tool_call_operation_with_nested_flow_client",
+        function: "<McpTargetExecutor as TargetProtocolExecutor>::execute",
+        target: "evaluate_bound_kernel_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+        function: "ChioMcpEdge::prepare_tool_call_request",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    // These ordinary-kernel factories cannot install a trusted flow host.
+    // Behavioral startup tests establish that rejection precedes launch/store
+    // acquisition; the source contracts prevent removing the selected gate.
+    CallContract {
+        path: "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs",
+        function: "RemoteSessionFactory::new",
+        target: "manifest_registry.requires_flow_runtime",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/products/chio-cli/src/cli/runtime.rs",
+        function: "cmd_mcp_serve",
+        target: "manifest_registry.requires_flow_runtime",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn",
+        target: "Self::spawn_with_timeouts",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_with_timeouts",
+        target: "migration.require_enforced",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_with_timeouts",
+        target: "chio_cage::launch_prepared",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+        function: "ChioMcpEdge::evaluate_tool_call_operation",
+        target: "self.kernel.evaluate_session_operation",
         minimum: 1,
     },
     CallContract {
@@ -188,36 +331,66 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
         function: "verify_swarm_authority_reference_from_store",
-        target: "verify_swarm_authority_bundle",
+        target: "verify_swarm_authority_for_admission",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
+        function: "verify_swarm_authority_reference_from_store",
+        target: "verify_swarm_request_binding",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
+        target: "self.prepare_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
+        target: "prepared.reserve",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
+        function: "ChioRuntimeAdmissionHook::prepare_request",
         target: "verify_swarm_authority_reference_from_store",
         minimum: 1,
     },
     CallContract {
-        path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "self.store.consume_swarm_continuation",
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
+        function: "PreparedHookAdmission::reserve",
+        target: "hook.store.consume_swarm_continuation",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::verify_capability_full_pre_admit",
-        target: "chio_kernel_core::verify_capability_full_with_root",
+        target: "self.verify_capability_full_pre_admit_with_clock",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
+        function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
+        target: "chio_kernel_core::verify_capability_full_with_evidence",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::admit_capability_budget",
+        target: "self.admit_capability_budget_for_dispatch",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
+        function: "ChioKernel::admit_capability_budget_for_dispatch",
         target: "budgets.try_admit_child",
         minimum: 1,
     },
     CallContract {
         path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::handle_jsonrpc",
+        function: "ChioAcpEdge::handle_jsonrpc_value",
         target: "validate_execution_context",
         minimum: 2,
     },
@@ -237,40 +410,38 @@ pub(crate) fn run() -> Result<(), XtaskError> {
 }
 
 fn validate_workspace(root: &Path) -> Result<(), String> {
-    let inventory = load_source_inventory(root)?;
+    let mut inventory = load_source_inventory(root)?;
+    let dispatch_sites = std::mem::take(&mut inventory.dispatch_sites);
+    inventory.constructor_sites.extend(dispatch_sites);
+    constructors::validate(root, &inventory.constructor_sites)?;
     validate_contract_source_registry(&inventory)?;
     let adapter_sources = discover_adapter_sources(root, &inventory)?;
-    let mut parsed = BTreeMap::new();
-    for relative in &adapter_sources {
-        parsed.insert(relative.clone(), parse_repo_source(root, relative)?);
-    }
+    let mut parsed = source::parse_repo_sources(root, &adapter_sources)?;
     validate_dangerous_calls(&parsed, true)?;
 
-    for relative in &inventory.contract_sources {
-        if !parsed.contains_key(relative) {
-            parsed.insert(relative.clone(), parse_repo_source(root, relative)?);
-        }
-    }
+    parsed.extend(source::parse_repo_sources(
+        root,
+        &inventory.contract_sources,
+    )?);
     for contract in CALL_CONTRACTS {
         let source = parsed
             .get(contract.path)
             .ok_or_else(|| format!("internal source lookup failed: {}", contract.path))?;
         require_call(source, contract)?;
     }
+    require_native_launch_gate(
+        parsed
+            .get(MCP_LAUNCH_SOURCE)
+            .ok_or_else(|| "native MCP launch source was not parsed".to_string())?,
+    )?;
     require_path(
         parsed
-            .get("crates/products/chio-api-protect/src/evaluator.rs")
-            .ok_or_else(|| "API protect evaluator was not parsed".to_string())?,
+            .get("crates/products/chio-api-protect/src/evaluator/route_matching.rs")
+            .ok_or_else(|| "API protect route matcher was not parsed".to_string())?,
         "RequestEvaluator::match_route_with_status",
         "PolicyDecision::DenyByDefault",
     )?;
-    require_path(
-        parsed
-            .get("crates/kernel/chio-kernel/src/kernel/validation.rs")
-            .ok_or_else(|| "kernel validation source was not parsed".to_string())?,
-        "ChioKernel::verify_capability_full_pre_admit",
-        "chio_kernel_core::NoopBudgetRegistry",
-    )?;
+    require_pre_admit_budget_registry(&parsed)?;
     require_call_tokens(
         parsed
             .get("crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs")
@@ -289,6 +460,57 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
             "reference.route_plan_receipt.evidence_id",
         ],
     )?;
+    Ok(())
+}
+
+fn require_pre_admit_budget_registry(parsed: &BTreeMap<String, SourceFacts>) -> Result<(), String> {
+    require_path(
+        parsed
+            .get("crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs")
+            .ok_or_else(|| "kernel capability evidence source was not parsed".to_string())?,
+        "ChioKernel::verify_capability_full_pre_admit_with_clock",
+        "chio_kernel_core::NoopBudgetRegistry",
+    )
+}
+
+fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
+    let function = "StdioMcpTransport::spawn_with_timeouts";
+    let facts = source
+        .functions
+        .get(function)
+        .ok_or_else(|| format!("native launch function missing: {function}"))?;
+    // These are source-shape obligations, backed by the owning runtime tests.
+    // Each phase must be a top-level statement in this order. A guard hidden
+    // in a closure or after process release cannot satisfy the contract.
+    let phases = [
+        (
+            "ifletErr(error)=validate_cage_migration_identity(&server_id,&migration).and_then(|()|{migration.require_enforced().map_err(",
+            "returnErr(merge_cleanup_failures(error,",
+        ),
+        (
+            "letlaunch_result=chio_cage::launch_prepared(prepared,launch_options);",
+            "",
+        ),
+        (
+            "ifletErr(error)=validate_cage_evidence(child.evidence(),&expected){",
+            "returnErr(fail_caged_child(",
+        ),
+        (
+            "matchcage_receipts.persistence.persist(",
+            "Err(error)=>returnErr(fail_caged_child(error,child,&cage_receipts,None))",
+        ),
+        ("lettransport=Self::from_launched_process(", ""),
+    ];
+    let mut statements = facts.statements.iter();
+    for (prefix, required) in phases {
+        if !statements
+            .any(|statement| statement.starts_with(prefix) && statement.contains(required))
+        {
+            return Err(format!(
+                "native launch phase missing, reordered, or not fail-closed: {function}::{prefix}"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -377,22 +599,6 @@ fn validate_contract_source_registry(inventory: &SourceInventory) -> Result<(), 
         ));
     }
     Ok(())
-}
-
-fn parse_repo_source(root: &Path, relative: impl AsRef<Path>) -> Result<SourceFacts, String> {
-    let relative = relative.as_ref();
-    let absolute = root.join(relative);
-    let metadata = fs::symlink_metadata(&absolute)
-        .map_err(|error| format!("cannot stat {}: {error}", display_path(relative)))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(format!(
-            "production Rust source is not a regular file: {}",
-            display_path(relative)
-        ));
-    }
-    let source = fs::read_to_string(&absolute)
-        .map_err(|error| format!("cannot read {}: {error}", display_path(relative)))?;
-    parse_source(&source, &display_path(relative))
 }
 
 fn discover_adapter_sources(
@@ -516,6 +722,9 @@ fn is_test_path(path: &Path) -> bool {
 fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
     let syntax = syn::parse_file(source)
         .map_err(|error| format!("cannot parse production Rust source {label}: {error}"))?;
+    if test_only(&syntax.attrs) {
+        return Ok(SourceFacts::default());
+    }
     let mut visitor = FunctionVisitor::default();
     visitor.visit_file(&syntax);
     let mut functions = BTreeMap::new();
@@ -524,7 +733,12 @@ fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
             return Err(format!("duplicate function identity in {label}: {name}"));
         }
     }
-    Ok(SourceFacts { functions })
+    let includes = source::include_paths(&syntax)
+        .map_err(|error| format!("cannot inventory includes in {label}: {error}"))?;
+    Ok(SourceFacts {
+        functions,
+        includes,
+    })
 }
 
 #[derive(Default)]
@@ -569,15 +783,13 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 }
 
 impl FunctionVisitor {
-    fn record_function(&mut self, name: String, attrs: &[Attribute], block: &syn::Block) {
+    fn record_function(&mut self, name: String, _attrs: &[Attribute], block: &syn::Block) {
         let mut body = BodyVisitor::default();
         body.visit_block(block);
         self.functions.push((
             name,
             FunctionFacts {
-                compatibility_surface: attrs.iter().any(|attribute| {
-                    normalize_tokens(attribute).contains("feature=\"compatibility-surface\"")
-                }),
+                statements: block.stmts.iter().map(normalize_tokens).collect(),
                 calls: body.calls,
                 paths: body.paths,
                 binaries: body.binaries,
@@ -668,7 +880,12 @@ fn impl_name(node: &ItemImpl) -> Option<String> {
 fn test_only(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attribute| {
         let path = normalize_tokens(attribute.path());
-        path == "test" || path.ends_with("::test") || normalize_tokens(attribute) == "#[cfg(test)]"
+        path == "test"
+            || path.ends_with("::test")
+            || (attribute.path().is_ident("cfg")
+                && attribute
+                    .parse_args::<syn::Path>()
+                    .is_ok_and(|path| path.is_ident("test")))
     })
 }
 
@@ -686,6 +903,7 @@ fn validate_dangerous_calls(
     require_all_rules: bool,
 ) -> Result<(), String> {
     let mut observed = vec![0_usize; EXCEPTION_RULES.len()];
+    let mut failures = Vec::new();
     for (path, source) in sources {
         for (function, facts) in &source.functions {
             for call in &facts.dangerous {
@@ -701,34 +919,35 @@ fn validate_dangerous_calls(
                     })
                     .collect();
                 if matching.len() != 1 {
-                    return Err(format!(
+                    failures.push(format!(
                         "unregistered production side effect {} in {path}::{function}",
                         call.kind.label()
                     ));
+                    continue;
                 }
                 let index = matching[0];
-                let rule = EXCEPTION_RULES[index];
-                if rule.compatibility_only && !facts.compatibility_surface {
-                    return Err(format!(
-                        "{} exception lacks compatibility-surface cfg in {path}::{function}",
-                        rule.class
-                    ));
-                }
                 observed[index] += 1;
             }
         }
     }
+    if !failures.is_empty() {
+        return Err(failures.join("\n"));
+    }
     if require_all_rules {
         for (rule, count) in EXCEPTION_RULES.iter().zip(observed) {
             if count != 1 {
-                return Err(format!(
+                failures.push(format!(
                     "side-effect exception must match exactly once: {} {}::{} matched {count}",
                     rule.class, rule.path, rule.function
                 ));
             }
         }
     }
-    Ok(())
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("\n"))
+    }
 }
 
 fn require_call(source: &SourceFacts, contract: &CallContract) -> Result<(), String> {
@@ -812,10 +1031,329 @@ fn require_binary_tokens(
 mod tests {
     use super::*;
 
+    #[test]
+    fn maintenance_supervisor_exception_is_exact_and_keeps_nested_checks() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let mut paths = EXCEPTION_RULES
+            .iter()
+            .map(|rule| rule.path.to_owned())
+            .collect::<BTreeSet<_>>();
+        paths.insert(MAINTENANCE_SUPERVISION_SOURCE.to_owned());
+        let parsed = source::parse_repo_sources(&root, &paths.into_iter().collect::<Vec<_>>())?;
+        validate_dangerous_calls(&parsed, true)?;
+        let actual = fs::read_to_string(root.join(MAINTENANCE_SUPERVISION_SOURCE))
+            .map_err(|error| error.to_string())?;
+        let expected = format!(
+            "unregistered production side effect .spawn in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn"
+        );
+        let wrong_name = actual.replace(
+            "chio-protect-admission-maintenance",
+            "unreviewed-maintenance",
+        );
+        assert_ne!(wrong_name, actual);
+        let mut altered = parsed.clone();
+        altered.insert(
+            MAINTENANCE_SUPERVISION_SOURCE.to_owned(),
+            parse_source(&wrong_name, MAINTENANCE_SUPERVISION_SOURCE)?,
+        );
+        assert_eq!(validate_dangerous_calls(&altered, false), Err(expected));
+
+        let mut altered = parsed.clone();
+        let facts = altered
+            .remove(MAINTENANCE_SUPERVISION_SOURCE)
+            .ok_or_else(|| "maintenance source was not parsed".to_owned())?;
+        let wrong_path = "crates/products/chio-api-protect/src/proxy/state/other.rs";
+        altered.insert(wrong_path.to_owned(), facts);
+        assert_eq!(
+            validate_dangerous_calls(&altered, false),
+            Err(format!(
+                "unregistered production side effect .spawn in {wrong_path}::AdmissionMaintenance::spawn"
+            )),
+        );
+
+        let mut altered = parsed.clone();
+        let owner = altered
+            .get_mut(MAINTENANCE_SUPERVISION_SOURCE)
+            .ok_or_else(|| "maintenance source was not parsed".to_owned())?;
+        let facts = owner
+            .functions
+            .remove("AdmissionMaintenance::spawn")
+            .ok_or_else(|| "maintenance spawn owner was not parsed".to_owned())?;
+        owner
+            .functions
+            .insert("AdmissionMaintenance::other_spawn".to_owned(), facts);
+        assert_eq!(
+            validate_dangerous_calls(&altered, false),
+            Err(format!(
+                "unregistered production side effect .spawn in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::other_spawn"
+            )),
+        );
+
+        let mut altered = parsed.clone();
+        let facts = altered
+            .get_mut(MAINTENANCE_SUPERVISION_SOURCE)
+            .and_then(|source| source.functions.get_mut("AdmissionMaintenance::spawn"))
+            .ok_or_else(|| "maintenance spawn owner was not parsed".to_owned())?;
+        assert_eq!(facts.dangerous.len(), 1);
+        facts.dangerous.push(facts.dangerous[0].clone());
+        assert_eq!(
+            validate_dangerous_calls(&altered, true),
+            Err(format!(
+                "side-effect exception must match exactly once: API-protect original-kernel maintenance supervision {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn matched 2"
+            )),
+        );
+
+        let entry = "let _entered_original_runtime = runtime.enter();";
+        assert_eq!(actual.matches(entry).count(), 1);
+        let nested = actual.replace(
+            entry,
+            "std::process::Command::new(\"unadmitted-tool\").spawn(); let _entered_original_runtime = runtime.enter();",
+        );
+        let mut altered = parsed;
+        altered.insert(
+            MAINTENANCE_SUPERVISION_SOURCE.to_owned(),
+            parse_source(&nested, MAINTENANCE_SUPERVISION_SOURCE)?,
+        );
+        let error = match validate_dangerous_calls(&altered, false) {
+            Ok(()) => return Err("nested unadmitted process launch was accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(error.lines().count(), 2);
+        for kind in ["Command::new", ".spawn"] {
+            assert!(error.lines().any(|line| line == format!(
+                "unregistered production side effect {kind} in {MAINTENANCE_SUPERVISION_SOURCE}::AdmissionMaintenance::spawn"
+            )));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dangerous_call_census_reports_every_violation() -> Result<(), String> {
+        let path = "crates/protocol/chio-fixture-edge/src/lib.rs";
+        let mut parsed = BTreeMap::new();
+        parsed.insert(
+            path.to_owned(),
+            parse_source(
+                "fn first() { Command::new(\"first\").spawn(); } fn second() { Command::new(\"second\").spawn(); }",
+                path,
+            )?,
+        );
+        let error = match validate_dangerous_calls(&parsed, false) {
+            Ok(()) => return Err("unregistered side effects were accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(error.lines().count(), 4);
+        for function in ["first", "second"] {
+            for kind in ["Command::new", ".spawn"] {
+                assert!(error.lines().any(|line| line
+                    == format!(
+                        "unregistered production side effect {kind} in {path}::{function}"
+                    )));
+            }
+        }
+        parsed.insert(
+            path.to_owned(),
+            parse_source("fn single() { Command::new(\"single\"); }", path)?,
+        );
+        assert_eq!(
+            validate_dangerous_calls(&parsed, false),
+            Err(format!(
+                "unregistered production side effect Command::new in {path}::single"
+            )),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pre_admit_budget_registry_guard_follows_its_extracted_owner() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let owner = "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs";
+        let mut parsed = BTreeMap::new();
+        for path in ["crates/kernel/chio-kernel/src/kernel/validation.rs", owner] {
+            let source = fs::read_to_string(root.join(path)).map_err(|error| error.to_string())?;
+            parsed.insert(path.to_owned(), parse_source(&source, path)?);
+        }
+        require_pre_admit_budget_registry(&parsed)?;
+        let source = fs::read_to_string(root.join(owner)).map_err(|error| error.to_string())?;
+        let registry = "chio_kernel_core::NoopBudgetRegistry";
+        assert_eq!(source.matches(registry).count(), 1);
+        let mutated = source.replacen(registry, "unapproved_budget_registry()", 1);
+        assert_ne!(mutated, source);
+        let facts = parse_source(&mutated, owner)?;
+        require_call(
+            &facts,
+            &CallContract {
+                path: owner,
+                function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
+                target: "chio_kernel_core::verify_capability_full_with_evidence",
+                minimum: 1,
+            },
+        )?;
+        parsed.insert(owner.to_owned(), facts);
+        let error = match require_pre_admit_budget_registry(&parsed) {
+            Ok(()) => return Err("unapproved pre-admit budget registry was accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            "mediation contract path missing: ChioKernel::verify_capability_full_pre_admit_with_clock requires chio_kernel_core::NoopBudgetRegistry",
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn transport_channel_successor_keeps_its_required_kernel_mediation() -> Result<(), String> {
+        let contract = CallContract {
+            path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+            function: "ChioMcpEdge::evaluate_tool_call_operation_with_transport_channel",
+            target: "self.kernel.evaluate_tool_call_operation_with_nested_flow_client",
+            minimum: 1,
+        };
+        assert_eq!(
+            CALL_CONTRACTS
+                .iter()
+                .filter(|current| current.path == contract.path
+                    && current.function == contract.function
+                    && current.target == contract.target
+                    && current.minimum == contract.minimum)
+                .count(),
+            1,
+            "the live transport channel must retain its independent mediation contract",
+        );
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let source =
+            fs::read_to_string(root.join(contract.path)).map_err(|error| error.to_string())?;
+        let mut facts = parse_source(&source, contract.path)?;
+        require_call(&facts, &contract)?;
+        let function = facts
+            .functions
+            .get_mut(contract.function)
+            .ok_or_else(|| format!("missing positive function {}", contract.function))?;
+        function.calls.retain(|call| call.target != contract.target);
+        let error = match require_call(&facts, &contract) {
+            Ok(()) => return Err("removed transport channel kernel call was accepted".to_string()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            format!(
+                "mediation contract call missing: {}::{} requires {} at least {} time(s)",
+                contract.path, contract.function, contract.target, contract.minimum,
+            ),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn every_current_mediation_contract_detects_a_removed_required_call() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let mut failures = Vec::new();
+        for contract in CALL_CONTRACTS {
+            let source =
+                fs::read_to_string(root.join(contract.path)).map_err(|error| error.to_string())?;
+            let mut facts = parse_source(&source, contract.path)?;
+            if let Err(error) = require_call(&facts, contract) {
+                failures.push(error);
+                continue;
+            }
+            let function = facts
+                .functions
+                .get_mut(contract.function)
+                .ok_or_else(|| format!("missing positive function {}", contract.function))?;
+            function.calls.retain(|call| call.target != contract.target);
+            let expected = format!(
+                "mediation contract call missing: {}::{} requires {} at least {} time(s)",
+                contract.path, contract.function, contract.target, contract.minimum,
+            );
+            match require_call(&facts, contract) {
+                Err(error) if error == expected => {}
+                Err(error) => failures.push(format!("unexpected mutation refusal: {error}")),
+                Ok(()) => failures.push(format!(
+                    "removed {} from {} did not break the required contract",
+                    contract.target, contract.function,
+                )),
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures.join("\n"))
+        }
+    }
+
     fn validate_fixture(path: &str, source: &str) -> Result<(), String> {
         let mut sources = BTreeMap::new();
         sources.insert(path.to_string(), parse_source(source, path)?);
         validate_dangerous_calls(&sources, false)
+    }
+
+    #[test]
+    fn supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure() {
+        let safe = r#"
+            impl StdioMcpTransport {
+                fn from_launched_process(mut child: Child) {
+                    std::thread::Builder::new().name("chio-mcp-child".to_string())
+                        .spawn(move || { child.wait(); });
+                }
+            }
+        "#;
+        assert!(validate_fixture(MCP_LAUNCH_SOURCE, safe).is_ok());
+        let unsafe_source = safe.replace("child.wait();", "Command::new(\"tool\").spawn();");
+        assert!(validate_fixture(MCP_LAUNCH_SOURCE, &unsafe_source).is_err());
+    }
+
+    #[test]
+    fn native_launch_gate_requires_authority_evidence_and_receipts_in_order() -> Result<(), String>
+    {
+        let safe = r#"
+            impl StdioMcpTransport {
+                fn spawn_with_timeouts() {
+                    if let Err(error) = validate_cage_migration_identity(&server_id, &migration)
+                        .and_then(|()| { migration.require_enforced().map_err(convert) }) {
+                        return Err(merge_cleanup_failures(error, []));
+                    }
+                    let launch_result = chio_cage::launch_prepared(prepared, launch_options);
+                    if let Err(error) = validate_cage_evidence(child.evidence(), &expected) {
+                        return Err(fail_caged_child(error, child, &cage_receipts, None));
+                    }
+                    match cage_receipts.persistence.persist(record) {
+                        Ok(receipt) => cage_receipts.enforcement_receipt = Some(receipt),
+                        Err(error) => return Err(fail_caged_child(error, child, &cage_receipts, None)),
+                    }
+                    let transport = Self::from_launched_process(child)?;
+                }
+            }
+        "#;
+        require_native_launch_gate(&parse_source(safe, MCP_LAUNCH_SOURCE)?)?;
+        for (from, to) in [
+            ("migration.require_enforced()", "Ok(())"),
+            ("validate_cage_migration_identity", "ignore_migration_identity"),
+            ("return Err(merge_cleanup_failures", "let _ = Err(merge_cleanup_failures"),
+            ("validate_cage_evidence", "ignore_cage_evidence"),
+            ("return Err(fail_caged_child", "let _ = Err(fail_caged_child"),
+            ("cage_receipts.persistence.persist", "skip_persistence"),
+            (
+                "Err(error) => return Err(fail_caged_child(error, child, &cage_receipts, None)),",
+                "Err(error) => ignore_persistence_failure(error),",
+            ),
+            (
+                "let launch_result = chio_cage::launch_prepared(prepared, launch_options);",
+                "let launch_result = (|| { chio_cage::launch_prepared(prepared, launch_options) })();",
+            ),
+        ] {
+            let mutated = safe.replacen(from, to, 1);
+            assert_ne!(safe, mutated);
+            let facts = parse_source(&mutated, MCP_LAUNCH_SOURCE)?;
+            assert!(require_native_launch_gate(&facts).is_err(), "{mutated}");
+        }
+        let mut reordered = parse_source(safe, MCP_LAUNCH_SOURCE)?;
+        let function = reordered
+            .functions
+            .get_mut("StdioMcpTransport::spawn_with_timeouts")
+            .ok_or_else(|| "missing fixture launch".to_string())?;
+        function.statements.swap(0, 1);
+        assert!(require_native_launch_gate(&reordered).is_err());
+        Ok(())
     }
 
     #[test]
@@ -916,7 +1454,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_compatibility_exception_is_accepted() {
+    fn removed_a2a_bypass_is_rejected_even_with_compatibility_cfg() {
         let source = r#"
             struct ChioA2aEdge;
             impl ChioA2aEdge {
@@ -926,7 +1464,21 @@ mod tests {
                 }
             }
         "#;
-        assert!(validate_fixture("crates/protocol/chio-a2a-edge/src/edge.rs", source).is_ok());
+        assert!(validate_fixture("crates/protocol/chio-a2a-edge/src/edge.rs", source).is_err());
+    }
+
+    #[test]
+    fn removed_acp_bypass_is_rejected_even_with_compatibility_cfg() {
+        let source = r#"
+            struct ChioAcpEdge;
+            impl ChioAcpEdge {
+                #[cfg(any(test, feature = "compatibility-surface"))]
+                fn invoke_passthrough(&self, server: &dyn Server) {
+                    let _result = server.invoke("tool");
+                }
+            }
+        "#;
+        assert!(validate_fixture("crates/protocol/chio-acp-edge/src/edge.rs", source).is_err());
     }
 
     #[test]
@@ -943,6 +1495,70 @@ mod tests {
         assert!(
             validate_fixture("crates/protocol/chio-acp-proxy/src/transport.rs", source).is_ok()
         );
+    }
+
+    #[test]
+    fn prepared_runtime_boundary_requires_both_entry_and_leaf_calls() {
+        let root = workspace_root().unwrap_or_else(|error| panic!("workspace root: {error}"));
+        let contracts: Vec<_> = CALL_CONTRACTS
+            .iter()
+            .filter(|contract| {
+                matches!(
+                    contract.target,
+                    "self.prepare_request"
+                        | "prepared.reserve"
+                        | "verify_swarm_authority_reference_from_store"
+                        | "verify_swarm_authority_for_admission"
+                        | "verify_swarm_request_binding"
+                        | "hook.store.consume_swarm_continuation"
+                )
+            })
+            .collect();
+        assert_eq!(contracts.len(), 6);
+        for contract in contracts {
+            let source = fs::read_to_string(root.join(contract.path))
+                .unwrap_or_else(|error| panic!("read {}: {error}", contract.path));
+            let facts = parse_source(&source, contract.path)
+                .unwrap_or_else(|error| panic!("parse {}: {error}", contract.path));
+            assert!(
+                require_call(&facts, contract).is_ok(),
+                "{}",
+                contract.target
+            );
+            let mut missing = facts;
+            missing
+                .functions
+                .get_mut(contract.function)
+                .unwrap_or_else(|| panic!("missing {}", contract.function))
+                .calls
+                .retain(|call| call.target != contract.target);
+            assert!(
+                require_call(&missing, contract).is_err(),
+                "{}",
+                contract.target
+            );
+        }
+    }
+
+    #[test]
+    fn startup_factory_flow_gates_cannot_be_removed() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let contracts: Vec<_> = CALL_CONTRACTS
+            .iter()
+            .filter(|contract| contract.target == "manifest_registry.requires_flow_runtime")
+            .collect();
+        assert_eq!(contracts.len(), 2);
+        for contract in contracts {
+            let source = fs::read_to_string(root.join(contract.path))
+                .map_err(|error| format!("read {}: {error}", contract.path))?;
+            let facts = parse_source(&source, contract.path)?;
+            require_call(&facts, contract)?;
+            let mutated = source.replace("manifest_registry.requires_flow_runtime()", "false");
+            assert_ne!(mutated, source);
+            let mutated_facts = parse_source(&mutated, contract.path)?;
+            assert!(require_call(&mutated_facts, contract).is_err());
+        }
+        Ok(())
     }
 
     #[test]

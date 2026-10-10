@@ -219,6 +219,13 @@ function isLowerHex64(value: string): boolean {
   return /^[0-9a-f]{64}$/.test(value);
 }
 
+function isCurrentToolOrigin(value: unknown): boolean {
+  return value === "caller_executed"
+    || value === "host_executed_provider_reported"
+    || value === "host_executed_unmediated"
+    || value === "chio_internal";
+}
+
 function validateReceiptSemantics(receipt: HttpReceipt): string[] {
   const errors: string[] = [];
   if (receipt.receipt_kind !== "mediated_decision"
@@ -231,9 +238,7 @@ function validateReceiptSemantics(receipt: HttpReceipt): string[] {
     && receipt.boundary_class !== "advisory_only") {
     errors.push("receipt.boundary_class must be a runtime boundary class");
   }
-  if (receipt.tool_origin !== "caller_executed"
-    && receipt.tool_origin !== "host_executed_provider_reported"
-    && receipt.tool_origin !== "host_executed_unmediated") {
+  if (!isCurrentToolOrigin(receipt.tool_origin)) {
     errors.push("receipt.tool_origin must be a current v1 tool origin");
   }
   if (receipt.redaction_mode !== "none"
@@ -285,6 +290,9 @@ function validateChioReceiptRecordSemantics(
   receipt: Receipt_Record.ChioReceiptRecord,
 ): string[] {
   const errors: string[] = [];
+  if (!isCurrentToolOrigin(receipt.tool_origin)) {
+    errors.push("receipt.tool_origin must be a current v1 tool origin");
+  }
   if (receipt.receipt_kind === "mediated_decision") {
     if (receipt.decision == null) {
       errors.push("mediated_decision receipts must include decision");

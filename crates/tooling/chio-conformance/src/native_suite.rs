@@ -1005,6 +1005,7 @@ fn trace_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1088,7 +1089,8 @@ fn evaluate_artifact_assertion(
         }
         NativeAssertionKind::DpopProofValid => {
             let dpop = fixture.dpop_case()?;
-            let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60));
+            let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60))
+                .map_err(chio_kernel::KernelError::from)?;
             let actual = verify_dpop_proof(
                 dpop.proof,
                 dpop.capability,
@@ -1228,6 +1230,7 @@ fn tool_result_status(result: &ToolCallResult) -> &'static str {
     match result {
         ToolCallResult::Ok { .. } => "ok",
         ToolCallResult::StreamComplete { .. } => "stream_complete",
+        ToolCallResult::PendingApproval { .. } => "pending_approval",
         ToolCallResult::Cancelled { .. } => "cancelled",
         ToolCallResult::Incomplete { .. } => "incomplete",
         ToolCallResult::Err { .. } => "err",
@@ -1465,6 +1468,7 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
             );
             let proof = DpopProof::sign(
                 DpopProofBody {
+                    replay_authority: None,
                     schema: chio_kernel::dpop::DPOP_SCHEMA.to_string(),
                     capability_id: capability.id.clone(),
                     tool_server: "conformance".to_string(),
@@ -1654,6 +1658,7 @@ fn build_governed_intent() -> GovernedTransactionIntent {
 
 fn build_governed_request() -> AgentMessage {
     AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: "req-governed-001".to_string(),
         capability_token: Box::new(build_capability(
             "cap-governed-001",
@@ -1683,6 +1688,7 @@ fn build_governed_request() -> AgentMessage {
 
 fn build_revoked_request() -> AgentMessage {
     AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: "req-revoked-001".to_string(),
         capability_token: Box::new(build_capability(
             "cap-revoked-001",

@@ -13,7 +13,9 @@ fn source_runtime_parity_rejects_tampered_proof_regeneration_report() -> Result<
         .ok_or("tampered runtime proof regeneration report unexpectedly verified")?;
 
     assert!(
-        error.contains("runtime proof regeneration report hash mismatch"),
+        error
+            .to_string()
+            .contains("runtime proof regeneration report hash mismatch"),
         "{error}"
     );
     Ok(())
@@ -65,7 +67,9 @@ fn source_runtime_parity_rejects_failed_parity_report() -> Result<(), Box<dyn Er
         .ok_or("failed runtime proof parity report unexpectedly verified")?;
 
     assert!(
-        error.contains("proof-room.runtime-parity.failed"),
+        error
+            .to_string()
+            .contains("proof-room.runtime-parity.failed"),
         "{error}"
     );
     Ok(())
@@ -84,7 +88,9 @@ fn source_runtime_parity_binds_report_hashes_to_regenerated_artifacts() -> Resul
         )?;
 
     assert!(
-        error.contains("proof-room.runtime-parity.package-hash-mismatch"),
+        error
+            .to_string()
+            .contains("proof-room.runtime-parity.package-hash-mismatch"),
         "{error}"
     );
     Ok(())
@@ -115,7 +121,9 @@ fn source_runtime_parity_requires_regeneration_artifacts() -> Result<(), Box<dyn
         )?;
 
     assert!(
-        error.contains("proof-room.runtime-regeneration.artifact-missing"),
+        error
+            .to_string()
+            .contains("proof-room.runtime-regeneration.artifact-missing"),
         "{error}"
     );
     Ok(())
@@ -132,7 +140,9 @@ fn source_runtime_regeneration_binds_source_records_to_workflow_steps() -> Resul
         .ok_or("runtime source record with mismatched workflow step unexpectedly verified")?;
 
     assert!(
-        error.contains("proof-room.runtime-regeneration.source-record-workflow-step-mismatch"),
+        error
+            .to_string()
+            .contains("proof-room.runtime-regeneration.source-record-workflow-step-mismatch"),
         "{error}"
     );
     Ok(())
@@ -410,7 +420,9 @@ fn rejects_first_run_receipt_signed_by_untrusted_kernel_key() -> Result<(), Box<
 
     let error = error.to_string();
     assert!(
-        error.contains("receipt signer is not authorized"),
+        error
+            .to_string()
+            .contains("receipt signer is not authorized"),
         "{error}"
     );
     Ok(())
@@ -916,7 +928,9 @@ fn rejects_detached_signature_without_trust_roots() -> Result<(), Box<dyn Error>
         .ok_or("proof room bundle signature without trust roots unexpectedly verified")?;
 
     assert!(
-        error.contains("proof-room.signature.trust-roots-missing"),
+        error
+            .to_string()
+            .contains("proof-room.signature.trust-roots-missing"),
         "{error}"
     );
     Ok(())
@@ -1133,12 +1147,7 @@ async fn quickstart_router_rejects_uploaded_bundle_path_escape() -> Result<(), B
     let body: serde_json::Value = serde_json::from_slice(&body)?;
     assert_eq!(body["schema"], "chio.proof-room.upload-verification.v1");
     assert_eq!(body["verdict"], "failed");
-    assert!(
-        body["error"]
-            .as_str()
-            .is_some_and(|error| error.contains("proof-room.artifact.unsafe-path")),
-        "{body}"
-    );
+    assert_eq!(body["error"], "proof-room.upload.invalid-input");
     Ok(())
 }
 
@@ -1223,4 +1232,29 @@ fn append_multipart_part(boundary: &str, path: &str, contents: &[u8], body: &mut
     body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
     body.extend_from_slice(contents);
     body.extend_from_slice(b"\r\n");
+}
+
+#[test]
+fn doctor_report_uses_verified_identity_after_manifest_is_replaced() -> Result<(), Box<dyn Error>> {
+    let source =
+        repo_root()?.join("fixtures/proof-room/first-run/single-call-authority/proof-room-bundle");
+    let work = tempfile::tempdir()?;
+    let bundle = work.path().join("bundle");
+    crate::copy_dir_all(&source, &bundle)?;
+    let manifest_path = bundle.join("manifest.json");
+    let verified = verify_proof_room_bundle(&manifest_path)?;
+    let expected_id = verified.bundle_id().to_owned();
+    let expected_hash = sha256_hex(&fs::read(&manifest_path)?);
+    assert_eq!(verified.manifest_sha256(), expected_hash);
+    fs::write(
+        &manifest_path,
+        br#"{"bundle_id":"replacement-without-proof"}"#,
+    )?;
+    let report_path = work.path().join("doctor.json");
+    crate::write_doctor_report(&report_path, &bundle, &verified)?;
+    let report: serde_json::Value = serde_json::from_slice(&fs::read(report_path)?)?;
+    assert_eq!(report["bundle_id"], expected_id);
+    assert_eq!(report["verdict"], "verified");
+    assert!(verify_proof_room_bundle(&manifest_path).is_err());
+    Ok(())
 }

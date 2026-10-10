@@ -8,6 +8,9 @@
 mod budget_fixture;
 pub(crate) use budget_fixture::seed_budget_exposure;
 
+#[path = "private_fixture.rs"]
+mod private_fixture;
+
 pub(crate) use super::receipt_query_capital_authority::*;
 pub(crate) use super::receipt_query_helpers::*;
 
@@ -82,29 +85,8 @@ pub(crate) use chio_test_support::loopback::{reserve_listen_addr, skip_when_loop
 pub(crate) use reqwest::blocking::Client;
 pub(crate) use rusqlite::Connection;
 
-pub(crate) fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
-
-pub(crate) fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
-}
-
-pub(crate) fn build_test_client() -> Client {
-    Client::builder()
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(120))
-        .build()
-        .expect("build reqwest client")
-}
+mod environment;
+pub(crate) use environment::{build_test_client, unique_dir, workspace_root};
 
 pub(crate) const TEST_REPUTATION_RECEIPT_TARGET: u64 = 100;
 pub(crate) const LARGE_RECEIPT_HISTORY_LEN: u64 = 128;
@@ -296,7 +278,7 @@ pub(crate) fn trust_service_authority_seed_path(receipt_db_path: &Path) -> PathB
 
 pub(crate) fn write_trust_service_authority_seed(receipt_db_path: &Path) -> PathBuf {
     let authority_seed_path = trust_service_authority_seed_path(receipt_db_path);
-    std::fs::write(&authority_seed_path, test_kernel_keypair().seed_hex())
+    private_fixture::write_private_file(&authority_seed_path, test_kernel_keypair().seed_hex())
         .expect("write authority seed file");
     authority_seed_path
 }
@@ -381,6 +363,18 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
     }
 }
 
+fn receipt_query_health_ready(response: reqwest::blocking::Response) -> bool {
+    if response.status() != reqwest::StatusCode::OK {
+        return false;
+    }
+    response.json::<serde_json::Value>().is_ok_and(|body| {
+        !body["stores"]["receiptsConfigured"]
+            .as_bool()
+            .unwrap_or(false)
+            || body["receiptQuerySnapshot"]["state"] == "ready"
+    })
+}
+
 pub(crate) fn wait_for_trust_service_result(
     client: &Client,
     base_url: &str,
@@ -394,8 +388,13 @@ pub(crate) fn wait_for_trust_service_result(
             ));
         }
         match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return Ok(()),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+            Ok(response) => {
+                if receipt_query_health_ready(response) {
+                    return Ok(());
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(_) => thread::sleep(Duration::from_millis(100)),
         }
     }
     Err("trust service did not become ready before timeout".to_string())
@@ -405,9 +404,12 @@ pub(crate) fn wait_for_trust_service(client: &Client, base_url: &str) {
     let mut last_error = None;
     for _ in 0..900 {
         match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return,
             Ok(response) => {
-                last_error = Some(format!("health returned {}", response.status()));
+                let observed_status = response.status();
+                if receipt_query_health_ready(response) {
+                    return;
+                }
+                last_error = Some(format!("health not query-ready (HTTP {observed_status})"));
                 thread::sleep(Duration::from_millis(100));
             }
             Err(error) => {
@@ -609,7 +611,7 @@ pub(crate) fn record_test_credit_loss_event_with_kind(
     };
     let event =
         SignedCreditLossLifecycle::sign(artifact, &keypair).expect("sign test loss lifecycle");
-    let mut store = SqliteReceiptStore::open(receipt_db_path).expect("open store for loss event");
+    let store = SqliteReceiptStore::open(receipt_db_path).expect("open store for loss event");
     store
         .record_credit_loss_lifecycle(&event)
         .expect("record test loss lifecycle");
@@ -803,8 +805,8 @@ pub(crate) fn make_financial_receipt_signed_by(
             grant_index: 0,
             cost_charged,
             currency: "USD".to_string(),
-            budget_remaining: 900u64,
-            budget_total: 1000u64,
+            budget_remaining: Some(900u64),
+            budget_total: Some(1000u64),
             delegation_depth,
             root_budget_holder: root_budget_holder.to_string(),
             payment_reference: None,
@@ -861,8 +863,8 @@ pub(crate) fn make_financial_receipt_with_budget_authority(
             grant_index: 0,
             cost_charged: 75,
             currency: "USD".to_string(),
-            budget_remaining: 925u64,
-            budget_total: 1000u64,
+            budget_remaining: Some(925u64),
+            budget_total: Some(1000u64),
             delegation_depth: 0,
             root_budget_holder: "root-budget-holder".to_string(),
             payment_reference: Some("pi-budget-lineage-1".to_string()),
@@ -984,8 +986,8 @@ pub(crate) fn make_financial_receipt_with_settlement_status(
             grant_index: 0,
             cost_charged,
             currency: "USD".to_string(),
-            budget_remaining: 900u64,
-            budget_total: 1000u64,
+            budget_remaining: Some(900u64),
+            budget_total: Some(1000u64),
             delegation_depth: 0,
             root_budget_holder: "root-budget-holder".to_string(),
             payment_reference: payment_reference.map(ToOwned::to_owned),
@@ -1048,8 +1050,8 @@ pub(crate) fn make_governed_financial_receipt_signed_by(
             grant_index: 0,
             cost_charged,
             currency: "USD".to_string(),
-            budget_remaining: 250u64,
-            budget_total: 1000u64,
+            budget_remaining: Some(250u64),
+            budget_total: Some(1000u64),
             delegation_depth: 1,
             root_budget_holder: root_budget_holder.to_string(),
             payment_reference: Some("payment-risk-1".to_string()),
@@ -1128,8 +1130,8 @@ pub(crate) fn make_governed_receipt(
             grant_index: 0,
             cost_charged: 4200,
             currency: "USD".to_string(),
-            budget_remaining: 5800u64,
-            budget_total: 10_000u64,
+            budget_remaining: Some(5800u64),
+            budget_total: Some(10_000u64),
             delegation_depth: 0,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some("pi_governed_1".to_string()),
@@ -1277,8 +1279,8 @@ pub(crate) fn make_governed_authorization_receipt_with_runtime_profile(
             grant_index: 0,
             cost_charged: exposure_units,
             currency: financial_currency.to_string(),
-            budget_remaining: 10_000u64.saturating_sub(exposure_units),
-            budget_total: 10_000u64,
+            budget_remaining: Some(10_000u64.saturating_sub(exposure_units)),
+            budget_total: Some(10_000u64),
             delegation_depth: 1,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some("pi_authorization_1".to_string()),
@@ -1427,8 +1429,8 @@ pub(crate) fn make_credit_history_receipt(
             grant_index: 0,
             cost_charged: exposure_units,
             currency: financial_currency.to_string(),
-            budget_remaining: 100_000u64.saturating_sub(exposure_units),
-            budget_total: 100_000u64,
+            budget_remaining: Some(100_000u64.saturating_sub(exposure_units)),
+            budget_total: Some(100_000u64),
             delegation_depth: 1,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some(format!("pi-{id}")),
@@ -1524,8 +1526,8 @@ pub(crate) fn make_governed_authorization_receipt_without_runtime_assurance(
             grant_index: 0,
             cost_charged: units,
             currency: currency.to_string(),
-            budget_remaining: 50_000u64.saturating_sub(units),
-            budget_total: 50_000u64,
+            budget_remaining: Some(50_000u64.saturating_sub(units)),
+            budget_total: Some(50_000u64),
             delegation_depth: 1,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some("pi_facility_1".to_string()),
@@ -1609,8 +1611,8 @@ pub(crate) fn make_underwriting_simulation_receipt(
             grant_index: 0,
             cost_charged: 100,
             currency: "USD".to_string(),
-            budget_remaining: 9_900u64,
-            budget_total: 10_000u64,
+            budget_remaining: Some(9_900u64),
+            budget_total: Some(10_000u64),
             delegation_depth: 1,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some(format!("pi-sim-{id}")),
@@ -1692,8 +1694,8 @@ pub(crate) fn make_governed_x402_receipt(
             grant_index: 0,
             cost_charged: 4200,
             currency: "USD".to_string(),
-            budget_remaining: 5800u64,
-            budget_total: 10_000u64,
+            budget_remaining: Some(5800u64),
+            budget_total: Some(10_000u64),
             delegation_depth: 0,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some("x402_txn_ops_1".to_string()),
@@ -1779,8 +1781,8 @@ pub(crate) fn make_governed_acp_receipt(
             grant_index: 0,
             cost_charged: 4200,
             currency: "USD".to_string(),
-            budget_remaining: 5800u64,
-            budget_total: 10_000u64,
+            budget_remaining: Some(5800u64),
+            budget_total: Some(10_000u64),
             delegation_depth: 0,
             root_budget_holder: "ops-root".to_string(),
             payment_reference: Some("acp_hold_ops_1".to_string()),

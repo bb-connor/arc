@@ -11,11 +11,10 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
-use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
 /// Guard name reported by [`SafeBrowsingGuard::name`].
@@ -37,7 +36,7 @@ pub const DEFAULT_CLIENT_VERSION: &str = "0.1.0";
 #[derive(Clone)]
 pub struct SafeBrowsingConfig {
     /// API key (query parameter `key`).
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Client identifier submitted in the request body.
     pub client_id: String,
     /// Client version submitted in the request body.
@@ -67,7 +66,7 @@ impl SafeBrowsingConfig {
     /// Construct a config with defaults.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             client_id: DEFAULT_CLIENT_ID.to_string(),
             client_version: DEFAULT_CLIENT_VERSION.to_string(),
             base_url: None,
@@ -206,7 +205,7 @@ impl ExternalGuard for SafeBrowsingGuard {
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
-        let args: SafeBrowsingArgs = serde_json::from_str(&ctx.arguments_json).ok()?;
+        let args: SafeBrowsingArgs = super::super::input::arguments(&ctx.arguments_json).ok()?;
         let mut hasher = Sha256::new();
         hasher.update(args.url.as_bytes());
         let digest = hasher.finalize();
@@ -222,14 +221,12 @@ impl ExternalGuard for SafeBrowsingGuard {
             "safe-browsing base_url",
             &self.base_url,
         )?;
-        let args: SafeBrowsingArgs = serde_json::from_str(&ctx.arguments_json).map_err(|e| {
-            ExternalGuardError::Permanent(format!("invalid safe-browsing arguments: {e}"))
-        })?;
+        let args: SafeBrowsingArgs = super::super::input::arguments(&ctx.arguments_json)?;
 
         let endpoint = format!(
             "{}/threatMatches:find?key={}",
             self.base_url,
-            self.cfg.api_key.as_str()
+            self.cfg.api_key.expose_secret()
         );
 
         let body = FindRequest {
@@ -255,16 +252,7 @@ impl ExternalGuard for SafeBrowsingGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
-
-        if !status.is_success() {
-            return Err(classify_status_error("safe-browsing", status, &text));
-        }
-
-        let parsed: FindResponse = serde_json::from_str(&text).map_err(|e| {
-            ExternalGuardError::Transient(format!("parse safe browsing response: {e}"))
-        })?;
+        let parsed: FindResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
         let matched = !parsed.matches.is_empty();
         tracing::info!(

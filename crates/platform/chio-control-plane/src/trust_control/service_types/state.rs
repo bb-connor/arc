@@ -3,6 +3,13 @@ use super::*;
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
+    /// Authority time for filing decisions, sampled after untrusted body I/O.
+    pub(crate) finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock>,
+    /// Witnessed selector and verifier for production seed-file custody.
+    pub(crate) authority_keyring: Option<crate::KeyringRuntimeComposition>,
+    /// Seed path retained outside `config` so non-keyring signing helpers
+    /// cannot reopen it once keyring enforcement is active.
+    pub(crate) authority_keyring_seed_path: Option<PathBuf>,
     /// Present only when a trusted, already-provisioned joint budget/revocation
     /// authority was injected. Configured database paths alone never enable the
     /// structured authority surface.
@@ -10,6 +17,17 @@ pub(crate) struct TrustServiceState {
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
     pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
     pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
+    /// The single receipt store for `config.receipt_db_path`, opened before
+    /// serving. Handlers share it and its one writer instead of opening a store
+    /// (and seeding a writer) per request.
+    pub(crate) receipt_store: Option<Arc<SqliteReceiptStore>>,
+    /// One authenticated projection and walker for the service-owned store.
+    pub(crate) receipt_query_snapshots:
+        Option<Arc<chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshots>>,
+    /// Bound submissions before entering the blocking pool, without queuing.
+    pub(crate) receipt_query_lane: Arc<tokio::sync::Semaphore>,
+    /// Full-history exports have an independent single-worker budget.
+    pub(crate) evidence_export_lane: Arc<tokio::sync::Semaphore>,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
@@ -18,6 +36,24 @@ pub(crate) struct TrustServiceState {
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
     /// watch instead of driving its own inline sync.
     pub(crate) cluster_progress: Option<Arc<ClusterProgress>>,
+    /// Non-queued permits for blocking forwards of writes to the cluster
+    /// leader. A forward acquires one only when it will contact a remote
+    /// leader, and holds it until its blocking transport call has ended.
+    pub(crate) leader_forward_lane: Arc<tokio::sync::Semaphore>,
+    /// Independent admission for public holder submissions and issuer-trust
+    /// reads. Local verification and public leader forwarding share this lane
+    /// and hold permits through blocking completion even on caller cancellation.
+    pub(crate) public_passport_challenge_lane: Arc<tokio::sync::Semaphore>,
+    /// Independent non-queued admission for public authority health inspection.
+    pub(crate) authority_health_lane: Arc<tokio::sync::Semaphore>,
+    /// Eight non-queued process permits for authenticated blocking authority inspection.
+    pub(crate) authority_inspection_lane: Arc<tokio::sync::Semaphore>,
+    /// Service-authenticated registry work, independent of public wallets.
+    pub(crate) operator_registry_write_lane: BlockingLane,
+    /// Public issuance work with a separate fixed admission budget.
+    pub(crate) public_passport_issuance_lane: BlockingLane,
+    /// Wallet bearer admission is independent of redemption and operators.
+    pub(crate) wallet_entitlement_lane: crate::trust_control::ingress_lanes::IngressLane,
     /// Evidenced rail seam for finding-market fee collection;
     /// `None` fails activation closed.
     pub(crate) finding_rail: Option<Arc<dyn super::super::finding_handlers::FindingRailObserver>>,
@@ -108,12 +144,16 @@ pub(crate) struct ClusterPeerClientAuth {
 }
 
 pub(crate) struct RemoteCapabilityAuthority {
+    pub(crate) clock: Arc<dyn chio_security_types::clock::Clock>,
     pub(crate) client: TrustControlClient,
     pub(crate) cache: Mutex<AuthorityKeyCache>,
     pub(crate) refresh_lock: Mutex<()>,
+    pub(crate) pinned_current: Option<PublicKey>,
+    pub(crate) pinned_trusted: Vec<PublicKey>,
 }
 
 pub(crate) struct AuthorityKeyCache {
+    pub(crate) issuer_state: Option<chio_kernel::AuthoritySnapshot>,
     pub(crate) current: Option<PublicKey>,
     pub(crate) trusted: Vec<PublicKey>,
     pub(crate) generation: Option<u64>,
@@ -135,17 +175,61 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
+    pub(crate) recovery_fence: Option<chio_kernel::admission_operation::StoreMutationFence>,
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
 }
 
-/// A cached usage projection together with whether its monetary totals were actually
-/// observed. Partial responses such as `try_increment` carry only the invocation
-/// count, so their entries default the cost fields to zero; serving one as real usage
-/// would report no spend for a grant that has some.
+/// Fields actually observed at this usage sequence. Legacy mutation responses
+/// can omit counters, either monetary total, and the durable usage timestamp.
+/// Unobserved fields default to zero and must never be served as a complete
+/// projection.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct BudgetUsageProvenance {
+    pub(crate) invocation_count: bool,
+    pub(crate) total_cost_exposed: bool,
+    pub(crate) total_cost_realized_spend: bool,
+    pub(crate) updated_at: bool,
+}
+
+impl BudgetUsageProvenance {
+    pub(crate) fn complete() -> Self {
+        Self {
+            invocation_count: true,
+            total_cost_exposed: true,
+            total_cost_realized_spend: true,
+            updated_at: true,
+        }
+    }
+
+    pub(crate) fn is_complete(self) -> bool {
+        self.invocation_count
+            && self.total_cost_exposed
+            && self.total_cost_realized_spend
+            && self.updated_at
+    }
+
+    pub(crate) fn agrees_with(
+        self,
+        observed: &BudgetUsageRecord,
+        incoming: &BudgetUsageRecord,
+    ) -> bool {
+        observed.capability_id == incoming.capability_id
+            && observed.grant_index == incoming.grant_index
+            && observed.seq == incoming.seq
+            && (!self.invocation_count || observed.invocation_count == incoming.invocation_count)
+            && (!self.total_cost_exposed
+                || observed.total_cost_exposed == incoming.total_cost_exposed)
+            && (!self.total_cost_realized_spend
+                || observed.total_cost_realized_spend == incoming.total_cost_realized_spend)
+            && (!self.updated_at || observed.updated_at == incoming.updated_at)
+    }
+}
+
+/// A cached projection and the fields known at its exact usage sequence.
 #[derive(Clone)]
 pub(crate) struct CachedBudgetUsage {
     pub(crate) record: BudgetUsageRecord,
-    pub(crate) cost_authoritative: bool,
+    pub(crate) observed: BudgetUsageProvenance,
 }
 
 impl TrustServiceState {
@@ -170,6 +254,15 @@ impl TrustServiceState {
                     "trust control service requires --budget-db",
                 )
             })
+    }
+
+    pub(crate) fn receipt_store(&self) -> Result<Arc<SqliteReceiptStore>, Response> {
+        self.receipt_store.clone().ok_or_else(|| {
+            plain_http_error(
+                StatusCode::CONFLICT,
+                "trust control service requires --receipt-db",
+            )
+        })
     }
 
     pub(crate) fn optional_revocation_store(
@@ -241,6 +334,77 @@ pub(crate) struct PeerSyncState {
     pub(crate) snapshot_applied_count: u64,
     pub(crate) last_snapshot_at: Option<u64>,
     pub(crate) force_snapshot: bool,
+    /// The peer's unresolved signed-authority refusal. Stream success never
+    /// clears it; only an authority import from this peer does.
+    pub(crate) authority_error: Option<String>,
+    /// This process imported a signed authority envelope from this peer. Bare
+    /// reachability and stream success cannot attest follower issuer freshness.
+    pub(crate) authority_import_confirmation: Option<AuthorityImportConfirmation>,
+    /// Current-term signed peer history agreement for elected-leader admission.
+    pub(crate) authority_agreement_confirmation: Option<AuthorityAgreementConfirmation>,
+    /// Maximal authenticated refused history, retained through transport loss
+    /// and lagging replies. Incomparable authenticated chains stay conflicting.
+    pub(crate) authority_refused_history: Option<AuthorityHistoryWitness>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityHistoryWitness {
+    head: String,
+    authenticated_history_commitments: Vec<String>,
+    incomparable: bool,
+}
+
+impl AuthorityHistoryWitness {
+    pub(crate) fn new(evidence: &chio_store_sqlite::authority::AuthorityPeerChainEvidence) -> Self {
+        Self {
+            head: evidence.chain_commitment.clone(),
+            authenticated_history_commitments: evidence
+                .authenticated_history_commitments()
+                .to_vec(),
+            incomparable: false,
+        }
+    }
+
+    /// Compare authenticated peer histories without consulting a cached local
+    /// view. Concurrent local imports cannot erase an unresolved newer head.
+    pub(crate) fn observe(
+        &mut self,
+        evidence: &chio_store_sqlite::authority::AuthorityPeerChainEvidence,
+    ) {
+        if evidence.contains_authenticated_history(&self.head) {
+            self.head = evidence.chain_commitment.clone();
+            self.authenticated_history_commitments =
+                evidence.authenticated_history_commitments().to_vec();
+        } else if !self
+            .authenticated_history_commitments
+            .contains(&evidence.chain_commitment)
+        {
+            self.incomparable = true;
+        }
+    }
+
+    pub(crate) fn head(&self) -> &str {
+        &self.head
+    }
+
+    pub(crate) fn has_conflict(&self) -> bool {
+        self.incomparable
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityAgreementConfirmation {
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
+    pub(crate) chain_commitment: String,
+    pub(crate) expires_at: u64,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityImportConfirmation {
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
+    pub(crate) envelope_digest: String,
 }
 
 /// One subject's in-window attempt timestamps together with the window (in
@@ -371,7 +535,7 @@ impl FederationAdmissionRateLimiter {
         entry
             .timestamps
             .retain(|timestamp| *timestamp > lower_bound);
-        if entry.timestamps.len() >= limit.max_requests as usize {
+        if crate::integer::count(entry.timestamps.len()) >= u64::from(limit.max_requests) {
             let retry_after_seconds = entry
                 .timestamps
                 .first()
@@ -401,10 +565,8 @@ impl FederationAdmissionRateLimiter {
             limit: limit.max_requests,
             window_seconds: limit.window_seconds,
             remaining: limit.max_requests.saturating_sub(
-                self.attempts
-                    .get(&key)
-                    .map(|v| v.timestamps.len())
-                    .unwrap_or(0) as u32,
+                u32::try_from(self.attempts.get(&key).map_or(0, |v| v.timestamps.len()))
+                    .unwrap_or(u32::MAX),
             ),
             retry_after_seconds: None,
         }
@@ -415,6 +577,9 @@ impl FederationAdmissionRateLimiter {
 pub(crate) enum PeerHealth {
     Unknown,
     Healthy,
+    /// Transport and independent streams can progress, while authority import
+    /// remains unresolved. This is reachable but never reported as healthy.
+    Degraded,
     Unhealthy,
 }
 
@@ -463,19 +628,32 @@ impl Default for PeerSyncState {
             snapshot_applied_count: 0,
             last_snapshot_at: None,
             force_snapshot: true,
+            authority_error: None,
+            authority_import_confirmation: None,
+            authority_agreement_confirmation: None,
+            authority_refused_history: None,
         }
     }
 }
 
 impl PeerHealth {
     pub(crate) fn is_reachable(&self) -> bool {
-        matches!(self, Self::Healthy)
+        matches!(self, Self::Healthy | Self::Degraded)
+    }
+
+    pub(crate) fn reachable_with_authority_error(error: &Option<String>) -> Self {
+        if error.is_some() {
+            Self::Degraded
+        } else {
+            Self::Healthy
+        }
     }
 
     pub(crate) fn label(&self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
             Self::Healthy => "healthy",
+            Self::Degraded => "degraded",
             Self::Unhealthy => "unhealthy",
         }
     }
@@ -483,7 +661,11 @@ impl PeerHealth {
 
 #[cfg(test)]
 mod admission_bound_tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )]
     use super::*;
 
     fn limit() -> FederationAdmissionRateLimit {

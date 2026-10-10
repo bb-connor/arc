@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
+use crate::passport_verifier::RegistryUpdateError;
 use crate::CliError;
 
-use super::helpers::{ensure_parent_dir, unix_now};
+use super::helpers::unix_now;
 use super::schema::{
     is_supported_certification_registry_version, CERTIFICATION_PUBLIC_SEARCH_SCHEMA,
     CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA, CERTIFICATION_REGISTRY_VERSION,
@@ -23,6 +23,22 @@ use super::verify::{
     verify_signed_certification_check,
 };
 
+#[cfg(test)]
+#[path = "registry/fixtures.rs"]
+mod test_fixtures;
+
+#[cfg(test)]
+#[path = "registry/revocation_capacity.rs"]
+pub(crate) mod revocation_capacity;
+
+#[cfg(test)]
+#[path = "registry/older_registry_files.rs"]
+mod older_registry_files;
+
+#[cfg(test)]
+#[path = "registry/registry_writer_lock.rs"]
+mod registry_writer_lock;
+
 impl Default for CertificationRegistry {
     fn default() -> Self {
         Self {
@@ -34,17 +50,19 @@ impl Default for CertificationRegistry {
 
 impl CertificationRegistry {
     pub(crate) fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if !is_supported_certification_registry_version(&registry.version) {
                     return Err(CliError::attest_error(format!(
                         "unsupported certification registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = CERTIFICATION_REGISTRY_VERSION.to_string();
-                for entry in registry.artifacts.values() {
+                for (key, entry) in &registry.artifacts {
+                    if key != &entry.artifact_id {
+                        return Err(CliError::RecordBinding("artifact_id"));
+                    }
                     verify_certification_registry_entry(entry)?;
                 }
                 Ok(registry)
@@ -54,10 +72,28 @@ impl CertificationRegistry {
         }
     }
 
+    /// Loads the registry at `path` under its writer lock, applies `change`,
+    /// and persists the result, keeping room for every entry to be revoked,
+    /// before the lock is released. This is the registry's only writer.
+    ///
+    /// `change` receives the registry freshly loaded under the lock and must
+    /// change it in place. Replacing it with a different or earlier value
+    /// would persist that value and defeat the single-writer guarantee, so
+    /// callers are trusted to only mutate the loaded registry, as the
+    /// trust-control handlers and CLI commands do.
+    pub(crate) fn update<R>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, CliError>,
+    ) -> Result<R, RegistryUpdateError> {
+        crate::signed_input::update_registry(path, Self::load, change)
+    }
+
+    /// Persists this copy under the writer lock without loading the file
+    /// first; test fixtures only.
+    #[cfg(test)]
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
-        ensure_parent_dir(path)?;
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        crate::signed_input::write_reserving_registry(&lock, self)
     }
 
     pub(crate) fn get(&self, artifact_id: &str) -> Option<&CertificationRegistryEntry> {
@@ -68,6 +104,7 @@ impl CertificationRegistry {
         &mut self,
         artifact: SignedCertificationCheck,
     ) -> Result<CertificationRegistryEntry, CliError> {
+        let clock_now = unix_now()?;
         verify_signed_certification_check(&artifact)?;
         self.version = CERTIFICATION_REGISTRY_VERSION.to_string();
         let artifact_id = certification_artifact_id(&artifact)?;
@@ -75,7 +112,7 @@ impl CertificationRegistry {
             return Ok(existing.clone());
         }
 
-        let published_at = unix_now();
+        let published_at = clock_now;
         for existing in self.artifacts.values_mut() {
             if existing.tool_server_id == artifact.body.target.tool_server_id
                 && existing.status == CertificationRegistryState::Active
@@ -166,8 +203,15 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
+        if let Some(reason) = reason {
+            crate::signed_input::check_revocation_text("revocation reason", reason)?;
+        }
+        let revoked_at = match revoked_at {
+            Some(at) => at,
+            None => unix_now()?,
+        };
         entry.status = CertificationRegistryState::Revoked;
-        entry.revoked_at = Some(revoked_at.unwrap_or_else(unix_now));
+        entry.revoked_at = Some(revoked_at);
         entry.revoked_reason = reason.map(str::to_string);
         Ok(entry.clone())
     }
@@ -182,7 +226,20 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
-        let updated_at = request.updated_at.unwrap_or_else(unix_now);
+        // A resolved-revoked note becomes the revocation reason, so it carries
+        // the reason bound; load refuses a zero dispute time.
+        if let Some(note) = request.note.as_deref() {
+            crate::signed_input::check_revocation_text("dispute note", note)?;
+        }
+        let updated_at = match request.updated_at {
+            Some(at) => at,
+            None => unix_now()?,
+        };
+        if updated_at == 0 {
+            return Err(CliError::attest_error(
+                "certification dispute updated_at must be nonzero",
+            ));
+        }
         let dispute = CertificationDisputeRecord {
             state: request.state,
             updated_at,
@@ -209,7 +266,8 @@ impl CertificationRegistry {
         publisher: &CertificationPublicPublisher,
         metadata_expires_at: u64,
         query: &CertificationPublicSearchQuery,
-    ) -> CertificationPublicSearchResponse {
+    ) -> Result<CertificationPublicSearchResponse, crate::CliError> {
+        let clock_now = unix_now()?;
         let mut results = self
             .artifacts
             .values()
@@ -251,22 +309,23 @@ impl CertificationRegistry {
                 .then(right.entry.checked_at.cmp(&left.entry.checked_at))
                 .then(left.entry.artifact_id.cmp(&right.entry.artifact_id))
         });
-        CertificationPublicSearchResponse {
+        Ok(CertificationPublicSearchResponse {
             schema: CERTIFICATION_PUBLIC_SEARCH_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: clock_now,
             peer_count: 1,
             reachable_count: 1,
             count: results.len(),
             results,
             errors: Vec::new(),
-        }
+        })
     }
 
     pub(crate) fn transparency(
         &self,
         publisher: &CertificationPublicPublisher,
         query: &CertificationTransparencyQuery,
-    ) -> CertificationTransparencyResponse {
+    ) -> Result<CertificationTransparencyResponse, crate::CliError> {
+        let clock_now = unix_now()?;
         let mut events = Vec::new();
         for entry in self.artifacts.values() {
             if query
@@ -358,14 +417,43 @@ impl CertificationRegistry {
                 .cmp(&right.observed_at)
                 .then(left.artifact_id.cmp(&right.artifact_id))
         });
-        CertificationTransparencyResponse {
+        Ok(CertificationTransparencyResponse {
             schema: CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: clock_now,
             peer_count: 1,
             reachable_count: 1,
             count: events.len(),
             events,
             errors: Vec::new(),
-        }
+        })
     }
+}
+
+impl crate::signed_input::RevocationReserve for CertificationRegistry {
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for entry in self.artifacts.values() {
+            let largest = largest_revoked_entry(entry)?;
+            reserved =
+                reserved.saturating_add(crate::signed_input::revocation_headroom(entry, &largest)?);
+        }
+        Ok(reserved)
+    }
+}
+
+/// `entry` with every field a revocation writes set to the larger, by JSON
+/// encoding, of its current value and the largest value a revocation may
+/// write. Revoking `entry` any number of times leaves it no larger than this
+/// form, and never makes this form larger.
+fn largest_revoked_entry(
+    entry: &CertificationRegistryEntry,
+) -> Result<CertificationRegistryEntry, CliError> {
+    use crate::signed_input::{encoded_len, largest_revocation_reason};
+    let mut largest = entry.clone();
+    if encoded_len(&entry.status)? < encoded_len(&CertificationRegistryState::Revoked)? {
+        largest.status = CertificationRegistryState::Revoked;
+    }
+    largest.revoked_at = Some(u64::MAX);
+    largest.revoked_reason = Some(largest_revocation_reason(entry.revoked_reason.as_deref())?);
+    Ok(largest)
 }

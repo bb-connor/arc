@@ -118,7 +118,7 @@ pub(crate) fn extract_caller_identity(headers: &HashMap<String, String>) -> Call
 }
 
 pub(crate) fn presented_capability_id(raw_capability: Option<&str>) -> Option<String> {
-    serde_json::from_str::<CapabilityToken>(raw_capability?)
+    input::decode::<CapabilityToken>(raw_capability?.as_bytes(), input::MAX_HEADER_BYTES)
         .ok()
         .map(|token| token.id)
 }
@@ -146,17 +146,13 @@ pub(crate) fn should_forward_request_header(name: &str) -> bool {
 
 pub(crate) fn extract_execution_nonce_from_maps(
     headers: &HashMap<String, String>,
-) -> Result<Option<chio_kernel::SignedExecutionNonce>, String> {
+) -> Result<Option<chio_kernel::SignedExecutionNonce>, chio_core_types::canonical::UntrustedJsonError>
+{
     let Some(raw_nonce) = crate::evaluator::header_value(headers, CHIO_EXECUTION_NONCE_HEADER)
     else {
         return Ok(None);
     };
-    if raw_nonce.trim().is_empty() {
-        return Err("blank execution nonce header".to_string());
-    }
-    serde_json::from_str(raw_nonce)
-        .map(Some)
-        .map_err(|error| format!("invalid execution nonce header: {error}"))
+    input::decode(raw_nonce.as_bytes(), input::MAX_HEADER_BYTES).map(Some)
 }
 
 pub(crate) fn extract_transport_capability(

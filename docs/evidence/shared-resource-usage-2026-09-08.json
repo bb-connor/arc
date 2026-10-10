@@ -1,0 +1,148 @@
+{
+  "cohort": "All six normal runs at the shared-instruction source, followed by the matched LangGraph worker-death pair. Exploratory failures remain in the source archive and are excluded from this configuration cohort.",
+  "limitations": [
+    "Provider request durations are summed across workers and are not wall-clock workload duration.",
+    "No kernel, installation, operator-intervention or end-to-end time is reconstructed from provider duration.",
+    "These small controlled runs do not establish population success rates or a causal cost reduction.",
+    "The matching baseline already has persistent operation identities and resource deduplication."
+  ],
+  "normal_groups": [
+    {
+      "accepted": 3,
+      "backend": "baseline",
+      "model_call_range": [
+        8,
+        9
+      ],
+      "runs": 3,
+      "token_range": [
+        7634,
+        8435
+      ],
+      "total_tokens": 24461
+    },
+    {
+      "accepted": 3,
+      "backend": "chio",
+      "model_call_range": [
+        8,
+        9
+      ],
+      "runs": 3,
+      "token_range": [
+        7562,
+        8457
+      ],
+      "total_tokens": 23626
+    }
+  ],
+  "rows": [
+    {
+      "accepted": true,
+      "backend": "baseline",
+      "completion_tokens": 504,
+      "model_calls": 9,
+      "prompt_tokens": 7888,
+      "report_sha256": "7e5bdc41d3c0bdf9732402d6aa0dfe38354a905e616ff56ffdd515b62d3d2fb1",
+      "run": "b3",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 15.323586,
+      "total_tokens": 8392
+    },
+    {
+      "accepted": true,
+      "backend": "baseline",
+      "completion_tokens": 522,
+      "model_calls": 8,
+      "prompt_tokens": 7112,
+      "report_sha256": "1884ea085435fe19fb06b76c1602ae1fa66c864891a7c9cd9c1fa8cf1e217da8",
+      "run": "b4",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 17.084927,
+      "total_tokens": 7634
+    },
+    {
+      "accepted": true,
+      "backend": "baseline",
+      "completion_tokens": 505,
+      "model_calls": 9,
+      "prompt_tokens": 7930,
+      "report_sha256": "3a3701a44689c0b334b5593cd93ee8ea31fdf146bead22fba2f7909e3a7890d2",
+      "run": "b5",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 19.400006,
+      "total_tokens": 8435
+    },
+    {
+      "accepted": true,
+      "backend": "chio",
+      "completion_tokens": 502,
+      "model_calls": 8,
+      "prompt_tokens": 7060,
+      "report_sha256": "e6fae748e6194e4ded20e81ea3982d4cc54139c563403e65b308b796f7155e91",
+      "run": "c2",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 14.27081,
+      "total_tokens": 7562
+    },
+    {
+      "accepted": true,
+      "backend": "chio",
+      "completion_tokens": 487,
+      "model_calls": 9,
+      "prompt_tokens": 7970,
+      "report_sha256": "13b8830a620251c480cda811d48511bdbcd4e9e182e2b95f27ac77fbc14aa425",
+      "run": "c3",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 12.963983,
+      "total_tokens": 8457
+    },
+    {
+      "accepted": true,
+      "backend": "chio",
+      "completion_tokens": 513,
+      "model_calls": 8,
+      "prompt_tokens": 7094,
+      "report_sha256": "e386d20848e0e3d75fbdbd430d09cbb07e94352332fbb2baac160d222783808f",
+      "run": "c4",
+      "scenario": "normal",
+      "source_commit": "d611c83ae24ef5a749677bba3e6dbaadf691e8f2",
+      "sum_provider_request_seconds": 13.190988,
+      "total_tokens": 7607
+    },
+    {
+      "accepted": true,
+      "backend": "baseline",
+      "completion_tokens": 522,
+      "model_calls": 9,
+      "prompt_tokens": 8004,
+      "report_sha256": "1c75ce12b663ed52beb096a5a0ac130b602ae1e370464842e7d101137112e453",
+      "run": "bf1",
+      "scenario": "worker-after-effect",
+      "source_commit": "8c3229ee21a1e33d03c98a12dd174a41341a75ca",
+      "sum_provider_request_seconds": 13.071207,
+      "total_tokens": 8526
+    },
+    {
+      "accepted": true,
+      "backend": "chio",
+      "completion_tokens": 502,
+      "model_calls": 9,
+      "prompt_tokens": 7906,
+      "report_sha256": "edc4d2fc2ba757375fd56e35f00ed061b5aa2bc6b71262d533dcc6f46d509091",
+      "run": "cf1",
+      "scenario": "worker-after-effect",
+      "source_commit": "8c3229ee21a1e33d03c98a12dd174a41341a75ca",
+      "sum_provider_request_seconds": 13.780576,
+      "total_tokens": 8408
+    }
+  ],
+  "schema": "chio.shared-resource.retained-usage.v1",
+  "source_archive": "shared-resource-2026-09-08.zip",
+  "source_archive_sha256": "2df0d5cac2183c692a2dc975ee9f2db59189b56562fb19194901697fa278f7f0"
+}

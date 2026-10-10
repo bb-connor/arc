@@ -53,7 +53,12 @@ pub(crate) fn default_upstream_egress_contract(
 /// `/swagger.json`, `/api-docs`) in order, returning the first
 /// non-empty successful response.
 pub async fn discover_spec(upstream: &str) -> Result<String, ProtectError> {
-    let contract = default_upstream_egress_contract(upstream)?;
+    let mut contract = default_upstream_egress_contract(upstream)?;
+    // The document limit must apply while collecting the HTTP body, including
+    // chunked responses, before a larger general-purpose upstream budget wins.
+    contract.max_response_bytes = contract
+        .max_response_bytes
+        .min(chio_openapi::MAX_OPENAPI_BYTES as u64);
     let client = client_builder_with_contract(&contract).build()?;
     let well_known_paths = [
         "/openapi.json",
@@ -154,5 +159,42 @@ mod tests {
             Err(error) => panic!("loopback IP remains available for local proxy tests: {error}"),
         };
         assert!(contract.allowed_authority_set.contains("127.0.0.1:8080"));
+    }
+
+    async fn discover_fixture(bytes: usize, chunked: bool) -> Result<String, ProtectError> {
+        use axum::{body::Body, http::Response, routing::get, Router};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let router = Router::new().route(
+            "/openapi.json",
+            get(move || async move {
+                let body = Body::from("x".repeat(bytes));
+                Response::new(if chunked {
+                    Body::from_stream(body.into_data_stream())
+                } else {
+                    body
+                })
+            }),
+        );
+        let server = tokio::spawn(async move { axum::serve(listener, router).await });
+        let result = discover_spec(&format!("http://{address}")).await;
+        server.abort();
+        let _ = server.await;
+        result
+    }
+
+    #[tokio::test]
+    async fn discovery_enforces_openapi_bound_for_sized_and_chunked_responses(
+    ) -> Result<(), ProtectError> {
+        for chunked in [false, true] {
+            let result = discover_fixture(chio_openapi::MAX_OPENAPI_BYTES + 1, chunked).await;
+            assert!(
+                matches!(result, Err(ProtectError::SpecLoad(_))),
+                "discovery accepted oversized body (chunked={chunked})"
+            );
+            let body = discover_fixture(chio_openapi::MAX_OPENAPI_BYTES, chunked).await?;
+            assert_eq!(body.len(), chio_openapi::MAX_OPENAPI_BYTES);
+        }
+        Ok(())
     }
 }

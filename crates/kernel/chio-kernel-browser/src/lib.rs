@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 //! Browser (wasm-bindgen) bindings over the portable Chio kernel core.
 //!
 //! This crate exposes portable entry points to browser JavaScript /
@@ -19,13 +34,12 @@
 //!
 //! # no_std posture
 //!
-//! The crate is `no_std + alloc` by source. `wasm-bindgen`, `js-sys`,
-//! `web-sys`, and `serde-wasm-bindgen` are all host crates that would
-//! pull `std` if enabled; we gate them on `cfg(target_arch = "wasm32")`
-//! so native `cargo test -p chio-kernel-browser` does not need them and
-//! the native target compiles the pure-logic helpers alone. The wasm
-//! entry points are themselves gated behind `#[cfg(target_arch =
-//! "wasm32")]` for the same reason.
+//! The pure surface uses `no_std + alloc`. The browser clock uses `std`
+//! for its thread-local regression fence; the JavaScript binding dependencies
+//! also link `std` on wasm. Those dependencies and entry points are gated on
+//! `cfg(target_arch = "wasm32")`, so native tests compile the pure helpers
+//! without JavaScript bindings. The underlying portable kernel and shared
+//! clock types remain `no_std + alloc`.
 //!
 //! # Fail-closed design
 //!
@@ -36,12 +50,17 @@
 //! error message describing which step failed.
 
 #![no_std]
-#![deny(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )
+)]
 
 extern crate alloc;
 
-#[cfg(not(target_arch = "wasm32"))]
 extern crate std;
 
 pub mod clock;
@@ -60,8 +79,8 @@ pub use pure::{
 };
 pub use rng::{WebCryptoRng, WebCryptoRngError};
 pub use wire::{
-    AdmittedChildBudgetJson, BindingError, EvaluateRequestJson, EvaluationVerdictJson,
-    ParentBudgetSnapshotJson, SignReceiptRequestJson, ToolCallRequestJson, VerifiedCapabilityJson,
+    AdmittedChildBudgetJson, BindingError, CapabilityVerificationJson, EvaluateRequestJson,
+    EvaluationVerdictJson, ParentBudgetSnapshotJson, SignReceiptRequestJson, ToolCallRequestJson,
     VerifyCapabilityRequestJson, VerifyReceiptResultJson,
 };
 

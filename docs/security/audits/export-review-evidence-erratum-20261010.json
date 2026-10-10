@@ -1,0 +1,25 @@
+{
+  "schema": "chio.security.review-evidence-erratum.v1",
+  "recorded_at": "2026-10-10T01:37:33.751228+00:00",
+  "stage": "573fdb930a0e4c92e5ef2b24fb15859e50af6932",
+  "affected_record": {
+    "path": "docs/security/audits/fee-wallet-review-20261010.json",
+    "sha256": "3cd17f09b4c2496eb058ad550b790905821915b00420d7d9ca250994e1b0761a",
+    "field": "export_review_reopens.report"
+  },
+  "superseded_preliminary": {
+    "sha256": "9c1697892dd0caf8f70d9f6fe08c3eb8380b895f8e32ba9804d8329d9a9c837a",
+    "availability": "unavailable",
+    "reason": "The reviewer drafted the report in place. Its final publication replaced the preliminary bytes. Claude confirmed the preliminary version was not retained in the evidence directory or scratch.",
+    "qualification": "Not reproducible final-source evidence; preserve the historical observation without claiming an available matching artifact."
+  },
+  "final_report": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-f03-a862-review.md",
+    "retained_copy": "/tmp/pr1160-final-review-20261009/final-f03-review/root-f03-a862-review.md",
+    "sha256": "8ef3188e54e3ae606d60aa58a474119a847385e835e91bb3e26e5b9dbf2a18fb",
+    "source": "a8623528d7a535e424f419ed9093b2cc0a8f9fe9",
+    "qualification": "Independent review findings and diagnostic witnesses; not repair closure."
+  },
+  "effect": "N1-N6 remain assigned under the existing F03 repair obligations. Diagnostic tests of defective behavior are not expected-safe RED. This erratum changes no requirement, repair state, cap, or acceptance gate.",
+  "process_correction": "Drafts use a draft filename. Published report bytes and reported hashes are immutable; later decisions use a separate erratum."
+}

@@ -36,6 +36,13 @@ config, and a mapped property that is deliberately absent from the aggregate
 positive invariant. Its counterexample prevents later documentation from
 silently reviving the rejected claim.
 
+The pre-dispatch and post-dispatch clock-failure witnesses reject cancellation
+receipt availability when construction cannot obtain trusted time. They retain
+zero append attempts and zero receipts as an explicit failure event. The existing
+`DropGuardNoFaultReceiptBroken` control still rejects a missing append after
+successful construction; it has no clock-failure event to excuse the omission.
+These bounded witnesses do not qualify durable admission recovery.
+
 ## Running locally
 
 ```bash

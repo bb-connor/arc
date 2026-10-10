@@ -1,4 +1,0 @@
-module chio_kernel_mobileFFI {
-    header "chio_kernel_mobileFFI.h"
-    export *
-}

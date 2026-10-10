@@ -140,11 +140,13 @@ class ProviderReviewClient:
         *,
         base_url: str,
         auth_token: str,
+        admin_token: str,
         timeout: float = 10.0,
         client: httpx.Client | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.auth_token = auth_token
+        self.admin_token = admin_token
         self.client = client or httpx.Client(timeout=timeout)
         self.last_trace: dict[str, Any] | None = None
 
@@ -238,7 +240,7 @@ class ProviderReviewClient:
         try:
             response = self.client.get(
                 f"{self.base_url}/admin/sessions/{session_id}/trust",
-                headers={"Authorization": f"Bearer {self.auth_token}"},
+                headers={"Authorization": f"Bearer {self.admin_token}"},
             )
             response.raise_for_status()
             payload = response.json()
@@ -409,10 +411,12 @@ def provider_from_env() -> ProviderGateway:
     )
     provider_base_url = os.environ.get("BUYER_PROVIDER_BASE_URL")
     provider_auth_token = os.environ.get("BUYER_PROVIDER_AUTH_TOKEN", "demo-token")
+    provider_admin_token = os.environ.get("BUYER_PROVIDER_ADMIN_TOKEN", "demo-admin-token")
     if provider_base_url:
         return ProviderReviewClient(
             base_url=provider_base_url,
             auth_token=provider_auth_token,
+            admin_token=provider_admin_token,
         )
     return StubProviderGateway(approval_threshold_minor)
 

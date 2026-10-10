@@ -178,6 +178,8 @@ mod audit_and_configuration_tests;
 mod enforcement_anchor_proof_fixture;
 #[path = "finding_challenge_enforcement_e2e_tests/evidence_bundle_tests.rs"]
 mod evidence_bundle_tests;
+#[path = "finding_challenge_enforcement_e2e_tests/impairment_publishers.rs"]
+mod impairment_publishers;
 #[path = "finding_challenge_enforcement_e2e_tests/purchase_standing_fixture.rs"]
 mod purchase_standing_fixture;
 #[path = "finding_challenge_enforcement_e2e_tests/replay_fixture.rs"]
@@ -188,6 +190,10 @@ mod status_impairment_tests;
 use enforcement_anchor_proof_fixture::{
     anchor_evidence_hash, enforcement_anchor_proof, sample_anchor_evidence_hash,
 };
+use impairment_publishers::{
+    AmbiguousPublisher, MiningPublisher, ReorgedReceiptPublisher, UnreachableChainPublisher,
+    UnreachablePublisher,
+};
 use purchase_standing_fixture::{clone_resolved, settled_delivery_evidence, SettledPurchase};
 use replay_fixture::{PhaseShape, ReplayActionFactory};
 
@@ -196,15 +202,9 @@ use super::build_router;
 type AnyError = Box<dyn std::error::Error>;
 type TestResult = Result<(), AnyError>;
 
-struct FixtureStatusCommitClock;
-
-impl crate::trust_control::finding_challenge_coordinator::FindingStatusCommitClock
-    for FixtureStatusCommitClock
-{
-    fn now_unix_secs(&self, venue_now: u64) -> u64 {
-        venue_now
-    }
-}
+#[path = "finding_challenge_enforcement_e2e_tests/fixture_clock.rs"]
+mod fixture_clock;
+use fixture_clock::{fixture_commit_time, FixtureStatusCommitClock};
 
 const VENUE_ID: &str = "venue-challenge";
 const LISTING_ID: &str = "listing-42";
@@ -900,14 +900,18 @@ fn deployment_publishing_terms_and_rounds(
     extra_terms: &[SignedFindingMarketTerms],
     extra_rounds: &[FindingAuditRound],
 ) -> Result<Deployment, AnyError> {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let database: PathBuf = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     std::fs::create_dir(&lock_root)?;
     secure_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let market = authority.finding_market_store();
     let purchases = authority.finding_purchase_store();
     let challenges = authority.finding_challenge_store();
@@ -1109,7 +1113,11 @@ impl Deployment {
         drop(purchases);
         drop(market);
         drop(_authority);
-        let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+        let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?);
         let market = authority.finding_market_store();
         let purchases = authority.finding_purchase_store();
         let challenges = authority.finding_challenge_store();
@@ -1165,66 +1173,6 @@ impl FindingChallengeSubmissionExecutor for RouteChallengeExecutor {
             .push(now);
         self.coordinator
             .submit(&request.challenge, raw_finding, NOW)
-    }
-}
-
-fn challenge_route_state(
-    deployment: &Deployment,
-    executor: Arc<dyn FindingChallengeSubmissionExecutor>,
-) -> TrustServiceState {
-    let config = TrustServiceConfig {
-        listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-        service_token: "challenge-service-secret".to_string(),
-        tenant_read_tokens: BTreeMap::new(),
-        receipt_db_path: None,
-        revocation_db_path: None,
-        authority_seed_path: None,
-        authority_db_path: None,
-        budget_db_path: None,
-        joint_authority_db_path: None,
-        fiscal_runtime: None,
-        enterprise_providers_file: None,
-        federation_policies_file: None,
-        scim_lifecycle_file: None,
-        verifier_policies_file: None,
-        verifier_challenge_db_path: None,
-        passport_statuses_file: None,
-        passport_issuance_offers_file: None,
-        certification_registry_file: None,
-        certification_discovery_file: None,
-        issuance_policy: None,
-        runtime_assurance_policy: None,
-        advertise_url: None,
-        allow_local_peer_urls: true,
-        certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
-        cluster_sync_interval: std::time::Duration::from_millis(25),
-        roster_policy: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        finding_market: Some(market_config()),
-    };
-    TrustServiceState {
-        config,
-        joint_authority_store: Some(Arc::clone(&deployment._authority)),
-        fiscal_runtime: None,
-        budget_store: None,
-        revocation_store: None,
-        enterprise_provider_registry: None,
-        verifier_policy_registry: None,
-        federation_admission_rate_limiter: Arc::new(Mutex::new(
-            FederationAdmissionRateLimiter::default(),
-        )),
-        cluster: None,
-        cluster_progress: None,
-        finding_rail: Some(deployment.rail.clone()),
-        finding_purchase_executor: None,
-        finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_proof_egress_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_seller_submission_executor: None,
-        finding_seller_submission_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_challenge_submission_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_authority_status_resolver: Some(Arc::new(TestAuthorityStatusResolver::live())),
-        finding_challenge_executor: Some(executor),
     }
 }
 
@@ -2818,7 +2766,10 @@ fn settle_purchase(
 
 /// The same settlement against a caller-chosen allocation, so a test can
 /// sell from the backing a listing carried before it was rebacked.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn settle_purchase_with(
     deployment: &Deployment,
     allocation_id: &str,
@@ -3260,7 +3211,10 @@ fn sample_case(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn sample_case_at(
     signer: &Keypair,
     listing: &SignedGenericListing,
@@ -3469,7 +3423,10 @@ fn admitted_terms_digest() -> Result<String, AnyError> {
 /// seal, so a payout only closes on a later call past that deadline. Both
 /// calls carry identical arguments; the second is the one the caller's
 /// assertion is about, and it carries whatever the sealing path decided.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn uphold_across_claim_window(
     coordinator: &FindingChallengeCoordinator,
     terms: &SignedFindingMarketTerms,
@@ -3644,7 +3601,7 @@ fn impair_after_appeal(
         &upheld.sanction_case_id,
         &upheld.hold,
         &hex64('7'),
-        now,
+        fixture_commit_time(now),
     )?;
     match resolution {
         AppealResolution::Finalizing(authorized) => Ok(authorized),
@@ -6600,44 +6557,8 @@ fn finding_challenge_pending_appeal_branch_holds_the_bond() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn finding_challenge_successful_appeal_reverses_before_impairment() -> TestResult {
-    let case = upheld_liability()?;
-    let identity = liability_identity(&case.finding_id, &case.deployment.allocation_id);
-    let resolution = case.coordinator.resolve_appeal(
-        &case.upheld.liability_key,
-        &case.outcome,
-        &identity,
-        Some(&case.upheld.sealed),
-        &case.governance.context(),
-        &AppealDisposition::Successful {
-            appeal_case: &case.governance.appeal_case,
-            appeal_case_id: &case.governance.appeal_case.body.case_id,
-        },
-        &case.upheld.sanction_case_id,
-        &case.upheld.hold,
-        &hex64('7'),
-        NOW + 20,
-    )?;
-    let AppealResolution::ReversedBeforeImpairment { reversal } = resolution else {
-        return Err("a timely successful appeal reverses the hold".into());
-    };
-    assert_eq!(
-        reversal.evaluation.effective_state,
-        OpenMarketPenaltyEffectiveState::Reversed
-    );
-    let liability = case
-        .deployment
-        .challenges
-        .get_liability(&case.upheld.liability_key)?
-        .ok_or("liability head is durable")?;
-    assert_eq!(
-        liability.state,
-        FindingLiabilityState::ReversedBeforeImpairment
-    );
-    assert!(!liability.publication_pending);
-    Ok(())
-}
+#[path = "finding_challenge_enforcement_e2e_tests/appeals.rs"]
+mod appeals;
 
 #[test]
 fn finding_challenge_appeal_accepts_a_retained_activation_across_governance_rotation() -> TestResult
@@ -6679,7 +6600,7 @@ fn finding_challenge_appeal_accepts_a_retained_activation_across_governance_rota
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     assert!(matches!(
         resolution,
@@ -6722,7 +6643,7 @@ fn finding_challenge_appeal_accepts_a_prior_hold_across_penalty_rotation() -> Te
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     assert!(matches!(
         resolution,
@@ -6768,7 +6689,7 @@ fn finding_challenge_an_appeal_opened_after_the_durable_deadline_reverses_nothin
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            deadline + 2,
+            fixture_commit_time(deadline + 2),
         )
         .expect_err("a late signed filing cannot reverse the sanction");
     assert!(matches!(
@@ -6811,7 +6732,7 @@ fn resolve_final(
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        now,
+        fixture_commit_time(now),
     )
 }
 
@@ -6931,234 +6852,6 @@ impl chio_settle::FindingBondObservationSource for ScriptedObservations {
     }
 }
 
-/// A publisher that reports the vault burned this evidence hash without
-/// producing the transaction that did it. That is exactly the ambiguity
-/// the choke point must refuse to read as a slash.
-struct AmbiguousPublisher;
-
-impl FindingImpairmentPublisher for AmbiguousPublisher {
-    fn publish(
-        &self,
-        _intent: &chio_settle::FindingImpairmentIntent,
-        _call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Ok(FindingImpairmentAttempt::Rejected {
-            rejection: FindingVaultRejection::EvidenceAlreadyUsed,
-            stored: None,
-        })
-    }
-
-    fn observe(
-        &self,
-        _intent: &chio_settle::FindingImpairmentIntent,
-        _call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Ok(FindingImpairmentAttempt::Rejected {
-            rejection: FindingVaultRejection::EvidenceAlreadyUsed,
-            stored: None,
-        })
-    }
-}
-
-/// A publisher that broadcasts, stores the raw transaction, and only
-/// observes a receipt for it on a later attempt. That is the ordinary
-/// shape of a real one: the transaction is not mined when publish
-/// returns.
-struct MiningPublisher {
-    tx_hash: String,
-    attempts: Mutex<u32>,
-}
-
-impl MiningPublisher {
-    fn new() -> Self {
-        Self {
-            tx_hash: chain_hash(0x77),
-            attempts: Mutex::new(0),
-        }
-    }
-
-    fn attempts(&self) -> u32 {
-        self.attempts.lock().map(|guard| *guard).unwrap_or_default()
-    }
-
-    fn observation(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-        mined: bool,
-    ) -> FindingImpairmentAttempt {
-        FindingImpairmentAttempt::Observed {
-            stored: StoredImpairmentTransaction {
-                chain_id: intent.chain_id.clone(),
-                tx_hash: self.tx_hash.clone(),
-                to_address: call.to_address.clone(),
-                input_data: Some(call.data.clone()),
-                receipt: mined.then(|| EvmTransactionReceipt {
-                    tx_hash: self.tx_hash.clone(),
-                    block_number: 21_000_100,
-                    block_hash: chain_hash(0xbc),
-                    status: true,
-                    from_address: call.from_address.clone(),
-                    to_address: call.to_address.clone(),
-                    gas_used: 210_000,
-                    observed_at: OBSERVED_AT,
-                    logs: Vec::new(),
-                }),
-                finality: mined.then_some(SettlementFinalityStatus::Finalized),
-            },
-        }
-    }
-}
-
-impl FindingImpairmentPublisher for MiningPublisher {
-    fn publish(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        let attempt = match self.attempts.lock() {
-            Ok(mut guard) => {
-                *guard = guard.saturating_add(1);
-                *guard
-            }
-            Err(_) => return Err(FindingImpairmentPublishError::Transient("poisoned".into())),
-        };
-        let mined = attempt > 1;
-        Ok(self.observation(intent, call, mined))
-    }
-
-    fn observe(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Ok(self.observation(intent, call, self.attempts() > 1))
-    }
-}
-
-/// A publisher that cannot reach the chain and says so. It reports no
-/// attempt at all, which is the one shape that leaves the coordinator
-/// unable to tell whether anything was broadcast.
-struct UnreachableChainPublisher;
-
-impl FindingImpairmentPublisher for UnreachableChainPublisher {
-    fn publish(
-        &self,
-        _intent: &chio_settle::FindingImpairmentIntent,
-        _call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Err(FindingImpairmentPublishError::Transient(
-            "no route to the chain".to_string(),
-        ))
-    }
-
-    fn observe(
-        &self,
-        _intent: &chio_settle::FindingImpairmentIntent,
-        _call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Err(FindingImpairmentPublishError::Transient(
-            "no route to the chain".to_string(),
-        ))
-    }
-}
-
-/// A publisher that must never be asked to move anything. A resumed
-/// finalization has already impaired the vault, so any dispatch on that
-/// path would be a second one.
-struct UnreachablePublisher;
-
-impl FindingImpairmentPublisher for UnreachablePublisher {
-    fn publish(
-        &self,
-        _intent: &chio_settle::FindingImpairmentIntent,
-        _call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Err(FindingImpairmentPublishError::Permanent(
-            "a confirmed impairment must never be dispatched again".to_string(),
-        ))
-    }
-
-    fn observe(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        let tx_hash = chain_hash(0x77);
-        Ok(FindingImpairmentAttempt::Observed {
-            stored: StoredImpairmentTransaction {
-                chain_id: intent.chain_id.clone(),
-                tx_hash: tx_hash.clone(),
-                to_address: call.to_address.clone(),
-                input_data: Some(call.data.clone()),
-                receipt: Some(EvmTransactionReceipt {
-                    tx_hash,
-                    block_number: 21_000_100,
-                    block_hash: chain_hash(0xbc),
-                    status: true,
-                    from_address: call.from_address.clone(),
-                    to_address: call.to_address.clone(),
-                    gas_used: 210_000,
-                    observed_at: OBSERVED_AT,
-                    logs: Vec::new(),
-                }),
-                finality: Some(SettlementFinalityStatus::Finalized),
-            },
-        })
-    }
-}
-
-/// A publisher whose first receipt is finalized but whose immediate
-/// re-observation no longer finds that receipt on the canonical chain.
-struct ReorgedReceiptPublisher;
-
-impl FindingImpairmentPublisher for ReorgedReceiptPublisher {
-    fn publish(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        let tx_hash = chain_hash(0x78);
-        Ok(FindingImpairmentAttempt::Observed {
-            stored: StoredImpairmentTransaction {
-                chain_id: intent.chain_id.clone(),
-                tx_hash: tx_hash.clone(),
-                to_address: call.to_address.clone(),
-                input_data: Some(call.data.clone()),
-                receipt: Some(EvmTransactionReceipt {
-                    tx_hash,
-                    block_number: 21_000_101,
-                    block_hash: chain_hash(0xbd),
-                    status: true,
-                    from_address: call.from_address.clone(),
-                    to_address: call.to_address.clone(),
-                    gas_used: 210_000,
-                    observed_at: OBSERVED_AT,
-                    logs: Vec::new(),
-                }),
-                finality: Some(SettlementFinalityStatus::Finalized),
-            },
-        })
-    }
-
-    fn observe(
-        &self,
-        intent: &chio_settle::FindingImpairmentIntent,
-        call: &PreparedEvmCall,
-    ) -> Result<FindingImpairmentAttempt, FindingImpairmentPublishError> {
-        Ok(FindingImpairmentAttempt::Observed {
-            stored: StoredImpairmentTransaction {
-                chain_id: intent.chain_id.clone(),
-                tx_hash: chain_hash(0x78),
-                to_address: call.to_address.clone(),
-                input_data: Some(call.data.clone()),
-                receipt: None,
-                finality: None,
-            },
-        })
-    }
-}
-
 include!("finding_challenge_enforcement_e2e_tests/finalizing_liability_support.rs");
 
 pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
@@ -7167,7 +6860,7 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
 
     // The first attempt reports exactly what a durable publisher holds
     // before its transaction is mined.
-    let first = case.finalize(&publisher, SETTLEMENT_NOW)?;
+    let first = case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(
         first,
         FindingFinalization::Reconciled(FindingImpairmentOutcome::Quarantined {
@@ -7186,7 +6879,7 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
     // The same transaction then mines and finalizes. This only makes the
     // retraction outbox eligible: the liability remains publication-pending
     // until a signed status epoch includes the exact intent.
-    let second = case.finalize(&publisher, SETTLEMENT_NOW + 60)?;
+    let second = case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW + 60))?;
     let FindingFinalization::Reconciled(FindingImpairmentOutcome::Confirmed { reconciliation }) =
         second
     else {
@@ -7210,7 +6903,10 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
     assert!(pending.publication_pending);
 
     case.publish_status(SETTLEMENT_NOW + 61)?;
-    let resumed = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 62)?;
+    let resumed = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 62),
+    )?;
     assert_eq!(resumed, FindingFinalization::AlreadyConfirmed);
     let settled = case.head()?;
     assert_eq!(settled.state, FindingLiabilityState::Settled);
@@ -7443,26 +7139,9 @@ fn assert_denial_cannot_sanction(shape: &DenyShape, expected_reason: &str) -> Te
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Cross-class pairings and the carried recipe preimage
-// ---------------------------------------------------------------------------
+#[path = "finding_challenge_enforcement_e2e_tests/filing_clock.rs"]
+mod filing_clock;
 
-// ---------------------------------------------------------------------------
-// Payout derivation
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// A clean venue audit
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Indeterminate results, the bounded retry, and the bond
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// The nested replay mapping through the coordinator
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// One defect, one slash, across a duplicate filing and a restart
-// ---------------------------------------------------------------------------
+#[path = "finding_challenge_enforcement_e2e_tests/route_fixture.rs"]
+mod route_fixture;
+use route_fixture::challenge_route_state;

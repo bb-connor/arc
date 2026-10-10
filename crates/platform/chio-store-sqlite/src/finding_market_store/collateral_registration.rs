@@ -39,8 +39,12 @@ impl SqliteFindingMarketStore {
         if backing_envelope_json.is_empty() || backing_envelope_json.len() > MAX_ENVELOPE_BYTES {
             return Err(invariant("backing envelope byte length is out of bounds"));
         }
-        let parsed: SignedFindingBondBacking = serde_json::from_str(backing_envelope_json)
-            .map_err(|error| invariant(format!("backing envelope bytes are invalid: {error}")))?;
+        let parsed: SignedFindingBondBacking = chio_core::canonical::UntrustedJsonText::from_wire(
+            (backing_envelope_json).as_bytes(),
+            MAX_ENVELOPE_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(FindingMarketStoreError::from)?;
         if parsed.body != *backing {
             return Err(invariant(
                 "backing envelope bytes do not carry the supplied backing body",

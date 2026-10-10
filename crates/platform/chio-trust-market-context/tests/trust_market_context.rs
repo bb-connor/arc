@@ -1311,7 +1311,10 @@ fn trust_market_bundle_with_required_claim(claim: &str) -> TrustMarketBundle {
 }
 
 fn update_trust_market_artifact(bundle: &mut TrustMarketBundle, path: &str, value: Value) {
-    let bytes = json_bytes(value);
+    update_trust_market_artifact_bytes(bundle, path, json_bytes(value));
+}
+
+fn update_trust_market_artifact_bytes(bundle: &mut TrustMarketBundle, path: &str, bytes: Vec<u8>) {
     let digest = chio_core_types::sha256_hex(&bytes);
     bundle.artifacts.insert(path.to_string(), bytes);
 
@@ -1941,3 +1944,6 @@ fn trust_market_rejects_untrusted_risk_sanction_jurisdiction_receipt() {
         "{error}"
     );
 }
+
+#[path = "trust_market_context/original_input.rs"]
+mod original_boundary_tests;

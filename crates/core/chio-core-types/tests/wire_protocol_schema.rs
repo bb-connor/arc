@@ -15,7 +15,7 @@ use chio_core_types::{
     receipt::{
         body::{ChioReceipt, ChioReceiptBody},
         decision::{Decision, ToolCallAction},
-        kinds::TrustLevel,
+        kinds::{ToolOrigin, TrustLevel},
         metadata::GuardEvidence,
         signing::{
             BbsReceiptSignature, CHIO_RECEIPT_BBS_PROJECTION_VERSION_V1,
@@ -25,6 +25,12 @@ use chio_core_types::{
 };
 use serde::Serialize;
 use serde_json::{json, Value};
+
+#[path = "wire_protocol_schema/pending_approval.rs"]
+mod pending_approval;
+
+#[path = "wire_protocol_schema/operation_nonce.rs"]
+mod operation_nonce;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -173,6 +179,12 @@ fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonsc
                     &fs::read_to_string(&path).expect("schema resource is readable"),
                 )
                 .expect("schema resource parses");
+                let canonical = path.canonicalize().expect("schema path canonicalizes");
+                let mut file_path = canonical.to_string_lossy().replace('\\', "/");
+                if !file_path.starts_with('/') {
+                    file_path.insert(0, '/');
+                }
+                resources.push((format!("file://{file_path}"), value.clone()));
                 if let Some(id) = value["$id"].as_str() {
                     resources.push((id.to_string(), value));
                 }
@@ -378,6 +390,7 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
     let token = make_token(&kp);
 
     let tool_call_request = AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: "req-wire-001".to_string(),
         capability_token: Box::new(token.clone()),
         server_id: "srv".to_string(),
@@ -645,6 +658,46 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
 }
 
 #[test]
+fn receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let key = Keypair::from_seed(&[73; 32]);
+    let origins = [
+        ToolOrigin::CallerExecuted,
+        ToolOrigin::HostExecutedProviderReported,
+        ToolOrigin::HostExecutedUnmediated,
+        ToolOrigin::ChioInternal,
+    ];
+    for origin in origins {
+        let mut body = make_receipt_body(&key, Decision::Allow);
+        body.tool_origin = origin;
+        let receipt = ChioReceipt::sign(body, &key)?;
+        assert!(receipt.verify_signature()?);
+        assert_schema_accepts("receipt/record.schema.json", &to_json(&receipt));
+        let mut changed = receipt.clone();
+        changed.tool_origin = if origin == ToolOrigin::ChioInternal {
+            ToolOrigin::CallerExecuted
+        } else {
+            ToolOrigin::ChioInternal
+        };
+        assert!(!changed.verify_signature()?);
+    }
+
+    let expected = to_json(&origins);
+    for path in [
+        "receipt/record.schema.json",
+        "../../chio-http/v1/http-receipt.schema.json",
+    ] {
+        let schema = load_schema(path);
+        assert_eq!(schema["properties"]["tool_origin"]["enum"], expected);
+    }
+    let mut unknown = to_json(&make_receipt(&key, Decision::Allow));
+    unknown["tool_origin"] = json!("untrusted_future_origin");
+    assert_schema_rejects("receipt/record.schema.json", &unknown);
+    assert!(serde_json::from_value::<ChioReceipt>(unknown).is_err());
+    Ok(())
+}
+
+#[test]
 fn receipt_schema_accepts_bound_bbs_signature_and_rejects_malformed_bindings() {
     let kp = Keypair::from_seed(&[37; 32]);
     let instance = to_json(&make_bbs_receipt(&kp));
@@ -751,4 +804,47 @@ fn capability_token_schema_accepts_live_hybrid_wire_values() {
         .expect("signature string")
         .starts_with("hybrid:"));
     assert_schema_accepts("capability/token.schema.json", &instance);
+}
+
+#[test]
+fn inbound_authority_invocation_proof_schema_preserves_signed_shape() {
+    let key = Keypair::from_seed(&[11; 32]);
+    let body = json!({
+        "schema":"chio.dpop_proof.v1", "capability_id":"cap", "tool_server":"srv",
+        "tool_name":"read", "action_hash":"a".repeat(64), "nonce":"wire-proof",
+        "issued_at":1, "agent_key":key.public_key()
+    });
+    let proof = json!({"signature":key.sign(&chio_core_types::canonical::canonical_json_bytes(&body).unwrap()),"body":body});
+    assert_schema_accepts("kernel/dpop_proof.schema.json", &proof);
+    let mut request = AgentMessage::ToolCallRequest {
+        id: "proof-wire".into(),
+        capability_token: Box::new(make_token(&key)),
+        server_id: "srv".into(),
+        tool: "read".into(),
+        params: Box::new(json!({})),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: vec![],
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        execution_nonce: None,
+        dpop_proof: Some(Box::new(proof.clone())),
+    };
+    assert_schema_accepts("agent/tool_call_request.schema.json", &to_json(&request));
+    if let AgentMessage::ToolCallRequest { dpop_proof, .. } = &mut request {
+        *dpop_proof = None;
+    }
+    assert_schema_accepts("agent/tool_call_request.schema.json", &to_json(&request));
+    let mut invalid = proof.clone();
+    invalid["body"]["schema"] = json!("chio.dpop_proof.v3");
+    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
+    invalid["body"]["schema"] = json!("chio.dpop_proof.v2");
+    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
+    invalid["body"]["replay_authority"] = json!({
+        "destination_store_uuid":"00000000-0000-4000-8000-000000000001", "dpop_authority_id":"authority",
+        "expectation_id":"b".repeat(64), "proof_ttl_secs":300, "max_clock_skew_secs":30,
+    });
+    assert_schema_accepts("kernel/dpop_proof.schema.json", &invalid);
+    invalid["body"]["schema"] = json!("chio.dpop_proof.v1");
+    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
 }

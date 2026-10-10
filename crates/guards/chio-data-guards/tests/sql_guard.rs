@@ -54,6 +54,7 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (kp, scope, agent_id, server_id, request)
@@ -68,6 +69,7 @@ fn evaluate(guard: &SqlQueryGuard, tool: &str, args: serde_json::Value) -> Verdi
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     guard
         .evaluate(&ctx)

@@ -7,6 +7,10 @@ use chio_federation::bilateral_dsse::{
 
 use crate::{KernelError, ToolCallRequest};
 
+#[path = "verified_treaty/evidence.rs"]
+mod evidence;
+pub(super) use evidence::TreatyVerificationEvidence;
+
 pub struct FederationTreatyAdmissionBinding<'a> {
     pub accepted: bool,
     pub admission_report_sha256: &'a str,
@@ -28,6 +32,11 @@ pub struct FederationTreatyVerification<'a> {
     pub now_unix_ms: u64,
 }
 
+/// Treaty authority can be constructed only by verification, not deserialization.
+///
+/// ```compile_fail
+/// let forged = serde_json::from_str::<chio_kernel::VerifiedFederationTreatyMaterial>("{}");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedFederationTreatyMaterial {
     request_id: String,
@@ -40,6 +49,8 @@ pub struct VerifiedFederationTreatyMaterial {
     local_public_key: PublicKey,
     extensions: BilateralPredicateExtensions,
     receipt_metadata: serde_json::Value,
+    // Original signed input and local admission binding, not derived metadata.
+    pub(super) verification_evidence: TreatyVerificationEvidence,
 }
 
 impl VerifiedFederationTreatyMaterial {
@@ -203,6 +214,7 @@ impl VerifiedFederationTreatyMaterial {
             local_public_key: input.participant_public_keys[1].clone(),
             extensions,
             receipt_metadata,
+            verification_evidence: TreatyVerificationEvidence::retain(&input),
         })
     }
 

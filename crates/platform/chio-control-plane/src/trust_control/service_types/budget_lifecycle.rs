@@ -357,7 +357,10 @@ fn expected_monetary_transition(
     Ok(transition)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn validate_transition(
     lifecycle: &ResolvedBudgetMutationLifecycle,
     kind: BudgetMutationKind,

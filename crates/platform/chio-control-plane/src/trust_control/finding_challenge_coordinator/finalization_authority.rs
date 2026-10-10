@@ -102,11 +102,12 @@ impl FindingChallengeCoordinator {
             ));
         }
         let retained: RetainedAuthorizedImpairment =
-            serde_json::from_slice(&stored.authorization_json).map_err(|error| {
-                ChallengeCoordinatorError::ChallengeStore(format!(
-                    "retained finalizing authorization is invalid: {error}"
-                ))
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                &stored.authorization_json,
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ChallengeCoordinatorError::from)?;
         let canonical =
             canonical_json_bytes(&retained).map_err(|_| ChallengeCoordinatorError::Canonical)?;
         if canonical != stored.authorization_json {

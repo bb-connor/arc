@@ -21,6 +21,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/conformance-matrix.yml"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "crates/security/chio-cage-init/**"
+      - "crates/security/chio-cage/**"
       - "crates/tooling/chio-conformance/**"
       - "crates/products/chio-cli/**"
       - "tests/conformance/**"
@@ -101,7 +105,7 @@ jobs:
     name: external-consumer-smoke (release-blocking python peer run)
     # owner: Chio maintainers
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -116,6 +120,9 @@ jobs:
         with:
           packages: protobuf-compiler
 
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+
       - name: Install chio-conformance (path install)
         # Once chio-conformance has a registry-public dependency closure, swap for:
         #   cargo install chio-conformance --version <pin>
@@ -126,7 +133,7 @@ jobs:
         # owned by the chio-cli crate; the source-install consumer also
         # installs both crates in sequence (see docs/conformance.md
         # "Standalone consumer" section).
-        run: cargo install --path crates/products/chio-cli --locked
+        run: cargo install --path crates/products/chio-cli --locked --features real-linux-enforcement
 
       - name: Detect published python peer
         id: python-peer
@@ -180,6 +187,16 @@ jobs:
           name: external-consumer-smoke-report
           path: /tmp/report.json
           if-no-files-found: ignore
+
+      - name: Preserve native consumer host evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: conformance-native-host-qualification
+          path: |
+            ${{ runner.temp }}/native-discovery.log
+            ${{ runner.temp }}/enforced-native-fixture/fixture.json
+          if-no-files-found: error
 
   notify-on-failure:
     name: notify-on-failure (alarm-policy issue opener)

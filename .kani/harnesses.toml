@@ -52,6 +52,7 @@ schema = "chio.kani.multi-crate.v1"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_verify_capability_rejects_untrusted_issuer_before_signature"
 default_unwind = 8
 timeout_secs = 1800
@@ -60,6 +61,7 @@ notes = "Concrete Ed25519 + canonical-JSON path; heaviest in the lane (~31s loca
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_normalized_scope_subset_rejects_widened_child"
 default_unwind = 8
 timeout_secs = 1800
@@ -67,6 +69,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_normalized_scope_subset_rejects_value_widened_child"
 default_unwind = 8
 timeout_secs = 1800
@@ -74,6 +77,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_normalized_scope_subset_rejects_identity_mismatch"
 default_unwind = 8
 timeout_secs = 1800
@@ -81,6 +85,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_resolve_matching_grants_rejects_out_of_scope_request"
 default_unwind = 8
 timeout_secs = 1800
@@ -88,6 +93,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_resolve_matching_grants_preserves_wildcard_matching"
 default_unwind = 8
 timeout_secs = 1800
@@ -95,6 +101,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_evaluate_rejects_untrusted_issuer_before_dispatch"
 default_unwind = 8
 timeout_secs = 1800
@@ -102,34 +109,55 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_sign_receipt_rejects_kernel_key_mismatch_before_signing"
+unwinding_checks = true
+require_cover = true
 default_unwind = 8
+# Compare the entire 65-byte SEC1 key without expanding recursive key variants.
+memcmp_unwind = 66
 timeout_secs = 1800
 lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_sign_receipt_accepts_matching_kernel_key"
+unwinding_checks = true
+require_cover = true
 default_unwind = 8
+# Compare the entire 65-byte SEC1 key without expanding recursive key variants.
+memcmp_unwind = 66
 timeout_secs = 1800
 lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_sign_receipt_refuses_content_hash_mismatch"
-default_unwind = 8
+unwinding_checks = true
+require_cover = true
+default_unwind = 66
+# Bound recursive key equality separately from SHA and byte loops.
+public_key_eq_unwind = 8
 timeout_secs = 1800
 lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_sign_receipt_accepts_matching_content_hash"
-default_unwind = 8
+unwinding_checks = true
+require_cover = true
+default_unwind = 66
+# Bound recursive key equality separately from SHA and byte loops.
+public_key_eq_unwind = 8
 timeout_secs = 1800
 lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_scope_intersection_associative"
 default_unwind = 8
 timeout_secs = 1800
@@ -137,6 +165,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_revocation_predicate_idempotent"
 default_unwind = 8
 timeout_secs = 1800
@@ -144,6 +173,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_revocation_admission_projection"
 default_unwind = 8
 timeout_secs = 1800
@@ -151,6 +181,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_delegation_chain_step"
 default_unwind = 8
 timeout_secs = 1800
@@ -158,6 +189,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_receipt_roundtrip"
 default_unwind = 8
 timeout_secs = 1800
@@ -165,6 +197,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_budget_checked_add_no_overflow"
 default_unwind = 8
 timeout_secs = 1800
@@ -172,6 +205,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_budget_admission_projection"
 default_unwind = 8
 timeout_secs = 1800
@@ -179,6 +213,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_reservation_ledger_terminal_classification"
 default_unwind = 8
 timeout_secs = 1800
@@ -188,6 +223,7 @@ notes = "The pure reservation-ledger helper classifies a state as terminal exact
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_reservation_ledger_conservation"
 default_unwind = 8
 timeout_secs = 1800
@@ -196,6 +232,7 @@ notes = "Bounded reservation transitions preserve partition totals, make finaliz
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_composite_quota_all_or_nothing"
 default_unwind = 8
 timeout_secs = 1800
@@ -203,6 +240,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_quota_maximum_immutable"
 default_unwind = 8
 timeout_secs = 1800
@@ -210,13 +248,33 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
-harness = "verify_family_binding_preservation"
+features = ["kani"]
+harness = "verify_captured_invocation_count_monotonic"
 default_unwind = 8
 timeout_secs = 1800
 lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
+harness = "verify_replay_fingerprint_uniqueness"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+
+[[harness]]
+crate = "chio-kernel-core"
+features = ["kani"]
+harness = "verify_family_binding_preservation"
+unwinding_checks = true
+require_cover = true
+default_unwind = 9
+timeout_secs = 1800
+lane = "pr"
+
+[[harness]]
+crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_threshold_distinct_signers"
 default_unwind = 8
 timeout_secs = 1800
@@ -224,6 +282,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_delegate_no_widen"
 default_unwind = 8
 timeout_secs = 1800
@@ -231,6 +290,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_delegation_receipt_canonical"
 default_unwind = 8
 timeout_secs = 1800
@@ -238,6 +298,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_revocation_view_freshness"
 default_unwind = 8
 timeout_secs = 1800
@@ -245,6 +306,7 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_inclusion_step_equivalence"
 default_unwind = 8
 timeout_secs = 1800
@@ -254,6 +316,7 @@ notes = "Production and extraction-safe inclusion-step equality through the eigh
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_oracle_inclusion_walk_parity"
 default_unwind = 8
 timeout_secs = 1800
@@ -264,6 +327,7 @@ notes = "Exact production compute_root_from_hash traversal over every leaf and t
 
 [[harness]]
 crate = "chio-kernel-core"
+features = ["kani"]
 harness = "public_delivery_contract_allow_implies_digest_match"
 default_unwind = 8
 timeout_secs = 1800
@@ -299,18 +363,25 @@ notes = "Settlement admission under a digest constraint implies a byte-identical
 # `verify_quote` models reflect the post-fix production order
 # TCB -> algorithm -> report_data; a bug had inverted that order and is
 # pinned by this harness set. See the harness module doc comment for
-# bound parameters (default_unwind = 8, symbolic byte-arrays <= 64).
+# explicit loop bounds and the symbolic seed/root domains.
 
 [[harness]]
 crate = "chio-attest-verify"
-harness = "public_expect_report_data_determinism_under_input_change"
-default_unwind = 8
+features = ["kani"]
+harness = "public_expect_report_data_determinism_and_binding"
+# Owner ruling 2026-10-09: OPEN/UNPROVED, not a passing or executed CI proof.
+open_residual = "KANI-ATTEST-DECOMP"
+unwinding_checks = true
+require_cover = true
+p256_encoder_bounds = true
+default_unwind = 136
 timeout_secs = 1800
 lane = "pr"
-notes = "Direct call into pub fn expect_report_data; pure determinism + tampering arms."
+notes = "Real SHA-256 determinism, zero padding and context-wrapper equivalence over all 256 key seeds and 32 root positions. Noncollision is ASSUME-SHA256, not proved; original unproved harness retained in kani_crypto_research."
 
 [[harness]]
 crate = "chio-attest-verify"
+features = ["kani"]
 harness = "public_nitro_verify_quote_rejects_report_data_mismatch"
 default_unwind = 8
 timeout_secs = 1800
@@ -319,6 +390,7 @@ notes = "MODEL-ONLY: proves model_verify_quote algebra over ModelQuoteOutcome, N
 
 [[harness]]
 crate = "chio-attest-verify"
+features = ["kani"]
 harness = "public_sev_snp_verify_quote_rejects_unacceptable_tcb"
 default_unwind = 8
 timeout_secs = 1800
@@ -327,6 +399,7 @@ notes = "MODEL-ONLY: proves model_verify_quote algebra, NOT the production <SevS
 
 [[harness]]
 crate = "chio-attest-verify"
+features = ["kani"]
 harness = "public_tdx_verify_quote_rejects_algorithm_mismatch"
 default_unwind = 8
 timeout_secs = 1800
@@ -434,38 +507,50 @@ notes = "Truth table over the public settlement_state_id helper used by the prod
 # Source: crates/trust/chio-weights/src/kani_public_harnesses.rs.
 # A `public_string_set_predicate_algebra` stanza was sketched in the
 # A3.5 commented draft but does not exist in this PR's harness file
-# (the existing predicate harnesses are inlined inside the four
-# entries below); the manifest only lists harnesses that actually
-# exist.
+# (StringSet predicates remain runtime-tested separately); the
+# manifest only lists harnesses that actually exist.
 
 [[harness]]
 crate = "chio-weights"
-harness = "public_weights_hash_of_determinism_and_tampering"
-default_unwind = 8
+features = ["kani"]
+harness = "public_weights_hash_of_determinism_and_shape"
+unwinding_checks = true
+require_cover = true
+default_unwind = 66
 timeout_secs = 1800
 lane = "pr"
-notes = "Determinism + tamper-detection of chio_weights::hash_weights."
+notes = "Real SHA-256 determinism and lowercase shape (noncollision is ASSUME-SHA256, original inequality retained as unproved research) checks for chio_weights::weights_hash_of over the original symbolic four-byte input domain."
 
 [[harness]]
 crate = "chio-weights"
+features = ["kani"]
 harness = "public_model_card_require_live_fail_closed"
-default_unwind = 8
+unwinding_checks = true
+require_cover = true
+default_unwind = 66
 timeout_secs = 1800
 lane = "pr"
 notes = "Fail-closed semantics of ModelCard::require_live."
 
 [[harness]]
 crate = "chio-weights"
+features = ["kani"]
 harness = "public_weights_error_urn_is_stable"
+unwinding_checks = true
+require_cover = true
 default_unwind = 8
+memcmp_unwind = 41
 timeout_secs = 1800
 lane = "pr"
-notes = "URN stability under chio_weights::WeightsError::Display."
+notes = "URN stability under chio_weights::WeightsError::urn."
 
 [[harness]]
 crate = "chio-weights"
+features = ["kani"]
 harness = "public_model_card_new_pins_schema_version"
-default_unwind = 8
+unwinding_checks = true
+require_cover = true
+default_unwind = 66
 timeout_secs = 1800
 lane = "pr"
 notes = "Schema-version pinning under chio_weights::ModelCard::new."
@@ -485,3 +570,36 @@ timeout_secs = 1800
 lane = "pr"
 features = ["kani"]
 notes = "Production M5 arithmetic core: full-width overflow and signed-cap failures reject; successful awards are live-bond capped and exact-sum over three ordered buyer harms in a fixed 1:2:3 ratio plus the community fund."
+
+[[harness]]
+crate = "chio-security-types"
+harness = "clock_fence_preserves_last_success_on_regression"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "authority_deadline_never_extends_on_retry"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "future_skew_uses_checked_full_width_arithmetic"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "response_terminal_states_and_clean_rollback_are_closed"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+primary_rust_symbol = "chio_security_types::response_state::is_legal_response_transition"

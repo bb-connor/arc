@@ -17,8 +17,7 @@ impl SqliteRuntimeOrchestrationStore {
         validate_state_label(evidence_kind, "runtime_treaty_artifact_invalid_kind")?;
         validate_non_empty(evidence_id, "runtime_treaty_artifact_empty_id")?;
         let artifact_sha256 = canonical_sha256(artifact)?;
-        let raw_json = serde_json::to_string(artifact)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw_json = serde_json::to_string(artifact).map_err(ChioRuntimeError::Json)?;
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -76,8 +75,18 @@ impl SqliteRuntimeOrchestrationStore {
             .optional()
             .map_err(sqlite_error)?;
         row.map(|(artifact_sha256, raw_json)| {
-            let raw_json = serde_json::from_str(&raw_json)
-                .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+            let raw_json = chio_core_types::canonical::UntrustedJsonText::from_wire(
+                raw_json.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ChioRuntimeError::from)?;
+            if canonical_sha256(&raw_json)? != artifact_sha256 {
+                return Err(ChioRuntimeError::Rejected {
+                    code: "runtime_stored_artifact_binding_mismatch",
+                    detail: "stored treaty artifact does not match its digest".to_owned(),
+                });
+            }
             Ok(TreatyRuntimeArtifactRecord {
                 evidence_kind: evidence_kind.to_string(),
                 evidence_id: evidence_id.to_string(),

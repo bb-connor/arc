@@ -167,6 +167,9 @@ pub enum Verdict {
 /// Errors returned by [`canonicalize`] and [`parse`].
 #[derive(Debug, thiserror::Error)]
 pub enum FrameError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
     /// JSON serialization failure (pre-canonicalization).
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
@@ -233,8 +236,11 @@ pub fn canonicalize(frame: &Frame) -> Result<Vec<u8>, FrameError> {
 /// Parse canonical-JSON bytes back into a [`Frame`]. The result is then
 /// validated against the v1 schema; bytes that decode but violate an
 /// invariant return [`FrameError::Schema`].
+pub const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
+
 pub fn parse(bytes: &[u8]) -> Result<Frame, FrameError> {
-    let frame: Frame = serde_json::from_slice(bytes)?;
+    let frame: Frame = chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_FRAME_BYTES)?
+        .decode_signed()?;
     validate(&frame)?;
     Ok(frame)
 }
@@ -302,7 +308,7 @@ mod tests {
         }
         let bytes = serde_json::to_vec(&value).expect("serialize");
         let result = parse(&bytes);
-        assert!(matches!(result, Err(FrameError::Json(_))));
+        assert!(matches!(result, Err(FrameError::Input(_))));
     }
 
     #[test]
@@ -328,5 +334,26 @@ mod tests {
             .find("\"schema_version\"")
             .expect("schema_version present");
         assert!(pos_event < pos_schema);
+    }
+
+    #[test]
+    fn frame_preserves_native_invocation_and_rejects_nested_duplicates() {
+        let mut frame = good_frame();
+        frame.invocation = serde_json::json!({"counter": u64::MAX});
+        let bytes = canonicalize(&frame).unwrap();
+        assert_eq!(
+            parse(&bytes).unwrap().invocation["counter"].as_u64(),
+            Some(u64::MAX)
+        );
+        let raw = String::from_utf8(bytes)
+            .unwrap()
+            .replace("\"counter\":", "\"counter\":0,\"counter\":");
+        assert!(matches!(parse(raw.as_bytes()), Err(FrameError::Input(_))));
+        assert!(matches!(
+            parse(&vec![b' '; MAX_FRAME_BYTES + 1]),
+            Err(FrameError::Input(
+                chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+            ))
+        ));
     }
 }

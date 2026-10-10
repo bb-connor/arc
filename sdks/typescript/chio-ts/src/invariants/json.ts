@@ -1,7 +1,7 @@
 export type JsonPrimitive = null | boolean | number | string;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-import { ChioInvariantError } from "./errors.ts";
+import { ChioInvariantError, parseJsonText } from "./errors.ts";
 
 type ParsedJson =
   | { readonly type: "null" }
@@ -258,4 +258,14 @@ export function canonicalizeJson(value: unknown): string {
 
 export function canonicalizeJsonString(input: string): string {
   return canonicalizeParsedJson(new JsonTextCanonicalParser(input).parse());
+}
+
+/**
+ * Parse with `parseJsonText` (JSON.parse number and string semantics) after
+ * rejecting a repeated object key at any depth of the original text.
+ */
+export function parseJsonTextUniqueKeys<T>(input: string): T {
+  const value = parseJsonText<T>(input);
+  new JsonTextCanonicalParser(input).parse();
+  return value;
 }

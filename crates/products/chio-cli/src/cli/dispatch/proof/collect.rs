@@ -5,8 +5,7 @@ const PROOF_ROOM_BUNDLE_SCHEMA: &str = "chio.proof-room.bundle.v1";
 const PROOF_ROOM_VERIFIER_REPORT_SCHEMA: &str = "chio.proof-room.verifier-report.v1";
 const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str = "application/vnd.chio.proof-room.bundle.v1+json";
 const PROOF_ROOM_BUNDLE_SIGNATURE_PATH: &str = "bundle-signature.dsse.json";
-const PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH: &str =
-    ".bundle-signature.dsse.json.pending";
+const PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH: &str = ".bundle-signature.dsse.json.pending";
 const PROOF_ROOM_TRUST_ROOTS_PATH: &str = "artifacts/authority/trust-roots.json";
 const PROOF_ROOM_TRUST_ROOTS_SCHEMA: &str = "chio.proof.first-run.trust-roots.v1";
 pub(super) const PROOF_COLLECT_BUNDLE_SIGNER_SEED_HEX_ENV: &str =
@@ -183,12 +182,10 @@ fn seal_collected_proof_bundle_with_fixture_id(
             enforce_collect_kind_requirements(kind, &read_only_report)?;
             (read_only_report.clone(), Some(read_only_report))
         }
-        SealVerificationMode::IsolatedFixture => {
-            (
-                fixture::verify_fixture_transaction_passport_file(&passport_path)?,
-                None,
-            )
-        }
+        SealVerificationMode::IsolatedFixture => (
+            fixture::verify_fixture_transaction_passport_file(&passport_path)?,
+            None,
+        ),
     };
     enforce_collect_kind_requirements(kind, &verification_report)?;
     let signature_path = match verification_mode {
@@ -196,9 +193,7 @@ fn seal_collected_proof_bundle_with_fixture_id(
             invalidate_collected_proof_room_bundle(bundle)?;
             bundle.join(PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH)
         }
-        SealVerificationMode::IsolatedFixture => {
-            bundle.join(PROOF_ROOM_BUNDLE_SIGNATURE_PATH)
-        }
+        SealVerificationMode::IsolatedFixture => bundle.join(PROOF_ROOM_BUNDLE_SIGNATURE_PATH),
     };
     let report = collected_verifier_report(bundle, verification_report)?;
     let verifier_report_path = bundle.join("verifier/report.json");
@@ -206,18 +201,13 @@ fn seal_collected_proof_bundle_with_fixture_id(
         fs::create_dir_all(parent)?;
     }
     write_json_line_file(&verifier_report_path, &report)?;
-    write_collected_proof_room_bundle(
-        bundle,
-        &report,
-        kind,
-        public_fixture_id,
-        &signature_path,
-    )?;
+    write_collected_proof_room_bundle(bundle, &report, kind, public_fixture_id, &signature_path)?;
     sync_collected_proof_room_bundle(bundle)?;
     if let Some(read_only_report) = replay_snapshot {
         let pending_signature_path = bundle.join(PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH);
         let final_signature_path = bundle.join(PROOF_ROOM_BUNDLE_SIGNATURE_PATH);
-        let replay_reservation_id = chio_core::sha256_hex(&fs::read(&pending_signature_path)?);
+        let replay_reservation_id =
+            chio_core::sha256_hex(&crate::input::read(&pending_signature_path)?);
         let consume_result = super::verify_transaction_passport_file_and_reserve_agent_web_replays(
             &passport_path,
             &read_only_report,
@@ -282,18 +272,7 @@ fn invalidate_collected_proof_room_bundle(bundle: &Path) -> Result<(), CliError>
 }
 
 fn sync_collected_proof_room_bundle(path: &Path) -> Result<(), CliError> {
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            sync_collected_proof_room_bundle(&entry.path())?;
-        } else if file_type.is_file() {
-            fs::File::open(entry.path())?.sync_all()?;
-        }
-    }
-    #[cfg(unix)]
-    fs::File::open(path)?.sync_all()?;
-    Ok(())
+    crate::input::collection::sync_tree(path)
 }
 
 fn enforce_collect_kind_requirements(
@@ -514,7 +493,7 @@ fn collected_verifier_report(
     }
 
     let passport = read_collected_transaction_passport(bundle)?;
-    let evidence_graph_bytes = fs::read(bundle.join(&passport.evidence_graph_path))?;
+    let evidence_graph_bytes = crate::input::read(bundle.join(&passport.evidence_graph_path))?;
     let transparency_state =
         chio_control_plane::transaction_passport::transaction_evidence_graph_transparency_state(
             &evidence_graph_bytes,
@@ -562,8 +541,8 @@ fn attach_checker_provenance(report: &mut serde_json::Value) {
 fn read_collected_transaction_passport(
     bundle: &Path,
 ) -> Result<chio_control_plane::transaction_passport::TransactionPassport, CliError> {
-    let bytes = fs::read(bundle.join("transaction-passport.json"))?;
-    serde_json::from_slice(&bytes).map_err(CliError::from)
+    let bytes = crate::input::read(bundle.join("transaction-passport.json"))?;
+    crate::input::json(&bytes).map_err(CliError::from)
 }
 
 fn report_verified_claims(report: &serde_json::Value) -> Vec<String> {
@@ -671,7 +650,7 @@ fn write_catalog_negative_cases(
         if !prefix_matches && !claim_matches {
             continue;
         }
-        let destination = bundle.join("negatives/catalog").join(&descriptor.id);
+        let destination = fixture::negative_destination(bundle, &descriptor.id)?;
         if destination.exists() {
             fs::remove_dir_all(&destination)?;
         }
@@ -777,8 +756,8 @@ fn catalog_negative_prefixes(verifier_report: &serde_json::Value) -> Vec<&'stati
 }
 
 fn read_collected_evidence_graph(bundle: &Path) -> Result<CollectedEvidenceGraph, CliError> {
-    let bytes = fs::read(bundle.join("evidence-graph.json"))?;
-    serde_json::from_slice(&bytes).map_err(CliError::from)
+    let bytes = crate::input::read(bundle.join("evidence-graph.json"))?;
+    crate::input::json(&bytes).map_err(CliError::from)
 }
 
 fn collected_manifest_claims(
@@ -1049,8 +1028,8 @@ fn artifact_declares_schema(path: &Path, expected_schema: &str) -> Result<bool, 
 }
 
 fn artifact_schema_from_file(path: &Path) -> Result<String, CliError> {
-    let bytes = fs::read(path)?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let bytes = crate::input::read(path)?;
+    let value: serde_json::Value = crate::input::json(&bytes)?;
     Ok(value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -1097,7 +1076,7 @@ fn artifact(
 }
 
 fn artifact_ref(bundle: &Path, path: &str, schema: &str) -> Result<serde_json::Value, CliError> {
-    let bytes = fs::read(bundle.join(path))?;
+    let bytes = crate::input::read(bundle.join(path))?;
     Ok(serde_json::json!({
         "path": path,
         "sha256": chio_core::sha256_hex(&bytes),
@@ -1109,20 +1088,22 @@ fn collected_receipt_coverage(
     bundle: &Path,
     evidence_graph: &CollectedEvidenceGraph,
 ) -> Result<Vec<serde_json::Value>, CliError> {
+    let mut budget = crate::input::collection::Budget::default();
     let mut categories = BTreeSet::new();
     let mut coverage = Vec::new();
     for node in &evidence_graph.nodes {
+        budget.enter(0)?;
         if !is_terminal_receipt_schema(&node.schema) {
             continue;
         }
         chio_proof_room::validate_proof_room_bundle_relative_path(&node.path)
-            .map_err(CliError::cli_other_error)?;
+            .map_err(room::command_error)?;
         let source_path = bundle.join(&node.path);
         if !source_path.is_file() {
             continue;
         }
-        let bytes = fs::read(&source_path)?;
-        let receipt: serde_json::Value = serde_json::from_slice(&bytes)?;
+        let bytes = budget.read(&source_path)?;
+        let receipt: serde_json::Value = crate::input::json(&bytes)?;
         let Some(status) = receipt
             .get("terminal_status")
             .and_then(serde_json::Value::as_str)
@@ -1153,7 +1134,7 @@ fn collected_receipt_coverage(
             if let Some(parent) = destination_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::copy(&source_path, &destination_path)?;
+            fs::write(&destination_path, &bytes)?;
         }
         coverage.push(serde_json::json!({
             "category": category,
@@ -1271,7 +1252,7 @@ fn write_bundle_signature_to_path(
     keypair: &chio_core::Keypair,
     signature_path: &Path,
 ) -> Result<(), CliError> {
-    let manifest_bytes = fs::read(bundle.join("manifest.json"))?;
+    let manifest_bytes = crate::input::read(bundle.join("manifest.json"))?;
     let signed_payload = dsse_pre_auth_encoding(PROOF_ROOM_DSSE_PAYLOAD_TYPE, &manifest_bytes);
     let signature = serde_json::json!({
         "payloadType": PROOF_ROOM_DSSE_PAYLOAD_TYPE,

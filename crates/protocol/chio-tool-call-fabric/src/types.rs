@@ -1,6 +1,5 @@
 use std::time::SystemTime;
 
-use chio_core::canonical::canonical_json_bytes;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -71,15 +70,17 @@ pub struct ToolInvocation {
     /// hash without re-serializing.
     pub arguments: Vec<u8>,
     pub provenance: ProvenanceStamp,
+    /// Registry-admitted manifest metadata retained across provider dialects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridge_security: Option<chio_manifest::BridgeSecurityMetadata>,
 }
 
 impl ToolInvocation {
     /// Validate the fabric-level invariants that cannot be expressed by the
     /// public struct shape alone.
     ///
-    /// This check is intentionally additive: public fields remain constructible
-    /// for compatibility, while adapters and replay consumers can fail closed
-    /// before trusting a value that crossed a boundary.
+    /// Adapters and replay consumers must validate before using an invocation
+    /// that crossed a trust boundary.
     pub fn validate(&self) -> Result<(), ToolInvocationValidationError> {
         if self.provider != self.provenance.provider {
             return Err(ToolInvocationValidationError::ProviderMismatch {
@@ -92,15 +93,41 @@ impl ToolInvocation {
         validate_identity_field("provenance.request_id", &self.provenance.request_id)?;
         validate_identity_field("provenance.api_version", &self.provenance.api_version)?;
 
-        let arguments_value = serde_json::from_slice::<serde_json::Value>(&self.arguments)
-            .map_err(|source| ToolInvocationValidationError::InvalidArgumentJson { source })?;
-        let canonical = canonical_json_bytes(&arguments_value).map_err(|source| {
-            ToolInvocationValidationError::ArgumentCanonicalization {
-                message: source.to_string(),
+        // These are normalized native JSON values, including full-width integers.
+        // Decode original bytes before comparing against the same native encoder
+        // used by adapters, so duplicates and noncanonical spellings still refuse.
+        let value: serde_json::Value =
+            chio_core::canonical::UntrustedJsonText::from_wire(&self.arguments, 1024 * 1024)
+                .and_then(|text| text.decode_document())
+                .map_err(|source| ToolInvocationValidationError::InvalidArgumentJson { source })?;
+        let canonical = chio_core::canonical_json_bytes(&value).map_err(|error| {
+            ToolInvocationValidationError::InvalidArgumentJson {
+                source: chio_core::canonical::UntrustedJsonError::Canonicalization(error),
             }
         })?;
         if canonical != self.arguments {
             return Err(ToolInvocationValidationError::NonCanonicalArguments);
+        }
+        if self.arguments.first() != Some(&b'{') {
+            return Err(ToolInvocationValidationError::NonObjectArguments);
+        }
+        if let Some(security) = &self.bridge_security {
+            if !security.has_registry_coordinates() {
+                return Err(ToolInvocationValidationError::UnadmittedBridgeSecurity);
+            }
+            let bound_tool = security
+                .tool_name()
+                .ok_or(ToolInvocationValidationError::UnadmittedBridgeSecurity)?;
+            let matches_regular = bound_tool == self.tool_name;
+            let matches_server_tool =
+                chio_manifest::ServerTool::from_anthropic_wire_name(&self.tool_name)
+                    .is_some_and(|tool| tool.as_str() == bound_tool);
+            if !matches_regular && !matches_server_tool {
+                return Err(ToolInvocationValidationError::BridgeToolMismatch {
+                    invocation: self.tool_name.clone(),
+                    admitted: bound_tool.to_string(),
+                });
+            }
         }
 
         Ok(())
@@ -195,6 +222,8 @@ fn validate_identity_field(
 
 #[derive(Debug, Error)]
 pub enum ToolInvocationValidationError {
+    #[error("tool invocation arguments must be an object")]
+    NonObjectArguments,
     #[error(
         "tool invocation provider {invocation:?} did not match provenance provider {provenance:?}"
     )]
@@ -202,15 +231,20 @@ pub enum ToolInvocationValidationError {
         invocation: ProviderId,
         provenance: ProviderId,
     },
-    #[error("tool invocation arguments were not JSON: {source}")]
+    #[error("tool invocation arguments rejected: {source}")]
     InvalidArgumentJson {
         #[source]
-        source: serde_json::Error,
+        source: chio_core::canonical::UntrustedJsonError,
     },
-    #[error("tool invocation arguments could not be canonicalized: {message}")]
-    ArgumentCanonicalization { message: String },
     #[error("tool invocation arguments were not canonical JSON bytes")]
     NonCanonicalArguments,
+    #[error("tool invocation bridge security was not registry admitted")]
+    UnadmittedBridgeSecurity,
+    #[error("tool invocation name {invocation} did not match admitted manifest tool {admitted}")]
+    BridgeToolMismatch {
+        invocation: String,
+        admitted: String,
+    },
     #[error("tool invocation {field} {reason}")]
     InvalidIdentity {
         field: &'static str,

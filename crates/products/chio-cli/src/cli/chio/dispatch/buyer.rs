@@ -36,13 +36,15 @@ pub(crate) fn cmd_chio_attest_buyer_package(run_output: &Path, out: &Path) -> Re
                 .to_string(),
         ));
     }
+    let mut budget = crate::input::collection::Budget::default();
     let mut artifacts = Vec::new();
     let mut packet_json = None;
     let mut generated_at_unix_ms = None;
     for (role, relative_path) in BUYER_REVIEW_ARTIFACT_FILES {
         validate_runtime_relative_path(relative_path)?;
-        let path = run_output.join(relative_path);
-        let bytes = fs::read(&path).map_err(|error| {
+        let path = crate::input::collection::member(run_output, relative_path)?;
+        budget.enter(artifact_depth(&path))?;
+        let bytes = budget.read(&path).map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read Chio buyer review artifact {}: {error}",
                 path.display()
@@ -64,7 +66,7 @@ pub(crate) fn cmd_chio_attest_buyer_package(run_output: &Path, out: &Path) -> Re
                 ))
             })?;
             let manifest: chio_attest_buyer::RuntimeEvidenceManifest =
-                serde_json::from_str(&manifest_json).map_err(|error| {
+                crate::input::text(&manifest_json).map_err(|error| {
                     CliError::cli_other_error(format!(
                         "Chio runtime evidence manifest {} parse: {error}",
                         path.display()
@@ -185,10 +187,8 @@ pub(crate) fn cmd_chio_attest_buyer_explain(
     out: &Path,
 ) -> Result<(), CliError> {
     let report_json = read_utf8_json_file(report_path, "Chio buyer review report")?;
-    let report: chio_attest_buyer::BuyerAttestationReviewReport =
-        serde_json::from_str(&report_json).map_err(|error| {
-            CliError::cli_other_error(format!("Chio buyer review report: {error}"))
-        })?;
+    let report: chio_attest_buyer::BuyerAttestationReviewReport = crate::input::text(&report_json)
+        .map_err(|error| CliError::cli_other_error(format!("Chio buyer review report: {error}")))?;
     let verification_state = buyer_review_verification_state(&report);
     match format {
         "json" => {
@@ -295,6 +295,7 @@ pub(crate) fn read_buyer_review_sources(
     base_dir: &Path,
     package: &chio_attest_buyer::BuyerAttestationReviewPackage,
 ) -> Result<Vec<chio_attest_buyer::BuyerAttestationReviewSource>, CliError> {
+    let mut budget = crate::input::collection::Budget::default();
     let mut sources = Vec::new();
     let mut roles = std::collections::BTreeSet::new();
     let mut paths = std::collections::BTreeSet::new();
@@ -312,8 +313,9 @@ pub(crate) fn read_buyer_review_sources(
                 artifact.relative_path
             )));
         }
-        let path = base_dir.join(&artifact.relative_path);
-        let bytes = fs::read(&path).map_err(|error| {
+        let path = crate::input::collection::member(base_dir, &artifact.relative_path)?;
+        budget.enter(artifact_depth(&path))?;
+        let bytes = budget.read(&path).map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read Chio buyer review artifact {}: {error}",
                 path.display()
@@ -326,4 +328,8 @@ pub(crate) fn read_buyer_review_sources(
         });
     }
     Ok(sources)
+}
+
+fn artifact_depth(path: &Path) -> usize {
+    path.components().count()
 }

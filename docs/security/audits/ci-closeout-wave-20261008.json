@@ -1,0 +1,102 @@
+{
+  "schema": "chio.foundation-ci-closeout-wave.v1",
+  "source_baseline": "71b0e88c2423566a0bfaae7f467be40400a698a8",
+  "local_history_checkpoint": "369b00c48aae7d1e55a2f9a28f527692188c9740",
+  "pr": 1160,
+  "requirements_before": 1794,
+  "requirements_after": 1799,
+  "new_requirement_ids": [
+    "incoming-pr1160-review-20261008:ci-closeout:XTC001",
+    "incoming-pr1160-review-20261008:ci-closeout:ADI001",
+    "incoming-pr1160-review-20261008:ci-closeout:APF001",
+    "incoming-pr1160-review-20261008:ci-closeout:CLOCK001",
+    "incoming-pr1160-review-20261008:ci-closeout:NCD001"
+  ],
+  "status": "focused-repairs-published-inventory-followup-local",
+  "preservation": "All existing requirement objects and source records remain unchanged. Existing failure, cancellation and unqualified states remain separate.",
+  "trusted_definition_merge": "5bb4ae6a52f3f6858d0c0cdc6b7e098277b537d8",
+  "hosted_failures": [
+    {
+      "job": 113365001571,
+      "kind": "stale-authorized-source-controller-refusal"
+    },
+    {
+      "job": 113379679515,
+      "kind": "stale-exact-test-inventory"
+    },
+    {
+      "job": 113379679581,
+      "kind": "stale-authorized-source-tooling-cohort"
+    },
+    {
+      "job": 113379679529,
+      "kind": "stale-authorized-source-tooling-cohort"
+    },
+    {
+      "job": 113365035032,
+      "kind": "clock-structural-gate-repaired-locally"
+    },
+    {
+      "job": 113379679680,
+      "kind": "keyring-checkpoint-exact-inventory-repair-pending"
+    }
+  ],
+  "remaining_boundary": "Four exact required checks, local qualification and current thread dispositions before foundation landing; native/trusted platform and release acceptance remain independently open.",
+  "source_integrations": {
+    "APF001": {
+      "commit": "fc82c723ce8f165e021f0a7c5e213c18fa680779",
+      "producer_commit": "26de0050eef43cf3287fe098c95691543eec8300",
+      "independent_review_seal_sha256": "2795fe6cc76a02f69413238ffea41bbb644e30e0c045e53d28fd728976bb9eb4",
+      "qualified": false
+    },
+    "ADI001": {
+      "commit": "439793268ddae842762c6eef29975f537462e093",
+      "producer_commit": "7fcd65355c3eb8b4fa5cea53f12f758194424ef4",
+      "independent_review_seal_sha256": "a5839736dde117752a74b20e13f5e4862ecc3a49da85f0d78eafee3637f46459",
+      "qualified": false,
+      "composed_inventory_commit": "b90834e85d05961f77eac2d14585fe30251fd0d4",
+      "portable_followup_commits": [
+        "270b40dc046b8aaa4bda9324f56d0d1dd26691bf",
+        "aebff22265ea9c63d383ee550b84632a05ca12e4"
+      ]
+    },
+    "NCD001": {
+      "commits": [
+        "2c4201d61068002f9ab906826bc701f443077ef5",
+        "21b997175117376f4a04258a21171fbe55a07bd2"
+      ],
+      "producer_to_integration": {
+        "8f229e7a25c02094bf099cd423dff946cc8fea0f": "2c4201d61068002f9ab906826bc701f443077ef5",
+        "75260051a57a31cb24685e3977ec130074208fc7": "21b997175117376f4a04258a21171fbe55a07bd2"
+      },
+      "qualified": false
+    },
+    "CLOCK001": {
+      "commits": [
+        "67ad2f73f29695f2fd8ed2bac30a58ff7b0d0259"
+      ],
+      "producer_to_integration": {
+        "84c5c4c1f9e3fb190db74722239d14e07dd4cdc9": "67ad2f73f29695f2fd8ed2bac30a58ff7b0d0259"
+      },
+      "qualified": false
+    },
+    "XTC001": {
+      "commits": [
+        "3f061148c7a255f6a0afcca9be6de09c3a9966e7",
+        "9a9bcf22dd221932a4938f7c7ff91cbb1b078508"
+      ],
+      "qualified": false
+    }
+  },
+  "composed_runtime": {
+    "source": "783738b780eec41da29186b3c25e0c3665327fef",
+    "focused_passes": 47,
+    "strict_production_and_approval_exit": 0,
+    "strict_units_and_tests_exit": 0,
+    "root_source_equivalence": "b90834e85d05961f77eac2d14585fe30251fd0d4",
+    "whole_candidate_qualified": false
+  },
+  "published_source": "9a9bcf22dd221932a4938f7c7ff91cbb1b078508",
+  "inventory_followup_source": "aebff22265ea9c63d383ee550b84632a05ca12e4",
+  "working_agreement": "Operator directive relayed via mailbox October8 16:56-17:01 UTC: fix with regression in one commit, focused batch verification, one batch review, push; hosted CI provides full suite. No changed checks or authority."
+}

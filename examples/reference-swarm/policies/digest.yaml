@@ -1,0 +1,12 @@
+# The digest edge: only sha256 is granted, so canonical_json is the scope
+# a worker cannot widen into.
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 2
+capabilities:
+  default:
+    tools:
+      - server: "reference-digest"
+        tool: "sha256"
+        operations: [invoke]
+        ttl: 900

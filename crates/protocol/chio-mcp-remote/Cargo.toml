@@ -16,6 +16,7 @@ public_entrypoint = true
 name = "chio_mcp_remote"
 
 [dependencies]
+thiserror = { workspace = true }
 async-trait = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
@@ -23,7 +24,10 @@ chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
 chio-mcp-adapter = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-secure-ipc = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -33,13 +37,25 @@ axum = "0.8"
 async-stream = "0.3"
 url = "2"
 base64 = "0.22"
+hmac = { workspace = true }
 reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
 rusqlite = { workspace = true }
+rustix = { workspace = true }
 rsa = { version = "0.9", features = ["sha2"] }
 p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["ecdsa"] }
 sha2 = { workspace = true }
 subtle = "2.6"
+zeroize = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+chio-errors = { workspace = true }
+tempfile = { workspace = true }
+rcgen = "0.13.2"
+chio-siem = { workspace = true }
+chio-test-support = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
+tower = { workspace = true, features = ["util"] }

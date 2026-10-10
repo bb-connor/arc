@@ -64,7 +64,10 @@ impl SqliteFindingPurchaseStore {
     /// request policy that authorized it. Exact reservation replays require
     /// the same request binding; a different public request cannot claim the
     /// reservation or any terminal it later reaches.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn open_live_public_reservation(
         &self,
         input: &FindingPurchaseReservationInput<'_>,

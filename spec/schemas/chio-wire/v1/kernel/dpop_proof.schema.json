@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/dpop_proof.schema.json",
+  "title": "Chio invocation proof of possession",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signature"
+  ],
+  "properties": {
+    "signature": {
+      "$ref": "../capability/governed-approval-token.schema.json#/$defs/governedApprovalSignature"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "capability_id",
+        "tool_server",
+        "tool_name",
+        "action_hash",
+        "nonce",
+        "issued_at",
+        "agent_key"
+      ],
+      "properties": {
+        "schema": {
+          "enum": [
+            "chio.dpop_proof.v1",
+            "chio.dpop_proof.v2"
+          ]
+        },
+        "replay_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "destination_store_uuid",
+            "dpop_authority_id",
+            "expectation_id",
+            "proof_ttl_secs",
+            "max_clock_skew_secs"
+          ],
+          "properties": {
+            "destination_store_uuid": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "dpop_authority_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "expectation_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "proof_ttl_secs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "max_clock_skew_secs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 300
+            }
+          }
+        },
+        "capability_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issued_at": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "agent_key": {
+          "$ref": "../capability/governed-approval-token.schema.json#/$defs/governedApprovalPublicKey"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schema": {
+                "const": "chio.dpop_proof.v2"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "replay_authority"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "replay_authority"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

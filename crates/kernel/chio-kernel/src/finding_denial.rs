@@ -59,10 +59,27 @@ impl fmt::Display for FindingDenialCode {
 ///
 /// Displays as its prose detail so existing receipt and log text is
 /// unchanged; consumers that need the family match on [`Self::code`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct FindingDenial {
     code: FindingDenialCode,
     detail: String,
+    source: Option<std::sync::Arc<dyn std::error::Error + Send + Sync>>,
+}
+
+// Native diagnostics do not participate in the closed denial identity.
+impl PartialEq for FindingDenial {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code && self.detail == other.detail
+    }
+}
+impl Eq for FindingDenial {}
+impl fmt::Debug for FindingDenial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FindingDenial")
+            .field("code", &self.code)
+            .field("detail", &self.detail)
+            .finish()
+    }
 }
 
 impl FindingDenial {
@@ -71,6 +88,21 @@ impl FindingDenial {
         Self {
             code,
             detail: detail.into(),
+            source: None,
+        }
+    }
+
+    /// Retain a local cause while keeping public denial text independent of it.
+    #[must_use]
+    pub fn with_source(
+        code: FindingDenialCode,
+        detail: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            code,
+            detail: detail.into(),
+            source: Some(std::sync::Arc::new(source)),
         }
     }
 
@@ -97,6 +129,7 @@ impl FindingDenial {
         Self {
             code: self.code,
             detail: format!("{prefix}: {}", self.detail),
+            source: self.source,
         }
     }
 
@@ -180,7 +213,13 @@ impl fmt::Display for FindingDenial {
     }
 }
 
-impl std::error::Error for FindingDenial {}
+impl std::error::Error for FindingDenial {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source
+            .as_deref()
+            .map(|source| -> &(dyn std::error::Error + 'static) { source })
+    }
+}
 
 impl From<FindingDenial> for String {
     fn from(denial: FindingDenial) -> Self {

@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 /// A failed event entry stored in the dead-letter queue.
 #[derive(Debug, Clone)]
 pub struct FailedEvent {
-    /// JSON-serialized SiemEvent that could not be exported.
+    /// JSON-serialized unsigned sink projection that could not be exported.
     pub event_json: String,
     /// Human-readable description of the export error.
     pub error: String,

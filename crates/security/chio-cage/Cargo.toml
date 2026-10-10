@@ -1,0 +1,36 @@
+[package]
+name = "chio-cage"
+description = "Verified manifest admission and retained-resource boundary for native tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[package.metadata.chio]
+public_entrypoint = true
+
+[features]
+real-linux-enforcement = []
+enforcement-mutants = ["chio-cage-plan/enforcement-mutants", "chio-cage-init/enforcement-mutants"]
+
+[dependencies]
+chio-cage-plan = { workspace = true }
+chio-core = { workspace = true }
+chio-manifest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+chio-cage-init = { workspace = true }
+libc = "0.2"
+
+[dev-dependencies]
+chio-cage-plan = { workspace = true, features = ["enforcement-mutants"] }
+chio-test-support = { workspace = true }
+
+[lints]
+workspace = true

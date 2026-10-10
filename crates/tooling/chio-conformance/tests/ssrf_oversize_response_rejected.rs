@@ -51,7 +51,7 @@ fn bridge_construction_accepts_in_scope_url() {
         base_url: "https://api.example.com".to_string(),
         egress_contract: Some(tight_response_size_contract()),
     };
-    let _bridge = OpenApiMcpBridge::from_spec(MINIMAL_OPENAPI_SPEC, cfg)
+    let _bridge = OpenApiMcpBridge::from_spec(MINIMAL_OPENAPI_SPEC.as_bytes(), cfg)
         .expect("bridge builds with allow-listed authority");
 }
 
@@ -68,4 +68,33 @@ fn contract_rejects_oversize_response() {
             max: 1024
         }
     ));
+}
+
+#[test]
+fn original_spec_rejections_retain_sources_and_never_project_a_bridge() {
+    use chio_openapi_mcp_bridge::BridgeError;
+    use std::error::Error;
+    let inputs = [
+        br#"{"openapi":"3.0.0","openapi":"private_marker"}"#.to_vec(),
+        b"openapi: 3.0.0\nopenapi: private_marker".to_vec(),
+        vec![b' '; 8 * 1024 * 1024 + 1],
+        vec![0xff],
+    ];
+    for input in inputs {
+        let config = BridgeConfig {
+            public_key: Keypair::from_seed(&[44u8; 32]).public_key().to_hex(),
+            server_id: "svc".into(),
+            server_name: "svc".into(),
+            server_version: "1".into(),
+            base_url: "https://api.example.com".into(),
+            egress_contract: Some(tight_response_size_contract()),
+        };
+        let error = match OpenApiMcpBridge::from_spec(&input, config) {
+            Err(error) => error,
+            Ok(_) => panic!("invalid original spec was projected"),
+        };
+        assert!(matches!(error, BridgeError::OpenApi(_)));
+        assert!(error.source().is_some());
+        assert!(!format!("{error:?} {error}").contains("private_marker"));
+    }
 }

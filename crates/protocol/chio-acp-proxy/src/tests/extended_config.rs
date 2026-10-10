@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn config_builder_defaults() {
     let config = AcpProxyConfig::new("agent-cmd", "pubkey-hex");
@@ -30,8 +32,7 @@ fn config_builder_chaining() {
 
 #[test]
 fn proxy_start_with_nonexistent_command_fails() {
-    let config =
-        AcpProxyConfig::new("/nonexistent/path/to/fake-agent-binary-xyz123", "deadbeef");
+    let config = AcpProxyConfig::new("/nonexistent/path/to/fake-agent-binary-xyz123", "deadbeef");
     let result = AcpProxy::start(config);
     assert!(
         result.is_err(),

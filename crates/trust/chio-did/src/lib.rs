@@ -47,6 +47,7 @@ pub enum DidError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidChio {
     public_key: PublicKey,
+    ed25519_bytes: [u8; 32],
 }
 
 impl DidChio {
@@ -56,7 +57,13 @@ impl DidChio {
                 public_key.algorithm().prefix().to_string(),
             ));
         }
-        Ok(Self { public_key })
+        let ed25519_bytes = *public_key.ed25519_bytes().map_err(|_| {
+            DidError::UnsupportedKeyAlgorithm(public_key.algorithm().prefix().to_string())
+        })?;
+        Ok(Self {
+            public_key,
+            ed25519_bytes,
+        })
     }
 
     pub fn try_from_public_key(public_key: PublicKey) -> Result<Self, DidError> {
@@ -82,7 +89,7 @@ impl DidChio {
     pub fn public_key_multibase(&self) -> String {
         let mut value = Vec::with_capacity(ED25519_PUB_MULTICODEC_PREFIX.len() + 32);
         value.extend_from_slice(&ED25519_PUB_MULTICODEC_PREFIX);
-        value.extend_from_slice(self.public_key.as_bytes());
+        value.extend_from_slice(&self.ed25519_bytes);
         format!("z{}", bs58::encode(value).into_string())
     }
 
@@ -319,7 +326,12 @@ mod tests {
             .expect("base58btc prefix");
         let decoded = bs58::decode(encoded).into_vec().expect("decode multibase");
         assert_eq!(&decoded[..2], &ED25519_PUB_MULTICODEC_PREFIX);
-        assert_eq!(&decoded[2..], did.public_key().as_bytes());
+        assert_eq!(
+            &decoded[2..],
+            did.public_key()
+                .ed25519_bytes()
+                .expect("validated Ed25519 DID")
+        );
     }
 
     #[test]

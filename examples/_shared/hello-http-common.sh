@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Smoke runs create authority databases and bearer tokens. Their fresh state
+# must be private; the authority still rejects unsafe existing ancestors.
+umask 077
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 pick_free_port() {
@@ -93,6 +97,24 @@ ensure_chio_bin() {
     (cd "${ROOT}" && cargo build --bin chio >/dev/null)
   fi
   printf '%s\n' "${chio_bin}"
+}
+
+create_demo_signing_custody() {
+  local seed_path="$1"
+  python3 - "${seed_path}" <<'PY'
+import os
+from pathlib import Path
+import secrets
+import sys
+
+# Fresh private custody for this smoke run only. Refuse an existing pathname.
+path = Path(sys.argv[1])
+descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+    handle.write(secrets.token_hex(32) + "\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
 }
 
 issue_demo_capability() {

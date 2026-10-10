@@ -14,6 +14,73 @@ integration surface. `chio-cli`, `chio-wall`, and `chio-mercury` build their
 `chio` binaries on it; `chio-mcp-remote` and `chio-hosted-mcp` re-export its
 `CliError` and `JwtProviderProfile`.
 
+Signed authority replication defaults to zero future issue skew. Operators
+with a measured receiver clock lag can explicitly set
+`chio trust serve --authority-replication-max-future-skew-seconds 1`
+(or `TrustServiceConfig::authority_replication_max_future_skew_seconds`). The
+configured bound is 0 to 60 seconds. It applies only to signed envelope issue
+times, never to expiry, local clock regression or issuer activation deadlines.
+Followers refuse authority verification reads when their authenticated
+envelope expires or an authority import from the elected leader is unresolved.
+The successful import must belong to the current process and the current
+election term; restart, leader changes and failed synchronization require
+another authenticated import before a follower serves issuer trust.
+Clustered trust reads also require current quorum. The elected leader needs
+live signing custody of its authenticated head and enough authenticated peer
+chain agreements observed in its current term to reach quorum. Each agreement
+binds the configured peer's advertised self URL before and after its envelope;
+an alias for one logical node cannot supply another authority vote. Key possession
+and URL election alone cannot authorize a returning former custodian. Known
+authenticated newer or conflicting history prevents old-head serving even if
+its import refuses replay or that peer later becomes unreachable. A peer with
+an authority error contributes no agreement; a fresh signed majority can still
+admit the leader after a minority's transport failure.
+Refused signed-history evidence retains the maximal authenticated chain within
+the existing chain limit. A shorter valid relay cannot erase that witness or
+create a conflict. Truly incomparable signed histories remain a serving refusal
+for the process, even if a later import encompasses one branch.
+Followers require an elected source that itself admits the imported state
+under stable source leader, quorum and term samples. Internal signed exports
+remain available for convergence before either node can serve, allowing a
+leader to observe signed peer agreement before followers confirm its status.
+Nonleader relays authenticate history but cannot overwrite a follower's
+leader-confirmed envelope; inspection of a consistent prefix does not relax
+the replay rules of an actual import.
+Confirmation binds the exact imported signed envelope, including its issue and
+expiry times and signature. Locally re-signing an old head cannot renew that
+confirmation. Reads recheck leader, term, quorum and the exact admitted view
+before return. Public trust documents and verification use that same view
+throughout construction. A signing operation binds its actual artifact key to
+the admitted live head and rechecks admission before returning the artifact.
+Public JWKS, verifier metadata/discovery and OID4VP issuer verification use
+the same freshness contract and the bounded public passport admission lane.
+Those authority document routes return HTTP 503 when a configured SQLite
+authority cannot pass admission, including absent storage, clock regression or
+unsafe file custody. Generic-market listings require their discovery signer to
+own the locally inspected live authority head and can refuse with HTTP 409 on
+followers. Cluster-wide authority admission for those listings remains follow-up
+work. Missing plain-seed authority routes retain their existing refusal statuses.
+With no authority configured, issuer
+metadata remains unsigned with no portable signing key or JWKS; discovery and
+JWKS refuse with 404, and OID4VP trust reads refuse with 409.
+Unconfigured health returns 200 with `configured: false` and `available: true`
+for a successful inspection, while publishing no backend or key material.
+Health then reports unavailable authority with HTTP 503 and degraded peer
+counts; independent revocation and budget replication continue. An admitted
+leader or a confirmed import from that leader restores authority readiness.
+Authenticated authority inspections use a separate eight-permit, non-queued
+blocking lane. Cancellation retains admission until the worker completes.
+Owner provisioning, mutation fences and SQLite issuance use the service clock
+and configured receiver policy, preserving local clock regression refusal.
+Explicit service startup provisions a configured plain signing seed through
+the owner custody loader. Requests load it only if it still exists; losing
+that seed causes refusal and never creates replacement custody. Keyring-owned
+seeds remain under keyring initialization and are not provisioned by this path.
+Health also returns HTTP 503 when configured authority storage is absent or
+unreadable. Its independent single-permit inspection lane never provisions
+authority storage or occupies authenticated request admission; a cancelled
+request retains its permit until the blocking inspection finishes.
+
 ## Responsibilities
 
 - Build a `ChioKernel` from a `LoadedPolicy` and wire local (SQLite) or remote
@@ -85,6 +152,69 @@ Re-exported facade crates: `agent_web` (`chio-agent-web-interop`),
 (`chio-risk-comptroller`), `commerce_order` (`chio-commerce-order`),
 `transaction_passport` (`chio-transaction-passport`), `trust_market`
 (`chio-trust-market-context`).
+
+## Prepared flow dispatch
+
+`security::adapters::PersistentFlowResolver::prepare_dispatch` returns an opaque,
+one-shot `PreparedFlowDispatch` tied to that resolver's immutable manifest and
+policy configuration. Preparation validates and classifies without consuming a
+declassification grant, joining flow state, acquiring a fence or emitting a
+receipt. Dropping the plan has no such effects. Its consuming `commit` method
+rechecks the exact current flow snapshot, grant/fence deadlines and the original
+authority's clock, then follows the existing attested consumption and outcome
+path. It cannot accept replacement inputs, stores or a different resolver.
+
+The plan borrows its original request and exposes `live_request_digest`, a
+commitment to the complete canonical envelope including transient credentials.
+`validate_live_request` checks a candidate against that commitment; commit also
+rechecks the borrowed request before mutation. This is not authentication or
+operation-owned custody. The existing flow/declassification request hash binds
+only the canonical argument payload and remains unchanged. Neither hash can
+replace the other, or the credential-stripped original admission material hash.
+
+The existing `commit_dispatch` entry point uses this same preparation path.
+Preparation is not operation-owned security custody or an external execution
+permit. Flow, declassification and receipt stores retain their existing separate
+transactions; full joined custody and crash recovery remain required.
+
+## Native input and post-join flow policy
+
+`security::adapters::NativeFlowResolver` uses the same read-only verified-manifest
+and classifier policy as the legacy resolver, but owns no legacy state backend.
+As a `SecurityPreDispatchHook`, it validates admitted manifest/bridge metadata
+and classifies the original canonical arguments before budget capture. It joins
+classification plus the operator floor through `NativeSecurityFlowJoinAuthority::join_input`.
+The kernel derives identity and intent; the fenced SQLite writer resolves every
+inherited principal, lineage and session label and propagates the full source
+in the operation's single join. No partial snapshot stands in for absent state.
+
+It consumes `PreparedNativeSecurityEgress` from the kernel, classifies that
+handle's borrowed request against its fresh native observation, and requires
+the full computed taint to be covered by each already joined native label.
+Insufficient propagation or changed classification denies without another join.
+
+Its one-shot `PreparedNativeFlowDispatch::commit_custody` revalidates the
+original operation and policy clock. Egress decisions acquire and commit native
+custody; local non-egress decisions do not manufacture a fence. Callback panics,
+clock failures, mismatched authority, legacy evidence-store configuration and
+native declassification fail closed. The result is historical policy and
+optional egress data, never an execution permit or credential disposition.
+
+`policy_evidence()` exposes the exact canonical policy record produced during
+that preparation: classifier evidence and category bindings, admitted policy and
+manifest commitments, native observation, original/live request digests, decision
+and deadline. The record is limited to 256 KiB and excludes argument payloads and
+reusable credentials. Oversized evidence denies before egress acquisition. Its
+bytes survive custody commitment unchanged; neither decoding nor retaining them
+can substitute for the pending durable dispatch ledger and current credentials.
+Classifier field paths, labels and other policy metadata may still be sensitive;
+the canonical record is not intended for unredacted application logs.
+
+The production before-budget hook and complete first join are implemented.
+Dispatch-ledger/credential coupling,
+native nonce/declassification, outcome recovery and activation remain required.
+The real-kernel SQLite tests use the test-support checkpoint and retain the
+unconditional native dispatch refusal.
 
 ## Feature flags
 

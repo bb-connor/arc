@@ -533,7 +533,7 @@ fn finding_challenge_every_value_bearing_role_enforces_authenticated_lifecycle()
                     &case.upheld.sanction_case_id,
                     &case.upheld.hold,
                     &hex64('7'),
-                    APPEAL_FINAL_AT,
+                    fixture_commit_time(APPEAL_FINAL_AT),
                 )
                 .expect_err("a revoked finalization authority signs no enforcement"),
             ChallengeCoordinatorError::AuthorityLifecycle {

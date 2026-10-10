@@ -1,0 +1,261 @@
+//! Governed parent issuance and verification for the explicit broker host.
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use chio_control_plane::KeyringRuntimeComposition;
+use chio_core_types::canonical_json_bytes;
+use chio_core_types::capability::token::CapabilityToken;
+use chio_keyring::{
+    KeyLogPolicyDocument, KeyringArtifactSignature, SignedArtifactTimeAnchor,
+    SqlitePinnedKeyLogVerifier, SystemClock,
+};
+use chio_security_types::clock::Clock;
+use serde::{Deserialize, Serialize};
+
+use super::state::error;
+use crate::CliError;
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Config {
+    pub runtime_config: PathBuf,
+    pub authority_seed_file: PathBuf,
+    pub receipt_anchor_directory: PathBuf,
+    pub verification_policy: KeyLogPolicyDocument,
+}
+
+impl Config {
+    pub fn validate(&self) -> Result<(), CliError> {
+        if !self.runtime_config.is_absolute()
+            || !self.authority_seed_file.is_absolute()
+            || !self.receipt_anchor_directory.is_absolute()
+        {
+            return Err(error("keyring host paths must be absolute"));
+        }
+        self.verification_policy
+            .clone()
+            .into_policy()
+            .map_err(error)?;
+        Ok(())
+    }
+
+    pub fn verifier(&self, path: &Path) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
+        self.verifier_with_clock(path, Arc::new(SystemClock))
+    }
+
+    fn verifier_with_clock(
+        &self,
+        path: &Path,
+        clock: Arc<dyn Clock>,
+    ) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
+        SqlitePinnedKeyLogVerifier::open(
+            path,
+            self.verification_policy
+                .clone()
+                .into_policy()
+                .map_err(error)?,
+            clock,
+        )
+        .map_err(|cause| error(format!("cannot open pinned key-log verifier: {cause}")))
+    }
+}
+
+pub(super) struct HostKeyring {
+    pub runtime: KeyringRuntimeComposition,
+    pub verifier: SqlitePinnedKeyLogVerifier,
+}
+
+impl HostKeyring {
+    pub fn authority(&self) -> Result<Box<dyn chio_kernel::CapabilityAuthority>, CliError> {
+        self.runtime.capability_verification_state()?;
+        let runtime = self.runtime.clone();
+        Ok(Box::new(ParentAuthority {
+            inner: self.runtime.capability_authority()?,
+            live_key_log: Box::new(move || runtime.capability_verification_state()),
+        }))
+    }
+
+    pub fn open(
+        config: &Config,
+        directory: &Path,
+        initializing: bool,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, CliError> {
+        config.validate()?;
+        // Preserve the original audit signer. These authority receipts cannot
+        // enter the kernel's single-signer call checkpoint stream.
+        let receipts = Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_clock(
+                directory.join("keyring-receipts.db"),
+                &config.receipt_anchor_directory,
+                clock.clone(),
+            )?,
+        );
+        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+        // This loader completes an existing rotation handoff or refuses a stale
+        // seed. Never replace governed signing with the host's receipt key.
+        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed_with_clock(
+            &config.runtime_config,
+            &config.authority_seed_file,
+            receipts,
+            clock.clone(),
+        )?;
+        let path = directory.join("keylog-verifier.db");
+        let verifier = if initializing {
+            SqlitePinnedKeyLogVerifier::provision(
+                &path,
+                config
+                    .verification_policy
+                    .clone()
+                    .into_policy()
+                    .map_err(error)?,
+                clock.clone(),
+            )
+            .map_err(error)?
+        } else {
+            config.verifier_with_clock(&path, clock)?
+        };
+        let base = verifier.pin().map_err(error)?;
+        verifier
+            .apply_sync(&runtime.key_log_synchronization_response(base.as_ref())?)
+            .map_err(error)?;
+        Ok(Self { runtime, verifier })
+    }
+
+    pub fn evidence(&self, capability: &CapabilityToken) -> Result<Evidence, CliError> {
+        let original = self.runtime.capability_signing_evidence(capability)?;
+        let evidence = Evidence {
+            signature: original.evidence,
+            time_anchor: original
+                .time_anchor
+                .ok_or_else(|| error("governed capability has no original trusted-time anchor"))?,
+        };
+        evidence.verify(capability, &self.verifier)?;
+        Ok(evidence)
+    }
+}
+
+type LiveKeyLog = dyn Fn() -> Result<
+        (
+            chio_security_types::clock::UnixMillis,
+            chio_keyring::KeyLogState,
+        ),
+        CliError,
+    > + Send
+    + Sync;
+
+struct ParentAuthority {
+    inner: chio_kernel::GovernedCapabilityAuthority,
+    live_key_log: Box<LiveKeyLog>,
+}
+
+impl chio_kernel::CapabilityAuthority for ParentAuthority {
+    fn authority_public_key(&self) -> chio_core_types::PublicKey {
+        self.inner.authority_public_key()
+    }
+
+    fn trusted_public_keys(&self) -> Vec<chio_core_types::PublicKey> {
+        match (self.live_key_log)() {
+            Ok((now, state)) => state
+                .witnessed_verification_keys_at(now.get())
+                .into_iter()
+                .map(|record| record.public_key)
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &chio_core_types::PublicKey,
+        issued_at: u64,
+        _now: u64,
+    ) -> Result<(), chio_kernel::KernelError> {
+        let (now, state) = (self.live_key_log)().map_err(|error| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(format!(
+                "current witnessed issuer authority unavailable: {error}"
+            ))
+        })?;
+        let permitted = state
+            .witnessed_verification_keys_at(now.get())
+            .into_iter()
+            .any(|key| {
+                key.public_key == *issuer
+                && issued_at >= key.activated_at / 1_000
+                && issued_at <= now.as_secs()
+                // A whole-second token cannot prove that it preceded a cutoff
+                // inside the same second. Require issuance before that second.
+                && key.deactivated_at.is_none_or(|cutoff| issued_at < cutoff / 1_000)
+            });
+        if permitted {
+            Ok(())
+        } else {
+            Err(chio_kernel::KernelError::UntrustedIssuer)
+        }
+    }
+
+    fn issue_capability(
+        &self,
+        subject: &chio_core_types::PublicKey,
+        scope: chio_core_types::capability::scope::ChioScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, chio_kernel::KernelError> {
+        self.inner.issue_capability(subject, scope, ttl_seconds)
+    }
+
+    fn issue_aggregate_family_root(
+        &self,
+        subject: &chio_core_types::PublicKey,
+        scope: chio_core_types::capability::scope::ChioScope,
+        ttl_seconds: u64,
+        max_invocations: u32,
+    ) -> Result<CapabilityToken, chio_kernel::KernelError> {
+        self.inner
+            .issue_aggregate_family_root(subject, scope, ttl_seconds, max_invocations)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Evidence {
+    signature: KeyringArtifactSignature,
+    time_anchor: SignedArtifactTimeAnchor,
+}
+
+impl Evidence {
+    pub fn verify(
+        &self,
+        capability: &CapabilityToken,
+        verifier: &SqlitePinnedKeyLogVerifier,
+    ) -> Result<(), CliError> {
+        capability.validate_schema().map_err(error)?;
+        let key = verifier
+            .verify_artifact_signing_evidence(
+                &canonical_json_bytes(&capability.signing_body()).map_err(error)?,
+                &self.signature,
+                &self.time_anchor,
+            )
+            .map_err(error)?;
+        if key.public_key != capability.issuer
+            || self.signature.artifact_signature != capability.signature
+            || capability
+                .issued_at
+                .checked_mul(1000)
+                .is_none_or(|issued| self.time_anchor.body.anchored_at < issued)
+            || capability
+                .expires_at
+                .checked_mul(1000)
+                .is_none_or(|expires| self.time_anchor.body.anchored_at >= expires)
+        {
+            return Err(error(
+                "keyring evidence differs from the original capability signature",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "keyring/live_tests.rs"]
+mod live_tests;

@@ -380,7 +380,8 @@ pub fn relay_alert_assurance_external_retention_profile_from_json(
     input: &str,
     now_unix_ms: u64,
 ) -> Result<RelayAlertAssuranceExternalRetentionProfileDocument, PheromoneRelayError> {
-    let profile: RelayAlertAssuranceExternalRetentionProfileDocument = serde_json::from_str(input)?;
+    let profile: RelayAlertAssuranceExternalRetentionProfileDocument =
+        crate::input::decode(input.as_bytes())?;
     validate_external_retention_profile(&profile, now_unix_ms)?;
     Ok(profile)
 }

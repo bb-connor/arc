@@ -140,9 +140,8 @@ struct AgentWebEvidenceEdge {
 }
 
 pub(super) fn parse_graph(bytes: &[u8]) -> Result<AgentWebEvidenceGraph, TransactionPassportError> {
-    let graph: AgentWebEvidenceGraph = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let graph: AgentWebEvidenceGraph = chio_transaction_passport::decode_evidence_json(bytes)?;
+    chio_transaction_passport::validate_evidence_graph_size(graph.nodes.len(), graph.edges.len())?;
     if graph.schema != TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedEvidenceGraphSchema(
             graph.schema,
@@ -229,12 +228,7 @@ pub(super) fn parse_artifact<T: for<'de> Deserialize<'de>>(
     expected_schema: &str,
 ) -> Result<T, TransactionPassportError> {
     let bytes = raw_artifact_bytes(bundle, node)?;
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidAgentWebArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -248,12 +242,7 @@ pub(super) fn parse_artifact<T: for<'de> Deserialize<'de>>(
             message: format!("unsupported schema: {schema}"),
         });
     }
-    serde_json::from_value(value).map_err(|error| {
-        TransactionPassportError::InvalidAgentWebArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
-    })
+    serde_json::from_value(value).map_err(|error| TransactionPassportError::Input(chio_core_types::canonical::UntrustedJsonError::Decode(error).into()))
 }
 
 pub(super) fn raw_artifact_bytes<'a>(

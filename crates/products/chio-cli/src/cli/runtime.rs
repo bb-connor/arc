@@ -1,8 +1,16 @@
 use super::*;
+#[path = "runtime/session_subject.rs"]
+mod session_subject;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+pub(crate) use session_subject::resolve_agent_subject;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
+
+#[cfg(test)]
+#[path = "runtime/payload_maintenance_tests.rs"]
+mod payload_maintenance_tests;
 
 pub(crate) fn resolve_sidecar_payment_adapter(
 ) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
@@ -12,9 +20,7 @@ pub(crate) fn resolve_sidecar_payment_adapter(
     match config {
         Some(config) => {
             config.validate().map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "invalid payment adapter configuration: {error}"
-                ))
+                CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
             })?;
             Ok(Some(config.build_adapter()))
         }
@@ -32,6 +38,18 @@ fn open_cli_durable_admission_runtime(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<Option<DurableAdmissionRuntime>, CliError> {
+    let maintenance = chio_control_plane::TerminalPayloadMaintenanceConfig::from_env()?;
+    if maintenance.is_some() {
+        if mode == chio_kernel::admission_operation::DurableAdmissionMode::Off {
+            return Err(CliError::cli_other_error(
+                "terminal raw payload maintenance requires enabled durable admission",
+            ));
+        }
+        if control_url.is_some() {
+            return Err(CliError::cli_other_error(
+                "terminal raw payload maintenance for a remote authority belongs to its server owner"));
+        }
+    }
     validate_durable_admission_participant_paths(
         mode,
         control_url,
@@ -54,19 +72,43 @@ fn open_cli_durable_admission_runtime(
             validate_distinct_database_paths(&paths)?;
         }
     }
-    match (mode, admission_db_path, control_url) {
+    let runtime = match (mode, admission_db_path, control_url) {
         (chio_kernel::admission_operation::DurableAdmissionMode::Off, _, _) => Ok(None),
         (_, Some(identity_path), Some(url)) => {
             let token = require_control_token(control_token)?;
             DurableAdmissionRuntime::open_remote(identity_path, url, token).map(Some)
         }
         _ => open_durable_admission_runtime(mode, admission_db_path),
+    }?;
+    if let Some(runtime) = runtime.as_ref() {
+        if let Some(config) = maintenance {
+            runtime
+                .start_terminal_payload_maintenance(config)
+                .map_err(|source| {
+                    CliError::with_public_source(
+                        &chio_errors::_generated::error_codes::CLI_OTHER,
+                        "terminal raw payload maintenance could not start",
+                        source,
+                    )
+                })?;
+            tracing::info!(
+                ttl_seconds = config.terminal_raw_payload_ttl.as_secs(),
+                interval_seconds = config.interval.as_secs(),
+                "terminal raw payload maintenance configured for supported local value calls"
+            );
+        } else if runtime.local_authority_store().is_some() {
+            tracing::warn!("terminal raw payload maintenance is disabled because operator TTL and interval are missing");
+        } else {
+            tracing::info!("terminal raw payload maintenance belongs to the remote server owner; this client has no local worker");
+        }
     }
+    Ok(runtime)
 }
 
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
+    agent_public_key: Option<&str>,
     json_output: bool,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
@@ -80,6 +122,7 @@ pub(crate) fn cmd_run(
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
     let durable_admission = open_cli_durable_admission_runtime(
@@ -109,11 +152,7 @@ pub(crate) fn cmd_run(
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
@@ -132,8 +171,6 @@ pub(crate) fn cmd_run(
         configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
     }
 
-    let agent_kp = Keypair::generate();
-    let agent_pk = agent_kp.public_key();
     let session_agent_id = agent_pk.to_hex();
     let initial_caps = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
     let session_id = kernel.open_session(session_agent_id.clone(), initial_caps.clone())?;
@@ -271,6 +308,14 @@ fn require_durable_or_ephemeral_optin(
             "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
         );
     }
+    if !ephemeral_receipts && authority_seed_path.is_none() {
+        return Err(CliError::cli_other_error(
+            "durable receipts require existing private signing custody: pass --authority-seed-file",
+        ));
+    }
+    if let Some(path) = authority_seed_path {
+        chio_control_plane::load_existing_authority_keypair(path)?;
+    }
     if authority_seed_path.is_none() {
         tracing::warn!(
             target: "chio::sidecar",
@@ -405,19 +450,35 @@ fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
+    transport: chio_http_serve::ServerTransportConfig,
     upstream: &str,
+    spec_sha256: Option<&str>,
+    allow_anonymous_reads: bool,
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
+    receipt_retention: Option<chio_api_protect::ProtectRetentionConfig>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
     revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(
+        &transport,
+        listen_addr
+            .parse::<SocketAddr>()
+            .map_err(std::io::Error::other)?,
+    )?;
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -431,25 +492,31 @@ pub(crate) fn cmd_api_protect(
             .or_else(|| std::env::var("CHIO_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
-        let signer_seed_hex = authority_seed_path
-            .map(load_or_create_authority_keypair)
-            .transpose()?
-            .map(|keypair| keypair.seed_hex());
-        let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_capability_issuers = trusted_capability_issuers(
+            parse_trusted_capability_issuers_from_env()?,
+            control_authority_public_key,
+        );
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
+            transport,
             upstream: upstream.to_string(),
             spec_content: None,
+            spec_sha256: spec_sha256.map(str::to_owned),
+            allow_anonymous_reads,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
-            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
+            receipt_db: durable_receipt_db_path(receipt_store)
+                .map(|path| path.display().to_string()),
             // The boot gate above already required an explicit opt-in when the
             // receipt store is missing or in-memory, so mirror the operator's
             // choice into the proxy's own durable-by-default gate.
             allow_ephemeral_receipts,
             sidecar_control_token,
-            signer_seed_hex,
+            receipt_retention,
+            signer_seed_file: authority_seed_path.map(Path::to_path_buf),
+            signer_seed_hex: None,
             trusted_capability_issuers,
+            approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -488,8 +555,10 @@ pub(crate) const CHIO_START_NO_UPSTREAM_URL: &str = "http://127.0.0.1:1";
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_start(
+    transport: chio_http_serve::ServerTransportConfig,
     listen_addr: &str,
     receipt_store: Option<&Path>,
+    receipt_retention: Option<chio_api_protect::ProtectRetentionConfig>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
     revocation_db: Option<&Path>,
@@ -498,7 +567,22 @@ pub(crate) fn cmd_start(
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    chio_control_plane::server_transport::prepare(
+        &transport,
+        listen_addr
+            .parse::<SocketAddr>()
+            .map_err(std::io::Error::other)?,
+    )?;
+    let scheme = if transport.tls_cert.is_some() {
+        "https"
+    } else {
+        "http"
+    };
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -512,13 +596,10 @@ pub(crate) fn cmd_start(
             .or_else(|| std::env::var("CHIO_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
-        let signer_seed_hex = authority_seed_path
-            .map(load_or_create_authority_keypair)
-            .transpose()?
-            .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
+            transport,
             // The chio-start shape never proxies upstream traffic; the
             // catch-all route exists only because the underlying axum
             // router shape is shared with `chio api protect`. Pointing
@@ -527,6 +608,8 @@ pub(crate) fn cmd_start(
             // forward.
             upstream: CHIO_START_NO_UPSTREAM_URL.to_string(),
             spec_content: Some(CHIO_START_SIDECAR_OPENAPI_SPEC.to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: listen_addr.to_string(),
             receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
@@ -535,8 +618,11 @@ pub(crate) fn cmd_start(
             // choice into the proxy's own durable-by-default gate.
             allow_ephemeral_receipts,
             sidecar_control_token,
-            signer_seed_hex,
+            receipt_retention,
+            signer_seed_file: authority_seed_path.map(Path::to_path_buf),
+            signer_seed_hex: None,
             trusted_capability_issuers,
+            approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -551,7 +637,7 @@ pub(crate) fn cmd_start(
         ProtectProxy::new(config)
             .with_payment_adapter(payment_adapter)
             .run_with_observer(move |bound_addr| {
-                let base_url = format!("http://{bound_addr}");
+                let base_url = format!("{scheme}://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
                 println!(
                     "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}, /v1/evaluate, /v1/receipts{{,/verify}}, /approvals/*"
@@ -571,6 +657,31 @@ pub(crate) fn cmd_start(
                 CliError::transport_error(format!("failed to start chio sidecar: {error}"))
             })
     })
+}
+
+/// The issuers a sidecar trusts: the ones named in its environment plus the
+/// remote capability authority it pins, so a sidecar under a control URL
+/// accepts the capabilities that authority issues without a second setting.
+pub(crate) fn trusted_capability_issuers(
+    mut issuers: Vec<chio_core::PublicKey>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+) -> Vec<chio_core::PublicKey> {
+    if let Some(authority) = control_authority_public_key {
+        if !issuers.contains(authority) {
+            issuers.push(authority.clone());
+        }
+    }
+    issuers
+}
+
+fn load_sidecar_approval_config(
+) -> Result<Option<chio_api_protect::ProtectApprovalConfig>, CliError> {
+    let Some(path) = std::env::var_os("CHIO_API_PROTECT_APPROVAL_CONFIG") else {
+        return Ok(None);
+    };
+    chio_api_protect::ProtectApprovalConfig::load(Path::new(&path))
+        .map(Some)
+        .map_err(|error| CliError::transport_error(error.to_string()))
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -652,11 +763,7 @@ pub(crate) fn cmd_check(
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
@@ -683,7 +790,7 @@ pub(crate) fn cmd_check(
     let agent_kp = Keypair::generate();
     let agent_pk = agent_kp.public_key();
     let session_agent_id = agent_pk.to_hex();
-    let params: serde_json::Value = serde_json::from_str(params_str)?;
+    let params: serde_json::Value = crate::input::text(params_str)?;
     let initial_caps = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
     let cap = match select_capability_for_request(&initial_caps, tool, server, &params) {
         Some(capability) => capability,
@@ -695,15 +802,39 @@ pub(crate) fn cmd_check(
                 ))
             })?,
     };
+    let dpop_proof = if chio_kernel::capability_request_requires_dpop_with_model_metadata(
+        &cap, tool, server, &params, None,
+    )? {
+        let proof = chio_kernel::dpop::DpopProof::sign(
+            chio_kernel::dpop::DpopProofBody {
+                schema: chio_kernel::DPOP_SCHEMA.to_string(),
+                replay_authority: None,
+                capability_id: cap.id.clone(),
+                tool_server: server.to_string(),
+                tool_name: tool.to_string(),
+                action_hash: chio_core::crypto::sha256_hex(
+                    &chio_core::canonical::canonical_json_bytes(&params)?,
+                ),
+                nonce: uuid::Uuid::new_v4().to_string(),
+                issued_at: kernel.authority_clock_reading()?.unix_millis().as_secs(),
+                agent_key: agent_pk.clone(),
+            },
+            &agent_kp,
+        )?;
+        Some(serde_json::to_value(proof)?)
+    } else {
+        None
+    };
     let session_id = kernel.open_session(session_agent_id.clone(), initial_caps)?;
     kernel.activate_session(&session_id)?;
 
     let context = OperationContext::new(
         session_id.clone(),
-        RequestId::new("check-001"),
+        RequestId::new(format!("check-{}", uuid::Uuid::new_v4())),
         session_agent_id,
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof,
         capability: cap,
         server_id: server.to_string(),
         tool_name: tool.to_string(),
@@ -715,7 +846,7 @@ pub(crate) fn cmd_check(
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     }));
 
     let response = match kernel.evaluate_session_operation(&context, &operation)? {
@@ -817,13 +948,13 @@ fn validate_check_mode(
 }
 
 fn load_check_output_fixture(path: &Path) -> Result<serde_json::Value, CliError> {
-    let content = fs::read_to_string(path).map_err(|error| {
+    let content = crate::input::read_text(path).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to read check output fixture {}: {error}",
             path.display()
         ))
     })?;
-    serde_json::from_str(&content).map_err(|error| {
+    crate::input::text(&content).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse check output fixture {} as JSON: {error}",
             path.display()
@@ -871,12 +1002,16 @@ pub(crate) fn verdict_label(verdict: chio_kernel::Verdict) -> &'static str {
 }
 
 pub(crate) fn cmd_mcp_serve(
+    agent_public_key: Option<&str>,
     policy_path: Option<&Path>,
     preset: Option<&str>,
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     command: &[String],
@@ -921,9 +1056,41 @@ pub(crate) fn cmd_mcp_serve(
         _ => unreachable!("policy path resolution validated above"),
     };
 
+    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
+                .to_string(),
+        )
+    })?;
+    let manifest_public_key = manifest_public_key.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --manifest-public-key with an independently registered key"
+                .to_string(),
+        )
+    })?;
+    let manifest_registry = Arc::new(
+        chio_manifest::load_existing_verified_manifest_registry(
+            signed_manifest_path,
+            manifest_public_key,
+            server_id,
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
+        })?,
+    );
+    // This command installs the ordinary kernel. Validate the authenticated
+    // profile before acquiring durable stores or effect-capable launch authority.
+    if manifest_registry.requires_flow_runtime() {
+        return Err(CliError::cli_other_error(
+            "MCP serve requires an active-defense host for flow-required manifests".to_string(),
+        ));
+    }
+
     let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -969,10 +1136,19 @@ pub(crate) fn cmd_mcp_serve(
         .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
     let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
 
-    let manifest_public_key = manifest_public_key
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
-    let adapted_server = AdaptedMcpServer::from_command(
+    let native_launch = crate::mcp_cli::load_native_mcp_launch(
+        cage_policy_path,
+        cage_policy_signer,
+        wrapped_cmd,
+        &wrapped_arg_refs,
+        Some(Arc::clone(&manifest_registry)),
+    )?;
+    if native_launch.server_id() != server_id {
+        return Err(CliError::cli_other_error(
+            "native MCP launch policy belongs to a different server".to_string(),
+        ));
+    }
+    let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
         wrapped_cmd,
         &wrapped_arg_refs,
         McpAdapterConfig {
@@ -981,12 +1157,13 @@ pub(crate) fn cmd_mcp_serve(
             server_version: server_version
                 .unwrap_or(env!("CARGO_PKG_VERSION"))
                 .to_string(),
-            public_key: manifest_public_key,
+            public_key: manifest_public_key.to_string(),
         },
+        manifest_registry.as_ref(),
+        native_launch,
     )?;
     let upstream_notification_source = adapted_server.notification_source();
     let upstream_capabilities = adapted_server.upstream_capabilities();
-    let manifest = adapted_server.manifest_clone();
     if let Some(resource_provider) = adapted_server.resource_provider() {
         kernel.register_resource_provider(Box::new(resource_provider));
     }
@@ -995,8 +1172,6 @@ pub(crate) fn cmd_mcp_serve(
     }
     kernel.register_tool_server(Box::new(adapted_server));
 
-    let agent_kp = Keypair::generate();
-    let agent_pk = agent_kp.public_key();
     let agent_id = agent_pk.to_hex();
     let capabilities = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
 
@@ -1009,7 +1184,7 @@ pub(crate) fn cmd_mcp_serve(
         "initialized MCP edge session"
     );
 
-    let mut edge = ChioMcpEdge::new(
+    let mut edge = ChioMcpEdge::new_with_manifest_registry_arc(
         McpEdgeConfig {
             server_name: "Chio MCP Edge".to_string(),
             server_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -1024,7 +1199,7 @@ pub(crate) fn cmd_mcp_serve(
         kernel,
         agent_id,
         capabilities,
-        vec![manifest],
+        manifest_registry,
     )?;
     edge.attach_upstream_transport(upstream_notification_source);
 
@@ -1033,15 +1208,22 @@ pub(crate) fn cmd_mcp_serve(
 }
 
 pub(crate) fn cmd_mcp_serve_http(
+    transport: chio_http_serve::ServerTransportConfig,
     policy_path: &Path,
+    approval_config: Option<&Path>,
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
+    signed_manifest_path: Option<&Path>,
     manifest_public_key: Option<&str>,
+    cage_policy_path: &Path,
+    cage_policy_signer: &str,
     page_size: usize,
     tools_list_changed: bool,
     shared_hosted_owner: bool,
     listen: SocketAddr,
+    trusted_proxy_peers: &[std::net::IpAddr],
+    trusted_proxy_token_file: Option<&Path>,
     auth_token: Option<&str>,
     auth_jwt_public_key: Option<&str>,
     auth_jwt_discovery_url: Option<&str>,
@@ -1055,6 +1237,7 @@ pub(crate) fn cmd_mcp_serve_http(
     auth_jwt_issuer: Option<&str>,
     auth_jwt_audience: Option<&str>,
     admin_token: Option<&str>,
+    remote_authority_workload_token: Option<&str>,
     public_base_url: Option<&str>,
     auth_servers: &[String],
     auth_authorization_endpoint: Option<&str>,
@@ -1072,9 +1255,14 @@ pub(crate) fn cmd_mcp_serve_http(
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
+    resume_hmac_keyring_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(&transport, listen)?;
     let loaded_policy = load_policy(policy_path)?;
     info!(
         policy_path = %policy_path.display(),
@@ -1100,8 +1288,22 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer,
         auth_jwks_uri,
     )?;
+    let native_launch_factory = Arc::new(crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+        cage_policy_path.to_path_buf(),
+        cage_policy_signer.to_string(),
+    )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        transport,
+        trusted_proxy: trusted_proxy_token_file
+            .map(|path| {
+                remote_mcp::TrustedProxyConfig::from_token_file(trusted_proxy_peers.to_vec(), path)
+            })
+            .transpose()?,
+        approval: approval_config
+            .map(remote_mcp::RemoteApprovalConfig::load)
+            .transpose()?,
+        clock: Default::default(),
         listen,
         auth_token,
         auth_jwt_public_key: auth_jwt_public_key.map(ToOwned::to_owned),
@@ -1118,6 +1320,9 @@ pub(crate) fn cmd_mcp_serve_http(
         admin_token,
         control_url: control_url.map(ToOwned::to_owned),
         control_token: control_token.map(ToOwned::to_owned),
+        remote_authority_workload_token: remote_authority_workload_token.map(ToOwned::to_owned),
+        control_authority_public_key: control_authority_public_key.cloned(),
+        control_authority_trusted_public_keys: control_authority_trusted_public_keys.to_vec(),
         public_base_url: public_base_url.map(ToOwned::to_owned),
         auth_servers: auth_servers.to_vec(),
         auth_authorization_endpoint: auth_authorization_endpoint.map(ToOwned::to_owned),
@@ -1134,13 +1339,16 @@ pub(crate) fn cmd_mcp_serve_http(
         authority_db_path: authority_db_path.map(std::path::Path::to_path_buf),
         budget_db_path: budget_db_path.map(std::path::Path::to_path_buf),
         session_db_path: session_db_path.map(std::path::Path::to_path_buf),
+        resume_hmac_keyring_path: resume_hmac_keyring_path.map(Path::to_path_buf),
         policy_path: policy_path.to_path_buf(),
         server_id: server_id.to_string(),
         server_name: server_name.unwrap_or(server_id).to_string(),
         server_version: server_version
             .unwrap_or(env!("CARGO_PKG_VERSION"))
             .to_string(),
+        signed_manifest_path: signed_manifest_path.map(Path::to_path_buf),
         manifest_public_key: manifest_public_key.map(ToOwned::to_owned),
+        native_launch_factory,
         page_size,
         tools_list_changed,
         shared_hosted_owner,
@@ -1297,16 +1505,14 @@ pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<
     })
 }
 
-pub(crate) fn load_roster_policy(
-    path: &Path,
-) -> Result<trust_control::RosterPolicy, CliError> {
-    let bytes = std::fs::read(path).map_err(|error| {
+pub(crate) fn load_roster_policy(path: &Path) -> Result<trust_control::RosterPolicy, CliError> {
+    let bytes = crate::input::read(path).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to read roster policy file `{}`: {error}",
             path.display()
         ))
     })?;
-    serde_json::from_slice(&bytes).map_err(|error| {
+    crate::input::json(&bytes).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse roster policy file `{}`: {error}",
             path.display()
@@ -1315,9 +1521,13 @@ pub(crate) fn load_roster_policy(
 }
 
 pub(crate) fn cmd_trust_serve(
+    transport: chio_http_serve::ServerTransportConfig,
     listen: SocketAddr,
     service_token: &str,
     tenant_read_tokens: &[String],
+    authority_workload_token: Option<&str>,
+    authority_keyring_config_path: Option<&Path>,
+    authority_keyring_receipt_anchor_root: Option<&Path>,
     policy_path: Option<&Path>,
     enterprise_providers_file: Option<&Path>,
     federation_policies_file: Option<&Path>,
@@ -1336,6 +1546,7 @@ pub(crate) fn cmd_trust_serve(
     fiscal_admission_signing_seed: Option<&Path>,
     fiscal_anchor_timeout_seconds: u64,
     receipt_db_path: Option<&Path>,
+    receipt_query_snapshot_quota_bytes: u64,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1346,8 +1557,11 @@ pub(crate) fn cmd_trust_serve(
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    authority_replication_max_future_skew_seconds: u64,
     roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(&transport, listen)?;
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
             "trust serve requires a non-empty --service-token".to_string(),
@@ -1362,6 +1576,11 @@ pub(crate) fn cmd_trust_serve(
             "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
         )));
     }
+    if authority_workload_token == Some(service_token) {
+        return Err(CliError::cli_other_error(
+            "--authority-workload-token must not equal --service-token".to_string(),
+        ));
+    }
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
@@ -1374,8 +1593,8 @@ pub(crate) fn cmd_trust_serve(
         fiscal_anchor_token,
         fiscal_admission_signing_seed,
     ) {
-        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => Some(
-            trust_control::TrustFiscalRuntimeConfig::from_policy_file(
+        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => {
+            Some(trust_control::TrustFiscalRuntimeConfig::from_policy_file(
                 policy,
                 anchor_url.to_owned(),
                 anchor_token.to_owned(),
@@ -1383,8 +1602,8 @@ pub(crate) fn cmd_trust_serve(
                 fiscal_admission_authority_id.to_owned(),
                 fiscal_admission_signer_key_epoch,
                 admission_seed.to_path_buf(),
-            )?,
-        ),
+            )?)
+        }
         (None, None, None, None) => None,
         _ => {
             return Err(CliError::cli_other_error(
@@ -1394,13 +1613,19 @@ pub(crate) fn cmd_trust_serve(
         }
     };
     trust_control::serve(trust_control::TrustServiceConfig {
+        transport,
         listen,
         service_token: service_token.to_string(),
         tenant_read_tokens,
+        authority_workload_token: authority_workload_token.map(ToOwned::to_owned),
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
+        receipt_query_snapshot_quota_bytes,
         revocation_db_path: revocation_db_path.map(Path::to_path_buf),
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
         authority_db_path: authority_db_path.map(Path::to_path_buf),
+        authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
+        authority_keyring_receipt_anchor_root: authority_keyring_receipt_anchor_root
+            .map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         fiscal_runtime,
@@ -1420,6 +1645,7 @@ pub(crate) fn cmd_trust_serve(
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        authority_replication_max_future_skew_seconds,
         roster_policy,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         // The finding surfaces stay at 409 until an operator-supplied
@@ -1609,15 +1835,15 @@ mod runtime_local_error_domain_tests {
     }
 
     #[test]
-    fn durable_receipt_path_boots_without_the_ephemeral_optin() {
+    fn durable_receipt_path_requires_private_signing_custody() {
         assert!(
             require_durable_or_ephemeral_optin(
                 Some(Path::new("/var/lib/chio/receipts.db")),
                 false,
                 None,
             )
-            .is_ok(),
-            "a filesystem receipt path is durable and needs no ephemeral opt-in"
+            .is_err(),
+            "a durable receipt path without private signing custody must fail closed"
         );
     }
 
@@ -1731,5 +1957,28 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+}
+
+#[cfg(test)]
+mod trusted_issuer_tests {
+    use super::trusted_capability_issuers;
+
+    #[test]
+    fn the_pinned_control_authority_is_a_trusted_issuer() {
+        let authority = chio_core::Keypair::generate().public_key();
+        let named = chio_core::Keypair::generate().public_key();
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], Some(&authority)),
+            vec![named.clone(), authority.clone()]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![authority.clone()], Some(&authority)),
+            vec![authority]
+        );
+        assert_eq!(
+            trusted_capability_issuers(vec![named.clone()], None),
+            vec![named]
+        );
     }
 }

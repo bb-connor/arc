@@ -1,15 +1,14 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::admission_operation::{
-    AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
-    AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationV1,
+    qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionIdentifier,
+    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore, AdmissionOperationV1,
     AdmissionParticipantRequirements, AdmissionRecoveryLease, AdmissionRequestBindingV1,
-    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
-    SideEffectClass, StoreMutationFence,
+    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStore,
+    QualifiedAdmissionOperationStoreExt, RecoveryClaimRequest, SideEffectClass, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::test_support::{
     prepared_evaluation, record_external_step, record_pure_step, resolve_with_blob, returned_value,
@@ -22,6 +21,20 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::{SqliteAdmissionOperationStore, SqliteAuthorityStore};
+
+#[path = "tool_outcome_store_tests/pure_finalization.rs"]
+mod pure_finalization;
+#[path = "tool_outcome_store_tests/qualified_claims.rs"]
+mod qualified_claims;
+#[path = "tool_outcome_store_tests/recovery_component.rs"]
+mod recovery_component;
+
+#[path = "tool_outcome_store_tests/compaction_fixture.rs"]
+mod compaction_fixture;
+use compaction_fixture::completed_return;
+
+#[path = "tool_outcome_store_tests/compaction_read_bounds.rs"]
+mod compaction_read_bounds;
 
 struct Fixture {
     _temp: TempDir,
@@ -47,7 +60,7 @@ fn fixture() -> Fixture {
     }
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let fence = authority.mutation_fence();
     let operations = authority.admission_operation_store();
     let outcomes = authority.tool_outcome_store();
@@ -63,13 +76,7 @@ fn fixture() -> Fixture {
 }
 
 fn now_ms() -> u64 {
-    u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_millis(),
-    )
-    .expect("millisecond clock")
+    chio_test_support::clock::unix_millis()
 }
 
 fn id(field: &'static str, value: &str) -> AdmissionIdentifier {
@@ -289,6 +296,66 @@ fn tool_return_atomically_persists_blob_and_advances_operation() {
     );
 }
 
+/// A claimed tool return and a claimed post-return begin are one durable
+/// write each: the anchor advances once per joint transaction where a
+/// separately claimed return advances it twice, and the lease the begin
+/// returns carries the later stages.
+
+#[test]
+fn replayed_post_return_begin_anchors_a_renewed_claim_before_the_next_stage() {
+    let fixture = fixture();
+    let at = now_ms();
+    let committed = committed(&fixture, "replay-renewed-claim", at);
+    let (operation, outcome) = record_return(&fixture, &committed, at + 20);
+    let prepared = prepared_evaluation(&operation, &outcome, at + 22).expect("evaluation");
+    let lease = claim(&fixture, &operation, at + 23);
+    fixture
+        .outcomes
+        .begin_post_return_evaluation(&lease, &prepared, &fixture.fence, at + 24)
+        .expect("first begin");
+    let before = fixture.authority.anchor_generation().expect("anchor");
+    let later = at + 60_100;
+    let claimant = id("claimant_id", "recovery-worker");
+    let request = RecoveryClaimRequest {
+        operation_id: operation.binding().operation_id(),
+        expected_version: operation.version(),
+        claimant_id: &claimant,
+        expires_at_unix_ms: later + 60_000,
+        fence: &fixture.fence,
+    };
+    let (replayed, lease) = fixture
+        .outcomes
+        .claim_and_begin_post_return_evaluation(
+            &fixture.operations,
+            request,
+            &mut qualified_lease(request, later),
+            &prepared,
+            &fixture.fence,
+            later,
+        )
+        .expect("renewed claim on replay");
+    assert_eq!(replayed, prepared);
+    assert_eq!(
+        fixture.authority.anchor_generation().expect("anchor"),
+        before + 1
+    );
+    let pure = record_pure_step(&prepared).expect("pure step");
+    assert_eq!(
+        fixture
+            .outcomes
+            .stage_post_return_evaluation(
+                operation.binding().operation_id(),
+                prepared.version(),
+                &lease,
+                &pure,
+                &fixture.fence,
+                later + 1,
+            )
+            .expect("stage after replay"),
+        pure
+    );
+}
+
 #[test]
 fn post_return_evaluation_is_fenced_staged_and_finalized_by_cas() {
     let fixture = fixture();
@@ -459,7 +526,7 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
     drop(operations);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)
         .expect("reopen outcome authority");
     assert_eq!(
         reopened
@@ -483,15 +550,18 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
         )
         .expect("tamper outcome commitment");
     drop(connection);
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     drop(_temp);
 }
 
 fn mark_operation_terminal(fixture: &Fixture, operation_id: &AdmissionOperationId) {
-    // Reaching a terminal state through the real API requires the signed
-    // terminal-projection machinery; this isolates the compaction gate, which
-    // reads only `admission_operations.terminal`. The version bump keeps the
-    // `admission_operations_versioned_body` trigger satisfied.
+    // Negative custody fixture: a terminal bit alone cannot authenticate a
+    // Completed replay contract. Positive erasure uses completed_return().
     let connection = fixture.outcomes.connection().expect("connection");
     let changed = connection
         .execute(
@@ -517,18 +587,604 @@ fn blob_state(fixture: &Fixture, digest: &str) -> (i64, bool) {
 }
 
 #[test]
-fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
+fn compaction_page_keeps_work_to_one_inspected_blob() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let fixture = fixture();
     let begun_at = now_ms();
-    let committed = committed(&fixture, "compaction-terminal", begun_at);
-    let (operation, outcome) = record_return(&fixture, &committed, begun_at + 20);
+    let mut digests = Vec::new();
+    for name in ["page-a", "page-b", "page-c"] {
+        let (_, outcome) = completed_return(&fixture, name, false).expect("signed completion");
+        digests.push(outcome.raw_output_digest().as_str().to_owned());
+    }
+    let summary = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(
+            begun_at + 1_000,
+            &fixture.fence,
+            begun_at + 1_000,
+            None,
+            1,
+        )
+        .expect("one compaction page");
+    assert_eq!(summary.inspected, 1);
+    assert!(
+        summary.compacted <= 1,
+        "one metadata row may be a resolved blob"
+    );
+    assert_eq!(
+        digests
+            .iter()
+            .filter(|digest| !blob_state(&fixture, digest).1)
+            .count(),
+        usize::try_from(summary.compacted).expect("bounded count")
+    );
+    let mut total = summary.compacted;
+    let mut cursor = summary.next_digest;
+    while cursor.is_some() {
+        let page = fixture
+            .outcomes
+            .compact_retained_invocation_blobs_page(
+                begun_at + 1_000,
+                &fixture.fence,
+                begun_at + 1_000,
+                cursor.as_ref(),
+                1,
+            )
+            .expect("next compaction page");
+        assert!(page.inspected <= 1);
+        assert!(page.compacted <= 1);
+        total += page.compacted;
+        cursor = page.next_digest;
+    }
+    assert_eq!(total, 3);
+}
+
+#[test]
+fn compaction_page_refuses_a_payload_beyond_its_byte_budget() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let (_, outcome) = completed_return(&fixture, "byte-budget", false).expect("signed completion");
+    let error = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits {
+                max_payload_bytes: 1,
+                ..ToolOutcomeCompactionLimits::default()
+            },
+        )
+        .expect_err("compaction must refuse a payload beyond its byte ceiling");
+    assert!(
+        matches!(error, ToolOutcomeStoreError::Unavailable(ref reason) if reason.contains("payload byte budget"))
+    );
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+}
+
+#[test]
+fn compaction_page_sql_ceiling_refuses_before_unbounded_custody_work_and_recovers() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let (_, outcome) = completed_return(&fixture, "sql-budget", false).expect("signed completion");
+    let error = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits {
+                max_sql_steps: 1,
+                ..ToolOutcomeCompactionLimits::default()
+            },
+        )
+        .expect_err("SQL work must be limited before custody verification");
+    assert!(
+        matches!(error, ToolOutcomeStoreError::Unavailable(ref reason) if reason.contains("SQL work budget"))
+    );
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+    let page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 201,
+            None,
+            64,
+        )
+        .expect("interruption must be cleared before returning the connection");
+    assert_eq!(page.compacted, 1);
+    assert!(page.sql_steps > 1);
+}
+
+#[test]
+fn compaction_page_partial_byte_progress_preserves_its_resume_cursor() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let mut digests = Vec::new();
+    for name in ["byte-page-a", "byte-page-b", "byte-page-c"] {
+        let (_, outcome) = completed_return(&fixture, name, false).expect("signed completion");
+        digests.push(outcome.raw_output_digest().as_str().to_owned());
+    }
+    let one_payload_size = u64::try_from(blob_state(&fixture, &digests[0]).0).unwrap();
+    assert!(digests
+        .iter()
+        .all(|digest| u64::try_from(blob_state(&fixture, digest).0).unwrap() == one_payload_size));
+    let limits = ToolOutcomeCompactionLimits {
+        // The same ceiling includes the original payload plus qualified
+        // request/operation/evaluation/projection/receipt verification reads.
+        max_payload_bytes: one_payload_size * 12,
+        ..ToolOutcomeCompactionLimits::default()
+    };
+    let mut cursor = None;
+    let mut total = 0;
+    for index in 0..3 {
+        let page = fixture
+            .outcomes
+            .compact_retained_invocation_blobs_page_with_limits(
+                begun_at + 1_000,
+                &fixture.fence,
+                begun_at + 1_000,
+                cursor.as_ref(),
+                limits,
+            )
+            .expect("bounded byte page");
+        assert_eq!(page.compacted, 1);
+        assert_eq!(page.compacted_bytes, one_payload_size);
+        assert!(
+            page.inspected_payload_bytes + page.inspected_verification_bytes
+                <= limits.max_payload_bytes
+        );
+        assert_eq!(page.byte_budget_exhausted, index < 2);
+        total += page.compacted;
+        cursor = page.next_digest;
+    }
+    assert_eq!(total, 3);
+    assert!(cursor.is_none());
+    assert!(digests.iter().all(|digest| !blob_state(&fixture, digest).1));
+}
+
+#[test]
+fn compaction_page_holds_actual_completed_resolved_alias_and_independent_trigger() {
+    let initial = chio_test_support::clock::unix_seconds();
+    let _time = chio_test_support::clock::scope_unix_secs(initial);
+    let fixture = fixture();
+    let (first, first_outcome) =
+        completed_return(&fixture, "completed-raw-alias", false).expect("first completion");
+    let raw = fixture
+        .outcomes
+        .load_raw_invocation_by_operation(first.binding().operation_id())
+        .expect("raw read")
+        .expect("raw");
+    let bytes = raw.canonical_blob().expect("blob").bytes().to_vec();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).expect("canonical raw value");
+    let (second, _) = compaction_fixture::completed_return_with_value(
+        &fixture,
+        "completed-resolved-alias",
+        false,
+        value,
+    )
+    .expect("second actual completion");
+    let resolved = fixture
+        .outcomes
+        .load_resolved_output_by_operation(second.binding().operation_id())
+        .expect("resolved read")
+        .expect("resolved");
+    assert_eq!(
+        resolved.blob_ref().digest(),
+        first_outcome.raw_output_digest()
+    );
+    assert_eq!(resolved.bytes(), bytes);
+    {
+        let connection = fixture.outcomes.connection().expect("connection");
+        let error = connection
+            .execute(
+                "UPDATE tool_outcome_blobs SET canonical_bytes=NULL WHERE digest=?1",
+                [first_outcome.raw_output_digest().as_str()],
+            )
+            .expect_err("independent resolved-custody trigger");
+        assert!(
+            matches!(error,rusqlite::Error::SqliteFailure(ref cause,_) if cause.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER)
+        );
+    }
+    let _advanced = chio_test_support::clock::scope_unix_secs(initial + 60);
+    let now = now_ms();
+    let page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(now, &fixture.fence, now, None, 64)
+        .expect("verified alias page");
+    assert_eq!(page.retained_resolved, 1);
+    assert_eq!(
+        page.compacted, 1,
+        "only the independent second raw envelope qualifies"
+    );
+    assert!(blob_state(&fixture, first_outcome.raw_output_digest().as_str()).1);
+    assert_eq!(
+        fixture
+            .outcomes
+            .load_resolved_output_by_operation(second.binding().operation_id())
+            .expect("terminal resolved read"),
+        Some(resolved)
+    );
+}
+
+#[test]
+fn compaction_page_refuses_unowned_large_sidecar_before_payload_column_access() {
+    use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let initial = chio_test_support::clock::unix_seconds();
+    let _time = chio_test_support::clock::scope_unix_secs(initial);
+    let fixture = fixture();
+    let (operation, outcome) = completed_return(&fixture, "unexpected-large-sidecar", false)
+        .expect("actual signed completed value");
+    assert!(operation.caller_dispatch_context_digest().is_none());
+    let accesses = Arc::new(AtomicUsize::new(0));
+    {
+        let connection = fixture.outcomes.connection().expect("connection");
+        // Deliberately corrupt this isolated fixture. This is not a legitimate
+        // runtime/caller claim or an authority witness. The authorizer records
+        // column access at statement preparation, not Rust allocation bytes.
+        let context = canonical_json_bytes(&serde_json::json!("x".repeat(512 * 1024)))
+            .expect("sidecar bytes");
+        connection.execute("INSERT INTO admission_operation_caller_contexts(operation_id,context_json) VALUES(?1,?2)",params![operation.binding().operation_id().as_str(),context]).expect("inject fixture-only unexpected sidecar");
+        let observe = accesses.clone();
+        connection
+            .authorizer(Some(move |context: AuthContext<'_>| {
+                if matches!(
+                    context.action,
+                    AuthAction::Read {
+                        table_name: "admission_operation_caller_contexts",
+                        column_name: "context_json"
+                    }
+                ) {
+                    observe.fetch_add(1, Ordering::SeqCst);
+                }
+                Authorization::Allow
+            }))
+            .expect("install column observation");
+    }
+    let _advanced = chio_test_support::clock::scope_unix_secs(initial + 60);
+    let now = now_ms();
+    let error = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page_with_limits(
+            now,
+            &fixture.fence,
+            now,
+            None,
+            ToolOutcomeCompactionLimits {
+                max_payload_bytes: 128 * 1024,
+                ..ToolOutcomeCompactionLimits::default()
+            },
+        )
+        .expect_err("unexpected sidecar custody must refuse");
+    {
+        let connection = fixture.outcomes.connection().expect("connection");
+        connection
+            .authorizer(None::<fn(AuthContext<'_>) -> Authorization>)
+            .expect("clear column observation");
+    }
+    assert_eq!(accesses.load(Ordering::SeqCst),0,"bounded retention must reject unexpected512KiB sidecar before preparing any payload-column read under128KiB cap; actual refusal: {error:?}");
+    assert!(
+        matches!(error,ToolOutcomeStoreError::Invariant(ref reason) if reason.contains("unexpected sidecar custody"))
+    );
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+    assert_eq!(fixture.authority.mutation_fence(), fixture.fence);
+}
+
+#[test]
+fn compaction_page_holds_shared_live_ownership_and_refuses_stale_fences() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let first = committed(&fixture, "shared-terminal", begun_at);
+    let (operation, outcome) = record_return(&fixture, &first, begun_at + 20);
+    mark_operation_terminal(&fixture, operation.binding().operation_id());
+    let live = committed(&fixture, "shared-live", begun_at + 100);
+    {
+        // Isolate the conservative custody predicate by introducing a second
+        // raw owner. The shared raw envelope is never trusted for execution.
+        let connection = fixture.outcomes.connection().expect("connection");
+        connection
+            .execute(
+                "INSERT INTO tool_outcomes (
+                operation_id, outcome_id, request_id, raw_output_digest, outcome_version,
+                lifecycle_digest, participant_digest, outcome_json, recorded_at_unix_ms,
+                updated_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch)
+             SELECT ?1, ?2, 'shared-live', raw_output_digest, outcome_version,
+                lifecycle_digest, participant_digest, outcome_json, recorded_at_unix_ms,
+                updated_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
+             FROM tool_outcomes WHERE operation_id = ?3",
+                params![
+                    live.binding().operation_id().as_str(),
+                    "f".repeat(64),
+                    operation.binding().operation_id().as_str()
+                ],
+            )
+            .expect("shared live owner");
+    }
+    let mut stale = fixture.fence.clone();
+    stale.owner_epoch += 1;
+    assert_eq!(
+        fixture.outcomes.compact_retained_invocation_blobs_page(
+            begun_at + 1_000,
+            &stale,
+            begun_at + 1_000,
+            None,
+            1,
+        ),
+        Err(ToolOutcomeStoreError::Fenced)
+    );
+    let page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(
+            begun_at + 1_000,
+            &fixture.fence,
+            begun_at + 1_000,
+            None,
+            1,
+        )
+        .expect("live shared owner remains retained");
+    assert_eq!(page.retained_live, 1);
+    assert_eq!(page.compacted, 0);
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+}
+
+#[test]
+fn compaction_page_refuses_poison_before_recovery_and_resumes_after_qualified_read() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let (operation, outcome) =
+        completed_return(&fixture, "poisoned-maintenance", false).expect("signed completion");
+    let poisoned_store = fixture.outcomes.clone();
+    let poison = std::thread::spawn(move || {
+        let _connection = poisoned_store
+            .connection()
+            .expect("owned authority connection");
+        panic!("intentional maintenance poison fixture");
+    });
+    assert!(poison.join().is_err());
+    let error = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            1,
+        )
+        .expect_err("maintenance must refuse before running unbudgeted connection recovery");
+    assert!(
+        matches!(error, ToolOutcomeStoreError::Unavailable(ref reason) if reason.contains("poisoned"))
+    );
+    // The ordinary qualified port keeps its existing recovery and anchor proof.
+    assert_eq!(
+        fixture
+            .outcomes
+            .lookup_by_operation(operation.binding().operation_id())
+            .expect("qualified recovery"),
+        Some(outcome.clone())
+    );
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+    let page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 201,
+            None,
+            64,
+        )
+        .expect("bounded maintenance resumes after qualified recovery");
+    assert_eq!(page.compacted, 1);
+    assert!(page.inspected <= 64);
+}
+
+#[test]
+fn compaction_page_holds_resolved_alias_while_live_and_after_terminal() {
+    use chio_kernel::tool_outcome::test_support::{
+        prepared_pure_evaluation, resolve_output_with_blob,
+    };
+    let fixture = fixture();
+    let at = now_ms();
+    let first = committed(&fixture, "alias-raw-owner", at);
+    let (first_operation, first_outcome) = record_return(&fixture, &first, at + 20);
+    let raw = fixture
+        .outcomes
+        .load_raw_invocation_by_operation(first_operation.binding().operation_id())
+        .expect("first raw envelope")
+        .expect("present raw envelope");
+    let raw_bytes = raw
+        .canonical_blob()
+        .expect("canonical raw envelope")
+        .bytes()
+        .to_vec();
+    let alias_output = chio_kernel::ToolCallOutput::Value(
+        serde_json::from_slice(&raw_bytes).expect("raw JSON value"),
+    );
+    let second = committed(&fixture, "alias-resolved-owner", at + 100);
+    let (second_operation, second_outcome) = record_return(&fixture, &second, at + 120);
+    let prepared =
+        prepared_pure_evaluation(&second_operation, &second_outcome, at + 122).expect("evaluation");
+    let lease = claim(&fixture, &second_operation, at + 122);
+    fixture
+        .outcomes
+        .begin_post_return_evaluation(&lease, &prepared, &fixture.fence, at + 123)
+        .expect("begin evaluation");
+    let results = [digest("pure_result", 'a'), digest("pure_result", 'b')];
+    let first_result = prepared
+        .record_next_pure_result(results[0].clone())
+        .expect("first pure result");
+    let second_result = first_result
+        .record_next_pure_result(results[1].clone())
+        .expect("second pure result");
+    let (terminal, resolved, blob) = resolve_output_with_blob(
+        &second_outcome,
+        &second_result,
+        SettlementDispositionV1::NotApplicable,
+        &alias_output,
+    )
+    .expect("alias resolution");
+    assert_eq!(blob.bytes(), raw_bytes);
+    assert_eq!(blob.blob_ref().digest(), first_outcome.raw_output_digest());
+    fixture
+        .outcomes
+        .finalize_post_return_with_pure_results(
+            second_operation.binding().operation_id(),
+            prepared.version(),
+            &results,
+            &lease,
+            &terminal,
+            second_outcome.version(),
+            &resolved,
+            Some(&blob),
+            &fixture.fence,
+            at + 124,
+        )
+        .expect("qualified resolved alias publication");
+    mark_operation_terminal(&fixture, first_operation.binding().operation_id());
+    let page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(at + 1_000, &fixture.fence, at + 1_000, None, 64)
+        .expect("shared resolved custody page");
+    assert_eq!(
+        page.compacted, 0,
+        "a live resolved owner keeps the raw alias bytes"
+    );
+    assert!(blob_state(&fixture, first_outcome.raw_output_digest().as_str()).1);
+    assert_eq!(
+        fixture
+            .outcomes
+            .load_resolved_output_by_operation(second_operation.binding().operation_id())
+            .expect("live resolved alias remains available"),
+        Some(blob.clone())
+    );
+    mark_operation_terminal(&fixture, second_operation.binding().operation_id());
+    let terminal_page = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page(at + 1_000, &fixture.fence, at + 1_001, None, 64)
+        .expect("terminal resolved custody page");
+    assert_eq!(
+        terminal_page.compacted, 0,
+        "terminal-bit-only fixture rows have no authenticated Completed replay contract"
+    );
+    assert!(blob_state(&fixture, first_outcome.raw_output_digest().as_str()).1);
+    assert_eq!(
+        fixture
+            .outcomes
+            .load_resolved_output_by_operation(second_operation.binding().operation_id())
+            .expect("terminal resolved replay bytes remain available"),
+        Some(blob)
+    );
+}
+
+#[test]
+fn legacy_compaction_refuses_unsupported_replay_profile() {
+    let initial = chio_test_support::clock::unix_seconds();
+    let _time = chio_test_support::clock::scope_unix_secs(initial);
+    let fixture = fixture();
+    let (operation, outcome) = completed_return(&fixture, "legacy-held-profile", true)
+        .expect("actual completed stream invocation");
+    let raw = fixture
+        .outcomes
+        .load_raw_invocation_by_operation(operation.binding().operation_id())
+        .expect("load completed raw")
+        .expect("raw envelope");
+    assert!(!raw.supports_compacted_value_replay());
+    let _advanced = chio_test_support::clock::scope_unix_secs(initial + 60);
+    let cutoff = now_ms();
+    let recorded: i64 = fixture
+        .outcomes
+        .connection()
+        .expect("connection")
+        .query_row(
+            "SELECT recorded_at_unix_ms FROM tool_outcome_blobs WHERE digest = ?1",
+            [outcome.raw_output_digest().as_str()],
+            |row| row.get(0),
+        )
+        .expect("raw age");
+    assert!(u64::try_from(recorded).expect("nonnegative raw time") < cutoff);
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+    let summary = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(cutoff, &fixture.fence, cutoff)
+        .expect("legacy bounded pass");
+    assert_eq!(
+        summary.compacted, 0,
+        "legacy erasure must use the same supported replay gate"
+    );
+    assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
+}
+
+#[test]
+fn legacy_compaction_obeys_a_bounded_page_instead_of_global_erasure() {
+    let initial = chio_test_support::clock::unix_seconds();
+    let _time = chio_test_support::clock::scope_unix_secs(initial);
+    let fixture = fixture();
+    let mut digests = Vec::new();
+    for index in 0..65 {
+        let (_, outcome) = completed_return(&fixture, &format!("legacy-row-{index:02}"), false)
+            .expect("actual completed value invocation");
+        digests.push(outcome.raw_output_digest().as_str().to_owned());
+    }
+    assert_eq!(
+        digests
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        65
+    );
+    let _advanced = chio_test_support::clock::scope_unix_secs(initial + 60);
+    let cutoff = now_ms();
+    let eligible: i64 = fixture.outcomes.connection().expect("connection").query_row(
+        "SELECT COUNT(*) FROM tool_outcome_blobs b
+         WHERE b.canonical_bytes IS NOT NULL AND b.recorded_at_unix_ms < ?1
+           AND EXISTS (SELECT 1 FROM tool_outcomes o WHERE o.raw_output_digest=b.digest)
+           AND NOT EXISTS (SELECT 1 FROM tool_outcomes o JOIN admission_operations a ON a.operation_id=o.operation_id
+               WHERE o.raw_output_digest=b.digest AND (a.terminal=0 OR a.state <> 'completed'))
+           AND NOT EXISTS (SELECT 1 FROM tool_outcomes o WHERE json_extract(o.outcome_json,'$.disposition.resolved_output.digest')=b.digest)
+           AND NOT EXISTS (SELECT 1 FROM post_return_evaluations e WHERE json_extract(e.evaluation_json,'$.state.resolution.resolved_output.digest')=b.digest)",
+        [i64::try_from(cutoff).expect("SQLite cutoff")], |row| row.get(0),
+    ).expect("independent aged completed-owner count");
+    assert_eq!(eligible,65,"all65 distinct completed raw envelopes must really be past the cutoff before the erase attempt");
+    let summary = fixture
+        .outcomes
+        .compact_retained_invocation_blobs(cutoff, &fixture.fence, cutoff)
+        .expect("legacy pass");
+    assert!(
+        summary.compacted > 0,
+        "the default page must make bounded progress"
+    );
+    assert!(
+        summary.compacted <= 64,
+        "legacy compatibility may not erase all 65 rows in a one-page pass"
+    );
+    assert!(summary.inspected <= 64);
+    assert!(
+        summary.next_digest.is_some(),
+        "a bounded first page must expose continuation for all65 eligible raw owners"
+    );
+    assert!(digests.iter().any(|digest| blob_state(&fixture, digest).1));
+}
+
+#[test]
+fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let (operation, outcome) =
+        completed_return(&fixture, "compaction-terminal", false).expect("signed completion");
     let operation_id = operation.binding().operation_id().clone();
     let digest = outcome.raw_output_digest().as_str().to_owned();
 
     let (size_before, present_before) = blob_state(&fixture, &digest);
     assert!(present_before, "blob payload is present before compaction");
 
-    mark_operation_terminal(&fixture, &operation_id);
     let summary = fixture
         .outcomes
         .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
@@ -545,7 +1201,8 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
         .load_raw_invocation_by_operation(&operation_id)
         .expect_err("a compacted raw invocation must not load silently");
     assert!(
-        matches!(&error, ToolOutcomeStoreError::Invariant(message) if message.contains("compacted")),
+        matches!(&error, ToolOutcomeStoreError::Compacted { raw_output_digest, raw_output_size_bytes }
+            if raw_output_digest.as_str() == digest && *raw_output_size_bytes == u64::try_from(size_before).expect("retained size")),
         "compacted read reports a defined error, got {error:?}"
     );
 
@@ -568,29 +1225,22 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
 
 #[test]
 fn reinserting_verified_bytes_rehydrates_a_compacted_blob() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let fixture = fixture();
     let begun_at = now_ms();
-    let committed = committed(&fixture, "compaction-rehydrate", begun_at);
-    let at = begun_at + 20;
-    let (blob, outcome) = returned_value(
-        &committed,
-        fixture.fence.clone(),
-        at,
-        serde_json::json!({"completed": true}),
-        None,
-    )
-    .expect("returned outcome");
-    let bytes = blob.bytes().to_vec();
-    let lease = claim(&fixture, &committed, at);
-    let inserted = fixture
+    let (finalizing, outcome) =
+        completed_return(&fixture, "compaction-rehydrate", false).expect("signed completion");
+    let blob = fixture
         .outcomes
-        .record_tool_returned(&committed, &lease, &blob, &outcome, &fixture.fence, at + 1)
-        .expect("record tool return");
-    let (_, finalizing) = inserted.into_parts();
+        .load_raw_invocation_by_operation(finalizing.binding().operation_id())
+        .expect("raw read")
+        .expect("present raw")
+        .canonical_blob()
+        .expect("raw blob");
+    let bytes = blob.bytes().to_vec();
     let operation_id = finalizing.binding().operation_id().clone();
     let digest = outcome.raw_output_digest().as_str().to_owned();
 
-    mark_operation_terminal(&fixture, &operation_id);
     fixture
         .outcomes
         .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
@@ -659,18 +1309,17 @@ fn compaction_is_refused_while_an_owning_operation_is_live() {
 
 #[test]
 fn compaction_respects_the_retention_cutoff() {
+    let _time = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let fixture = fixture();
     let begun_at = now_ms();
-    let committed = committed(&fixture, "compaction-cutoff", begun_at);
-    let (operation, outcome) = record_return(&fixture, &committed, begun_at + 20);
-    let operation_id = operation.binding().operation_id().clone();
+    let (_, outcome) =
+        completed_return(&fixture, "compaction-cutoff", false).expect("signed completion");
     let digest = outcome.raw_output_digest().as_str().to_owned();
-    mark_operation_terminal(&fixture, &operation_id);
 
-    // The blob is recorded at `begun_at + 21`; a cutoff before it retains it.
+    // The injected authority clock fixes the blob's real recording time.
     let early = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at, &fixture.fence, begun_at + 200)
+        .compact_retained_invocation_blobs(begun_at - 1, &fixture.fence, begun_at + 200)
         .expect("compaction below the cutoff");
     assert_eq!(
         early.compacted, 0,
@@ -703,3 +1352,7 @@ fn secure_temp_directory(path: &std::path::Path) {
     #[cfg(not(unix))]
     let _ = path;
 }
+
+#[path = "tool_outcome_store_tests/connection_recovery.rs"]
+#[cfg(unix)]
+mod connection_recovery;

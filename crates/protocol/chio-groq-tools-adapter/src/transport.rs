@@ -63,6 +63,7 @@ pub fn groq_transport_config(auth: AuthScheme) -> HttpTransportConfig {
             GROQ_API_VERSION.to_string(),
         )],
         timeout: Duration::from_secs(60),
+        max_response_bytes: chio_provider_adapter_core::input::MAX_DOCUMENT_BYTES,
     }
 }
 

@@ -226,7 +226,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], request_path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                request_path
+            );
             let request = if self.cluster_peer_auth.is_some() {
                 self.build_internal_get_request(&self.http, &url, auth_endpoint, term)?
             } else {
@@ -264,7 +272,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             let request = if self.cluster_peer_auth.is_some() {
                 self.build_internal_post_request(&self.http, &url, path, term)?
             } else {
@@ -311,7 +327,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url, &self.token) {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -351,7 +375,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url) {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -394,7 +426,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url) {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -464,22 +504,13 @@ fn read_capped_json<T>(reader: impl std::io::Read, cap: u64) -> Result<T, CliErr
 where
     T: for<'de> Deserialize<'de>,
 {
-    use std::io::Read as _;
-    let mut limited = reader.take(cap.saturating_add(1));
-    let mut buffer = Vec::new();
-    limited.read_to_end(&mut buffer).map_err(|error| {
-        CliError::cli_other_error(format!("failed to read peer response: {error}"))
+    let cap = usize::try_from(cap).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "JSON input bound exceeds platform range",
+        )
     })?;
-    if buffer.len() as u64 > cap {
-        return Err(CliError::cli_other_error(format!(
-            "peer response exceeded the {cap}-byte cap"
-        )));
-    }
-    serde_json::from_slice(&buffer).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to decode trust control service response body: {error}"
-        ))
-    })
+    crate::json_input::read(reader, cap)
 }
 
 #[cfg(test)]
@@ -497,7 +528,10 @@ mod transport_cap_tests {
         let Err(error) = result else {
             panic!("oversized body must fail closed");
         };
-        assert!(error.to_string().contains("exceeded"));
+        assert_eq!(
+            error.report().code,
+            "urn:chio:error:attest:signed-json-too-large"
+        );
     }
 
     #[test]

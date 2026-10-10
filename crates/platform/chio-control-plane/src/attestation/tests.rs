@@ -566,7 +566,7 @@ fn attestation_oidc_and_metadata_helpers_cover_parse_and_resolution_edges() {
     let bad_json = URL_SAFE_NO_PAD.encode(b"not-json");
     assert!(matches!(
         decode_jwt_parts::<Value>(&format!("{bad_json}.b.c")),
-        Err(OidcJwtDecodeError::InvalidJwt("invalid header json"))
+        Err(OidcJwtDecodeError::UntrustedInput(error)) if error.code() == "urn:chio:error:attest:signed-json-invalid-input"
     ));
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256"}"#);
     assert!(matches!(
@@ -576,7 +576,7 @@ fn attestation_oidc_and_metadata_helpers_cover_parse_and_resolution_edges() {
     let bad_payload = URL_SAFE_NO_PAD.encode(b"not-json");
     assert!(matches!(
         decode_jwt_parts::<Value>(&format!("{header}.{bad_payload}.c")),
-        Err(OidcJwtDecodeError::InvalidJwt("invalid payload json"))
+        Err(OidcJwtDecodeError::UntrustedInput(error)) if error.code() == "urn:chio:error:attest:signed-json-invalid-input"
     ));
     let valid_payload = URL_SAFE_NO_PAD.encode(br#"{"sub":"demo"}"#);
     assert!(matches!(
@@ -922,7 +922,7 @@ fn enterprise_and_appraisal_negative_paths_cover_remaining_branch_states() {
 
     assert!(matches!(
         adapter.verify_and_appraise("{", now),
-        Err(EnterpriseVerifierVerificationError::InvalidEnvelope(_))
+        Err(EnterpriseVerifierVerificationError::UntrustedInput(error)) if error.code() == "urn:chio:error:attest:signed-json-invalid-input"
     ));
 
     let signed = SignedExportEnvelope::sign(sample_enterprise_evidence(now), &signer).test_unwrap();
@@ -1588,4 +1588,45 @@ fn enterprise_verifier_adapter_rejects_untrusted_signer() {
         error,
         EnterpriseVerifierVerificationError::UntrustedSigner { .. }
     ));
+}
+
+#[test]
+fn jwt_original_tokens_are_bounded_unambiguous_and_keep_signed_preimage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::error::Error as _;
+    let header = URL_SAFE_NO_PAD.encode(br#"{ "alg" : "RS256" }"#);
+    let claims = URL_SAFE_NO_PAD.encode(br#"{"sub":"valid","counter":18446744073709551615}"#);
+    let signature = URL_SAFE_NO_PAD.encode([7_u8; 8]);
+    let token = format!("{header}.{claims}.{signature}");
+    let (_, body, signed_input, decoded_signature) = decode_jwt_parts::<Value>(&token)?;
+    assert_eq!(signed_input, format!("{header}.{claims}"));
+    assert_eq!(decoded_signature, vec![7; 8]);
+    assert_eq!(body["counter"].as_u64(), Some(u64::MAX));
+    for payload in [
+        br#"{"sub":"secret-first","sub":"secret-last"}"#.as_slice(),
+        br#"{"counter":9007199254740993.0}"#.as_slice(),
+    ] {
+        let wire = format!("{header}.{}.{signature}", URL_SAFE_NO_PAD.encode(payload));
+        let error = decode_jwt_parts::<Value>(&wire)
+            .err()
+            .ok_or("accepted ambiguous claims")?;
+        let OidcJwtDecodeError::UntrustedInput(cause) = &error else {
+            return Err("wrong rejection class".into());
+        };
+        assert_eq!(
+            cause.code(),
+            "urn:chio:error:attest:signed-json-invalid-input"
+        );
+        assert!(error.source().is_some());
+        assert!(!format!("{error:?}").contains("secret-first"));
+    }
+    let oversized = "!".repeat(2 * 1024 * 1024 + 1);
+    let error = decode_jwt_parts::<Value>(&oversized)
+        .err()
+        .ok_or("accepted oversized token")?;
+    let OidcJwtDecodeError::UntrustedInput(cause) = error else {
+        return Err("base64 allocation happened before bounding".into());
+    };
+    assert_eq!(cause.code(), "urn:chio:error:attest:signed-json-too-large");
+    Ok(())
 }

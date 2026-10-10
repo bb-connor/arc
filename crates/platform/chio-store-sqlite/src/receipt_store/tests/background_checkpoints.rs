@@ -404,7 +404,14 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
         claim_log_max_seq: max_batch,
     };
     let signer_a = signer(&keypair, max_batch);
-    let result = build_due_checkpoints(&store.pool, &mut stale_head, &signer_a, None, None);
+    let result = build_due_checkpoints(
+        &store.pool,
+        &mut stale_head,
+        &signer_a,
+        None,
+        None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
+    );
     assert!(
         result.is_ok(),
         "stale-head background build must adopt the external checkpoint, got {result:?}"
@@ -995,6 +1002,7 @@ fn frontier_rebuild_adopts_concurrent_checkpoint_winner() -> Result<(), Box<dyn 
         &mut stale_head,
         &signer(&keypair, max_batch),
         None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
     )?;
     assert!(
         advanced,
@@ -1089,6 +1097,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
         &mut head,
         &signer(&wrong_keypair, max_batch),
         None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
     )
     .err()
     .ok_or("the mismatched signer must fail after consuming the cached frontier")?;
@@ -1180,6 +1189,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
         &mut head,
         &signer(&keypair, max_batch),
         None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
     )
     .err()
     .ok_or("a cache-miss retry must reject the disconnected legacy prefix")?;
@@ -1227,9 +1237,13 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
     assert_eq!(
         connection.execute(
             "UPDATE kernel_checkpoints
-             SET statement_json = ?1, signature = ?2
+             SET statement_json = ?1, signature = ?2, previous_checkpoint_sha256 = ?3
              WHERE checkpoint_seq = 2",
-            rusqlite::params![replacement_two_json, replacement_two_signature],
+            rusqlite::params![
+                replacement_two_json,
+                replacement_two_signature,
+                replacement_predecessor
+            ],
         )?,
         1
     );
@@ -1270,6 +1284,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
         &mut head,
         &signer(&keypair, max_batch),
         None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
     )
     .err()
     .ok_or("a cache-miss retry must reject a coherent same-length fork")?;

@@ -1,59 +1,34 @@
-use std::env;
-use std::fs;
-use std::process::Command;
-
+use crate::RecordError;
+use chio_provider_adapter_core::http::{HttpTransport, HttpTransportConfig, ProviderHttpTransport};
 use serde_json::Value;
 
-use crate::util::{now_ts, sanitize_id};
-use crate::RecordError;
-
-pub(crate) fn curl_json_post(
-    provider: &'static str,
+pub(crate) fn post_json_capture(
+    _provider: &'static str,
     url: &str,
     headers: &[(&str, String)],
     body: &Value,
 ) -> Result<String, RecordError> {
-    let input_path =
-        env::temp_dir().join(format!("chio-{provider}-{}.json", sanitize_id(&now_ts())));
-    fs::write(&input_path, serde_json::to_vec(body)?).map_err(|source| {
-        RecordError::WriteFixture {
-            path: input_path.clone(),
-            source,
+    let mut config = HttpTransportConfig::new(url);
+    for (name, value) in headers {
+        config = config.with_header(*name, value);
+    }
+    let transport = HttpTransport::new(config)?;
+    let body_bytes = chio_core::canonical_json_bytes(body)
+        .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let response = runtime.block_on(async {
+        if body.get("stream").and_then(Value::as_bool) == Some(true) {
+            transport.post_sse("", &body_bytes).await
+        } else {
+            transport
+                .post_json("", &body_bytes)
+                .await
+                .map(|response| response.body)
         }
     })?;
-
-    let mut command = Command::new("curl");
-    command.args([
-        "--silent",
-        "--show-error",
-        "--fail-with-body",
-        "--location",
-        "--request",
-        "POST",
-        "--header",
-        "Content-Type: application/json",
-    ]);
-    for (name, value) in headers {
-        command.args(["--header", &format!("{name}: {value}")]);
-    }
-    command.args(["--data-binary", &format!("@{}", input_path.display()), url]);
-
-    let output = command.output().map_err(|source| RecordError::Curl {
-        provider,
-        message: format!("failed to run curl: {source}"),
-    })?;
-    let _ = fs::remove_file(&input_path);
-    if !output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let message = if stdout.is_empty() {
-            stderr
-        } else if stderr.is_empty() {
-            stdout
-        } else {
-            format!("{stderr}\n{stdout}")
-        };
-        return Err(RecordError::Curl { provider, message });
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    String::from_utf8(response).map_err(|error| {
+        chio_core::canonical::UntrustedJsonError::NotUtf8(error.utf8_error()).into()
+    })
 }

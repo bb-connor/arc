@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json",
+  "title": "Chio keyring artifact signature evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "artifact_hash",
+    "key_id",
+    "signing_epoch",
+    "algorithm",
+    "artifact_signature",
+    "fence_signature"
+  ],
+  "properties": {
+    "schema": { "const": "chio.keyring.artifact-signature.v1" },
+    "artifact_hash": { "$ref": "#/$defs/hash" },
+    "key_id": { "$ref": "#/$defs/hash" },
+    "signing_epoch": { "$ref": "#/$defs/u64" },
+    "algorithm": { "$ref": "#/$defs/algorithm" },
+    "artifact_signature": { "$ref": "#/$defs/signature" },
+    "fence_signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "u64": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

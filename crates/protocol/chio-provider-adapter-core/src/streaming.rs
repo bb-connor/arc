@@ -12,10 +12,7 @@
 use chio_tool_call_fabric::{ProviderError, ToolInvocation, VerdictResult};
 use serde_json::Value;
 
-use crate::{
-    ensure_streaming_allow_no_redactions, openai_tool_call_to_function_call, parse_sse_frames,
-    GatedStream, SseParseOptions,
-};
+use crate::{ensure_streaming_allow_no_redactions, parse_sse_frames, GatedStream, SseParseOptions};
 
 /// A decoded OpenAI-compatible `tool_calls[]` entry lifted from an SSE frame.
 ///
@@ -54,64 +51,24 @@ where
         options = options.with_done_sentinel(sentinel);
     }
     let frames = parse_sse_frames(raw, options)?;
-    let mut output: Vec<u8> = Vec::new();
-    let mut invocations = Vec::new();
-    let mut verdicts = Vec::new();
-
-    for frame in frames {
-        let Some(data) = frame.data.as_ref() else {
-            output.extend_from_slice(&frame.raw);
-            continue;
-        };
-
-        // Walk OpenAI-shaped choices[].{delta,message}.tool_calls[].
-        for call in extract_stream_tool_calls(data, provider_label)? {
-            let invocation = invoke(&call)?;
-            let verdict = evaluate(&invocation)?;
-            ensure_streaming_allow_no_redactions(
-                provider_label,
-                "functionCall",
-                &call.name,
-                None,
-                &verdict,
-            )?;
-            invocations.push(invocation);
-            verdicts.push(verdict);
-        }
-        output.extend_from_slice(&frame.raw);
+    let calls = assembly::assemble(&frames, done_sentinel.is_some())?;
+    let invocations = calls
+        .iter()
+        .map(&mut invoke)
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut verdicts = Vec::with_capacity(invocations.len());
+    for (call, invocation) in calls.iter().zip(&invocations) {
+        let verdict = evaluate(invocation)?;
+        ensure_streaming_allow_no_redactions(
+            provider_label,
+            "functionCall",
+            &call.name,
+            None,
+            &verdict,
+        )?;
+        verdicts.push(verdict);
     }
-
-    Ok(GatedStream::new(output, invocations, verdicts))
+    Ok(GatedStream::new(raw.to_vec(), invocations, verdicts))
 }
 
-fn extract_stream_tool_calls(
-    data: &Value,
-    provider_label: &str,
-) -> Result<Vec<DecodedToolCall>, ProviderError> {
-    let mut out = Vec::new();
-    if let Some(choices) = data.get("choices").and_then(Value::as_array) {
-        for choice in choices {
-            // Streaming deltas live at choices[].delta.tool_calls[], while
-            // batched / aggregated chunks reuse choices[].message.tool_calls[].
-            for source in ["delta", "message"] {
-                let Some(tool_calls) = choice
-                    .get(source)
-                    .and_then(|m| m.get("tool_calls"))
-                    .and_then(Value::as_array)
-                else {
-                    continue;
-                };
-                for entry in tool_calls {
-                    if let Some(call) = openai_tool_call_to_function_call(
-                        entry,
-                        provider_label,
-                        |id, name, args| DecodedToolCall { id, name, args },
-                    )? {
-                        out.push(call);
-                    }
-                }
-            }
-        }
-    }
-    Ok(out)
-}
+mod assembly;

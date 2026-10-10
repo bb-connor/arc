@@ -166,7 +166,14 @@ fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> St
 
 #[test]
 fn fixed_clock_helpers_preserve_epoch_zero_and_negative_sentinel() {
-    assert_eq!(fixed_clock_from_secs(0).unwrap().now_unix_secs(), 0);
+    assert_eq!(
+        fixed_clock_from_secs(0)
+            .unwrap()
+            .unix_millis()
+            .unwrap()
+            .as_secs(),
+        0
+    );
     assert!(fixed_clock_from_secs(-1).is_none());
 }
 
@@ -191,6 +198,34 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
         KernelFfiError::InvalidCapability(message)
             if message.contains("cannot authenticate governed approvals")
     ));
+}
+
+#[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let envelope: serde_json::Value = serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+    let positive: serde_json::Value =
+        serde_json::from_str(&evaluate_json_str(&envelope.to_string()).unwrap()).unwrap();
+    assert_eq!(positive["verdict"], "allow");
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut changed = envelope.clone();
+        changed["request"][field] = if field == "approval_tokens" {
+            json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            json!({"artifact":field})
+        };
+        let error = evaluate_json_str(&changed.to_string()).unwrap_err();
+        assert!(
+            matches!(error, KernelFfiError::InvalidCapability(message)
+            if message.contains("cannot authenticate governed approvals")),
+            "{field}"
+        );
+    }
 }
 
 #[test]
@@ -256,16 +291,27 @@ fn evaluate_honors_epoch_zero_clock() {
 }
 
 #[test]
-fn evaluate_accepts_u64_now_secs_above_i64_max() {
+fn evaluate_checks_seconds_to_milliseconds_at_the_clock_boundary() {
+    let maximum_seconds = u64::MAX / 1_000;
     let output = evaluate_json_str(&evaluate_envelope_at(
         "echo",
         0,
         u64::MAX,
-        Some(i64::MAX as u64 + 1),
+        Some(maximum_seconds),
     ))
     .unwrap();
     let value: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(value["verdict"], "allow");
+    for now in [maximum_seconds + 1, i64::MAX as u64 + 1, u64::MAX] {
+        let output =
+            evaluate_json_str(&evaluate_envelope_at("echo", 0, u64::MAX, Some(now))).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["verdict"], "deny");
+        assert!(value["reason"]
+            .as_str()
+            .unwrap()
+            .contains("trusted time exceeds representable range"));
+    }
 }
 
 #[test]
@@ -464,6 +510,20 @@ fn take_result_string(result: &ChioKernelFfiResult) -> String {
     // over UTF-8 bytes with exactly this pointer and length.
     let bytes = unsafe { std::slice::from_raw_parts(result.data.ptr, result.data.len) };
     String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+#[test]
+fn returned_buffer_can_be_read_modified_and_freed() {
+    let mut value = String::with_capacity(64);
+    value.push_str("data");
+    let buffer = ChioKernelFfiBuffer::from_string(value);
+    assert_eq!(buffer.len, 4);
+    // SAFETY: this buffer owns four initialized bytes and has not been freed.
+    let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.ptr, buffer.len) };
+    assert_eq!(bytes, b"data");
+    bytes[0] = b'D';
+    assert_eq!(bytes, b"Data");
+    chio_kernel_buffer_free(buffer);
 }
 
 #[test]

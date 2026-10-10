@@ -130,11 +130,11 @@ pub(crate) fn evaluate_runtime_pheromone_policy(
     {
         return Err("runtime_reputation_epoch_mismatch");
     }
-    if input
+    let advisory_age = input
         .now_unix_ms
-        .saturating_sub(advisory.evaluated_at_unix_ms)
-        > policy_body.max_query_report_age_ms
-    {
+        .checked_sub(advisory.evaluated_at_unix_ms)
+        .ok_or("runtime_pheromone_advisory_from_future")?;
+    if advisory_age > policy_body.max_query_report_age_ms {
         return Err("runtime_pheromone_advisory_stale");
     }
     if advisory.distinct_origin_pairs < policy_body.min_distinct_origin_pairs {

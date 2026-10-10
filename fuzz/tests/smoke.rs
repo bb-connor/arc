@@ -31,11 +31,14 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "eval_receipt_bundle",
     "federation_trust_establishment",
     "finding_worker_protocol",
+    "frost_round2_envelope",
     "jwt_vc_verify",
     "mcp_envelope_decode",
     "oid4vp_presentation",
     "openapi_ingest",
+    "peers_lock_decode",
     "receipt_log_replay",
+    "rollback_anchor_slots",
     "underwriting_policy_input",
     "wasm_guard_escape",
     "wasm_guard_smith",
@@ -54,6 +57,9 @@ const NO_IN_PROCESS_SMOKE_TARGETS: &[&str] = &[
     "fuzz_tool_action",
     "manifest_roundtrip",
     "revocation_oracle_merkle",
+    // These optional targets run through their scheduled, feature-enabled binaries.
+    "response_authority_protocol",
+    "response_lifecycle",
 ];
 
 /// Resolve a seed-corpus directory by target name. Lives under
@@ -304,6 +310,18 @@ fn receipt_log_replay_smoke() {
 }
 
 #[test]
+fn rollback_anchor_slots_smoke() {
+    use chio_store_sqlite::fuzz::rollback_anchor_slots;
+    assert_seed_floor("rollback_anchor_slots", rollback_anchor_slots);
+}
+
+#[test]
+fn peers_lock_decode_smoke() {
+    use chio_conformance::fuzz::peers_lock_decode;
+    assert_seed_floor("peers_lock_decode", peers_lock_decode);
+}
+
+#[test]
 fn eval_receipt_bundle_smoke() {
     use chio_fuzz::entries::eval_receipt_bundle;
     assert_seed_floor("eval_receipt_bundle", eval_receipt_bundle);
@@ -328,4 +346,12 @@ fn finding_worker_protocol_smoke() {
 fn underwriting_policy_input_smoke() {
     use chio_fuzz::entries::underwriting_policy_input;
     assert_seed_floor("underwriting_policy_input", underwriting_policy_input);
+}
+
+#[test]
+fn frost_round2_envelope_smoke() {
+    assert_seed_floor(
+        "frost_round2_envelope",
+        chio_fuzz::entries::frost_round2_envelope,
+    );
 }

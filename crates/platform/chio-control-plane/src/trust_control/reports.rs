@@ -1,8 +1,16 @@
 use super::*;
+use chio_appraisal::{
+    verify_runtime_attestation_record, RuntimeAttestationAppraisal,
+    RuntimeAttestationAppraisalReasonCode, RuntimeAttestationNormalizedClaimConfidence,
+};
 use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 
 pub type SignedComptrollerSurfaceReport = SignedExportEnvelope<ComptrollerSurfaceReport>;
+
+#[cfg(test)]
+#[path = "reports/attestation_authentication_tests.rs"]
+mod attestation_authentication_tests;
 
 #[derive(Default)]
 pub(crate) struct ResolvedBudgetGrant {
@@ -20,6 +28,8 @@ pub(crate) fn build_operator_report(
     budget_store: &SqliteBudgetStore,
     query: &OperatorReportQuery,
 ) -> Result<OperatorReport, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let activity = receipt_store
         .query_receipt_analytics(&query.to_receipt_analytics_query())
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
@@ -44,7 +54,7 @@ pub(crate) fn build_operator_report(
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
 
     Ok(OperatorReport {
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: query.clone(),
         activity,
         cost_attribution,
@@ -91,26 +101,20 @@ pub(crate) fn build_comptroller_surface_report(
 }
 
 pub fn build_signed_behavioral_feed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &BehavioralFeedQuery,
 ) -> Result<SignedBehavioralFeed, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set (chio-reputation::receipt_integrity_valid
     // fails closed on an empty set).
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
-    let report = build_behavioral_feed_report(
-        &receipt_store,
-        receipt_db_path,
-        budget_db_path,
-        query,
-        &trusted_kernel_keys,
-    )
-    .map_err(|response| CliError::cli_other_error(response_status_text(&response)))?;
+    let report =
+        build_behavioral_feed_report(receipt_store, budget_db_path, query, &trusted_kernel_keys)
+            .map_err(|response| CliError::cli_other_error(response_status_text(&response)))?;
     SignedBehavioralFeed::sign(report, &keypair).map_err(Into::into)
 }
 
@@ -142,35 +146,43 @@ fn build_runtime_attestation_appraisal_report(
     runtime_assurance_policy: Option<&crate::policy::RuntimeAssuranceIssuancePolicy>,
     evidence: &RuntimeAttestationEvidence,
 ) -> Result<RuntimeAttestationAppraisalReport, Response> {
-    let appraisal = derive_runtime_attestation_appraisal(evidence)
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
+    let observed = derive_runtime_attestation_appraisal(evidence)
         .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let trust_policy =
         runtime_assurance_policy.and_then(|policy| policy.attestation_trust_policy.as_ref());
-    let policy_outcome = match trust_policy {
-        Some(policy) => {
-            match evidence.resolve_effective_runtime_assurance(Some(policy), generated_at) {
-                Ok(resolved) => RuntimeAttestationPolicyOutcome {
-                    trust_policy_configured: true,
-                    accepted: true,
-                    effective_tier: resolved.effective_tier,
-                    reason: None,
-                },
-                Err(error) => RuntimeAttestationPolicyOutcome {
-                    trust_policy_configured: true,
-                    accepted: false,
-                    effective_tier: RuntimeAssuranceTier::None,
-                    reason: Some(error.to_string()),
-                },
-            }
+    let policy_outcome =
+        match verify_runtime_attestation_record(evidence, trust_policy, generated_at) {
+            Ok(record) => record.policy_outcome,
+            Err(error) => RuntimeAttestationPolicyOutcome {
+                trust_policy_configured: trust_policy
+                    .is_some_and(|policy| !policy.rules.is_empty()),
+                accepted: false,
+                effective_tier: RuntimeAssuranceTier::None,
+                reason: Some(error.to_string()),
+            },
+        };
+
+    // Export signing authenticates this observation, not the caller's evidence.
+    // Preserve normalized values without endorsing them in either report format.
+    let mut appraisal = RuntimeAttestationAppraisal::rejected(
+        observed.adapter,
+        observed.verifier_family,
+        evidence,
+        observed.normalized_assertions,
+        observed.vendor_claims,
+        vec![RuntimeAttestationAppraisalReasonCode::PolicyRejected],
+    );
+    for claim in &mut appraisal.normalized_claims {
+        claim.confidence = RuntimeAttestationNormalizedClaimConfidence::Derived;
+    }
+    if let Some(artifact) = appraisal.artifact.as_mut() {
+        for claim in &mut artifact.claims.normalized_claims {
+            claim.confidence = RuntimeAttestationNormalizedClaimConfidence::Derived;
         }
-        None => RuntimeAttestationPolicyOutcome {
-            trust_policy_configured: false,
-            accepted: true,
-            effective_tier: evidence.tier,
-            reason: None,
-        },
-    };
+    }
 
     Ok(RuntimeAttestationAppraisalReport {
         schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
@@ -201,11 +213,12 @@ pub fn build_runtime_attestation_appraisal_import_report(
 
 fn build_behavioral_feed_report(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     query: &BehavioralFeedQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<BehavioralFeedReport, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let normalized_query = query.normalized();
     let operator_query = normalized_query.to_operator_report_query();
     let activity = receipt_store
@@ -220,11 +233,11 @@ fn build_behavioral_feed_report(
     let (settlements, governed_actions, metered_billing, selection) = receipt_store
         .query_behavioral_feed_receipts(&normalized_query)
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
-                receipt_db_path,
+                receipt_store,
                 budget_db_path,
                 subject_key,
                 normalized_query.since,
@@ -245,7 +258,7 @@ fn build_behavioral_feed_report(
         filters: normalized_query,
         privacy: BehavioralFeedPrivacyBoundary {
             matching_receipts: selection.matching_receipts,
-            returned_receipts: selection.receipts.len() as u64,
+            returned_receipts: crate::integer::count(selection.receipts.len()),
             direct_evidence_export_supported: compliance.direct_evidence_export_supported,
             child_receipt_scope: compliance.child_receipt_scope,
             proofs_complete: compliance.proofs_complete,
@@ -281,13 +294,12 @@ pub fn build_signed_comptroller_surface_report(
 }
 
 pub fn build_signed_exposure_ledger_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &ExposureLedgerQuery,
 ) -> Result<SignedExposureLedgerReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let report = build_exposure_ledger_report(&receipt_store, query).map_err(CliError::from)?;
+    let report = build_exposure_ledger_report(receipt_store, query).map_err(CliError::from)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedExposureLedgerReport::sign(report, &keypair).map_err(Into::into)
 }
@@ -323,6 +335,7 @@ pub(crate) fn build_exposure_ledger_report_with_context(
     query: &ExposureLedgerQuery,
     read_context: chio_kernel::ReceiptReadContext,
 ) -> Result<ExposureLedgerReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -445,14 +458,14 @@ pub(crate) fn build_exposure_ledger_report_with_context(
     let currencies = positions_by_currency.keys().cloned().collect::<Vec<_>>();
     Ok(ExposureLedgerReport {
         schema: EXPOSURE_LEDGER_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: normalized_query,
         support_boundary: ExposureLedgerSupportBoundary::default(),
         summary: ExposureLedgerSummary {
             matching_receipts: selection.matching_receipts,
-            returned_receipts: receipts.len() as u64,
+            returned_receipts: crate::integer::count(receipts.len()),
             matching_decisions: decision_report.summary.matching_decisions,
-            returned_decisions: decisions.len() as u64,
+            returned_decisions: crate::integer::count(decisions.len()),
             active_decisions: decision_report.summary.active_decisions,
             superseded_decisions: decision_report.summary.superseded_decisions,
             actionable_receipts,
@@ -460,9 +473,9 @@ pub(crate) fn build_exposure_ledger_report_with_context(
             failed_settlement_receipts,
             currencies: currencies.clone(),
             mixed_currency_book: currencies.len() > 1,
-            truncated_receipts: selection.matching_receipts > receipts.len() as u64,
+            truncated_receipts: selection.matching_receipts > crate::integer::count(receipts.len()),
             truncated_decisions: decision_report.summary.matching_decisions
-                > decisions.len() as u64,
+                > crate::integer::count(decisions.len()),
         },
         positions: positions_by_currency.into_values().collect(),
         receipts,
@@ -471,20 +484,18 @@ pub(crate) fn build_exposure_ledger_report_with_context(
 }
 
 pub fn build_signed_credit_scorecard_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &ExposureLedgerQuery,
 ) -> Result<SignedCreditScorecardReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_scorecard_report(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         None,
         query,
@@ -495,26 +506,25 @@ pub fn build_signed_credit_scorecard_report(
 }
 
 pub fn build_signed_capital_book_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     query: &CapitalBookQuery,
 ) -> Result<SignedCapitalBookReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let report =
-        build_capital_book_report_from_store(&receipt_store, query).map_err(CliError::from)?;
+        build_capital_book_report_from_store(receipt_store, query).map_err(CliError::from)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedCapitalBookReport::sign(report, &keypair).map_err(Into::into)
 }
 
 pub fn issue_signed_capital_execution_instruction(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<SignedCapitalExecutionInstruction, CliError> {
     issue_signed_capital_execution_instruction_detailed(
-        receipt_db_path,
+        receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
@@ -523,21 +533,19 @@ pub fn issue_signed_capital_execution_instruction(
 }
 
 pub(crate) fn issue_signed_capital_execution_instruction_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<SignedCapitalExecutionInstruction, TrustHttpError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let artifact =
-        build_capital_execution_instruction_artifact_from_store(&receipt_store, request)?;
+    let artifact = build_capital_execution_instruction_artifact_from_store(receipt_store, request)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedCapitalExecutionInstruction::sign(artifact, &keypair)
         .map_err(|error| TrustHttpError::internal(error.to_string()))
 }
 
 pub fn issue_signed_capital_allocation_decision(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -545,7 +553,7 @@ pub fn issue_signed_capital_allocation_decision(
     request: &CapitalAllocationDecisionRequest,
 ) -> Result<SignedCapitalAllocationDecision, CliError> {
     issue_signed_capital_allocation_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -556,22 +564,20 @@ pub fn issue_signed_capital_allocation_decision(
 }
 
 pub(crate) fn issue_signed_capital_allocation_decision_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
 ) -> Result<SignedCapitalAllocationDecision, TrustHttpError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set, then reuse it to sign the artifact.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let artifact = build_capital_allocation_decision_artifact_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         request,
@@ -581,16 +587,19 @@ pub(crate) fn issue_signed_capital_allocation_decision_detailed(
         .map_err(|error| TrustHttpError::internal(error.to_string()))
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the ordered report projection in one function; its stages share the same validated input."
+)]
 fn build_capital_allocation_decision_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
     trusted_kernel_keys: &[String],
 ) -> Result<CapitalAllocationDecisionArtifact, TrustHttpError> {
-    let issued_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let issued_at = clock_now;
     let normalized_query = request.query.normalized();
     normalized_query
         .validate()
@@ -648,7 +657,6 @@ fn build_capital_allocation_decision_artifact_from_store(
     let fallback_facility_report = if active_facility.is_none() {
         Some(build_credit_facility_report_from_store(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             certification_registry_file,
             None,
@@ -966,6 +974,8 @@ mod reports_tests {
         let dir = std::env::temp_dir().join(format!("chio-signed-cs-{}", std::process::id()));
         std::fs::create_dir_all(&dir).test_expect("create temp dir");
         let authority_seed_path = dir.join("authority.seed");
+        crate::load_or_create_authority_keypair(&authority_seed_path)
+            .test_expect("owner provisions comptroller report authority");
 
         let report = ComptrollerSurfaceReport {
             schema: COMPTROLLER_SURFACE_REPORT_SCHEMA.to_string(),

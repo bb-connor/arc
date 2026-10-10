@@ -8,7 +8,10 @@ mod nested_flow;
 mod stdio;
 mod utils;
 
-pub use stdio::StdioMcpTransport;
+pub use stdio::{
+    CageReceiptPersistence, CageRequiredLaunch, NativeMcpLaunchFactory, StdioMcpTransport,
+    StdioRequestTimeouts,
+};
 
 #[cfg(test)]
 use std::io::BufReader;
@@ -39,7 +42,6 @@ use utils::{
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::framing::MAX_STDIO_MCP_FRAME_BYTES;
     use chio_core::session::ElicitationAction;
     use chio_core::RequestId;
 
@@ -170,21 +172,34 @@ mod tests {
         let mut reader = BufReader::new(&input[..]);
         let err = read_line(&mut reader).unwrap_err();
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::SignedInput(_)
+                )
+            ),
             "expected ParseError, got: {err}"
         );
     }
 
     #[test]
     fn read_line_rejects_oversized_frame() {
-        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1));
+        let input = format!(
+            "{}\n",
+            "x".repeat(crate::framing::MAX_STDIO_MCP_RESPONSE_BYTES + 1)
+        );
         let mut reader = BufReader::new(input.as_bytes());
         let err = match read_line(&mut reader) {
             Ok(value) => panic!("oversized frame must fail closed, got: {value}"),
             Err(err) => err,
         };
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                )
+            ),
             "expected ParseError for oversized frame, got: {err}"
         );
     }
@@ -318,9 +333,11 @@ for line in sys.stdin:
         let script_path = dir.join("mock_mcp_server.py");
         std::fs::write(&script_path, script).expect("write mock script");
 
-        let transport =
-            StdioMcpTransport::spawn("python3", &[script_path.to_str().expect("path to str")])
-                .expect("spawn mock server");
+        let transport = StdioMcpTransport::spawn_test_process(
+            "python3",
+            &[script_path.to_str().expect("path to str")],
+        )
+        .expect("spawn mock server");
 
         let tools = transport.list_tools().expect("list_tools");
         assert_eq!(tools.len(), 1);
@@ -343,40 +360,44 @@ for line in sys.stdin:
     fn background_tick_can_complete_multiple_nested_flow_tasks() {
         let mut runtime = NestedFlowTaskRuntime::default();
         let parent_request_id = RequestId::new("parent-1");
-        let task_a = runtime.create_message_task(
-            "nested-upstream-1".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
-        let task_b = runtime.create_message_task(
-            "2".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
+        let task_a = runtime
+            .create_message_task(
+                "nested-upstream-1".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
+        let task_b = runtime
+            .create_message_task(
+                "2".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
         let task_id_a = task_a["task"]["taskId"].as_str().unwrap().to_string();
         let task_id_b = task_b["task"]["taskId"].as_str().unwrap().to_string();
         assert_eq!(task_a["task"]["ownership"]["workOwner"], "task");
@@ -416,23 +437,25 @@ for line in sys.stdin:
     fn tasks_result_includes_nested_task_lineage_in_related_task_meta() {
         let mut runtime = NestedFlowTaskRuntime::default();
         let parent_request_id = RequestId::new("parent-1");
-        let created = runtime.create_message_task(
-            "nested-upstream-7".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
+        let created = runtime
+            .create_message_task(
+                "nested-upstream-7".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
         let task_id = created["task"]["taskId"].as_str().unwrap().to_string();
 
         let mut bridge = MockNestedFlowBridge;

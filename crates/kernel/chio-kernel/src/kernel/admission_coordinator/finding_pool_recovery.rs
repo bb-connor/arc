@@ -9,7 +9,7 @@ impl ChioKernel {
         };
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(0)?;
         let mut after_operation_id: Option<String> = None;
         let mut reconciled = 0_usize;
         loop {

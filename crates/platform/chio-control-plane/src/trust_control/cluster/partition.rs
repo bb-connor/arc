@@ -39,12 +39,16 @@ pub(crate) async fn handle_internal_cluster_partition(
                 let was_partitioned = peer_state.partitioned;
                 peer_state.partitioned = blocked.contains(peer_url);
                 if peer_state.partitioned {
+                    peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.last_error =
                         Some("cluster peer intentionally partitioned".to_string());
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
+                    peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.health = PeerHealth::Unknown;
-                    peer_state.last_error = None;
+                    peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
                     peer_state.delta_records_since_snapshot = 0;
                 }
@@ -62,12 +66,16 @@ pub(crate) async fn handle_internal_cluster_partition(
                 let was_partitioned = peer_state.partitioned;
                 peer_state.partitioned = blocked.contains(peer_url);
                 if peer_state.partitioned {
+                    peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.last_error =
                         Some("cluster peer intentionally partitioned".to_string());
                     peer_state.force_snapshot = true;
                 } else if was_partitioned {
+                    peer_state.authority_import_confirmation = None;
+                    peer_state.authority_agreement_confirmation = None;
                     peer_state.health = PeerHealth::Unknown;
-                    peer_state.last_error = None;
+                    peer_state.last_error = peer_state.authority_error.clone();
                     peer_state.force_snapshot = true;
                     peer_state.delta_records_since_snapshot = 0;
                 }
@@ -97,15 +105,18 @@ pub(crate) async fn handle_internal_cluster_partition(
 }
 
 pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
     if let Some(cluster) = state.cluster.as_ref() {
-        let now = unix_timestamp_now();
+        let now = clock_now;
         match cluster.lock() {
             Ok(mut guard) => {
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
-                    peer.health = PeerHealth::Healthy;
+                    peer.health = PeerHealth::reachable_with_authority_error(&peer.authority_error);
                     peer.last_contact_at = Some(now);
                     if !peer.partitioned {
-                        peer.last_error = None;
+                        peer.last_error = peer.authority_error.clone();
                     }
                     peer.force_snapshot = false;
                 }
@@ -113,10 +124,10 @@ pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
             Err(poisoned) => {
                 let mut guard = poisoned.into_inner();
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
-                    peer.health = PeerHealth::Healthy;
+                    peer.health = PeerHealth::reachable_with_authority_error(&peer.authority_error);
                     peer.last_contact_at = Some(now);
                     if !peer.partitioned {
-                        peer.last_error = None;
+                        peer.last_error = peer.authority_error.clone();
                     }
                     peer.force_snapshot = false;
                 }
@@ -126,9 +137,12 @@ pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
 }
 
 pub(crate) fn update_peer_reachable(state: &TrustServiceState, peer_url: &str) {
-    let now = unix_timestamp_now();
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
+    let now = clock_now;
     update_peer_state(state, peer_url, |peer| {
-        peer.health = PeerHealth::Healthy;
+        peer.health = PeerHealth::reachable_with_authority_error(&peer.authority_error);
         peer.last_contact_at = Some(now);
     });
 }
@@ -139,6 +153,8 @@ pub(crate) fn update_peer_failure(state: &TrustServiceState, peer_url: &str, err
             Ok(mut guard) => {
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Unhealthy;
+                    peer.authority_import_confirmation = None;
+                    peer.authority_agreement_confirmation = None;
                     peer.last_error = Some(error.clone());
                     peer.force_snapshot = true;
                 }
@@ -147,6 +163,8 @@ pub(crate) fn update_peer_failure(state: &TrustServiceState, peer_url: &str, err
                 let mut guard = poisoned.into_inner();
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Unhealthy;
+                    peer.authority_import_confirmation = None;
+                    peer.authority_agreement_confirmation = None;
                     peer.last_error = Some(error);
                     peer.force_snapshot = true;
                 }
@@ -157,8 +175,48 @@ pub(crate) fn update_peer_failure(state: &TrustServiceState, peer_url: &str, err
 
 pub(crate) fn update_peer_sync_error(state: &TrustServiceState, peer_url: &str, error: String) {
     update_peer_state(state, peer_url, |peer| {
-        peer.health = PeerHealth::Healthy;
+        peer.health = PeerHealth::reachable_with_authority_error(&peer.authority_error);
         peer.last_error = Some(error);
+    });
+}
+
+/// Record a refused signed-authority import from a peer. Unlike a stream
+/// error, it stays the peer's reported error across successful stream rounds
+/// until `clear_peer_authority_error` records an authority import.
+pub(crate) fn update_peer_authority_error(
+    state: &TrustServiceState,
+    peer_url: &str,
+    error: String,
+) {
+    update_peer_state(state, peer_url, |peer| {
+        peer.health = PeerHealth::Degraded;
+        peer.authority_import_confirmation = None;
+        peer.authority_agreement_confirmation = None;
+        peer.last_error = Some(error.clone());
+        peer.authority_error = Some(error);
+    });
+}
+
+/// Resolve a peer's authority refusal after a signed-authority import from it
+/// succeeded. Any other error reported on the peer is left in place.
+pub(crate) fn clear_peer_authority_error(
+    state: &TrustServiceState,
+    peer_url: &str,
+    confirmation: Option<AuthorityImportConfirmation>,
+    agreement: Option<AuthorityAgreementConfirmation>,
+) {
+    update_peer_state(state, peer_url, |peer| {
+        peer.authority_import_confirmation = confirmation;
+        peer.authority_agreement_confirmation = agreement;
+        let Some(resolved) = peer.authority_error.take() else {
+            return;
+        };
+        if peer.last_error.as_deref() == Some(resolved.as_str()) {
+            peer.last_error = None;
+        }
+        if matches!(peer.health, PeerHealth::Degraded) {
+            peer.health = PeerHealth::Healthy;
+        }
     });
 }
 
@@ -179,7 +237,7 @@ pub(crate) fn request_peer_snapshot_recovery(
     error: String,
 ) {
     update_peer_state(state, peer_url, |peer| {
-        peer.health = PeerHealth::Healthy;
+        peer.health = PeerHealth::reachable_with_authority_error(&peer.authority_error);
         peer.last_error = Some(error);
         peer.force_snapshot = true;
     });

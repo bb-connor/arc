@@ -1,5 +1,4 @@
-// End-to-end test wrapping a real MCP fixture server, asserting the
-// verdict gate and the attestation header round-trip.
+// CLI fixture test asserting the shared wrap response loop and verdict gate.
 //
 // This test exercises the full `chio mcp wrap` stdio orchestration loop
 // without a real wrapped child by feeding the binary the
@@ -16,9 +15,8 @@
 //
 // We then drive the binary with two `tools/call` JSON-RPC frames:
 //
-// - An allowed call (`echo`) MUST round-trip with the wrapped response
-//   plus the "Chio-verified" attestation header injected at
-//   `_meta.chio_verified`.
+// - An allowed call (`echo`) MUST preserve the wrapped content without
+//   injecting an unbound verification claim.
 // - A denied call (`delete_record`) MUST surface a JSON-RPC error
 //   carrying the `urn:chio:error:capability:scope-exceeded` reason code.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
@@ -36,7 +34,7 @@ fn fixture_path() -> std::path::PathBuf {
 }
 
 #[test]
-fn e2e_wrap_round_trip_attestation_and_verdict_gate() {
+fn e2e_wrap_round_trip_content_and_verdict_gate() {
     let mut child = Command::new(chio_bin())
         .args(["mcp", "wrap", "--server-id", "e2e", "--e2e-fixture"])
         .arg(fixture_path())
@@ -117,21 +115,16 @@ fn e2e_wrap_round_trip_attestation_and_verdict_gate() {
         .expect("tools array on response");
     assert_eq!(tools.len(), 4, "expected 4 tools in list response");
 
-    // Frame 2: allowed call -- result carries the attestation header.
+    // Frame 2: allowed content is retained without an unbound attestation.
     let allowed = &frames[2];
     assert_eq!(allowed.get("id"), Some(&serde_json::json!(2)));
-    let header = allowed
-        .pointer("/result/_meta/chio_verified")
-        .expect("chio_verified header present on allowed call");
+    assert!(allowed.pointer("/result/_meta/chio_verified").is_none());
     assert_eq!(
-        header.get("header").and_then(|v| v.as_str()),
-        Some("Chio-verified")
+        allowed
+            .pointer("/result/content/0/text")
+            .and_then(serde_json::Value::as_str),
+        Some("echoed: hello")
     );
-    assert_eq!(
-        header.get("schema").and_then(|v| v.as_str()),
-        Some("urn:chio:attest:tool-call/v1")
-    );
-    assert_eq!(header.get("tool").and_then(|v| v.as_str()), Some("echo"));
 
     // Frame 3: denied call -- error envelope carries the chio reason code.
     let denied = &frames[3];
@@ -213,12 +206,7 @@ fn e2e_wrap_strict_execution_nonce_allows_call_through_kernel_path() {
         allowed.get("error").is_none(),
         "strict nonce call must return a successful MCP result: {allowed:?}"
     );
-    assert_eq!(
-        allowed
-            .pointer("/result/_meta/chio_verified/header")
-            .and_then(serde_json::Value::as_str),
-        Some("Chio-verified")
-    );
+    assert!(allowed.pointer("/result/_meta/chio_verified").is_none());
     assert_eq!(
         allowed
             .pointer("/result/content/0/text")

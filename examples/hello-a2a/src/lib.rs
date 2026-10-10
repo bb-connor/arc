@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use std::error::Error;
 use std::io::{self, BufRead, Write};
 
@@ -9,13 +10,17 @@ use chio_kernel::{
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry};
 use serde_json::{json, Value};
 
 const SERVER_ID: &str = "hello-a2a-srv";
 const TOOL_NAME: &str = "hello_task";
 
 pub type HelloA2aResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+fn manifest_signer() -> Keypair {
+    Keypair::from_seed(&[75; 32])
+}
 
 struct HelloStreamServer;
 
@@ -105,7 +110,7 @@ fn kernel_config() -> KernelConfig {
 
 pub fn demo_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: SERVER_ID.to_string(),
         name: "Hello A2A Server".to_string(),
         description: Some("A tiny receipt-bearing A2A hello surface".to_string()),
@@ -120,13 +125,27 @@ pub fn demo_manifest() -> ToolManifest {
             }),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
-        public_key: "hello-a2a-manifest".to_string(),
+        public_key: manifest_signer().public_key().to_hex(),
     }
+}
+
+fn demo_registry() -> HelloA2aResult<VerifiedManifestRegistry> {
+    let signer = manifest_signer();
+    let signed = chio_manifest::sign_manifest(&demo_manifest(), &signer)?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry.register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())?;
+    Ok(registry)
 }
 
 pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
@@ -169,8 +188,9 @@ pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
         model_metadata: None,
     };
 
+    let registry = demo_registry()?;
     Ok(HelloA2aDemoState {
-        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), vec![demo_manifest()]).map_err(
+        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), &registry).map_err(
             |error| -> Box<dyn Error + Send + Sync> { format!("create edge: {error}").into() },
         )?,
         kernel,
@@ -195,22 +215,36 @@ pub fn serve_stdio() -> HelloA2aResult<()> {
     serve_reader(stdin.lock(), stdout.lock())
 }
 
-pub fn serve_reader<R, W>(reader: R, mut writer: W) -> HelloA2aResult<()>
+pub fn serve_reader<R, W>(mut reader: R, mut writer: W) -> HelloA2aResult<()>
 where
     R: BufRead,
     W: Write,
 {
     let mut state = build_demo_state()?;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() {
+    // Bound allocation before parsing or skipping whitespace. The extra byte
+    // distinguishes an exact-size EOF frame from a truncated oversized frame.
+    const MAX_FRAME_BYTES: usize = 1024 * 1024;
+    loop {
+        let mut frame = Vec::new();
+        let count = std::io::Read::take(&mut reader, MAX_FRAME_BYTES as u64 + 1)
+            .read_until(b'\n', &mut frame)?;
+        if count == 0 {
+            break;
+        }
+        if count > MAX_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "JSON-RPC frame exceeds its byte limit",
+            )
+            .into());
+        }
+        if frame.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        let message: Value = serde_json::from_str(&line)?;
         let response = state
             .edge
-            .handle_jsonrpc(message, &state.kernel, &state.execution);
+            .handle_jsonrpc(&frame, &state.kernel, &state.execution)?;
         if let Some(response) = response.as_value() {
             serde_json::to_writer(&mut writer, response)?;
             writeln!(&mut writer)?;
@@ -248,6 +282,13 @@ mod tests {
     use chio_kernel::{KernelError, ToolServerConnection};
     use serde_json::{json, Value};
     use std::io::Cursor;
+
+    #[test]
+    fn inbound_authority_example_bounds_frames_before_whitespace_or_json() {
+        let mut output = Vec::new();
+        assert!(serve_reader(Cursor::new(vec![b' '; 1024 * 1024 + 1]), &mut output).is_err());
+        assert!(output.is_empty());
+    }
 
     fn send_message_frame(id: u64) -> Value {
         json!({
@@ -302,10 +343,11 @@ mod tests {
     fn direct_jsonrpc_send_stream_and_task_get_carry_receipts() -> HelloA2aResult<()> {
         let mut state = build_demo_state()?;
 
-        let send_response =
-            state
-                .edge
-                .handle_jsonrpc(send_message_frame(1), &state.kernel, &state.execution);
+        let send_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&send_message_frame(1))?,
+            &state.kernel,
+            &state.execution,
+        )?;
         assert_eq!(send_response["result"]["status"], "completed");
         assert_eq!(
             send_response["result"]["metadata"]["chio"]["authorityPath"],
@@ -315,10 +357,11 @@ mod tests {
             .as_str()
             .is_some_and(|receipt_id| !receipt_id.is_empty()));
 
-        let stream_response =
-            state
-                .edge
-                .handle_jsonrpc(stream_message_frame(2), &state.kernel, &state.execution);
+        let stream_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&stream_message_frame(2))?,
+            &state.kernel,
+            &state.execution,
+        )?;
         assert_eq!(stream_response["result"]["status"], "working");
         assert_eq!(
             stream_response["result"]["metadata"]["chio"]["receiptPending"],
@@ -329,15 +372,15 @@ mod tests {
             .ok_or_else(|| KernelError::ToolServerError("missing stream task id".to_string()))?;
 
         let task_response = state.edge.handle_jsonrpc(
-            json!({
+            &serde_json::to_vec(&json!({
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "task/get",
                 "params": { "taskId": task_id }
-            }),
+            }))?,
             &state.kernel,
             &state.execution,
-        );
+        )?;
         assert_eq!(task_response["result"]["status"], "completed");
         assert!(task_response["result"]["metadata"]["chio"]["receiptId"]
             .as_str()

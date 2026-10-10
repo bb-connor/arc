@@ -4,7 +4,7 @@ use super::support::*;
 #[test]
 fn liability_provider_registry_supersedes_and_resolves_latest_provider() {
     let path = unique_db_path("chio-liability-provider-registry");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let initial = signed_liability_provider(
         "lpr-1",
@@ -65,7 +65,7 @@ fn liability_provider_registry_supersedes_and_resolves_latest_provider() {
 #[test]
 fn liability_market_workflow_tracks_quote_to_bound_coverage_with_manual_review() {
     let path = unique_db_path("chio-liability-market-workflow");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let provider = signed_liability_provider(
         "lpr-workflow-1",
@@ -175,7 +175,7 @@ fn liability_market_workflow_tracks_quote_to_bound_coverage_with_manual_review()
 #[test]
 fn liability_market_rejects_unsupported_requests_and_stale_active_quotes() {
     let path = unique_db_path("chio-liability-market-conflicts");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let provider = signed_liability_provider(
         "lpr-conflict-1",
@@ -241,7 +241,7 @@ fn liability_claim_lifecycle_persists_package_through_payout_receipt() {
         .stack_size(32 * 1024 * 1024)
         .spawn(|| {
             let path = unique_db_path("chio-liability-claim-lifecycle");
-            let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+            let store = SqliteReceiptStore::open(&path).test_unwrap();
             let subject_key = "subject-claim";
             let far_future = 4_102_444_800;
 

@@ -31,6 +31,7 @@ use chio_kernel::admission_operation::{
 use chio_kernel::ReceiptStore;
 use chio_store_sqlite::{
     SqliteAdmissionOperationStore, SqliteAuthorityStore, SqliteEconomicStateCache,
+    SqliteServingOwnerError,
 };
 use serde_json::json;
 use tempfile::TempDir;
@@ -40,6 +41,7 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {
+    _clock: chio_test_support::clock::ClockScope,
     _temp: TempDir,
     _authority: SqliteAuthorityStore,
     cache: SqliteEconomicStateCache,
@@ -48,18 +50,26 @@ struct Fixture {
 }
 
 fn fixture() -> Fixture {
-    let temp = tempfile::tempdir().expect("tempdir");
+    // Freeze before opening the store so a later whole-second fixture reading
+    // never backdates the authority's already persisted millisecond floor.
+    let (_, clock) = recovery_clock();
+    let temp = chio_test_support::private_tempdir().expect("tempdir");
     crate::create_private_directory(temp.path()).expect("secure database parent");
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root).expect("create lock root");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )
+    .expect("open authority");
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
     let operations = Arc::new(authority.admission_operation_store());
     Fixture {
+        _clock: clock,
         _temp: temp,
         _authority: authority,
         cache,
@@ -336,6 +346,13 @@ fn now_ms() -> u64 {
             .as_millis(),
     )
     .expect("system time fits u64")
+}
+
+/// Keep setup leases live while tests advance explicit decision timestamps.
+/// Lifecycle races and stage expiry must not depend on parallel test load.
+fn recovery_clock() -> (u64, chio_test_support::clock::ClockScope) {
+    let now = now_ms() / 1_000;
+    (now * 1_000, chio_test_support::clock::scope_unix_secs(now))
 }
 
 fn prepared_economic_operation(
@@ -670,7 +687,7 @@ fn bounded_stage_retries_before_expiry() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-before-expiry");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, committed) =
         stage_bounded_operation(&fixture, &operation, &claimant, now + 2, now + 10)?;
@@ -695,7 +712,7 @@ fn bounded_stage_compensates_at_the_exact_expiry_boundary() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-at-expiry");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     let not_after = now + 3;
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, _) =
@@ -723,7 +740,7 @@ fn bounded_stage_finalizes_an_observed_anchor_after_expiry() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-anchored-expiry");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     let not_after = now + 3;
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, committed) =
@@ -748,7 +765,7 @@ fn bounded_stage_quarantines_postdispatch_work_after_expiry() -> TestResult {
     let fixture = fixture();
     let mut operation = prepared_dispatch_operation(&fixture.fence, "bounded-postdispatch-expiry");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     operation = advance_operation_with_attachments(
         fixture.operations.as_ref(),
@@ -818,7 +835,7 @@ fn bounded_stage_expired_anchor_read_outage_stays_pending() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-expired-outage");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     let not_after = now + 3;
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, _) =
@@ -845,7 +862,7 @@ fn bounded_stage_expired_divergent_predecessor_quarantines() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-expired-divergent");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     let not_after = now + 3;
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, _) =
@@ -874,7 +891,7 @@ fn bounded_stage_expired_committed_effect_quarantines() -> TestResult {
     let fixture = fixture();
     let operation = prepared_dispatch_operation(&fixture.fence, "bounded-expired-effect");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     let not_after = now + 3;
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let lease = fixture.operations.claim_recovery(
@@ -926,14 +943,18 @@ fn bounded_stage_expired_without_operation_binding_quarantines() -> TestResult {
 
 #[test]
 fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     crate::create_private_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let snapshot = temp.path().join("before-economic-stage.db");
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     fs::copy(&database, &snapshot)?;
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
@@ -952,7 +973,17 @@ fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
     for suffix in ["-wal", "-shm"] {
         let _ = fs::remove_file(format!("{}{suffix}", database.display()));
     }
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    let restored = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    );
+    assert!(
+        matches!(&restored, Err(SqliteServingOwnerError::Invalid(reason))
+            if reason == "authority database is behind its rollback anchor"),
+        "unexpected restore error: {:?}",
+        restored.err()
+    );
     Ok(())
 }
 
@@ -984,7 +1015,7 @@ fn operation_version_race_discards_unanchored_stage_without_cas() -> TestResult 
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let operation = prepared_economic_operation(&fixture.fence, "operation-race");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
     let stage_lease = operations.claim_recovery(
@@ -1031,7 +1062,7 @@ fn compensation_winner_discards_the_unanchored_stage_before_anchor_cas() -> Test
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let operation = prepared_dispatch_operation(&fixture.fence, "compensation-wins");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
     let stage_lease = operations.claim_recovery(
@@ -1082,7 +1113,7 @@ fn recovery_winner_rejects_late_pre_dispatch_compensation() -> TestResult {
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let operation = prepared_dispatch_operation(&fixture.fence, "recovery-wins");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
     let stage_lease = operations.claim_recovery(
@@ -1130,7 +1161,8 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let operation = prepared_dispatch_operation(&fixture.fence, "concurrent-race");
-    let now = now_ms();
+    // Every participant observes the same clock even under parallel test load.
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
     let stage_lease = operations.claim_recovery(
@@ -1166,6 +1198,7 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
         let barrier = barrier.clone();
         let batch_id = batch_id.clone();
         std::thread::spawn(move || {
+            let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
             barrier.wait();
             recovery.compensate_unanchored_stage_before_dispatch(&batch_id, now + 3)
         })
@@ -1175,6 +1208,7 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
         let barrier = barrier.clone();
         let batch_id = batch_id.clone();
         std::thread::spawn(move || {
+            let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
             barrier.wait();
             recovery.recover_stage(&batch_id, now + 4)
         })
@@ -1216,7 +1250,7 @@ fn compensation_recovery_discards_a_stage_after_terminal_commit_ack_loss() -> Te
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let operation = prepared_dispatch_operation(&fixture.fence, "compensation-ack-loss");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
     let stage_lease = operations.claim_recovery(
@@ -1272,7 +1306,7 @@ fn handoff_verifier_requires_exact_submitted_state_version_and_store_fence() -> 
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
     let mut operation = prepared_economic_operation(&fixture.fence, "handoff");
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let claimant = identifier("claimant_id", "handoff-owner");
     operation = advance_operation(
@@ -1332,7 +1366,7 @@ fn prepared_effect_verifier_binds_operation_request_handoff_and_fences() -> Test
             ..AdmissionParticipantRequirements::NONE
         },
     );
-    let now = now_ms();
+    let (now, _clock) = recovery_clock();
     operations.begin(&mutation, &fixture.fence, now)?;
     operations.begin(&dispatch, &fixture.fence, now + 1)?;
     operations.begin(&approval, &fixture.fence, now + 2)?;

@@ -11,9 +11,21 @@ use chio_swarm_authority::{
     SwarmJoinReceipt, SwarmRevocationEpoch, SwarmRoutePlanReceipt, SwarmTaskGraph,
 };
 
+#[cfg(unix)]
+#[path = "runtime_store/replay_source.rs"]
+mod replay_source;
+#[cfg(not(unix))]
+#[path = "runtime_store/replay_source_unsupported.rs"]
+mod replay_source_unsupported;
+#[path = "runtime_store/trust_floor_defaults.rs"]
+mod trust_floor_defaults;
+#[path = "runtime_store/trust_floor_races.rs"]
+mod trust_floor_races;
+
 #[derive(Default)]
 struct StoreWithoutTreatyContinuationSupport {
     inner: InMemoryRuntimeAdmissionStore,
+    floor_callbacks: std::sync::atomic::AtomicUsize,
 }
 
 impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
@@ -45,6 +57,8 @@ impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
         verifier_id: &str,
         key_id: &str,
     ) -> Result<Option<RuntimeTrustFloorEntry>, ChioRuntimeError> {
+        self.floor_callbacks
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.inner.runtime_trust_floor(verifier_id, key_id)
     }
 
@@ -52,6 +66,8 @@ impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
         &self,
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
+        self.floor_callbacks
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.inner.record_runtime_trust_floor(entry)
     }
 }
@@ -155,21 +171,22 @@ fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
     {
         let store = SqliteRuntimeOrchestrationStore::open(&path)?;
         store.insert_bundle(bundle())?;
-        store.record_run_state(
-            "runtime-orchestration-1",
-            "proof_accepted",
-            None,
-            1_800_000_001_000,
+        store.register_run("runtime-orchestration-1")?;
+        let lease =
+            store.acquire_current_run_lease("runtime-orchestration-1", "fixture", 60_000)?;
+        store.record_run_state(&lease, "proof_accepted", None)?;
+        store.record_step_state(
+            &lease,
+            chio_runtime_core::RuntimeOrchestrationStepState {
+                step_index: 1,
+                admission_id: "adm-live-1".to_string(),
+                state: "proof_accepted".to_string(),
+                destructive: true,
+                admission_report_sha256: Some("1".repeat(64)),
+                tool_receipt_sha256: Some("2".repeat(64)),
+                lease_id: Some("lease-live-1".to_string()),
+            },
         )?;
-        store.record_step_state(chio_runtime_core::RuntimeOrchestrationStepState {
-            step_index: 1,
-            admission_id: "adm-live-1".to_string(),
-            state: "proof_accepted".to_string(),
-            destructive: true,
-            admission_report_sha256: Some("1".repeat(64)),
-            tool_receipt_sha256: Some("2".repeat(64)),
-            lease_id: Some("lease-live-1".to_string()),
-        })?;
         store.consume_destructive_lease("lease-live-1", "adm-live-1")?;
     }
 
@@ -248,8 +265,11 @@ fn sqlite_runtime_orchestration_store_preserves_same_artifact_hash_per_run(
         byte_count: 4096,
     };
 
-    store.record_evidence_artifact("runtime-run-a", &entry, 1_800_000_000_000)?;
-    store.record_evidence_artifact("runtime-run-b", &entry, 1_800_000_000_001)?;
+    for run in ["runtime-run-a", "runtime-run-b"] {
+        store.register_run(run)?;
+        let lease = store.acquire_current_run_lease(run, "fixture", 60_000)?;
+        store.record_evidence_artifact(&lease, &entry)?;
+    }
 
     let connection = rusqlite::Connection::open(&path)?;
     let count: i64 = connection.query_row(
@@ -348,3 +368,6 @@ fn treaty_scope() -> TreatyScope {
         trust_bundle_sha256: "b".repeat(64),
     }
 }
+
+#[path = "runtime_store/authority_readers.rs"]
+mod authority_readers;

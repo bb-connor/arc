@@ -14,6 +14,17 @@
 //! [`ApprovalGuard::evaluate`] and
 //! [`ChioKernel::evaluate_tool_call_with_hitl`](crate::ChioKernel).
 
+mod collector;
+mod tool_context;
+
+pub use tool_context::ToolApprovalContext;
+
+pub use collector::{
+    ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalCreationParameters, ThresholdApprovalProposalRecord,
+    ThresholdApprovalProposalRegistration, ThresholdApprovalVoteRecord,
+};
+
 use std::collections::HashMap;
 use std::sync::{Mutex, RwLock};
 
@@ -22,13 +33,14 @@ use chio_core::capability::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedAutonomyTier,
         GovernedTransactionIntent,
     },
-    scope::{Constraint, MonetaryAmount},
+    scope::Constraint,
 };
 use chio_core::crypto::{sha256_hex, PublicKey};
 use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime::{ToolCallRequest, Verdict};
+use crate::security_admission_operation::ReplayReservationState;
 use crate::{AgentId, KernelError, ServerId};
 
 /// Maximum lifetime (in seconds) permitted on a single approval token.
@@ -36,6 +48,7 @@ use crate::{AgentId, KernelError, ServerId};
 /// section 15: the single-use replay registry's TTL is pinned to this
 /// value so no token can outlive its replay entry.
 pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
+pub(crate) const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
 /// A request for human approval, produced when the approval guard
 /// returns `Verdict::PendingApproval`. Designed to be serialized into
@@ -169,8 +182,15 @@ impl ApprovalToken {
         request: &ApprovalRequest,
         now: u64,
     ) -> Result<GovernedApprovalDecision, KernelError> {
+        if now >= request.expires_at || self.governed_token.expires_at > request.expires_at {
+            return Err(KernelError::ApprovalRejected(
+                "approval request expired or token exceeds its deadline".into(),
+            ));
+        }
         // Binding checks: request_id, intent hash, approver identity.
-        if self.governed_token.request_id != request.approval_id {
+        if self.approval_id != request.approval_id
+            || self.governed_token.request_id != request.approval_id
+        {
             return Err(KernelError::ApprovalRejected(
                 "approval token bound to a different request".into(),
             ));
@@ -210,6 +230,16 @@ impl ApprovalToken {
             None => {}
         }
 
+        // Lifetime cap: a token whose lifetime exceeds MAX_APPROVAL_TTL_SECS
+        // cannot be safely tracked in the single-use replay registry.
+        let lifetime = self
+            .governed_token
+            .expires_at
+            .checked_sub(self.governed_token.issued_at)
+            .ok_or_else(|| {
+                KernelError::ApprovalRejected("approval token validity window is inverted".into())
+            })?;
+
         // Time bounds.
         if now >= self.governed_token.expires_at {
             return Err(KernelError::ApprovalRejected(
@@ -222,12 +252,6 @@ impl ApprovalToken {
             ));
         }
 
-        // Lifetime cap: a token whose lifetime exceeds MAX_APPROVAL_TTL_SECS
-        // cannot be safely tracked in the single-use replay registry.
-        let lifetime = self
-            .governed_token
-            .expires_at
-            .saturating_sub(self.governed_token.issued_at);
         if lifetime > MAX_APPROVAL_TTL_SECS {
             return Err(KernelError::ApprovalRejected(format!(
                 "approval token lifetime {lifetime}s exceeds cap {MAX_APPROVAL_TTL_SECS}s"
@@ -252,16 +276,262 @@ impl ApprovalToken {
 /// Errors emitted by approval stores.
 #[derive(Debug, thiserror::Error)]
 pub enum ApprovalStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("invalid approval reservation: {0}")]
+    Invalid(String),
     #[error("approval request not found: {0}")]
     NotFound(String),
     #[error("approval already resolved: {0}")]
     AlreadyResolved(String),
+    #[error("approval state conflict: {0}")]
+    Conflict(String),
     #[error("approval token already consumed (replay detected): {0}")]
     Replay(String),
     #[error("storage backend error: {0}")]
     Backend(String),
     #[error("serialization error: {0}")]
     Serialization(String),
+}
+
+/// Durability and coordination guarantees provided by an approval replay authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalStoreProfile {
+    EphemeralLocal,
+    SingleNodeDurable,
+    SharedLinearizable,
+}
+
+impl ApprovalStoreProfile {
+    #[must_use]
+    pub fn supports_dispatch_workers(self, dispatch_worker_count: usize) -> bool {
+        match self {
+            Self::EphemeralLocal => false,
+            Self::SingleNodeDurable => dispatch_worker_count == 1,
+            Self::SharedLinearizable => dispatch_worker_count > 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservationMember {
+    token_id: String,
+    token_digest: String,
+}
+
+impl ApprovalReservationMember {
+    pub fn new(token_id: String, token_digest: String) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_identifier(&token_id, "token_id")?;
+        validate_reservation_digest(&token_digest, "token_digest")?;
+        Ok(Self {
+            token_id,
+            token_digest,
+        })
+    }
+
+    pub fn token_id(&self) -> &str {
+        &self.token_id
+    }
+
+    pub fn token_digest(&self) -> &str {
+        &self.token_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalSetReservationInput {
+    approval_set_hash: String,
+    members: Vec<ApprovalReservationMember>,
+    proposal_deadline: u64,
+}
+
+impl ApprovalSetReservationInput {
+    pub fn new(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&approval_set_hash, "approval_set_hash")?;
+        if proposal_deadline == 0 || i64::try_from(proposal_deadline).is_err() {
+            return Err(ApprovalStoreError::Invalid(
+                "proposal_deadline is outside the durable timestamp range".to_string(),
+            ));
+        }
+        let members = normalize_approval_reservation_members(members)?;
+        Ok(Self {
+            approval_set_hash,
+            members,
+            proposal_deadline,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        let normalized = Self::new(
+            approval_set_hash.clone(),
+            members.clone(),
+            proposal_deadline,
+        )
+        .map_err(persisted_approval_reservation_error)?;
+        if normalized.members != members {
+            return Err(ApprovalStoreError::Serialization(
+                "persisted approval members are not normalized".to_string(),
+            ));
+        }
+        Ok(normalized)
+    }
+
+    pub fn approval_set_hash(&self) -> &str {
+        &self.approval_set_hash
+    }
+
+    pub fn members(&self) -> &[ApprovalReservationMember] {
+        &self.members
+    }
+
+    pub fn proposal_deadline(&self) -> u64 {
+        self.proposal_deadline
+    }
+}
+
+/// Immutable operation ownership for one normalized verified approval set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservation {
+    operation_id: String,
+    approval_set: ApprovalSetReservationInput,
+    state: ReplayReservationState,
+}
+
+impl ApprovalReservation {
+    pub fn new(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&operation_id, "operation_id")?;
+        let approval_set = ApprovalSetReservationInput::new(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        Ok(Self {
+            operation_id,
+            approval_set,
+            state: ReplayReservationState::Reserved,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+        state: ReplayReservationState,
+    ) -> Result<Self, ApprovalStoreError> {
+        let approval_set = ApprovalSetReservationInput::from_persisted_parts(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        let mut reservation =
+            Self::new(operation_id, approval_set).map_err(persisted_approval_reservation_error)?;
+        reservation.state = state;
+        Ok(reservation)
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
+    pub fn approval_set(&self) -> &ApprovalSetReservationInput {
+        &self.approval_set
+    }
+
+    pub fn state(&self) -> ReplayReservationState {
+        self.state
+    }
+}
+
+fn validate_reservation_identifier(
+    value: &str,
+    label: &'static str,
+) -> Result<(), ApprovalStoreError> {
+    if value.is_empty()
+        || value.len() > MAX_RESERVATION_IDENTIFIER_BYTES
+        || value.bytes().any(|byte| byte == 0)
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} is empty, oversized, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_reservation_digest(value: &str, label: &'static str) -> Result<(), ApprovalStoreError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
+fn normalize_approval_reservation_members(
+    mut members: Vec<ApprovalReservationMember>,
+) -> Result<Vec<ApprovalReservationMember>, ApprovalStoreError> {
+    if members.is_empty()
+        || members.len()
+            > crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "approval member count must be between 1 and {}",
+            crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+        )));
+    }
+    for member in &members {
+        validate_reservation_identifier(&member.token_id, "token_id")?;
+        validate_reservation_digest(&member.token_digest, "token_digest")?;
+    }
+    members.sort_unstable_by(|left, right| {
+        left.token_digest
+            .cmp(&right.token_digest)
+            .then_with(|| left.token_id.cmp(&right.token_id))
+    });
+    if members
+        .array_windows::<2>()
+        .any(|pair| pair[0].token_digest == pair[1].token_digest)
+    {
+        return Err(ApprovalStoreError::Invalid(
+            "approval-token digests contain a duplicate".to_string(),
+        ));
+    }
+    let mut token_ids = members
+        .iter()
+        .map(|member| member.token_id.as_str())
+        .collect::<Vec<_>>();
+    token_ids.sort_unstable();
+    if token_ids
+        .array_windows::<2>()
+        .any(|pair| pair[0] == pair[1])
+    {
+        return Err(ApprovalStoreError::Invalid(
+            "approval token IDs contain a duplicate".to_string(),
+        ));
+    }
+    Ok(members)
+}
+
+fn persisted_approval_reservation_error(error: ApprovalStoreError) -> ApprovalStoreError {
+    match error {
+        ApprovalStoreError::Invalid(message) => ApprovalStoreError::Serialization(message),
+        other => other,
+    }
 }
 
 /// Filter for `list_pending`.
@@ -289,6 +559,12 @@ pub struct ResolvedApproval {
     pub resolved_at: u64,
     pub approver_hex: String,
     pub token_id: String,
+    /// Original request and signed decision. Legacy audit-only resolutions may
+    /// omit these, in which case they cannot authorize a new execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<ApprovalRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<GovernedApprovalToken>,
 }
 
 /// Persistent store for pending and resolved HITL approvals. The trait
@@ -297,6 +573,10 @@ pub struct ResolvedApproval {
 /// synchronous, and the kernel itself does not run on an async
 /// executor.
 pub trait ApprovalStore: Send + Sync {
+    fn authority_profile(&self) -> ApprovalStoreProfile {
+        ApprovalStoreProfile::EphemeralLocal
+    }
+
     /// Persist a new pending request. Idempotent on `approval_id`: a
     /// second call with the same id returns without error as long as
     /// the stored payload matches.
@@ -342,54 +622,45 @@ pub trait ApprovalStore: Send + Sync {
 
     /// Fetch the resolution record for a previously resolved approval.
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
-}
-
-/// Batch approvals let a human pre-approve a class of calls.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BatchApproval {
-    pub batch_id: String,
-    pub approver_hex: String,
-    pub subject_id: AgentId,
-    pub server_pattern: String,
-    pub tool_pattern: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_amount_per_call: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_total_amount: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_calls: Option<u32>,
-    pub not_before: u64,
-    pub not_after: u64,
-    #[serde(default)]
-    pub used_calls: u32,
-    #[serde(default)]
-    pub used_total_units: u64,
-    #[serde(default)]
-    pub revoked: bool,
-}
-
-/// Store for batch approvals. Counterpart to `ApprovalStore`.
-pub trait BatchApprovalStore: Send + Sync {
-    fn store(&self, batch: &BatchApproval) -> Result<(), ApprovalStoreError>;
-
-    fn find_matching(
+    /// Atomically bind a normalized approval-token digest set to an operation.
+    /// The default fails closed so operation-owned callers never fall back to
+    /// the legacy immediate-consumption registry.
+    fn reserve_approval_set(
         &self,
-        subject_id: &str,
-        server_id: &str,
-        tool_name: &str,
-        amount: Option<&MonetaryAmount>,
-        now: u64,
-    ) -> Result<Option<BatchApproval>, ApprovalStoreError>;
+        _operation_id: &str,
+        _approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 
-    fn record_usage(
+    fn commit_approval_reservation(
         &self,
-        batch_id: &str,
-        amount: Option<&MonetaryAmount>,
-    ) -> Result<(), ApprovalStoreError>;
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 
-    fn revoke(&self, batch_id: &str) -> Result<(), ApprovalStoreError>;
+    fn cancel_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 
-    fn get(&self, batch_id: &str) -> Result<Option<BatchApproval>, ApprovalStoreError>;
+    fn get_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 }
 
 /// Contract a channel must satisfy to dispatch an approval request.
@@ -476,6 +747,16 @@ pub fn compute_parameter_hash(
         // a stable string so callers do not have to handle the error.
         Err(_) => sha256_hex(envelope.to_string().as_bytes()),
     }
+}
+
+fn checked_approval_request_expiry(now: u64, ttl_secs: u64) -> Result<u64, KernelError> {
+    if !(1..=MAX_APPROVAL_TTL_SECS).contains(&ttl_secs) {
+        return Err(KernelError::ApprovalRejected(
+            "approval request lifetime is outside the supported range".into(),
+        ));
+    }
+    now.checked_add(ttl_secs)
+        .ok_or_else(|| KernelError::ApprovalRejected("approval request expiry overflow".into()))
 }
 
 /// The built-in HITL guard. Runs before the generic guard pipeline and
@@ -618,9 +899,9 @@ impl ApprovalGuard {
                     tool_name: ctx.request.tool_name.clone(),
                     action: "invoke".to_string(),
                     parameter_hash: parameter_hash.clone(),
-                    expires_at: now + self.default_ttl_secs,
+                    expires_at: token.governed_token.expires_at,
                     callback_hint: None,
-                    created_at: now,
+                    created_at: token.governed_token.issued_at,
                     summary: String::new(),
                     governed_intent: ctx.request.governed_intent.clone(),
                     trusted_approvers: ctx.trusted_approvers.to_vec(),
@@ -664,7 +945,7 @@ impl ApprovalGuard {
                 &ctx.request.arguments,
                 ctx.request.governed_intent.as_ref(),
             );
-            let expires_at = now.saturating_add(self.default_ttl_secs);
+            let expires_at = checked_approval_request_expiry(now, self.default_ttl_secs)?;
             let summary = format!(
                 "agent {} requests approval for {}:{}",
                 ctx.request.agent_id, ctx.request.server_id, ctx.request.tool_name
@@ -917,9 +1198,21 @@ impl ApprovalStore for InMemoryApprovalStore {
             .pending
             .write()
             .map_err(|_| ApprovalStoreError::Backend("pending map poisoned".into()))?;
-        let Some(pending) = pending_guard.remove(id) else {
+        let Some(pending) = pending_guard.get(id).cloned() else {
             return Err(ApprovalStoreError::NotFound(id.to_string()));
         };
+
+        let verified = ApprovalToken::from_decision(decision)
+            .verify_against(&pending, decision.received_at)
+            .map_err(|error| ApprovalStoreError::Invalid(error.to_string()))?;
+        if matches!(verified, GovernedApprovalDecision::Approved)
+            != (decision.outcome == ApprovalOutcome::Approved)
+        {
+            return Err(ApprovalStoreError::Invalid(
+                "signed decision disagrees with resolution".into(),
+            ));
+        }
+        pending_guard.remove(id);
 
         {
             let mut consumed = self
@@ -951,6 +1244,8 @@ impl ApprovalStore for InMemoryApprovalStore {
                 resolved_at: decision.received_at,
                 approver_hex: decision.approver.to_hex(),
                 token_id: decision.token.id.clone(),
+                request: Some(pending.clone()),
+                token: Some(decision.token.clone()),
             },
         );
 
@@ -1016,127 +1311,6 @@ impl ApprovalStore for InMemoryApprovalStore {
             .map_err(|_| ApprovalStoreError::Backend("resolved map poisoned".into()))?;
         Ok(guard.get(id).cloned())
     }
-}
-
-/// In-memory `BatchApprovalStore` used in tests. Production backends
-/// should persist via `SqliteBatchApprovalStore`.
-#[derive(Default)]
-pub struct InMemoryBatchApprovalStore {
-    batches: RwLock<HashMap<String, BatchApproval>>,
-}
-
-impl InMemoryBatchApprovalStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl BatchApprovalStore for InMemoryBatchApprovalStore {
-    fn store(&self, batch: &BatchApproval) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        guard.insert(batch.batch_id.clone(), batch.clone());
-        Ok(())
-    }
-
-    fn find_matching(
-        &self,
-        subject_id: &str,
-        server_id: &str,
-        tool_name: &str,
-        amount: Option<&MonetaryAmount>,
-        now: u64,
-    ) -> Result<Option<BatchApproval>, ApprovalStoreError> {
-        let guard = self
-            .batches
-            .read()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        Ok(guard
-            .values()
-            .find(|b| {
-                !b.revoked
-                    && b.subject_id == subject_id
-                    && pattern_matches(&b.server_pattern, server_id)
-                    && pattern_matches(&b.tool_pattern, tool_name)
-                    && now >= b.not_before
-                    && now < b.not_after
-                    && b.max_calls.is_none_or(|c| b.used_calls < c)
-                    && amount_fits(b, amount)
-            })
-            .cloned())
-    }
-
-    fn record_usage(
-        &self,
-        batch_id: &str,
-        amount: Option<&MonetaryAmount>,
-    ) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        let Some(batch) = guard.get_mut(batch_id) else {
-            return Err(ApprovalStoreError::NotFound(batch_id.to_string()));
-        };
-        batch.used_calls = batch.used_calls.saturating_add(1);
-        if let Some(amt) = amount {
-            batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
-        }
-        Ok(())
-    }
-
-    fn revoke(&self, batch_id: &str) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        let Some(batch) = guard.get_mut(batch_id) else {
-            return Err(ApprovalStoreError::NotFound(batch_id.to_string()));
-        };
-        batch.revoked = true;
-        Ok(())
-    }
-
-    fn get(&self, batch_id: &str) -> Result<Option<BatchApproval>, ApprovalStoreError> {
-        let guard = self
-            .batches
-            .read()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        Ok(guard.get(batch_id).cloned())
-    }
-}
-
-fn pattern_matches(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    if let Some(prefix) = pattern.strip_suffix('*') {
-        return value.starts_with(prefix);
-    }
-    pattern == value
-}
-
-fn amount_fits(batch: &BatchApproval, amount: Option<&MonetaryAmount>) -> bool {
-    let Some(amt) = amount else {
-        // Calls without a monetary intent match only batches that don't
-        // constrain per-call amount.
-        return batch.max_amount_per_call.is_none() && batch.max_total_amount.is_none();
-    };
-    if let Some(per_call) = &batch.max_amount_per_call {
-        if amt.currency != per_call.currency || amt.units > per_call.units {
-            return false;
-        }
-    }
-    if let Some(total) = &batch.max_total_amount {
-        if amt.currency != total.currency
-            || batch.used_total_units.saturating_add(amt.units) > total.units
-        {
-            return false;
-        }
-    }
-    true
 }
 
 #[cfg(test)]

@@ -440,7 +440,7 @@ fn economic_cancellation(
         namespace: "economy-prod".to_owned(),
         signer_key_id: "anchor-key-1".to_owned(),
         signer_key_epoch: 1,
-        signer_public_key: PublicKey::from_bytes(keypair.public_key().as_bytes())?,
+        signer_public_key: PublicKey::from_bytes(&keypair.public_key_bytes())?,
     };
     let mut slot = EconomicEffectSlotV1 {
         schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_owned(),
@@ -669,6 +669,7 @@ fn external_effect_cancellation_constructs_bound_permanently_not_applied_result(
         &AdmissionProjectionCapabilities {
             operation_terminal: true,
             economic_mutation_terminal: true,
+            execution_nonce_participant: false,
             ..AdmissionProjectionCapabilities::default()
         },
         &Keypair::from_seed(&[0x53; 32]),

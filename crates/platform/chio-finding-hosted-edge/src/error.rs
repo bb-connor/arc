@@ -19,8 +19,16 @@ pub struct HostedErrorBody {
 
 /// Closed edge failure vocabulary; every variant maps to one stable
 /// wire code and HTTP status.
-#[derive(Clone, Copy, Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum HostedEdgeError {
+    #[error("hosted request JSON is invalid")]
+    InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted credential JSON is invalid")]
+    InvalidCredential(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted durable JSON is invalid")]
+    CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted authority clock rejected the operation")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("hosted request is invalid")]
     InvalidRequest,
     #[error("hosted authentication failed")]
@@ -50,39 +58,40 @@ pub enum HostedEdgeError {
 impl HostedEdgeError {
     /// Stable machine-readable wire code.
     #[must_use]
-    pub const fn code(self) -> &'static str {
+    pub const fn code(&self) -> &'static str {
         match self {
-            Self::InvalidRequest => "invalid_request",
-            Self::AuthenticationFailed => "authentication_failed",
+            Self::InvalidRequest | Self::InvalidInput(_) => "invalid_request",
+            Self::AuthenticationFailed | Self::InvalidCredential(_) => "authentication_failed",
             Self::AuthorizationFailed => "authorization_failed",
             Self::ReplayRejected => "replay_rejected",
             Self::RateLimited => "rate_limited",
             Self::NotFound => "not_found",
             Self::Conflict => "conflict",
-            Self::IntegrityFailure => "integrity_failure",
+            Self::IntegrityFailure | Self::CorruptInput(_) => "integrity_failure",
             Self::CapacityUnavailable => "authentication_capacity_unavailable",
             Self::RequestCapacityUnavailable => "request_capacity_unavailable",
-            Self::DependencyUnavailable => "authentication_dependency_unavailable",
+            Self::DependencyUnavailable | Self::Clock(_) => "authentication_dependency_unavailable",
             Self::Configuration => "edge_configuration_invalid",
         }
     }
 
     /// Whether a retry can succeed without operator action.
     #[must_use]
-    pub const fn retryable(self) -> bool {
+    pub const fn retryable(&self) -> bool {
         matches!(
             self,
             Self::RateLimited
                 | Self::CapacityUnavailable
                 | Self::RequestCapacityUnavailable
                 | Self::DependencyUnavailable
+                | Self::Clock(_)
         )
     }
 
     /// The wire body for this error, with an invalid request id replaced
     /// by a fixed fallback so the response never echoes hostile bytes.
     #[must_use]
-    pub fn body(self, request_id: impl Into<String>) -> HostedErrorBody {
+    pub fn body(&self, request_id: impl Into<String>) -> HostedErrorBody {
         let request_id = request_id.into();
         let request_id = if valid_request_id(&request_id) {
             request_id
@@ -93,21 +102,25 @@ impl HostedEdgeError {
             schema: HOSTED_ERROR_SCHEMA,
             code: self.code(),
             message: match self {
-                Self::InvalidRequest => "The request is invalid.",
-                Self::AuthenticationFailed => "Authentication failed.",
+                Self::InvalidRequest | Self::InvalidInput(_) => "The request is invalid.",
+                Self::AuthenticationFailed | Self::InvalidCredential(_) => "Authentication failed.",
                 Self::AuthorizationFailed => "The credential does not authorize this action.",
                 Self::ReplayRejected => "The proof was already used.",
                 Self::RateLimited => "The request rate limit was exceeded.",
                 Self::NotFound => "The requested resource was not found.",
                 Self::Conflict => "The request conflicts with durable state.",
-                Self::IntegrityFailure => "Durable state failed validation.",
+                Self::IntegrityFailure | Self::CorruptInput(_) => {
+                    "Durable state failed validation."
+                }
                 Self::CapacityUnavailable => {
                     "The service is temporarily unable to accept this request."
                 }
                 Self::RequestCapacityUnavailable => {
                     "The edge is temporarily unable to accept this request."
                 }
-                Self::DependencyUnavailable => "Authentication is temporarily unavailable.",
+                Self::DependencyUnavailable | Self::Clock(_) => {
+                    "Authentication is temporarily unavailable."
+                }
                 Self::Configuration => "The hosted edge is not ready.",
             },
             request_id,
@@ -117,18 +130,19 @@ impl HostedEdgeError {
 
     /// The HTTP status this error maps to.
     #[must_use]
-    pub const fn http_status(self) -> u16 {
+    pub const fn http_status(&self) -> u16 {
         match self {
-            Self::InvalidRequest => 400,
-            Self::AuthenticationFailed => 401,
+            Self::InvalidRequest | Self::InvalidInput(_) => 400,
+            Self::AuthenticationFailed | Self::InvalidCredential(_) => 401,
             Self::AuthorizationFailed => 403,
             Self::ReplayRejected | Self::RateLimited => 429,
             Self::NotFound => 404,
             Self::Conflict => 409,
-            Self::IntegrityFailure => 503,
+            Self::IntegrityFailure | Self::CorruptInput(_) => 503,
             Self::CapacityUnavailable
             | Self::RequestCapacityUnavailable
-            | Self::DependencyUnavailable => 503,
+            | Self::DependencyUnavailable
+            | Self::Clock(_) => 503,
             Self::Configuration => 500,
         }
     }

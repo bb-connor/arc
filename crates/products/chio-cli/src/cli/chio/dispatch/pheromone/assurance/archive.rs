@@ -558,7 +558,7 @@ pub(super) fn read_relay_alert_assurance_archive_package(
     for entry in entries {
         if entry.path == ARCHIVE_PACKAGE_MANIFEST_PATH {
             let parsed: chio_pheromone_relay::RelayAlertAssuranceArchivePackageManifest =
-                serde_json::from_slice(&entry.bytes).map_err(|error| {
+                crate::input::json(&entry.bytes).map_err(|error| {
                     CliError::cli_other_error(format!(
                         "Chio archive package manifest JSON: {error}"
                     ))

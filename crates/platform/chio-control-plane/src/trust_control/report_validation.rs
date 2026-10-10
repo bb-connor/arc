@@ -1,5 +1,42 @@
-use super::cluster::cluster_authority_lease_view;
+#[path = "authority_admission.rs"]
+mod authority_admission;
+pub(crate) use authority_admission::inspect_authority_state_blocking;
+
+use super::cluster::{
+    cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,
+    ClusterAuthorityServingEvidence,
+};
 use super::*;
+
+/// Inspect an admitted authority view on the blocking pool. A term/quorum or
+/// authority-head/live-key-set change before return refuses the result. The
+/// caller must additionally bind any artifact's actual signer to this view.
+pub(crate) async fn inspect_authority_state<T, F>(
+    state: &TrustServiceState,
+    inspect: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
+    authority_admission::run_blocking_authority_operation(state, move |state| {
+        inspect_authority_state_blocking(state, inspect)
+    })
+    .await
+}
+
+/// Run a bounded commit whose operation checks final authority admission inside
+/// its transaction before persistence. There is no outer post-commit refusal.
+pub(crate) async fn run_authority_commit<T, F>(
+    state: &TrustServiceState,
+    commit: F,
+) -> Result<T, Response>
+where
+    T: Send + 'static,
+    F: FnOnce(&TrustServiceState) -> Result<T, Response> + Send + 'static,
+{
+    authority_admission::run_authority_commit(state, commit).await
+}
 
 pub(crate) fn budget_visibility_matches(
     allowed: bool,
@@ -42,6 +79,15 @@ pub(crate) fn normalize_cluster_config_url(
                 "cluster URL scheme `{scheme}` is not allowed"
             )));
         }
+    }
+    if parsed.scheme() == "http"
+        && !matches!(parsed.host(),
+        Some(Host::Ipv4(address)) if address.is_loopback())
+        && !matches!(parsed.host(), Some(Host::Ipv6(address)) if address.is_loopback())
+    {
+        return Err(CliError::cli_other_error(
+            "plaintext cluster URLs require a literal loopback address".to_string(),
+        ));
     }
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(CliError::cli_other_error(
@@ -166,7 +212,10 @@ fn cluster_peer_auth_is_rate_limited(node_id: &str, now: u64) -> bool {
 }
 
 fn record_cluster_peer_auth_failure(node_id: &str) {
-    let now = unix_timestamp_now();
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
+    let now = clock_now;
     let Ok(mut failures) = CLUSTER_PEER_AUTH_FAILURES.lock() else {
         return;
     };
@@ -214,6 +263,8 @@ pub(crate) fn validate_cluster_peer_auth(
     config: &TrustServiceConfig,
     endpoint: &str,
 ) -> Result<ClusterPeerAuthContext, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let node_id = headers
         .get(CLUSTER_NODE_ID_HEADER)
         .and_then(|value| value.to_str().ok())
@@ -250,14 +301,19 @@ pub(crate) fn validate_cluster_peer_auth(
             "cluster peer is not in the configured allowlist",
         ));
     }
-    let now = unix_timestamp_now() as i64;
+    let now = i64::try_from(clock_now).map_err(|_| {
+        plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "clock exceeds signed timestamp field",
+        )
+    })?;
     let expected =
         cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
     if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
-        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
+        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, clock_now) {
             let mut response = plain_http_error(
                 StatusCode::TOO_MANY_REQUESTS,
                 "cluster peer authentication temporarily rate limited after repeated invalid signatures",
@@ -271,7 +327,7 @@ pub(crate) fn validate_cluster_peer_auth(
         record_cluster_peer_auth_failure(&unverified_failure_key);
         return Err(cluster_peer_auth_error());
     }
-    if cluster_peer_auth_is_rate_limited(&node_id, now as u64) {
+    if cluster_peer_auth_is_rate_limited(&node_id, clock_now) {
         let mut response = plain_http_error(
             StatusCode::TOO_MANY_REQUESTS,
             "cluster peer authentication temporarily rate limited after repeated verified failures",
@@ -327,39 +383,102 @@ pub(crate) fn validate_authority_mutation_auth(
         || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
     if has_cluster_peer_headers {
         let peer = validate_cluster_peer_auth(headers, &state.config, endpoint)?;
-        let Some(term) = peer.term else {
-            return Err(plain_http_error(
-                StatusCode::UNAUTHORIZED,
-                "cluster authority mutation is missing the forwarded term",
-            ));
-        };
-        let Some(authority_lease) = cluster_authority_lease_view(state) else {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease is unavailable for authority mutation",
-            ));
-        };
-        if !authority_lease.lease_valid {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease expired before authority mutation",
-            ));
-        }
-        if term != authority_lease.term {
-            return Err(plain_http_error(
-                StatusCode::CONFLICT,
-                "cluster authority mutation term does not match the current lease",
-            ));
-        }
+        validate_authority_mutation_term(state, Some(&peer))?;
         return Ok(Some(peer));
     }
     validate_service_auth(headers, &state.config.service_token)?;
     Ok(None)
 }
 
+/// Recheck an authenticated forward against the live lease at execution time.
+/// Queueing must not transfer a request from an earlier election into a new term.
+pub(crate) fn validate_authority_mutation_term(
+    state: &TrustServiceState,
+    peer: Option<&ClusterPeerAuthContext>,
+) -> Result<(), Response> {
+    let Some(peer) = peer else {
+        return Ok(());
+    };
+    let Some(term) = peer.term else {
+        return Err(plain_http_error(
+            StatusCode::UNAUTHORIZED,
+            "cluster authority mutation is missing the forwarded term",
+        ));
+    };
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease is unavailable for authority mutation",
+        ));
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before authority mutation",
+        ));
+    }
+    if term != authority_lease.term {
+        return Err(plain_http_error(
+            StatusCode::CONFLICT,
+            "cluster authority mutation term does not match the current lease",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_authority_workload_auth(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+) -> Result<(), Response> {
+    let service_error = match validate_service_auth(headers, &config.service_token) {
+        Ok(()) => return Ok(()),
+        Err(response) => response,
+    };
+    let Some(expected) = config.authority_workload_token.as_deref() else {
+        return Err(service_error);
+    };
+    let Some(provided) = control_bearer_token(headers) else {
+        return Err(service_error);
+    };
+    if bool::from(provided.as_bytes().ct_eq(expected.as_bytes())) {
+        Ok(())
+    } else {
+        Err(service_error)
+    }
+}
+
+pub(crate) fn validate_authority_issue_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    endpoint: &str,
+) -> Result<Option<ClusterPeerAuthContext>, Response> {
+    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
+    if has_cluster_peer_headers {
+        return validate_authority_mutation_auth(headers, state, endpoint);
+    }
+    validate_authority_workload_auth(headers, &state.config)?;
+    Ok(None)
+}
+
 pub(crate) fn enforce_authority_mutation_fence(
     state: &TrustServiceState,
 ) -> Result<Option<ClusterAuthorityLeaseView>, Response> {
+    if state.cluster.is_some() {
+        let status = load_authority_status_for_state(state)?;
+        let public = status.public_key.as_deref().ok_or_else(|| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "authority replication from the elected leader is unresolved",
+            )
+        })?;
+        let key = PublicKey::from_hex(public).map_err(|error| {
+            plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+        })?;
+        authority_admission::signing_admission(state, &key)?;
+    }
     let Some(authority_lease) = cluster_authority_lease_view(state) else {
         return Ok(None);
     };
@@ -370,9 +489,11 @@ pub(crate) fn enforce_authority_mutation_fence(
         ));
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        SqliteCapabilityAuthority::open(path)
+        open_authority_for_state(state, path)
             .and_then(|authority| {
-                authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+                authority
+                    .enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+                    .map_err(CliError::from)
             })
             .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
     }
@@ -392,9 +513,11 @@ pub(crate) fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Res
     let Some(path) = state.config.authority_db_path.as_deref() else {
         return Ok(());
     };
-    SqliteCapabilityAuthority::open(path)
+    open_authority_for_state(state, path)
         .and_then(|authority| {
-            authority.seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
+            authority
+                .seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
+                .map_err(CliError::from)
         })
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
     Ok(())
@@ -555,41 +678,68 @@ pub(crate) fn validate_metered_billing_reconciliation_request(
     Ok(())
 }
 
+fn open_authority_for_state(
+    state: &TrustServiceState,
+    path: &Path,
+) -> Result<SqliteCapabilityAuthority, CliError> {
+    SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        path,
+        state.finding_challenge_clock.clone(),
+        state.config.authority_replication_clock_policy()?,
+    )
+    .map_err(CliError::from)
+}
+
 pub(crate) fn load_capability_authority(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    load_capability_authority_with_lineage_mode(config, true)
+    load_capability_authority_with_lineage_mode(state, true)
 }
 
 pub(crate) fn load_capability_authority_with_deferred_lineage(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    load_capability_authority_with_lineage_mode(config, false)
+    load_capability_authority_with_lineage_mode(state, false)
 }
 
 fn load_capability_authority_with_lineage_mode(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
     persist_lineage_immediately: bool,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    let wrap = |inner: Box<dyn CapabilityAuthority>| {
-        if persist_lineage_immediately {
-            issuance::wrap_capability_authority(
-                inner,
-                config.issuance_policy.clone(),
-                config.runtime_assurance_policy.clone(),
-                config.receipt_db_path.as_deref(),
-                config.budget_db_path.as_deref(),
-            )
-        } else {
-            issuance::wrap_capability_authority_with_deferred_lineage(
-                inner,
-                config.issuance_policy.clone(),
-                config.runtime_assurance_policy.clone(),
-                config.receipt_db_path.as_deref(),
-                config.budget_db_path.as_deref(),
-            )
-        }
+    let config = &state.config;
+    let wrap = |inner: Box<dyn CapabilityAuthority>| match state.receipt_store.as_ref() {
+        Some(receipt_store) => issuance::wrap_capability_authority_with_receipt_store(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            Arc::clone(receipt_store),
+            config.budget_db_path.as_deref(),
+            persist_lineage_immediately,
+        ),
+        None if persist_lineage_immediately => issuance::wrap_capability_authority(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            None,
+            config.budget_db_path.as_deref(),
+        ),
+        None => issuance::wrap_capability_authority_with_deferred_lineage(
+            inner,
+            config.issuance_policy.clone(),
+            config.runtime_assurance_policy.clone(),
+            None,
+            config.budget_db_path.as_deref(),
+        ),
     };
+    if let Some(keyring) = state.authority_keyring.as_ref() {
+        let authority = keyring.capability_authority().map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority is unavailable",
+            )
+        })?;
+        return authority_admission::admit_capability_authority(state, wrap(Box::new(authority)));
+    }
     match (
         config.authority_seed_path.as_deref(),
         config.authority_db_path.as_deref(),
@@ -599,21 +749,111 @@ fn load_capability_authority_with_lineage_mode(
             "trust control service requires either --authority-seed-file or --authority-db, not both",
         )),
         (Some(path), None) => {
-            let keypair = load_or_create_authority_keypair(path).map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            let keypair = crate::load_existing_authority_keypair(path).map_err(|error| {
+                plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
             })?;
-            Ok(wrap(Box::new(LocalCapabilityAuthority::new(keypair))))
+            authority_admission::admit_capability_authority(state, wrap(Box::new(LocalCapabilityAuthority::new_with_clock(keypair, state.finding_challenge_clock.clone()))))
         }
-        (None, Some(path)) => SqliteCapabilityAuthority::open(path)
-            .map(|authority| wrap(Box::new(authority)))
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            }),
+        (None, Some(path)) => {
+            let authority = open_authority_for_state(state, path).map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))?;
+            authority_admission::admit_capability_authority(state, wrap(Box::new(authority)))
+        },
         (None, None) => Err(plain_http_error(
             StatusCode::CONFLICT,
             "trust control service requires --authority-seed-file or --authority-db",
         )),
     }
+}
+
+pub(crate) fn load_authority_status_for_state(
+    state: &TrustServiceState,
+) -> Result<TrustAuthorityStatus, Response> {
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        if let Some(path) = state.config.authority_db_path.as_deref() {
+            let unavailable = || {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority replication from the elected leader is unresolved",
+                )
+            };
+            let role = if state.cluster.is_some() {
+                Some(cluster_authority_read_role(state).ok_or_else(unavailable)?)
+            } else {
+                None
+            };
+            let verification = if matches!(
+                &role,
+                Some(ClusterAuthorityReadRole {
+                    evidence: ClusterAuthorityServingEvidence::ConfirmedFollower { .. },
+                    ..
+                })
+            ) {
+                public_replicated_authority_verification_status(
+                    path,
+                    &state.config,
+                    &state.finding_challenge_clock,
+                )
+            } else {
+                public_authority_verification_status(
+                    path,
+                    &state.config,
+                    &state.finding_challenge_clock,
+                )
+            }
+            .map_err(|error| {
+                plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+            })?;
+            let now = state
+                .finding_challenge_clock
+                .unix_millis()
+                .map_err(|error| {
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                })?;
+            if !verification.is_live_at(now) {
+                return Err(unavailable());
+            }
+            if let Some(before) = role.as_ref() {
+                let after = cluster_authority_read_role(state).ok_or_else(unavailable)?;
+                if before.context != after.context
+                    || !authority_admission::role_accepts_view(before, &verification, now)
+                    || !authority_admission::role_accepts_view(&after, &verification, now)
+                {
+                    return Err(unavailable());
+                }
+            }
+            return Ok(authority_status_response(
+                "sqlite".to_string(),
+                verification.status,
+            ));
+        }
+        return load_authority_status(&state.config);
+    };
+    let status = keyring.authority_status().map_err(|_| {
+        plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "witnessed capability authority state is unavailable",
+        )
+    })?;
+    let generation = status.signing_epoch.checked_add(1).ok_or_else(|| {
+        plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "witnessed capability authority generation overflow",
+        )
+    })?;
+    Ok(TrustAuthorityStatus {
+        configured: true,
+        backend: Some("enterprise_keyring".to_string()),
+        public_key: Some(status.public_key.to_hex()),
+        generation: Some(generation),
+        rotated_at: status.activated_at,
+        issuer_state: None,
+        applies_to_future_sessions_only: true,
+        trusted_public_keys: status
+            .witnessed_verification_keys
+            .into_iter()
+            .map(|key| key.to_hex())
+            .collect(),
+    })
 }
 
 pub(crate) fn load_authority_status(
@@ -635,6 +875,7 @@ pub(crate) fn load_authority_status(
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         });
@@ -646,6 +887,7 @@ pub(crate) fn load_authority_status(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -655,6 +897,7 @@ pub(crate) fn load_authority_status(
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         }),
@@ -690,6 +933,7 @@ pub(crate) fn rotate_authority(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -698,6 +942,40 @@ pub(crate) fn rotate_authority(
             &error.to_string(),
         )),
     }
+}
+
+pub(crate) fn rotate_authority_for_state(
+    state: &TrustServiceState,
+) -> Result<TrustAuthorityStatus, Response> {
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        if let Some(path) = state.config.authority_db_path.as_deref() {
+            let status = open_authority_for_state(state, path)
+                .and_then(|authority| authority.rotate().map_err(CliError::from))
+                .map_err(|error| {
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                })?;
+            return Ok(authority_status_response("sqlite".to_string(), status));
+        }
+        return rotate_authority(&state.config);
+    };
+    let seed_path = state
+        .authority_keyring_seed_path
+        .as_deref()
+        .ok_or_else(|| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority seed custody is unavailable",
+            )
+        })?;
+    keyring
+        .rotate_remote_authority_seed(seed_path)
+        .map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority rotation failed",
+            )
+        })?;
+    load_authority_status_for_state(state)
 }
 
 pub(crate) fn authority_status_response(
@@ -710,7 +988,8 @@ pub(crate) fn authority_status_response(
         public_key: Some(status.public_key.to_hex()),
         generation: Some(status.generation),
         rotated_at: Some(status.rotated_at),
-        applies_to_future_sessions_only: true,
+        issuer_state: Some(status.issuer_state),
+        applies_to_future_sessions_only: false,
         trusted_public_keys: status
             .trusted_public_keys
             .into_iter()

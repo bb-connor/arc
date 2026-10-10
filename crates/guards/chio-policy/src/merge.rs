@@ -69,7 +69,19 @@ fn merge_rules(base: &Option<Rules>, child: &Option<Rules>) -> Option<Rules> {
                     .shell_commands
                     .clone()
                     .or(base_rules.shell_commands),
-                tool_access: child_rules.tool_access.clone().or(base_rules.tool_access),
+                tool_access: child_rules
+                    .tool_access
+                    .clone()
+                    .map(|mut rule| {
+                        if rule.dpop_required.is_none() {
+                            rule.dpop_required = base_rules
+                                .tool_access
+                                .as_ref()
+                                .and_then(|base| base.dpop_required);
+                        }
+                        rule
+                    })
+                    .or(base_rules.tool_access),
                 computer_use: child_rules.computer_use.clone().or(base_rules.computer_use),
                 remote_desktop_channels: child_rules
                     .remote_desktop_channels
@@ -563,6 +575,7 @@ mod tests {
                 exceptions: Vec::new(),
             }),
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: vec!["mail.send".to_string()],
                 block: Vec::new(),
@@ -584,6 +597,7 @@ mod tests {
                 default: DefaultAction::Block,
             }),
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: vec!["calendar.read".to_string()],
                 block: Vec::new(),

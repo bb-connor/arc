@@ -9,6 +9,7 @@ pub(crate) fn build_capital_book_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CapitalBookQuery,
 ) -> Result<CapitalBookReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     normalized.validate().map_err(TrustHttpError::bad_request)?;
     let subject_key = normalized
@@ -92,7 +93,7 @@ pub(crate) fn build_capital_book_report_from_store(
     } else {
         CreditLossLifecycleListReport {
             schema: chio_kernel::CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_timestamp_now(),
+            generated_at: clock_now,
             query: CreditLossLifecycleListQuery {
                 event_id: None,
                 bond_id: None,
@@ -545,29 +546,30 @@ pub(crate) fn build_capital_book_report_from_store(
     let summary_currencies = currency.into_iter().collect::<Vec<_>>();
     Ok(CapitalBookReport {
         schema: CAPITAL_BOOK_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: normalized,
         subject_key,
         support_boundary: CapitalBookSupportBoundary::default(),
         summary: CapitalBookSummary {
             matching_receipts: exposure.summary.matching_receipts,
-            returned_receipts: exposure.receipts.len() as u64,
+            returned_receipts: crate::integer::count(exposure.receipts.len()),
             matching_facilities: facility_report.summary.matching_facilities,
-            returned_facilities: facility_report.facilities.len() as u64,
+            returned_facilities: crate::integer::count(facility_report.facilities.len()),
             matching_bonds: bond_report.summary.matching_bonds,
-            returned_bonds: bond_report.bonds.len() as u64,
+            returned_bonds: crate::integer::count(bond_report.bonds.len()),
             matching_loss_events: loss_history.summary.matching_events,
-            returned_loss_events: loss_history.events.len() as u64,
+            returned_loss_events: crate::integer::count(loss_history.events.len()),
             currencies: summary_currencies.clone(),
             mixed_currency_book: summary_currencies.len() > 1,
-            funding_sources: sources.len() as u64,
-            ledger_events: events.len() as u64,
+            funding_sources: crate::integer::count(sources.len()),
+            ledger_events: crate::integer::count(events.len()),
             truncated_receipts: exposure.summary.truncated_receipts,
             truncated_facilities: facility_report.summary.matching_facilities
-                > facility_report.facilities.len() as u64,
-            truncated_bonds: bond_report.summary.matching_bonds > bond_report.bonds.len() as u64,
+                > crate::integer::count(facility_report.facilities.len()),
+            truncated_bonds: bond_report.summary.matching_bonds
+                > crate::integer::count(bond_report.bonds.len()),
             truncated_loss_events: loss_history.summary.matching_events
-                > loss_history.events.len() as u64,
+                > crate::integer::count(loss_history.events.len()),
         },
         sources,
         events,
@@ -623,7 +625,8 @@ pub(crate) fn build_capital_execution_instruction_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
-    let issued_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let issued_at = clock_now;
     let transfer_governed_receipt_id =
         validate_capital_execution_instruction_request(request, issued_at)?;
 
@@ -697,7 +700,9 @@ pub(crate) fn build_capital_execution_instruction_artifact_from_store(
                     ),
                 ));
             }
-            Some((governed_receipt_id, matching_events[0]))
+            matching_events
+                .first()
+                .map(|event| (governed_receipt_id, *event))
         }
         _ => None,
     };
@@ -1032,7 +1037,7 @@ pub(crate) fn capital_allocation_ceiling_units(units: u64, ceiling_bps: u16) -> 
     if units == 0 || ceiling_bps == 0 {
         0
     } else {
-        (((units as u128) * (ceiling_bps as u128)) / 10_000_u128).min(u64::MAX as u128) as u64
+        u64::try_from((u128::from(units) * u128::from(ceiling_bps)) / 10_000).unwrap_or(u64::MAX)
     }
 }
 
@@ -1104,17 +1109,15 @@ pub(crate) fn push_unique_capital_book_evidence(
 }
 
 pub fn build_credit_facility_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditFacilityReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_facility_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1125,7 +1128,7 @@ pub fn build_credit_facility_report(
 }
 
 pub struct CreditIssuanceArgs<'a> {
-    pub receipt_db_path: &'a Path,
+    pub receipt_store: &'a SqliteReceiptStore,
     pub budget_db_path: Option<&'a Path>,
     pub authority_seed_path: Option<&'a Path>,
     pub authority_db_path: Option<&'a Path>,
@@ -1142,27 +1145,24 @@ pub fn issue_signed_credit_facility(
 }
 
 pub fn list_credit_facilities(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditFacilityListQuery,
 ) -> Result<CreditFacilityListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_facilities(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_bond_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBondReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_bond_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1179,40 +1179,37 @@ pub fn issue_signed_credit_bond(
 }
 
 pub fn list_credit_bonds(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditBondListQuery,
 ) -> Result<CreditBondListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_bonds(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_bonded_execution_simulation_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &CreditBondedExecutionSimulationRequest,
 ) -> Result<CreditBondedExecutionSimulationReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    build_credit_bonded_execution_simulation_report_from_store(&receipt_store, request)
+    build_credit_bonded_execution_simulation_report_from_store(receipt_store, request)
         .map_err(CliError::from)
 }
 
 pub fn build_credit_loss_lifecycle_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleQuery,
 ) -> Result<CreditLossLifecycleReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    build_credit_loss_lifecycle_report_from_store(&receipt_store, query).map_err(CliError::from)
+    build_credit_loss_lifecycle_report_from_store(receipt_store, query).map_err(CliError::from)
 }
 
 pub fn issue_signed_credit_loss_lifecycle(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, CliError> {
     issue_signed_credit_loss_lifecycle_detailed(
-        receipt_db_path,
+        receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
@@ -1221,27 +1218,24 @@ pub fn issue_signed_credit_loss_lifecycle(
 }
 
 pub fn list_credit_loss_lifecycle(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleListQuery,
 ) -> Result<CreditLossLifecycleListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_credit_loss_lifecycle(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn build_credit_backtest_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &CreditBacktestQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBacktestReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_credit_backtest_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1252,7 +1246,7 @@ pub fn build_credit_backtest_report(
 }
 
 pub fn build_signed_credit_provider_risk_package(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1260,11 +1254,9 @@ pub fn build_signed_credit_provider_risk_package(
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &CreditProviderRiskPackageQuery,
 ) -> Result<SignedCreditProviderRiskPackage, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let package = build_credit_provider_risk_package_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -1278,13 +1270,13 @@ pub fn build_signed_credit_provider_risk_package(
 
 pub(crate) fn build_credit_backtest_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &CreditBacktestQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBacktestReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     if let Err(message) = normalized.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -1293,9 +1285,13 @@ pub(crate) fn build_credit_backtest_report_from_store(
     let window_count = normalized.window_count_or_default();
     let window_seconds = normalized.window_seconds_or_default();
     let stale_after_seconds = normalized.stale_after_seconds_or_default();
-    let end_anchor = normalized.until.unwrap_or_else(unix_timestamp_now);
+    let end_anchor = match normalized.until {
+        Some(at) => at,
+        None => unix_timestamp_now()?,
+    };
     let earliest_start = normalized.since.unwrap_or_else(|| {
-        end_anchor.saturating_sub(window_seconds.saturating_mul(window_count as u64))
+        end_anchor
+            .saturating_sub(window_seconds.saturating_mul(crate::integer::count(window_count)))
     });
     let mut windows = Vec::new();
     let mut previous_band = None;
@@ -1310,7 +1306,8 @@ pub(crate) fn build_credit_backtest_report_from_store(
     let mut over_utilized_windows = 0_u64;
 
     for offset_index in (0..window_count).rev() {
-        let window_end = end_anchor.saturating_sub((offset_index as u64) * window_seconds);
+        let window_end = end_anchor
+            .saturating_sub(crate::integer::count(offset_index).saturating_mul(window_seconds));
         if window_end < earliest_start {
             continue;
         }
@@ -1331,7 +1328,6 @@ pub(crate) fn build_credit_backtest_report_from_store(
         };
         let scorecard = build_credit_scorecard_report(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             issuance_policy,
             &exposure_query,
@@ -1339,7 +1335,6 @@ pub(crate) fn build_credit_backtest_report_from_store(
         )?;
         let facility = build_credit_facility_report_from_store(
             receipt_store,
-            receipt_db_path,
             budget_db_path,
             certification_registry_file,
             issuance_policy,
@@ -1413,7 +1408,7 @@ pub(crate) fn build_credit_backtest_report_from_store(
         }
 
         windows.push(CreditBacktestWindow {
-            index: windows.len() as u64,
+            index: crate::integer::count(windows.len()),
             window_started_at: window_start,
             window_ended_at: window_end,
             newest_receipt_at,
@@ -1441,10 +1436,10 @@ pub(crate) fn build_credit_backtest_report_from_store(
 
     Ok(CreditBacktestReport {
         schema: CREDIT_BACKTEST_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: normalized,
         summary: CreditBacktestSummary {
-            windows_evaluated: windows.len() as u64,
+            windows_evaluated: crate::integer::count(windows.len()),
             drift_windows,
             score_band_changes,
             facility_disposition_changes,

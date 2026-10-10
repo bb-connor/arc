@@ -15,6 +15,7 @@ mod config;
 mod evm;
 mod finding_enforcement;
 mod hook;
+mod input;
 mod observe;
 mod ops;
 mod outcome_store;
@@ -186,6 +187,10 @@ pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, Settl
 
 #[derive(Debug, thiserror::Error)]
 pub enum SettlementError {
+    #[error("invalid settlement input: {0}")]
+    Input(#[from] chio_core::canonical::SharedUntrustedJsonError),
+    #[error("settlement file read failed")]
+    Io(#[from] std::io::Error),
     #[error("invalid input: {0}")]
     InvalidInput(String),
 

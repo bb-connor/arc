@@ -14,6 +14,8 @@ pub const CHIO_FEDERATION_CROSS_BOUNDARY_ADMISSION_REPORT_SCHEMA: &str =
 
 #[derive(Debug, thiserror::Error)]
 pub enum FederationTreatyError {
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("federation treaty rejected: {code}: {detail}")]
     Rejected { code: &'static str, detail: String },
     #[error("federation treaty JSON failed: {0}")]
@@ -26,6 +28,7 @@ impl FederationTreatyError {
     #[must_use]
     pub fn code(&self) -> &'static str {
         match self {
+            Self::Input(error) => error.code(),
             Self::Rejected { code, .. } => code,
             Self::Json(_) => "federation_treaty_json",
             Self::Canonical(_) => "federation_treaty_canonical",
@@ -159,17 +162,17 @@ pub struct CrossBoundaryAdmissionInput<'a> {
 pub fn governance_ladder_manifest_from_json(
     json: &str,
 ) -> Result<GovernanceLadderManifest, FederationTreatyError> {
-    serde_json::from_str(json).map_err(|error| FederationTreatyError::Json(error.to_string()))
+    crate::input::decode(json.as_bytes()).map_err(FederationTreatyError::from)
 }
 
 pub fn treaty_scope_from_json(json: &str) -> Result<TreatyScope, FederationTreatyError> {
-    serde_json::from_str(json).map_err(|error| FederationTreatyError::Json(error.to_string()))
+    crate::input::decode(json.as_bytes()).map_err(FederationTreatyError::from)
 }
 
 pub fn ladder_intersection_from_json(
     json: &str,
 ) -> Result<LadderIntersection, FederationTreatyError> {
-    serde_json::from_str(json).map_err(|error| FederationTreatyError::Json(error.to_string()))
+    crate::input::decode(json.as_bytes()).map_err(FederationTreatyError::from)
 }
 
 pub fn ladder_intersection_json(

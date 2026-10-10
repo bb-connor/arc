@@ -19,6 +19,7 @@ from chio_sdk.models import Operation
 from chio_sdk.testing import MockChioClient
 
 from chio_hermes import cli
+from tests.conftest import sample_capability, sample_decision
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -109,6 +110,9 @@ def test_issue_calls_create_capability(
     assert cache.exists(), "issue must write the local capability cache"
     cached = json.loads(cache.read_text(encoding="utf-8"))
     assert cached, "cache must be non-empty after issue"
+    assert cached[0]["signed_capability"]["id"] == cached[0]["capability_id"]
+    assert cached[0]["signed_capability"]["signature"]
+    assert cache.stat().st_mode & 0o777 == 0o600
 
 
 def test_list_reads_cache_and_prints_json(
@@ -298,10 +302,28 @@ def test_approvals_respond_requires_verdict_flag() -> None:
         parser.parse_args(["approvals", "respond", "ap-1"])
 
 
+def test_approvals_respond_requires_signed_token_file() -> None:
+    with pytest.raises(SystemExit) as rejected:
+        _build_parser().parse_args(["approvals", "respond", "ap-1", "--approve"])
+    assert rejected.value.code == 2
+
+
+def test_signed_capability_cache_rejects_duplicate_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cache_dir = _fake_cache_dir(tmp_path, monkeypatch)
+    (cache_dir / "chio-capabilities.json").write_text(
+        '[{"capability_id":"cap-a","signed_capability":{"id":"cap-a","id":"cap-b"}}]',
+        encoding="utf-8",
+    )
+    assert cli._load_cache() == []
+    assert "duplicate field" in capsys.readouterr().err
+
+
 def test_approvals_respond_parses_approve_flag() -> None:
     parser = _build_parser()
     ns = parser.parse_args(
-        ["approvals", "respond", "ap-1", "--approve", "--reason", "ok"]
+        ["approvals", "respond", "ap-1", "--approve", "--reason", "ok", "--signed-token-file", "decision.json"]
     )
     assert ns.subcommand == "approvals"
     assert ns.approvals_subcommand == "respond"
@@ -321,7 +343,8 @@ def test_approvals_list_invokes_sdk(
 
     asyncio.run(
         client.submit_for_approval(
-            capability_id="cap-x",
+            capability=sample_capability("cap-x"),
+            requested_by=sample_capability("cap-x")["subject"],
             tool_name="chio_shell_run",
             tool_args={"command": "ls"},
             tool_server="shell",
@@ -356,6 +379,7 @@ def test_approvals_list_invokes_sdk(
 
 def test_approvals_respond_invokes_sdk(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     client = MockChioClient()
 
@@ -363,7 +387,8 @@ def test_approvals_respond_invokes_sdk(
 
     approval_id = asyncio.run(
         client.submit_for_approval(
-            capability_id="cap-x",
+            capability=sample_capability("cap-x"),
+            requested_by=sample_capability("cap-x")["subject"],
             tool_name="chio_shell_run",
             tool_args={"command": "rm -rf old"},
             tool_server="shell",
@@ -372,10 +397,15 @@ def test_approvals_respond_invokes_sdk(
 
     monkeypatch.setattr(cli, "_approvals_client", lambda _args: client)
 
+    pending = asyncio.run(client.get_approval(approval_id)).pending
+    token_file = tmp_path / "decision.json"
+    token_file.write_text(json.dumps(sample_decision(pending)), encoding="utf-8")
+
     args = argparse.Namespace(
         subcommand="approvals",
         approvals_subcommand="respond",
         approval_id=approval_id,
+        signed_token_file=str(token_file),
         verdict="approve",
         reason="ok-cli",
         json=True,

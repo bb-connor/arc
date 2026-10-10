@@ -24,7 +24,10 @@ fn operator_filing_resolver_retains_pre_rotation_authority_policies() -> TestRes
     let deployment = provision(RevealCase::honest())?;
     let bundle = production_operator_bundle(&deployment.web);
     let original = market_config();
-    bundle.verify_at(&original, unix_timestamp_now())?;
+    bundle.verify_at(
+        &original,
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )?;
     let bundle_json = bundle.to_canonical_json()?;
     let indexes = finding_operator_bundle_artifact_indexes(&bundle, Some(&original))
         .map_err(std::io::Error::other)?;
@@ -113,7 +116,10 @@ fn production_purchase_executor(
 ) -> Result<FindingOperatorPurchaseExecutor, AnyError> {
     let config = market_config();
     let bundle = production_operator_bundle(&deployment.web);
-    bundle.verify_at(&config, unix_timestamp_now())?;
+    bundle.verify_at(
+        &config,
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )?;
     let bundle_json = bundle.to_canonical_json()?;
     SqliteFindingOperatorBundleStore::open(&operator_db_path)?
         .put(&deployment.web.finding_id, &bundle_json)?;
@@ -158,7 +164,7 @@ fn production_purchase_executor(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_production_operator_purchase_survives_cache_loss() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -274,7 +280,7 @@ async fn cognition_market_production_operator_purchase_survives_cache_loss() -> 
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_production_operator_resumes_after_reserved_restart() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -367,7 +373,7 @@ async fn cognition_market_production_operator_resumes_after_reserved_restart() -
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_terminal_capacity_is_reserved_before_payment() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -428,7 +434,7 @@ async fn cognition_market_terminal_capacity_is_reserved_before_payment() -> Test
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_pre_reservation_crash_releases_terminal_capacity_on_expiry() -> TestResult
 {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -447,7 +453,8 @@ async fn cognition_market_pre_reservation_crash_releases_terminal_capacity_on_ex
     let operator_db = deployment
         .database
         .with_file_name("operator-pre-reservation-crash.db");
-    let started_at = unix_timestamp_now();
+    let started_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let interrupted = Arc::new(production_purchase_executor(
         &deployment,
         authority.clone(),
@@ -515,7 +522,7 @@ async fn cognition_market_pre_reservation_crash_releases_terminal_capacity_on_ex
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_pre_reservation_crash_releases_capacity_on_bundle_expiry() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -538,7 +545,9 @@ async fn cognition_market_pre_reservation_crash_releases_capacity_on_bundle_expi
         authority.clone(),
         operator_db.clone(),
     )?);
-    interrupted.set_test_now(unix_timestamp_now());
+    interrupted.set_test_now(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     interrupted.stop_after_terminal_capacity_once();
     state.finding_purchase_executor = Some(interrupted);
 
@@ -583,7 +592,7 @@ async fn cognition_market_pre_reservation_crash_releases_capacity_on_bundle_expi
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_reclaims_abandoned_capacity_before_a_new_purchase() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -593,7 +602,8 @@ async fn cognition_market_reclaims_abandoned_capacity_before_a_new_purchase() ->
     let operator_db = deployment
         .database
         .with_file_name("operator-abandoned-terminal-capacity.db");
-    let started_at = unix_timestamp_now();
+    let started_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let interrupted = Arc::new(production_purchase_executor(
         &deployment,
         authority.clone(),
@@ -668,7 +678,7 @@ async fn cognition_market_reclaims_abandoned_capacity_before_a_new_purchase() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_predispatch_release_is_a_stable_rejection() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -750,7 +760,7 @@ async fn cognition_market_predispatch_release_is_a_stable_rejection() -> TestRes
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_expired_reserved_restart_is_stably_rejected() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -769,7 +779,8 @@ async fn cognition_market_expired_reserved_restart_is_stably_rejected() -> TestR
     let operator_db = deployment
         .database
         .with_file_name("operator-expired-reserved.db");
-    let started_at = unix_timestamp_now();
+    let started_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let interrupted = Arc::new(production_purchase_executor(
         &deployment,
         authority.clone(),
@@ -832,7 +843,7 @@ async fn cognition_market_expired_reserved_restart_is_stably_rejected() -> TestR
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_expired_captured_restart_refunds_before_rejection() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -851,7 +862,8 @@ async fn cognition_market_expired_captured_restart_refunds_before_rejection() ->
     let operator_db = deployment
         .database
         .with_file_name("operator-expired-captured.db");
-    let started_at = unix_timestamp_now();
+    let started_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let interrupted = Arc::new(production_purchase_executor(
         &deployment,
         authority.clone(),
@@ -925,7 +937,7 @@ async fn cognition_market_expired_captured_restart_refunds_before_rejection() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_prepared_job_revalidates_before_first_reservation() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -994,7 +1006,7 @@ async fn cognition_market_prepared_job_revalidates_before_first_reservation() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_rejects_expired_prepared_ask_before_reservation() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;

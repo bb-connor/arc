@@ -8,10 +8,20 @@ use chio_core::session::{
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
     CreateMessageResult, OperationContext, OperationTerminalState, RequestId, RootDefinition,
 };
+use chio_core_types::SignedDeclassificationGrant;
 
 use crate::dpop;
 use crate::execution_nonce::SignedExecutionNonce;
 use crate::{AgentId, KernelError, ServerId};
+
+mod blocking_connection;
+mod connection;
+mod dispatch_context;
+pub use blocking_connection::{BlockingToolServerAdapter, BlockingToolServerConnection};
+pub use dispatch_context::ToolDispatchContext;
+mod invocation_context;
+pub use connection::ToolServerConnection;
+pub use invocation_context::ToolInvocationContext;
 
 /// Verdict of a guard or capability evaluation.
 ///
@@ -104,9 +114,26 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+    /// Optional one-shot declassification grant bound to this invocation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<SignedDeclassificationGrant>,
 }
 
 impl ToolCallRequest {
+    /// Fail closed on extensions absent from the host-established peer profile.
+    pub fn validate_peer_capabilities(
+        &self,
+        peer: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<(), chio_core::Error> {
+        peer.validate_invocation_features(
+            &self.capability,
+            &self.approval_tokens,
+            self.threshold_approval_proposal.as_ref(),
+            self.governed_intent.as_ref(),
+            self.supplemental_authorization.as_ref(),
+        )
+    }
+
     pub fn validate_authorization_extensions(&self) -> Result<(), chio_core::Error> {
         self.approval_artifact_digest()?;
         Ok(())
@@ -148,7 +175,7 @@ impl ToolCallRequest {
             .iter()
             .map(GovernedApprovalToken::artifact_digest)
             .collect::<Result<Vec<_>, chio_core::Error>>()?;
-        chio_core::capability::governance::VerifiedApprovalSetBody::new(token_digests, proposal)?
+        chio_core::capability::governance::ApprovalSetBody::new(token_digests, proposal)?
             .approval_set_hash()
             .map(Some)
     }
@@ -199,9 +226,19 @@ pub struct ToolCallStream {
 }
 
 impl ToolCallStream {
+    #[allow(
+        clippy::as_conversions,
+        reason = "The supported 32-bit and 64-bit targets widen collection lengths into u64 without loss."
+    )]
     pub fn chunk_count(&self) -> u64 {
         self.chunks.len() as u64
     }
+}
+
+pub(crate) fn stream_size(size: usize) -> Result<u64, KernelError> {
+    u64::try_from(size).map_err(|_| KernelError::Overloaded {
+        resource: crate::OverloadResource::StreamBytes,
+    })
 }
 
 /// Sum the canonical byte size of a materialized stream and deny with
@@ -219,7 +256,7 @@ pub fn enforce_stream_byte_limit(
     for chunk in &stream.chunks {
         let bytes = crate::canonical_json_bytes(&chunk.data)
             .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?;
-        total = total.saturating_add(bytes.len() as u64);
+        total = checked_stream_byte_total(total, stream_size(bytes.len())?)?;
         if total > max_total_bytes {
             return Err(KernelError::Overloaded {
                 resource: crate::OverloadResource::StreamBytes,
@@ -249,15 +286,17 @@ pub fn push_chunk_bounded(
     // Chunk-count bound: shed before retaining another chunk when the retained
     // count is already at the cap, so a flood of tiny chunks under the byte cap
     // still cannot grow `acc` (or the per-chunk signing preimage) without bound.
-    if max_chunks > 0 && acc.len() as u64 >= max_chunks {
+    if max_chunks > 0 && stream_size(acc.len())? >= max_chunks {
         return Err(KernelError::Overloaded {
             resource: crate::OverloadResource::StreamChunks,
         });
     }
-    let chunk_bytes = crate::canonical_json_bytes(&chunk.data)
-        .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
-        .len() as u64;
-    let next = running_bytes.saturating_add(chunk_bytes);
+    let chunk_bytes = stream_size(
+        crate::canonical_json_bytes(&chunk.data)
+            .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
+            .len(),
+    )?;
+    let next = checked_stream_byte_total(*running_bytes, chunk_bytes)?;
     if max_total_bytes > 0 && next > max_total_bytes {
         return Err(KernelError::Overloaded {
             resource: crate::OverloadResource::StreamBytes,
@@ -393,96 +432,6 @@ pub struct ToolInvocationCost {
     pub breakdown: Option<serde_json::Value>,
 }
 
-/// Trait representing a connection to a tool server.
-///
-/// The kernel holds one `ToolServerConnection` per registered server. In
-/// production this is an mTLS connection over UDS or TCP. For testing,
-/// an in-process implementation can be used.
-#[async_trait::async_trait]
-pub trait ToolServerConnection: Send + Sync {
-    /// The server's unique identifier.
-    fn server_id(&self) -> &str;
-
-    /// List the tool names available on this server.
-    fn tool_names(&self) -> Vec<String>;
-
-    /// Return whether the registered tool is explicitly declared read-only.
-    ///
-    /// The conservative default keeps unannotated tools side-effecting for
-    /// durable admission. Implementations should return `true` only from
-    /// authenticated manifest metadata owned by the registered connection.
-    fn tool_is_read_only(&self, _tool_name: &str) -> bool {
-        false
-    }
-
-    /// Invoke a tool on this server. The kernel has already validated the
-    /// capability and run guards before calling this.
-    async fn invoke(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<serde_json::Value, KernelError>;
-
-    /// Invoke a tool and optionally report the actual cost of the invocation.
-    ///
-    /// Tool servers that track monetary costs should override this method.
-    /// The default implementation delegates to `invoke` and returns `None`
-    /// cost, meaning the kernel will charge `max_cost_per_invocation` as
-    /// the worst-case debit.
-    async fn invoke_with_cost(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
-        let value = self
-            .invoke(tool_name, arguments, nested_flow_bridge)
-            .await?;
-        Ok((value, None))
-    }
-
-    /// Whether this server measures the realized cost of an invocation it
-    /// dispatches.
-    ///
-    /// The default is `true`: a server that returns `None` cost from
-    /// `invoke_with_cost` is asserting that the realized cost equals the
-    /// authorized ceiling, and the kernel reconciles and settles that as a
-    /// completed spend.
-    ///
-    /// A server that returns `false` does not execute the target tool and
-    /// cannot measure a realized cost (for example a pre-execution
-    /// authorization gate that dispatches a pass-through while the real tool
-    /// runs elsewhere). For such a server the kernel reverses the
-    /// pre-execution hold and signs a provisional, unreconciled receipt
-    /// instead of a settled authoritative spend, since no cost was realized on
-    /// this path. Real reconciliation happens at the execution site.
-    fn measures_realized_cost(&self) -> bool {
-        true
-    }
-
-    /// Invoke a tool that can emit multiple streamed chunks before its final terminal state.
-    ///
-    /// Servers that do not support streaming can ignore this and rely on `invoke`.
-    async fn invoke_stream(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
-        let _ = (tool_name, arguments, nested_flow_bridge);
-        Ok(None)
-    }
-
-    /// Drain asynchronous events emitted after a tool invocation has already returned.
-    ///
-    /// Native tool servers can use this to surface late URL-elicitation completions and
-    /// catalog/resource notifications without depending on a still-live request-local bridge.
-    async fn drain_events(&self) -> Result<Vec<ToolServerEvent>, KernelError> {
-        Ok(vec![])
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToolServerEvent {
     ElicitationCompleted { elicitation_id: String },
@@ -490,4 +439,30 @@ pub enum ToolServerEvent {
     ResourcesListChanged,
     ToolsListChanged,
     PromptsListChanged,
+}
+
+/// Refuse an unrepresentable stream size before retaining or hashing its chunk.
+pub(crate) fn checked_stream_byte_total(current: u64, additional: u64) -> Result<u64, KernelError> {
+    current
+        .checked_add(additional)
+        .ok_or(KernelError::Overloaded {
+            resource: crate::OverloadResource::StreamBytes,
+        })
+}
+
+#[cfg(test)]
+mod byte_accounting_tests {
+    use super::*;
+
+    #[test]
+    fn stream_total_overflow_is_not_an_unlimited_or_maximum_budget() -> Result<(), KernelError> {
+        assert_eq!(checked_stream_byte_total(u64::MAX - 1, 1)?, u64::MAX);
+        assert!(matches!(
+            checked_stream_byte_total(u64::MAX, 1),
+            Err(KernelError::Overloaded {
+                resource: crate::OverloadResource::StreamBytes
+            })
+        ));
+        Ok(())
+    }
 }

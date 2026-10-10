@@ -58,7 +58,7 @@
 //! are not part of it, so a retry issued from a later clock replays rather
 //! than stranding the durable row it is retrying.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::validate_evm_payout_destination;
@@ -66,9 +66,9 @@ use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use thiserror::Error;
 
-use crate::admission_operation_store::verify_active_owner;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
 use crate::serving_owner::SqliteServingOwner;
+use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
 
 #[path = "finding_purchase_public_request.rs"]
 mod public_request;
@@ -372,13 +372,13 @@ pub struct FindingPayoutDestinationAdmission {
 
 #[derive(Clone)]
 pub struct SqliteFindingPurchaseStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingPurchaseStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -394,11 +394,9 @@ impl SqliteFindingPurchaseStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingPurchaseStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingPurchaseStoreError::Unavailable(
-                "sqlite finding purchase lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingPurchaseStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -462,7 +460,10 @@ impl SqliteFindingPurchaseStore {
     /// Seed the sibling admission table for cross-store unit tests whose
     /// subject is purchase or challenge transactionality, not activation.
     #[cfg(any(test, feature = "cognition-market-test-support"))]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn install_active_admission_for_tests(
         &self,
         finding_id: &str,
@@ -2092,6 +2093,10 @@ fn admit_payout_destination_tx(
         });
     }
     reserve_payout_destination_tx(transaction, allocation_id, destination)?;
+    #[allow(
+        clippy::as_conversions,
+        reason = "The constant u8 slot count fits every supported usize width."
+    )]
     let mut taken = [false; PAYOUT_DESTINATION_SLOTS as usize];
     {
         let mut statement = transaction
@@ -2112,7 +2117,7 @@ fn admit_payout_destination_tx(
         }
     }
     let slot_index = (1..PAYOUT_DESTINATION_SLOTS)
-        .find(|index| !taken[usize::from(*index)])
+        .find(|index| taken.get(usize::from(*index)) == Some(&false))
         .ok_or_else(|| {
             FindingPurchaseStoreError::DestinationSlotsExhausted(allocation_id.to_owned())
         })?;
@@ -3267,119 +3272,21 @@ fn finding_purchase_schema_catalog(
 /// them, failing closed on any mismatch. Both retained record columns
 /// route through this one comparison so the check cannot drift between
 /// call sites.
-fn verify_stored_digest(
-    bytes: &[u8],
-    expected_hex: &str,
-    what: &str,
-) -> Result<(), FindingPurchaseStoreError> {
-    if sha256_hex(bytes) == expected_hex {
-        Ok(())
-    } else {
-        Err(invariant(format!("{what} digest is invalid")))
-    }
-}
+#[path = "finding_purchase_store/validation.rs"]
+mod validation;
+use validation::{
+    admission_error, invariant, require_currency, require_evm_payout_destination, require_hex64,
+    require_identifier, require_terminal_record, require_trusted_time, sqlite_error, sqlite_i64,
+    stored_slot_index, stored_u64, verify_stored_digest,
+};
 
-fn require_terminal_record(
-    bytes: &[u8],
-    expected_hex: &str,
-) -> Result<(), FindingPurchaseStoreError> {
-    if bytes.is_empty() || bytes.len() > MAX_TERMINAL_RECORD_BYTES {
-        return Err(invariant("terminal record byte length is out of bounds"));
-    }
-    if sha256_hex(bytes) != expected_hex {
-        return Err(FindingPurchaseStoreError::Conflict(
-            "terminal record bytes do not match the claimed digest".to_owned(),
-        ));
-    }
-    Ok(())
-}
-
-fn require_hex64(value: &str, field: &'static str) -> Result<(), FindingPurchaseStoreError> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Ok(());
-    }
-    Err(invariant(format!(
-        "{field} is not 64 lowercase hex characters"
-    )))
-}
-
-fn require_identifier(value: &str, field: &'static str) -> Result<(), FindingPurchaseStoreError> {
-    if value.is_empty() || value.len() > MAX_IDENTIFIER_BYTES {
-        return Err(invariant(format!("{field} byte length is out of bounds")));
-    }
-    Ok(())
-}
-
-fn require_evm_payout_destination(value: &str) -> Result<(), FindingPurchaseStoreError> {
-    validate_evm_payout_destination(value)
-        .map_err(|_| invariant("payout destination is not a valid EVM address"))
-}
-
-fn require_currency(currency: &str) -> Result<(), FindingPurchaseStoreError> {
-    if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
-        return Err(invariant("currency is not a three-letter uppercase code"));
-    }
-    Ok(())
-}
-
-fn require_trusted_time(value: u64, field: &'static str) -> Result<(), FindingPurchaseStoreError> {
-    if value == 0 {
-        return Err(invariant(format!("{field} must be nonzero")));
-    }
-    Ok(())
-}
-
-fn sqlite_i64(value: u64, field: &'static str) -> Result<i64, FindingPurchaseStoreError> {
-    i64::try_from(value).map_err(|_| invariant(format!("{field} exceeds SQLite integer range")))
-}
-
-fn stored_u64(value: i64, field: &'static str) -> Result<u64, FindingPurchaseStoreError> {
-    u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
-}
-
-fn stored_slot_index(value: i64) -> Result<u8, FindingPurchaseStoreError> {
-    u8::try_from(value)
-        .ok()
-        .filter(|index| *index < PAYOUT_DESTINATION_SLOTS)
-        .ok_or_else(|| invariant("stored payout slot index is out of range"))
-}
-
-fn invariant(detail: impl Into<String>) -> FindingPurchaseStoreError {
-    FindingPurchaseStoreError::Invariant(detail.into())
-}
-
-fn admission_error(error: AdmissionOperationStoreError) -> FindingPurchaseStoreError {
-    match error {
-        AdmissionOperationStoreError::Fenced => FindingPurchaseStoreError::Fenced,
-        AdmissionOperationStoreError::NotFound => FindingPurchaseStoreError::NotFound,
-        AdmissionOperationStoreError::Unavailable(detail) => {
-            FindingPurchaseStoreError::Unavailable(detail)
-        }
-        AdmissionOperationStoreError::OutcomeUnknown(detail) => {
-            FindingPurchaseStoreError::OutcomeUnknown(detail)
-        }
-        AdmissionOperationStoreError::Invariant(detail) => {
-            FindingPurchaseStoreError::Invariant(detail)
-        }
-        AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
-    }
-}
-
-fn sqlite_error(error: rusqlite::Error) -> FindingPurchaseStoreError {
-    match error {
-        rusqlite::Error::FromSqlConversionFailure(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..)
-        | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::Utf8Error(..) => invariant(error.to_string()),
-        other => FindingPurchaseStoreError::Unavailable(other.to_string()),
-    }
-}
-
+#[cfg(all(test, unix))]
+mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_purchase_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

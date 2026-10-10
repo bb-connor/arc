@@ -49,22 +49,62 @@ use crate::normalized::{NormalizationError, NormalizedVerifiedCapability};
 /// revocation membership) and avoids returning a reference into the token
 /// so adapters that drop the token after verification can still act on
 /// the captured scope.
+/// Only the owning verifier can construct this result. Projections may expose
+/// its values, but cannot be converted back into verification evidence.
+///
+/// ```compile_fail
+/// use chio_kernel_core::VerifiedCapability;
+/// fn forge(bytes: &[u8]) {
+///     let _ = serde_json::from_slice::<VerifiedCapability>(bytes);
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct VerifiedCapability {
     /// The capability ID.
-    pub id: String,
+    id: String,
     /// The subject hex-encoded public key.
-    pub subject_hex: String,
+    subject_hex: String,
     /// The issuer hex-encoded public key.
-    pub issuer_hex: String,
+    issuer_hex: String,
     /// The authorized scope.
-    pub scope: ChioScope,
+    scope: ChioScope,
     /// `issued_at` timestamp (Unix seconds).
-    pub issued_at: u64,
+    issued_at: u64,
     /// `expires_at` timestamp (Unix seconds).
-    pub expires_at: u64,
+    expires_at: u64,
     /// The clock value used for time-bound enforcement.
-    pub evaluated_at: u64,
+    evaluated_at: u64,
+}
+
+impl VerifiedCapability {
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    #[must_use]
+    pub fn subject_hex(&self) -> &str {
+        &self.subject_hex
+    }
+    #[must_use]
+    pub fn issuer_hex(&self) -> &str {
+        &self.issuer_hex
+    }
+    #[must_use]
+    pub fn scope(&self) -> &ChioScope {
+        &self.scope
+    }
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+    #[must_use]
+    pub fn evaluated_at(&self) -> u64 {
+        self.evaluated_at
+    }
 }
 
 impl VerifiedCapability {
@@ -198,7 +238,10 @@ fn verify_capability_base(
     }
 
     // Time-bound check.
-    let now = clock.now_unix_secs();
+    let now = clock
+        .unix_millis()
+        .map_err(|error| CapabilityError::Internal(error.to_string()))?
+        .as_secs();
     match classify_time_window(now, token.issued_at, token.expires_at) {
         TimeWindowStatus::Valid => {}
         TimeWindowStatus::NotYetValid => return Err(CapabilityError::NotYetValid),
@@ -345,6 +388,15 @@ pub struct CapabilityFeatureContext<'a> {
     pub direct_root: Option<&'a CapabilityToken>,
 }
 
+/// Signed ancestor evidence in root-to-parent order. An empty slice retains
+/// the existing verifier behavior, including rejection of multi-hop narrowed
+/// chains that have no authenticated intermediate scopes.
+#[derive(Debug, Clone, Copy)]
+pub struct CapabilityEvidenceContext<'a> {
+    pub features: CapabilityFeatureContext<'a>,
+    pub ancestors: &'a [CapabilityToken],
+}
+
 /// Chain-binding entry point. Verify a capability token while also
 /// enforcing the chain-binding rule required for delegation soundness.
 ///
@@ -430,6 +482,36 @@ pub fn verify_capability_full_with_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
+    verify_capability_full_with_evidence(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        CapabilityEvidenceContext {
+            features,
+            ancestors: &[],
+        },
+        trust_root,
+        budgets,
+    )
+}
+
+/// Full verification with signed scope evidence for recursive delegation.
+/// Ancestor evidence is untrusted input and is verified before budget admission.
+/// Missing evidence keeps the existing fail-closed chain-binding behavior.
+pub fn verify_capability_full_with_evidence(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    evidence: CapabilityEvidenceContext<'_>,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> Result<VerifiedCapability, CapabilityError> {
+    let CapabilityEvidenceContext {
+        features,
+        ancestors,
+    } = evidence;
     let CapabilityFeatureContext { peer, direct_root } = features;
     validate_peer_capabilities(peer)?;
     let aggregate_budget_enabled = peer.supports(AGGREGATE_INVOCATION_BUDGET);
@@ -465,10 +547,25 @@ pub fn verify_capability_full_with_root(
         direct_root,
     )?;
     verify_delegation_chain_shape(token)?;
-    verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+    if ancestors.is_empty() {
+        verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+    } else {
+        lineage::verify_signed_lineage(
+            token,
+            ancestors,
+            trusted_issuers,
+            clock,
+            crypto_floor,
+            features,
+            trust_root,
+        )?;
+    }
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }
+
+#[path = "capability_verify/lineage.rs"]
+mod lineage;
 
 fn validate_peer_capabilities(peer: &CapabilityNegotiation) -> Result<(), CapabilityError> {
     peer.validate().map_err(|error| {

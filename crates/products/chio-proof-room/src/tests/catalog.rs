@@ -419,7 +419,12 @@ fn fixture_catalog_rejects_load_report_path_escape() -> Result<(), Box<dyn Error
         .err()
         .ok_or("catalog unexpectedly read outside load report")?;
 
-    assert!(error.contains("proof-room.artifact.unsafe-path"), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("proof-room.artifact.unsafe-path"),
+        "{error}"
+    );
     Ok(())
 }
 
@@ -437,10 +442,9 @@ fn available_fixture_catalog_marks_malformed_verifier_report_failed() {
         report.failure_code.as_deref(),
         Some("proof-room.fixture.report-invalid")
     );
-    assert!(report
-        .error
-        .as_deref()
-        .is_some_and(|error: &str| error.contains("proof-room.fixture.report-invalid")));
+    assert!(report.error.as_deref().is_some_and(|error: &str| error
+        .to_string()
+        .contains("proof-room.fixture.report-invalid")));
 }
 
 #[test]
@@ -491,7 +495,7 @@ fn fixture_catalog_schema_rejects_uninspectable_available_fixture() {
         Ok(()) => panic!("available fixture without report should be rejected"),
     };
 
-    assert!(error.contains("verifier_report"), "{error}");
+    assert!(error.to_string().contains("verifier_report"), "{error}");
 }
 
 #[tokio::test]
@@ -737,7 +741,9 @@ async fn quickstart_router_rejects_unadvertised_installed_fixture_asset(
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = to_bytes(response.into_body(), 1024 * 1024).await?;
     let error = String::from_utf8(body.to_vec())?;
-    assert!(error.contains("proof-room.fixture.asset-not-found"));
+    assert!(error
+        .to_string()
+        .contains("proof-room.fixture.asset-not-found"));
     Ok(())
 }
 
@@ -764,7 +770,9 @@ async fn quickstart_router_requires_fixture_root_for_non_shipped_catalog_assets(
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = to_bytes(response.into_body(), 1024 * 1024).await?;
     let error = String::from_utf8(body.to_vec())?;
-    assert!(error.contains("proof-room.fixture.asset-not-found"));
+    assert!(error
+        .to_string()
+        .contains("proof-room.fixture.asset-not-found"));
     Ok(())
 }
 

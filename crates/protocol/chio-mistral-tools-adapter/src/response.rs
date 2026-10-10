@@ -7,11 +7,8 @@ use serde_json::Value;
 use crate::native::FunctionCallPart;
 
 pub(crate) fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Mistral chat/completions payload was not JSON: {error}"
-        ))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = response_body(value, "Mistral chat/completions")?;
     classify_content_policy(&body)?;
     extract_function_calls(&body)
@@ -51,13 +48,11 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
                 .and_then(Value::as_array);
             if let Some(tool_calls) = tool_calls {
                 for entry in tool_calls {
-                    if let Some(part) =
-                        openai_tool_call_to_function_call(entry, "Mistral", |id, name, args| {
-                            FunctionCallPart { id, name, args }
-                        })?
-                    {
-                        calls.push(part);
-                    }
+                    calls.push(openai_tool_call_to_function_call(
+                        entry,
+                        "Mistral",
+                        |id, name, args| FunctionCallPart { id, name, args },
+                    )?);
                 }
             }
         }

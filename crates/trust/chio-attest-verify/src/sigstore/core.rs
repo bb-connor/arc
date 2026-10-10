@@ -152,8 +152,11 @@ impl AttestVerifier for SigstoreVerifier {
         bundle_json: &[u8],
         expected: &ExpectedIdentity,
     ) -> Result<VerifiedAttestation, AttestError> {
-        let bundle: Bundle = serde_json::from_slice(bundle_json)
-            .map_err(|e| AttestError::Malformed(format!("bundle JSON parse: {e}")))?;
+        let bundle: Bundle = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bundle_json,
+            16 * 1024 * 1024,
+        )?
+        .decode_external()?;
 
         let issuer_policy = IssuerOnlyPolicy {
             expected_issuer: expected.certificate_oidc_issuer.clone(),

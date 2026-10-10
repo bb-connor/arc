@@ -1,0 +1,1020 @@
+fn merge_cleanup_failures<const N: usize>(
+    primary: AdapterError,
+    cleanup: [(&str, Result<(), AdapterError>); N],
+) -> AdapterError {
+    let failures = cleanup
+        .into_iter()
+        .filter_map(|(label, result)| result.err().map(|error| format!("{label}: {error}")))
+        .collect::<Vec<_>>();
+    if failures.is_empty() {
+        primary
+    } else {
+        AdapterError::ConnectionFailed(format!(
+            "{primary}; cleanup also failed: {}",
+            failures.join("; ")
+        ))
+    }
+}
+
+fn fail_caged_child(
+    primary: AdapterError,
+    child: chio_cage::EnforcedChild,
+    cage_receipts: &ActiveCageReceiptPersistence,
+    failure: Option<(
+        chio_cage::CageEnforcementState,
+        chio_cage::CageEnforcementFailureCode,
+        &'static str,
+    )>,
+) -> AdapterError {
+    let failure_receipt = failure.map_or(Ok(()), |(state, code, stage)| {
+        cage_receipts.persist_failure(state, code, stage)
+    });
+    let terminal_receipt = persist_pre_fully_enforced_terminal(child, cage_receipts);
+    merge_cleanup_failures(
+        primary,
+        [
+            ("failure receipt", failure_receipt),
+            ("terminal receipt", terminal_receipt),
+        ],
+    )
+}
+
+fn poll_natural_child_exit(
+    lifecycle_mutex: &Mutex<ChildLifecycle>,
+    cage_receipts: Option<&ActiveCageReceiptPersistence>,
+) -> NaturalExitPoll {
+    let mut lifecycle = match lifecycle_mutex.lock() {
+        Ok(lifecycle) => lifecycle,
+        Err(error) => {
+            return NaturalExitPoll::Failed(AdapterError::ConnectionFailed(format!(
+                "child lifecycle lock poisoned: {error}"
+            )))
+        }
+    };
+    if !matches!(&lifecycle.terminal, ChildTerminalState::Running) {
+        return NaturalExitPoll::Stopped;
+    }
+    let observation = match lifecycle.child.as_mut() {
+        #[cfg(test)]
+        Some(ManagedChild::TestProcess(child)) => match child.try_wait() {
+            Ok(Some(_)) => Ok(Some(NaturalChildExit::TestProcess)),
+            Ok(None) => Ok(None),
+            Err(error) => Err(AdapterError::ConnectionFailed(format!(
+                "failed to poll MCP child status: {error}"
+            ))),
+        },
+        Some(ManagedChild::Caged(child)) => match child.try_wait() {
+            Ok(Some(record)) => Ok(Some(NaturalChildExit::Caged(Box::new(record)))),
+            Ok(None) => Ok(None),
+            Err(error) => Err(AdapterError::ConnectionFailed(format!(
+                "failed to poll fully enforced MCP child status: {error}"
+            ))),
+        },
+        None => Err(AdapterError::ConnectionFailed(
+            "running MCP child lifecycle lost its retained process handle".to_string(),
+        )),
+    };
+    let observation = match observation {
+        Ok(observation) => observation,
+        Err(error) => {
+            drop(lifecycle);
+            let terminal = finish_child_lifecycle(lifecycle_mutex, cage_receipts);
+            return NaturalExitPoll::Failed(merge_cleanup_failures(
+                error,
+                [("terminal receipt", terminal)],
+            ));
+        }
+    };
+    match observation {
+        None => NaturalExitPoll::Running,
+        #[cfg(test)]
+        Some(NaturalChildExit::TestProcess) => {
+            lifecycle.child.take();
+            lifecycle.terminal = ChildTerminalState::Exited;
+            NaturalExitPoll::Exited
+        }
+        Some(NaturalChildExit::Caged(record)) => {
+            lifecycle.child.take();
+            let persistence = if record.state != chio_cage::CageEnforcementState::Exited {
+                Err(AdapterError::ConnectionFailed(
+                    "fully enforced child poll produced a non-exit record".to_string(),
+                ))
+            } else {
+                cage_receipts
+                    .ok_or_else(|| {
+                        AdapterError::ConnectionFailed(
+                            "caged child lost its mandatory receipt persistence context"
+                                .to_string(),
+                        )
+                    })
+                    .and_then(|cage_receipts| cage_receipts.persist(*record))
+            };
+            match persistence {
+                Ok(()) => {
+                    lifecycle.terminal = ChildTerminalState::Exited;
+                    NaturalExitPoll::Exited
+                }
+                Err(error) => {
+                    lifecycle.terminal = ChildTerminalState::Failed(error.to_string());
+                    NaturalExitPoll::Failed(error)
+                }
+            }
+        }
+    }
+}
+
+fn notify_active_request_after_terminal(
+    active_request: &Mutex<Option<ActiveRequest>>,
+    shutdown_requested: bool,
+    terminal_failure: Option<String>,
+) {
+    let Ok(mut active_request) = active_request.lock() else {
+        return;
+    };
+    let Some(active_request) = active_request.take() else {
+        return;
+    };
+    let message = match terminal_failure {
+        Some(error) => RequestMessage::ReadError(error),
+        None if shutdown_requested => {
+            RequestMessage::Cancelled("upstream MCP request cancelled by shutdown".to_string())
+        }
+        None => RequestMessage::ReadError("upstream MCP process exited".to_string()),
+    };
+    let _ = active_request.sender.try_send(message);
+}
+
+fn finish_child_lifecycle(
+    lifecycle: &Mutex<ChildLifecycle>,
+    cage_receipts: Option<&ActiveCageReceiptPersistence>,
+) -> Result<(), AdapterError> {
+    let mut lifecycle = lifecycle.lock().map_err(|error| {
+        AdapterError::ConnectionFailed(format!("child lifecycle lock poisoned: {error}"))
+    })?;
+    match &lifecycle.terminal {
+        ChildTerminalState::Exited => return Ok(()),
+        ChildTerminalState::Failed(error) => {
+            return Err(AdapterError::ConnectionFailed(format!(
+                "prior MCP terminal shutdown failed: {error}"
+            )))
+        }
+        ChildTerminalState::Running => {}
+    }
+    let Some(child) = lifecycle.child.take() else {
+        let error = "running MCP child lifecycle lost its retained process handle".to_string();
+        lifecycle.terminal = ChildTerminalState::Failed(error.clone());
+        return Err(AdapterError::ConnectionFailed(error));
+    };
+    match terminate_child(child, cage_receipts) {
+        Ok(()) => {
+            lifecycle.terminal = ChildTerminalState::Exited;
+            Ok(())
+        }
+        Err(error) => {
+            lifecycle.terminal = ChildTerminalState::Failed(error.to_string());
+            Err(error)
+        }
+    }
+}
+
+fn terminate_child(
+    child: ManagedChild,
+    cage_receipts: Option<&ActiveCageReceiptPersistence>,
+) -> Result<(), AdapterError> {
+    match child {
+        #[cfg(test)]
+        ManagedChild::TestProcess(child) => terminate_test_child(child),
+        ManagedChild::Caged(child) => {
+            let cage_receipts = cage_receipts.ok_or_else(|| {
+                AdapterError::ConnectionFailed(
+                    "caged child lost its mandatory receipt persistence context".to_string(),
+                )
+            })?;
+            persist_fully_enforced_terminal(*child, cage_receipts)
+        }
+    }
+}
+
+#[cfg(test)]
+fn terminate_test_child(mut child: Child) -> Result<(), AdapterError> {
+    let kill_error = child.kill().err().map(|error| error.to_string());
+    let deadline = Instant::now() + TEST_CHILD_REAP_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return Ok(()),
+            Ok(None) => {}
+            Err(error) => {
+                let reaper = detach_test_child_reaper(child);
+                return Err(merge_cleanup_failures(
+                    AdapterError::ConnectionFailed(format!(
+                        "failed to poll test MCP child after termination: {error}"
+                    )),
+                    [("detached child reaper", reaper)],
+                ));
+            }
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            let kill_context = kill_error
+                .as_deref()
+                .map(|error| format!("; initial kill failed: {error}"))
+                .unwrap_or_default();
+            let reaper = detach_test_child_reaper(child);
+            return Err(merge_cleanup_failures(
+                AdapterError::ConnectionFailed(format!(
+                    "test MCP child did not reap within {TEST_CHILD_REAP_TIMEOUT:?}{kill_context}"
+                )),
+                [("detached child reaper", reaper)],
+            ));
+        }
+        std::thread::sleep(std::cmp::min(UPSTREAM_REQUEST_POLL_INTERVAL, remaining));
+    }
+}
+
+#[cfg(test)]
+fn detach_test_child_reaper(mut child: Child) -> Result<(), AdapterError> {
+    std::thread::Builder::new()
+        .name("chio-mcp-test-reaper".to_string())
+        .spawn(move || {
+            let _ = child.wait();
+        })
+        .map(|_| ())
+        .map_err(|error| {
+            AdapterError::ConnectionFailed(format!(
+                "failed to spawn test MCP child reaper: {error}"
+            ))
+        })
+}
+
+fn persist_fully_enforced_terminal(
+    child: chio_cage::EnforcedChild,
+    cage_receipts: &ActiveCageReceiptPersistence,
+) -> Result<(), AdapterError> {
+    let record = child.terminate().map_err(|_| {
+        AdapterError::ConnectionFailed(
+            "fully enforced caged child termination did not produce verified exit evidence"
+                .to_string(),
+        )
+    })?;
+    if record.state != chio_cage::CageEnforcementState::Exited {
+        return Err(AdapterError::ConnectionFailed(
+            "fully enforced caged child termination produced a non-exit record".to_string(),
+        ));
+    }
+    cage_receipts.persist(record)
+}
+
+fn persist_pre_fully_enforced_terminal(
+    child: chio_cage::EnforcedChild,
+    cage_receipts: &ActiveCageReceiptPersistence,
+) -> Result<(), AdapterError> {
+    match child.terminate() {
+        Ok(record) => cage_receipts.persist(record),
+        Err(_) => Err(AdapterError::ConnectionFailed(
+            "caged child termination did not produce verified exit evidence".to_string(),
+        )),
+    }
+}
+
+fn now_unix_ms() -> Result<u64, AdapterError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    Ok(SystemClock.unix_millis()?.get())
+}
+
+fn validate_cage_required_inputs(
+    command: &str,
+    args: &[&str],
+    manifest_registry: &chio_manifest::VerifiedManifestRegistry,
+    server_id: &str,
+    compiled: &chio_cage::CompiledCage,
+) -> Result<ExpectedCageEvidence, AdapterError> {
+    let authorization = validate_cage_registry_binding(manifest_registry, server_id, compiled)?;
+    let manifest_digest = authorization.manifest_digest().to_string();
+
+    let target_path = compiled.runtime().target().resource().path();
+    if !std::path::Path::new(command).is_absolute() || std::path::Path::new(command) != target_path
+    {
+        return Err(AdapterError::ConnectionFailed(
+            "cage-required command does not match the retained target executable".into(),
+        ));
+    }
+    let expected_argv = std::iter::once(command.to_string())
+        .chain(args.iter().map(|argument| (*argument).to_string()))
+        .collect::<Vec<_>>();
+    if compiled.runtime().target_argv() != expected_argv
+        || compiled.plan().target_argv != expected_argv
+    {
+        return Err(AdapterError::ConnectionFailed(
+            "cage-required argv does not match the compiled launch plan".into(),
+        ));
+    }
+
+    if compiled.admitted().native_syscall_profile()
+        == chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+        && (compiled.broker_ipc().is_none()
+            || !compiled.admitted().read_resources().is_empty()
+            || !compiled.admitted().write_resources().is_empty()
+            || !compiled.admitted().environment_variables().is_empty()
+            // Cage compilation supplies only these fixed locale values even
+            // when the manifest grants no inherited environment variables.
+            || compiled.plan().environment
+                != std::collections::BTreeMap::from([
+                    ("LANG".to_string(), "C".to_string()),
+                    ("LC_ALL".to_string(), "C".to_string()),
+                    ("TZ".to_string(), "UTC".to_string()),
+                ]))
+    {
+        return Err(AdapterError::ConnectionFailed(
+            "brokered cage launch requires only authenticated preconnected broker IPC and no raw file or environment grants".into(),
+        ));
+    }
+
+    Ok(ExpectedCageEvidence {
+        manifest_digest,
+        helper_binding_digest: compiled.runtime().helper().binding_digest().to_string(),
+        target_binding_digest: compiled.runtime().target().binding_digest().to_string(),
+        target_identity: compiled.runtime().target().resource().identity(),
+    })
+}
+
+fn validate_cage_registry_binding<'a>(
+    manifest_registry: &'a chio_manifest::VerifiedManifestRegistry,
+    server_id: &str,
+    compiled: &chio_cage::CompiledCage,
+) -> Result<chio_manifest::VerifiedCageManifest<'a>, AdapterError> {
+    let authorization = manifest_registry
+        .authorize_cage_manifest(server_id)
+        .map_err(|error| {
+            AdapterError::ConnectionFailed(format!(
+                "cage-required registry authorization failed: {error}"
+            ))
+        })?;
+    let manifest_digest = authorization.manifest_digest();
+    let authorization_digest = authorization.authorization_digest();
+    if compiled.admitted().manifest_digest() != manifest_digest
+        || compiled.plan().manifest_digest != manifest_digest
+        || compiled.profile().manifest_digest != manifest_digest
+        || compiled.admitted().signed_manifest_digest() != authorization.signed_manifest_digest()
+        || compiled.admitted().registry_digest() != authorization.registry_digest()
+        || compiled.admitted().cage_authorization_digest() != authorization_digest
+        || compiled.profile().cage_authorization_digest != authorization_digest
+    {
+        return Err(AdapterError::ConnectionFailed(
+            "cage-required compiled admission does not match the live registry authorization"
+                .into(),
+        ));
+    }
+    Ok(authorization)
+}
+
+fn validate_cage_evidence(
+    evidence: &chio_cage::FullyEnforcedEvidence,
+    expected: &ExpectedCageEvidence,
+) -> Result<(), AdapterError> {
+    evidence.validate().map_err(|_| {
+        AdapterError::ConnectionFailed("cage-required enforcement evidence is invalid".into())
+    })?;
+    if !evidence.status_eof_observed
+        || evidence.prepared.manifest_digest != expected.manifest_digest
+        || evidence.prepared.helper_binding_digest != expected.helper_binding_digest
+        || evidence.prepared.target_binding_digest != expected.target_binding_digest
+        || evidence.prepared.target_identity != expected.target_identity
+        || evidence.exec_transition.target_binding_digest != expected.target_binding_digest
+        || evidence.exec_transition.target_identity != expected.target_identity
+    {
+        return Err(AdapterError::ConnectionFailed(
+            "cage-required enforcement evidence does not match the admitted launch".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_signed_mcp_tool_surface(
+    transport: &StdioMcpTransport,
+    admitted_manifest: &chio_manifest::ToolManifest,
+) -> Result<(), AdapterError> {
+    let tools = transport
+        .list_tools()?
+        .into_iter()
+        .map(crate::manifest::tool_definition_from_mcp)
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut discovered = admitted_manifest.clone();
+    discovered.tools = tools;
+    crate::verify_discovered_manifest_surface(&discovered, admitted_manifest)
+}
+
+#[cfg(test)]
+mod cage_launch_tests {
+
+    use chio_test_support::prelude::*;
+
+    use super::*;
+
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn prepared_broker_descriptor_rejects_another_socket_with_the_same_peer() {
+        use std::os::fd::OwnedFd;
+        use std::os::unix::fs::MetadataExt;
+        use std::os::unix::net::UnixStream;
+
+        // Both channels belong to this process. A duplicated descriptor must
+        // match, while a second channel from the same peer must be refused.
+        let (original, _original_peer) = UnixStream::pair().test_expect("original channel");
+        let (substitute, _substitute_peer) = UnixStream::pair().test_expect("substitute channel");
+        let retained = std::fs::File::from(OwnedFd::from(
+            original.try_clone().test_expect("retained socket"),
+        ));
+        let original_identity = retained.metadata().test_expect("original identity");
+        verify_prepared_broker_descriptor(
+            original_identity.dev(),
+            original_identity.ino(),
+            &original,
+        )
+        .test_expect("original retained");
+        assert!(verify_prepared_broker_descriptor(
+            original_identity.dev(),
+            original_identity.ino(),
+            &substitute,
+        )
+        .is_err());
+    }
+
+    fn identity() -> chio_cage::FileIdentity {
+        serde_json::from_value(serde_json::json!({
+            "device": 1,
+            "inode": 2,
+            "mount_id": 3,
+            "mode": 0o100700,
+            "uid": 1000,
+            "gid": 1000,
+            "kind": "regular_file"
+        }))
+        .test_expect("valid identity")
+    }
+
+    fn evidence() -> chio_cage::FullyEnforcedEvidence {
+        let prepared = chio_cage::EnforcementPrepared {
+            schema: chio_cage::ENFORCEMENT_PREPARED_SCHEMA.to_string(),
+            process_id: 42,
+            manifest_digest: digest('1'),
+            profile_digest: digest('2'),
+            plan_digest: digest('3'),
+            fd_table_digest: digest('4'),
+            helper_binding_digest: digest('5'),
+            target_binding_digest: digest('6'),
+            target_identity: identity(),
+            applied_execution_identity: chio_cage::ExecutionIdentity::new(
+                10_001,
+                10_001,
+                vec![10_002],
+            )
+            .test_expect("valid execution identity"),
+            nono_version: chio_cage::PINNED_NONO_VERSION.to_string(),
+            nono_patch_version: chio_cage::NONO_PATCH_VERSION.to_string(),
+            landlock_abi: 6,
+            landlock_filesystem_status: chio_cage::ObservedRulesetStatus::FullyEnforced,
+            landlock_network_status: chio_cage::ObservedRulesetStatus::FullyEnforced,
+            seccompiler_version: chio_cage::PINNED_SECCOMPILER_VERSION.to_string(),
+            seccomp_status: chio_cage::SeccompEnforcementStatus::FullyEnforced,
+            seccomp_architecture: chio_cage::SandboxArchitecture::X86_64,
+            seccomp_filter_digest: digest('7'),
+            trace_session_digest: digest('8'),
+            prepared_at_unix_ms: 1_000,
+        };
+        let transition = chio_cage::ExecTransitionObserved {
+            schema: chio_cage::EXEC_TRANSITION_OBSERVED_SCHEMA.to_string(),
+            process_id: 42,
+            trace_session_digest: digest('8'),
+            target_binding_digest: digest('6'),
+            target_identity: identity(),
+            observed_at_unix_ms: 1_001,
+        };
+        chio_cage::FullyEnforcedEvidence::new(prepared, transition, true)
+            .test_expect("valid evidence")
+    }
+
+    fn flow_registry(
+        flow: Option<chio_manifest::ToolFlowDeclaration>,
+    ) -> chio_manifest::VerifiedManifestRegistry {
+        let server_id = "flow-cage";
+        let signer = chio_core::Keypair::from_seed(&[73; 32]);
+        let manifest = chio_manifest::ToolManifest {
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: server_id.to_string(),
+            name: "Flow cage".to_string(),
+            description: None,
+            version: "1".to_string(),
+            tools: vec![chio_manifest::ToolDefinition {
+                name: "send".to_string(),
+                description: "Send".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: false,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
+                latency_hint: Some(chio_manifest::LatencyHint::Moderate),
+                flow,
+            }],
+            server_tools: Vec::new(),
+            required_permissions: Some(chio_manifest::RequiredPermissions {
+                read_paths: None,
+                write_paths: None,
+                network_destinations: None,
+                environment_variables: None,
+                native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+            }),
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &signer)
+            .test_expect("sign manifest authorization");
+        let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+        registry
+            .register_public_only(
+                signed,
+                &signer.public_key(),
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .test_expect("register manifest authorization");
+        registry
+    }
+
+    #[test]
+    fn signed_manifest_rejects_discovered_tool_surface_drift() {
+        let script = r#"
+import json
+import sys
+
+def respond(value):
+    sys.stdout.write(json.dumps(value) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        respond({
+            "jsonrpc": "2.0",
+            "id": request["id"],
+            "result": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "drifted", "version": "1"}
+            }
+        })
+    elif method == "tools/list":
+        respond({
+            "jsonrpc": "2.0",
+            "id": request["id"],
+            "result": {
+                "tools": [{
+                    "name": "unexpected",
+                    "description": "Unexpected",
+                    "inputSchema": {"type": "object"}
+                }]
+            }
+        })
+"#;
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_expect("signed surface test clock")
+            .as_nanos();
+        let script_path = std::env::temp_dir().join(format!(
+            "chio-mcp-adapter-drifted-{}-{stamp}.py",
+            std::process::id()
+        ));
+        std::fs::write(&script_path, script).test_expect("write signed surface test server");
+        let script_argument = script_path
+            .to_str()
+            .test_expect("signed surface test path is UTF-8");
+
+        let registry = flow_registry(None);
+        let transport = StdioMcpTransport::spawn_test_process("python3", &[script_argument])
+            .test_expect("start stdio fixture");
+        let manifest = &registry
+            .verified_manifest("flow-cage")
+            .test_expect("registered")
+            .manifest;
+        let result = validate_signed_mcp_tool_surface(&transport, manifest);
+        transport.shutdown().test_expect("shutdown fixture");
+        let _ = std::fs::remove_file(script_path);
+        let error = match result {
+            Ok(()) => panic!("accepted a tool surface outside its signed manifest"),
+            Err(error) => error,
+        };
+
+        assert!(
+            matches!(error, AdapterError::ManifestSurfaceMismatch(_)),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn cage_launch_contract_requires_registry_authorized_local_topology() {
+        let keypair = chio_core::Keypair::from_seed(&[73; 32]);
+        let manifest = chio_manifest::ToolManifest {
+            schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: "flow-cage".to_string(),
+            name: "Flow cage".to_string(),
+            description: None,
+            version: "1".to_string(),
+            tools: vec![chio_manifest::ToolDefinition {
+                name: "send".to_string(),
+                description: "Send".to_string(),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: false,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
+                latency_hint: Some(chio_manifest::LatencyHint::Moderate),
+                flow: Some(chio_manifest::ToolFlowDeclaration::public_egress()),
+            }],
+            server_tools: Vec::new(),
+            required_permissions: Some(chio_manifest::RequiredPermissions {
+                read_paths: None,
+                write_paths: None,
+                network_destinations: None,
+                environment_variables: None,
+                native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+            }),
+            public_key: keypair.public_key().to_hex(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &keypair).test_expect("sign manifest");
+
+        let mut remote_registry = chio_manifest::VerifiedManifestRegistry::default();
+        remote_registry
+            .register_public_only(
+                signed.clone(),
+                &keypair.public_key(),
+                chio_manifest::RuntimeToolTopology::remote(),
+            )
+            .test_expect("register remote manifest");
+        assert!(remote_registry
+            .authorize_cage_manifest("flow-cage")
+            .is_err());
+
+        let mut local_registry = chio_manifest::VerifiedManifestRegistry::default();
+        local_registry
+            .register_public_only(
+                signed,
+                &keypair.public_key(),
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .test_expect("register local manifest");
+        assert!(local_registry.authorize_cage_manifest("flow-cage").is_ok());
+    }
+
+    #[test]
+    fn helper_or_target_evidence_mismatch_is_rejected() {
+        let expected = ExpectedCageEvidence {
+            manifest_digest: digest('1'),
+            helper_binding_digest: digest('5'),
+            target_binding_digest: digest('9'),
+            target_identity: identity(),
+        };
+        let error = validate_cage_evidence(&evidence(), &expected).test_expect_err("mismatch");
+        assert!(error.to_string().contains("does not match"));
+    }
+
+    fn write_stdio_server_script(name: &str, script: &str) -> std::path::PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_expect("stdio lifecycle test clock")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "chio-mcp-adapter-{name}-{}-{stamp}.py",
+            std::process::id()
+        ));
+        std::fs::write(&path, script).test_expect("write stdio lifecycle test server");
+        path
+    }
+
+    fn short_request_timeouts() -> StdioRequestTimeouts {
+        StdioRequestTimeouts {
+            initialization: Duration::from_secs(10),
+            discovery: Duration::from_millis(200),
+            request: Duration::from_millis(200),
+        }
+    }
+
+    fn short_initialization_timeout() -> StdioRequestTimeouts {
+        StdioRequestTimeouts {
+            initialization: Duration::from_secs(1),
+            ..short_request_timeouts()
+        }
+    }
+
+    #[test]
+    fn operator_request_timeouts_are_bounded_without_extending_startup_or_discovery() {
+        assert_eq!(
+            StdioRequestTimeouts::default().request_timeout_seconds(),
+            60
+        );
+        for seconds in [1, 60, 300, 3600] {
+            let timeouts = StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                .test_expect("bounded operator request deadline");
+            assert_eq!(timeouts.request, Duration::from_secs(seconds));
+            assert_eq!(timeouts.initialization, Duration::from_secs(10));
+            assert_eq!(timeouts.discovery, Duration::from_secs(10));
+        }
+        for seconds in [0, 3601, u64::MAX] {
+            StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                .test_expect_err("unbounded operator request deadline must be refused");
+        }
+    }
+
+    #[test]
+    fn initialization_has_a_bounded_deadline() {
+        let script = r#"
+import sys
+
+for _line in sys.stdin:
+    pass
+"#;
+        let script_path = write_stdio_server_script("initialize-timeout", script);
+        let script_argument = script_path
+            .to_str()
+            .test_expect("initialize timeout script path is UTF-8");
+        let started = Instant::now();
+        let result = StdioMcpTransport::spawn_test_process_with_timeouts(
+            "python3",
+            &[script_argument],
+            short_initialization_timeout(),
+        );
+        let elapsed = started.elapsed();
+        let _ = std::fs::remove_file(script_path);
+        let error = match result {
+            Ok(transport) => {
+                let _ = transport.shutdown();
+                panic!("initialize without a response exceeded its deadline contract")
+            }
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("initialize request timed out"));
+        assert!(elapsed < Duration::from_secs(3), "elapsed: {elapsed:?}");
+    }
+
+    #[test]
+    fn discovery_and_tool_requests_use_distinct_bounded_deadlines() {
+        let script = r#"
+import json
+import sys
+
+def respond(value):
+    sys.stdout.write(json.dumps(value) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    request = json.loads(line)
+    if request.get("method") == "initialize":
+        respond({
+            "jsonrpc": "2.0",
+            "id": request["id"],
+            "result": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "timeout", "version": "1"}
+            }
+        })
+"#;
+        let script_path = write_stdio_server_script("discovery-timeout", script);
+        let script_argument = script_path
+            .to_str()
+            .test_expect("discovery timeout script path is UTF-8");
+        let timeouts = StdioRequestTimeouts {
+            request: Duration::from_secs(2),
+            ..short_request_timeouts()
+        };
+        let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
+            "python3",
+            &[script_argument],
+            timeouts,
+        )
+        .test_expect("initialize timeout test transport");
+        assert_eq!(
+            transport.request_timeout_for("initialize"),
+            timeouts.initialization
+        );
+        for method in [
+            "tools/list",
+            "resources/list",
+            "resources/templates/list",
+            "prompts/list",
+        ] {
+            assert_eq!(transport.request_timeout_for(method), timeouts.discovery);
+        }
+        assert_eq!(
+            transport.request_timeout_for("tools/call"),
+            timeouts.request
+        );
+        let error = transport
+            .list_tools()
+            .test_expect_err("tools/list without a response must time out");
+        assert!(error.to_string().contains("tools/list request timed out"));
+        transport.shutdown().test_expect("shutdown timeout server");
+        let _ = std::fs::remove_file(script_path);
+    }
+
+    #[test]
+    fn configured_request_deadline_controls_completion_and_terminal_timeout() {
+        let script = r#"
+import json
+import sys
+import time
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        result = {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "operator-timeout", "version": "1"}
+        }
+    elif method == "tools/call":
+        time.sleep(1.25)
+        result = {"content": [{"type": "text", "text": "completed"}]}
+    else:
+        continue
+    print(json.dumps({"jsonrpc": "2.0", "id": request["id"], "result": result}), flush=True)
+"#;
+        let script_path = write_stdio_server_script("operator-timeout", script);
+        let script_argument = script_path
+            .to_str()
+            .test_expect("operator timeout script path is UTF-8");
+        for seconds in [1, 3] {
+            let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
+                "python3",
+                &[script_argument],
+                StdioRequestTimeouts::with_request_timeout_seconds(seconds)
+                    .test_expect("bounded operator timeout"),
+            )
+            .test_expect("initialize configured timeout test transport");
+            let result = transport.call_tool("wait", json!({}));
+            if seconds == 1 {
+                let error = result.test_expect_err("short deadline must stop the request");
+                assert!(error.to_string().contains("tools/call request timed out"));
+                let lifecycle = transport
+                    .child_lifecycle
+                    .lock()
+                    .test_expect("configured timeout lifecycle lock");
+                assert!(matches!(&lifecycle.terminal, ChildTerminalState::Exited));
+            } else {
+                let completed = result.test_expect("extended deadline must allow completion");
+                assert_eq!(completed.content[0]["text"], "completed");
+            }
+            transport
+                .shutdown()
+                .test_expect("shutdown configured timeout server");
+        }
+        let _ = std::fs::remove_file(script_path);
+    }
+
+    #[test]
+    fn request_timeout_is_bounded_and_terminal() {
+        let script = r#"
+import json
+import sys
+
+def respond(value):
+    sys.stdout.write(json.dumps(value) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        respond({
+            "jsonrpc": "2.0",
+            "id": request["id"],
+            "result": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "timeout", "version": "1"}
+            }
+        })
+"#;
+        let script_path = write_stdio_server_script("request-cancel", script);
+        let script_argument = script_path
+            .to_str()
+            .test_expect("request cancellation script path is UTF-8");
+        let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
+            "python3",
+            &[script_argument],
+            short_request_timeouts(),
+        )
+        .test_expect("initialize request cancellation test transport");
+        let started = Instant::now();
+        let error = transport
+            .call_tool("hang", json!({}))
+            .test_expect_err("tools/call without a response must time out");
+        assert!(error.to_string().contains("tools/call request timed out"));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        {
+            let lifecycle = transport
+                .child_lifecycle
+                .lock()
+                .test_expect("request timeout lifecycle lock");
+            assert!(matches!(&lifecycle.terminal, ChildTerminalState::Exited));
+        }
+        transport
+            .list_tools()
+            .test_expect_err("timed-out transport must not accept another request");
+        transport
+            .shutdown()
+            .test_expect("shutdown cancellation server");
+        let _ = std::fs::remove_file(script_path);
+    }
+
+    #[test]
+    fn shutdown_preempts_a_hung_stdio_request() {
+        let script = r#"
+import json
+import pathlib
+import sys
+
+marker = pathlib.Path(sys.argv[1])
+
+def respond(value):
+    sys.stdout.write(json.dumps(value) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        respond({
+            "jsonrpc": "2.0",
+            "id": request["id"],
+            "result": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "shutdown", "version": "1"}
+            }
+        })
+    elif method == "tools/call":
+        marker.write_text("entered")
+"#;
+        let script_path = write_stdio_server_script("shutdown-preempt", script);
+        let marker_path = script_path.with_extension("entered");
+        let script_argument = script_path
+            .to_str()
+            .test_expect("shutdown preemption script path is UTF-8");
+        let marker_argument = marker_path
+            .to_str()
+            .test_expect("shutdown preemption marker path is UTF-8");
+        let transport = Arc::new(
+            StdioMcpTransport::spawn_test_process_with_timeouts(
+                "python3",
+                &[script_argument, marker_argument],
+                StdioRequestTimeouts {
+                    initialization: Duration::from_secs(10),
+                    discovery: Duration::from_secs(1),
+                    request: Duration::from_secs(30),
+                },
+            )
+            .test_expect("initialize shutdown preemption transport"),
+        );
+        let request_transport = transport.clone();
+        let request_thread =
+            std::thread::spawn(move || request_transport.call_tool("hang", json!({})));
+        for _ in 0..200 {
+            if marker_path.exists() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(marker_path.exists(), "hung request did not reach the child");
+        let started = Instant::now();
+        transport
+            .shutdown()
+            .test_expect("shutdown hung stdio request");
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "shutdown did not preempt the request"
+        );
+        let request_error = request_thread
+            .join()
+            .unwrap_or_else(|_| panic!("hung request thread panicked"))
+            .test_expect_err("shutdown must cancel the hung request");
+        assert!(
+            request_error.to_string().contains("cancelled by shutdown")
+                || request_error.to_string().contains("process exited"),
+            "unexpected shutdown request error: {request_error}"
+        );
+        let _ = std::fs::remove_file(marker_path);
+        let _ = std::fs::remove_file(script_path);
+    }
+
+}

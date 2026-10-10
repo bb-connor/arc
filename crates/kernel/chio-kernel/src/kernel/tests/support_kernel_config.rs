@@ -1,4 +1,5 @@
-fn make_config() -> KernelConfig {
+use super::*;
+pub(in crate::kernel::tests) fn make_config() -> KernelConfig {
     KernelConfig {
         keypair: make_keypair(),
         ca_public_keys: vec![],
@@ -19,8 +20,8 @@ fn make_config() -> KernelConfig {
     }
 }
 
-fn make_kernel(config: KernelConfig) -> ChioKernel {
-    let mut kernel = ChioKernel::new(config);
+pub(in crate::kernel::tests) fn make_kernel(config: KernelConfig) -> ChioKernel {
+    let mut kernel = ChioKernel::new_with_clock(config, chio_test_support::clock::clock());
     kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     kernel
 }

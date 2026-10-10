@@ -6,68 +6,64 @@ pub(in crate::runtime) fn select_capability_for_request(
     server_id: &str,
     arguments: &Value,
     model_metadata: Option<&ModelMetadata>,
-) -> Option<CapabilityToken> {
-    capabilities
-        .iter()
-        .find(|capability| {
-            chio_kernel::capability_matches_request_with_model_metadata(
-                capability,
-                tool_name,
-                server_id,
-                arguments,
-                model_metadata,
-            )
-            .unwrap_or(false)
-        })
-        .cloned()
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    select_matching_capability(capabilities, |capability| {
+        chio_kernel::capability_matches_request_with_model_metadata(
+            capability,
+            tool_name,
+            server_id,
+            arguments,
+            model_metadata,
+        )
+    })
 }
 
 pub(in crate::runtime) fn select_capability_for_resource(
     capabilities: &[CapabilityToken],
     uri: &str,
-) -> Option<CapabilityToken> {
-    capabilities
-        .iter()
-        .find(|capability| {
-            chio_kernel::capability_matches_resource_request(capability, uri).unwrap_or(false)
-        })
-        .cloned()
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    select_matching_capability(capabilities, |capability| {
+        chio_kernel::capability_matches_resource_request(capability, uri)
+    })
 }
 
 pub(in crate::runtime) fn select_capability_for_resource_subscription(
     capabilities: &[CapabilityToken],
     uri: &str,
-) -> Option<CapabilityToken> {
-    capabilities
-        .iter()
-        .find(|capability| {
-            chio_kernel::capability_matches_resource_subscription(capability, uri).unwrap_or(false)
-        })
-        .cloned()
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    select_matching_capability(capabilities, |capability| {
+        chio_kernel::capability_matches_resource_subscription(capability, uri)
+    })
 }
 
 pub(in crate::runtime) fn select_capability_for_prompt(
     capabilities: &[CapabilityToken],
     prompt_name: &str,
-) -> Option<CapabilityToken> {
-    capabilities
-        .iter()
-        .find(|capability| {
-            chio_kernel::capability_matches_prompt_request(capability, prompt_name).unwrap_or(false)
-        })
-        .cloned()
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    select_matching_capability(capabilities, |capability| {
+        chio_kernel::capability_matches_prompt_request(capability, prompt_name)
+    })
 }
 
 pub(in crate::runtime) fn select_capability_for_resource_pattern(
     capabilities: &[CapabilityToken],
     pattern: &str,
-) -> Option<CapabilityToken> {
-    capabilities
-        .iter()
-        .find(|capability| {
-            chio_kernel::capability_matches_resource_pattern(capability, pattern).unwrap_or(false)
-        })
-        .cloned()
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    select_matching_capability(capabilities, |capability| {
+        chio_kernel::capability_matches_resource_pattern(capability, pattern)
+    })
+}
+
+fn select_matching_capability(
+    capabilities: &[CapabilityToken],
+    mut matches: impl FnMut(&CapabilityToken) -> Result<bool, chio_kernel::KernelError>,
+) -> Result<Option<CapabilityToken>, chio_kernel::KernelError> {
+    for capability in capabilities {
+        if matches(capability)? {
+            return Ok(Some(capability.clone()));
+        }
+    }
+    Ok(None)
 }
 
 pub(in crate::runtime) fn tool_is_authorized(

@@ -1,31 +1,13 @@
 use super::*;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpListener;
-use std::path::PathBuf;
-use std::sync::Once;
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
 
-use chio_core::capability::{scope::{ChioScope, Operation, ToolGrant}, token::{CapabilityToken, CapabilityTokenBody}};
-use chio_core::crypto::Keypair;
-use chio_core::receipt::decision::Decision;
-use chio_kernel::{
-    ChioKernel, KernelConfig, ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
-};
-use rcgen::{
-    BasicConstraints, CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose,
-    IsCa, KeyPair as RcgenKeyPair,
-};
-
-fn ensure_rustls_crypto_provider() {
+pub(super) fn ensure_rustls_crypto_provider() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
         let _ = ureq::rustls::crypto::aws_lc_rs::default_provider().install_default();
     });
 }
 
-fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
+pub(super) fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
@@ -33,7 +15,7 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
 }
 
-fn bind_fake_a2a_listener(label: &str) -> Option<TcpListener> {
+pub(super) fn bind_fake_a2a_listener(label: &str) -> Option<TcpListener> {
     match TcpListener::bind("127.0.0.1:0") {
         Ok(listener) => Some(listener),
         Err(err)
@@ -51,12 +33,11 @@ fn bind_fake_a2a_listener(label: &str) -> Option<TcpListener> {
     }
 }
 
-fn test_adapter_config(base_url: &str, public_key: String) -> A2aAdapterConfig {
-    A2aAdapterConfig::new(base_url, public_key)
-        .with_egress_contract(test_egress_contract(base_url))
+pub(super) fn test_adapter_config(base_url: &str, public_key: String) -> A2aAdapterConfig {
+    A2aAdapterConfig::new(base_url, public_key).with_egress_contract(test_egress_contract(base_url))
 }
 
-fn test_egress_contract(base_url: &str) -> HttpEgressContract {
+pub(super) fn test_egress_contract(base_url: &str) -> HttpEgressContract {
     let url = Url::parse(base_url).expect("test base URL parses");
     let host = url.host_str().expect("test base URL has host");
     let authority = match url.port() {
@@ -66,7 +47,7 @@ fn test_egress_contract(base_url: &str) -> HttpEgressContract {
     HttpEgressContract::permissive_for_tests(&authority)
 }
 
-fn seed_a2a_task(adapter: &A2aAdapter, tool_name: &str, task_id: &str) {
+pub(super) fn seed_a2a_task(adapter: &A2aAdapter, tool_name: &str, task_id: &str) {
     adapter
         .record_task_activity(
             tool_name,
@@ -81,7 +62,7 @@ fn seed_a2a_task(adapter: &A2aAdapter, tool_name: &str, task_id: &str) {
         .expect("seed A2A task registry");
 }
 
-fn insert_test_egress_authority(contract: &mut HttpEgressContract, base_url: &str) {
+pub(super) fn insert_test_egress_authority(contract: &mut HttpEgressContract, base_url: &str) {
     let url = Url::parse(base_url).expect("test base URL parses");
     let host = url.host_str().expect("test base URL has host");
     let authority = match url.port() {
@@ -91,7 +72,7 @@ fn insert_test_egress_authority(contract: &mut HttpEgressContract, base_url: &st
     contract.allowed_authority_set.insert(authority);
 }
 
-fn local_test_adapter(
+pub(super) fn local_test_adapter(
     capabilities: A2aAgentCapabilities,
     selected_binding: A2aProtocolBinding,
     tenant: Option<&str>,
@@ -158,6 +139,7 @@ fn local_test_adapter(
             egress_contract: None,
         },
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: Duration::from_secs(2),
         request_counter: AtomicU64::new(0),
         partner_policy: None,
@@ -166,13 +148,13 @@ fn local_test_adapter(
 }
 
 #[derive(Clone, Copy)]
-enum TestBinding {
+pub(super) enum TestBinding {
     JsonRpc,
     HttpJson,
 }
 
 #[derive(Clone, Copy)]
-enum TestScenario {
+pub(super) enum TestScenario {
     BlockingMessage,
     TaskFollowUp,
     CancelTask,
@@ -194,131 +176,131 @@ enum TestScenario {
     MutualTlsRequired,
 }
 
-enum TestResponse {
+pub(super) enum TestResponse {
     Json(Value),
     EventStream(String),
 }
 
-struct FakeA2aServer {
-    base_url: String,
-    requests: Arc<Mutex<Vec<String>>>,
-    handle: thread::JoinHandle<()>,
+pub(super) struct FakeA2aServer {
+    pub(super) base_url: String,
+    pub(super) requests: Arc<Mutex<Vec<String>>>,
+    pub(super) handle: thread::JoinHandle<()>,
 }
 
 impl FakeA2aServer {
-    fn spawn_jsonrpc() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::BlockingMessage)
     }
 
-    fn spawn_jsonrpc_task_follow_up() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_task_follow_up() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::TaskFollowUp)
     }
 
-    fn spawn_jsonrpc_missing_send_message_result() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_missing_send_message_result() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::MissingSendMessageResult)
     }
 
-    fn spawn_http_json() -> Option<Self> {
+    pub(super) fn spawn_http_json() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::BlockingMessage)
     }
 
-    fn spawn_http_json_task_follow_up() -> Option<Self> {
+    pub(super) fn spawn_http_json_task_follow_up() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::TaskFollowUp)
     }
 
-    fn spawn_jsonrpc_cancel_task() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_cancel_task() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::CancelTask)
     }
 
-    fn spawn_http_json_cancel_task() -> Option<Self> {
+    pub(super) fn spawn_http_json_cancel_task() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::CancelTask)
     }
 
-    fn spawn_jsonrpc_push_notification_crud() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_push_notification_crud() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::PushNotificationCrud)
     }
 
-    fn spawn_http_json_push_notification_crud() -> Option<Self> {
+    pub(super) fn spawn_http_json_push_notification_crud() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::PushNotificationCrud)
     }
 
-    fn spawn_jsonrpc_push_notification_capability_only() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_push_notification_capability_only() -> Option<Self> {
         Self::spawn(
             TestBinding::JsonRpc,
             TestScenario::PushNotificationCapabilityOnly,
         )
     }
 
-    fn spawn_jsonrpc_oauth_client_credentials_required() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_oauth_client_credentials_required() -> Option<Self> {
         Self::spawn(
             TestBinding::JsonRpc,
             TestScenario::OAuthClientCredentialsRequired,
         )
     }
 
-    fn spawn_jsonrpc_oauth_client_credentials_single_invoke() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_oauth_client_credentials_single_invoke() -> Option<Self> {
         Self::spawn(
             TestBinding::JsonRpc,
             TestScenario::OAuthClientCredentialsSingleInvoke,
         )
     }
 
-    fn spawn_jsonrpc_openid_client_credentials_required() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_openid_client_credentials_required() -> Option<Self> {
         Self::spawn(
             TestBinding::JsonRpc,
             TestScenario::OpenIdClientCredentialsRequired,
         )
     }
 
-    fn spawn_jsonrpc_streaming_complete() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_streaming_complete() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::StreamingComplete)
     }
 
-    fn spawn_http_json_streaming_complete() -> Option<Self> {
+    pub(super) fn spawn_http_json_streaming_complete() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::StreamingComplete)
     }
 
-    fn spawn_jsonrpc_streaming_incomplete() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_streaming_incomplete() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::StreamingIncomplete)
     }
 
-    fn spawn_jsonrpc_subscribe_complete() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_subscribe_complete() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::SubscribeComplete)
     }
 
-    fn spawn_http_json_subscribe_complete() -> Option<Self> {
+    pub(super) fn spawn_http_json_subscribe_complete() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::SubscribeComplete)
     }
 
-    fn spawn_jsonrpc_subscribe_incomplete() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_subscribe_incomplete() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::SubscribeIncomplete)
     }
 
-    fn spawn_jsonrpc_bearer_required() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_bearer_required() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::BearerRequired)
     }
 
-    fn spawn_http_json_basic_required() -> Option<Self> {
+    pub(super) fn spawn_http_json_basic_required() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::BasicRequired)
     }
 
-    fn spawn_http_json_api_key_required() -> Option<Self> {
+    pub(super) fn spawn_http_json_api_key_required() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyRequired)
     }
 
-    fn spawn_http_json_api_key_query_required() -> Option<Self> {
+    pub(super) fn spawn_http_json_api_key_query_required() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyQueryRequired)
     }
 
-    fn spawn_http_json_api_key_cookie_required() -> Option<Self> {
+    pub(super) fn spawn_http_json_api_key_cookie_required() -> Option<Self> {
         Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyCookieRequired)
     }
 
-    fn spawn_jsonrpc_mtls_required() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc_mtls_required() -> Option<Self> {
         Self::spawn(TestBinding::JsonRpc, TestScenario::MutualTlsRequired)
     }
 
-    fn spawn(binding: TestBinding, scenario: TestScenario) -> Option<Self> {
+    pub(super) fn spawn(binding: TestBinding, scenario: TestScenario) -> Option<Self> {
         let listener = bind_fake_a2a_listener("fake A2A listener")?;
         let address = listener.local_addr().expect("listener address");
         let base_url = format!("http://{address}");
@@ -360,9 +342,7 @@ impl FakeA2aServer {
                     .expect("lock request log")
                     .push(request.clone());
                 let first_line = request.lines().next().unwrap_or_default();
-                let response_body = if first_line
-                    .starts_with("GET /.well-known/agent-card.json")
-                {
+                let response_body = if first_line.starts_with("GET /.well-known/agent-card.json") {
                     let interface = match binding {
                         TestBinding::JsonRpc => json!([{
                             "url": format!("{base_url_for_thread}/rpc"),
@@ -404,13 +384,11 @@ impl FakeA2aServer {
                         .into()
                 } else if first_line.starts_with("POST /rpc") {
                     response_for_jsonrpc(&request, scenario)
-                } else if first_line.starts_with("GET /openid/.well-known/openid-configuration")
-                {
+                } else if first_line.starts_with("GET /openid/.well-known/openid-configuration") {
                     response_for_openid_configuration(&request, scenario, &base_url_for_thread)
                 } else if first_line.starts_with("POST /oauth/token") {
                     response_for_oauth_token(&request, scenario)
-                } else if first_line.starts_with("POST /tasks/")
-                    && first_line.contains(":cancel ")
+                } else if first_line.starts_with("POST /tasks/") && first_line.contains(":cancel ")
                 {
                     response_for_http_cancel_task(&request, scenario)
                 } else if first_line.starts_with("POST /tasks/")
@@ -446,9 +424,7 @@ impl FakeA2aServer {
                     .into()
                 };
                 match response_body {
-                    TestResponse::Json(body) => {
-                        write_http_json_response(&mut stream, 200, &body)
-                    }
+                    TestResponse::Json(body) => write_http_json_response(&mut stream, 200, &body),
                     TestResponse::EventStream(body) => {
                         write_http_event_stream_response(&mut stream, 200, &body)
                     }
@@ -464,38 +440,38 @@ impl FakeA2aServer {
         })
     }
 
-    fn base_url(&self) -> &str {
+    pub(super) fn base_url(&self) -> &str {
         &self.base_url
     }
 
-    fn requests(&self) -> Vec<String> {
+    pub(super) fn requests(&self) -> Vec<String> {
         self.requests.lock().expect("lock requests").clone()
     }
 
-    fn join(self) {
+    pub(super) fn join(self) {
         self.handle.join().expect("join fake A2A server");
     }
 }
 
-struct MtlsTestMaterials {
-    root_ca_pem: String,
-    client_cert_chain_pem: String,
-    client_private_key_pem: String,
-    server_cert_chain_pem: String,
-    server_private_key_pem: String,
+pub(super) struct MtlsTestMaterials {
+    pub(super) root_ca_pem: String,
+    pub(super) client_cert_chain_pem: String,
+    pub(super) client_private_key_pem: String,
+    pub(super) server_cert_chain_pem: String,
+    pub(super) server_private_key_pem: String,
 }
 
-struct FakeMtlsA2aServer {
-    base_url: String,
-    requests: Arc<Mutex<Vec<String>>>,
-    root_ca_pem: String,
-    client_cert_chain_pem: String,
-    client_private_key_pem: String,
-    handle: thread::JoinHandle<()>,
+pub(super) struct FakeMtlsA2aServer {
+    pub(super) base_url: String,
+    pub(super) requests: Arc<Mutex<Vec<String>>>,
+    pub(super) root_ca_pem: String,
+    pub(super) client_cert_chain_pem: String,
+    pub(super) client_private_key_pem: String,
+    pub(super) handle: thread::JoinHandle<()>,
 }
 
 impl FakeMtlsA2aServer {
-    fn spawn_jsonrpc() -> Option<Self> {
+    pub(super) fn spawn_jsonrpc() -> Option<Self> {
         ensure_rustls_crypto_provider();
         let materials = generate_mtls_test_materials();
         let listener = bind_fake_a2a_listener("fake mTLS A2A listener")?;
@@ -591,32 +567,32 @@ impl FakeMtlsA2aServer {
         })
     }
 
-    fn base_url(&self) -> &str {
+    pub(super) fn base_url(&self) -> &str {
         &self.base_url
     }
 
-    fn root_ca_pem(&self) -> &str {
+    pub(super) fn root_ca_pem(&self) -> &str {
         &self.root_ca_pem
     }
 
-    fn client_cert_chain_pem(&self) -> &str {
+    pub(super) fn client_cert_chain_pem(&self) -> &str {
         &self.client_cert_chain_pem
     }
 
-    fn client_private_key_pem(&self) -> &str {
+    pub(super) fn client_private_key_pem(&self) -> &str {
         &self.client_private_key_pem
     }
 
-    fn requests(&self) -> Vec<String> {
+    pub(super) fn requests(&self) -> Vec<String> {
         self.requests.lock().expect("lock requests").clone()
     }
 
-    fn join(self) {
+    pub(super) fn join(self) {
         self.handle.join().expect("join fake mTLS A2A server");
     }
 }
 
-fn generate_mtls_test_materials() -> MtlsTestMaterials {
+pub(super) fn generate_mtls_test_materials() -> MtlsTestMaterials {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).expect("CA params");
     ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     ca_params.distinguished_name = DistinguishedName::new();
@@ -641,8 +617,7 @@ fn generate_mtls_test_materials() -> MtlsTestMaterials {
         .signed_by(&server_key_pair, &ca_cert, &ca_key_pair)
         .expect("sign server certificate");
 
-    let mut client_params =
-        CertificateParams::new(Vec::<String>::new()).expect("client params");
+    let mut client_params = CertificateParams::new(Vec::<String>::new()).expect("client params");
     client_params.distinguished_name = DistinguishedName::new();
     client_params
         .distinguished_name
@@ -663,22 +638,20 @@ fn generate_mtls_test_materials() -> MtlsTestMaterials {
     }
 }
 
-fn build_test_server_tls_config(
+pub(super) fn build_test_server_tls_config(
     materials: &MtlsTestMaterials,
 ) -> Arc<ureq::rustls::ServerConfig> {
     let mut client_root_store = ureq::rustls::RootCertStore::empty();
-    for certificate in
-        parse_pem_certificates(materials.root_ca_pem.as_str(), "mTLS test root CA")
-            .expect("parse test root CA")
+    for certificate in parse_pem_certificates(materials.root_ca_pem.as_str(), "mTLS test root CA")
+        .expect("parse test root CA")
     {
         client_root_store
             .add(certificate)
             .expect("add test root CA to verifier store");
     }
-    let verifier =
-        ureq::rustls::server::WebPkiClientVerifier::builder(Arc::new(client_root_store))
-            .build()
-            .expect("build client cert verifier");
+    let verifier = ureq::rustls::server::WebPkiClientVerifier::builder(Arc::new(client_root_store))
+        .build()
+        .expect("build client cert verifier");
     let server_cert_chain = parse_pem_certificates(
         materials.server_cert_chain_pem.as_str(),
         "mTLS test server certificate chain",
@@ -697,7 +670,7 @@ fn build_test_server_tls_config(
     )
 }
 
-fn mtls_agent_card_payload(base_url: &str) -> Value {
+pub(super) fn mtls_agent_card_payload(base_url: &str) -> Value {
     json!({
         "name": "Research Agent",
         "description": "Answers research questions over A2A",
@@ -735,11 +708,11 @@ fn mtls_agent_card_payload(base_url: &str) -> Value {
     })
 }
 
-fn read_http_request<R: Read>(stream: &mut R) -> String {
+pub(super) fn read_http_request<R: Read>(stream: &mut R) -> String {
     try_read_http_request(stream).expect("read request")
 }
 
-fn try_read_http_request<R: Read>(stream: &mut R) -> std::io::Result<String> {
+pub(super) fn try_read_http_request<R: Read>(stream: &mut R) -> std::io::Result<String> {
     let mut request = Vec::new();
     let mut chunk = [0_u8; 1024];
     let mut header_end = None;
@@ -766,7 +739,7 @@ fn try_read_http_request<R: Read>(stream: &mut R) -> std::io::Result<String> {
     Ok(String::from_utf8_lossy(&request).into_owned())
 }
 
-fn write_http_json_response<W: Write>(stream: &mut W, status: u16, body: &Value) {
+pub(super) fn write_http_json_response<W: Write>(stream: &mut W, status: u16, body: &Value) {
     let body_text = body.to_string();
     let response = format!(
         "HTTP/1.1 {status} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -779,7 +752,7 @@ fn write_http_json_response<W: Write>(stream: &mut W, status: u16, body: &Value)
         .expect("write response");
 }
 
-fn write_http_event_stream_response<W: Write>(stream: &mut W, status: u16, body: &str) {
+pub(super) fn write_http_event_stream_response<W: Write>(stream: &mut W, status: u16, body: &str) {
     let response = format!(
         "HTTP/1.1 {status} {}\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         status_text(status),
@@ -791,14 +764,14 @@ fn write_http_event_stream_response<W: Write>(stream: &mut W, status: u16, body:
         .expect("write response");
 }
 
-fn find_header_end(request: &[u8]) -> Option<usize> {
+pub(super) fn find_header_end(request: &[u8]) -> Option<usize> {
     request
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
         .map(|position| position + 4)
 }
 
-fn parse_content_length(headers: &[u8]) -> usize {
+pub(super) fn parse_content_length(headers: &[u8]) -> usize {
     let text = String::from_utf8_lossy(headers);
     text.lines()
         .find_map(|line| {
@@ -812,7 +785,7 @@ fn parse_content_length(headers: &[u8]) -> usize {
         .unwrap_or(0)
 }
 
-fn status_text(status: u16) -> &'static str {
+pub(super) fn status_text(status: u16) -> &'static str {
     match status {
         200 => "OK",
         400 => "Bad Request",
@@ -820,7 +793,7 @@ fn status_text(status: u16) -> &'static str {
     }
 }
 
-fn response_for_jsonrpc(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_jsonrpc(request: &str, scenario: TestScenario) -> TestResponse {
     if request.contains("\"method\":\"SendMessage\"") {
         assert!(request.contains("\"targetSkillId\":\"research\""));
         match scenario {
@@ -829,21 +802,21 @@ fn response_for_jsonrpc(request: &str, scenario: TestScenario) -> TestResponse {
                     assert!(request.contains("Authorization: Bearer secret-token"));
                 }
                 json!({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "result": {
-                        "message": {
-                            "messageId": "msg-out",
-                            "contextId": "ctx-1",
-                            "taskId": "task-1",
-                            "role": "ROLE_AGENT",
-                            "parts": [{
-                                "text": "completed research request",
-                                "mediaType": "text/plain"
-                            }]
-                        }
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "message": {
+                        "messageId": "msg-out",
+                        "contextId": "ctx-1",
+                        "taskId": "task-1",
+                        "role": "ROLE_AGENT",
+                        "parts": [{
+                            "text": "completed research request",
+                            "mediaType": "text/plain"
+                        }]
                     }
-                    })
+                }
+                })
                 .into()
             }
             TestScenario::MissingSendMessageResult => json!({
@@ -1008,7 +981,7 @@ fn response_for_jsonrpc(request: &str, scenario: TestScenario) -> TestResponse {
     }
 }
 
-fn response_for_http_send(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_http_send(request: &str, scenario: TestScenario) -> TestResponse {
     assert!(request.contains("\"targetSkillId\":\"research\""));
     match scenario {
         TestScenario::BlockingMessage => json!({
@@ -1073,7 +1046,7 @@ fn response_for_http_send(request: &str, scenario: TestScenario) -> TestResponse
     .into()
 }
 
-fn response_for_http_stream(_request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_http_stream(_request: &str, scenario: TestScenario) -> TestResponse {
     assert!(matches!(
         scenario,
         TestScenario::StreamingComplete | TestScenario::StreamingIncomplete
@@ -1081,7 +1054,7 @@ fn response_for_http_stream(_request: &str, scenario: TestScenario) -> TestRespo
     TestResponse::EventStream(http_stream_body(scenario))
 }
 
-fn response_for_http_subscribe(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_http_subscribe(request: &str, scenario: TestScenario) -> TestResponse {
     assert!(matches!(
         scenario,
         TestScenario::SubscribeComplete | TestScenario::SubscribeIncomplete
@@ -1090,20 +1063,20 @@ fn response_for_http_subscribe(request: &str, scenario: TestScenario) -> TestRes
     TestResponse::EventStream(http_stream_body(scenario))
 }
 
-fn response_for_http_get_task(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_http_get_task(request: &str, scenario: TestScenario) -> TestResponse {
     assert!(matches!(scenario, TestScenario::TaskFollowUp));
     assert!(request.starts_with("GET /tasks/task-1"));
     json!(task_payload("TASK_STATE_COMPLETED", true)).into()
 }
 
-fn response_for_http_cancel_task(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_http_cancel_task(request: &str, scenario: TestScenario) -> TestResponse {
     assert!(matches!(scenario, TestScenario::CancelTask));
     assert!(request.starts_with("POST /tasks/task-1:cancel"));
     assert!(request.contains("\"reason\":\"user-request\""));
     json!(task_payload("TASK_STATE_CANCELED", false)).into()
 }
 
-fn response_for_http_create_push_notification_config(
+pub(super) fn response_for_http_create_push_notification_config(
     request: &str,
     scenario: TestScenario,
 ) -> TestResponse {
@@ -1113,7 +1086,7 @@ fn response_for_http_create_push_notification_config(
     json!(push_notification_config_payload()).into()
 }
 
-fn response_for_http_get_push_notification_config(
+pub(super) fn response_for_http_get_push_notification_config(
     request: &str,
     scenario: TestScenario,
 ) -> TestResponse {
@@ -1122,7 +1095,7 @@ fn response_for_http_get_push_notification_config(
     json!(push_notification_config_payload()).into()
 }
 
-fn response_for_http_list_push_notification_configs(
+pub(super) fn response_for_http_list_push_notification_configs(
     request: &str,
     scenario: TestScenario,
 ) -> TestResponse {
@@ -1136,7 +1109,7 @@ fn response_for_http_list_push_notification_configs(
     .into()
 }
 
-fn response_for_http_delete_push_notification_config(
+pub(super) fn response_for_http_delete_push_notification_config(
     request: &str,
     scenario: TestScenario,
 ) -> TestResponse {
@@ -1145,7 +1118,7 @@ fn response_for_http_delete_push_notification_config(
     json!({}).into()
 }
 
-fn response_for_openid_configuration(
+pub(super) fn response_for_openid_configuration(
     request: &str,
     scenario: TestScenario,
     base_url: &str,
@@ -1161,7 +1134,7 @@ fn response_for_openid_configuration(
     .into()
 }
 
-fn response_for_oauth_token(request: &str, scenario: TestScenario) -> TestResponse {
+pub(super) fn response_for_oauth_token(request: &str, scenario: TestScenario) -> TestResponse {
     assert!(matches!(
         scenario,
         TestScenario::OAuthClientCredentialsRequired
@@ -1200,7 +1173,10 @@ fn response_for_oauth_token(request: &str, scenario: TestScenario) -> TestRespon
     }
 }
 
-fn agent_card_security_metadata(scenario: TestScenario, base_url: &str) -> (Value, Value) {
+pub(super) fn agent_card_security_metadata(
+    scenario: TestScenario,
+    base_url: &str,
+) -> (Value, Value) {
     match scenario {
         TestScenario::BearerRequired => (
             json!({
@@ -1349,7 +1325,7 @@ fn agent_card_security_metadata(scenario: TestScenario, base_url: &str) -> (Valu
     }
 }
 
-fn task_payload(state: &str, include_artifacts: bool) -> Value {
+pub(super) fn task_payload(state: &str, include_artifacts: bool) -> Value {
     let mut task = json!({
         "id": "task-1",
         "contextId": "ctx-1",
@@ -1371,7 +1347,7 @@ fn task_payload(state: &str, include_artifacts: bool) -> Value {
     task
 }
 
-fn push_notification_config_payload() -> Value {
+pub(super) fn push_notification_config_payload() -> Value {
     json!({
         "id": "config-1",
         "taskId": "task-1",
@@ -1384,7 +1360,7 @@ fn push_notification_config_payload() -> Value {
     })
 }
 
-fn jsonrpc_stream_body(scenario: TestScenario) -> String {
+pub(super) fn jsonrpc_stream_body(scenario: TestScenario) -> String {
     sse_body(match scenario {
         TestScenario::StreamingComplete | TestScenario::SubscribeComplete => vec![
             json!({
@@ -1446,7 +1422,7 @@ fn jsonrpc_stream_body(scenario: TestScenario) -> String {
     })
 }
 
-fn http_stream_body(scenario: TestScenario) -> String {
+pub(super) fn http_stream_body(scenario: TestScenario) -> String {
     sse_body(match scenario {
         TestScenario::StreamingComplete | TestScenario::SubscribeComplete => vec![
             json!({ "task": task_payload("TASK_STATE_WORKING", false) }),
@@ -1488,14 +1464,14 @@ fn http_stream_body(scenario: TestScenario) -> String {
     })
 }
 
-fn sse_body(events: Vec<Value>) -> String {
+pub(super) fn sse_body(events: Vec<Value>) -> String {
     events
         .into_iter()
         .map(|event| format!("data: {}\n\n", event))
         .collect()
 }
 
-fn test_capability(
+pub(super) fn test_capability(
     issuer: &Keypair,
     subject: &Keypair,
     server_id: &str,
@@ -1535,7 +1511,7 @@ impl From<Value> for TestResponse {
     }
 }
 
-trait ToolCallOutputExt {
+pub(super) trait ToolCallOutputExt {
     fn into_value(self) -> Value;
     fn into_stream(self) -> ToolCallStream;
 }

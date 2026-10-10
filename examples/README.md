@@ -22,6 +22,7 @@ See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](../docs/guides/WEB_BACKEND_QUICKST
 
 ## Flagship Examples
 
+- [`repository-review/`](./repository-review/): experimental concurrent repository readers and a separately authorized publisher, with persistent LangGraph planning and Chio host recovery
 - [`agent-commerce-network/`](./agent-commerce-network/): buyer/provider/reviewer topology with approvals, budgets, settlement, federation, and live receipt capture
 - [`cognition-market-pilot/`](./cognition-market-pilot/): scoped seller and buyer coding agents that admit, verify, purchase, and explicitly consume verified patches
 - [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/): recursive cross-org incident-response network with a live happy path for OpenAI SDK orchestration, MCP tools, ACP provider jobs, and offline review

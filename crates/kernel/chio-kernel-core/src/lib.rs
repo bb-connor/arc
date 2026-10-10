@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 //! Portable Chio kernel core.
 //!
 //! This crate contains the pure-compute subset of Chio evaluation as a
@@ -53,11 +68,18 @@
 //! qualification on top of this core.
 
 #![no_std]
-#![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
-#![deny(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )
+)]
 
 extern crate alloc;
 
+pub mod accounting;
 pub mod budget_split;
 pub mod capability_verify;
 pub mod clock;
@@ -81,16 +103,17 @@ pub use budget_split::{
     MAX_BUDGET_SHARE_BPS,
 };
 pub use capability_verify::{
-    verify_capability, verify_capability_full, verify_capability_full_with_root,
-    verify_capability_with_floor, verify_capability_with_floor_and_resolver,
-    verify_capability_with_floor_and_trust_root, verify_capability_with_negotiated_floor,
-    CapabilityError, CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
+    verify_capability, verify_capability_full, verify_capability_full_with_evidence,
+    verify_capability_full_with_root, verify_capability_with_floor,
+    verify_capability_with_floor_and_resolver, verify_capability_with_floor_and_trust_root,
+    verify_capability_with_negotiated_floor, CapabilityError, CapabilityEvidenceContext,
+    CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
 };
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,
-    evaluate_with_full_floor, evaluate_with_full_floor_and_root, EvaluateInput, EvaluationVerdict,
-    KernelCoreError,
+    evaluate_with_full_floor, evaluate_with_full_floor_and_evidence,
+    evaluate_with_full_floor_and_root, EvaluateInput, EvaluationVerdict, KernelCoreError,
 };
 pub use formal_core::{
     budget_charge_admits, budget_commit, budget_increment_admits, budget_precheck,

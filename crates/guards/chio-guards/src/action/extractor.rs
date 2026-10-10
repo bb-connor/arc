@@ -112,6 +112,46 @@ impl<'a> ActionExtractor<'a> {
             return Ok(None);
         }
 
+        // The host signs and retains the complete broker envelope, while the
+        // privileged adapter executes its body. Inspect those exact bytes so
+        // wrapping a command cannot hide it from shell/path guards. This is
+        // action classification, never broker signature or dispatch authority.
+        if self.arguments.get("schema").and_then(Value::as_str) == Some("chio.broker-execute.v1") {
+            let malformed = || MalformedAction {
+                tool_name: self.tool_name.into(),
+                field: "request.body".into(),
+                expected: "bounded canonical JSON command",
+            };
+            let body = self
+                .arguments
+                .pointer("/request/body")
+                .and_then(Value::as_array)
+                .ok_or_else(malformed)?;
+            if body.is_empty() || body.len() > 524_288 {
+                return Err(malformed());
+            }
+            let bytes = body
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|number| u8::try_from(number).ok())
+                        .ok_or_else(malformed)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let decoded: Value =
+                chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 524_288)
+                    .and_then(|text| text.decode_canonical())
+                    .map_err(|_| malformed())?;
+            if !decoded.is_object() {
+                return Err(malformed());
+            }
+            // Recursion is deliberately not used: nested broker envelopes are
+            // not executable command arguments.
+            let inner = ActionExtractor::new(self.tool_name, &decoded);
+            let command = inner.required_string(&["command", "cmd", "input"])?;
+            return Ok(Some(ToolAction::ShellCommand(command.to_string())));
+        }
         let command = self.required_string(&["command", "cmd", "input"])?;
         Ok(Some(ToolAction::ShellCommand(command.to_string())))
     }

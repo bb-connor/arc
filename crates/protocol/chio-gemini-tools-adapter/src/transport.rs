@@ -39,12 +39,39 @@ pub const GEMINI_API_KEY_ENV: &str = "GEMINI_API_KEY";
 /// Provider label used when mapping transport failures into the fabric taxonomy.
 const PROVIDER_LABEL: &str = "Gemini";
 
+/// Longest model id accepted as a request path segment.
+pub const MAX_GEMINI_MODEL_ID_BYTES: usize = 128;
+
+/// Refuse any `model` that is not one lowercase model id such as
+/// `gemini-1.5-pro`. The model is interpolated into the request path, so a
+/// slash, query or fragment would redirect the request to another endpoint.
+pub fn validate_model(model: &str) -> Result<(), ProviderError> {
+    let mut bytes = model.bytes();
+    let valid = model.len() <= MAX_GEMINI_MODEL_ID_BYTES
+        && bytes
+            .next()
+            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && bytes.all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'.' || byte == b'-'
+        });
+    if valid {
+        Ok(())
+    } else {
+        Err(ProviderError::BadToolArgs(
+            "Gemini model must be one lowercase model id such as gemini-1.5-pro".to_string(),
+        ))
+    }
+}
+
 /// Build the model-scoped `generateContent` request path joined onto the host.
 ///
 /// For example, model `gemini-1.5-pro` yields
 /// `/v1beta/models/gemini-1.5-pro:generateContent`.
-pub fn generate_content_path(model: &str) -> String {
-    format!("/{GEMINI_API_VERSION}/models/{model}:generateContent")
+pub fn generate_content_path(model: &str) -> Result<String, ProviderError> {
+    validate_model(model)?;
+    Ok(format!(
+        "/{GEMINI_API_VERSION}/models/{model}:generateContent"
+    ))
 }
 
 /// Build the model-scoped `streamGenerateContent` request path joined onto the
@@ -52,8 +79,11 @@ pub fn generate_content_path(model: &str) -> String {
 ///
 /// The `alt=sse` query parameter selects the server-sent-events framing the
 /// adapter's [`crate::GeminiAdapter::gate_sse_stream`] expects.
-pub fn stream_generate_content_path(model: &str) -> String {
-    format!("/{GEMINI_API_VERSION}/models/{model}:streamGenerateContent?alt=sse")
+pub fn stream_generate_content_path(model: &str) -> Result<String, ProviderError> {
+    validate_model(model)?;
+    Ok(format!(
+        "/{GEMINI_API_VERSION}/models/{model}:streamGenerateContent?alt=sse"
+    ))
 }
 
 /// Adapter-local transport errors.
@@ -172,7 +202,7 @@ impl Transport for GeminiTransport {
     ) -> Result<ProviderRequest, ProviderError> {
         let response = self
             .inner
-            .post_json(&generate_content_path(model), body)
+            .post_json(&generate_content_path(model)?, body)
             .await
             .map_err(|error| map_transport_error(PROVIDER_LABEL, error))?;
         Ok(ProviderRequest(response.body))
@@ -184,7 +214,7 @@ impl Transport for GeminiTransport {
         body: &[u8],
     ) -> Result<Vec<u8>, ProviderError> {
         self.inner
-            .post_sse(&stream_generate_content_path(model), body)
+            .post_sse(&stream_generate_content_path(model)?, body)
             .await
             .map_err(|error| map_transport_error(PROVIDER_LABEL, error))
     }
@@ -274,7 +304,7 @@ impl Transport for MockTransport {
     ) -> Result<ProviderRequest, ProviderError> {
         let response = self
             .inner
-            .post_json(&generate_content_path(model), body)
+            .post_json(&generate_content_path(model)?, body)
             .await
             .map_err(|error| map_transport_error(PROVIDER_LABEL, error))?;
         Ok(ProviderRequest(response.body))
@@ -286,7 +316,7 @@ impl Transport for MockTransport {
         body: &[u8],
     ) -> Result<Vec<u8>, ProviderError> {
         self.inner
-            .post_sse(&stream_generate_content_path(model), body)
+            .post_sse(&stream_generate_content_path(model)?, body)
             .await
             .map_err(|error| map_transport_error(PROVIDER_LABEL, error))
     }
@@ -310,11 +340,11 @@ mod tests {
     #[test]
     fn model_scoped_paths_are_built() {
         assert_eq!(
-            generate_content_path("gemini-1.5-pro"),
+            generate_content_path("gemini-1.5-pro").unwrap(),
             "/v1beta/models/gemini-1.5-pro:generateContent"
         );
         assert_eq!(
-            stream_generate_content_path("gemini-1.5-pro"),
+            stream_generate_content_path("gemini-1.5-pro").unwrap(),
             "/v1beta/models/gemini-1.5-pro:streamGenerateContent?alt=sse"
         );
     }
@@ -355,7 +385,7 @@ mod tests {
     async fn mock_transport_exhaustion_fails_closed() {
         let mock = MockTransport::new();
         match mock.send_generate_content("gemini-1.5-pro", b"{}").await {
-            Err(ProviderError::Malformed(_)) => {}
+            Err(ProviderError::Transport { .. }) => {}
             Err(other) => panic!("an empty script must fail closed, got {other:?}"),
             Ok(_) => panic!("an empty script must fail closed, got success"),
         }
@@ -364,10 +394,7 @@ mod tests {
     #[tokio::test]
     async fn mock_transport_maps_status_error() {
         let mock = MockTransport::new();
-        mock.push_error(HttpTransportError::Status {
-            code: 429,
-            body: "resource exhausted".to_string(),
-        });
+        mock.push_error(HttpTransportError::Status { code: 429 });
         match mock.send_generate_content("gemini-1.5-pro", b"{}").await {
             Err(ProviderError::RateLimited { .. }) => {}
             Err(other) => panic!("a 429 must fail closed, got {other:?}"),

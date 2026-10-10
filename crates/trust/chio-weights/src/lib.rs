@@ -47,3 +47,7 @@ pub use error::WeightsError;
 pub use lineage::{
     anchor_model_card, verify_model_card_anchor, ModelCardLineageAnchor, MODEL_CARD_ANCHOR_SCHEMA,
 };
+
+// Unproved research obligations are opt-in and never part of mandatory enrollment.
+#[cfg(all(kani, feature = "kani-research"))]
+mod kani_crypto_research;

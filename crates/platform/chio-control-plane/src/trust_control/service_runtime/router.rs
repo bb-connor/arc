@@ -47,6 +47,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),
         )
+        .route(
+            AUTHORITY_KEY_LOG_SYNC_PATH,
+            post(handle_authority_key_log_sync).layer(DefaultBodyLimit::max(4 * 1024)),
+        )
         .route(ISSUE_CAPABILITY_PATH, post(handle_issue_capability))
         .route(FEDERATED_ISSUE_PATH, post(handle_federated_issue))
         .route(SCIM_USERS_PATH, post(handle_scim_create_user))
@@ -398,6 +402,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             get(handle_internal_lineage_delta),
         )
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
+        .route(
+            RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
+            post(handle_receipt_query_snapshot_recovery),
+        )
         .route(RECEIPT_ANALYTICS_PATH, get(handle_receipt_analytics))
         .route(EVIDENCE_EXPORT_PATH, post(handle_evidence_export))
         .route(
@@ -652,7 +660,16 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         router
     };
 
-    let router = router.with_state(state);
+    let router = router
+        .route_layer(axum::middleware::from_fn(
+            super::super::json_ingress::validate,
+        ))
+        // The later layer runs first, before original-byte buffering and Json.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::super::json_ingress::authenticate,
+        ))
+        .with_state(state);
 
     // Dashboard SPA is served from the same origin via ServeDir -- no CORS
     // headers needed.
@@ -805,7 +822,11 @@ mod finding_wedge_purchase_e2e_tests;
 
 #[cfg(all(test, unix))]
 #[path = "finding_challenge_enforcement_e2e_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod finding_challenge_enforcement_e2e_tests;
 
 /// The bounded single-operator cognition-market qualification composes the
@@ -814,12 +835,49 @@ mod finding_challenge_enforcement_e2e_tests;
 /// Each leg provisions an independent deployment so authority state from one
 /// security boundary cannot make a later boundary pass accidentally.
 #[cfg(all(test, unix))]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn cognition_market_qualified_profile() -> Result<(), Box<dyn std::error::Error>> {
-    finding_market_exit_tests::run_finding_publish_discover_admission().await?;
-    finding_wedge_purchase_e2e_tests::run_cognition_market_wedge_purchase_e2e().await?;
-    finding_challenge_enforcement_e2e_tests::run_finding_challenge_digest_mismatch()?;
-    finding_challenge_enforcement_e2e_tests::run_enforced_challenge_status_retraction()?;
-    finding_wedge_purchase_e2e_tests::run_finding_status_retraction().await?;
-    Ok(())
+#[test]
+fn cognition_market_qualified_profile() -> Result<(), Box<dyn std::error::Error>> {
+    const PROFILE_STACK_BYTES: usize = 16 * 1024 * 1024;
+
+    let worker = std::thread::Builder::new()
+        .name("cognition-market-qualified-profile".to_string())
+        .stack_size(PROFILE_STACK_BYTES)
+        .spawn(run_cognition_market_qualified_profile)
+        .map_err(|error| {
+            std::io::Error::other(format!(
+                "failed to spawn cognition-market qualification thread: {error}"
+            ))
+        })?;
+    match worker.join() {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(std::io::Error::other(error).into()),
+        Err(_) => {
+            Err(std::io::Error::other("cognition-market qualification thread panicked").into())
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+fn run_cognition_market_qualified_profile() -> Result<(), String> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .map_err(|error| format!("build cognition-market qualification runtime: {error}"))?;
+    runtime.block_on(async {
+        finding_market_exit_tests::run_finding_publish_discover_admission()
+            .await
+            .map_err(|error| error.to_string())?;
+        finding_wedge_purchase_e2e_tests::run_cognition_market_wedge_purchase_e2e()
+            .await
+            .map_err(|error| error.to_string())?;
+        finding_challenge_enforcement_e2e_tests::run_finding_challenge_digest_mismatch()
+            .map_err(|error| error.to_string())?;
+        finding_challenge_enforcement_e2e_tests::run_enforced_challenge_status_retraction()
+            .map_err(|error| error.to_string())?;
+        finding_wedge_purchase_e2e_tests::run_finding_status_retraction()
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    })
 }

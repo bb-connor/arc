@@ -1,0 +1,39 @@
+{
+  "schema": "chio.foundation-landing-review-promotion.v1",
+  "observed_utc": "2026-10-09T06:36:45.384234+00:00",
+  "source_head": "0dbfa910d1f4e50959039e57905c19ec3e8edf93",
+  "source_tree": "5b3d3835ca0816fba220ca4009a28636074c2673",
+  "original_review_index": "docs/security/audits/landing-review-wave-20261009.json",
+  "original_review_index_sha256": "6516fdb3d8f805d0d80b2f7499fa26ba446c590584a53f22a52eef61b2444150",
+  "original_report_sha256": "d96c51d8b3a4aa3b97cf3bd021ddacccfe63bf768771a5217cf50f5706bd358d",
+  "changes": {
+    "V26": {
+      "original_classification": "plausible",
+      "current_classification": "confirmed",
+      "scope": "now",
+      "integrated_commit": "0dbfa910d1f4e50959039e57905c19ec3e8edf93",
+      "composed_tests": 24,
+      "strict_clippy_passed": true
+    },
+    "V29": {
+      "original_classification": "plausible",
+      "current_classification": "confirmed-by-owner-pending-review",
+      "scope": "later",
+      "preserved_candidate": "ba02f3eb6377e2fffa347b268eb559046447f483",
+      "integrated": false
+    }
+  },
+  "landing_required": 11,
+  "source_integrated_landing_repairs": 9,
+  "implementation_in_progress": [
+    "V02",
+    "V25"
+  ],
+  "post_merge_review_followups": 17,
+  "pre_existing_followups": 1,
+  "requirements": 1828,
+  "prior1799_requirements_unchanged": true,
+  "full_qualified": false,
+  "merged": false,
+  "remaining_acceptance": "V02/V25 implementation, strict Kani proof and final independent candidate/hosted qualification remain open. Later findings and the pre-existing issue remain open."
+}

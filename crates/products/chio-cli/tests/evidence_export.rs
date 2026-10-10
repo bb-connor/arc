@@ -19,7 +19,37 @@ use chio_core::sha256_hex;
 use chio_kernel::{build_checkpoint, ReceiptStore};
 use chio_store_sqlite::SqliteReceiptStore;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
+use chio_test_support::prelude::*;
 use reqwest::blocking::Client;
+
+#[path = "evidence_export/package_trust.rs"]
+mod package_trust;
+
+fn fixture_keypair() -> Keypair {
+    Keypair::from_seed(&[87; 32])
+}
+
+fn write_fixture_seed(path: &Path) {
+    use std::io::Write;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options
+        .open(path)
+        .test_unwrap()
+        .write_all(fixture_keypair().seed_hex().as_bytes())
+        .test_unwrap();
+}
+
+fn fixture_seed_file(receipt_db: &Path) -> PathBuf {
+    let path = receipt_db.with_extension("kernel.seed");
+    write_fixture_seed(&path);
+    path
+}
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()
@@ -131,7 +161,7 @@ fn receipt_with_tenant(
     timestamp: u64,
     tenant_id: Option<&str>,
 ) -> ChioReceipt {
-    let keypair = Keypair::generate();
+    let keypair = fixture_keypair();
     receipt_with_keypair(id, capability_id, timestamp, tenant_id, &keypair)
 }
 
@@ -173,7 +203,7 @@ fn receipt_with_keypair(
 }
 
 fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
-    let keypair = Keypair::generate();
+    let keypair = fixture_keypair();
     ChildRequestReceipt::sign(
         ChildRequestReceiptBody {
             id: id.to_string(),
@@ -200,6 +230,8 @@ fn export_fixture_package(receipt_db_path: &Path, output_dir: &Path) {
         .arg(receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(output_dir)
@@ -281,7 +313,7 @@ capabilities:
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-evidence", &subject, &issuer);
         store
@@ -333,6 +365,8 @@ capabilities:
         .arg(&receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)
@@ -382,6 +416,8 @@ capabilities:
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
+        .arg("--trusted-kernel-pubkey")
+        .arg(fixture_keypair().public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -407,7 +443,7 @@ fn evidence_export_require_proofs_fails_when_receipts_are_uncheckpointed() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-require-proofs", &subject, &issuer);
         store
@@ -428,6 +464,8 @@ fn evidence_export_require_proofs_fails_when_receipts_are_uncheckpointed() {
         .arg(&receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)
@@ -455,7 +493,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-federated", &subject, &issuer);
         store
@@ -513,6 +551,8 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         .arg(&receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)
@@ -540,6 +580,8 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
+        .arg("--trusted-kernel-pubkey")
+        .arg(fixture_keypair().public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -563,7 +605,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     let signing_seed_path = unique_path("federation-policy-imported-trust-seed", ".txt");
     let authority_seed_path = unique_path("evidence-import-authority-seed", ".txt");
 
-    let issuer = Keypair::generate();
+    let issuer = fixture_keypair();
     let subject = Keypair::generate();
     let subject_hex = subject.public_key().to_hex();
 
@@ -573,7 +615,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     // receipts without rewriting the importer's (empty) local history. The
     // share's federation-policy signer is a different key and is deliberately
     // NOT auto-trusted (that would be fail-open).
-    std::fs::write(&authority_seed_path, issuer.seed_hex()).expect("write authority seed");
+    write_fixture_seed(&authority_seed_path);
 
     {
         let store =
@@ -634,6 +676,8 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
         .arg(&source_receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&source_receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)
@@ -658,6 +702,8 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
                 .expect("imported receipt db path"),
             "evidence",
             "import",
+            "--trusted-kernel-pubkey",
+            &fixture_keypair().public_key().to_hex(),
             "--input",
             output_dir.to_str().expect("evidence output path"),
         ])
@@ -733,7 +779,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-one", &subject, &issuer);
         store
@@ -756,6 +802,8 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
         .arg(&receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)
@@ -783,8 +831,10 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         return;
     }
 
-    let dir = unique_path("evidence-export-remote", "");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    // The trust service refuses an authority database whose directory is not
+    // private to its owner, whatever the test runner's umask.
+    let temp = chio_test_support::private_tempdir().expect("create private temp dir");
+    let dir = temp.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -795,7 +845,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-remote-federated", &subject, &issuer);
         store
@@ -871,6 +921,8 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
             service_token,
             "evidence",
             "export",
+            "--kernel-seed-file",
+            fixture_seed_file(&receipt_db_path).to_str().test_unwrap(),
             "--admin-all",
             "--output",
             output_dir.to_str().expect("output dir"),
@@ -896,6 +948,8 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
+        .arg("--trusted-kernel-pubkey")
+        .arg(fixture_keypair().public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -907,6 +961,14 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         String::from_utf8_lossy(&verify.stdout),
         String::from_utf8_lossy(&verify.stderr)
     );
+
+    package_trust::verify_remote_import_boundary(
+        &client,
+        &base_url,
+        service_token,
+        &output_dir,
+        &receipt_db_path,
+    );
 }
 
 #[test]
@@ -916,7 +978,7 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-evidence-verify", &subject, &issuer);
         store
@@ -989,6 +1051,8 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
+        .arg("--trusted-kernel-pubkey")
+        .arg(fixture_keypair().public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -998,13 +1062,10 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
         !verify.status.success(),
         "verify should fail on tampered receipt"
     );
-    // The signed manifest commits to a semantic summary derived from each
-    // receipt's signature and action-hash validity, so tampering the receipt
-    // body trips the semantic-summary check before the raw signature pass even
-    // when the manifest file hash is refreshed to match the altered bytes.
+    // The envelope authenticates the original manifest before file hashes or receipt semantics.
     assert!(
         String::from_utf8_lossy(&verify.stderr)
-            .contains("semantic summary does not match exported data"),
+            .contains("manifest does not match its signed envelope"),
         "stdout={}\nstderr={}",
         String::from_utf8_lossy(&verify.stdout),
         String::from_utf8_lossy(&verify.stderr)
@@ -1016,7 +1077,7 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
 
 fn build_tenant_scoped_export_fixture(receipt_db_path: &Path, output_dir: &Path, tenant: &str) {
     let store = SqliteReceiptStore::open(receipt_db_path).expect("open receipt store");
-    let issuer = Keypair::generate();
+    let issuer = fixture_keypair();
     let subject = Keypair::generate();
     let capability = capability_with_id("cap-tenant-disclosure", &subject, &issuer);
     store
@@ -1091,6 +1152,8 @@ fn build_tenant_scoped_export_fixture(receipt_db_path: &Path, output_dir: &Path,
         .arg(receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(receipt_db_path))
         .arg("--tenant")
         .arg(tenant)
         .arg("--output")
@@ -1157,6 +1220,8 @@ fn tenant_evidence_export_omits_cross_tenant_metadata() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
+        .arg("--trusted-kernel-pubkey")
+        .arg(fixture_keypair().public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -1258,7 +1323,7 @@ fn admin_all_evidence_export_omits_tenant_disclosure_notice() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        let issuer = Keypair::generate();
+        let issuer = fixture_keypair();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-admin-disclosure", &subject, &issuer);
         store
@@ -1307,6 +1372,8 @@ fn admin_all_evidence_export_omits_tenant_disclosure_notice() {
         .arg(&receipt_db_path)
         .arg("evidence")
         .arg("export")
+        .arg("--kernel-seed-file")
+        .arg(fixture_seed_file(&receipt_db_path))
         .arg("--admin-all")
         .arg("--output")
         .arg(&output_dir)

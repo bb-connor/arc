@@ -25,7 +25,10 @@ pub(super) fn live_admission_epoch(
         .get_recipe_blob(&admission.body.terms_envelope_sha256)
         .ok()
         .flatten()?;
-    let terms: SignedFindingMarketTerms = serde_json::from_slice(&terms_bytes).ok()?;
+    let terms: SignedFindingMarketTerms =
+        chio_core::canonical::UntrustedJsonText::from_wire(&terms_bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .ok()?;
     let epoch_length = terms.body.audit_epoch_length_secs.max(1);
     Some(now.saturating_sub(snapshot.activated_at) / epoch_length)
 }
@@ -155,8 +158,9 @@ pub(super) fn verify_current_admission_authorities(
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "admission-bound seller authorization is not retained".to_owned())?;
     let authorization: SignedFindingSellerAuthorization =
-        serde_json::from_slice(&authorization_bytes)
-            .map_err(|_| "admission-bound seller authorization is malformed".to_owned())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&authorization_bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| error.code().to_owned())?;
     chio_finding::verify_signed_seller_authorization(&authorization)
         .map_err(|error| error.to_string())?;
     if now < authorization.body.issued_at || now >= authorization.body.expires_at {
@@ -226,7 +230,12 @@ pub(super) fn current_admission_view(
     if purchase_store.sales_blocked(&snapshot.listing_id).ok()? {
         return None;
     }
-    let admission: SignedFindingAdmission = serde_json::from_str(&snapshot.envelope_json).ok()?;
+    let admission: SignedFindingAdmission = chio_core::canonical::UntrustedJsonText::from_wire(
+        snapshot.envelope_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .ok()?;
     let authority_status_resolver = authority_status_resolver?;
     verify_current_admission_authorities(
         store,

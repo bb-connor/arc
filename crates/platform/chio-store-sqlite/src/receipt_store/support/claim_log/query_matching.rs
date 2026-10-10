@@ -48,8 +48,8 @@ pub(crate) fn query_underwriting_appeal(
                 reason,
                 status: parse_underwriting_appeal_status(&status)?,
                 note,
-                created_at: created_at.max(0) as u64,
-                updated_at: updated_at.max(0) as u64,
+                created_at: u64::try_from(created_at.max(0)).unwrap_or_default(),
+                updated_at: u64::try_from(updated_at.max(0)).unwrap_or_default(),
                 resolved_by,
                 replacement_decision_id,
             })
@@ -61,7 +61,8 @@ pub(crate) fn query_underwriting_appeal(
 pub(crate) fn parse_underwriting_appeal_status(
     value: &str,
 ) -> Result<UnderwritingAppealStatus, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn load_underwriting_appeal_rows(
@@ -108,8 +109,8 @@ pub(crate) fn load_underwriting_appeal_rows(
             reason,
             status: parse_underwriting_appeal_status(&status)?,
             note,
-            created_at: created_at.max(0) as u64,
-            updated_at: updated_at.max(0) as u64,
+            created_at: u64::try_from(created_at.max(0)).unwrap_or_default(),
+            updated_at: u64::try_from(updated_at.max(0)).unwrap_or_default(),
             resolved_by,
             replacement_decision_id,
         })
@@ -427,9 +428,6 @@ pub(crate) fn liability_claim_workflow_matches_query(
         && policy_number_matches
 }
 
-pub(crate) fn unix_now() -> u64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => duration.as_secs(),
-        Err(_) => 0,
-    }
+pub(crate) fn unix_now(clock: &crate::store_clock::StoreClock) -> Result<u64, ReceiptStoreError> {
+    Ok(clock.unix_millis()?.as_secs())
 }

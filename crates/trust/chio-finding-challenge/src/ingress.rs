@@ -17,13 +17,15 @@ pub enum FindingIngressError {
     TooLarge,
     /// The carried text is not strict canonical I-JSON.
     #[error("carried bytes are not strict canonical I-JSON")]
-    NotCanonical,
+    NotCanonical(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     /// The carried text canonicalizes to different bytes than it contains.
     #[error("carried bytes are not their own canonical serialization")]
     NonCanonicalSpelling,
     /// The carried text failed typed deserialization.
     #[error("carried bytes failed typed deserialization")]
-    Deserialization,
+    Deserialization(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("carried bytes could not be canonically encoded")]
+    Encoding(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     /// The typed value re-serializes to bytes other than those carried.
     #[error("typed value does not re-serialize to the carried bytes")]
     TypedDrift,
@@ -41,13 +43,24 @@ where
     if text.len() > max_bytes {
         return Err(FindingIngressError::TooLarge);
     }
-    let strict_bytes =
-        canonical_json_bytes_from_str(text).map_err(|_| FindingIngressError::NotCanonical)?;
+    let strict_bytes = canonical_json_bytes_from_str(text).map_err(|error| {
+        FindingIngressError::NotCanonical(
+            chio_core_types::canonical::UntrustedJsonError::Canonicalization(error).into(),
+        )
+    })?;
     if strict_bytes.as_slice() != text.as_bytes() {
         return Err(FindingIngressError::NonCanonicalSpelling);
     }
-    let parsed: T = serde_json::from_str(text).map_err(|_| FindingIngressError::Deserialization)?;
-    let typed_bytes = canonical_json_bytes(&parsed).map_err(|_| FindingIngressError::TypedDrift)?;
+    let parsed: T = serde_json::from_str(text).map_err(|error| {
+        FindingIngressError::Deserialization(
+            chio_core_types::canonical::UntrustedJsonError::Decode(error).into(),
+        )
+    })?;
+    let typed_bytes = canonical_json_bytes(&parsed).map_err(|error| {
+        FindingIngressError::Encoding(
+            chio_core_types::canonical::UntrustedJsonError::Canonicalization(error).into(),
+        )
+    })?;
     if typed_bytes != strict_bytes {
         return Err(FindingIngressError::TypedDrift);
     }

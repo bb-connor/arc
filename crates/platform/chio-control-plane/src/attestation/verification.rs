@@ -32,6 +32,9 @@ pub(super) struct OidcJwtHeader {
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum OidcJwtDecodeError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("invalid JWT: {0}")]
     InvalidJwt(&'static str),
 }
@@ -163,6 +166,7 @@ impl From<OidcJwtDecodeError> for AzureMaaVerificationError {
     fn from(value: OidcJwtDecodeError) -> Self {
         match value {
             OidcJwtDecodeError::InvalidJwt(message) => Self::InvalidJwt(message),
+            OidcJwtDecodeError::UntrustedInput(error) => Self::UntrustedInput(error),
         }
     }
 }
@@ -185,6 +189,7 @@ impl From<OidcJwtDecodeError> for GoogleConfidentialVmVerificationError {
     fn from(value: OidcJwtDecodeError) -> Self {
         match value {
             OidcJwtDecodeError::InvalidJwt(message) => Self::InvalidJwt(message),
+            OidcJwtDecodeError::UntrustedInput(error) => Self::UntrustedInput(error),
         }
     }
 }
@@ -1079,9 +1084,20 @@ pub(super) fn canonicalize_issuer(value: &str) -> String {
     }
 }
 
+const MAX_JWT_JSON_BYTES: usize = 1024 * 1024;
+const MAX_COMPACT_JWT_BYTES: usize = 2 * 1024 * 1024;
+
 pub(super) fn decode_jwt_parts<T: DeserializeOwned>(
     token: &str,
 ) -> Result<(OidcJwtHeader, T, String, Vec<u8>), OidcJwtDecodeError> {
+    // Bound the compact representation before base64 decoding allocates.
+    if token.len() > MAX_COMPACT_JWT_BYTES {
+        return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+            bytes: token.len(),
+            bound: MAX_COMPACT_JWT_BYTES,
+        }
+        .into());
+    }
     let mut parts = token.split('.');
     let header_b64 = parts
         .next()
@@ -1096,18 +1112,22 @@ pub(super) fn decode_jwt_parts<T: DeserializeOwned>(
         return Err(OidcJwtDecodeError::InvalidJwt("too many segments"));
     }
 
-    let header = serde_json::from_slice(
+    let header = chio_core::canonical::UntrustedJsonText::from_wire(
         &URL_SAFE_NO_PAD
             .decode(header_b64)
             .map_err(|_| OidcJwtDecodeError::InvalidJwt("invalid header encoding"))?,
+        MAX_JWT_JSON_BYTES,
     )
-    .map_err(|_| OidcJwtDecodeError::InvalidJwt("invalid header json"))?;
-    let claims = serde_json::from_slice(
+    .and_then(|input| input.decode_signed())
+    .map_err(OidcJwtDecodeError::from)?;
+    let claims = chio_core::canonical::UntrustedJsonText::from_wire(
         &URL_SAFE_NO_PAD
             .decode(payload_b64)
             .map_err(|_| OidcJwtDecodeError::InvalidJwt("invalid payload encoding"))?,
+        MAX_JWT_JSON_BYTES,
     )
-    .map_err(|_| OidcJwtDecodeError::InvalidJwt("invalid payload json"))?;
+    .and_then(|input| input.decode_signed())
+    .map_err(OidcJwtDecodeError::from)?;
     let signature = URL_SAFE_NO_PAD
         .decode(signature_b64)
         .map_err(|_| OidcJwtDecodeError::InvalidJwt("invalid signature encoding"))?;

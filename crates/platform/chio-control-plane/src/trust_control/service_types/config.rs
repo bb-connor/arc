@@ -48,12 +48,10 @@ impl TrustFiscalRuntimeConfig {
                 policy_path.display()
             ))
         })?;
-        let genesis_policy = serde_json::from_slice(&bytes).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to parse fiscal genesis policy {}: {error}",
-                policy_path.display()
-            ))
-        })?;
+        let genesis_policy =
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(CliError::from)?;
         Ok(Self {
             genesis_policy,
             anchor_url,
@@ -69,12 +67,22 @@ impl TrustFiscalRuntimeConfig {
 #[derive(Clone)]
 pub struct TrustServiceConfig {
     pub listen: SocketAddr,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
     pub service_token: String,
     pub tenant_read_tokens: BTreeMap<String, String>,
+    pub authority_workload_token: Option<String>,
     pub receipt_db_path: Option<PathBuf>,
+    /// Maximum private receipt query snapshot database bytes (at least 1 MiB).
+    pub receipt_query_snapshot_quota_bytes: u64,
     pub revocation_db_path: Option<PathBuf>,
     pub authority_seed_path: Option<PathBuf>,
     pub authority_db_path: Option<PathBuf>,
+    /// Witnessed key-log runtime configuration for seed-file authority custody.
+    /// When present, direct seed signing is disabled after startup.
+    pub authority_keyring_config_path: Option<PathBuf>,
+    /// Private receipt rollback anchors on a separate filesystem device.
+    pub authority_keyring_receipt_anchor_root: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub joint_authority_db_path: Option<PathBuf>,
     pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
@@ -94,6 +102,9 @@ pub struct TrustServiceConfig {
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
+    /// Explicit future-issue skew for signed authority replication (0 to 60
+    /// seconds). Expiry and local clock floors receive no tolerance.
+    pub authority_replication_max_future_skew_seconds: u64,
     pub roster_policy: Option<RosterPolicy>,
     /// Process memory budget for the trust control service. Its
     /// `admission_key_cap` bounds the federation admission rate limiter, so
@@ -106,9 +117,60 @@ pub struct TrustServiceConfig {
     pub finding_market: Option<super::finding_market_config::FindingMarketConfig>,
 }
 
+const MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES: u64 = 1024 * 1024;
+
 impl TrustServiceConfig {
+    pub(crate) fn authority_replication_clock_policy(
+        &self,
+    ) -> Result<chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy, CliError> {
+        chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy::new(
+            self.authority_replication_max_future_skew_seconds,
+        )
+        .map_err(CliError::from)
+    }
+
     pub fn validate(&self) -> Result<(), CliError> {
+        self.transport
+            .validate(self.listen)
+            .map_err(std::io::Error::other)?;
+        self.authority_replication_clock_policy()?;
+        if self.receipt_query_snapshot_quota_bytes < MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES {
+            return Err(CliError::cli_other_error(format!(
+                "--receipt-query-snapshot-quota-bytes must be at least {MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES} bytes (1 MiB)"
+            )));
+        }
         validate_control_secret(&self.service_token, "control service token")?;
+        if self.authority_seed_path.is_some() && self.authority_db_path.is_some() {
+            return Err(CliError::cli_other_error(
+                "use either --authority-seed-file or --authority-db, not both".to_string(),
+            ));
+        }
+        if self.authority_keyring_config_path.is_some() {
+            if self.authority_seed_path.is_none()
+                || self.authority_db_path.is_some()
+                || self.receipt_db_path.is_none()
+                || self.authority_keyring_receipt_anchor_root.is_none()
+                || self.authority_workload_token.is_none()
+            {
+                return Err(CliError::cli_other_error(
+                    "authority keyring configuration requires --authority-seed-file, --receipt-db, --authority-keyring-receipt-anchor-root, and --authority-workload-token and forbids --authority-db"
+                        .to_string(),
+                ));
+            }
+            if !self.peer_urls.is_empty() {
+                return Err(CliError::cli_other_error(
+                    "clustered keyring authority issuance is unavailable until selector leases share the cluster consensus domain"
+                        .to_string(),
+                ));
+            }
+        }
+        if self.authority_keyring_receipt_anchor_root.is_some()
+            && self.authority_keyring_config_path.is_none()
+        {
+            return Err(CliError::cli_other_error(
+                "authority keyring receipt anchors require --authority-keyring-config".to_string(),
+            ));
+        }
         for (tenant_id, token) in &self.tenant_read_tokens {
             if tenant_id.trim().is_empty() {
                 return Err(CliError::cli_other_error(
@@ -130,6 +192,23 @@ impl TrustServiceConfig {
             if token == &self.service_token {
                 return Err(CliError::cli_other_error(
                     "control tenant read token must not equal service token".to_string(),
+                ));
+            }
+        }
+        if let Some(token) = self.authority_workload_token.as_deref() {
+            validate_control_secret(token, "authority workload token")?;
+            if token == self.service_token {
+                return Err(CliError::cli_other_error(
+                    "authority workload token must not equal service token".to_string(),
+                ));
+            }
+            if self
+                .tenant_read_tokens
+                .values()
+                .any(|tenant_token| tenant_token == token)
+            {
+                return Err(CliError::cli_other_error(
+                    "authority workload token must not equal a tenant read token".to_string(),
                 ));
             }
         }
@@ -238,13 +317,18 @@ mod service_config_tests {
             Err(error) => panic!("test listen address should parse: {error}"),
         };
         TrustServiceConfig {
+            transport: Default::default(),
             listen,
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
+            receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -264,9 +348,36 @@ mod service_config_tests {
             certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
+        }
+    }
+
+    #[test]
+    fn trust_service_config_refuses_receipt_query_snapshot_quota_below_minimum() {
+        for quota in [0, 1, 1_048_575] {
+            let mut config = base_config();
+            config.receipt_query_snapshot_quota_bytes = quota;
+            let error = config
+                .validate()
+                .test_expect_err("snapshot quotas below 1 MiB must fail service configuration");
+            assert!(error
+                .to_string()
+                .contains("--receipt-query-snapshot-quota-bytes must be at least 1048576"));
+        }
+    }
+
+    #[test]
+    fn trust_service_config_preserves_explicit_nonzero_snapshot_quota_bytes() {
+        for quota in [1_048_576, 2_147_483_648, 4_294_967_296, u64::MAX] {
+            let mut config = base_config();
+            config.receipt_query_snapshot_quota_bytes = quota;
+            config
+                .validate()
+                .test_expect("a nonzero u64 quota belongs to core capacity validation");
+            assert_eq!(config.receipt_query_snapshot_quota_bytes, quota);
         }
     }
 
@@ -318,6 +429,68 @@ mod service_config_tests {
                 "unexpected error for token `{token:?}`: {error}",
             );
         }
+    }
+
+    #[test]
+    fn trust_service_config_separates_authority_workload_credentials() {
+        let mut config = base_config();
+        config.authority_workload_token = Some("token".to_string());
+        let service_error = config
+            .validate()
+            .test_expect_err("authority workload token must differ from service token");
+        assert!(service_error
+            .to_string()
+            .contains("authority workload token must not equal service token"));
+
+        config.authority_workload_token = Some("tenant-token".to_string());
+        config
+            .tenant_read_tokens
+            .insert("tenant-a".to_string(), "tenant-token".to_string());
+        let tenant_error = config
+            .validate()
+            .test_expect_err("authority workload token must differ from tenant read tokens");
+        assert!(tenant_error
+            .to_string()
+            .contains("authority workload token must not equal a tenant read token"));
+
+        config.authority_workload_token = Some("authority-only".to_string());
+        config
+            .validate()
+            .test_expect("a distinct authority workload token is valid");
+    }
+
+    #[test]
+    fn keyring_authority_requires_complete_single_node_custody() {
+        let mut config = base_config();
+        config.authority_keyring_config_path = Some(PathBuf::from("keyring.yml"));
+        let incomplete = config
+            .validate()
+            .test_expect_err("keyring without custody must fail");
+        assert!(incomplete.to_string().contains(
+            "authority keyring configuration requires --authority-seed-file, --receipt-db"
+        ));
+
+        config.authority_seed_path = Some(PathBuf::from("authority.seed"));
+        config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
+        config.authority_workload_token = Some("authority-only".to_string());
+        let unanchored = config
+            .validate()
+            .test_expect_err("keyring receipt custody requires independent rollback anchors");
+        assert!(unanchored
+            .to_string()
+            .contains("--authority-keyring-receipt-anchor-root"));
+        config.authority_keyring_receipt_anchor_root = Some(PathBuf::from("/anchors/keyring"));
+        config
+            .validate()
+            .test_expect("complete single-node keyring config is valid");
+
+        config.peer_urls = vec!["https://peer.example".to_string()];
+        let clustered = config
+            .validate()
+            .test_expect_err("keyring cluster without selector consensus must fail");
+        assert!(clustered
+            .to_string()
+            .contains("selector leases share the cluster consensus domain"));
     }
 
     #[test]

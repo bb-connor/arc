@@ -27,6 +27,13 @@ The operator surface is `chio pheromone`. Deprecated compatibility command
 families are no longer part of the main CLI operator path; migrate existing
 automation to the commands below.
 
+Relay and iroh seed files must be existing regular files owned by the invoking
+user, with one link and owner-only permissions (`chmod 600`). Symlinks and files
+readable by group or others are rejected. Pretty JSON and a trailing newline are
+accepted; duplicate and unknown fields are rejected. Repository example keys are
+public test fixtures. Copy them to a private file before invoking a signing command;
+`cargo xtask check fixtures` stages its own private copy automatically.
+
 ```bash
 chio pheromone relay lint \
   --peer-directory-state peer-directory-state.json \

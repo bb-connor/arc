@@ -16,12 +16,12 @@
 
 use std::time::Duration;
 
+#[cfg(test)]
+use crate::SettlementFailureCode;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use crate::hook::{
-    SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementSkipReason,
-};
+use crate::hook::{SettlementFailureClass, SettlementFailureReason, SettlementSkipReason};
 use crate::outcome_store::SettlementRoutingInput;
 
 /// Schema string emitted on the wire for [`DeadLetterRecord`] frames.
@@ -251,53 +251,24 @@ struct TypedDeadLetterRecord {
     reason: SettlementFailureReason,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyDeadLetterRecord {
-    #[serde(deserialize_with = "deserialize_dead_letter_schema")]
-    schema: String,
-    receipt_id: String,
-    finalized_at: u64,
-    attempts: u32,
-    reason: String,
-    #[serde(default)]
-    pipeline_error: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum DeadLetterRecordWire {
-    Typed(TypedDeadLetterRecord),
-    Legacy(LegacyDeadLetterRecord),
-}
-
 impl<'de> Deserialize<'de> for DeadLetterRecord {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match DeadLetterRecordWire::deserialize(deserializer)? {
-            DeadLetterRecordWire::Typed(record) => Ok(Self {
-                schema: record.schema,
-                receipt_id: record.receipt_id,
-                finalized_at: record.finalized_at,
-                attempts: record.attempts,
-                reason: record.reason,
-            }),
-            DeadLetterRecordWire::Legacy(record) => {
-                let detail = record.pipeline_error.as_deref().unwrap_or(&record.reason);
-                Ok(Self {
-                    schema: record.schema,
-                    receipt_id: record.receipt_id,
-                    finalized_at: record.finalized_at,
-                    attempts: record.attempts,
-                    reason: SettlementFailureReason::from_detail(
-                        SettlementFailureCode::Backend,
-                        detail,
-                    ),
-                })
-            }
+        let record = TypedDeadLetterRecord::deserialize(deserializer)?;
+        if record.attempts == 0 {
+            return Err(serde::de::Error::custom(
+                "dead-letter attempts must be nonzero",
+            ));
         }
+        Ok(Self {
+            schema: record.schema,
+            receipt_id: record.receipt_id,
+            finalized_at: record.finalized_at,
+            attempts: record.attempts,
+            reason: record.reason,
+        })
     }
 }
 
@@ -347,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn string_reason_v1_schema_decodes_to_a_bounded_reason() {
+    fn legacy_string_reason_is_rejected() {
         let decoded = serde_json::from_value::<DeadLetterRecord>(serde_json::json!({
             "schema": "chio.settle.dead-letter.v1",
             "receipt_id": "receipt-1",
@@ -356,16 +327,7 @@ mod tests {
             "reason": "rpc unavailable",
             "pipeline_error": "settlement pipeline error: rpc unavailable",
         }));
-        let record = match decoded {
-            Ok(record) => record,
-            Err(error) => panic!("legacy dead-letter record must decode: {error}"),
-        };
-
-        let expected = SettlementFailureReason::from_detail(
-            SettlementFailureCode::Backend,
-            "settlement pipeline error: rpc unavailable",
-        );
-        assert_eq!(record.reason, expected);
+        assert!(matches!(decoded, Err(error) if error.is_data()));
     }
 
     #[test]
@@ -650,5 +612,27 @@ mod tests {
             policy.backoff_for(u32::MAX),
             Duration::from_millis(policy.initial_backoff_ms)
         );
+    }
+}
+
+#[cfg(test)]
+mod original_record_tests {
+    use super::*;
+    #[test]
+    fn original_dead_letter_rejects_zero_attempts() {
+        let mut value = match serde_json::to_value(DeadLetterRecord::new(
+            "receipt",
+            1,
+            1,
+            SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, "failure"),
+        )) {
+            Ok(value) => value,
+            Err(error) => panic!("fixture: {error}"),
+        };
+        value["attempts"] = serde_json::json!(0);
+        match serde_json::from_value::<DeadLetterRecord>(value) {
+            Ok(_) => panic!("zero-attempt terminal record accepted"),
+            Err(error) => assert!(error.to_string().contains("attempts")),
+        }
     }
 }

@@ -740,9 +740,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
     )?;
     let operator_ed_key_hash = format!(
         "0x{}",
-        hex::encode(
-            alloy_primitives::keccak256(operator_keypair.public_key().as_bytes()).as_slice()
-        )
+        hex::encode(alloy_primitives::keccak256(operator_keypair.public_key_bytes()).as_slice())
     );
     let _devnet = spawn_runtime_devnet(&deployment_path, &operator_ed_key_hash, 8549).await?;
 

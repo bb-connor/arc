@@ -119,6 +119,9 @@ pub(super) fn compile_rule_guards(
                 max_args_size: ta.max_args_size,
             };
             builder.add(McpToolGuard::with_config(config));
+            if ta.dpop_required == Some(true) {
+                builder.add(super::sender_proof::SenderProofGuard);
+            }
         }
     }
 

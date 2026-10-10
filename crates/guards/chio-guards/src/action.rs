@@ -180,6 +180,28 @@ mod tests {
     }
 
     #[test]
+    fn broker_shell_guards_classify_exact_body_and_refuse_malformed_envelopes() {
+        let body = chio_core::canonical_json_bytes(&serde_json::json!({"command":"rm -rf /"}))
+            .unwrap_or_else(|error| panic!("fixture: {error}"));
+        let mut arguments = serde_json::json!({"schema":"chio.broker-execute.v1", "command":"echo decoy", "request":{"body":body}});
+        let action = extract_action_checked("execute", &arguments)
+            .unwrap_or_else(|error| panic!("action: {error:?}"));
+        assert!(
+            matches!(action, ToolAction::ShellCommand(ref command) if crate::shell_command::ShellCommandGuard::new().is_forbidden(command))
+        );
+        for bytes in [
+            b"{\"command\":\"echo safe\",\"command\":\"rm -rf /\"}".to_vec(),
+            b"{\"command\": []}".to_vec(),
+            b"not json".to_vec(),
+        ] {
+            arguments["request"]["body"] = serde_json::json!(bytes);
+            assert!(extract_action_checked("execute", &arguments).is_err());
+        }
+        arguments["request"]["body"] = serde_json::json!([256]);
+        assert!(extract_action_checked("execute", &arguments).is_err());
+    }
+
+    #[test]
     fn shell_command_rejects_malformed_primary_alias() {
         let args = serde_json::json!({"command": ["rm", "-rf", "/"], "cmd": "echo safe"});
         assert_eq!(malformed_field("bash", &args), "command");

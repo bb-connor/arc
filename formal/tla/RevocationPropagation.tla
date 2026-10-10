@@ -16,9 +16,10 @@
 (* cannot be starved indefinitely. The fairness conjunct is                *)
 (* WF_vars(PropagateAny) where PropagateAny is the top-level named action  *)
 (* `pending # {} /\ \E m \in pending : Propagate(m)`. The named-action     *)
-(* form is required because Apalache's tableau encoding (PDR-017) supports *)
-(* WF_vars(<named action>) but does not support an existential quantifier  *)
-(* nested directly under WF_vars.  Liveness is checked in the nightly      *)
+(* form identifies the fair action for TLC. Apalache 0.50.1 ignores        *)
+(* specification fairness, including named actions. The temporal property *)
+(* includes the equivalent PropagateWeakFair premise explicitly, and its *)
+(* config selects explicit stuttering. Liveness is checked in the nightly *)
 (* formal-tla-liveness lane at PROCS=4, CAPS=8 via Apalache's              *)
 (* `--temporal=` flag; the PR job continues to check only the safety       *)
 (* invariants via `--inv=`.                                                 *)
@@ -238,15 +239,10 @@ Evaluate(a, c) ==
     /\ UNCHANGED << state, depth, rev_epoch, pending >>
 
 (***************************************************************************)
-(* PropagateAny: existentially-quantified Propagate as a top-level named  *)
-(* action so that weak fairness can be expressed without nesting an       *)
-(* existential under WF_vars. Apalache's tableau-based temporal encoding  *)
-(* (PDR-017) accepts WF_vars(<named action>) but does not support         *)
-(* WF_vars(\E ... : <action>) because the existential under ENABLED       *)
-(* defeats its SMT translation. Lifting the existential to a named        *)
-(* action preserves the intended semantics: PropagateAny is enabled iff   *)
-(* pending is non-empty, exactly the precondition the original           *)
-(* WF_vars(\E m \in pending : Propagate(m)) was asserting.                *)
+(* PropagateAny is enabled exactly when pending is non-empty. Every       *)
+(* propagation removes one pending message; no other action removes one. *)
+(* These facts give exact state/action predicates for the explicit weak  *)
+(* fairness premise below without unsupported WF or ENABLED operators.   *)
 (***************************************************************************)
 PropagateAny ==
     /\ pending # {}
@@ -263,6 +259,8 @@ Next ==
     \/ \E a \in ProcSet, c \in CapSet : Evaluate(a, c)
     \/ PropagateAny
 
+StutteringNext == Next \/ UNCHANGED vars
+
 (***************************************************************************)
 (* Spec is the temporal formula characterizing valid behaviors:            *)
 (*                                                                          *)
@@ -273,10 +271,9 @@ Next ==
 (*     action PropagateAny. PropagateAny is enabled exactly when pending   *)
 (*     is non-empty; weak fairness then says that a continuously enabled   *)
 (*     PropagateAny eventually fires, which is the load-bearing            *)
-(*     assumption for RevocationEventuallySeen below. Apalache's           *)
-(*     tableau-based fairness encoding (PDR-017) supports                  *)
-(*     WF_vars(<named action>) but rejects WF_vars(\E ... : <action>);     *)
-(*     PropagateAny is the named-action workaround.                         *)
+(*     assumption for RevocationEventuallySeen below. TLC consumes this   *)
+(*     conjunct. Apalache requires an explicit fairness premise in the    *)
+(*     temporal property and StutteringNext in its configuration.         *)
 (*                                                                          *)
 (* Strong fairness is not required: PropagateAny is enabled whenever       *)
 (* pending is non-empty, so the standard "continuously enabled implies     *)
@@ -397,10 +394,10 @@ SafetyInv ==
 (* pair, so this aggregate property is equivalent to the per-pair         *)
 (* eventual catch-up obligation under the weak fairness assumption below. *)
 (*                                                                          *)
-(* The property is gated on WF_vars(PropagateAny) declared in Spec above. *)
-(* Without that fairness conjunct the model admits behaviors where         *)
-(* pending Propagate messages are starved forever and                      *)
-(* RevocationEventuallySeen would not hold.                                 *)
+(* The property includes weak fairness explicitly because Apalache ignores *)
+(* WF_vars(PropagateAny) in Spec. Under Spec this premise is guaranteed,   *)
+(* so the eventual catch-up obligation is unchanged. Without fairness,    *)
+(* pending messages may be starved forever.                                *)
 (*                                                                          *)
 (* The a = b case is trivially satisfied (rev_epoch[a][c] >=               *)
 (* rev_epoch[a][c]) and is left in the quantifier rather than excluded.    *)
@@ -414,7 +411,20 @@ AllObservedRevocationsCaughtUp ==
         \A c \in CapSet :
             rev_epoch[a][c] # 0 => rev_epoch[b][c] >= rev_epoch[a][c]
 
+PropagateEnabled == pending # {}
+
+PropagateProgressAction ==
+    /\ pending' \subseteq pending
+    /\ pending' # pending
+
+\* Weak fairness: disabled infinitely often, or progress infinitely often.
+\* Eventually always disabled would instead encode strong fairness.
+PropagateWeakFair ==
+    \/ []<>(~PropagateEnabled)
+    \/ []<><<PropagateProgressAction>>_pending
+
 RevocationEventuallySeen ==
-    AnyRevocationObserved ~> AllObservedRevocationsCaughtUp
+    PropagateWeakFair =>
+        (AnyRevocationObserved ~> AllObservedRevocationsCaughtUp)
 
 ==================================================================================

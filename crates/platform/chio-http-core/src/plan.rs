@@ -18,17 +18,19 @@
 
 use std::sync::Arc;
 
+use chio_core_types::canonical::{UntrustedJsonError, UntrustedJsonText};
 use chio_core_types::{PlanEvaluationRequest, PlanEvaluationResponse};
 use chio_kernel::ChioKernel;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Error surfaced by [`handle_evaluate_plan`] when the request body is
 /// malformed. Aggregate plan denials are NOT represented here; those
 /// are carried inside the successful response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PlanHandlerError {
     /// Request body could not be parsed as a `PlanEvaluationRequest`.
-    BadRequest(String),
+    #[error("invalid evaluate-plan request body")]
+    BadRequest(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
 }
 
 impl PlanHandlerError {
@@ -52,7 +54,7 @@ impl PlanHandlerError {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::BadRequest(reason) => reason.clone(),
+            Self::BadRequest(_) => "invalid evaluate-plan request body".to_string(),
         }
     }
 
@@ -77,9 +79,31 @@ pub fn handle_evaluate_plan(
     kernel: &Arc<ChioKernel>,
     body: &[u8],
 ) -> Result<PlanEvaluationResponse, PlanHandlerError> {
-    let parsed: PlanEvaluationRequest = serde_json::from_slice(body).map_err(|error| {
-        PlanHandlerError::BadRequest(format!("invalid evaluate-plan request body: {error}"))
-    })?;
+    let parsed = decode_plan(body).map_err(PlanHandlerError::BadRequest)?;
 
     Ok(kernel.evaluate_plan_blocking(&parsed))
+}
+
+fn decode_plan(
+    body: &[u8],
+) -> Result<PlanEvaluationRequest, chio_core_types::canonical::SharedUntrustedJsonError> {
+    // Parameters are unsigned tool arguments and accept ordinary JSON floats.
+    // The embedded capability has its own signed original-token contract.
+    let value = UntrustedJsonText::from_wire(body, crate::input::MAX_REQUEST_BYTES)?
+        .decode_document::<serde_json::Value>()?;
+    #[derive(Deserialize)]
+    struct OriginalCapability<'a> {
+        #[serde(borrow)]
+        planner_capability: &'a serde_json::value::RawValue,
+    }
+    let original: OriginalCapability<'_> =
+        serde_json::from_slice(body).map_err(UntrustedJsonError::Decode)?;
+    let capability = crate::input::decode(
+        original.planner_capability.get().as_bytes(),
+        crate::input::MAX_CAPABILITY_BYTES,
+    )?;
+    let mut parsed: PlanEvaluationRequest =
+        serde_json::from_value(value).map_err(UntrustedJsonError::Decode)?;
+    parsed.planner_capability = capability;
+    Ok(parsed)
 }

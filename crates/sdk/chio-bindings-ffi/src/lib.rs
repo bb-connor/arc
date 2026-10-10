@@ -48,6 +48,7 @@ pub const CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA: i32 = 25;
 pub const CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD: i32 = 26;
 pub const CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION: i32 = 27;
 pub const CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION: i32 = 28;
+pub const CHIO_FFI_ERROR_UNTRUSTED_INPUT: i32 = 29;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -75,10 +76,9 @@ impl ChioFfiBuffer {
         if bytes.is_empty() {
             return Self::empty();
         }
-        let mut boxed = bytes.into_boxed_slice();
-        let ptr = boxed.as_mut_ptr();
+        let boxed = bytes.into_boxed_slice();
         let len = boxed.len();
-        std::mem::forget(boxed);
+        let ptr = Box::into_raw(boxed).cast::<u8>();
         Self { ptr, len }
     }
 
@@ -92,10 +92,12 @@ pub extern "C" fn chio_buffer_free(buffer: ChioFfiBuffer) {
     if buffer.ptr.is_null() || buffer.len == 0 {
         return;
     }
-    // SAFETY: all non-empty buffers returned by this crate come from
-    // `Vec::into_boxed_slice` with exactly this pointer and length.
+    // SAFETY: callers return a live buffer from this crate exactly once. Its
+    // pointer and length reconstruct the slice transferred by `Box::into_raw`.
     unsafe {
-        drop(Vec::from_raw_parts(buffer.ptr, buffer.len, buffer.len));
+        drop(Box::from_raw(ptr::slice_from_raw_parts_mut(
+            buffer.ptr, buffer.len,
+        )));
     }
 }
 
@@ -121,6 +123,7 @@ fn helper_error_code(error: &Error) -> i32 {
 
 fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
     match code {
+        ErrorCode::UntrustedInput => CHIO_FFI_ERROR_UNTRUSTED_INPUT,
         ErrorCode::InvalidPublicKey => CHIO_FFI_ERROR_INVALID_PUBLIC_KEY,
         ErrorCode::InvalidHex => CHIO_FFI_ERROR_INVALID_HEX,
         ErrorCode::InvalidSignature => CHIO_FFI_ERROR_INVALID_SIGNATURE,
@@ -652,6 +655,20 @@ mod tests {
             ptr: std::ptr::null_mut(),
             len: 16,
         });
+    }
+
+    #[test]
+    fn returned_buffer_can_be_read_modified_and_freed() {
+        let mut value = String::with_capacity(64);
+        value.push_str("data");
+        let buffer = ChioFfiBuffer::from_string(value);
+        assert_eq!(buffer.len, 4);
+        // SAFETY: this buffer owns four initialized bytes and has not been freed.
+        let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.ptr, buffer.len) };
+        assert_eq!(bytes, b"data");
+        bytes[0] = b'D';
+        assert_eq!(bytes, b"Data");
+        chio_buffer_free(buffer);
     }
 
     #[test]

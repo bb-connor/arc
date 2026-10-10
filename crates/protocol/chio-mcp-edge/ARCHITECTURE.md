@@ -98,7 +98,7 @@ flowchart TD
 - A centralized params gate runs before dispatch: missing params on a known method normalize to `{}`, but non-object params on a known request method fail with `-32602` before session, discovery, or kernel state is touched; a matching notification gate keeps a malformed `notifications/initialized` from advancing session state.
 - Manifest admission is fail-closed: `chio_manifest::validate_manifest` runs on every manifest before any tool is exposed, duplicate tool names across manifests are rejected, and non-object `inputSchema`/`outputSchema` are rejected.
 - `parse_protocol_identifier` rejects empty, padded, or control-character `taskId`, prompt names, resource URIs, and completion argument names before they reach task maps or capability selection; completion argument *values* are exempt, including an empty prefix.
-- Stdio framing is bounded at `MAX_STDIO_MCP_FRAME_BYTES` (1 MiB); EOF before a newline on a non-empty frame is a parse error, and an oversized frame discards its remainder so the next frame still parses.
+- Stdio framing is bounded at `MAX_STDIO_MCP_FRAME_BYTES` (1 MiB); EOF before a newline on a non-empty frame is a parse error, and an oversized frame terminates the reader without draining the peer's remaining bytes.
 - Deferred tasks are bounded at `MAX_DEFERRED_MCP_TASKS` (1024); a full task table prunes terminal tasks before rejecting new ones. Task TTL defaults to 5 minutes and is capped at 60 minutes. Background task start is delayed for `StreamableHttp` sessions and immediate for `InProcess`/`Stdio` sessions.
 - An unauthorized `tools/call` returns a normal JSON-RPC *result* containing an MCP tool result with `isError: true`, not a JSON-RPC error object, so the calling model sees a tool failure rather than a protocol fault.
 - Every terminal tool-call outcome (allow, deny, pending-approval, error) records `chio_receipt_write_total`; `RequestCancelled` and `UrlElicitationsRequired` kernel errors are excluded from the error counter because they are expected control flow.
@@ -112,7 +112,8 @@ flowchart TD
 - `chio-manifest` - `ToolManifest`, `ToolDefinition`, `ManifestError`, `validate_manifest`; the admission gate for every tool this crate exposes.
 - `chio-cross-protocol` - `DiscoveryProtocol`, `TargetProtocolExecutor`, cross-protocol request/execution types; `McpTargetExecutor` implements the executor trait so `chio-a2a-edge` and `chio-acp-edge` can route into MCP targets.
 - `chio-edge-metrics` - shared receipt-write counter and Prometheus-rendering logic; this crate owns one independent counter instance.
-- `chrono` (`clock` feature) - task timestamps (`iso8601_now`, `unix_now_millis`).
+- `chio-security-types::Clock` through the kernel authority clock - task deadlines and expiry.
+- `chrono` - formatting the sampled task timestamp.
 - `tokio` - the async kernel call path and the current-thread/multi-thread runtime bridging in `execute_bridge_mcp_tool_call`.
 - `serde` / `serde_json` - the wire format; most dispatch works directly on `serde_json::Value` rather than a typed JSON-RPC model.
 - `thiserror` - `AdapterError`.
@@ -128,3 +129,11 @@ re-emit an upstream server's own `resources/list_changed`-style notifications
 to its downstream MCP session. Routing an upstream tool call through the
 kernel is a separate concern, handled by whoever adapts that transport into a
 `ToolServerConnection` (`chio-mcp-adapter`).
+
+Deferred task admission constructs a checked wall/monotonic deadline from the
+kernel clock. Every background tick and task-result path prunes expired work
+before dispatch. Clock faults retain pending work and return a registered
+rejection. Zero TTL rejects at creation. Newline-delimited peer frames have a
+1 MiB bound; oversize is terminal so an unterminated peer tail cannot keep the
+reader draining forever. Original JSON is duplicate-checked before metadata is
+projected into unverified native artifacts.

@@ -17,7 +17,7 @@ pub(crate) fn cmd_chio_pheromone_receive(
 ) -> Result<(), CliError> {
     let batch_json = read_utf8_json_file(batch, "Chio pheromone gossip batch")?;
     let batch: chio_federation::pheromone_gossip::PheromoneGossipBatch =
-        serde_json::from_str(&batch_json)
+        crate::input::text(&batch_json)
             .map_err(|error| CliError::cli_other_error(format!("Chio pheromone batch: {error}")))?;
     let policy_json = read_utf8_json_file(transit_policy, "Chio pheromone transit policy")?;
     let now_unix_ms = now_unix_ms.unwrap_or(batch.flushed_at_unix_ms);
@@ -72,7 +72,7 @@ pub(crate) fn cmd_chio_pheromone_query(
     let weights = chio_pheromone_runtime::peer_weights_from_json(&weights_json)
         .map_err(|error| CliError::cli_other_error(format!("Chio peer weights: {error}")))?;
     let validation_context = chio_pheromone::PheromoneValidationContext {
-        now_unix_ms: now_unix_ms.unwrap_or_else(unix_now_ms),
+        now_unix_ms: now_unix_ms.map_or_else(unix_now_ms, Ok)?,
         replay_window_ms: 0,
         active_peers_in_treaty: 0,
         active_reputation_epoch: reputation_epoch,

@@ -57,6 +57,7 @@ fn make_request_with_scope(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (req, scope, agent_id, server_id)
 }
@@ -77,6 +78,7 @@ fn eval_with<G: Guard>(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index,
+        security_context: None,
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

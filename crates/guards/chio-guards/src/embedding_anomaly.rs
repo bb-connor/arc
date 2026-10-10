@@ -46,6 +46,7 @@ pub const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.85;
 pub const DEFAULT_AMBIGUITY_BAND: f64 = 0.10;
 /// Default top-K pattern matches to score.
 pub const DEFAULT_TOP_K: usize = 5;
+const MAX_PATTERN_BYTES: usize = 16 * 1024 * 1024;
 
 /// Policy for scores landing inside the ambiguity band.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -62,8 +63,8 @@ pub enum AmbiguousPolicy {
 #[derive(Debug, Error)]
 pub enum EmbeddingAnomalyError {
     /// Pattern JSON failed to parse.
-    #[error("pattern database parse error: {0}")]
-    Parse(String),
+    #[error("pattern database input rejected: {0}")]
+    Parse(#[from] chio_core::canonical::UntrustedJsonError),
     /// Pattern database is empty or has inconsistent dimensionality.
     #[error("pattern database is invalid: {0}")]
     Invalid(String),
@@ -71,8 +72,8 @@ pub enum EmbeddingAnomalyError {
     #[error("invalid configuration: {0}")]
     Config(String),
     /// I/O error reading the pattern database from disk.
-    #[error("failed to read pattern database: {0}")]
-    Io(String),
+    #[error("failed to read pattern database")]
+    Io(#[from] std::io::Error),
 }
 
 /// Configuration for [`EmbeddingAnomalyGuard`].
@@ -145,7 +146,8 @@ impl EmbeddingAnomalyPatternDb {
     /// - every embedding value is finite.
     pub fn from_json(json: &str) -> Result<Self, EmbeddingAnomalyError> {
         let entries: Vec<PatternEntry> =
-            serde_json::from_str(json).map_err(|e| EmbeddingAnomalyError::Parse(e.to_string()))?;
+            chio_core::canonical::UntrustedJsonText::from_wire(json.as_bytes(), MAX_PATTERN_BYTES)?
+                .decode_document()?;
         Self::from_entries(entries)
     }
 
@@ -251,9 +253,14 @@ impl EmbeddingAnomalyGuard {
 
     /// Read a pattern database from a JSON file on disk.
     pub fn from_json_file(path: &str) -> Result<Self, EmbeddingAnomalyError> {
-        let data = std::fs::read_to_string(path)
-            .map_err(|e| EmbeddingAnomalyError::Io(format!("{path}: {e}")))?;
-        Self::from_json(&data)
+        let bytes = crate::input::read_file(std::path::Path::new(path), MAX_PATTERN_BYTES)?;
+        let entries =
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_PATTERN_BYTES)?
+                .decode_document()?;
+        Self::new(
+            EmbeddingAnomalyPatternDb::from_entries(entries)?,
+            EmbeddingAnomalyConfig::default(),
+        )
     }
 
     /// Score an embedding against the pattern database. Returns the
@@ -580,5 +587,23 @@ mod tests {
             ..EmbeddingAnomalyConfig::default()
         };
         assert!(EmbeddingAnomalyGuard::new(db, bad).is_err());
+    }
+}
+
+#[cfg(test)]
+mod reader_boundary_tests {
+    use super::*;
+    #[test]
+    fn pattern_extension_duplicates_and_byte_limit_reject_before_projection() {
+        assert!(matches!(
+            EmbeddingAnomalyPatternDb::from_json(r#"[{"unused":{"x":1,"x":2}}]"#),
+            Err(EmbeddingAnomalyError::Parse(_))
+        ));
+        assert!(matches!(
+            EmbeddingAnomalyPatternDb::from_json(&" ".repeat(MAX_PATTERN_BYTES + 1)),
+            Err(EmbeddingAnomalyError::Parse(
+                chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+            ))
+        ));
     }
 }

@@ -1,9 +1,10 @@
 #[cfg(loom)]
-use loom::sync::atomic::{AtomicU64, Ordering};
+use loom::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::{HashMap, HashSet, VecDeque};
 #[cfg(not(loom))]
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
 use chio_core::crypto::{canonical_json_bytes, sha256_hex};
 use chio_core::session::{
@@ -19,10 +20,13 @@ use chio_core::session::{
     ResourceTemplateDefinition,
 };
 use chio_core::{capability::token::CapabilityToken, AgentId};
+
+mod threshold_continuation;
 #[cfg(loom)]
 use loom::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 #[cfg(not(loom))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+pub use threshold_continuation::PendingThresholdApproval;
 
 #[cfg(not(loom))]
 use crate::{ToolCallResponse, ToolServerEvent};
@@ -104,6 +108,10 @@ impl SessionState {
 /// Feature flags negotiated with the peer at session establishment.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PeerCapabilities {
+    /// Persisted invocation feature intersection. Legacy sessions have no
+    /// extension profile and must not gain features merely by being restored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<chio_core::capability::features::CapabilityNegotiation>,
     pub supports_progress: bool,
     pub supports_cancellation: bool,
     pub supports_subscriptions: bool,
@@ -131,6 +139,8 @@ pub struct InflightRequest {
     pub cancellation_reason: Option<String>,
     pub cancellable: bool,
     pub pending_execution_nonce_id: Option<String>,
+    /// Session retry binding only, never approval or execution authority.
+    pub pending_threshold_approval: Option<PendingThresholdApproval>,
 }
 
 impl InflightRequest {
@@ -144,7 +154,7 @@ impl InflightRequest {
 pub struct InflightRegistry {
     requests: RwLock<HashMap<RequestId, InflightRequest>>,
     dispatching: RwLock<HashSet<RequestId>>,
-    active_count: AtomicU64,
+    active_count: AtomicUsize,
 }
 
 impl Clone for InflightRegistry {
@@ -153,7 +163,7 @@ impl Clone for InflightRegistry {
         let requests = requests_guard.clone();
         let dispatching = read_lock(&self.dispatching).clone();
         Self {
-            active_count: AtomicU64::new(requests.len() as u64),
+            active_count: AtomicUsize::new(requests.len()),
             requests: RwLock::new(requests),
             dispatching: RwLock::new(dispatching),
         }
@@ -165,7 +175,7 @@ impl Default for InflightRegistry {
         Self {
             requests: RwLock::new(HashMap::new()),
             dispatching: RwLock::new(HashSet::new()),
-            active_count: AtomicU64::new(0),
+            active_count: AtomicUsize::new(0),
         }
     }
 }
@@ -206,6 +216,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -239,6 +250,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -261,8 +273,7 @@ impl InflightRegistry {
             })
             .is_err()
         {
-            self.active_count
-                .store(requests.len() as u64, Ordering::Release);
+            self.active_count.store(requests.len(), Ordering::Release);
         }
         Ok(completed)
     }
@@ -352,11 +363,12 @@ impl InflightRegistry {
             });
         }
         request.pending_execution_nonce_id = Some(nonce_id.to_string());
+        request.pending_threshold_approval = None;
         Ok(())
     }
 
     pub fn len(&self) -> usize {
-        self.active_count.load(Ordering::Acquire) as usize
+        self.active_count.load(Ordering::Acquire)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -387,14 +399,14 @@ enum SubscriptionSubject {
 #[derive(Debug)]
 pub struct SubscriptionRegistry {
     subscriptions: RwLock<HashSet<SubscriptionSubject>>,
-    subscription_count: AtomicU64,
+    subscription_count: AtomicUsize,
 }
 
 impl Clone for SubscriptionRegistry {
     fn clone(&self) -> Self {
         let subscriptions = read_lock(&self.subscriptions).clone();
         Self {
-            subscription_count: AtomicU64::new(subscriptions.len() as u64),
+            subscription_count: AtomicUsize::new(subscriptions.len()),
             subscriptions: RwLock::new(subscriptions),
         }
     }
@@ -404,7 +416,7 @@ impl Default for SubscriptionRegistry {
     fn default() -> Self {
         Self {
             subscriptions: RwLock::new(HashSet::new()),
-            subscription_count: AtomicU64::new(0),
+            subscription_count: AtomicUsize::new(0),
         }
     }
 }
@@ -433,14 +445,14 @@ impl SubscriptionRegistry {
         let mut subscriptions = write_lock(&self.subscriptions);
         subscriptions.insert(SubscriptionSubject::Resource(uri.into()));
         self.subscription_count
-            .store(subscriptions.len() as u64, Ordering::Release);
+            .store(subscriptions.len(), Ordering::Release);
     }
 
     pub fn unsubscribe_resource(&self, uri: &str) {
         let mut subscriptions = write_lock(&self.subscriptions);
         subscriptions.remove(&SubscriptionSubject::Resource(uri.to_string()));
         self.subscription_count
-            .store(subscriptions.len() as u64, Ordering::Release);
+            .store(subscriptions.len(), Ordering::Release);
     }
 
     pub fn contains_resource(&self, uri: &str) -> bool {
@@ -448,7 +460,7 @@ impl SubscriptionRegistry {
     }
 
     pub fn len(&self) -> usize {
-        self.subscription_count.load(Ordering::Acquire) as usize
+        self.subscription_count.load(Ordering::Acquire)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -553,6 +565,11 @@ impl TerminalRegistry {
 /// Errors for session lifecycle and in-flight management.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SessionError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error("session {session_id} authentication epoch is exhausted")]
+    AuthEpochExhausted { session_id: SessionId },
+
     #[error("invalid session transition from {from} to {to}")]
     InvalidTransition {
         from: &'static str,
@@ -588,6 +605,9 @@ pub enum SessionError {
         "execution nonce retry for request {request_id} does not match a pending session preflight"
     )]
     ExecutionNonceRetryMismatch { request_id: RequestId },
+
+    #[error("threshold retry for request {request_id} does not match its pending session request")]
+    ThresholdApprovalRetryMismatch { request_id: RequestId },
 
     #[error("request {request_id} is not cancellable")]
     RequestNotCancellable { request_id: RequestId },
@@ -628,6 +648,28 @@ pub enum SessionPersistError<E> {
     Persist(E),
 }
 
+// Reserve the final epoch for terminal closure. Every active epoch still has
+// a distinct successor that can revoke its authentication, even at exhaustion.
+fn next_auth_epoch(
+    session_id: &SessionId,
+    current: u64,
+    closing: bool,
+) -> Result<u64, SessionError> {
+    current
+        .checked_add(1)
+        .filter(|next| closing || *next < u64::MAX)
+        .ok_or_else(|| SessionError::AuthEpochExhausted {
+            session_id: session_id.clone(),
+        })
+}
+
+fn in_memory_session_error(error: SessionPersistError<std::convert::Infallible>) -> SessionError {
+    match error {
+        SessionPersistError::Session(error) => error,
+        SessionPersistError::Persist(never) => match never {},
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionAnchorState {
     id: String,
@@ -637,14 +679,19 @@ pub struct SessionAnchorState {
 }
 
 impl SessionAnchorState {
-    fn new(session_id: &SessionId, auth_context: &SessionAuthContext, auth_epoch: u64) -> Self {
+    fn new(
+        session_id: &SessionId,
+        auth_context: &SessionAuthContext,
+        auth_epoch: u64,
+        issued_at: u64,
+    ) -> Self {
         let auth_context_hash = auth_context_hash(auth_context);
         let hash_prefix = &auth_context_hash[..12.min(auth_context_hash.len())];
         Self {
             id: format!("{session_id}:anchor:{auth_epoch}:{hash_prefix}"),
             auth_epoch,
             auth_context_hash,
-            issued_at: current_unix_timestamp(),
+            issued_at,
         }
     }
 
@@ -712,8 +759,9 @@ pub struct SessionRequestStart {
 }
 
 /// Session host object owned by the kernel.
-#[derive(Debug)]
 pub struct Session {
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+    clock_fence: Arc<std::sync::Mutex<chio_security_types::clock::ClockFence>>,
     id: SessionId,
     agent_id: AgentId,
     inner: RwLock<SessionInner>,
@@ -783,12 +831,19 @@ fn validate_parent_request_lineage_locked(
 
 impl Clone for Session {
     fn clone(&self) -> Self {
-        let inner = self.read_inner().clone();
+        // Lifecycle and authentication must describe the same transition.
+        // In particular, an active snapshot cannot inherit the terminal epoch.
+        let (inner, auth_state) = {
+            let inner = self.read_inner();
+            (inner.clone(), self.auth_state.clone())
+        };
         Self {
+            clock: self.clock.clone(),
+            clock_fence: self.clock_fence.clone(),
             id: self.id.clone(),
             agent_id: self.agent_id.clone(),
             inner: RwLock::new(inner),
-            auth_state: self.auth_state.clone(),
+            auth_state,
             peer_capabilities: self.peer_capabilities.clone(),
             roots: self.roots.clone(),
             issued_capabilities: self.issued_capabilities.clone(),
@@ -807,10 +862,28 @@ impl Session {
         id: SessionId,
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
-    ) -> Self {
+    ) -> Result<Self, SessionError> {
+        Self::new_with_clock(
+            id,
+            agent_id,
+            issued_capabilities,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn new_with_clock(
+        id: SessionId,
+        agent_id: AgentId,
+        issued_capabilities: Vec<CapabilityToken>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, SessionError> {
+        let mut fence = chio_security_types::clock::ClockFence::default();
+        let issued_at = fence.observe(clock.read()?)?.unix_millis().as_secs();
         let auth_context = SessionAuthContext::in_process_anonymous();
-        let session_anchor = SessionAnchorState::new(&id, &auth_context, 0);
-        Self {
+        let session_anchor = SessionAnchorState::new(&id, &auth_context, 0, issued_at);
+        Ok(Self {
+            clock,
+            clock_fence: Arc::new(std::sync::Mutex::new(fence)),
             id,
             agent_id,
             inner: RwLock::new(SessionInner {
@@ -832,7 +905,15 @@ impl Session {
             request_lineage: RwLock::new(HashMap::new()),
             pending_url_elicitations: RwLock::new(HashMap::new()),
             late_events: RwLock::new(VecDeque::new()),
-        }
+        })
+    }
+
+    fn trusted_timestamp(&self) -> Result<u64, SessionError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis().as_secs())
     }
 
     fn read_inner(&self) -> RwLockReadGuard<'_, SessionInner> {
@@ -1076,45 +1157,13 @@ impl Session {
         self.subscriptions.contains_resource(uri)
     }
 
+    /// Replace authentication atomically, refusing closed sessions or exhausted epochs.
     pub fn set_auth_context(
         &self,
         auth_context: SessionAuthContext,
-    ) -> (bool, SessionAnchorSnapshot, Option<String>) {
-        self.auth_state.replace_with(|current| {
-            let rotated = current.auth_context != auth_context;
-            if rotated {
-                let previous_anchor_id = current.session_anchor.id().to_string();
-                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
-                let snapshot = SessionAnchorSnapshot {
-                    session_id: self.id.clone(),
-                    agent_id: self.agent_id.clone(),
-                    auth_context: auth_context.clone(),
-                    session_anchor: session_anchor.clone(),
-                };
-                (
-                    Some(SessionAuthState {
-                        auth_context,
-                        session_anchor,
-                    }),
-                    (true, snapshot, Some(previous_anchor_id)),
-                )
-            } else {
-                (
-                    None,
-                    (
-                        false,
-                        SessionAnchorSnapshot {
-                            session_id: self.id.clone(),
-                            agent_id: self.agent_id.clone(),
-                            auth_context: current.auth_context.clone(),
-                            session_anchor: current.session_anchor.clone(),
-                        },
-                        None,
-                    ),
-                )
-            }
-        })
+    ) -> Result<(bool, SessionAnchorSnapshot, Option<String>), SessionError> {
+        self.update_auth_context(auth_context, |_, _| Ok::<(), std::convert::Infallible>(()))
+            .map_err(in_memory_session_error)
     }
 
     pub fn set_auth_context_persisted<E>(
@@ -1122,6 +1171,17 @@ impl Session {
         auth_context: SessionAuthContext,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(), SessionPersistError<E>> {
+        self.update_auth_context(auth_context, persist).map(|_| ())
+    }
+
+    fn update_auth_context<E>(
+        &self,
+        auth_context: SessionAuthContext,
+        persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
+    ) -> Result<(bool, SessionAnchorSnapshot, Option<String>), SessionPersistError<E>> {
+        let issued_at = self
+            .trusted_timestamp()
+            .map_err(SessionPersistError::Session)?;
         let state_guard = self.write_inner();
         if state_guard.state == SessionState::Closed {
             return Err(SessionPersistError::Session(
@@ -1137,8 +1197,13 @@ impl Session {
             let rotated = current.auth_context != auth_context;
             let (next, snapshot, supersedes_anchor_id) = if rotated {
                 let previous_anchor_id = current.session_anchor.id().to_string();
-                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+                let next_epoch =
+                    match next_auth_epoch(&self.id, current.session_anchor.auth_epoch, false) {
+                        Ok(epoch) => epoch,
+                        Err(error) => return (None, Err(SessionPersistError::Session(error))),
+                    };
+                let session_anchor =
+                    SessionAnchorState::new(&self.id, &auth_context, next_epoch, issued_at);
                 let snapshot = SessionAnchorSnapshot {
                     session_id: self.id.clone(),
                     agent_id: self.agent_id.clone(),
@@ -1168,7 +1233,7 @@ impl Session {
 
             let result = persist(&snapshot, supersedes_anchor_id.as_deref());
             match result {
-                Ok(()) => (next, Ok(())),
+                Ok(()) => (next, Ok((rotated, snapshot, supersedes_anchor_id))),
                 Err(error) => (None, Err(SessionPersistError::Persist(error))),
             }
         })
@@ -1198,53 +1263,21 @@ impl Session {
     }
 
     pub fn close(&self) -> Result<(), SessionError> {
-        {
-            let mut inner = self.write_inner();
-            if inner.state == SessionState::Closed {
-                return Ok(());
-            }
-
-            let active_count = self.inflight.len() as u64;
-            if active_count > 0 {
-                if inner.state != SessionState::Closed {
-                    inner.state = SessionState::Draining;
-                }
-                return Err(SessionError::CloseRequiresDrain {
-                    session_id: self.id.clone(),
-                    active_count,
-                });
-            }
-
-            inner.state = SessionState::Closed;
-        }
-
-        self.inflight.clear();
-        self.subscriptions.clear();
-        self.auth_state.replace_with(|current| {
-            let auth_context = SessionAuthContext::in_process_anonymous();
-            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
-            (
-                Some(SessionAuthState {
-                    auth_context,
-                    session_anchor,
-                }),
-                (),
-            )
-        });
-        self.roots.replace(SessionRoots {
-            roots: Vec::new(),
-            normalized_roots: Vec::new(),
-        });
-        self.write_pending_url_elicitations().clear();
-        self.write_late_events().clear();
-        Ok(())
+        self.close_persisted(|_, _| Ok::<(), std::convert::Infallible>(()))
+            .map_err(in_memory_session_error)
     }
 
+    #[allow(
+        clippy::as_conversions,
+        reason = "The active-request count is usize and only widens into the diagnostic u64 field on supported targets."
+    )]
     pub fn close_persisted<E>(
         &self,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(), SessionPersistError<E>> {
+        let issued_at = self
+            .trusted_timestamp()
+            .map_err(SessionPersistError::Session)?;
         let mut inner = self.write_inner();
         if inner.state == SessionState::Closed {
             return Ok(());
@@ -1266,8 +1299,13 @@ impl Session {
         self.auth_state.replace_with(|current| {
             let auth_context = SessionAuthContext::in_process_anonymous();
             let previous_anchor_id = current.session_anchor.id().to_string();
-            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+            let next_epoch =
+                match next_auth_epoch(&self.id, current.session_anchor.auth_epoch, true) {
+                    Ok(epoch) => epoch,
+                    Err(error) => return (None, Err(SessionPersistError::Session(error))),
+                };
+            let session_anchor =
+                SessionAnchorState::new(&self.id, &auth_context, next_epoch, issued_at);
             let snapshot = SessionAnchorSnapshot {
                 session_id: self.id.clone(),
                 agent_id: self.agent_id.clone(),
@@ -1386,6 +1424,7 @@ impl Session {
                     request_id: context.request_id.clone(),
                 });
             }
+            let started_at = self.trusted_timestamp()?;
             self.inflight.track_locked(
                 &mut requests,
                 context,
@@ -1399,7 +1438,7 @@ impl Session {
                 auth_epoch: auth_state.session_anchor.auth_epoch(),
                 parent_request_id: context.parent_request_id.clone(),
                 operation_kind,
-                started_at: current_unix_timestamp(),
+                started_at,
                 terminal_state: None,
             };
             request_lineage.insert(context.request_id.clone(), lineage.clone());
@@ -1542,13 +1581,6 @@ impl Session {
     }
 }
 
-fn current_unix_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
-}
-
 fn auth_context_hash(auth_context: &SessionAuthContext) -> String {
     canonical_json_bytes(auth_context)
         .map(|bytes| sha256_hex(&bytes))
@@ -1591,5 +1623,22 @@ pub enum SessionOperationResponse {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
+
+#[cfg(all(test, not(loom)))]
+#[path = "session/auth_epoch_tests.rs"]
+mod auth_epoch_tests;
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("id", &self.id)
+            .field("agent_id", &self.agent_id)
+            .finish_non_exhaustive()
+    }
+}

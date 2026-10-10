@@ -1134,3 +1134,17 @@ fn concentration_query_uses_persisted_passport_history_after_restart() {
 
     assert!((actual_total - expected_total).abs() < f64::EPSILON);
 }
+
+#[test]
+fn policy_and_weight_imports_reject_duplicates_before_schema_or_signature_projection() {
+    let raw = r#"{"schema":"secret-sentinel","schema":"other"}"#;
+    for result in [
+        runtime_policy_from_json(raw, 1, &[]).map(|_| ()),
+        peer_weights_from_json(raw).map(|_| ()),
+    ] {
+        let error = result.unwrap_err();
+        assert!(matches!(error, PheromoneRuntimeError::Input(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
+    }
+}

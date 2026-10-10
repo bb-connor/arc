@@ -81,6 +81,8 @@ type TestResult = Result<(), AnyError>;
 
 #[path = "finding_market_exit_tests/activation_security.rs"]
 mod activation_security;
+#[path = "finding_market_exit_tests/participation_fees.rs"]
+mod participation_fees;
 
 const SERVICE_TOKEN: &str = "service-secret";
 const VENUE_ID: &str = "venue-wedge";
@@ -126,7 +128,7 @@ fn retract_finding(
     label: &str,
 ) -> Result<(), AnyError> {
     let config = market_config();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let store = authority.finding_status_store();
     let intent_id = sha256_hex(format!("finding-market-exit-retraction:{label}").as_bytes());
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
@@ -460,7 +462,7 @@ fn participation_request(
     Ok(serde_json::json!({
         "feeSchedule": serde_json::to_value(schedule)?,
         "statusOperatorAuthorityStatus": serde_json::to_value(
-            signed_status_operator_authority_status(unix_timestamp_now(), revoked_from)?,
+            signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), revoked_from)?,
         )?,
     }))
 }
@@ -528,7 +530,9 @@ fn audit_pool_binding() -> FindingPoolBinding {
     }
 }
 
-include!("finding_market_exit_tests/market_config.rs");
+#[path = "finding_market_exit_tests/market_config.rs"]
+mod market_config_fixture;
+use market_config_fixture::market_config;
 
 /// Rail observer that always refuses the crash-before-observation activation leg.
 struct FailingRail;
@@ -565,13 +569,18 @@ fn market_state(
     rail: Arc<dyn FindingRailObserver>,
 ) -> TrustServiceState {
     let config = TrustServiceConfig {
+        transport: Default::default(),
         listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
         service_token: SERVICE_TOKEN.to_string(),
         tenant_read_tokens: std::collections::BTreeMap::new(),
+        authority_workload_token: None,
         receipt_db_path: None,
+        receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
+        authority_keyring_config_path: None,
+        authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
@@ -591,16 +600,24 @@ fn market_state(
         certification_public_metadata_ttl_seconds: 300,
         peer_urls: Vec::new(),
         cluster_sync_interval: std::time::Duration::from_millis(25),
+        authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: Some(config),
     };
     TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
+        authority_keyring: None,
+        authority_keyring_seed_path: None,
         joint_authority_store: Some(joint),
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        receipt_store: None,
+        receipt_query_snapshots: None,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(std::sync::Mutex::new(
@@ -608,6 +625,15 @@ fn market_state(
         )),
         cluster: None,
         cluster_progress: None,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
+        operator_registry_write_lane: BlockingLane::new("operator_registry_write", 2),
+        public_passport_issuance_lane: BlockingLane::new("public_passport_issuance", 2),
+        wallet_entitlement_lane: crate::trust_control::ingress_lanes::wallet_entitlement_lane(),
+        public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+            crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+        )),
         finding_rail: Some(rail),
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -1394,7 +1420,8 @@ impl MarketWeb {
         // Seed a provisional affirmative report that `seed_market` replaces
         // from the venue's durable collateral acceptance time. The stale
         // report remains the pre-backing rejection input.
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let report = make_signed_report(&report_inputs, now.saturating_add(1))?;
         let stale_report = make_signed_report(&report_inputs, now)?;
 
@@ -1556,27 +1583,27 @@ impl MarketWeb {
         let body = serde_json::json!({
             "admission": serde_json::to_value(admission)?,
             "collateralAuthorityStatus": serde_json::to_value(
-                signed_collateral_authority_status(unix_timestamp_now(), None)?,
+                signed_collateral_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "profileGovernanceAuthorityStatus": serde_json::to_value(
-                signed_governance_authority_status(unix_timestamp_now(), None)?,
+                signed_governance_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "venueAuthorityStatus": serde_json::to_value(signed_venue_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "listingAuthorityStatus": serde_json::to_value(signed_listing_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "statusOperatorAuthorityStatus": serde_json::to_value(
-                signed_status_operator_authority_status(unix_timestamp_now(), None)?,
+                signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "sellerAuthorization": serde_json::to_value(&self.authorization)?,
             "sellerAuthorizationStatus": serde_json::to_value(
                 signed_seller_authorization_status(
                     &self.authorization,
-                    unix_timestamp_now(),
+                    unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                     None,
                 )?,
             )?,
@@ -1585,7 +1612,7 @@ impl MarketWeb {
             "feeSchedule": serde_json::to_value(schedule)?,
             "verifierReport": serde_json::to_value(report)?,
             "verifierAuthorityStatus": serde_json::to_value(signed_verifier_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "listing": serde_json::to_value(listing)?,
@@ -1608,14 +1635,18 @@ fn provision_stack(
     audit_epoch_length_secs: u64,
     admission_expires_at: u64,
 ) -> Result<MarketStack, AnyError> {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
     std::fs::create_dir(&lock_root)?;
     secure_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let store = joint.finding_market_store();
     let web = MarketWeb::build(audit_epoch_length_secs, admission_expires_at)?;
     let config = market_config();
@@ -1693,7 +1724,12 @@ impl MarketStack {
             &self.state,
             authed_post(
                 "/v1/findings/collateral",
-                collateral_registration_raw(&self.web.backing, unix_timestamp_now(), None)?,
+                collateral_registration_raw(
+                    &self.web.backing,
+                    unix_timestamp_now()
+                        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+                    None,
+                )?,
             )?,
         )
         .await?;
@@ -1714,7 +1750,9 @@ impl MarketStack {
         // The affirmative report is signed only after the venue has accepted
         // collateral. Wait until its exact evaluation instant so the current
         // authority-status reading is never future-dated at activation.
-        while unix_timestamp_now() < self.web.report.body.evaluation_time {
+        while unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+            < self.web.report.body.evaluation_time
+        {
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
         let authority = self
@@ -1730,7 +1768,11 @@ impl MarketStack {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?
-        .publish_non_inclusion(&self.web.finding_id, &[], unix_timestamp_now())?;
+        .publish_non_inclusion(
+            &self.web.finding_id,
+            &[],
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        )?;
         Ok(())
     }
 
@@ -1933,7 +1975,12 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
         &stack.state,
         authed_post(
             "/v1/findings/collateral",
-            collateral_registration_raw(&web.backing, unix_timestamp_now(), None)?,
+            collateral_registration_raw(
+                &web.backing,
+                unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+                None,
+            )?,
         )?,
     )
     .await?;
@@ -1946,7 +1993,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     // Rejection sweep over the activation surface. Every leg asserts the
     // specific status and that nothing was admitted.
 
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut revoked_governance_request: serde_json::Value =
         serde_json::from_str(&web.activate_request(&web.admission, &web.schedule, &web.report)?)?;
     revoked_governance_request["profileGovernanceAuthorityStatus"] =
@@ -2077,7 +2124,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     .await?;
 
     let mut future_pricing_body = web.pricing_hint.body.clone();
-    future_pricing_body.issued_at = unix_timestamp_now().saturating_add(60);
+    future_pricing_body.issued_at = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .saturating_add(60);
     let future_pricing = SignedListingPricingHint::sign(future_pricing_body, &web.operator)?;
     let mut future_pricing_admission =
         web.admission_body(&web.schedule_sha256, &web.report, ADMISSION_EXPIRES_AT)?;
@@ -2097,7 +2146,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     .await?;
 
     let mut post_status_pricing_body = web.pricing_hint.body.clone();
-    post_status_pricing_body.issued_at = unix_timestamp_now().saturating_sub(1);
+    post_status_pricing_body.issued_at = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .saturating_sub(1);
     let post_status_pricing =
         SignedListingPricingHint::sign(post_status_pricing_body, &web.operator)?;
     let mut post_status_admission =
@@ -2246,7 +2297,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     )
     .await?;
 
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut future_listing_body = web.listing.body.clone();
     future_listing_body.published_at = now.saturating_add(60);
     let future_listing = SignedGenericListing::sign(future_listing_body, &web.operator)?;
@@ -2430,7 +2481,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
         .as_mut()
         .ok_or_else(|| missing("finding market config"))?
         .venue
-        .valid_until = unix_timestamp_now();
+        .valid_until =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let (status, body) = send(
         &expired_venue_state,
         authed_post(
@@ -2510,7 +2562,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     retry_config.venue.valid_until = attempt.prepared_at.saturating_add(1);
     retry_config.status_feed_operator.authority.valid_until = attempt.prepared_at.saturating_add(1);
     let rollover = attempt.prepared_at.saturating_add(1);
-    while unix_timestamp_now() < rollover {
+    while unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        < rollover
+    {
         tokio::time::sleep(std::time::Duration::from_millis(25)).await;
     }
     let (status, body) = send(
@@ -2663,7 +2717,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     let context = FindingAdmissionContext {
         venue_authority: &venue_key,
         venue_id: VENUE_ID,
-        now: unix_timestamp_now(),
+        now: unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         fee_schedule: &web.schedule,
         fee_schedule_gate: FindingFeeScheduleGate::Legacy,
         trusted_local_operator_signers: &trusted_signers,
@@ -2712,7 +2766,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
             age_secs: 20,
             max_age_secs: 300,
             valid_until: WINDOW_EXPIRES_AT,
-            generated_at: unix_timestamp_now(),
+            generated_at: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         },
     };
     let request = SignedBidRequest::sign(
@@ -2729,7 +2784,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
                 max_invocations: Some(1),
                 capability_scope_prefix: web.scope.clone(),
             },
-            issued_at: unix_timestamp_now(),
+            issued_at: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         },
         &agent,
     )?;
@@ -2740,7 +2796,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
             issuer_keypair: &web.operator,
             agent_subject: agent.public_key(),
             token_id: "finding-token-0001".to_string(),
-            now: unix_timestamp_now(),
+            now: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             grant_constraints: Vec::new(),
             dpop_required: None,
         },
@@ -2805,82 +2862,12 @@ async fn enforced_penalty_block_refuses_a_fresh_activation() -> TestResult {
 }
 
 #[tokio::test]
-async fn noncanonical_publish_ingress_rejects() -> TestResult {
-    let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    stack.seed_market().await?;
-    let web = &stack.web;
-
-    let parsed: serde_json::Value = serde_json::from_str(&web.second_raw_finding)?;
-
-    // Duplicate member names never reach the schema layer.
-    let duplicate_keys = r#"{"schema":"chio.finding.v1","schema":"chio.finding.v1"}"#.to_string();
-
-    // Uppercase hex survives canonicalization byte-for-byte and is caught
-    // by the registered schema's lowercase digest pattern.
-    let mut uppercase = parsed.clone();
-    uppercase["payload_sha256"] = serde_json::json!(HEX64.to_uppercase());
-    let uppercase = canonical_string(&uppercase)?;
-
-    // An explicit null option is either rejected by the schema or erased
-    // by typed deserialization, breaking typed-canonical equality.
-    let mut explicit_null = parsed.clone();
-    explicit_null["license_ref"] = serde_json::Value::Null;
-    let explicit_null = canonical_string(&explicit_null)?;
-
-    // A float token spells the same number noncanonically.
-    let float_token = web
-        .second_raw_finding
-        .replacen("\"units\":10}", "\"units\":10.0}", 1);
-    assert_ne!(float_token, web.second_raw_finding);
-
-    // Whitespace padding breaks raw-equals-canonical.
-    let padded = format!(" {}", web.second_raw_finding);
-
-    for raw in [
-        duplicate_keys,
-        uppercase,
-        explicit_null,
-        float_token,
-        padded,
-    ] {
-        let (status, body) = send(&stack.state, authed_post("/v1/findings/publish", raw)?).await?;
-        assert_eq!(
-            status,
-            StatusCode::BAD_REQUEST,
-            "{}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-    // Nothing was indexed by any rejected spelling.
-    let (status, _) = send(
-        &stack.state,
-        public_get(&format!("/v1/findings/{}", web.second_finding_id))?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    Ok(())
-}
-
-#[tokio::test]
-async fn oversized_publish_body_rejects() -> TestResult {
-    let stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    let oversized = "x".repeat(FINDING_PUBLISH_MAX_BODY_BYTES + 1);
-    let (status, _) = send(
-        &stack.state,
-        authed_post("/v1/findings/publish", oversized)?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
-    Ok(())
-}
-
-#[tokio::test]
 async fn future_issued_and_expired_findings_reject() -> TestResult {
     let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
     stack.seed_market().await?;
     let web = &stack.web;
     let issuer = keypair(3);
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let mut future = web.finding.clone();
     future.descriptor.topic = "repo:backbay/chio#m2-exit-future".to_string();
@@ -3221,218 +3208,7 @@ fn activation_reverifies_profile_and_report_authority_lifecycle() -> TestResult 
     Ok(())
 }
 
-#[tokio::test]
-async fn unpaid_epoch_drops_the_marker_until_renewal() -> TestResult {
-    // One-second audit epochs: the epoch lapses on the wall clock right
-    // after activation, so the unpaid-epoch read-time filter is
-    // observable without touching the stored envelope.
-    let mut stack = provision_stack(1, ADMISSION_EXPIRES_AT)?;
-    stack.seed_market().await?;
-    let (status, body) = stack.activate().await?;
-    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
-    tokio::time::sleep(std::time::Duration::from_millis(1_200)).await;
-    assert!(
-        stack.admission_marker().await?.is_none(),
-        "an unpaid epoch must clear the qualified-profile marker"
-    );
-    let (status, _) = send(
-        &stack.state,
-        public_get(&format!("/v1/findings/{}/admission", stack.web.finding_id))?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-
-    // Renewal restores currency. Epochs advance one wall-clock second at
-    // a time here, so a short bounded loop of renewals catches up.
-    let renewal = participation_request(&stack.web.schedule, None)?.to_string();
-    let mut restored = false;
-    for _ in 0..8 {
-        let (status, body) = send(
-            &stack.state,
-            authed_post(
-                &format!("/v1/findings/{}/participation", stack.web.finding_id),
-                renewal.clone(),
-            )?,
-        )
-        .await?;
-        assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
-        if stack.admission_marker().await?.is_some() {
-            restored = true;
-            break;
-        }
-    }
-    assert!(
-        restored,
-        "participation renewal must restore the qualified-profile marker"
-    );
-    let paid_through = stack
-        .store
-        .paid_through_epoch(
-            &stack.web.finding_id,
-            LISTING_ID,
-            &stack.web.schedule_sha256,
-        )?
-        .ok_or_else(|| missing("paid-through epoch after renewal"))?;
-    assert!(paid_through >= 1);
-    Ok(())
-}
-
-#[tokio::test]
-async fn fee_routes_require_an_explicit_authoritative_rail() -> TestResult {
-    let mut activation = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    activation.seed_market().await?;
-    let mut no_rail_state = activation.state.clone();
-    no_rail_state.finding_rail = None;
-    let (status, body) = send(
-        &no_rail_state,
-        authed_post(
-            &format!("/v1/findings/{}/activate", activation.web.finding_id),
-            activation.web.activate_request(
-                &activation.web.admission,
-                &activation.web.schedule,
-                &activation.web.report,
-            )?,
-        )?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::CONFLICT);
-    assert!(String::from_utf8_lossy(&body).contains("no evidenced rail observer"));
-    assert_nothing_admitted(&activation).await?;
-
-    let mut participation = provision_stack(1, ADMISSION_EXPIRES_AT)?;
-    participation.seed_market().await?;
-    let (status, body) = participation.activate().await?;
-    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
-    tokio::time::sleep(std::time::Duration::from_millis(1_200)).await;
-    let mut no_rail_state = participation.state.clone();
-    no_rail_state.finding_rail = None;
-    let renewal = participation_request(&participation.web.schedule, None)?;
-    let (status, body) = send(
-        &no_rail_state,
-        authed_post(
-            &format!(
-                "/v1/findings/{}/participation",
-                participation.web.finding_id
-            ),
-            renewal.to_string(),
-        )?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::CONFLICT);
-    assert!(String::from_utf8_lossy(&body).contains("no evidenced rail observer"));
-    assert_eq!(
-        participation.store.paid_through_epoch(
-            &participation.web.finding_id,
-            LISTING_ID,
-            &participation.web.schedule_sha256,
-        )?,
-        Some(0)
-    );
-    assert!(participation.admission_marker().await?.is_none());
-    Ok(())
-}
-
-#[tokio::test]
-async fn activation_rejects_a_mismatched_rail_observation() -> TestResult {
-    let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    stack.seed_market().await?;
-    let mut mismatched_state = stack.state.clone();
-    mismatched_state.finding_rail = Some(Arc::new(MismatchedRail));
-    let (status, body) = send(
-        &mismatched_state,
-        authed_post(
-            &format!("/v1/findings/{}/activate", stack.web.finding_id),
-            stack.web.activate_request(
-                &stack.web.admission,
-                &stack.web.schedule,
-                &stack.web.report,
-            )?,
-        )?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    assert!(String::from_utf8_lossy(&body).contains("does not reconcile"));
-    let publication_event = stack
-        .store
-        .get_fee_event(&stack.publication_fee_key())?
-        .ok_or_else(|| missing("publication fee intent after rail mismatch"))?;
-    assert_eq!(publication_event.state, FindingFeeState::Failed);
-    assert!(publication_event.observation_sha256.is_none());
-    assert_not_admitted_with_allocation(&stack, FindingAllocationState::Consumed).await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn participation_renewal_rejects_a_mismatched_rail_observation() -> TestResult {
-    let mut stack = provision_stack(1, ADMISSION_EXPIRES_AT)?;
-    stack.seed_market().await?;
-    let (status, body) = stack.activate().await?;
-    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
-
-    tokio::time::sleep(std::time::Duration::from_millis(1_200)).await;
-    let mut mismatched_state = stack.state.clone();
-    mismatched_state.finding_rail = Some(Arc::new(MismatchedRail));
-    let renewal = participation_request(&stack.web.schedule, None)?;
-    let (status, body) = send(
-        &mismatched_state,
-        authed_post(
-            &format!("/v1/findings/{}/participation", stack.web.finding_id),
-            renewal.to_string(),
-        )?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    assert!(String::from_utf8_lossy(&body).contains("does not reconcile"));
-    assert_eq!(
-        stack.store.paid_through_epoch(
-            &stack.web.finding_id,
-            LISTING_ID,
-            &stack.web.schedule_sha256,
-        )?,
-        Some(0)
-    );
-    assert!(stack.admission_marker().await?.is_none());
-    Ok(())
-}
-
-#[tokio::test]
-async fn expired_admission_loses_the_marker() -> TestResult {
-    let expires_at = unix_timestamp_now() + 6;
-    let mut stack = provision_stack(LONG_EPOCH_SECS, expires_at)?;
-    stack.seed_market().await?;
-    let (status, body) = stack.activate().await?;
-    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
-    assert!(stack.admission_marker().await?.is_some());
-    let remaining = expires_at.saturating_sub(unix_timestamp_now()) + 1;
-    tokio::time::sleep(std::time::Duration::from_secs(remaining)).await;
-    assert!(
-        stack.admission_marker().await?.is_none(),
-        "an expired admission must clear the qualified-profile marker"
-    );
-    let (status, _) = send(
-        &stack.state,
-        public_get(&format!("/v1/findings/{}/admission", stack.web.finding_id))?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    let renewal = participation_request(&stack.web.schedule, None)?;
-    let (status, body) = send(
-        &stack.state,
-        authed_post(
-            &format!("/v1/findings/{}/participation", stack.web.finding_id),
-            renewal.to_string(),
-        )?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert!(String::from_utf8_lossy(&body).contains("not live"));
-    assert_eq!(
-        stack.store.paid_through_epoch(
-            &stack.web.finding_id,
-            LISTING_ID,
-            &stack.web.schedule_sha256,
-        )?,
-        Some(0)
-    );
-    Ok(())
-}
+#[path = "finding_market_exit_tests/ingress.rs"]
+mod ingress;
+#[path = "finding_market_exit_tests/search_admission.rs"]
+mod search_admission;

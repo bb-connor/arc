@@ -12,6 +12,7 @@ keywords = ["chio", "conformance", "mcp", "agent-protocol"]
 categories = ["development-tools::testing", "command-line-utilities"]
 include = [
     "src/**",
+    "build.rs",
     "README.md",
     "Cargo.toml",
     "peers.lock.toml",
@@ -59,6 +60,8 @@ path = "src/bin/chio_econsim_runner.rs"
 # directories through `ConformanceRunOptions`.
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
+# Entry points for the fuzz targets under fuzz/; never enabled by the CLI.
+fuzz = []
 chio-bbs = [
     "dep:chio-selective-disclosure",
     "dep:chio-workflow",
@@ -74,6 +77,7 @@ chio-kernel = { workspace = true }
 chio-trace-validate = { workspace = true }
 chio-store-sqlite = { workspace = true }
 async-trait = { workspace = true }
+base64ct = { workspace = true, features = ["alloc"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -147,8 +151,14 @@ chio-custody-hw = { workspace = true, default-features = false, features = ["dev
 chio-http-core = { workspace = true }
 chio-http-session = { workspace = true }
 chio-guards = { workspace = true }
+chio-control-plane = { workspace = true }
+chio-decoy = { workspace = true }
+chio-flow = { workspace = true }
+chio-quarantine = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-security-types = { workspace = true }
+chio-test-support = { workspace = true }
 chio-weights = { workspace = true }
-base64ct = { workspace = true, features = ["alloc"] }
 # Negative conformance fixture: `b4_bilateral_dsse_signature_slice.rs`
 # re-encodes signature bytes in base64 to forge a DSSE envelope;
 # chio-federation's DSSE envelope wire format is RFC 4648 standard
@@ -199,6 +209,7 @@ rusqlite = { workspace = true }
 # Registry-consumed smoke test pulls in the six edges plus
 # chio-wasm-guards so it can drive each emission boundary directly.
 chio-mcp-edge = { workspace = true }
+chio-cross-protocol = { workspace = true }
 chio-acp-edge = { workspace = true }
 chio-a2a-edge = { workspace = true }
 chio-manifest = { workspace = true }

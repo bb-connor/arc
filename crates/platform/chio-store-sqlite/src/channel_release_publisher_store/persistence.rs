@@ -189,17 +189,19 @@ pub(super) fn encode(
 }
 
 pub(super) fn canonicalize_json(bytes: &[u8]) -> Result<Vec<u8>, ChannelReleasePublisherError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| invalid(format!("channel release authorization is invalid: {error}")))?;
+    let value: serde_json::Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChannelReleasePublisherError::from)?;
     canonical_json_bytes(&value)
         .map_err(|error| invalid(format!("channel release authorization is invalid: {error}")))
 }
 
 pub(super) fn authorization_digest(canonical_authorization: &[u8]) -> String {
     let mut bytes = Vec::with_capacity(
-        CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN.len() + canonical_authorization.len(),
+        SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN.len() + canonical_authorization.len(),
     );
-    bytes.extend_from_slice(CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN);
+    bytes.extend_from_slice(SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN);
     bytes.extend_from_slice(canonical_authorization);
     sha256_hex(&bytes)
 }
@@ -217,10 +219,11 @@ pub(super) fn parse_base_units(value: &str) -> Result<u128, ChannelReleasePublis
 }
 
 pub(super) fn verify_trusted_time(
+    owner: &SqliteServingOwner,
     transaction: &Transaction<'_>,
     trusted_now_unix_ms: u64,
 ) -> Result<(), ChannelReleasePublisherError> {
-    crate::admission_operation_store::verify_trusted_time(transaction, trusted_now_unix_ms)
+    crate::admission_operation_store::verify_trusted_time(transaction, trusted_now_unix_ms, owner)
         .map_err(admission_error)?;
     let high_water = transaction
         .query_row(

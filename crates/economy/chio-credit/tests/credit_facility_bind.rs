@@ -231,11 +231,13 @@ fn facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes
     let noncanonical = serde_json::to_vec_pretty(&fixture.signed)?;
     assert!(matches!(
         SignedCreditFacilityBindV1::from_canonical_bytes(&noncanonical),
-        Err(CreditFacilityBindError::Canonicalization(_))
+        Err(CreditFacilityBindError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
     assert!(matches!(
         verify(&noncanonical, &fixture.trust, ISSUED_AT_UNIX_MS),
-        Err(CreditFacilityBindError::Canonicalization(_))
+        Err(CreditFacilityBindError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
 
     let unknown = substituted_bytes(

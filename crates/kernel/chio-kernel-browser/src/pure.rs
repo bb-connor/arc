@@ -2,6 +2,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNegotiation};
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
@@ -14,8 +15,8 @@ use chio_kernel_core::{
 };
 
 use crate::wire::{
-    BindingError, EvaluateRequestJson, EvaluationVerdictJson, ParentBudgetSnapshotJson,
-    SignReceiptRequestJson, VerifiedCapabilityJson, VerifyCapabilityRequestJson,
+    BindingError, CapabilityVerificationJson, EvaluateRequestJson, EvaluationVerdictJson,
+    ParentBudgetSnapshotJson, SignReceiptRequestJson, VerifyCapabilityRequestJson,
     VerifyReceiptResultJson,
 };
 
@@ -218,7 +219,7 @@ pub fn sign_receipt_relaying_trusted_body_pure(
 pub fn verify_capability_pure(
     input: VerifyCapabilityRequestJson,
     clock: &dyn chio_kernel_core::Clock,
-) -> Result<VerifiedCapabilityJson, BindingError> {
+) -> Result<CapabilityVerificationJson, BindingError> {
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
     let crypto_floor =
         chio_core_types::capability::crypto_floor::CapabilityCryptoFloor::AllowClassical;
@@ -264,7 +265,7 @@ pub fn verify_capability_pure(
     };
 
     match result {
-        Ok(verified) => Ok(VerifiedCapabilityJson::from(verified)),
+        Ok(verified) => Ok(CapabilityVerificationJson::from(verified)),
         Err(error) => Err(BindingError::new(
             "capability_verification_failed",
             capability_error_message(&error),
@@ -276,6 +277,11 @@ pub fn verify_capability_pure(
 /// envelope, runs the embedded-key signature check, optionally pins the
 /// signer to a trusted-issuer set, and returns a structured outcome.
 ///
+/// The envelope is decoded with the signed-wire contract: a duplicate
+/// object key at any depth, or a number token that would change
+/// representation, rejects as `invalid_receipt_envelope` before any field
+/// is read.
+///
 /// `trusted_issuers` must contain the signer before `ok` can be true.
 /// An empty slice means "signature-only verification": the signature
 /// and parameter hash fields still report their mathematical status,
@@ -284,12 +290,13 @@ pub fn verify_receipt_pure(
     envelope: &[u8],
     trusted_issuers: &[PublicKey],
 ) -> Result<VerifyReceiptResultJson, BindingError> {
-    let receipt: ChioReceipt = serde_json::from_slice(envelope).map_err(|error| {
-        BindingError::new(
-            "invalid_receipt_envelope",
-            format!("could not parse receipt envelope as JSON: {error}"),
-        )
-    })?;
+    let receipt: ChioReceipt = core::str::from_utf8(envelope)
+        .map_err(|error| invalid_receipt_envelope(&error))
+        .and_then(|text| {
+            UntrustedJsonText::new(text)
+                .decode_signed()
+                .map_err(|error| invalid_receipt_envelope(&error))
+        })?;
 
     let signer_key_hex = receipt.kernel_key.to_hex();
     let receipt_id = receipt.id.clone();
@@ -353,6 +360,13 @@ pub fn verify_receipt_pure(
         signature_valid,
         signer_trusted,
     })
+}
+
+fn invalid_receipt_envelope(error: &dyn core::fmt::Display) -> BindingError {
+    BindingError::new(
+        "invalid_receipt_envelope",
+        format!("could not parse receipt envelope as JSON: {error}"),
+    )
 }
 
 fn capability_error_message(error: &chio_kernel_core::CapabilityError) -> String {
@@ -436,22 +450,20 @@ pub fn decode_seed_hex(hex_str: &str) -> Result<[u8; 32], BindingError> {
     }
     let mut out = [0u8; 32];
     let bytes = stripped.as_bytes();
-    let mut idx = 0;
-    while idx < bytes.len() {
-        let hi = from_hex_nibble(bytes[idx]).map_err(|reason| {
+    for (output, [hi, lo]) in out.iter_mut().zip(bytes.as_chunks::<2>().0) {
+        let hi = from_hex_nibble(*hi).map_err(|reason| {
             BindingError::new(
                 "invalid_seed_hex",
                 format!("seed has non-hex character: {reason}"),
             )
         })?;
-        let lo = from_hex_nibble(bytes[idx + 1]).map_err(|reason| {
+        let lo = from_hex_nibble(*lo).map_err(|reason| {
             BindingError::new(
                 "invalid_seed_hex",
                 format!("seed has non-hex character: {reason}"),
             )
         })?;
-        out[idx / 2] = (hi << 4) | lo;
-        idx += 2;
+        *output = (hi << 4) | lo;
     }
     Ok(out)
 }
@@ -467,14 +479,18 @@ fn from_hex_nibble(byte: u8) -> Result<u8, &'static str> {
 
 /// Lowercase-hex encoder shared by the wasm seed-minting entry and the
 /// native unit tests.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The table has 16 entries and each index is a masked four-bit nibble."
+)]
 pub fn hex_encode_lower(bytes: &[u8]) -> String {
     const NIBBLES: [char; 16] = [
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
     ];
     let mut out = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        out.push(NIBBLES[(byte >> 4) as usize]);
-        out.push(NIBBLES[(byte & 0x0f) as usize]);
+        out.push(NIBBLES[usize::from(byte >> 4)]);
+        out.push(NIBBLES[usize::from(byte & 0x0f)]);
     }
     out
 }

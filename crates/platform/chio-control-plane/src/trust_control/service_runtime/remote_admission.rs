@@ -1,3 +1,10 @@
+#[cfg(test)]
+#[path = "remote_admission/compacted_metadata_tests.rs"]
+mod compacted_metadata_tests;
+
+#[path = "remote_admission/recovery.rs"]
+mod recovery;
+
 use std::sync::Arc;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -6,7 +13,9 @@ use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_kernel::admission_operation::{
     AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult, AdmissionOperationCommand,
     AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionRecoveryLease,
+    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionRecoveryDeferralClear,
+    AdmissionRecoveryDeferralWrite, AdmissionRecoveryLease, AdmissionRecoveryPageQuery,
+    AdmissionRecoveryPageV1, AdmissionRecoveryPortError, AdmissionRecoveryStatusV1,
     AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection,
     QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
@@ -73,7 +82,11 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
-    let budget = super::budget::build_shared_remote_budget_store(control_url, control_token)?;
+    let budget = super::budget::build_shared_remote_budget_store(
+        control_url,
+        control_token,
+        status.fence.clone(),
+    )?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),
@@ -118,6 +131,13 @@ fn decode_response<T: DeserializeOwned>(
     if !response.schema_is_valid() {
         return Err(RemoteAdmissionError::Protocol(
             "admission authority response schema is invalid".to_owned(),
+        ));
+    }
+    if response.error.as_ref().is_some_and(|error| {
+        error.compacted_raw.is_some() && error.code != AdmissionAuthorityErrorCode::Invariant
+    }) {
+        return Err(RemoteAdmissionError::Protocol(
+            "compacted raw status conflicts with its admission authority error category".into(),
         ));
     }
     match (response.result, response.error) {
@@ -304,6 +324,36 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
             .map_err(Into::into)
     }
 
+    fn recovery_page(
+        &self,
+        query: AdmissionRecoveryPageQuery<'_>,
+    ) -> Result<AdmissionRecoveryPageV1, AdmissionRecoveryPortError> {
+        self.recovery_page_rpc(query)
+    }
+
+    fn load_recovery_status(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionRecoveryStatusV1>, AdmissionRecoveryPortError> {
+        self.recovery_status_rpc(operation_id, fence)
+    }
+
+    fn defer_recovery(
+        &self,
+        request: AdmissionRecoveryDeferralWrite<'_>,
+    ) -> Result<AdmissionRecoveryStatusV1, AdmissionRecoveryPortError> {
+        self.recovery_defer_rpc(request)
+    }
+
+    fn clear_recovery_deferral(
+        &self,
+        request: AdmissionRecoveryDeferralClear<'_>,
+    ) -> Result<(), AdmissionRecoveryPortError> {
+        self.recovery_clear_rpc(request)
+    }
+
     fn load_terminal_replay(
         &self,
         replay_key: &AdmissionReplayKey,
@@ -340,18 +390,10 @@ impl ReceiptStore for RemoteAdmissionAuthority {
     }
 
     fn admission_projection_capabilities(&self) -> AdmissionProjectionCapabilities {
+        // The remote authority does not serve the operation-owned nonce ports.
         AdmissionProjectionCapabilities {
-            operation_terminal: true,
-            incident_terminal: true,
-            tool_outcome: true,
-            payment_terminal: true,
-            authorization_consumption: true,
-            outcome_eligibility: true,
-            observation_attempt_zero: true,
-            obligation: true,
-            channel_terminal: true,
-            credit_exposure_terminal: true,
-            economic_mutation_terminal: true,
+            execution_nonce_participant: false,
+            ..AdmissionProjectionCapabilities::ALL
         }
     }
 
@@ -1070,6 +1112,15 @@ fn payment_journal_error(error: RemoteAdmissionError) -> AdmissionPaymentJournal
 
 fn outcome_error(error: RemoteAdmissionError) -> ToolOutcomeStoreError {
     match error {
+        RemoteAdmissionError::Authority(error)
+            if error.code == AdmissionAuthorityErrorCode::Invariant
+                && error.compacted_raw.is_some() =>
+        {
+            match error.compacted_raw {
+                Some(metadata) => metadata.into_store_error(),
+                None => ToolOutcomeStoreError::Invariant(error.message),
+            }
+        }
         RemoteAdmissionError::Authority(error) => match error.code {
             AdmissionAuthorityErrorCode::Fenced => ToolOutcomeStoreError::Fenced,
             AdmissionAuthorityErrorCode::NotFound => ToolOutcomeStoreError::NotFound,

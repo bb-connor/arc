@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json",
+  "title": "Chio cage receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "attempt_id", "stage", "enforcement_record", "started_at_unix_ms", "recorded_at_unix_ms"],
+  "properties": {
+    "schema": { "const": "chio.cage.receipt-body.v1" },
+    "attempt_id": { "$ref": "#/$defs/identifier" },
+    "stage": { "enum": ["rejection", "bootstrap", "enforcement", "terminal_exit"] },
+    "bindings": { "$ref": "#/$defs/bindings" },
+    "enforcement_record": { "$ref": "cage-enforcement-record-v1.schema.json" },
+    "started_at_unix_ms": { "type": "integer", "minimum": 1 },
+    "recorded_at_unix_ms": { "type": "integer", "minimum": 1000 }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "stage": { "const": "rejection" },
+        "enforcement_record": { "type": "object", "properties": { "state": { "enum": ["unsupported", "rejected"] } }, "required": ["state"] }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["bindings"],
+      "properties": {
+        "stage": { "const": "bootstrap" },
+        "enforcement_record": { "type": "object", "properties": { "state": { "const": "bootstrap_failed" } }, "required": ["state"] }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["bindings"],
+      "properties": {
+        "stage": { "const": "enforcement" },
+        "enforcement_record": { "type": "object", "properties": { "state": { "const": "fully_enforced" } }, "required": ["state"] }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["bindings"],
+      "properties": {
+        "stage": { "const": "terminal_exit" },
+        "enforcement_record": { "type": "object", "properties": { "state": { "const": "exited" } }, "required": ["state"] }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_digest", "profile_digest", "plan_digest", "fd_table_digest", "helper_binding_digest", "target_binding_digest", "target_identity"],
+      "properties": {
+        "manifest_digest": { "$ref": "#/$defs/digest" },
+        "profile_digest": { "$ref": "#/$defs/digest" },
+        "plan_digest": { "$ref": "#/$defs/digest" },
+        "fd_table_digest": { "$ref": "#/$defs/digest" },
+        "helper_binding_digest": { "$ref": "#/$defs/digest" },
+        "target_binding_digest": { "$ref": "#/$defs/digest" },
+        "target_identity": { "$ref": "cage-enforcement-prepared-v1.schema.json#/$defs/regularFileIdentity" }
+      }
+    }
+  }
+}

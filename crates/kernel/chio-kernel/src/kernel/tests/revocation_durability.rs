@@ -1,3 +1,4 @@
+use super::*;
 // The kernel denies at dispatch when the revocation store is ephemeral and the
 // operator has not opted in, mirroring the receipt-persistence admission gate.
 

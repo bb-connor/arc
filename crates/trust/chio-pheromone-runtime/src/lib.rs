@@ -26,6 +26,7 @@ use chio_pheromone::{
 };
 use serde::{Deserialize, Serialize};
 
+mod input;
 pub mod store;
 
 pub const PHEROMONE_RECEIVE_REPORT_SCHEMA: &str = "chio.pheromone.receive-report.v1";
@@ -38,6 +39,8 @@ const PHEROMONE_PEER_WEIGHTS_SCHEMA_JSON: &str =
 
 #[derive(Debug, thiserror::Error)]
 pub enum PheromoneRuntimeError {
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("federation: {0}")]
     Federation(#[from] PheromoneGossipError),
     #[error("pheromone: {0}")]
@@ -46,10 +49,12 @@ pub enum PheromoneRuntimeError {
     WorkflowContextMismatch(String),
     #[error("chio_workflow_verification: {0}")]
     WorkflowVerification(String),
+    #[error("pheromone runtime IO failed")]
+    Io(#[source] std::io::Error),
     #[error("sqlite: {0}")]
     Sqlite(String),
     #[error("json: {0}")]
-    Json(String),
+    Json(#[source] chio_core_types::canonical::UntrustedJsonError),
     #[error("schema_invalid: {0}")]
     SchemaInvalid(String),
     #[error("canonical_json: {0}")]
@@ -68,7 +73,9 @@ impl PheromoneRuntimeError {
             Self::Pheromone(error) => error.code(),
             Self::WorkflowContextMismatch(_) => "workflow_context_mismatch",
             Self::WorkflowVerification(_) => "chio_workflow_verification",
+            Self::Io(_) => "io",
             Self::Sqlite(_) => "sqlite",
+            Self::Input(error) => error.code(),
             Self::Json(_) => "json",
             Self::SchemaInvalid(_) => "schema_invalid",
             Self::CanonicalJson(_) => "canonical_json",
@@ -92,13 +99,15 @@ impl<T> From<PoisonError<T>> for PheromoneRuntimeError {
 
 impl From<serde_json::Error> for PheromoneRuntimeError {
     fn from(error: serde_json::Error) -> Self {
-        Self::Json(error.to_string())
+        Self::Json(chio_core_types::canonical::UntrustedJsonError::Decode(
+            error,
+        ))
     }
 }
 
 impl From<std::io::Error> for PheromoneRuntimeError {
     fn from(error: std::io::Error) -> Self {
-        Self::Json(error.to_string())
+        Self::Io(error)
     }
 }
 
@@ -286,7 +295,7 @@ pub fn runtime_policy_from_json(
     now_unix_ms: u64,
     trusted_runtime_policy_issuer_keys: &[chio_core_types::PublicKey],
 ) -> Result<(PheromoneTransitPolicy, PheromoneReceiverConfig), PheromoneRuntimeError> {
-    let value: serde_json::Value = serde_json::from_str(json)?;
+    let value: serde_json::Value = crate::input::decode(json.as_bytes())?;
     validate_runtime_policy_schema(&value)?;
     let envelope: SignedExportEnvelope<serde_json::Value> = serde_json::from_value(value)?;
     if !envelope
@@ -399,7 +408,7 @@ fn validate_json_schema(
 pub fn peer_weights_from_json(
     json: &str,
 ) -> Result<StaticPeerWeightProvider, PheromoneRuntimeError> {
-    let value: serde_json::Value = serde_json::from_str(json)?;
+    let value: serde_json::Value = crate::input::decode(json.as_bytes())?;
     validate_json_schema(&value, PHEROMONE_PEER_WEIGHTS_SCHEMA_JSON, "peer weights")?;
     let document: PeerWeightsDocument = serde_json::from_value(value)?;
     if document.schema != PHEROMONE_PEER_WEIGHTS_SCHEMA {

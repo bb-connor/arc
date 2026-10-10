@@ -48,11 +48,15 @@ pub const OUTCOME_ARTIFACT_SCHEMAS: &[(&str, &str)] = &[
     ("verdict.schema.json", OUTCOME_VERDICT_SCHEMA),
 ];
 
+/// Maximum original bytes accepted for an outcome artifact or evaluated JSON output.
+pub const MAX_OUTCOME_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAX_TEXT_CHARS: usize = 2_048;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum OutcomeError {
+    #[error("invalid outcome input: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("invalid outcome field `{0}`")]
     InvalidField(&'static str),
     #[error("outcome artifact binding does not match")]
@@ -131,18 +135,19 @@ pub fn load_canonical_outcome_json<T>(bytes: &[u8]) -> Result<T, OutcomeError>
 where
     T: DeserializeOwned,
 {
-    let input =
-        std::str::from_utf8(bytes).map_err(|error| OutcomeError::InvalidJson(error.to_string()))?;
-    let canonical = canonical_json_bytes_from_str(input)
-        .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?;
-    if canonical.as_slice() != bytes {
-        return Err(OutcomeError::Canonicalization(
-            "input bytes differ from RFC 8785 form".to_owned(),
-        ));
-    }
-    let value = serde_json::from_slice(bytes)
-        .map_err(|error| OutcomeError::InvalidJson(error.to_string()))?;
-    Ok(value)
+    use chio_core_types::canonical::{
+        SharedUntrustedJsonError, UntrustedJsonError, UntrustedJsonText,
+    };
+    let decode = || -> Result<T, UntrustedJsonError> {
+        let input = UntrustedJsonText::from_wire(bytes, MAX_OUTCOME_JSON_BYTES)?;
+        if input.canonicalize()?.as_slice() != bytes {
+            return Err(UntrustedJsonError::NonCanonical);
+        }
+        input.decode_external()
+    };
+    decode()
+        .map_err(SharedUntrustedJsonError::from)
+        .map_err(Into::into)
 }
 
 pub(super) fn domain_digest(domain: &[u8], value: &impl Serialize) -> Result<String, OutcomeError> {

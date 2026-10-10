@@ -63,10 +63,9 @@ pub(super) fn verify_coordinator_invariants(
 }
 
 fn verify_stored_coordinator(stored: &StoredCoordinator) -> Result<(), FrostStoreError> {
-    let body: FrostAuthorizationBodyV1 = serde_json::from_slice(&stored.authorization_body_json)
-        .map_err(|error| invalid(error.to_string()))?;
-    let roster: FrostRosterV1 =
-        serde_json::from_slice(&stored.roster_json).map_err(|error| invalid(error.to_string()))?;
+    let body: FrostAuthorizationBodyV1 =
+        crate::frost_store::decode_record(&stored.authorization_body_json)?;
+    let roster: FrostRosterV1 = crate::frost_store::decode_record(&stored.roster_json)?;
     body.validate()
         .map_err(|error| invalid(error.to_string()))?;
     roster
@@ -123,8 +122,7 @@ fn verify_stored_coordinator(stored: &StoredCoordinator) -> Result<(), FrostStor
         }
     }
     if let Some(blob) = stored.authorization_blob.as_deref() {
-        let proof: FrostAuthorizationV1 =
-            serde_json::from_slice(blob).map_err(|error| invalid(error.to_string()))?;
+        let proof: FrostAuthorizationV1 = crate::frost_store::decode_record(blob)?;
         if proof.body != body
             || proof
                 .canonical_bytes()

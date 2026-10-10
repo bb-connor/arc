@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn session_operation_rejects_nonce_bound_to_another_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -20,10 +21,7 @@ fn session_operation_rejects_nonce_bound_to_another_request(
         .execution_nonce
         .ok_or_else(|| std::io::Error::other("strict preflight nonce missing"))?;
 
-    let session_id = kernel.open_session(
-        agent.public_key().to_hex(),
-        vec![capability.clone()],
-    )?;
+    let session_id = kernel.open_session(agent.public_key().to_hex(), vec![capability.clone()])?;
     kernel.activate_session(&session_id)?;
     let context = make_operation_context(
         &session_id,
@@ -31,6 +29,7 @@ fn session_operation_rejects_nonce_bound_to_another_request(
         &agent.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: bound_request.server_id,
         tool_name: bound_request.tool_name,

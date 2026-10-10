@@ -40,10 +40,12 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
     // `/v1/evaluate`. It sits behind the reconcile control gate so only a caller
     // presenting the sidecar-control token can reconcile.
     let reconcile_routes = Router::new()
+        .route("/v1/caller/start", post(mediated::authenticated::start))
+        .route("/v1/caller/report", post(mediated::authenticated::report))
         .route("/v1/reconcile", post(mediated::sidecar_reconcile_handler))
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
-            require_reconcile_control_middleware,
+            require_sidecar_control_middleware,
         ));
 
     Router::new()
@@ -134,56 +136,16 @@ async fn handle_metrics() -> impl axum::response::IntoResponse {
     )
 }
 
-pub(crate) async fn require_sidecar_control_middleware(
-    State(state): State<Arc<ProxyState>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    if let Err(response) =
-        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
-    {
-        return response;
-    }
-
-    next.run(request).await
-}
-
-/// Trusted-caller gate for `POST /v1/reconcile`.
-///
-/// Reconciliation settles a reserved budget hold at a caller-reported realized
-/// cost, so it is restricted to the tool server operating under the
-/// sidecar-control token (the operator/tool-server trust boundary), not the
-/// controlled agent that called `/v1/evaluate`. Unlike the loopback-exempt
-/// operator endpoints, reconcile admits no unauthenticated loopback caller: the
-/// controlled agent is itself typically loopback, and letting it self-reconcile
-/// would settle its own reservation at cost zero and defeat the cumulative spend
-/// cap. A sidecar with no configured control token therefore rejects every
-/// reconcile fail-closed; with one configured, only a caller presenting a
-/// matching bearer token reconciles.
-pub(crate) async fn require_reconcile_control_middleware(
-    State(state): State<Arc<ProxyState>>,
-    request: Request<Body>,
-    next: Next,
-) -> Response {
-    let Some(expected_bearer_token) = state.sidecar_control_token.as_deref() else {
-        warn!(
-            "rejecting /v1/reconcile without a configured sidecar-control token; \
-             reconcile is restricted to the tool server presenting that token"
-        );
-        return sidecar_control_forbidden_response(false);
-    };
-    if let Err(response) = require_sidecar_control_request(&request, Some(expected_bearer_token)) {
-        return response;
-    }
-
-    next.run(request).await
-}
-
 /// Axum handler that evaluates the request and proxies to upstream.
 pub(crate) async fn proxy_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if let Err(error) =
+        check_proxy_control_credential(request.headers(), state.sidecar_control_token.as_deref())
+    {
+        return error.into_response();
+    }
     let uri = request.uri().clone();
     let raw_headers = request.headers().clone();
     let method = match request.method().as_str() {
@@ -235,16 +197,7 @@ pub(crate) async fn proxy_handler(
     };
     let execution_nonce = match extract_execution_nonce_from_maps(&headers) {
         Ok(nonce) => nonce,
-        Err(message) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({
-                    "error": "chio_bad_request",
-                    "message": message,
-                })),
-            )
-                .into_response();
-        }
+        Err(error) => return input::rejected(error),
     };
 
     if let Some(response) =
@@ -606,12 +559,18 @@ pub(crate) async fn record_receipt(
     receipt: &HttpReceipt,
 ) -> Result<(), ProtectError> {
     if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        store.append(receipt)?;
+        let store = store.lock().await;
+        store.append(receipt, &state.signer_keypair)?;
     }
 
-    let mut log = state.receipt_log.lock().await;
-    log.receipts.push(receipt.clone());
+    #[cfg(test)]
+    {
+        let mut log = state.receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
     Ok(())
 }
 
@@ -620,12 +579,58 @@ pub(crate) async fn record_tool_receipt(
     receipt: &ChioReceipt,
 ) -> Result<(), ProtectError> {
     if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
+        let store = store.lock().await;
         store.append_tool_receipt(receipt)?;
     }
 
-    let mut log = state.tool_receipt_log.lock().await;
-    log.receipts.push(receipt.clone());
+    #[cfg(test)]
+    {
+        let mut log = state.tool_receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
+    Ok(())
+}
+
+/// Kernel redelivery is idempotent in the same authoritative sink. This also
+/// retries a transient persistence failure after an irreversible settlement.
+pub(crate) async fn record_kernel_receipt(
+    state: &Arc<ProxyState>,
+    receipt: &ChioReceipt,
+) -> Result<(), ProtectError> {
+    if let Some(store) = &state.receipt_store {
+        use chio_kernel::ReceiptStore;
+        let store = store.lock().await;
+        if let Err(error) = store
+            .core
+            .append_chio_receipt_with_timeout(receipt, std::time::Duration::from_secs(5))
+        {
+            // Archived IDs remain tombstoned against new writes. Redelivery
+            // succeeds only when the authenticated retained snapshot already
+            // contains this exact signed evidence, without appending anything.
+            let retained = store.core.load_retained_chio_receipt(&receipt.id)?;
+            let identical = match retained {
+                Some(retained) => {
+                    chio_core_types::canonical_json_bytes(&retained)?
+                        == chio_core_types::canonical_json_bytes(receipt)?
+                }
+                None => false,
+            };
+            if !identical {
+                return Err(error.into());
+            }
+        }
+    }
+    #[cfg(test)]
+    {
+        let mut log = state.tool_receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
     Ok(())
 }
 

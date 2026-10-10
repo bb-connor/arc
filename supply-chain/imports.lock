@@ -169,6 +169,10 @@ audited_as = "0.1.2"
 version = "0.1.0"
 audited_as = "0.1.2"
 
+[[unpublished.chio-mcp-remote]]
+version = "0.1.0"
+audited_as = "0.1.2"
+
 [[unpublished.chio-mercury]]
 version = "0.1.0"
 audited_as = "0.1.2"
@@ -214,6 +218,10 @@ version = "0.1.0"
 audited_as = "0.1.2"
 
 [[unpublished.chio-proof-room]]
+version = "0.1.0"
+audited_as = "0.1.2"
+
+[[unpublished.chio-provider-adapter-core]]
 version = "0.1.0"
 audited_as = "0.1.2"
 

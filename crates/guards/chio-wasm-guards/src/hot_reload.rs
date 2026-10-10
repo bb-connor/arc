@@ -52,6 +52,13 @@ impl CanaryCorpus {
         let manifest_path = canary_dir.join(MANIFEST_FILE_NAME);
         let manifest = read_to_string(&manifest_path)?;
         let manifest_entries = parse_manifest(&manifest_path, &manifest)?;
+        if manifest_entries.len() != CANARY_FIXTURE_COUNT {
+            return Err(HotReloadError::CanaryFixtureCount {
+                guard_id,
+                expected: CANARY_FIXTURE_COUNT,
+                actual: manifest_entries.len(),
+            });
+        }
         let fixture_names = json_fixture_names(canary_dir)?;
         let manifest_names = manifest_entries
             .iter()
@@ -83,13 +90,13 @@ impl CanaryCorpus {
             }
 
             let fixture_file: CanaryFixtureFile =
-                serde_json::from_slice(&bytes).map_err(|source| {
+                crate::input::decode(&bytes).map_err(|source| {
                     HotReloadError::CanaryFixtureJson {
                         path: fixture_path.clone(),
                         source,
                     }
                 })?;
-            serde_json::from_slice::<CanaryExpectedVerdict>(
+            crate::input::decode::<CanaryExpectedVerdict>(
                 fixture_file.expected_verdict_bytes.as_bytes(),
             )
             .map_err(|source| HotReloadError::CanaryFixtureJson {
@@ -516,7 +523,7 @@ pub enum HotReloadError {
         path: PathBuf,
         /// JSON error.
         #[source]
-        source: serde_json::Error,
+        source: chio_core::canonical::UntrustedJsonError,
     },
 
     /// Canary manifest failed validation.
@@ -1124,16 +1131,18 @@ fn default_blocklist() -> GuardDigestBlocklist {
 }
 
 fn read_to_string(path: &Path) -> Result<String, HotReloadError> {
-    fs::read_to_string(path).map_err(|source| HotReloadError::CanaryIo {
+    String::from_utf8(read_bytes(path)?).map_err(|source| HotReloadError::CanaryIo {
         path: path.to_path_buf(),
-        source,
+        source: io::Error::new(io::ErrorKind::InvalidData, source),
     })
 }
 
 fn read_bytes(path: &Path) -> Result<Vec<u8>, HotReloadError> {
-    fs::read(path).map_err(|source| HotReloadError::CanaryIo {
-        path: path.to_path_buf(),
-        source,
+    crate::input::read_file(path, crate::input::MAX_DOCUMENT_BYTES).map_err(|source| {
+        HotReloadError::CanaryIo {
+            path: path.to_path_buf(),
+            source,
+        }
     })
 }
 
@@ -1203,6 +1212,12 @@ fn json_fixture_names(canary_dir: &Path) -> Result<BTreeSet<String>, HotReloadEr
         let file_name = entry.file_name().to_string_lossy().into_owned();
         if file_name.ends_with(".json") {
             names.insert(file_name);
+            if names.len() > CANARY_FIXTURE_COUNT {
+                return Err(HotReloadError::CanaryManifest {
+                    path: canary_dir.to_path_buf(),
+                    reason: "too many canary fixture files".into(),
+                });
+            }
         }
     }
     Ok(names)

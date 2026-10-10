@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -27,6 +27,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 
 mod persistence;
 pub(crate) use persistence::verify_cache_sql_invariants;
@@ -73,6 +74,8 @@ END;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EconomicStateCacheError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("economic state cache is unavailable: {0}")]
     Unavailable(String),
     #[error("economic state cache mutation was fenced")]
@@ -532,14 +535,15 @@ fn qualify_generic_terminal_projection_effect_slot(
     descriptor: &EconomicStateStageDescriptor,
     verified: &VerifiedAdmissionTerminalProjectionV1,
 ) -> Result<EconomicEffectSlotV1, EconomicStateCacheError> {
-    if batch.transitions.len() != 1
-        || !batch.effect_slots.is_empty()
+    let [transition] = batch.transitions.as_slice() else {
+        return Err(EconomicStateCacheError::Conflict);
+    };
+    if !batch.effect_slots.is_empty()
         || !batch.request_replays.is_empty()
-        || batch.transitions[0].prepared_effect.is_some()
+        || transition.prepared_effect.is_some()
     {
         return Err(EconomicStateCacheError::Conflict);
     }
-    let transition = &batch.transitions[0];
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(EconomicStateCacheError::Conflict);
     }
@@ -705,7 +709,10 @@ fn validate_stage_options(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn stage_channel_batch_in_transaction(
     transaction: &Transaction<'_>,
     advance: &VerifiedEconomicStateBatchAdvance,
@@ -918,13 +925,13 @@ fn stage_batch_in_transaction(
 
 #[derive(Clone)]
 pub struct SqliteEconomicStateCache {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteEconomicStateCache {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -936,7 +943,7 @@ impl SqliteEconomicStateCache {
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, EconomicStateCacheError> {
         self.connection
             .lock()
-            .map_err(|_| invariant("economic state cache lock is poisoned"))
+            .map_err(|fenced| EconomicStateCacheError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -1877,5 +1884,9 @@ fn verify_stage_admission_checkpoint(
 
 #[cfg(test)]
 #[path = "economic_state_cache_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Example guard: tool-name-based allow/deny.
 //!
 //! Inspects the request tool name through the guard SDK and allows every tool

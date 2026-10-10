@@ -56,8 +56,8 @@ fn sample_receipt_with_financial(id: &str) -> ChioReceipt {
         grant_index: 0,
         cost_charged: 500,
         currency: "USD".to_string(),
-        budget_remaining: 9_500,
-        budget_total: 10_000,
+        budget_remaining: Some(9_500),
+        budget_total: Some(10_000),
         delegation_depth: 1,
         root_budget_holder: "org-root".to_string(),
         payment_reference: None,
@@ -199,22 +199,21 @@ async fn splunk_hec_sends_correct_envelope() {
     );
     let event0 = obj0.get("event").expect("event field must exist");
     assert_eq!(
-        event0.get("id").and_then(|v| v.as_str()),
+        event0.get("receipt_id").and_then(|v| v.as_str()),
         Some(receipt1_id.as_str()),
-        "event.id must match receipt id"
+        "event.receipt_id must match receipt id"
     );
 
     // Parse second object: receipt with financial metadata.
     let obj1: serde_json::Value = serde_json::from_str(lines[1]).expect("line 1 is valid JSON");
     let event1 = obj1.get("event").expect("event field must exist");
     assert_eq!(
-        event1.get("id").and_then(|v| v.as_str()),
+        event1.get("receipt_id").and_then(|v| v.as_str()),
         Some(receipt2_id.as_str()),
-        "event.id must match receipt id"
+        "event.receipt_id must match receipt id"
     );
     let cost = event1
-        .get("metadata")
-        .and_then(|m| m.get("financial"))
+        .get("financial")
         .and_then(|f| f.get("cost_charged"))
         .and_then(|c| c.as_u64());
     assert_eq!(cost, Some(500), "financial.cost_charged must be 500");
@@ -431,6 +430,7 @@ async fn splunk_hec_honors_configured_timeout() {
                 .set_delay(Duration::from_secs(5))
                 .set_body_raw(r#"{"text":"Success","code":0}"#, "application/json"),
         )
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -454,9 +454,12 @@ async fn splunk_hec_honors_configured_timeout() {
 
     match result.unwrap_err() {
         ExportError::HttpError(msg) => {
-            assert!(
-                msg.contains("timed out") || msg.contains("timeout"),
-                "HttpError should mention timeout, got: {msg}"
+            // The egress boundary redacts transport details. A real request
+            // reached the delayed server and failed inside the configured
+            // timeout bound; its public error remains the stable transport code.
+            assert_eq!(
+                msg,
+                "HEC request failed: urn:chio:error:transport:http-failed"
             );
         }
         other => panic!("expected ExportError::HttpError, got: {other:?}"),

@@ -12,8 +12,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let issuer = query.issuer.as_deref();
         let partner = query.partner.as_deref();
@@ -46,7 +52,7 @@ impl SqliteReceiptStore {
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?.max(0) as u64,
+                        u64::try_from(row.get::<_, i64>(1)?.max(0)).unwrap_or_default(),
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
                     ))
@@ -130,7 +136,10 @@ impl SqliteReceiptStore {
                     .local_anchor_capability_id
                     .clone()
                     .or(local_anchor_capability_id);
-                entry.matched_local_receipts = entry.matched_local_receipts.saturating_add(1);
+                entry.matched_local_receipts =
+                    entry.matched_local_receipts.checked_add(1).ok_or_else(|| {
+                        ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                    })?;
                 entry.first_seen = Some(
                     entry
                         .first_seen
@@ -142,10 +151,28 @@ impl SqliteReceiptStore {
                         .map_or(timestamp, |value| value.max(timestamp)),
                 );
                 match decision.as_str() {
-                    "allow" => entry.allow_count = entry.allow_count.saturating_add(1),
-                    "deny" => entry.deny_count = entry.deny_count.saturating_add(1),
-                    "cancelled" => entry.cancelled_count = entry.cancelled_count.saturating_add(1),
-                    _ => entry.incomplete_count = entry.incomplete_count.saturating_add(1),
+                    "allow" => {
+                        entry.allow_count = entry.allow_count.checked_add(1).ok_or_else(|| {
+                            ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                        })?
+                    }
+                    "deny" => {
+                        entry.deny_count = entry.deny_count.checked_add(1).ok_or_else(|| {
+                            ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                        })?
+                    }
+                    "cancelled" => {
+                        entry.cancelled_count =
+                            entry.cancelled_count.checked_add(1).ok_or_else(|| {
+                                ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                            })?
+                    }
+                    _ => {
+                        entry.incomplete_count =
+                            entry.incomplete_count.checked_add(1).ok_or_else(|| {
+                                ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                            })?
+                    }
                 }
                 matched_this_receipt = true;
             }
@@ -175,7 +202,7 @@ impl SqliteReceiptStore {
             distinct_remote_subjects.insert(reference.subject_key.clone());
         }
 
-        let matching_references = returned_references.len() as u64;
+        let matching_references = crate::integer::count(returned_references.len());
         let truncated = returned_references.len() > limit;
         if truncated {
             returned_references.truncate(limit);
@@ -183,9 +210,9 @@ impl SqliteReceiptStore {
 
         Ok(SharedEvidenceReferenceReport {
             summary: SharedEvidenceReferenceSummary {
-                matching_shares: distinct_shares.len() as u64,
+                matching_shares: crate::integer::count(distinct_shares.len()),
                 matching_references,
-                matching_local_receipts: matched_local_receipts.len() as u64,
+                matching_local_receipts: crate::integer::count(matched_local_receipts.len()),
                 remote_tool_receipts: distinct_shares
                     .values()
                     .map(|share| share.tool_receipts)
@@ -194,11 +221,13 @@ impl SqliteReceiptStore {
                     .values()
                     .map(|share| share.capability_lineage)
                     .sum(),
-                distinct_remote_subjects: distinct_remote_subjects.len() as u64,
-                proof_required_shares: distinct_shares
-                    .values()
-                    .filter(|share| share.require_proofs)
-                    .count() as u64,
+                distinct_remote_subjects: crate::integer::count(distinct_remote_subjects.len()),
+                proof_required_shares: crate::integer::count(
+                    distinct_shares
+                        .values()
+                        .filter(|share| share.require_proofs)
+                        .count(),
+                ),
                 truncated,
             },
             references: returned_references,

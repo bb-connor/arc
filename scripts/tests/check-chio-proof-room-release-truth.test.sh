@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 lint="${repo_root}/scripts/check-chio-proof-room-release-truth.sh"
+python3 "${repo_root}/scripts/tests/check-proof-room-historical-protocols.test.py"
 work="$(mktemp -d -t chio-release-truth-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
 truth="$work/release-truth.json"

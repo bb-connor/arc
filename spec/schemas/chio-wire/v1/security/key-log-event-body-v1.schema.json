@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json",
+  "title": "Chio key-log event body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "log_id", "sequence", "event_id", "authority_id", "key_id", "algorithm", "public_key", "operation", "effective_at", "issued_at"],
+  "properties": {
+    "schema": { "const": "chio.key-log.event.v1" },
+    "log_id": { "$ref": "#/$defs/keyLogIdentifier" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "event_id": { "$ref": "#/$defs/keyLogIdentifier" },
+    "previous_event_hash": { "$ref": "#/$defs/hash" },
+    "authority_id": { "$ref": "#/$defs/keyLogIdentifier" },
+    "key_id": { "$ref": "#/$defs/hash" },
+    "algorithm": { "$ref": "#/$defs/algorithm" },
+    "public_key": { "$ref": "#/$defs/publicKey" },
+    "operation": { "$ref": "#/$defs/operation" },
+    "effective_at": { "type": "integer", "minimum": 0 },
+    "verify_until": { "type": "integer", "minimum": 0 },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
+    "issued_at": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "keyLogIdentifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:/-]+$" },
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "publicKey": { "type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "operation": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "genesis" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "previous_key_id", "witness_roster_id", "witness_roster_binding"], "properties": { "type": { "const": "rotate" }, "previous_key_id": { "$ref": "#/$defs/hash" }, "witness_roster_id": { "$ref": "#/$defs/keyLogIdentifier" }, "witness_roster_binding": { "$ref": "#/$defs/hash" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "previous_key_id"], "properties": { "type": { "const": "abort_rotation" }, "previous_key_id": { "$ref": "#/$defs/hash" }, "recovery_policy_id": { "$ref": "#/$defs/keyLogIdentifier" }, "recovery_policy_binding": { "$ref": "#/$defs/hash" } }, "dependentRequired": { "recovery_policy_id": ["recovery_policy_binding"], "recovery_policy_binding": ["recovery_policy_id"] } },
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "retire" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "revoke" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "previous_key_id", "witness_roster_id", "witness_roster_binding", "recovery_policy_id", "recovery_policy_binding"], "properties": { "type": { "const": "recover" }, "previous_key_id": { "$ref": "#/$defs/hash" }, "witness_roster_id": { "$ref": "#/$defs/keyLogIdentifier" }, "witness_roster_binding": { "$ref": "#/$defs/hash" }, "recovery_policy_id": { "$ref": "#/$defs/keyLogIdentifier" }, "recovery_policy_binding": { "$ref": "#/$defs/hash" } } }
+      ]
+    }
+  }
+}

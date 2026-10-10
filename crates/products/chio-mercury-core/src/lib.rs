@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! MERCURY core contracts layered on Chio receipt truth.
 
 pub mod assurance_suite;

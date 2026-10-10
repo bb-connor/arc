@@ -346,7 +346,7 @@ mod tests {
     fn signed_frame_verifies_under_public_key() {
         let keypair = Keypair::from_seed(&[3u8; 32]);
         let frame = sign_frame(sample_inputs(), &keypair).test_unwrap();
-        let pubkey = *keypair.public_key().as_bytes();
+        let pubkey = keypair.public_key_bytes();
         validate_signed(&frame, &pubkey).test_expect("signed frame must verify");
     }
 
@@ -355,7 +355,7 @@ mod tests {
         let keypair = Keypair::from_seed(&[4u8; 32]);
         let frame = sign_frame(sample_inputs(), &keypair).test_unwrap();
         let wrong = Keypair::from_seed(&[5u8; 32]);
-        let wrong_pub = *wrong.public_key().as_bytes();
+        let wrong_pub = wrong.public_key_bytes();
         assert!(validate_signed(&frame, &wrong_pub).is_err());
     }
 

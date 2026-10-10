@@ -14,12 +14,16 @@ pub enum ReadError {
     /// A JSON parse failure with the offending 1-based line number.
     /// For directory mode the line number is local to the file that failed
     /// and the file path is recorded in `path`.
-    #[error("malformed JSON at {}:{line}: {detail}", path.display())]
+    #[error("malformed JSON at {}:{line}: {source}", path.display())]
     MalformedJson {
         path: std::path::PathBuf,
         line: usize,
-        detail: String,
+        #[source]
+        source: chio_core::canonical::UntrustedJsonError,
     },
+
+    #[error("receipt corpus exceeds its byte or record bound")]
+    Limit,
 
     /// The receipt log was opened successfully but contained zero receipts.
     /// Replay is fail-closed: an empty corpus must not be silently accepted.
@@ -91,7 +95,7 @@ impl ReceiptLogReader {
     ) -> Result<Box<dyn Iterator<Item = Result<serde_json::Value, ReadError>>>, ReadError> {
         match &self.source {
             Source::NdjsonStream(path) => {
-                let receipts = read_ndjson_file(path)?;
+                let receipts = read_ndjson_file(path, &mut Budget::default())?;
                 if receipts.is_empty() {
                     return Err(ReadError::Empty(path.clone()));
                 }
@@ -112,23 +116,60 @@ impl ReceiptLogReader {
 ///
 /// Blank lines (containing only whitespace) are skipped silently so a
 /// trailing newline at end-of-file does not produce a spurious receipt.
-fn read_ndjson_file(path: &std::path::Path) -> Result<Vec<serde_json::Value>, ReadError> {
-    use std::io::BufRead;
-    let file = std::fs::File::open(path)?;
-    let reader = std::io::BufReader::new(file);
-    let mut out = Vec::new();
-    for (idx, line) in reader.lines().enumerate() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
+const MAX_RECORD_BYTES: usize = 8 * 1024 * 1024;
+const MAX_CORPUS_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RECORDS: usize = 10_000;
+struct Budget {
+    bytes: usize,
+    records: usize,
+}
+impl Default for Budget {
+    fn default() -> Self {
+        Self {
+            bytes: MAX_CORPUS_BYTES,
+            records: MAX_RECORDS,
         }
-        let value: serde_json::Value =
-            serde_json::from_str(&line).map_err(|error| ReadError::MalformedJson {
-                path: path.to_path_buf(),
-                line: idx + 1,
-                detail: error.to_string(),
-            })?;
-        out.push(value);
+    }
+}
+impl Budget {
+    fn parse(
+        &mut self,
+        bytes: &[u8],
+        path: &std::path::Path,
+        line: usize,
+    ) -> Result<Option<serde_json::Value>, ReadError> {
+        self.bytes = self
+            .bytes
+            .checked_sub(bytes.len())
+            .ok_or(ReadError::Limit)?;
+        if bytes.len() > MAX_RECORD_BYTES {
+            return Err(ReadError::Limit);
+        }
+        if bytes.iter().all(u8::is_ascii_whitespace) {
+            return Ok(None);
+        }
+        self.records = self.records.checked_sub(1).ok_or(ReadError::Limit)?;
+        crate::input::decode(bytes, MAX_RECORD_BYTES)
+            .map(Some)
+            .map_err(|source| ReadError::MalformedJson {
+                path: path.to_owned(),
+                line,
+                source,
+            })
+    }
+}
+
+fn read_ndjson_file(
+    path: &std::path::Path,
+    budget: &mut Budget,
+) -> Result<Vec<serde_json::Value>, ReadError> {
+    // The whole corpus is bounded before materialization, including whitespace.
+    let bytes = crate::input::read_regular(path, budget.bytes)?;
+    let mut out = Vec::new();
+    for (idx, line) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
+        if let Some(value) = budget.parse(line, path, idx + 1)? {
+            out.push(value);
+        }
     }
     Ok(out)
 }
@@ -156,12 +197,16 @@ fn read_directory(dir: &std::path::Path) -> Result<Vec<serde_json::Value>, ReadE
         }
         let lower = name.to_ascii_lowercase();
         if lower.ends_with(".ndjson") || lower.ends_with(".json") {
+            if paths.len() == MAX_RECORDS {
+                return Err(ReadError::Limit);
+            }
             paths.push(path);
         }
     }
     paths.sort();
 
     let mut out = Vec::new();
+    let mut budget = Budget::default();
     for path in paths {
         let lower = path
             .file_name()
@@ -169,28 +214,16 @@ fn read_directory(dir: &std::path::Path) -> Result<Vec<serde_json::Value>, ReadE
             .map(str::to_ascii_lowercase)
             .unwrap_or_default();
         if lower.ends_with(".ndjson") {
-            let mut chunk = read_ndjson_file(&path)?;
+            let mut chunk = read_ndjson_file(&path, &mut budget)?;
             out.append(&mut chunk);
         } else {
             // Single-receipt JSON. Treat empty/whitespace-only files as
             // skip rather than malformed so an editor-touched file does
             // not blow up the whole replay.
-            let bytes = std::fs::read(&path)?;
-            let text = std::str::from_utf8(&bytes).map_err(|error| ReadError::MalformedJson {
-                path: path.clone(),
-                line: 1,
-                detail: format!("invalid utf-8: {error}"),
-            })?;
-            if text.trim().is_empty() {
-                continue;
+            let bytes = crate::input::read_regular(&path, MAX_RECORD_BYTES.min(budget.bytes))?;
+            if let Some(value) = budget.parse(&bytes, &path, 1)? {
+                out.push(value);
             }
-            let value: serde_json::Value =
-                serde_json::from_str(text).map_err(|error| ReadError::MalformedJson {
-                    path: path.clone(),
-                    line: 1,
-                    detail: error.to_string(),
-                })?;
-            out.push(value);
         }
     }
     Ok(out)
@@ -386,11 +419,11 @@ mod replay_reader_tests {
             ReadError::MalformedJson {
                 path: p,
                 line,
-                detail,
+                source,
             } => {
                 assert_eq!(p, path);
                 assert_eq!(line, 2);
-                assert!(!detail.is_empty());
+                assert!(std::error::Error::source(&source).is_some());
             }
             other => panic!("expected MalformedJson, got {other:?}"),
         }
@@ -410,5 +443,33 @@ mod replay_reader_tests {
             }
             other => panic!("expected MalformedJson, got {other:?}"),
         }
+    }
+    #[test]
+    fn replay_corpus_checks_original_keys_and_shared_record_budget() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = write_file(
+            directory.path(),
+            "duplicate.json",
+            r#"{"decision":{"verdict":"allow","verdict":"deny"}}"#,
+        );
+        assert!(matches!(
+            read_directory(directory.path()),
+            Err(ReadError::MalformedJson {
+                source: chio_core::canonical::UntrustedJsonError::SignedInput(_),
+                ..
+            })
+        ));
+        let mut budget = Budget {
+            bytes: 4,
+            records: 1,
+        };
+        assert_eq!(
+            budget.parse(b"{}", &path, 1).unwrap(),
+            Some(serde_json::json!({}))
+        );
+        assert!(matches!(
+            budget.parse(b"{}", &path, 2),
+            Err(ReadError::Limit)
+        ));
     }
 }

@@ -1,4 +1,5 @@
 use super::super::cluster::{build_cluster_state, run_cluster_sync_loop};
+use super::super::report_rendering::{LEADER_FORWARD_PERMITS, PUBLIC_PASSPORT_CHALLENGE_PERMITS};
 use super::super::*;
 use super::router;
 use chio_http_serve::{
@@ -7,6 +8,13 @@ use chio_http_serve::{
 };
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
+
+#[path = "init/payload_maintenance.rs"]
+mod payload_maintenance;
+
+#[cfg(test)]
+#[path = "init/authority_provision_tests.rs"]
+mod authority_provision_tests;
 
 pub(crate) async fn serve_async(
     config: TrustServiceConfig,
@@ -55,6 +63,68 @@ async fn serve_async_inner(
     >,
 ) -> Result<(), CliError> {
     config.validate()?;
+    let payload_maintenance_config = crate::TerminalPayloadMaintenanceConfig::from_env()?;
+    payload_maintenance::validate_requested_authority(
+        config.joint_authority_db_path.as_deref(),
+        payload_maintenance_config,
+    )?;
+    let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
+    // Co-located startup stores may need the space held by abandoned snapshots.
+    // Reclaim one bounded window before any of those stores opens or writes.
+    if let Some(receipt_path) = config.receipt_db_path.as_deref() {
+        chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(receipt_path);
+    }
+    let authority_keyring_seed_path = config
+        .authority_keyring_config_path
+        .as_ref()
+        .and(config.authority_seed_path.clone());
+    // Keyring custody owns the anchored receipt store; handlers share that same
+    // store so one writer serves the database.
+    let (authority_keyring, anchored_receipt_store) = match (
+        config.authority_keyring_config_path.as_deref(),
+        authority_keyring_seed_path.as_deref(),
+        config.receipt_db_path.as_deref(),
+        config.authority_keyring_receipt_anchor_root.as_deref(),
+    ) {
+        (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
+            let receipt_store = Arc::new(SqliteReceiptStore::open_for_finding_pool(
+                receipt_path,
+                anchor_root,
+            )?);
+            receipt_store.join_writer_on_reaper();
+            // Keyring custody writes through this store, so it waits for the
+            // seed to finish instead of serving while the writer seeds.
+            let seeding = Arc::clone(&receipt_store);
+            tokio::task::spawn_blocking(move || {
+                await_receipt_writer_seed(&seeding, RECEIPT_WRITER_READY_WAIT)
+            })
+            .await
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "trust-control receipt writer readiness task failed: {error}"
+                ))
+            })??;
+            let keyring_receipts: Arc<dyn chio_kernel::ReceiptStore> = receipt_store.clone();
+            let (_, composition) = crate::load_keyring_runtime_from_authority_seed(
+                keyring_config,
+                seed_path,
+                keyring_receipts,
+            )?;
+            (Some(composition), Some(receipt_store))
+        }
+        (None, None, _, None) => (None, None),
+        _ => {
+            return Err(CliError::cli_other_error(
+                "validated keyring runtime configuration is incomplete".to_string(),
+            ));
+        }
+    };
+    // A configured keyring becomes the sole seed signing owner. Every
+    // config-only signing helper sees no seed and therefore fails closed.
+    let mut config = config;
+    if authority_keyring.is_some() {
+        config.authority_seed_path = None;
+    }
     validate_finding_purchase_runtime_dependencies(
         finding_purchase_executor.is_some(),
         finding_rail.is_some(),
@@ -91,7 +161,11 @@ async fn serve_async_inner(
         joint_authority_store.as_ref(),
         config.fiscal_runtime.as_ref(),
     )?;
-    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let payload_maintenance_owner = payload_maintenance::start_on_existing_authority(
+        joint_authority_store.as_ref(),
+        payload_maintenance_config,
+    )?;
+    let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let budget_store = config
         .budget_db_path
@@ -115,7 +189,45 @@ async fn serve_async_inner(
             ))
         })?
         .map(Arc::new);
-    let cluster = build_cluster_state(&config, local_addr)?;
+    let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
+        Arc::new(chio_security_types::clock::SystemClock);
+    provision_service_authority(&config, finding_challenge_clock.clone())?;
+    let cluster = build_cluster_state(&config, local_addr, finding_challenge_clock.clone())?;
+    let receipt_store = match anchored_receipt_store {
+        Some(store) => Some(store),
+        None => {
+            let path = config.receipt_db_path.clone();
+            tokio::task::spawn_blocking(move || open_service_receipt_store(path.as_deref()))
+                .await
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "trust-control receipt store startup task failed: {error}"
+                    ))
+                })??
+        }
+    };
+    let receipt_store_owner = receipt_store.clone();
+    let receipt_query_snapshots = receipt_store
+        .as_ref()
+        .map(|store| {
+            chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshots::start(
+                Arc::clone(store),
+                chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotConfig {
+                    quota_bytes: config.receipt_query_snapshot_quota_bytes,
+                    ..chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotConfig::default()
+                },
+            )
+            .map(Arc::new)
+        })
+        .transpose()
+        .map_err(|source| {
+            CliError::with_public_source(
+                &chio_errors::_generated::error_codes::CLI_OTHER,
+                "trust-control receipt query snapshot startup failed",
+                source,
+            )
+        })?;
+    let receipt_query_owner = receipt_query_snapshots.clone();
     // Thread the operator-configured memory budget into the admission guard so a
     // lowered `admission_key_cap` actually tightens it. Read the cap before
     // `config` is moved into the state.
@@ -124,16 +236,32 @@ async fn serve_async_inner(
     ));
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
+        finding_challenge_clock,
         config,
+        authority_keyring,
+        authority_keyring_seed_path,
         joint_authority_store,
         fiscal_runtime,
         budget_store,
         revocation_store,
+        receipt_store,
+        receipt_query_snapshots,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,
         cluster,
         cluster_progress,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
+        operator_registry_write_lane: BlockingLane::new("operator_registry_write", 2),
+        public_passport_issuance_lane: BlockingLane::new("public_passport_issuance", 2),
+        wallet_entitlement_lane: crate::trust_control::ingress_lanes::wallet_entitlement_lane(),
+        public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+            PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+        )),
         finding_rail,
         finding_purchase_executor,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -185,14 +313,15 @@ async fn serve_async_inner(
     let router = apply_server_hygiene(router::build_router(state), &hygiene);
 
     info!(listen_addr = %local_addr, "serving Chio trust control service");
-    eprintln!("Chio trust control service listening on http://{local_addr}");
+    tracing::info!(%local_addr, "Chio trust control service listening");
 
     let listener = MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
     let server = axum::serve(listener, router).with_graceful_shutdown(controller.signalled());
 
     // Trust-control writes budget and revocation state synchronously inside its
-    // handlers, so completing in-flight requests during the drain is the whole
-    // fix; there is no async commit actor to flush.
+    // handlers, and a receipt append returns only after the shared writer made
+    // it durable, so completing in-flight requests during the drain is the whole
+    // fix; no queued receipt write outlives its request.
     let serve_result = run_until_drained(
         server,
         controller.subscribe(),
@@ -216,9 +345,108 @@ async fn serve_async_inner(
         let _ = tokio::time::timeout(join_budget, task).await;
     }
 
+    if let Some(owner) = payload_maintenance_owner.as_ref() {
+        owner.shutdown().map_err(|source| {
+            CliError::with_public_source(
+                &chio_errors::_generated::error_codes::CLI_OTHER,
+                "terminal raw payload maintenance server worker joined with a failure",
+                source,
+            )
+        })?;
+    }
+
+    // Stop the walker off the async runtime before flushing its store.
+    if let Some(snapshots) = receipt_query_owner {
+        if let Err(error) = tokio::task::spawn_blocking(move || snapshots.shutdown()).await {
+            warn!(%error, "trust-control receipt query snapshot shutdown task failed");
+        }
+    }
+
+    // Make queued receipt work durable before returning. Whichever owner
+    // releases the store last (this guard, a handler detached by a forced
+    // drain, or a cluster loop abandoned at its join budget), the writer is
+    // joined on its reaper thread, never on an async worker.
+    if let Some(store) = receipt_store_owner {
+        let flushed = tokio::task::spawn_blocking(move || {
+            let flushed = store.flush_receipt_writes().map(|_| ());
+            drop(store);
+            flushed
+        })
+        .await;
+        match flushed {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => warn!(%error, "trust-control receipt store shutdown flush failed"),
+            Err(error) => warn!(%error, "trust-control receipt store shutdown task failed"),
+        }
+    }
+
     serve_result.map(|_outcome| ()).map_err(|error| {
         CliError::cli_other_error(format!("trust control service failed: {error}"))
     })
+}
+
+/// How long one startup readiness probe waits before it reports a writer that
+/// is still seeding.
+const RECEIPT_WRITER_READY_WAIT: Duration = Duration::from_secs(30);
+
+/// Startup state of the service's single receipt writer. A failed seed is not
+/// a state: it refuses startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReceiptWriterStartup {
+    /// The writer verified the persisted history and is serving.
+    Ready,
+    /// The writer is still verifying a large history. It is the only seed
+    /// owner and serves queued appends in order once its head is verified.
+    Seeding,
+}
+
+/// Open the service's unanchored receipt store and wait for its writer.
+///
+/// A failed seed (a poisoned verified head or a dead writer) refuses startup. A
+/// seed still running after the wait is not a failure, so a large healthy
+/// history never becomes a startup refusal, and no second store or reseed is
+/// started for it.
+pub(crate) fn open_service_receipt_store(
+    path: Option<&Path>,
+) -> Result<Option<Arc<SqliteReceiptStore>>, CliError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(path);
+    let store = SqliteReceiptStore::open(path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to open trust-control receipt store: {error}"
+        ))
+    })?;
+    store.join_writer_on_reaper();
+    await_receipt_writer(&store, RECEIPT_WRITER_READY_WAIT)?;
+    Ok(Some(Arc::new(store)))
+}
+
+/// Wait for the writer's seed to finish, however long a healthy history takes.
+/// A failed seed still refuses; a healthy one is never cut off or restarted.
+fn await_receipt_writer_seed(store: &SqliteReceiptStore, poll: Duration) -> Result<(), CliError> {
+    while await_receipt_writer(store, poll)? == ReceiptWriterStartup::Seeding {}
+    Ok(())
+}
+
+fn await_receipt_writer(
+    store: &SqliteReceiptStore,
+    wait: Duration,
+) -> Result<ReceiptWriterStartup, CliError> {
+    let seeded = store.wait_for_writer_seed(wait).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "trust-control receipt writer failed startup readiness: {error}"
+        ))
+    })?;
+    if seeded {
+        return Ok(ReceiptWriterStartup::Ready);
+    }
+    warn!(
+        wait_ms = wait.as_millis(),
+        "trust-control receipt writer is still verifying its history"
+    );
+    Ok(ReceiptWriterStartup::Seeding)
 }
 
 fn validate_finding_purchase_runtime_dependencies(
@@ -282,151 +510,8 @@ fn cluster_join_budget(drain_timeout: Duration, elapsed_since_signal: Duration) 
 }
 
 #[cfg(test)]
-mod tests {
-    use super::cluster_join_budget;
-    use super::{
-        open_configured_joint_authority_store, validate_finding_purchase_runtime_dependencies,
-        validate_injected_joint_authority_store, SqliteAuthorityStore, TrustServiceConfig,
-    };
-    use std::collections::BTreeMap;
-    use std::path::{Path, PathBuf};
-    use std::time::Duration;
-
-    fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
-        TrustServiceConfig {
-            listen: "127.0.0.1:0"
-                .parse()
-                .unwrap_or_else(|error| panic!("fixed loopback address must parse: {error}")),
-            service_token: "service-token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            receipt_db_path: None,
-            revocation_db_path: None,
-            authority_seed_path: None,
-            authority_db_path: None,
-            budget_db_path: None,
-            joint_authority_db_path: Some(joint_authority_db_path),
-            fiscal_runtime: None,
-            enterprise_providers_file: None,
-            federation_policies_file: None,
-            scim_lifecycle_file: None,
-            verifier_policies_file: None,
-            verifier_challenge_db_path: None,
-            passport_statuses_file: None,
-            passport_issuance_offers_file: None,
-            certification_registry_file: None,
-            certification_discovery_file: None,
-            issuance_policy: None,
-            runtime_assurance_policy: None,
-            advertise_url: None,
-            allow_local_peer_urls: true,
-            certification_public_metadata_ttl_seconds: 300,
-            peer_urls: Vec::new(),
-            cluster_sync_interval: Duration::from_millis(25),
-            roster_policy: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            finding_market: None,
-        }
-    }
-
-    #[cfg(unix)]
-    fn secure_directory(path: &Path) -> std::io::Result<()> {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
-    }
-
-    /// The cluster-loop join must not add a second wait on top of the HTTP drain:
-    /// for every point at which the drain could return, the drain time already
-    /// spent plus the join budget it hands out stays within one drain window, so
-    /// the whole teardown fits the platform stop grace rather than overrunning it
-    /// and being escalated to a kill.
-    #[test]
-    fn cluster_join_never_extends_teardown_past_the_drain_window() {
-        let drain = Duration::from_secs(25);
-        // A drain that ran to its deadline leaves no budget at all.
-        assert_eq!(cluster_join_budget(drain, drain), Duration::ZERO);
-        for elapsed_ms in [0u64, 1_000, 12_500, 24_000, 25_000] {
-            let elapsed = Duration::from_millis(elapsed_ms).min(drain);
-            assert!(
-                elapsed + cluster_join_budget(drain, elapsed) <= drain,
-                "teardown at elapsed={elapsed:?} must stay within the drain window"
-            );
-        }
-    }
-
-    #[test]
-    fn purchase_runtime_requires_rail_and_authority_status_resolution() {
-        assert!(validate_finding_purchase_runtime_dependencies(false, false, false).is_ok());
-        assert!(validate_finding_purchase_runtime_dependencies(true, true, true).is_ok());
-
-        let Err(missing_rail) = validate_finding_purchase_runtime_dependencies(true, false, true)
-        else {
-            panic!("purchase runtime without a rail must fail closed");
-        };
-        assert!(missing_rail.to_string().contains("settlement rail"));
-
-        let Err(missing_status) = validate_finding_purchase_runtime_dependencies(true, true, false)
-        else {
-            panic!("purchase runtime without status resolution must fail closed");
-        };
-        assert!(missing_status
-            .to_string()
-            .contains("authority-status resolver"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn injected_challenge_authority_must_match_configured_database(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let temp = tempfile::tempdir()?;
-        secure_directory(temp.path())?;
-        let configured_database = temp.path().join("configured.db");
-        let configured_locks = temp.path().join("configured-locks");
-        let injected_database = temp.path().join("injected.db");
-        let injected_locks = temp.path().join("injected-locks");
-        std::fs::create_dir(&configured_locks)?;
-        secure_directory(&configured_locks)?;
-        std::fs::create_dir(&injected_locks)?;
-        secure_directory(&injected_locks)?;
-        SqliteAuthorityStore::provision(&configured_database, &configured_locks)?;
-        SqliteAuthorityStore::provision(&injected_database, &injected_locks)?;
-        let injected = SqliteAuthorityStore::open_serving(&injected_database, &injected_locks)?;
-
-        let matching = test_config(injected_database);
-        validate_injected_joint_authority_store(&matching, &injected)?;
-
-        let mismatched = test_config(configured_database);
-        let error = match validate_injected_joint_authority_store(&mismatched, &injected) {
-            Ok(()) => panic!("a different configured authority database must fail closed"),
-            Err(error) => error,
-        };
-        assert!(error.to_string().contains("does not match"));
-        Ok(())
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn configured_joint_authority_hardens_an_existing_lock_root(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        use std::os::unix::fs::PermissionsExt;
-
-        let temp = tempfile::tempdir()?;
-        secure_directory(temp.path())?;
-        let database = temp.path().join("joint-authority.db");
-        let lock_root = crate::durable_admission_lock_root(&database)?;
-        std::fs::create_dir(&lock_root)?;
-        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o775))?;
-
-        let store = open_configured_joint_authority_store(&test_config(database))?
-            .ok_or("configured authority store was not opened")?;
-        assert_eq!(
-            std::fs::metadata(&lock_root)?.permissions().mode() & 0o077,
-            0,
-            "startup must remove group and other access before provisioning"
-        );
-        drop(store);
-        Ok(())
-    }
-}
+#[path = "init/tests.rs"]
+mod tests;
 
 #[cfg(all(test, windows))]
 mod windows_authority_tests {
@@ -440,13 +525,18 @@ mod windows_authority_tests {
         let database = state_parent.join("joint-authority.sqlite3");
         let lock_root = crate::durable_admission_lock_root(&database)?;
         let config = TrustServiceConfig {
+            transport: Default::default(),
             listen: SocketAddr::from(([127, 0, 0, 1], 0)),
             service_token: "service-token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
+            receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: Some(database.clone()),
             fiscal_runtime: None,
@@ -466,6 +556,7 @@ mod windows_authority_tests {
             certification_public_metadata_ttl_seconds: 300,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
@@ -486,4 +577,24 @@ mod windows_authority_tests {
         assert!(std::fs::read_dir(directory.path())?.next().is_none());
         Ok(())
     }
+}
+
+/// The authenticated service owner provisions its database with the same clock
+/// and receiver policy used by runtime inspections and replication.
+pub(super) fn provision_service_authority(
+    config: &TrustServiceConfig,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<(), CliError> {
+    if config.authority_keyring_config_path.is_none() {
+        if let Some(path) = config.authority_db_path.as_deref() {
+            SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+                path,
+                clock,
+                config.authority_replication_clock_policy()?,
+            )?;
+        } else if let Some(path) = config.authority_seed_path.as_deref() {
+            load_or_create_authority_keypair(path)?;
+        }
+    }
+    Ok(())
 }

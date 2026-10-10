@@ -1,161 +1,62 @@
-use crate::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
-    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionReplayClassification,
-    AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
-};
-use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
-use crate::tool_outcome::{
-    validate_evaluation_store_successor, validate_terminal_store_pair, CanonicalInvocationBlobV1,
-    CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore,
-    RawInvocationOutcomeV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
-    ToolOutcomeStoreError,
-};
+use super::*;
 
-#[path = "durable_admission/monetary.rs"]
-mod monetary;
-#[path = "durable_admission/receipt_projection.rs"]
-mod receipt_projection;
-#[path = "durable_admission/review_regressions.rs"]
-mod review_regressions;
-
+#[path = "durable_admission/configuration.rs"]
+mod configuration;
+#[path = "durable_admission/cumulative_budget.rs"]
+mod cumulative_budget;
+#[path = "durable_admission/output_finalization.rs"]
+mod output_finalization;
+#[path = "durable_admission/pre_dispatch.rs"]
+mod pre_dispatch;
+#[path = "durable_admission/recovery.rs"]
+mod recovery;
 use receipt_projection::AdmissionReceiptProjectionStore;
 
-#[test]
-fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode() {
-    use crate::admission_operation::{AdmissionOperationError, DurableAdmissionMode};
-
-    let mut kernel = make_kernel(make_config());
-    assert_eq!(
-        kernel.durable_admission_mode(),
-        DurableAdmissionMode::SideEffecting
-    );
-    assert_eq!(
-        kernel.configure_durable_admission(DurableAdmissionMode::Off, false),
-        Err(AdmissionOperationError::UnsafeDurableAdmissionOff)
-    );
-    kernel
-        .configure_durable_admission(DurableAdmissionMode::Monetary, false)
-        .expect("monetary qualification mode");
-    assert_eq!(
-        kernel.durable_admission_mode(),
-        DurableAdmissionMode::Monetary
-    );
-    kernel
-        .configure_durable_admission(DurableAdmissionMode::Off, true)
-        .expect("explicit unsafe ephemeral mode");
-    assert_eq!(kernel.durable_admission_mode(), DurableAdmissionMode::Off);
-
-    let mut durable_config = make_config();
-    durable_config.allow_ephemeral_receipt_log = false;
-    let mut durable_kernel = make_kernel(durable_config);
-    assert_eq!(
-        durable_kernel.configure_durable_admission(DurableAdmissionMode::Off, true),
-        Err(AdmissionOperationError::UnsafeDurableAdmissionOff)
-    );
-}
-
-#[test]
-fn side_effecting_mode_exempts_only_explicitly_read_only_tools() {
-    struct ReadOnlyServer;
-
-    #[async_trait::async_trait]
-    impl ToolServerConnection for ReadOnlyServer {
-        fn server_id(&self) -> &str {
-            "read-only-server"
-        }
-
-        fn tool_names(&self) -> Vec<String> {
-            vec!["lookup".to_owned()]
-        }
-
-        fn tool_is_read_only(&self, tool_name: &str) -> bool {
-            tool_name == "lookup"
-        }
-
-        async fn invoke(
-            &self,
-            _tool_name: &str,
-            _arguments: serde_json::Value,
-            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-        ) -> Result<serde_json::Value, KernelError> {
-            Ok(serde_json::json!({"found": true}))
-        }
-    }
-
-    let mut kernel = make_kernel(make_config());
-    kernel.register_tool_server(Box::new(ReadOnlyServer));
-    let agent = make_keypair();
-    let capability = make_capability(
-        &kernel,
-        &agent,
-        make_scope(vec![make_grant("read-only-server", "lookup")]),
-        300,
-    );
-    let request = make_request(
-        "durable-read-only-classification",
-        &capability,
-        "lookup",
-        "read-only-server",
-    );
-    let matching = resolve_required_matching_grants(
-        &capability,
-        &request.tool_name,
-        &request.server_id,
-        &request.arguments,
-        request.model_metadata.as_ref(),
-    )
-    .expect("matching read-only grant");
-
-    assert!(kernel
-        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
-        .expect("read-only classification")
-        .is_none());
-}
-
-#[test]
-fn finding_memory_lineage_requires_a_durable_terminal_projection() {
-    let mut kernel = make_kernel(make_config());
-    kernel
-        .configure_durable_admission(crate::admission_operation::DurableAdmissionMode::Off, true)
-        .expect("unsafe ephemeral mode for the regression");
-    let agent = make_keypair();
-    let capability = make_capability(
-        &kernel,
-        &agent,
-        make_scope(vec![make_grant("memory-server", "write")]),
-        300,
-    );
-    let mut request = make_request("finding-memory-durable", &capability, "write", "memory-server");
-    request.arguments[crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT] =
-        serde_json::json!("delivery-receipt");
-    let matching = resolve_required_matching_grants(
-        &capability,
-        &request.tool_name,
-        &request.server_id,
-        &request.arguments,
-        request.model_metadata.as_ref(),
-    )
-    .expect("matching Finding memory grant");
-
-    let error = match kernel.begin_durable_tool_admission(
-        &request,
-        &matching,
-        current_unix_timestamp_ms(),
-    ) {
-        Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
-        Err(error) => error,
-    };
-    assert!(error
-        .to_string()
-        .contains("no qualified admission operation store"));
-}
+#[path = "durable_admission/authority_profile.rs"]
+mod authority_profile;
+#[path = "durable_admission/caller_budget_snapshot.rs"]
+mod caller_budget_snapshot;
+#[path = "durable_admission/delivery_revalidation.rs"]
+mod delivery_revalidation;
+#[path = "durable_admission/dispatch_commit_failure.rs"]
+mod dispatch_commit_failure;
+#[path = "durable_admission/dpop_acquisition.rs"]
+mod dpop_acquisition;
+#[path = "durable_admission/federation_context.rs"]
+mod federation_context;
+#[path = "durable_admission/governed_acquisition.rs"]
+mod governed_acquisition;
+#[path = "durable_admission/monetary.rs"]
+mod monetary;
+#[path = "durable_admission/native_acquisition.rs"]
+mod native_acquisition;
+#[path = "durable_admission/native_dispatch_ledger.rs"]
+mod native_dispatch_ledger;
+#[path = "durable_admission/native_egress.rs"]
+mod native_egress;
+#[path = "durable_admission/operation_store.rs"]
+mod operation_store;
+#[path = "durable_admission/payment_recovery.rs"]
+mod payment_recovery;
+#[path = "durable_admission/receipt_projection.rs"]
+mod receipt_projection;
+#[path = "durable_admission/recovery_lease.rs"]
+mod recovery_lease;
+#[path = "durable_admission/return_context.rs"]
+mod return_context;
+#[path = "durable_admission/review_boundaries.rs"]
+mod review_boundaries;
+#[path = "durable_admission/review_regressions.rs"]
+mod review_regressions;
+#[path = "durable_admission/runtime_participant.rs"]
+mod runtime_participant;
+#[path = "durable_admission/security_binding.rs"]
+mod security_binding;
 
 #[derive(Default)]
-struct TestAdmissionState {
-    operation: Option<AdmissionOperationV1>,
+pub(super) struct TestAdmissionState {
+    pub(super) operation: Option<AdmissionOperationV1>,
+    pub(super) retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
@@ -165,10 +66,20 @@ struct TestAdmissionState {
     budget_authorization: Option<crate::budget_store::BudgetAuthorizeHoldRequest>,
     payment_journal: Option<crate::payment::PaymentJournalRecord>,
     payment_release_evidence: Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,
+    recovery_status: Option<crate::admission_operation::AdmissionRecoveryStatusV1>,
 }
 
-struct TestAdmissionOperationStore {
-    fence: std::sync::Mutex<StoreMutationFence>,
+pub(super) struct TestAdmissionOperationStore {
+    caller_share_times: std::sync::Mutex<Vec<u64>>,
+    recovery_pages: operation_store::TestRecoveryPages,
+    recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
+    native_recovery: native_acquisition::TestNative,
+    native_egress: native_egress::TestEgress,
+    native_dispatch_ledger: native_dispatch_ledger::TestLedger,
+    dpop_recovery: dpop_acquisition::TestDpop,
+    approval_recovery: governed_acquisition::TestApproval,
+    runtime_recovery: runtime_participant::TestRuntimeRecovery,
+    pub(super) fence: std::sync::Mutex<StoreMutationFence>,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
@@ -176,13 +87,24 @@ struct TestAdmissionOperationStore {
     fail_next_terminal_projection: std::sync::atomic::AtomicBool,
     fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool,
     fail_next_budget_authorization: std::sync::atomic::AtomicBool,
+    panic_capture_boundary: std::sync::atomic::AtomicU8,
+    substitute_capture_participant: std::sync::atomic::AtomicBool,
     budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
-    state: std::sync::Mutex<TestAdmissionState>,
+    pub(super) state: std::sync::Mutex<TestAdmissionState>,
 }
 
 impl TestAdmissionOperationStore {
-    fn new(fence: StoreMutationFence) -> Self {
+    pub(super) fn new(fence: StoreMutationFence) -> Self {
         Self {
+            caller_share_times: std::sync::Mutex::new(Vec::new()),
+            recovery_pages: operation_store::TestRecoveryPages::default(),
+            recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults::default(),
+            native_recovery: native_acquisition::TestNative::default(),
+            native_egress: native_egress::TestEgress::default(),
+            native_dispatch_ledger: native_dispatch_ledger::TestLedger::default(),
+            dpop_recovery: dpop_acquisition::TestDpop::default(),
+            approval_recovery: governed_acquisition::TestApproval::default(),
+            runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
@@ -191,6 +113,8 @@ impl TestAdmissionOperationStore {
             fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
             fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool::new(false),
             fail_next_budget_authorization: std::sync::atomic::AtomicBool::new(false),
+            panic_capture_boundary: std::sync::atomic::AtomicU8::new(0),
+            substitute_capture_participant: std::sync::atomic::AtomicBool::new(false),
             budget: std::sync::Arc::new(crate::budget_store::InMemoryBudgetStore::new()),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
@@ -238,7 +162,7 @@ impl TestAdmissionOperationStore {
         *self.fence.lock().expect("test admission fence lock") = fence;
     }
 
-    fn operation(&self) -> AdmissionOperationV1 {
+    pub(super) fn operation(&self) -> AdmissionOperationV1 {
         self.state
             .lock()
             .expect("test admission state lock")
@@ -283,7 +207,7 @@ impl TestAdmissionOperationStore {
             .store(true, Ordering::SeqCst);
     }
 
-    fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
+    pub(super) fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
         self.budget.clone()
     }
 
@@ -296,189 +220,6 @@ impl TestAdmissionOperationStore {
             .ok_or(AdmissionOperationStoreError::Fenced)
     }
 }
-
-impl AdmissionOperationStore for TestAdmissionOperationStore {
-    fn begin(
-        &self,
-        operation: &AdmissionOperationV1,
-        fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
-        self.require_fence(fence)?;
-        operation.validate()?;
-        let mut state = self.state.lock().expect("test admission state lock");
-        let Some(existing) = state.operation.as_ref() else {
-            state.operation = Some(operation.clone());
-            return Ok(AdmissionBeginResult::Created(operation.clone()));
-        };
-        Ok(match existing.classify_replay(operation) {
-            AdmissionReplayClassification::Exact { terminal_replay } => {
-                AdmissionBeginResult::ExactReplay {
-                    operation: existing.clone(),
-                    terminal_replay,
-                }
-            }
-            AdmissionReplayClassification::Conflict => AdmissionBeginResult::Conflict {
-                existing_operation_id: existing.binding().operation_id().clone(),
-            },
-        })
-    }
-
-    fn load_by_operation_id(
-        &self,
-        operation_id: &AdmissionOperationId,
-    ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        Ok(self
-            .state
-            .lock()
-            .expect("test admission state lock")
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == operation_id)
-            .cloned())
-    }
-
-    fn load_by_replay_key(
-        &self,
-        replay_key: &AdmissionReplayKey,
-    ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        Ok(self
-            .state
-            .lock()
-            .expect("test admission state lock")
-            .operation
-            .as_ref()
-            .filter(|operation| &operation.replay_key() == replay_key)
-            .cloned())
-    }
-
-    fn compare_and_swap(
-        &self,
-        command: &AdmissionOperationCommand,
-        trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
-        let mut state = self.state.lock().expect("test admission state lock");
-        let operation = state
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == command.operation_id())
-            .cloned()
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
-        let claim = state
-            .claim
-            .as_ref()
-            .filter(|claim| claim.operation_id() == command.operation_id())
-            .ok_or(AdmissionOperationStoreError::Fenced)?;
-        let lease = command.recovery_lease();
-        if claim.claimant_id() != lease.claimant_id()
-            || claim.coordinator_lease_id() != lease.coordinator_lease_id()
-            || claim.claimed_version() != lease.claimed_version()
-            || claim.expires_at_unix_ms() != lease.expires_at_unix_ms()
-            || claim.store_fence() != lease.store_fence()
-        {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        let result = operation.apply_command(command, trusted_now_unix_ms)?;
-        state.operation = Some(result.clone().into_operation());
-        state.claim = None;
-        Ok(result)
-    }
-
-    fn claim_recovery_untrusted(
-        &self,
-        operation_id: &AdmissionOperationId,
-        expected_version: u64,
-        claimant_id: &AdmissionIdentifier,
-        _trusted_now_unix_ms: u64,
-        expires_at_unix_ms: u64,
-        fence: &StoreMutationFence,
-    ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
-        self.require_fence(fence)?;
-        let mut state = self.state.lock().expect("test admission state lock");
-        let operation = state
-            .operation
-            .as_ref()
-            .filter(|operation| operation.binding().operation_id() == operation_id)
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
-        if operation.version() != expected_version {
-            return Err(AdmissionOperationError::StaleVersion {
-                expected: expected_version,
-                actual: operation.version(),
-            }
-            .into());
-        }
-        let claim = UntrustedAdmissionRecoveryClaim::new(
-            operation_id.clone(),
-            claimant_id.clone(),
-            AdmissionIdentifier::try_new("coordinator_lease_id", fence.lease_id.clone())?,
-            operation.coordinator_lease_epoch(),
-            expected_version,
-            expires_at_unix_ms,
-            fence.clone(),
-        )?;
-        state.claim = Some(claim.clone());
-        Ok(claim)
-    }
-
-    fn revalidate_recovery_claim(
-        &self,
-        operation: &AdmissionOperationV1,
-        claim: &UntrustedAdmissionRecoveryClaim,
-        trusted_now_unix_ms: u64,
-        current_store_fence: &StoreMutationFence,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        self.require_fence(current_store_fence)?;
-        let state = self.state.lock().expect("test admission state lock");
-        if state.operation.as_ref() != Some(operation)
-            || state.claim.as_ref() != Some(claim)
-            || trusted_now_unix_ms >= claim.expires_at_unix_ms()
-        {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        Ok(())
-    }
-
-    fn list_recoverable(
-        &self,
-        not_after_unix_ms: u64,
-        limit: usize,
-    ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        let store_fence = self.fence.lock().expect("test admission fence lock").clone();
-        let state = self.state.lock().expect("test admission state lock");
-        // Mirror the durable store's recovery contract: an operation still under a
-        // live recovery lease held by the serving fence is being actively driven
-        // and is not recoverable. Only an expired lease, a lease from another
-        // fence, or no lease at all makes an operation eligible for the sweep.
-        Ok(state
-            .operation
-            .iter()
-            .filter(|operation| !operation.state().is_terminal())
-            .filter(|operation| {
-                operation.state() != AdmissionOperationState::ApprovalRequired
-            })
-            .filter(|operation| {
-                !state.claim.as_ref().is_some_and(|claim| {
-                    claim.operation_id() == operation.binding().operation_id()
-                        && claim.expires_at_unix_ms() > not_after_unix_ms
-                        && claim.store_fence() == &store_fence
-                })
-            })
-            .take(limit)
-            .cloned()
-            .collect())
-    }
-
-    fn load_terminal_replay(
-        &self,
-        replay_key: &AdmissionReplayKey,
-    ) -> Result<Option<AdmissionTerminalReplay>, AdmissionOperationStoreError> {
-        Ok(self
-            .load_by_replay_key(replay_key)?
-            .and_then(|operation| operation.terminal_replay().cloned()))
-    }
-}
-
-impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {}
 
 impl ReceiptStore for TestAdmissionOperationStore {
     fn append_chio_receipt(
@@ -731,7 +472,8 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         }
         match (transition, release_evidence) {
             (
-                crate::payment::PaymentJournalTransition::BeginRelease { authority },
+                crate::payment::PaymentJournalTransition::BeginRelease { authority }
+                | crate::payment::PaymentJournalTransition::BeginPrepaymentRefund { authority },
                 Some(evidence),
             ) => {
                 let persisted = evidence.to_persisted();
@@ -759,7 +501,11 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
                 }
                 state.payment_release_evidence = Some(persisted);
             }
-            (crate::payment::PaymentJournalTransition::BeginRelease { .. }, None)
+            (
+                crate::payment::PaymentJournalTransition::BeginRelease { .. }
+                | crate::payment::PaymentJournalTransition::BeginPrepaymentRefund { .. },
+                None,
+            )
             | (_, Some(_)) => {
                 return Err(
                     crate::receipt_store::AdmissionPaymentJournalError::Invariant(
@@ -1008,6 +754,8 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, AdmissionCaptureError> {
+        let panic_boundary = self.panic_capture_boundary.swap(0, Ordering::SeqCst);
+        assert_ne!(panic_boundary, 1, "injected panic before capture mutation");
         self.require_fence(active_fence)
             .map_err(|_| AdmissionCaptureError::Fenced)?;
         request
@@ -1042,6 +790,18 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
             .compare_and_swap(&command, trusted_now_unix_ms)
             .map(AdmissionCommandResult::into_operation)
             .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
+        assert_ne!(
+            panic_boundary, 2,
+            "injected panic after dispatch commitment"
+        );
+        let operation = if self
+            .substitute_capture_participant
+            .swap(false, Ordering::SeqCst)
+        {
+            return_context::substitute_captured_participant(operation)?
+        } else {
+            operation
+        };
         Ok(crate::receipt_store::AdmissionBudgetCapture {
             decision,
             operation,
@@ -1328,7 +1088,7 @@ fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
     );
 }
 
-fn admission_test_fence() -> StoreMutationFence {
+pub(super) fn admission_test_fence() -> StoreMutationFence {
     StoreMutationFence {
         store_uuid: "test-admission-authority".to_string(),
         lease_id: "test-admission-lease".to_string(),
@@ -1336,11 +1096,11 @@ fn admission_test_fence() -> StoreMutationFence {
     }
 }
 
-struct DurableAdmissionCheckingServer {
-    id: String,
-    tools: Vec<String>,
-    invocations: std::sync::Arc<AtomicU64>,
-    store: std::sync::Arc<TestAdmissionOperationStore>,
+pub(super) struct DurableAdmissionCheckingServer {
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
+    pub(super) invocations: std::sync::Arc<AtomicU64>,
+    pub(super) store: std::sync::Arc<TestAdmissionOperationStore>,
 }
 
 #[async_trait::async_trait]
@@ -1421,7 +1181,7 @@ impl ToolServerConnection for DurableIncompleteStreamServer {
     }
 }
 
-fn durable_admission_fixture(
+pub(super) fn durable_admission_fixture(
     request_id: &str,
 ) -> (
     ChioKernel,
@@ -1471,681 +1231,6 @@ fn durable_admission_fixture_with_grants(
         serde_json::json!({"record": "ledger-7", "value": "settled"}),
     );
     (kernel, request, store, invocations)
-}
-
-#[test]
-fn cumulative_approval_membership_does_not_change_operation_identity() {
-    let (kernel, mut request, _store, _invocations) =
-        durable_admission_fixture("cumulative-stable-operation");
-    let mut body = request.capability.body();
-    body.scope.grants[0]
-        .constraints
-        .push(Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 100,
-                currency: "USD".to_owned(),
-            },
-            approval_budget_id: "budget-identity".to_owned(),
-            approval_budget_epoch: 1,
-            cumulative_approval_root_binding: None,
-        });
-    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("cumulative capability must sign");
-    let first = {
-        let matching = [MatchingGrant {
-            index: 0,
-            grant: &request.capability.scope.grants[0],
-            specificity: (0, 0, 0),
-        }];
-        kernel
-            .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
-            .expect("prepare cumulative operation")
-            .expect("cumulative admission must be durable")
-    };
-
-    let approver = CoreKeypair::generate();
-    let subject = CoreKeypair::generate();
-    request.approval_tokens.push(hitl_sign_token(
-        &approver,
-        &subject,
-        "cumulative-stable-operation",
-        &sha256_hex(b"cumulative-stable-intent"),
-        GovernedApprovalDecision::Approved,
-        current_unix_timestamp(),
-    ));
-    let resumed = {
-        let matching = [MatchingGrant {
-            index: 0,
-            grant: &request.capability.scope.grants[0],
-            specificity: (0, 0, 0),
-        }];
-        kernel
-            .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
-            .expect("resume cumulative operation")
-            .expect("cumulative admission must remain durable")
-    };
-
-    assert_eq!(first.operation_id(), resumed.operation_id());
-}
-
-#[test]
-fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
-    let (mut kernel, mut request, store, invocations) =
-        durable_admission_fixture("cumulative-approval-dispatch");
-    let approver_a = CoreKeypair::generate();
-    let approver_b = CoreKeypair::generate();
-    let requirement = ThresholdApprovalRequirement::new(
-        kernel.config.policy_hash.clone(),
-        2,
-        vec![
-            ThresholdApproverIdentity {
-                identifier: "approver-a".to_owned(),
-                public_key: approver_a.public_key(),
-            },
-            ThresholdApproverIdentity {
-                identifier: "approver-b".to_owned(),
-                public_key: approver_b.public_key(),
-            },
-        ],
-        "cumulative-approval-directory-v1".to_owned(),
-        300,
-    )
-    .expect("threshold requirement");
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
-        requirement,
-    )));
-    let mut body = request.capability.body();
-    body.scope.grants[0]
-        .constraints
-        .push(Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 100,
-                currency: "USD".to_owned(),
-            },
-            approval_budget_id: "budget-dispatch".to_owned(),
-            approval_budget_epoch: 7,
-            cumulative_approval_root_binding: None,
-        });
-    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("cumulative capability must sign");
-    let intent = GovernedTransactionIntent {
-        id: "cumulative-approval-intent".to_owned(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "authorize a bounded ledger mutation".to_owned(),
-        max_amount: Some(MonetaryAmount {
-            units: 100,
-            currency: "USD".to_owned(),
-        }),
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: None,
-        body: Default::default(),
-    };
-    let intent_hash = intent.binding_hash().expect("intent hash");
-    request.governed_intent = Some(intent);
-
-    let pending = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("pending approval response");
-    assert_eq!(
-        pending.verdict,
-        Verdict::PendingApproval,
-        "{:?}",
-        pending.reason
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let proposal: ThresholdApprovalProposal = match pending.output {
-        Some(ToolCallOutput::Value(value)) => {
-            serde_json::from_value(value).expect("stored threshold proposal")
-        }
-        _ => panic!("pending response must return the stored proposal"),
-    };
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::ApprovalRequired
-    );
-    let operation_id = store
-        .operation()
-        .binding()
-        .operation_id()
-        .as_str()
-        .to_owned();
-    let proposal_hash = proposal.artifact_digest().expect("proposal digest");
-    let sign_token = |id: &str, approver: &CoreKeypair| {
-        GovernedApprovalToken::sign(
-            GovernedApprovalTokenBody {
-                id: id.to_owned(),
-                approver: approver.public_key(),
-                subject: request.capability.subject.clone(),
-                governed_intent_hash: intent_hash.clone(),
-                request_id: request.request_id.clone(),
-                threshold_proposal_hash: Some(proposal_hash.clone()),
-                issued_at: proposal.body.proposal_created_at,
-                expires_at: proposal.body.proposal_deadline,
-                decision: GovernedApprovalDecision::Approved,
-            },
-            approver,
-        )
-        .expect("approval token")
-    };
-    let approval_tokens = vec![
-        sign_token("cumulative-token-b", &approver_b),
-        sign_token("cumulative-token-a", &approver_a),
-    ];
-    let mut approved = request.clone();
-    approved.threshold_approval_proposal = Some(proposal);
-    approved.approval_tokens = approval_tokens;
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&approved)
-        .expect("approved cumulative dispatch");
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert_eq!(
-        store.operation().binding().operation_id().as_str(),
-        operation_id
-    );
-    let usage = crate::budget_store::BudgetStore::get_cumulative_approval_operation_usage(
-        store.budget_store().as_ref(),
-        &operation_id,
-    )
-    .expect("cumulative operation lookup")
-    .expect("captured cumulative operation");
-    assert_eq!(
-        usage.state,
-        crate::budget_store::BudgetCumulativeApprovalState::Captured
-    );
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&approved)
-        .expect("completed cumulative replay");
-    assert_eq!(replay.verdict, Verdict::Allow);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn cumulative_approval_below_threshold_dispatches_without_a_proposal() {
-    let (kernel, mut request, store, invocations) =
-        durable_admission_fixture("cumulative-below-threshold");
-    let mut body = request.capability.body();
-    body.scope.grants[0]
-        .constraints
-        .push(Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 100,
-                currency: "USD".to_owned(),
-            },
-            approval_budget_id: "budget-below-threshold".to_owned(),
-            approval_budget_epoch: 1,
-            cumulative_approval_root_binding: None,
-        });
-    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("cumulative capability must sign");
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "cumulative-below-threshold-intent".to_owned(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "authorize a bounded ledger mutation".to_owned(),
-        max_amount: Some(MonetaryAmount {
-            units: 60,
-            currency: "USD".to_owned(),
-        }),
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: None,
-        body: Default::default(),
-    });
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("below-threshold cumulative dispatch");
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert!(store.operation().threshold_proposal().is_none());
-}
-
-#[test]
-fn cumulative_approval_guard_denial_creates_no_budget_state() {
-    struct DenyAll;
-
-    impl Guard for DenyAll {
-        fn name(&self) -> &str {
-            "cumulative-deny-all"
-        }
-
-        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
-            Ok(GuardDecision::deny(Vec::new()))
-        }
-    }
-
-    let (mut kernel, mut request, store, invocations) =
-        durable_admission_fixture("cumulative-guard-denial");
-    let mut body = request.capability.body();
-    body.scope.grants[0]
-        .constraints
-        .push(Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 100,
-                currency: "USD".to_owned(),
-            },
-            approval_budget_id: "budget-guard-denial".to_owned(),
-            approval_budget_epoch: 1,
-            cumulative_approval_root_binding: None,
-        });
-    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("cumulative capability must sign");
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "cumulative-guard-denial-intent".to_owned(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "authorize a bounded ledger mutation".to_owned(),
-        max_amount: Some(MonetaryAmount {
-            units: 60,
-            currency: "USD".to_owned(),
-        }),
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: None,
-        body: Default::default(),
-    });
-    kernel.add_guard(Box::new(DenyAll));
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("guard denial must produce a signed response");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let operation = store.operation();
-    assert_eq!(
-        operation.state(),
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert!(
-        crate::budget_store::BudgetStore::get_cumulative_approval_operation_usage(
-            store.budget_store().as_ref(),
-            operation.binding().operation_id().as_str(),
-        )
-        .expect("cumulative operation lookup")
-        .is_none()
-    );
-}
-
-#[test]
-fn nested_cumulative_approval_resumes_and_dispatches_once() {
-    let (mut kernel, mut request, _store, invocations) =
-        durable_admission_fixture("nested-cumulative-approval");
-    let approver = CoreKeypair::generate();
-    let requirement = ThresholdApprovalRequirement::new(
-        kernel.config.policy_hash.clone(),
-        1,
-        vec![ThresholdApproverIdentity {
-            identifier: "nested-approver".to_owned(),
-            public_key: approver.public_key(),
-        }],
-        "nested-cumulative-directory-v1".to_owned(),
-        300,
-    )
-    .expect("threshold requirement");
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
-        requirement,
-    )));
-    let mut body = request.capability.body();
-    body.scope.grants[0]
-        .constraints
-        .push(Constraint::RequireCumulativeApprovalAbove {
-            threshold: MonetaryAmount {
-                units: 25,
-                currency: "USD".to_owned(),
-            },
-            approval_budget_id: "nested-cumulative-budget".to_owned(),
-            approval_budget_epoch: 1,
-            cumulative_approval_root_binding: None,
-        });
-    request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("cumulative capability must sign");
-    let intent = GovernedTransactionIntent {
-        id: "nested-cumulative-intent".to_owned(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "authorize nested ledger mutation".to_owned(),
-        max_amount: Some(MonetaryAmount {
-            units: 25,
-            currency: "USD".to_owned(),
-        }),
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: None,
-        body: Default::default(),
-    };
-    let intent_hash = intent.binding_hash().expect("intent hash");
-    request.governed_intent = Some(intent);
-    let session_id = kernel
-        .open_session("nested-cumulative-parent".to_owned(), Vec::new())
-        .expect("parent session");
-    kernel
-        .activate_session(&session_id)
-        .expect("activate parent session");
-    let parent_context = make_operation_context(
-        &session_id,
-        "nested-cumulative-parent-request",
-        "nested-cumulative-parent",
-    );
-    kernel
-        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
-        .expect("begin parent request");
-    let mut client = NoopNestedFlowClient;
-
-    let pending = kernel
-        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
-        .expect("nested pending response");
-    assert_eq!(
-        pending.verdict,
-        Verdict::PendingApproval,
-        "{:?}",
-        pending.reason
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let proposal: ThresholdApprovalProposal = match pending.output {
-        Some(ToolCallOutput::Value(value)) => {
-            serde_json::from_value(value).expect("stored nested proposal")
-        }
-        _ => panic!("nested pending response must return its proposal"),
-    };
-    let proposal_hash = proposal.artifact_digest().expect("proposal digest");
-    let token = GovernedApprovalToken::sign(
-        GovernedApprovalTokenBody {
-            id: "nested-cumulative-token".to_owned(),
-            approver: approver.public_key(),
-            subject: request.capability.subject.clone(),
-            governed_intent_hash: intent_hash,
-            request_id: request.request_id.clone(),
-            threshold_proposal_hash: Some(proposal_hash),
-            issued_at: proposal.body.proposal_created_at,
-            expires_at: proposal.body.proposal_deadline,
-            decision: GovernedApprovalDecision::Approved,
-        },
-        &approver,
-    )
-    .expect("nested approval token");
-    request.threshold_approval_proposal = Some(proposal);
-    request.approval_tokens = vec![token];
-
-    let response = kernel
-        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
-        .expect("nested approved response");
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
-    use chio_core::capability::aggregate_invocation::{
-        AggregateInvocationBudget, AggregateInvocationScope,
-    };
-
-    let mut first_grant = make_grant("durable-server", "mutate");
-    first_grant.max_invocations = Some(1);
-    let mut second_grant = make_grant("durable-server", "mutate-alt");
-    second_grant.max_invocations = Some(1);
-    let (kernel, mut first, store, invocations) =
-        durable_admission_fixture_with_grants("aggregate-first", vec![first_grant, second_grant]);
-    let mut body = first.capability.body();
-    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
-        scope: AggregateInvocationScope::Capability,
-        max_invocations: 1,
-        root_binding: None,
-    });
-    first.capability = CapabilityToken::sign(body, &kernel.config.keypair)
-        .expect("aggregate capability must sign");
-
-    let first_response = kernel
-        .evaluate_tool_call_blocking(&first)
-        .expect("first aggregate invocation");
-    assert_eq!(
-        first_response.verdict,
-        Verdict::Allow,
-        "{:?}",
-        first_response.reason
-    );
-
-    let mut second = first.clone();
-    second.request_id = "aggregate-second".to_string();
-    second.tool_name = "mutate-alt".to_string();
-    let second_response = kernel
-        .evaluate_tool_call_blocking(&second)
-        .expect("aggregate exhaustion must produce a signed denial");
-    assert_eq!(second_response.verdict, Verdict::Deny);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let second_grant_usage = store
-        .budget_store()
-        .get_invocation_quota_usage(&crate::budget_store::BudgetQuotaKey::grant(
-            first.capability.id.clone(),
-            1,
-        ))
-        .expect("second grant quota lookup");
-    assert!(second_grant_usage.is_none());
-}
-
-#[test]
-fn durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier() {
-    struct BoundVerifier;
-
-    impl crate::supplemental_quota::SupplementalQuotaVerifier for BoundVerifier {
-        fn verify(
-            &self,
-            signed_extension: &[u8],
-            context: &crate::supplemental_quota::SupplementalQuotaVerificationContext,
-        ) -> Result<
-            crate::supplemental_quota::VerifiedSupplementalQuotaClaim,
-            crate::supplemental_quota::SupplementalQuotaVerifierError,
-        > {
-            let request_binding_hash =
-                crate::supplemental_quota::supplemental_request_binding_hash(context).map_err(
-                    |error| {
-                        crate::supplemental_quota::SupplementalQuotaVerifierError::new(
-                            error.to_string(),
-                        )
-                    },
-                )?;
-            Ok(crate::supplemental_quota::VerifiedSupplementalQuotaClaim {
-                profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(),
-                broker_capability_id: "broker-capability-7".to_string(),
-                issuer: context.subject.clone(),
-                request_constraint_digest: "a".repeat(64),
-                max_invocations: 7,
-                authorization_artifact_digest:
-                    crate::supplemental_quota::supplemental_authorization_artifact_digest(
-                        signed_extension,
-                    ),
-                supplemental_revocation_ids: vec!["broker-capability-7".to_string()],
-                expires_at: current_unix_timestamp() + 300,
-                request_binding_hash,
-                capability_id: context.capability_id.clone(),
-                capability_digest: context.capability_digest.clone(),
-                request_namespace_digest: context.request_namespace_digest.clone(),
-                operation_id: context.operation_id.clone(),
-                subject: context.subject.clone(),
-                request_id: context.request_id.clone(),
-                normalized_destination: context.normalized_destination.clone(),
-                arguments_hash: context.arguments_hash.clone(),
-                negotiated_features: context.negotiated_features.clone(),
-            })
-        }
-    }
-
-    let (mut kernel, mut request, _store, _invocations) =
-        durable_admission_fixture("durable-supplemental-verifier");
-    kernel
-        .set_supplemental_quota_verifier(
-            std::sync::Arc::new(BoundVerifier),
-            crate::supplemental_quota::SupplementalQuotaVerifierBinding {
-                verifier_identity: "test/bound-verifier.v1".to_string(),
-                configuration_digest: "b".repeat(64),
-            },
-        )
-        .expect("valid verifier binding");
-    request.supplemental_authorization = Some(
-        chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
-            signed_extension: "opaque-signed-extension".to_string(),
-        },
-    );
-    let matching = resolve_required_matching_grants(
-        &request.capability,
-        &request.tool_name,
-        &request.server_id,
-        &request.arguments,
-        request.model_metadata.as_ref(),
-    )
-    .expect("matching grants");
-
-    let admission = kernel
-        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
-        .expect("verified durable admission")
-        .expect("covered durable admission");
-
-    let verified = admission
-        .supplemental_quota()
-        .expect("verified supplemental quota");
-    assert_eq!(verified.max_invocations(), 7);
-    assert_eq!(verified.broker_capability_id(), "broker-capability-7");
-    assert_eq!(
-        admission
-            .operation()
-            .supplemental_authorization_digest()
-            .map(crate::admission_operation::AdmissionDigest::as_str),
-        Some(verified.authorization_artifact_digest())
-    );
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn dropped_durable_guard_evaluation_terminalizes_before_dispatch() {
-    struct ParkingGuard {
-        started: std::sync::Arc<tokio::sync::Notify>,
-    }
-
-    impl Guard for ParkingGuard {
-        fn name(&self) -> &str {
-            "durable-parking-guard"
-        }
-
-        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
-            self.started.notify_one();
-            std::thread::sleep(std::time::Duration::from_secs(2));
-            Ok(GuardDecision::allow())
-        }
-    }
-
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-dropped-guard-evaluation");
-    kernel.config.deadlines.always_offload_guards = true;
-    let started = std::sync::Arc::new(tokio::sync::Notify::new());
-    kernel.add_guard(Box::new(ParkingGuard {
-        started: started.clone(),
-    }));
-    let kernel = std::sync::Arc::new(kernel);
-    let evaluation = {
-        let kernel = kernel.clone();
-        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
-    };
-
-    tokio::time::timeout(std::time::Duration::from_secs(5), started.notified())
-        .await
-        .expect("guard evaluation started");
-    evaluation.abort();
-    assert!(evaluation.await.is_err());
-
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-}
-
-#[test]
-fn startup_recovery_terminalizes_admission_before_budget_authorization() {
-    let (kernel, request, store, invocations) =
-        durable_admission_fixture("durable-startup-before-budget");
-    let matching = resolve_required_matching_grants(
-        &request.capability,
-        &request.tool_name,
-        &request.server_id,
-        &request.arguments,
-        request.model_metadata.as_ref(),
-    )
-    .expect("matching grants");
-    let admission = kernel
-        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
-        .expect("begin durable admission")
-        .expect("covered durable admission");
-    assert_eq!(
-        admission.state(),
-        AdmissionOperationState::BrokerAttemptRegistered
-    );
-
-    assert_eq!(
-        kernel
-            .reconcile_recoverable_admissions()
-            .expect("recover pre-budget admission"),
-        1
-    );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-}
-
-#[test]
-fn durable_pre_dispatch_denial_commits_terminal_compensation() {
-    struct DenyAll;
-
-    impl Guard for DenyAll {
-        fn name(&self) -> &str {
-            "durable-deny-all"
-        }
-
-        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
-            Ok(GuardDecision::deny(Vec::new()))
-        }
-    }
-
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-pre-dispatch-denial");
-    kernel.add_guard(Box::new(DenyAll));
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("terminal pre-dispatch denial");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("terminal compensation replay");
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
 struct VersionlessPostInvocationHook;
@@ -2231,245 +1316,6 @@ impl crate::post_invocation::PostInvocationHook for StableStreamRedactingPostInv
     }
 }
 
-#[test]
-fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
-    let (kernel, request, store, invocations) = durable_admission_fixture("durable-top-level");
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("first durable dispatch");
-    assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("exact replay delivery");
-    assert_eq!(replay.verdict, Verdict::Allow);
-    assert_eq!(replay.receipt.id, response.receipt.id);
-    assert_eq!(replay.output, response.output);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let mut conflict = request.clone();
-    conflict.arguments = serde_json::json!({"record": "ledger-7", "value": "reopened"});
-    let conflict = kernel
-        .evaluate_tool_call_blocking(&conflict)
-        .expect("conflicting replay denial");
-    assert_eq!(conflict.verdict, Verdict::Deny);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn durable_completion_projects_the_canonical_receipt_idempotently() {
-    let (mut kernel, request, _store, invocations) =
-        durable_admission_fixture("durable-receipt-projection");
-    let projection = AdmissionReceiptProjectionStore::default();
-    kernel
-        .set_receipt_store(Box::new(projection.clone()))
-        .expect("receipt projection store");
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("durable receipt projection");
-    assert_same_receipt(
-        projection.receipt().as_ref().expect("projected receipt"),
-        &response.receipt,
-    );
-    assert_eq!(projection.successful_appends(), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("idempotent durable receipt projection replay");
-    assert_same_receipt(&replay.receipt, &response.receipt);
-    assert_eq!(projection.successful_appends(), 1);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn completed_replay_heals_a_failed_receipt_projection_without_redispatch() {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-receipt-projection-recovery");
-    let projection = AdmissionReceiptProjectionStore::default();
-    projection.fail_next_append();
-    kernel
-        .set_receipt_store(Box::new(projection.clone()))
-        .expect("receipt projection store");
-
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("receipt projection failure must fail closed");
-    assert!(error
-        .to_string()
-        .contains("injected admission receipt projection failure"));
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert!(projection.receipt().is_none());
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("completed replay must heal receipt projection");
-    assert_same_receipt(
-        projection.receipt().as_ref().expect("healed receipt"),
-        &replay.receipt,
-    );
-    assert_eq!(projection.successful_appends(), 1);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn completed_federated_replay_remains_closed_until_cosign_succeeds(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (mut kernel, mut request, store, invocations) =
-        durable_admission_fixture("durable-federation-cosign-retry");
-    kernel.set_receipt_store(Box::new(AdmissionReceiptProjectionStore::default()))?;
-
-    let origin_keypair = Keypair::generate();
-    let origin_kernel_id = "kernel.org-a";
-    let local_kernel_id = "kernel.org-b";
-    kernel.set_federation_local_kernel_id(local_kernel_id);
-    let trust = KernelTrustExchange::new(local_kernel_id, kernel.config.keypair.clone())
-        .with_trusted_peer(origin_kernel_id, origin_keypair.public_key());
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs();
-    let peer = handshake_and_pin(&trust, origin_kernel_id, &origin_keypair, now);
-    let mut kernel = kernel.with_federation_peers(vec![peer]);
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(TreatyDsseAdmissionHook::new(
-        origin_keypair,
-        kernel.config.keypair.clone(),
-    )));
-    let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_federation_cosigner(std::sync::Arc::new(CountingRejectingCosigner {
-        calls: std::sync::Arc::clone(&cosigner_calls),
-    }));
-    request.federated_origin_kernel_id = Some(origin_kernel_id.to_owned());
-
-    assert!(matches!(
-        kernel.evaluate_tool_call_blocking(&request),
-        Err(KernelError::Internal(reason)) if reason.contains("bilateral co-sign failed")
-    ));
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert_eq!(cosigner_calls.load(Ordering::SeqCst), 1);
-
-    assert!(matches!(
-        kernel.evaluate_tool_call_blocking(&request),
-        Err(KernelError::Internal(reason)) if reason.contains("bilateral co-sign failed")
-    ));
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert_eq!(cosigner_calls.load(Ordering::SeqCst), 2);
-    Ok(())
-}
-
-#[test]
-fn admission_receipt_reconciliation_heals_a_crash_gap_before_serving() {
-    let (kernel, request, store, invocations) =
-        durable_admission_fixture("durable-receipt-startup-recovery");
-    let completed = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("canonical admission completion");
-
-    let mut recovered_config = make_config();
-    recovered_config.keypair = kernel.config.keypair.clone();
-    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
-    let mut recovered_kernel = make_kernel(recovered_config);
-    let projection = AdmissionReceiptProjectionStore::default();
-    recovered_kernel
-        .set_receipt_store(Box::new(projection.clone()))
-        .expect("receipt projection store");
-    recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())
-        .expect("qualified admission store");
-
-    assert_eq!(
-        recovered_kernel
-            .reconcile_durable_admission_receipt_projections()
-            .expect("startup receipt reconciliation"),
-        1
-    );
-    assert_same_receipt(
-        projection.receipt().as_ref().expect("reconciled receipt"),
-        &completed.receipt,
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
-    let (kernel, request, store, invocations) =
-        durable_admission_fixture("durable-return-write-failure");
-    store.fail_next_outcome_write();
-
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("tool return journal failure must fail closed");
-    assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason)
-            if reason.contains("injected tool outcome write failure")
-    ));
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::DispatchCommitted
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let failure_receipt = receipt_log.get(0).expect("tool return failure receipt");
-    assert!(failure_receipt.is_denied());
-    assert!(failure_receipt.verify_signature().expect("signed receipt"));
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("retained dispatch must produce a denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("DispatchCommitted")));
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn failed_terminal_projection_retains_finalizing_operation_and_blocks_redispatch() {
-    let (kernel, request, store, invocations) =
-        durable_admission_fixture("durable-terminal-projection-failure");
-    store.fail_next_terminal_projection();
-
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("terminal projection failure must fail closed");
-    assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason)
-            if reason.contains("injected terminal projection failure")
-    ));
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("retained finalization must recover delivery");
-    assert_eq!(replay.verdict, Verdict::Allow);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
 fn assert_finalization_crash_recovers(
     request_id: &str,
     inject: fn(&TestAdmissionOperationStore),
@@ -2482,9 +1328,21 @@ fn assert_finalization_crash_recovers(
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .expect_err("injected finalization crash must fail closed");
+    assert_eq!(error.report().code, "CHIO-KERNEL-DURABLE-ADMISSION");
+    let KernelError::AdmissionRecovery(retained) = &error else {
+        panic!("expected the original typed recovery error");
+    };
+    let source = std::error::Error::source(&error).expect("native recovery error");
+    let cause = source
+        .downcast_ref::<Box<crate::admission_operation::AdmissionRecoveryError>>()
+        .expect("original boxed recovery error type");
+    assert!(std::ptr::eq(cause, retained));
+    assert!(std::error::Error::source(cause).is_none());
     assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason) if reason.contains(expected_error)
+        cause.as_ref(),
+        crate::admission_operation::AdmissionRecoveryError::Outcome(
+            ToolOutcomeStoreError::Unavailable(reason)
+        ) if reason == expected_error
     ));
     assert_eq!(
         store.operation().state(),
@@ -2512,262 +1370,5 @@ fn assert_finalization_crash_recovers(
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
-#[test]
-fn finalization_recovers_before_evaluation_creation() {
-    assert_finalization_crash_recovers(
-        "durable-evaluation-begin-failure",
-        TestAdmissionOperationStore::fail_next_evaluation_begin,
-        "injected evaluation begin failure",
-        (None, Some(1)),
-    );
-}
-
-#[test]
-fn finalization_recovers_after_frozen_evaluation_creation() {
-    assert_finalization_crash_recovers(
-        "durable-evaluation-stage-failure",
-        TestAdmissionOperationStore::fail_next_evaluation_stage,
-        "injected evaluation stage failure",
-        (Some(1), Some(1)),
-    );
-}
-
-#[test]
-fn finalization_recovers_after_pure_result_staging() {
-    assert_finalization_crash_recovers(
-        "durable-evaluation-finalization-failure",
-        TestAdmissionOperationStore::fail_next_evaluation_finalization,
-        "injected evaluation finalization failure",
-        (Some(2), Some(1)),
-    );
-}
-
-#[test]
-fn finalization_recovers_after_store_owner_rotation() {
-    let (kernel, request, store, invocations) =
-        durable_admission_fixture("durable-owner-rotation-recovery");
-    store.fail_next_evaluation_begin();
-
-    kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("injected finalization crash must fail closed");
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let rotated_fence = StoreMutationFence {
-        store_uuid: admission_test_fence().store_uuid,
-        lease_id: "test-admission-lease-2".to_owned(),
-        owner_epoch: 2,
-    };
-    store.rotate_fence(rotated_fence.clone());
-    let mut recovered_config = make_config();
-    recovered_config.keypair = kernel.config.keypair.clone();
-    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
-    let mut recovered_kernel = make_kernel(recovered_config);
-    recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
-        .expect("rotated qualified admission store");
-    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
-        id: "durable-server".to_owned(),
-        tools: vec!["mutate".to_owned()],
-        invocations: invocations.clone(),
-        store: store.clone(),
-    }));
-
-    let recovered = recovered_kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("new serving owner must finish retained finalization");
-    assert_eq!(recovered.verdict, Verdict::Allow);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn durable_post_invocation_identity_binds_transformed_output_and_replay() {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-versioned-post-hook");
-    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
-        replacement: "filtered",
-    }));
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("versioned post hook dispatch");
-    assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(
-        response.output,
-        Some(ToolCallOutput::Value(
-            serde_json::json!({"replacement": "filtered"})
-        ))
-    );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(store.outcome_versions(), (Some(4), Some(2)));
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("versioned post hook replay");
-    assert_eq!(replay.output, response.output);
-    assert_eq!(replay.receipt.id, response.receipt.id);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn durable_redaction_cannot_upgrade_incomplete_transport_and_replay_is_exactly_once() {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-incomplete-redacted-stream");
-    kernel.register_tool_server(Box::new(DurableIncompleteStreamServer {
-        invocations: invocations.clone(),
-        store: store.clone(),
-    }));
-    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
-        replacement: "filtered-partial",
-    }));
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("durable incomplete stream finalization");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        response.output,
-        Some(ToolCallOutput::Value(
-            serde_json::json!({"replacement": "filtered-partial"})
-        ))
-    );
-    assert_eq!(
-        response.reason.as_deref(),
-        Some("transport ended after the side effect")
-    );
-    assert_eq!(
-        response.receipt.decision,
-        Some(chio_core::receipt::decision::Decision::Incomplete {
-            reason: "transport ended after the side effect".to_owned(),
-        })
-    );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("durable incomplete stream replay");
-    assert_eq!(replay.output, response.output);
-    assert_eq!(replay.receipt.id, response.receipt.id);
-    assert_eq!(replay.terminal_state, response.terminal_state);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn durable_redaction_recovery_uses_the_recorded_stream_limits() {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-redaction-stream-limit-snapshot");
-    kernel.config.memory_budget.max_stream_chunks = 1;
-    kernel.add_post_invocation_hook(Box::new(StableStreamRedactingPostInvocationHook));
-    store.fail_next_evaluation_begin();
-
-    kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("injected finalization crash");
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    let mut recovered_config = make_config();
-    recovered_config.keypair = kernel.config.keypair.clone();
-    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
-    recovered_config.memory_budget.max_stream_chunks = 2;
-    let mut recovered_kernel = make_kernel(recovered_config);
-    recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())
-        .expect("qualified admission store");
-    recovered_kernel.add_post_invocation_hook(Box::new(StableStreamRedactingPostInvocationHook));
-    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
-        id: "durable-server".to_owned(),
-        tools: vec!["mutate".to_owned()],
-        invocations: invocations.clone(),
-        store: store.clone(),
-    }));
-
-    let recovered = recovered_kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("recover redacted stream with recorded limits");
-    assert_eq!(recovered.verdict, Verdict::Deny);
-    assert!(recovered
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("max chunk count of 1")));
-    let Some(ToolCallOutput::Stream(stream)) = recovered.output else {
-        panic!("expected retained redacted stream");
-    };
-    assert_eq!(stream.chunk_count(), 1);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization() {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("durable-post-hook-identity-change");
-    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
-        replacement: "first",
-    }));
-    store.fail_next_evaluation_begin();
-    kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("injected finalization crash");
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-
-    // Recovery runs under a rotated store lease, exactly as a restarted process
-    // takes over: the crashed operation's recovery lease belongs to the prior
-    // owner, so the sweep sees it as recoverable rather than actively leased.
-    let rotated_fence = StoreMutationFence {
-        store_uuid: admission_test_fence().store_uuid,
-        lease_id: "test-admission-lease-2".to_owned(),
-        owner_epoch: 2,
-    };
-    store.rotate_fence(rotated_fence.clone());
-    let mut recovered_config = make_config();
-    recovered_config.keypair = kernel.config.keypair.clone();
-    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
-    let mut recovered_kernel = make_kernel(recovered_config);
-    recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
-        .expect("qualified admission store");
-    recovered_kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
-        replacement: "second",
-    }));
-    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
-        id: "durable-server".to_owned(),
-        tools: vec!["mutate".to_owned()],
-        invocations: invocations.clone(),
-        store: store.clone(),
-    }));
-
-    let error = recovered_kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("identity substitution must fail closed");
-    assert!(error
-        .to_string()
-        .contains("recovered post-return plan does not match durable admission"));
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-}
+#[path = "durable_admission/clock_ownership.rs"]
+mod clock_ownership;

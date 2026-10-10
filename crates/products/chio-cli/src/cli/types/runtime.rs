@@ -1,3 +1,26 @@
+#[derive(Clone, Debug, Default, clap::Args)]
+pub(crate) struct ReceiptRetentionArgs {
+    /// Days to keep checkpointed receipts live before archiving (explicit opt-in).
+    #[arg(long = "receipt-retention-days", value_parser = clap::value_parser!(u64).range(1..), requires_all = ["receipt_archive", "receipt_retention_interval_secs"])]
+    receipt_retention_days: Option<u64>,
+    /// Archive database. Its parent must exist and it must differ from the live store.
+    #[arg(long = "receipt-archive", requires_all = ["receipt_retention_days", "receipt_retention_interval_secs"])]
+    receipt_archive: Option<std::path::PathBuf>,
+    /// Explicit retention check interval, in seconds (1 through 86400).
+    #[arg(long = "receipt-retention-interval-secs", value_parser = clap::value_parser!(u64).range(1..=86400), requires_all = ["receipt_retention_days", "receipt_archive"])]
+    receipt_retention_interval_secs: Option<u64>,
+}
+
+impl ReceiptRetentionArgs {
+    pub(crate) fn into_config(self) -> Result<Option<chio_api_protect::ProtectRetentionConfig>, chio_control_plane::CliError> {
+        match (self.receipt_retention_days, self.receipt_archive, self.receipt_retention_interval_secs) {
+            (None, None, None) => Ok(None),
+            (Some(retention_days), Some(archive_path), Some(check_interval_secs)) => Ok(Some(chio_api_protect::ProtectRetentionConfig { retention_days, archive_path, check_interval_secs })),
+            _ => Err(chio_control_plane::CliError::cli_other_error("receipt retention requires days, archive and interval together")),
+        }
+    }
+}
+
 use super::*;
 
 #[derive(Subcommand)]
@@ -644,6 +667,10 @@ pub(crate) enum McpCommands {
 
     /// Wrap an MCP server subprocess and expose a secured MCP edge over stdio.
     Serve {
+        /// Public key held by the agent. Required when policy requires invocation proofs.
+        #[arg(long)]
+        agent_public_key: Option<String>,
+
         /// Path to the policy YAML file. Mutually exclusive with `--preset`.
         #[arg(long, conflicts_with = "preset")]
         policy: Option<PathBuf>,
@@ -670,9 +697,21 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -689,9 +728,15 @@ pub(crate) enum McpCommands {
 
     /// Wrap an MCP server subprocess and expose a secured MCP edge over Streamable HTTP.
     ServeHttp {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Path to the policy YAML file.
         #[arg(long)]
         policy: PathBuf,
+
+        /// Explicit approver roster and already activated durable replay source.
+        #[arg(long)]
+        approval_config: Option<PathBuf>,
 
         /// Server ID to assign to the wrapped MCP server inside Chio.
         #[arg(long)]
@@ -705,9 +750,21 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         server_version: Option<String>,
 
-        /// Override the public key embedded in the synthetic manifest.
+        /// Existing JSON file containing the publisher-signed manifest.
+        #[arg(long)]
+        signed_manifest: Option<PathBuf>,
+
+        /// Independently registered public key for manifest verification.
         #[arg(long)]
         manifest_public_key: Option<String>,
+
+        /// Canonical signed native-launch policy for the wrapped server.
+        #[arg(long)]
+        cage_policy: PathBuf,
+
+        /// Independently pinned public key for the native-launch policy signer.
+        #[arg(long)]
+        cage_policy_signer: String,
 
         /// Page size for paginated `tools/list` responses.
         #[arg(long, default_value_t = 50)]
@@ -724,6 +781,14 @@ pub(crate) enum McpCommands {
         /// Socket address to bind the remote MCP edge to.
         #[arg(long, default_value = "127.0.0.1:8931")]
         listen: SocketAddr,
+
+        /// Exact proxy socket peer IP allowed to attest TLS/runtime identity (repeatable).
+        #[arg(long, requires = "trusted_proxy_token_file")]
+        trusted_proxy_peer: Vec<std::net::IpAddr>,
+
+        /// Dedicated private proxy token file. Proxy must strip caller identity headers.
+        #[arg(long, requires = "trusted_proxy_peer")]
+        trusted_proxy_token_file: Option<PathBuf>,
 
         /// Static bearer token required for remote MCP session admission.
         /// Prefer `CHIO_AUTH_TOKEN` env over the argv form so the bearer
@@ -787,6 +852,14 @@ pub(crate) enum McpCommands {
         #[arg(long, env = "CHIO_ADMIN_TOKEN", hide_env_values = true)]
         admin_token: Option<String>,
 
+        /// Dedicated trust-control bearer used only for remote capability issuance.
+        #[arg(
+            long,
+            env = "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        remote_authority_workload_token: Option<String>,
+
         /// Public base URL used when constructing protected-resource metadata URLs.
         #[arg(long)]
         public_base_url: Option<String>,
@@ -827,6 +900,10 @@ pub(crate) enum McpCommands {
         #[arg(long, default_value_t = 600)]
         auth_access_token_ttl_secs: u64,
 
+        /// Existing dedicated HMAC keyring for authenticated durable session state.
+        #[arg(long)]
+        resume_hmac_keyring: Option<PathBuf>,
+
         /// The wrapped MCP server command and its arguments.
         #[arg(trailing_var_arg = true, required = true)]
         command: Vec<String>,
@@ -837,6 +914,8 @@ pub(crate) enum McpCommands {
 pub(crate) enum ApiCommands {
     /// Start the Chio HTTP sidecar/reverse proxy.
     Protect {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Upstream base URL to proxy to.
         #[arg(long)]
         upstream: String,
@@ -845,6 +924,14 @@ pub(crate) enum ApiCommands {
         #[arg(long)]
         spec: Option<PathBuf>,
 
+        /// SHA-256 of the exact local spec bytes, required for permissive overrides.
+        #[arg(long, requires = "spec")]
+        spec_sha256: Option<String>,
+
+        /// Permit anonymous reads on known routes classified by local policy.
+        #[arg(long, default_value_t = false)]
+        allow_anonymous_reads: bool,
+
         /// Address to listen on.
         #[arg(long, default_value = "127.0.0.1:9090")]
         listen: String,
@@ -852,6 +939,8 @@ pub(crate) enum ApiCommands {
         /// Optional SQLite receipt store path.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
+        #[command(flatten)]
+        receipt_retention: ReceiptRetentionArgs,
 
         /// Permit in-memory receipts, whose audit evidence is lost on every
         /// restart. Required to boot without `--receipt-store`. For local

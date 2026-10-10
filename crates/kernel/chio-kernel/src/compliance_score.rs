@@ -123,6 +123,10 @@ pub struct ComplianceFactor {
 }
 
 impl ComplianceFactor {
+    #[allow(
+        clippy::as_conversions,
+        reason = "The advisory score is clamped to its u32 weight before truncating fractional points."
+    )]
     fn from_rate(name: &str, weight: u32, rate: f64) -> Self {
         let clamped = rate.clamp(0.0, 1.0);
         // Round half-away-from-zero is not necessary; floor is enough
@@ -274,6 +278,10 @@ pub fn compliance_score(
 /// Exposed for callers that want to surface individual factor deltas
 /// (dashboards) without collapsing to a single number.
 #[must_use]
+#[allow(
+    clippy::as_conversions,
+    reason = "Advisory compliance ratios intentionally approximate counters as floating point and do not authorize access or money."
+)]
 pub fn compliance_factor_breakdown(
     report: &ComplianceReport,
     inputs: &ComplianceScoreInputs,
@@ -374,7 +382,11 @@ pub fn compliance_factor_breakdown(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};

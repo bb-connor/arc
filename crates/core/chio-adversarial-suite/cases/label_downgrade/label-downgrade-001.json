@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "label-downgrade-001",
+  "class": "label_downgrade",
+  "expected_verdict": "DENY",
+  "expected_reason": "label_downgrade_detected",
+  "threat_id": "pii_phi_exposure",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "label_order_control",
+        "package": "chio-security-types",
+        "test_source": "crates/security/chio-security-types/src/flow.rs",
+        "target_kind": "lib",
+        "test_name": "flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints"
+      },
+      {
+        "id": "egress_clearance_control",
+        "package": "chio-flow",
+        "test_source": "crates/security/chio-flow/src/lattice.rs",
+        "target_kind": "lib",
+        "test_name": "lattice::tests::top_is_mathematical_top_but_operationally_denied_on_egress"
+      },
+      {
+        "id": "flow_store_control",
+        "package": "chio-security-kernel",
+        "test_source": "crates/security/chio-security-kernel/tests/adapters.rs",
+        "target_kind": "test",
+        "target": "adapters",
+        "test_name": "every_flow_domain_error_is_fail_closed_pre_and_post"
+      },
+      {
+        "id": "grant_replay_control",
+        "package": "chio-flow",
+        "test_source": "crates/security/chio-flow/src/declassification.rs",
+        "target_kind": "lib",
+        "test_name": "declassification::tests::exact_grant_consumes_once_and_persists_terminal_dispatch_outcomes"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "reader_subset_direction",
+        "control_id": "label_order_control",
+        "package": "chio-security-types",
+        "source": "crates/security/chio-security-types/src/flow.rs",
+        "function": "InformationLabel::flows_to",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "&&",
+          "replacement": "||"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/reader_subset_direction/mutants.out/outcomes.json",
+          "sha256": "5abcb28bb519be7e12232f7c86ce95cd0dc76f34c48556eff2b18c8bb238db3c",
+          "inputs_sha256": "5ea91f3088bda39e2af09ca3c31b2446e8a72f7fe76c4c50962b7440a0538175"
+        }
+      },
+      {
+        "id": "missing_clearance_allow",
+        "control_id": "egress_clearance_control",
+        "package": "chio-flow",
+        "source": "crates/security/chio-flow/src/lattice.rs",
+        "function": "authorize_egress",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/missing_clearance_allow/mutants.out/outcomes.json",
+          "sha256": "9abf2e54d28eb0c806c49cec30481f929a937934a725ffd18b1f606a2cd43d75",
+          "inputs_sha256": "da2389004d181518235b5ce8c0e6fe57b7a66ca3dcc64e427b91b25b7d520a58"
+        }
+      },
+      {
+        "id": "ignored_store_error",
+        "control_id": "flow_store_control",
+        "package": "chio-security-kernel",
+        "source": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+        "function": "<impl FlowPreInvocationPort for EngineFlowPreInvocationPort>::evaluate",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/ignored_store_error/mutants.out/outcomes.json",
+          "sha256": "d01364ddc4d2f064535b403d5569675ee4408441bacf3224f73b9def17630b90",
+          "inputs_sha256": "7cfdea9d786b8418a4b6fcb972f348b47fd19be1d1db6960bc3f597f4dfe8c04"
+        }
+      },
+      {
+        "id": "grant_replay",
+        "control_id": "grant_replay_control",
+        "package": "chio-flow",
+        "source": "crates/security/chio-flow/src/declassification.rs",
+        "function": "declassification_consume_is_fresh",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/grant_replay/mutants.out/outcomes.json",
+          "sha256": "5f597a7e9d56a3441b77d447190d0d7e797592af69d8763d988b0fc79288ceb3",
+          "inputs_sha256": "2669ee7ef3b92503c9e252cf6fc1d22ee93aae40c9492743acd20489e853aa86"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

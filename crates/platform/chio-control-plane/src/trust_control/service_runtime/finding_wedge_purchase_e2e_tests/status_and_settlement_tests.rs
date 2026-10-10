@@ -1,6 +1,6 @@
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn admission_views_hide_revoked_terminal_authorities() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority, market_config());
     deployment.seed_and_activate(&state).await?;
@@ -71,131 +71,6 @@ fn assert_denied_with(response: &ToolCallResponse, fragment: &str) {
     );
 }
 
-struct FixedStatusAdmissionClock(u64);
-
-impl crate::trust_control::finding_status_verifier::FindingStatusAdmissionClock
-    for FixedStatusAdmissionClock
-{
-    fn now_unix_secs(&self) -> Result<u64, String> {
-        Ok(self.0)
-    }
-}
-
-struct FinalBoundaryStatusAdmissionClock {
-    fresh_now: u64,
-    final_now: u64,
-    calls: AtomicU64,
-}
-
-impl crate::trust_control::finding_status_verifier::FindingStatusAdmissionClock
-    for FinalBoundaryStatusAdmissionClock
-{
-    fn now_unix_secs(&self) -> Result<u64, String> {
-        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
-            Ok(self.fresh_now)
-        } else {
-            Ok(self.final_now)
-        }
-    }
-}
-
-struct FinalBoundaryRetractionClock {
-    fresh_now: u64,
-    final_now: u64,
-    calls: AtomicU64,
-}
-
-impl chio_guards::finding_retraction::FindingRetractionClock
-    for FinalBoundaryRetractionClock
-{
-    fn now_unix_secs(
-        &self,
-    ) -> Result<u64, chio_guards::finding_retraction::FindingRetractionResolveError> {
-        if self.calls.fetch_add(1, Ordering::SeqCst) < 2 {
-            Ok(self.fresh_now)
-        } else {
-            Ok(self.final_now)
-        }
-    }
-}
-
-struct RetractionBeforeCacheReleaseClock {
-    now: u64,
-    calls: AtomicU64,
-    store: SqliteFindingStatusStore,
-    feed_id: String,
-    operator_id: String,
-    finding_id: String,
-    intent_id: String,
-    intent_bytes: Vec<u8>,
-    inclusion_deadline: u64,
-}
-
-impl chio_guards::finding_retraction::FindingRetractionClock
-    for RetractionBeforeCacheReleaseClock
-{
-    fn now_unix_secs(
-        &self,
-    ) -> Result<u64, chio_guards::finding_retraction::FindingRetractionResolveError> {
-        if self.calls.fetch_add(1, Ordering::SeqCst) == 2 {
-            self.store
-                .issue_retraction_intent(&chio_store_sqlite::FindingRetractionIntentInput {
-                    intent_id: &self.intent_id,
-                    feed_id: &self.feed_id,
-                    operator_id: &self.operator_id,
-                    finding_id: &self.finding_id,
-                    source: chio_store_sqlite::FindingRetractionIntentSource::Voluntary,
-                    intent_bytes: &self.intent_bytes,
-                    issued_at: self.now,
-                    inclusion_deadline: self.inclusion_deadline,
-                    created_at: self.now,
-                })
-                .map_err(|error| {
-                    chio_guards::finding_retraction::FindingRetractionResolveError::ClockUnavailable(
-                        error.to_string(),
-                    )
-                })?;
-        }
-        Ok(self.now)
-    }
-}
-
-struct RetractionOnRefreshClock {
-    now: u64,
-    calls: AtomicU64,
-    fire_on_call: u64,
-    store: SqliteFindingStatusStore,
-    feed_id: String,
-    operator_id: String,
-    finding_id: String,
-    intent_id: String,
-    intent_bytes: Vec<u8>,
-    inclusion_deadline: u64,
-}
-
-impl crate::trust_control::finding_status_verifier::FindingStatusAdmissionClock
-    for RetractionOnRefreshClock
-{
-    fn now_unix_secs(&self) -> Result<u64, String> {
-        if self.calls.fetch_add(1, Ordering::SeqCst) == self.fire_on_call {
-            self.store
-                .issue_retraction_intent(&chio_store_sqlite::FindingRetractionIntentInput {
-                    intent_id: &self.intent_id,
-                    feed_id: &self.feed_id,
-                    operator_id: &self.operator_id,
-                    finding_id: &self.finding_id,
-                    source: chio_store_sqlite::FindingRetractionIntentSource::Voluntary,
-                    intent_bytes: &self.intent_bytes,
-                    issued_at: self.now,
-                    inclusion_deadline: self.inclusion_deadline,
-                    created_at: self.now,
-                })
-                .map_err(|error| error.to_string())?;
-        }
-        Ok(self.now)
-    }
-}
-
 struct RejectCurrentRecoveryStatusVerifier {
     inner: MarketFindingStatusVerifier,
 }
@@ -259,10 +134,22 @@ async fn finding_purchase_without_status_verifier_denies_before_effects() -> Tes
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn finding_status_retraction() -> TestResult {
-    run_finding_status_retraction().await
+    let scenario = run_finding_status_retraction();
+    assert!(
+        std::mem::size_of_val(&scenario) <= 2 * std::mem::size_of::<usize>(),
+        "the composed retraction fixture must not inline its large future: {} bytes",
+        std::mem::size_of_val(&scenario)
+    );
+    scenario.await
 }
 
-pub(super) async fn run_finding_status_retraction() -> TestResult {
+pub(super) fn run_finding_status_retraction() -> impl std::future::Future<Output = TestResult> {
+    // Construct the large fixture outside its caller's poll frame. The same
+    // stack must also accommodate blocking kernel finalization and decoding.
+    Box::pin(run_finding_status_retraction_scenario())
+}
+
+async fn run_finding_status_retraction_scenario() -> TestResult {
     let lane = open_lane(LaneOptions {
         install_status_verifier: true,
         publish_status_proof: false,
@@ -279,14 +166,10 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     assert!(
         status_store
-            .list_non_inclusion_enrollment_candidates(
-                &config.status_feed_operator_ref,
-                now,
-                200,
-            )?
+            .list_non_inclusion_enrollment_candidates(&config.status_feed_operator_ref, now, 200,)?
             .is_empty(),
         "activation must enroll the admission's first non-inclusion proof"
     );
@@ -299,11 +182,7 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
     let live = publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     assert_eq!(live.proof_sha256, enrolled.proof_sha256);
     assert!(status_store
-        .list_non_inclusion_enrollment_candidates(
-            &config.status_feed_operator_ref,
-            now,
-            200,
-        )?
+        .list_non_inclusion_enrollment_candidates(&config.status_feed_operator_ref, now, 200,)?
         .is_empty());
     let duplicate_live =
         publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now + 1)?;
@@ -316,7 +195,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         "point proofs over an unchanged map reuse the signed epoch"
     );
     assert_eq!(
-        status_store.get_feed_floor(&config.status_feed_operator_ref)?.map_epoch,
+        status_store
+            .get_feed_floor(&config.status_feed_operator_ref)?
+            .map_epoch,
         live.map_epoch
     );
     assert_eq!(
@@ -381,7 +262,10 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         },
         Arc::clone(&resolver),
     )?;
-    let mut holder_kernel = ChioKernel::new(kernel_config(keypair(42), Vec::new()));
+    let mut holder_kernel = ChioKernel::new_with_clock(
+        kernel_config(keypair(42), Vec::new()),
+        chio_test_support::clock::clock(),
+    );
     holder_kernel.add_guard(Box::new(guard));
     holder_kernel.register_tool_server(Box::new(BuyerMemoryServer));
     let read_capability = holder_kernel.issue_capability(
@@ -420,6 +304,7 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let live_read =
         holder_kernel.evaluate_tool_call_blocking(&memory_read_request("m6-holder-live-read"))?;
@@ -443,7 +328,8 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let status_gate_now = unix_timestamp_now();
+    let status_gate_now =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let intent_id = sha256_hex(b"m6-voluntary-retraction-intent");
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
@@ -451,7 +337,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         "reason": "seller_voluntary_retraction",
         "schema": "chio.finding.voluntary-retraction.v1",
     }))?;
-    let primary_intent_now = unix_timestamp_now().max(now);
+    let primary_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(now);
     let intent = chio_store_sqlite::FindingRetractionIntentInput {
         intent_id: &intent_id,
         feed_id: &config.status_feed_operator_ref,
@@ -460,8 +348,7 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         source: chio_store_sqlite::FindingRetractionIntentSource::Voluntary,
         intent_bytes: &intent_bytes,
         issued_at: primary_intent_now,
-        inclusion_deadline: primary_intent_now
-            + config.status_feed_service_bond.inclusion_sla_secs,
+        inclusion_deadline: primary_intent_now + config.status_feed_service_bond.inclusion_sla_secs,
         created_at: primary_intent_now,
     };
     assert_eq!(
@@ -473,11 +360,7 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         chio_store_sqlite::FindingStatusWriteOutcome::ExactReplay
     );
     assert!(publisher
-        .publish_non_inclusion(
-            &lane.deployment.web.finding_id,
-            &[],
-            primary_intent_now,
-        )
+        .publish_non_inclusion(&lane.deployment.web.finding_id, &[], primary_intent_now,)
         .is_err());
 
     let hook_store = status_gate_store.clone();
@@ -486,7 +369,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
     let hook_operator_id = config.status_feed_operator.authority.authority_id.clone();
     let hook_finding_id = lane.deployment.web.finding_id.clone();
     let hook_intent_bytes = intent_bytes.clone();
-    let status_gate_intent_now = unix_timestamp_now().max(status_gate_now);
+    let status_gate_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(status_gate_now);
     let hook_inclusion_sla_secs = config.status_feed_service_bond.inclusion_sla_secs;
     let status_gate_live = status_gate_publisher.publish_non_inclusion(
         &status_lane.deployment.web.finding_id,
@@ -499,7 +384,8 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         .set_payment_adapter(Box::new(ReversibleHoldAdapter {
             calls: status_lane.calls.clone(),
             authorize_hook: Some(Arc::new(move || {
-                let hook_now = unix_timestamp_now();
+                let hook_now = unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
                 hook_store
                     .issue_retraction_intent(&chio_store_sqlite::FindingRetractionIntentInput {
                         intent_id: &hook_intent_id,
@@ -535,18 +421,14 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
     assert_eq!(status_lane.calls.releases.load(Ordering::SeqCst), 1);
     assert_eq!(status_lane.invocations.load(Ordering::SeqCst), 0);
 
-    let status_gate_retraction_now = unix_timestamp_now().max(pending_intent.issued_at);
-    let included = status_gate_publisher.publish_retraction(
-        &intent_id,
-        &[],
-        status_gate_retraction_now,
-    )?;
+    let status_gate_retraction_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(pending_intent.issued_at);
+    let included =
+        status_gate_publisher.publish_retraction(&intent_id, &[], status_gate_retraction_now)?;
     let included_b64 = STANDARD.encode(&included.proof_bytes);
-    let duplicate = status_gate_publisher.publish_retraction(
-        &intent_id,
-        &[],
-        status_gate_retraction_now,
-    )?;
+    let duplicate =
+        status_gate_publisher.publish_retraction(&intent_id, &[], status_gate_retraction_now)?;
     assert_eq!(duplicate.proof_sha256, included.proof_sha256);
     let retracted = status_lane.reveal_with_status(
         &status_lane.purchase,
@@ -570,7 +452,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         "reason": "seller_voluntary_retraction",
         "schema": "chio.finding.voluntary-retraction.v1",
     }))?;
-    let second_intent_now = unix_timestamp_now().max(status_gate_retraction_now);
+    let second_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(status_gate_retraction_now);
     status_gate_store.issue_retraction_intent(
         &chio_store_sqlite::FindingRetractionIntentInput {
             intent_id: &second_intent_id,
@@ -585,12 +469,11 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
             created_at: second_intent_now,
         },
     )?;
-    let second_publish_now = unix_timestamp_now().max(second_intent_now + 1);
-    let second_included = status_gate_publisher.publish_retraction(
-        &second_intent_id,
-        &[],
-        second_publish_now,
-    )?;
+    let second_publish_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(second_intent_now + 1);
+    let second_included =
+        status_gate_publisher.publish_retraction(&second_intent_id, &[], second_publish_now)?;
     let refresh_candidates = status_gate_store.list_publication_candidates(
         &config.status_feed_operator_ref,
         &config.status_feed_operator.authority.key_hex,
@@ -602,7 +485,10 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         .iter()
         .any(|candidate| candidate.intent_id == intent_id));
     assert!(status_gate_store
-        .get_latest_proof(&config.status_feed_operator_ref, &lane.deployment.web.finding_id)?
+        .get_latest_proof(
+            &config.status_feed_operator_ref,
+            &lane.deployment.web.finding_id
+        )?
         .is_none());
     let refreshed_included =
         status_gate_publisher.publish_retraction(&intent_id, &[], second_publish_now)?;
@@ -642,13 +528,12 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         prior_invalid_refresh_epoch
     );
     let finalized_anchors = vec!["anchor://finding-status/finalized-1".to_owned()];
-    assert!(status_gate_publisher
-        .epoch_refresh_required(&finalized_anchors, anchor_refresh_at)?);
+    assert!(status_gate_publisher.epoch_refresh_required(&finalized_anchors, anchor_refresh_at)?);
     let prior_anchor_epoch = status_gate_store
         .get_feed_floor(&config.status_feed_operator_ref)?
         .map_epoch;
-    let anchored_epoch = status_gate_publisher
-        .publish_epoch_refresh(&finalized_anchors, anchor_refresh_at)?;
+    let anchored_epoch =
+        status_gate_publisher.publish_epoch_refresh(&finalized_anchors, anchor_refresh_at)?;
     assert_eq!(anchored_epoch.body.map_epoch, prior_anchor_epoch + 1);
     assert_eq!(anchored_epoch.body.anchor_refs, finalized_anchors);
     assert!(!status_gate_store
@@ -677,7 +562,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
     let prior_epoch = status_gate_store
         .get_feed_floor(&config.status_feed_operator_ref)?
         .map_epoch;
-    let rotation_now = unix_timestamp_now().max(anchor_refresh_at + 1);
+    let rotation_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(anchor_refresh_at + 1);
     let rotated = rotated_publisher.publish_non_inclusion(
         &sha256_hex(b"m6-live-after-operator-rotation"),
         &[],
@@ -691,7 +578,9 @@ pub(super) async fn run_finding_status_retraction() -> TestResult {
         rotated_operator.authority.key_epoch
     );
 
-    let primary_retraction_now = unix_timestamp_now().max(primary_intent_now);
+    let primary_retraction_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(primary_intent_now);
     publisher.publish_retraction(&intent_id, &[], primary_retraction_now)?;
     let delivery_status = delivery
         .status_proof
@@ -749,7 +638,7 @@ async fn finding_status_freshness_rechecks_at_final_clock_samples() -> TestResul
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = admission_publisher.publish_non_inclusion(
         &admission_lane.deployment.web.finding_id,
         &[],
@@ -788,7 +677,8 @@ async fn finding_status_freshness_rechecks_at_final_clock_samples() -> TestResul
         .err()
         .ok_or("final status admission clock accepted an expired epoch")?;
     assert!(
-        stale_admission.detail().contains("stale") || stale_admission.detail().contains("freshness"),
+        stale_admission.detail().contains("stale")
+            || stale_admission.detail().contains("freshness"),
         "unexpected refreshed-time rejection: {stale_admission}"
     );
 
@@ -807,12 +697,9 @@ async fn finding_status_freshness_rechecks_at_final_clock_samples() -> TestResul
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let cache_now = unix_timestamp_now();
-    cache_publisher.publish_non_inclusion(
-        &cache_lane.deployment.web.finding_id,
-        &[],
-        cache_now,
-    )?;
+    let cache_now =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    cache_publisher.publish_non_inclusion(&cache_lane.deployment.web.finding_id, &[], cache_now)?;
     let cache = crate::trust_control::finding_retraction_resolver::SqliteFindingStatusCache::new(
         &config,
         cache_store,
@@ -828,11 +715,14 @@ async fn finding_status_freshness_rechecks_at_final_clock_samples() -> TestResul
     )
     .err()
     .ok_or("final cache clock accepted an expired epoch")?;
-    assert!(matches!(
-        &stale_cache,
-        chio_guards::finding_retraction::FindingRetractionResolveError::InvalidStatus(ref message)
-            if message.contains("stale") || message.contains("freshness")
-    ), "unexpected refreshed-cache rejection: {stale_cache:?}");
+    assert!(
+        matches!(
+            &stale_cache,
+            chio_guards::finding_retraction::FindingRetractionResolveError::InvalidStatus(ref message)
+                if message.contains("stale") || message.contains("freshness")
+        ),
+        "unexpected refreshed-cache rejection: {stale_cache:?}"
+    );
     Ok(())
 }
 
@@ -854,7 +744,7 @@ async fn finding_status_cache_rechecks_sticky_state_after_proof_verification() -
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
         "finding_id": lane.deployment.web.finding_id,
@@ -909,7 +799,7 @@ async fn finding_status_admission_rechecks_sticky_state_after_proof_verification
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     let live_b64 = STANDARD.encode(&live.proof_bytes);
     let live_view = chio_kernel::finding_purchase::FindingStatusProofContextView {
@@ -938,25 +828,27 @@ async fn finding_status_admission_rechecks_sticky_state_after_proof_verification
             finding_id: lane.deployment.web.finding_id.clone(),
             intent_id: sha256_hex(b"m6-concurrent-retraction-intent"),
             intent_bytes,
-            inclusion_deadline: refresh_now
-                + config.status_feed_service_bond.inclusion_sla_secs,
+            inclusion_deadline: refresh_now + config.status_feed_service_bond.inclusion_sla_secs,
         }),
     )?;
-    let verified =
-        chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
-            &verifier, &live_view,
-        )?;
+    let verified = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
+        &verifier, &live_view,
+    )?;
     let error = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_admission(
         &verifier, &live_view, &verified, now,
     )
     .err()
     .ok_or("concurrent retraction was accepted after final proof verification")?;
-    assert!(error.detail().contains("pending"), "unexpected rejection: {error}");
+    assert!(
+        error.detail().contains("pending"),
+        "unexpected rejection: {error}"
+    );
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn finding_status_admission_makes_sticky_read_final_after_record_verification() -> TestResult {
+async fn finding_status_admission_makes_sticky_read_final_after_record_verification() -> TestResult
+{
     let lane = open_lane(LaneOptions {
         install_status_verifier: true,
         publish_status_proof: false,
@@ -973,7 +865,7 @@ async fn finding_status_admission_makes_sticky_read_final_after_record_verificat
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     let live_b64 = STANDARD.encode(&live.proof_bytes);
     let live_view = chio_kernel::finding_purchase::FindingStatusProofContextView {
@@ -1002,20 +894,21 @@ async fn finding_status_admission_makes_sticky_read_final_after_record_verificat
             finding_id: lane.deployment.web.finding_id.clone(),
             intent_id: sha256_hex(b"m6-post-verification-retraction-intent"),
             intent_bytes,
-            inclusion_deadline: refresh_now
-                + config.status_feed_service_bond.inclusion_sla_secs,
+            inclusion_deadline: refresh_now + config.status_feed_service_bond.inclusion_sla_secs,
         }),
     )?;
-    let verified =
-        chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
-            &verifier, &live_view,
-        )?;
+    let verified = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
+        &verifier, &live_view,
+    )?;
     let error = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_admission(
         &verifier, &live_view, &verified, now,
     )
     .err()
     .ok_or("retraction after record verification was accepted")?;
-    assert!(error.detail().contains("pending"), "unexpected rejection: {error}");
+    assert!(
+        error.detail().contains("pending"),
+        "unexpected rejection: {error}"
+    );
     Ok(())
 }
 
@@ -1037,7 +930,7 @@ async fn finding_status_admission_rejects_clock_rollback() -> TestResult {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     let live_b64 = STANDARD.encode(&live.proof_bytes);
     let live_view = chio_kernel::finding_purchase::FindingStatusProofContextView {
@@ -1052,10 +945,9 @@ async fn finding_status_admission_rejects_clock_rollback() -> TestResult {
         status_store,
         Arc::new(FixedStatusAdmissionClock(now + 1)),
     )?;
-    let verified =
-        chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
-            &verifier, &live_view,
-        )?;
+    let verified = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_proof(
+        &verifier, &live_view,
+    )?;
     let error = chio_kernel::finding_purchase::FindingStatusProofVerifier::verify_status_admission(
         &verifier,
         &live_view,
@@ -1064,7 +956,10 @@ async fn finding_status_admission_rejects_clock_rollback() -> TestResult {
     )
     .err()
     .ok_or("a refreshed wall clock below the durable high-water was accepted")?;
-    assert!(error.detail().contains("clock rollback"), "unexpected rejection: {error}");
+    assert!(
+        error.detail().contains("clock rollback"),
+        "unexpected rejection: {error}"
+    );
     Ok(())
 }
 
@@ -1088,7 +983,7 @@ async fn wedge_purchase_settles_into_a_signed_record() -> TestResult {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now)?;
     let live_b64 = STANDARD.encode(&live.proof_bytes);
     let response = lane.reveal_with_status(
@@ -1098,7 +993,8 @@ async fn wedge_purchase_settles_into_a_signed_record() -> TestResult {
         "nonce-settle-1",
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    let finalized_at = unix_timestamp_now();
+    let finalized_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let purchase_store = lane.authority.finding_purchase_store();
     purchase_store.register_community_fund_destination(

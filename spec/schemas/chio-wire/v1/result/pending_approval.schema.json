@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/result/pending_approval.schema.json",
+  "title": "Chio ToolCallResult pending approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "proposal"],
+  "properties": {
+    "status": { "const": "pending_approval" },
+    "proposal": { "$ref": "../capability/threshold-approval-proposal.schema.json" }
+  }
+}

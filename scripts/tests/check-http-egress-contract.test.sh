@@ -14,6 +14,44 @@ LINT="$REPO_ROOT/scripts/check-http-egress-contract.sh"
 work="$(mktemp -d -t chio-egress-lint-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
 
+# Named test directories require their own compiler-enforced inner cfg(test).
+# An ancestor guard, unreachable declaration or production alias cannot hide egress.
+for declaration in guarded guarded_alias unguarded wrong_guard wrong_path production_alias unreachable_owner; do
+    fixture="$work/test_module_$declaration"
+    mkdir -p "$fixture/crates/chio-fake/src/remote/hosted_tests"
+    cat > "$fixture/crates/chio-fake/src/remote/hosted_tests/support.rs" <<'EOF'
+pub fn probe() {
+    let _ = reqwest::blocking::get("http://localhost");
+}
+EOF
+    case "$declaration" in
+        guarded|guarded_alias|production_alias|unreachable_owner) prefix='#[cfg(test)]'; module_path='remote/hosted_tests/mod.rs' ;;
+        unguarded) prefix=''; module_path='remote/hosted_tests/mod.rs' ;;
+        wrong_guard) prefix='#[cfg(feature = "test")]'; module_path='remote/hosted_tests/mod.rs' ;;
+        wrong_path) prefix='#[cfg(test)]'; module_path='other/hosted_tests/mod.rs' ;;
+    esac
+    printf '%s\n#[path = "%s"]\nmod hosted_tests;\n' "$prefix" "$module_path" \
+        > "$fixture/crates/chio-fake/src/lib.rs"
+    printf 'mod support;\n' > "$fixture/crates/chio-fake/src/remote/hosted_tests/mod.rs"
+    if [[ "$declaration" == guarded || "$declaration" == guarded_alias ]]; then
+        sed -i '1i#![cfg(test)]' "$fixture/crates/chio-fake/src/remote/hosted_tests/support.rs"
+    fi
+    if [[ "$declaration" == production_alias || "$declaration" == guarded_alias ]]; then
+        printf '#[path = "remote/hosted_tests/support.rs"]\nmod production_http;\n' >> "$fixture/crates/chio-fake/src/lib.rs"
+    elif [[ "$declaration" == unreachable_owner ]]; then
+        mv "$fixture/crates/chio-fake/src/lib.rs" "$fixture/crates/chio-fake/src/unreferenced.rs"
+        : > "$fixture/crates/chio-fake/src/lib.rs"
+    fi
+    result=0
+    CHIO_EGRESS_LINT_ROOT="$fixture" bash "$LINT" > "$fixture/result.log" 2>&1 || result=$?
+    if [[ "$declaration" == guarded* && "$result" -ne 0 ]] || \
+       [[ "$declaration" != guarded* && "$result" -eq 0 ]]; then
+        cat "$fixture/result.log" >&2
+        echo "FAIL: named test module classification is wrong for $declaration" >&2
+        exit 1
+    fi
+done
+
 # Synthetic positive: crate that builds the reqwest client through the egress
 # helper and dispatches through send_with_contract.
 mkdir -p "$work/positive/crates/chio-fake-positive/src"

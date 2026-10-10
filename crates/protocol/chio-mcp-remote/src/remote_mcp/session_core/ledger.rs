@@ -2,20 +2,30 @@ use super::*;
 
 impl RemoteSessionLedger {
     pub(super) fn new(
+        clock: RemoteClock,
         lifecycle_policy: SessionLifecyclePolicy,
         tombstone_db_path: Option<PathBuf>,
+        resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     ) -> Result<Self, CliError> {
         let terminal = if let Some(path) = tombstone_db_path.as_deref() {
-            load_terminal_session_records(path)?
+            let keyring = resume_hmac_keyring.as_deref().ok_or_else(|| {
+                CliError::cli_other_error(
+                    "durable MCP terminal state requires a dedicated resume HMAC keyring"
+                        .to_string(),
+                )
+            })?;
+            load_terminal_session_records(path, keyring, clock.millis()?)?
         } else {
             HashMap::new()
         };
 
         Ok(Self {
+            clock,
             active: Arc::new(Mutex::new(HashMap::new())),
             terminal: Arc::new(Mutex::new(terminal)),
             lifecycle_policy,
             tombstone_db_path,
+            resume_hmac_keyring,
         })
     }
 
@@ -85,40 +95,37 @@ impl RemoteSessionLedger {
             .await
     }
 
-    pub(super) async fn cleanup_due_sessions(&self) {
-        let now = session_now_millis();
+    pub(super) async fn cleanup_due_sessions(&self) -> Result<(), CliError> {
+        let now = self.clock.millis()?;
         let sessions = {
             let guard = self.active.lock().await;
             guard.values().cloned().collect::<Vec<_>>()
         };
 
         for session in sessions {
+            let serving_closed = *session.worker_serving_closed.borrow();
+            if serving_closed {
+                self.mark_closed(&session).await?;
+                continue;
+            }
+            let expired = session.deadline_expired()?;
             let snapshot = session.lifecycle_snapshot();
             match snapshot.state {
-                RemoteSessionState::Ready if snapshot.idle_expires_at <= now => {
-                    match self.mark_expired(&session).await {
-                        Ok(()) => {
-                            self.active.lock().await.remove(&session.session_id);
-                        }
-                        Err(error) => {
-                            warn!(
-                                session_id = %session.session_id,
-                                error = %error,
-                                "failed to expire MCP session without resumable-state risk"
-                            );
-                        }
+                RemoteSessionState::Ready if expired => match self.mark_expired(&session).await {
+                    Ok(()) => {}
+                    Err(error) => {
+                        warn!(
+                            session_id = %session.session_id,
+                            error = %error,
+                            "failed to expire MCP session without resumable-state risk"
+                        );
                     }
-                }
+                },
                 RemoteSessionState::Ready => {}
                 RemoteSessionState::Draining => {
-                    if snapshot
-                        .drain_deadline_at
-                        .is_some_and(|deadline| deadline <= now)
-                    {
+                    if expired {
                         match self.mark_deleted(&session).await {
-                            Ok(()) => {
-                                self.active.lock().await.remove(&session.session_id);
-                            }
+                            Ok(()) => {}
                             Err(error) => {
                                 warn!(
                                     session_id = %session.session_id,
@@ -139,6 +146,32 @@ impl RemoteSessionLedger {
         }
 
         self.purge_old_terminal_records(now).await;
+        Ok(())
+    }
+
+    pub(super) async fn shutdown_all_active(&self) -> Result<(), CliError> {
+        let sessions = {
+            let guard = self.active.lock().await;
+            guard.values().cloned().collect::<Vec<_>>()
+        };
+        let mut failures = Vec::new();
+        for session in sessions {
+            match self.mark_closed(&session).await {
+                Ok(()) => {
+                    self.active.lock().await.remove(&session.session_id);
+                }
+                Err(error) => failures.push(format!("{}: {error}", session.session_id)),
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(CliError::cli_other_error(format!(
+                "failed to terminalize {} MCP session(s): {}",
+                failures.len(),
+                failures.join("; ")
+            )))
+        }
     }
 
     pub(super) async fn transition_to_terminal(
@@ -147,90 +180,122 @@ impl RemoteSessionLedger {
         state: RemoteSessionState,
     ) -> Result<(), CliError> {
         match state {
-            RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed => {}
-            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {
+            RemoteSessionState::Deleted
+            | RemoteSessionState::Expired
+            | RemoteSessionState::Closed => {}
+            RemoteSessionState::Initializing
+            | RemoteSessionState::Ready
+            | RemoteSessionState::Draining => {
                 return Err(CliError::cli_other_error(format!(
                     "unsupported terminal MCP session state: {}",
                     state.as_str()
                 )));
             }
         }
-        // Guard against re-terminalizing a session that has already reached a
-        // terminal state. Without this, a concurrent reaper expiry followed by
-        // an admin shutdown (or DELETE) on the same session would overwrite the
-        // first tombstone's state, refresh `terminal_at` (extending retention),
-        // and re-issue spurious resumable-record deletes against SQLite.
-        let current_state = session.lifecycle_snapshot().state;
-        match current_state {
-            RemoteSessionState::Deleted
-            | RemoteSessionState::Expired
-            | RemoteSessionState::Closed => {
+        let _terminalization = session.terminalization.lock().await;
+        let mut record = session.diagnostic_record();
+        let (terminal_at, durable_tombstone) = {
+            // Serialize renewal with expiry adjudication and durable terminal intent.
+            let mut lifecycle = session
+                .lifecycle
+                .lock()
+                .map_err(|_| ClockError::Unavailable)?;
+            if lifecycle.state.is_terminal() {
                 return Ok(());
             }
-            RemoteSessionState::Initializing
-            | RemoteSessionState::Ready
-            | RemoteSessionState::Draining => {}
-        }
-        let terminal_at = session_now_millis();
-        let mut record = session.diagnostic_record();
-        record.lifecycle.state = state;
-        record.lifecycle.last_seen_at = terminal_at;
-        record.lifecycle.drain_deadline_at = None;
-        record.terminal_at = terminal_at;
-        let mut tombstone_guards_restore = self.tombstone_db_path.is_none();
-        let mut tombstone_error = None;
-        if let Some(path) = self.tombstone_db_path.as_deref() {
-            match persist_terminal_session_record(path, &record) {
-                Ok(()) => {
-                    tombstone_guards_restore = true;
+            let reading = self.clock.read()?;
+            if state == RemoteSessionState::Expired {
+                if lifecycle.state != RemoteSessionState::Ready {
+                    return Ok(());
                 }
-                Err(error) => {
-                    tombstone_error = Some(error.to_string());
-                    warn!(
-                        session_id = %session.session_id,
-                        error = %error,
-                        "failed to persist terminal MCP session tombstone"
-                    );
+                match lifecycle
+                    .deadline
+                    .as_mut()
+                    .ok_or(ClockError::InvalidWindow)?
+                    .remaining(reading)
+                {
+                    Ok(_) => return Ok(()),
+                    Err(ClockError::Expired) => {}
+                    Err(error) => return Err(error.into()),
                 }
             }
-        }
-
-        if let Err(delete_error) = session.remove_resumable_record() {
-            if tombstone_guards_restore {
-                warn!(
-                    session_id = %session.session_id,
-                    error = %delete_error,
-                    "failed to delete resumable MCP session record; terminal tombstone will block restore"
-                );
-            } else {
-                let tombstone_error = tombstone_error
-                    .unwrap_or_else(|| "terminal tombstone was not persisted".to_string());
-                return Err(CliError::cli_other_error(format!(
-                    "failed to terminalize MCP session {}: {tombstone_error}; active resume delete failed: {delete_error}",
+            let terminal_at = reading.unix_millis().get();
+            record.lifecycle = lifecycle.clone();
+            record.lifecycle.state = state;
+            record.lifecycle.last_seen_at = terminal_at;
+            record.lifecycle.drain_deadline_at = None;
+            record.terminal_at = terminal_at;
+            let durable_tombstone = if let Some(path) = self.tombstone_db_path.as_deref() {
+                session.ensure_session_store_owned()?;
+                let keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
+                    CliError::cli_other_error(format!(
+                    "failed to terminalize MCP session {} without a dedicated resume HMAC keyring",
                     session.session_id
-                )));
-            }
-        }
+                ))
+                })?;
+                let terminal_epoch = session.next_terminal_persistence_epoch()?;
+                let (tombstone, fence) = sign_terminal_session_records(
+                    keyring,
+                    record.clone(),
+                    terminal_epoch,
+                    terminal_epoch,
+                )?;
+                prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
+                Some((path, keyring, tombstone))
+            } else {
+                None
+            };
 
-        match state {
-            RemoteSessionState::Deleted => session.mark_deleted(),
-            RemoteSessionState::Expired => session.mark_expired(),
-            RemoteSessionState::Closed => session.mark_closed(),
-            RemoteSessionState::Initializing | RemoteSessionState::Ready | RemoteSessionState::Draining => {}
-        }
+            lifecycle.state = state;
+            lifecycle.last_seen_at = terminal_at;
+            lifecycle.drain_deadline_at = None;
+            lifecycle.deadline = None;
+            (terminal_at, durable_tombstone)
+        };
+        self.active.lock().await.remove(&session.session_id);
+
+        // The durable terminal intent and active-row deletion are committed
+        // before the owned upstream transport receives its terminal effect.
+        // The in-memory session is also made terminal and removed from active
+        // lookup before shutdown is attempted. A crash or shutdown error can
+        // therefore expose neither durable resume nor live dispatch authority.
+        // Shared-owner session shutdown remains a no-op here; the shared native
+        // transport is closed once at service shutdown.
+        let shutdown_result = session.shutdown_upstream_transport();
+
+        let finalization_result = if let Some((path, keyring, tombstone)) = durable_tombstone {
+            let result = session.ensure_session_store_owned().and_then(|()| {
+                finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)
+            });
+            record = tombstone.record;
+            result
+        } else {
+            Ok(())
+        };
 
         self.terminal
             .lock()
             .await
             .insert(session.session_id.clone(), Arc::new(record));
-        Ok(())
+        match (shutdown_result, finalization_result) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+            (Err(shutdown_error), Err(finalization_error)) => {
+                Err(CliError::cli_other_error(format!(
+                    "MCP session {} upstream shutdown failed: {shutdown_error}; terminal diagnostic finalization also failed: {finalization_error}",
+                    session.session_id
+                )))
+            }
+        }
     }
 
     pub(super) async fn purge_old_terminal_records(&self, now: u64) {
         let retention = self.lifecycle_policy.tombstone_retention_millis;
-        let cutoff = now.saturating_sub(retention);
+        let Some(cutoff) = now.checked_sub(retention) else {
+            return;
+        };
         let mut terminal = self.terminal.lock().await;
-        terminal.retain(|_, record| now.saturating_sub(record.terminal_at) <= retention);
+        terminal.retain(|_, record| record.terminal_at >= cutoff);
         if let Some(path) = self.tombstone_db_path.as_deref() {
             if let Err(error) = purge_terminal_session_records_before(path, cutoff) {
                 warn!(

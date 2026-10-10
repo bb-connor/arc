@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json",
+  "title": "Chio signed key-log checkpoint envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "operator_key_id", "operator_algorithm", "operator_signature"],
+  "properties": {
+    "body": { "$ref": "key-log-checkpoint-body-v1.schema.json" },
+    "operator_key_id": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "operator_algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "operator_signature": { "$ref": "#/$defs/signature" },
+    "witness_signatures": { "type": "array", "maxItems": 64, "items": { "$ref": "key-log-witness-signature-v1.schema.json" } }
+  },
+  "$defs": { "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" } }
+}

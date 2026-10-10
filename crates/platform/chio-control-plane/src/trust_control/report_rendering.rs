@@ -64,20 +64,13 @@ pub(crate) fn json_response_with_leader_visibility_and_budget_commit<T: Serializ
     Json(value).into_response()
 }
 
-pub(crate) fn authority_snapshot_view(snapshot: AuthoritySnapshot) -> AuthoritySnapshotView {
+#[cfg(test)]
+pub(crate) fn authority_snapshot_view(
+    snapshot: chio_kernel::AuthoritySnapshot,
+) -> AuthoritySnapshotView {
     AuthoritySnapshotView {
-        public_key_hex: snapshot.public_key_hex,
-        generation: snapshot.generation,
-        rotated_at: snapshot.rotated_at,
-        trusted_keys: snapshot
-            .trusted_keys
-            .into_iter()
-            .map(|trusted_key| AuthorityTrustedKeyView {
-                public_key_hex: trusted_key.public_key_hex,
-                generation: trusted_key.generation,
-                activated_at: trusted_key.activated_at,
-            })
-            .collect(),
+        snapshot,
+        proof: None,
     }
 }
 
@@ -97,23 +90,6 @@ pub(crate) fn budget_cursor_view(cursor: BudgetCursor) -> BudgetCursorView {
         updated_at: cursor.updated_at,
         capability_id: cursor.capability_id,
         grant_index: cursor.grant_index,
-    }
-}
-
-pub(crate) fn authority_snapshot_from_view(view: AuthoritySnapshotView) -> AuthoritySnapshot {
-    AuthoritySnapshot {
-        public_key_hex: view.public_key_hex,
-        generation: view.generation,
-        rotated_at: view.rotated_at,
-        trusted_keys: view
-            .trusted_keys
-            .into_iter()
-            .map(|trusted_key| chio_kernel::AuthorityTrustedKeySnapshot {
-                public_key_hex: trusted_key.public_key_hex,
-                generation: trusted_key.generation,
-                activated_at: trusted_key.activated_at,
-            })
-            .collect(),
     }
 }
 
@@ -230,16 +206,73 @@ fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliE
     })
 }
 
-fn post_json_to_control_service<B: Serialize>(
+/// Leader forwards admitted at once on one node: an explicit resource bound,
+/// one eighth of Tokio's default 512-thread blocking pool.
+pub(crate) const LEADER_FORWARD_PERMITS: usize = 64;
+
+/// Public holder submissions, including remote forwards, admitted on one node.
+pub(crate) const PUBLIC_PASSPORT_CHALLENGE_PERMITS: usize = 16;
+
+/// Why a leader forward attempt produced no transport outcome.
+enum LeaderForwardRefusal {
+    /// Every forward permit was held, so the attempt never started.
+    AtCapacity,
+    /// The blocking forward panicked or its runtime shut down.
+    Aborted(tokio::task::JoinError),
+}
+
+impl LeaderForwardRefusal {
+    fn into_response(self, writes: &str, error: fn(StatusCode, &str) -> Response) -> Response {
+        match self {
+            Self::AtCapacity => error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &format!("cluster leader forwarding is at capacity for {writes}"),
+            ),
+            Self::Aborted(join_error) => error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("cluster leader forwarding for {writes} did not complete: {join_error}"),
+            ),
+        }
+    }
+}
+
+/// Runs one blocking leader forward on Tokio's blocking pool.
+///
+/// Admission never waits: without a free permit the attempt is refused before
+/// any network I/O. The permit moves into the blocking closure and is released
+/// only when that closure returns, after the leader's response is read in
+/// full and the forwarded response is built, so a request future dropped
+/// mid-forward keeps its permit until that work has actually ended.
+async fn run_leader_forward<T>(
+    lane: &Arc<tokio::sync::Semaphore>,
+    forward: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, LeaderForwardRefusal>
+where
+    T: Send + 'static,
+{
+    let permit = Arc::clone(lane)
+        .try_acquire_owned()
+        .map_err(|_| LeaderForwardRefusal::AtCapacity)?;
+    tokio::task::spawn_blocking(move || {
+        let outcome = forward();
+        drop(permit);
+        outcome
+    })
+    .await
+    .map_err(LeaderForwardRefusal::Aborted)
+}
+
+fn forwarded_request_json<B: Serialize>(body: &B, request: &str) -> Result<Value, CliError> {
+    serde_json::to_value(body).map_err(|error| {
+        CliError::cli_other_error(format!("failed to serialize {request}: {error}"))
+    })
+}
+
+fn post_json_to_control_service(
     client: &TrustControlClient,
     path: &str,
-    body: &B,
+    json: Value,
 ) -> Result<Response, CliError> {
-    let json = serde_json::to_value(body).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to serialize forwarded trust control request: {error}"
-        ))
-    })?;
     let endpoint = client.endpoints.first().ok_or_else(|| {
         CliError::cli_other_error("trust control client requires at least one endpoint".to_string())
     })?;
@@ -262,6 +295,30 @@ pub(crate) async fn forward_post_to_leader<B: Serialize>(
     state: &TrustServiceState,
     path: &str,
     body: &B,
+) -> Result<Option<Response>, Response> {
+    forward_post_to_leader_in_lane(state, path, body, &state.leader_forward_lane).await
+}
+
+/// This unauthenticated route has independent admission, shared with its local
+/// verification path. It cannot consume authenticated write-forwarding permits.
+pub(crate) async fn forward_public_passport_challenge_to_leader<B: Serialize>(
+    state: &TrustServiceState,
+    body: &B,
+) -> Result<Option<Response>, Response> {
+    forward_post_to_leader_in_lane(
+        state,
+        PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH,
+        body,
+        &state.public_passport_challenge_lane,
+    )
+    .await
+}
+
+async fn forward_post_to_leader_in_lane<B: Serialize>(
+    state: &TrustServiceState,
+    path: &str,
+    body: &B,
+    lane: &Arc<tokio::sync::Semaphore>,
 ) -> Result<Option<Response>, Response> {
     let Some(self_url) = cluster_self_url(state) else {
         return Ok(None);
@@ -303,7 +360,20 @@ pub(crate) async fn forward_post_to_leader<B: Serialize>(
                 .map_err(|error| {
                     plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 })?;
-        match post_json_to_control_service(&client, path, body) {
+        let attempt = match forwarded_request_json(body, "forwarded trust control request") {
+            Ok(json) => {
+                let request_path = path.to_owned();
+                run_leader_forward(lane, move || {
+                    post_json_to_control_service(&client, &request_path, json)
+                })
+                .await
+                .map_err(|refusal| {
+                    refusal.into_response("trust-control writes", plain_http_error)
+                })?
+            }
+            Err(error) => Err(error),
+        };
+        match attempt {
             Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
@@ -401,18 +471,35 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
             &self_url,
         )
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-        if let Ok(status) = client.cluster_status() {
-            update_peer_reachable(state, &leader_url);
-            if status.has_quorum && status.leader_url.as_deref() == Some(leader_url.as_str()) {
-                if let Some(lease) = status.authority_lease.as_ref() {
-                    if lease.lease_valid && lease.leader_url == leader_url {
-                        authority_term = lease.term;
-                    }
-                }
+        let (attempt, attempt_term) = match forwarded_request_json(body, "trust control request") {
+            Ok(json) => {
+                let peer_state = state.clone();
+                let target = leader_url.clone();
+                let request_path = path.to_owned();
+                run_leader_forward(&state.leader_forward_lane, move || {
+                    let term = leader_confirmed_authority_term(
+                        &peer_state,
+                        &client,
+                        &target,
+                        authority_term,
+                    );
+                    let forwarded = client
+                        .post_internal_json::<_, Value>(&request_path, &json, Some(term))
+                        .map(|value| {
+                            #[cfg(test)]
+                            forward_finalization_pause::pause_if_armed(&value);
+                            Json(value).into_response()
+                        });
+                    (forwarded, term)
+                })
+                .await
+                .map_err(|refusal| refusal.into_response("authority writes", plain_http_error))?
             }
-        }
-        match client.post_internal_json::<_, Value>(path, body, Some(authority_term)) {
-            Ok(value) => return Ok(Some(Json(value).into_response())),
+            Err(error) => (Err(error), authority_term),
+        };
+        authority_term = attempt_term;
+        match attempt {
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -463,6 +550,28 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
     ))
 }
 
+/// The leader's own authority term when its status confirms a valid lease it
+/// holds, otherwise `term`. A reachable status marks the leader reachable.
+fn leader_confirmed_authority_term(
+    state: &TrustServiceState,
+    client: &TrustControlClient,
+    leader_url: &str,
+    term: u64,
+) -> u64 {
+    let Ok(status) = client.cluster_status() else {
+        return term;
+    };
+    update_peer_reachable(state, leader_url);
+    if status.has_quorum && status.leader_url.as_deref() == Some(leader_url) {
+        if let Some(lease) = status.authority_lease.as_ref() {
+            if lease.lease_valid && lease.leader_url == leader_url {
+                return lease.term;
+            }
+        }
+    }
+    term
+}
+
 pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
     state: &TrustServiceState,
     path: &str,
@@ -496,8 +605,27 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
                 .map_err(|error| {
                     scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 })?;
-        match client.post_json::<_, Value>(path, body) {
-            Ok(value) => return Ok(Some(scim_json_response(StatusCode::CREATED, &value))),
+        let attempt = match forwarded_request_json(body, "trust control request") {
+            Ok(json) => {
+                let request_path = path.to_owned();
+                run_leader_forward(&state.leader_forward_lane, move || {
+                    client
+                        .post_json::<_, Value>(&request_path, &json)
+                        .map(|value| {
+                            #[cfg(test)]
+                            forward_finalization_pause::pause_if_armed(&value);
+                            scim_json_response(StatusCode::CREATED, &value)
+                        })
+                })
+                .await
+                .map_err(|refusal| {
+                    refusal.into_response("trust-control writes", scim_error_response)
+                })?
+            }
+            Err(error) => Err(error),
+        };
+        match attempt {
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -567,8 +695,18 @@ pub(crate) async fn forward_scim_delete_to_leader(
                 .map_err(|error| {
                     scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 })?;
-        match client.delete_json::<Value>(path) {
-            Ok(value) => return Ok(Some(scim_json_response(StatusCode::OK, &value))),
+        let request_path = path.to_owned();
+        let attempt = run_leader_forward(&state.leader_forward_lane, move || {
+            client.delete_json::<Value>(&request_path).map(|value| {
+                #[cfg(test)]
+                forward_finalization_pause::pause_if_armed(&value);
+                scim_json_response(StatusCode::OK, &value)
+            })
+        })
+        .await
+        .map_err(|refusal| refusal.into_response("trust-control writes", scim_error_response))?;
+        match attempt {
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -604,4 +742,92 @@ pub(crate) async fn forward_scim_delete_to_leader(
         StatusCode::SERVICE_UNAVAILABLE,
         "failed to forward scim delete to cluster leader",
     ))
+}
+
+/// Test-only pause inside the builders of forwarded leader responses. A pause
+/// armed for a token blocks the build of any leader reply whose `FIELD` holds
+/// that token, so a test can observe where response finalization runs.
+#[cfg(test)]
+pub(crate) mod forward_finalization_pause {
+    use serde_json::Value;
+    use std::sync::{Arc, Condvar, LazyLock, Mutex, PoisonError};
+    use std::time::Duration;
+
+    pub(crate) const FIELD: &str = "finalizationPause";
+    /// Bounds one pause, so a build that blocks the only async worker ends
+    /// instead of hanging the test binary.
+    const PAUSE_GUARD: Duration = Duration::from_secs(10);
+
+    struct Gate {
+        token: String,
+        released: Mutex<bool>,
+        wake: Condvar,
+        reached: tokio::sync::mpsc::UnboundedSender<()>,
+    }
+
+    static ARMED: LazyLock<Mutex<Vec<Arc<Gate>>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
+    /// Releases its paused builds when released or dropped.
+    pub(crate) struct Pause(Arc<Gate>);
+
+    impl Pause {
+        pub(crate) fn release(&self) {
+            *self
+                .0
+                .released
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = true;
+            self.0.wake.notify_all();
+        }
+    }
+
+    impl Drop for Pause {
+        fn drop(&mut self) {
+            self.release();
+            ARMED
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .retain(|gate| !Arc::ptr_eq(gate, &self.0));
+        }
+    }
+
+    /// Arms a pause for replies carrying `token`. Each delivery on the
+    /// returned receiver means one build has reached the pause.
+    pub(crate) fn arm(token: &str) -> (Pause, tokio::sync::mpsc::UnboundedReceiver<()>) {
+        let (reached, reached_rx) = tokio::sync::mpsc::unbounded_channel();
+        let gate = Arc::new(Gate {
+            token: token.to_owned(),
+            released: Mutex::new(false),
+            wake: Condvar::new(),
+            reached,
+        });
+        ARMED
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(Arc::clone(&gate));
+        (Pause(gate), reached_rx)
+    }
+
+    pub(crate) fn pause_if_armed(reply: &Value) {
+        let Some(token) = reply.get(FIELD).and_then(Value::as_str) else {
+            return;
+        };
+        let gate = ARMED
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .find(|gate| gate.token == token)
+            .cloned();
+        let Some(gate) = gate else {
+            return;
+        };
+        if gate.reached.send(()).is_err() {
+            return;
+        }
+        let released = gate.released.lock().unwrap_or_else(PoisonError::into_inner);
+        let (_released, _timed_out) = gate
+            .wake
+            .wait_timeout_while(released, PAUSE_GUARD, |released| !*released)
+            .unwrap_or_else(PoisonError::into_inner);
+    }
 }

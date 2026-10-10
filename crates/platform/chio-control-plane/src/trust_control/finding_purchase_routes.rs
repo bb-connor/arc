@@ -475,6 +475,8 @@ impl FindingPurchaseResult {
 /// and never exposes adapter-provided detail.
 #[derive(Debug, thiserror::Error)]
 pub enum FindingPurchaseExecutionError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("purchase rejected: {0}")]
     Rejected(String),
     #[error("purchase conflicts with durable state: {0}")]
@@ -620,8 +622,8 @@ pub(crate) async fn handle_publish_live_finding_status(
             "finding status publication is not configured",
         );
     };
-    let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
-        Ok(duration) => duration.as_secs(),
+    let now = match super::config_and_public::now_unix_secs() {
+        Ok(now) => now,
         Err(_) => {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -764,13 +766,16 @@ fn parse_request(raw: &str) -> Result<FindingPurchaseRequest, Response> {
             "purchase request bytes are not canonical",
         ));
     }
-    let request: FindingPurchaseRequest = serde_json::from_str(raw).map_err(|_| {
-        purchase_error(
-            StatusCode::BAD_REQUEST,
-            "purchase_request_invalid",
-            "purchase request has an invalid closed shape",
-        )
-    })?;
+    let request: FindingPurchaseRequest =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                purchase_error(
+                    StatusCode::BAD_REQUEST,
+                    "purchase_request_invalid",
+                    "purchase request has an invalid closed shape",
+                )
+            })?;
     let typed = chio_core::canonical_json_bytes(&request).map_err(|_| {
         purchase_error(
             StatusCode::BAD_REQUEST,
@@ -803,13 +808,16 @@ fn parse_stored_finding(raw: &str) -> Result<Finding, Response> {
             "stored finding bytes are not canonical",
         ));
     }
-    let finding: Finding = serde_json::from_str(raw).map_err(|_| {
-        purchase_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "stored_finding_invalid",
-            "stored finding failed typed parsing",
-        )
-    })?;
+    let finding: Finding =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                purchase_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "stored_finding_invalid",
+                    "stored finding failed typed parsing",
+                )
+            })?;
     let typed = chio_core::canonical_json_bytes(&finding).map_err(|_| {
         purchase_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1007,6 +1015,9 @@ pub(crate) async fn handle_purchase_finding(
     let execution = runtime.block_on(executor.execute(authenticated_buyer, request.clone()));
     let result = match execution {
         Ok(result) => result,
+        Err(FindingPurchaseExecutionError::Clock(error)) => {
+            return purchase_error(StatusCode::SERVICE_UNAVAILABLE, error.code(), "trusted clock is unavailable");
+        }
         Err(FindingPurchaseExecutionError::Rejected(error)) => {
             tracing::warn!(error = %error, finding_id = %finding_id, "finding purchase rejected");
             return purchase_error(
@@ -1075,7 +1086,7 @@ pub(crate) async fn handle_purchase_finding(
             )
         }
     };
-    let admission: SignedFindingAdmission = match serde_json::from_str(&admission_json) {
+    let admission: SignedFindingAdmission = match chio_core::canonical::UntrustedJsonText::from_wire(admission_json.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()) {
         Ok(admission) => admission,
         Err(_) => {
             return purchase_error(

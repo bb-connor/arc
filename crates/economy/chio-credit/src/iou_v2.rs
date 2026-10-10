@@ -29,6 +29,8 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum IouEnvelopeV2Error {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("invalid v2 iou field '{0}'")]
     InvalidField(&'static str),
     #[error("v2 iou source binding does not match: {0}")]
@@ -458,14 +460,8 @@ impl SignedIouEnvelopeV2 {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, IouEnvelopeV2Error> {
-        let signed: Self = serde_json::from_slice(bytes)
-            .map_err(|error| IouEnvelopeV2Error::Canonicalization(error.to_string()))?;
+        let signed: Self = crate::input::canonical(bytes, crate::input::MAX_EVIDENCE_BYTES)?;
         signed.body.validate()?;
-        if signed.canonical_bytes()?.as_slice() != bytes {
-            return Err(IouEnvelopeV2Error::Canonicalization(
-                "v2 iou envelope is not canonical".to_owned(),
-            ));
-        }
         Ok(signed)
     }
 

@@ -1,7 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum ReputationError {
     #[error("failed to decode capability scope json: {0}")]
-    InvalidScopeJson(#[from] serde_json::Error),
+    InvalidScopeJson(#[from] chio_core::canonical::UntrustedJsonError),
 }
 
 /// Normalized local view of a persisted capability-lineage snapshot.
@@ -27,21 +27,6 @@ pub struct CapabilityLineageScopeJsonInput<'a> {
     pub scope_json: &'a str,
     pub delegation_depth: u64,
     pub parent_capability_id: Option<String>,
-}
-
-impl CapabilityLineageRecord {
-    pub fn from_scope_json(input: CapabilityLineageScopeJsonInput<'_>) -> Result<Self, ReputationError> {
-        Ok(Self {
-            capability_id: input.capability_id,
-            subject_key: input.subject_key,
-            issuer_key: input.issuer_key,
-            issued_at: input.issued_at,
-            expires_at: input.expires_at,
-            scope: serde_json::from_str(input.scope_json)?,
-            delegation_depth: input.delegation_depth,
-            parent_capability_id: input.parent_capability_id,
-        })
-    }
 }
 
 /// Normalized local view of per-grant budget usage.

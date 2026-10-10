@@ -13,11 +13,9 @@ impl InMemoryBudgetStoreInner {
             max_invocations,
         };
         let key = (capability_id.to_string(), grant_index);
-        let current = self
-            .counts
-            .get(&key)
-            .cloned()
-            .unwrap_or_else(|| Self::default_usage_record(capability_id, grant_index_u32));
+        let current = self.counts.get(&key).cloned().unwrap_or_else(|| {
+            Self::default_usage_record(capability_id, grant_index_u32, self.now)
+        });
         let quota = self.grant_quota_for_legacy_mutation(
             capability_id,
             grant_index_u32,
@@ -32,10 +30,10 @@ impl InMemoryBudgetStoreInner {
                         "grant quota maximum changed".to_string(),
                     ));
                 }
-                let used = existing
-                    .reserved_invocations
-                    .checked_add(existing.captured_invocations)
-                    .ok_or_else(|| {
+                let used = InvocationCount::new(existing.reserved_invocations)
+                    .try_add(InvocationCount::new(existing.captured_invocations))
+                    .map(InvocationCount::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "reserved + captured quota count overflowed u32".to_string(),
                         )
@@ -55,14 +53,17 @@ impl InMemoryBudgetStoreInner {
             .map(|quota| self.invocation_quota_usages(std::slice::from_ref(quota)))
             .transpose()?
             .unwrap_or_default();
-        let recorded_at = unix_now();
+        let recorded_at = self.now;
         let event_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
         let next_invocation_count = if allowed {
-            current.invocation_count.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("invocation_count overflowed u32".to_string())
-            })?
+            InvocationCount::new(current.invocation_count)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
+                    BudgetStoreError::Overflow("invocation_count overflowed u32".to_string())
+                })?
         } else {
             current.invocation_count
         };
@@ -102,10 +103,9 @@ impl InMemoryBudgetStoreInner {
         };
         self.next_seq = event_seq;
         let usage_seq = if allowed {
-            let entry = self
-                .counts
-                .entry(key)
-                .or_insert_with(|| Self::default_usage_record(capability_id, grant_index_u32));
+            let entry = self.counts.entry(key).or_insert_with(|| {
+                Self::default_usage_record(capability_id, grant_index_u32, self.now)
+            });
             entry.invocation_count = next_invocation_count;
             entry.updated_at = recorded_at;
             entry.seq = event_seq;
@@ -207,7 +207,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn try_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
@@ -232,7 +232,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn try_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
@@ -273,11 +273,9 @@ impl InMemoryBudgetStoreInner {
         }
 
         let key = (capability_id.to_string(), grant_index);
-        let current = self
-            .counts
-            .get(&key)
-            .cloned()
-            .unwrap_or_else(|| Self::default_usage_record(capability_id, grant_index_u32));
+        let current = self.counts.get(&key).cloned().unwrap_or_else(|| {
+            Self::default_usage_record(capability_id, grant_index_u32, self.now)
+        });
         let quota = self.grant_quota_for_legacy_mutation(
             capability_id,
             grant_index_u32,
@@ -293,10 +291,10 @@ impl InMemoryBudgetStoreInner {
         let mut allowed = true;
         if let Some(quota) = &quota {
             if let Some(existing) = self.invocation_quotas.get(&quota.key) {
-                let used = existing
-                    .reserved_invocations
-                    .checked_add(existing.captured_invocations)
-                    .ok_or_else(|| {
+                let used = InvocationCount::new(existing.reserved_invocations)
+                    .try_add(InvocationCount::new(existing.captured_invocations))
+                    .map(InvocationCount::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "reserved + captured quota count overflowed u32".to_string(),
                         )
@@ -315,11 +313,14 @@ impl InMemoryBudgetStoreInner {
             current.total_cost_exposed,
             current.total_cost_realized_spend,
         )?;
-        let new_total = current_total.checked_add(cost_units).ok_or_else(|| {
-            BudgetStoreError::Overflow(
-                "authorized exposure + cost_units overflowed u64".to_string(),
-            )
-        })?;
+        let new_total = ExposureUnits::new(current_total)
+            .try_add(ExposureUnits::new(cost_units))
+            .map(ExposureUnits::get)
+            .map_err(|_| {
+                BudgetStoreError::Overflow(
+                    "authorized exposure + cost_units overflowed u64".to_string(),
+                )
+            })?;
         if let Some(max_total) = max_total_cost_units {
             if new_total > max_total {
                 allowed = false;
@@ -331,23 +332,26 @@ impl InMemoryBudgetStoreInner {
             ));
         }
 
-        let recorded_at = unix_now();
+        let recorded_at = self.now;
         let event_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
         let next_invocation_count = allowed
             .then(|| {
-                current.invocation_count.checked_add(1).ok_or_else(|| {
-                    BudgetStoreError::Overflow("invocation_count overflowed u32".to_string())
-                })
+                InvocationCount::new(current.invocation_count)
+                    .try_add(InvocationCount::new(1))
+                    .map(InvocationCount::get)
+                    .map_err(|_| {
+                        BudgetStoreError::Overflow("invocation_count overflowed u32".to_string())
+                    })
             })
             .transpose()?;
         let next_exposure = allowed
             .then(|| {
-                current
-                    .total_cost_exposed
-                    .checked_add(cost_units)
-                    .ok_or_else(|| {
+                ExposureUnits::new(current.total_cost_exposed)
+                    .try_add(ExposureUnits::new(cost_units))
+                    .map(ExposureUnits::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "total_cost_exposed + cost_units overflowed u64".to_string(),
                         )
@@ -419,10 +423,9 @@ impl InMemoryBudgetStoreInner {
                 None
             };
             self.next_seq = event_seq;
-            let entry = self
-                .counts
-                .entry(key.clone())
-                .or_insert_with(|| Self::default_usage_record(capability_id, grant_index_u32));
+            let entry = self.counts.entry(key.clone()).or_insert_with(|| {
+                Self::default_usage_record(capability_id, grant_index_u32, self.now)
+            });
             entry.invocation_count = checked_invocation_count;
             entry.total_cost_exposed = checked_exposure;
             entry.updated_at = recorded_at;
@@ -663,9 +666,14 @@ impl InMemoryBudgetStoreInner {
                     "invocation quota reservation does not match its hold".to_string(),
                 ));
             }
-            state.captured_invocations.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("captured invocation quota overflowed u32".to_string())
-            })?;
+            InvocationCount::new(state.captured_invocations)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
+                    BudgetStoreError::Overflow(
+                        "captured invocation quota overflowed u32".to_string(),
+                    )
+                })?;
         }
         let cumulative_before = if let Some(participant) = &hold.cumulative_approval {
             if participant.state != BudgetCumulativeApprovalState::Authorized {
@@ -684,10 +692,12 @@ impl InMemoryBudgetStoreInner {
                     "cumulative approval reservation is incomplete".to_string(),
                 ));
             }
-            account
-                .captured_authorized_units
-                .checked_add(participant.request.requested_authorized.units)
-                .ok_or_else(|| {
+            ExposureUnits::new(account.captured_authorized_units)
+                .try_add(ExposureUnits::new(
+                    participant.request.requested_authorized.units,
+                ))
+                .map(ExposureUnits::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow(
                         "captured cumulative authorized units overflowed u64".to_string(),
                     )
@@ -715,27 +725,9 @@ impl InMemoryBudgetStoreInner {
         let event_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
+        let accounting = self.prepare_capture_accounting(&hold)?;
         self.next_seq = event_seq;
-        for quota in &hold.invocation_quotas {
-            let state = self.invocation_quotas.get_mut(&quota.key).ok_or_else(|| {
-                BudgetStoreError::Invariant("validated invocation quota disappeared".to_string())
-            })?;
-            state.reserved_invocations -= 1;
-            state.captured_invocations += 1;
-        }
-        if let Some(participant) = &hold.cumulative_approval {
-            let account = self
-                .cumulative_approval_accounts
-                .get_mut(&participant.request.account_key)
-                .ok_or_else(|| {
-                    BudgetStoreError::Invariant(
-                        "validated cumulative approval account disappeared".to_string(),
-                    )
-                })?;
-            account.reserved_authorized_units -= participant.request.requested_authorized.units;
-            account.captured_authorized_units += participant.request.requested_authorized.units;
-            account.version += 1;
-        }
+        accounting.apply(self);
         let quota_usages = self.invocation_quota_usages(&hold.invocation_quotas)?;
         let quota_mutations =
             Self::invocation_quota_mutations(&quota_usages_before, &quota_usages)?;
@@ -803,7 +795,7 @@ impl InMemoryBudgetStoreInner {
                 invocation_state_after: BudgetInvocationState::Captured,
                 monetary_state_before: hold.monetary_state,
                 monetary_state_after: hold.monetary_state,
-                recorded_at: unix_now(),
+                recorded_at: self.now,
                 event_seq,
                 usage_seq: Some(usage.seq),
                 exposure_units: hold.remaining_exposure_units,

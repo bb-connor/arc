@@ -71,20 +71,23 @@ pub struct EmergencyStatusResponse {
 
 /// Errors returned by the emergency handlers. Each variant maps
 /// cleanly onto an HTTP status code via [`EmergencyHandlerError::status`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum EmergencyHandlerError {
     /// `X-Admin-Token` header missing or does not match the configured value.
     /// Returns HTTP 401 and a minimal JSON error body.
+    #[error("missing or invalid X-Admin-Token header")]
     Unauthorized,
 
     /// Request body could not be parsed as the expected JSON shape. The
     /// operator supplied bad input; returns HTTP 400.
-    BadRequest(String),
+    #[error("invalid emergency-stop request body")]
+    BadRequest(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
 
     /// Kernel-side failure while toggling the kill switch. Fail-closed:
     /// the handler has already engaged the stop (see
     /// [`handle_emergency_stop`]); this error just reports what went wrong
     /// after the flag flipped. Returns HTTP 500.
+    #[error("kernel emergency operation failed: {0}")]
     Kernel(String),
 }
 
@@ -115,7 +118,8 @@ impl EmergencyHandlerError {
     pub fn message(&self) -> String {
         match self {
             Self::Unauthorized => "missing or invalid X-Admin-Token header".to_string(),
-            Self::BadRequest(reason) | Self::Kernel(reason) => reason.clone(),
+            Self::BadRequest(_) => "invalid emergency-stop request body".to_string(),
+            Self::Kernel(reason) => reason.clone(),
         }
     }
 
@@ -210,9 +214,8 @@ pub fn handle_emergency_stop(
 ) -> Result<EmergencyStopResponse, EmergencyHandlerError> {
     admin.authorize(admin_token)?;
 
-    let parsed: EmergencyStopRequest = serde_json::from_slice(body).map_err(|error| {
-        EmergencyHandlerError::BadRequest(format!("invalid emergency-stop request body: {error}"))
-    })?;
+    let parsed: EmergencyStopRequest = crate::input::decode(body, crate::input::MAX_REQUEST_BYTES)
+        .map_err(EmergencyHandlerError::BadRequest)?;
 
     admin.kernel.emergency_stop(&parsed.reason)?;
 

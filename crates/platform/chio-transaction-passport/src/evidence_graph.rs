@@ -297,6 +297,7 @@ pub(super) enum EvidenceClass {
 pub(super) fn validate_evidence_graph(
     graph: &TransactionEvidenceGraph,
 ) -> Result<(), TransactionPassportError> {
+    crate::validate_evidence_graph_size(graph.nodes.len(), graph.edges.len())?;
     if graph.schema != TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedEvidenceGraphSchema(
             graph.schema.clone(),
@@ -340,9 +341,7 @@ pub(super) fn validate_evidence_graph(
 pub fn validate_transaction_evidence_graph(
     evidence_graph_bytes: &[u8],
 ) -> Result<(), TransactionPassportError> {
-    let graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
     let schema = required_graph_string(&graph, "schema", "evidence graph schema")?;
     if schema != TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedEvidenceGraphSchema(
@@ -358,6 +357,10 @@ pub fn validate_transaction_evidence_graph(
             "evidence graph must contain at least one node".to_string(),
         ));
     }
+    crate::validate_evidence_graph_size(
+        nodes.len(),
+        required_graph_array(&graph, "edges", "evidence graph edges")?.len(),
+    )?;
     let mut node_ids = Vec::with_capacity(nodes.len());
     for node in nodes {
         let node_id = required_graph_string(node, "id", "evidence graph node id")?;
@@ -570,6 +573,7 @@ pub(super) fn validate_evidence_graph_artifact_bytes(
     graph: &TransactionEvidenceGraph,
     artifacts: &BTreeMap<String, Vec<u8>>,
 ) -> Result<(), TransactionPassportError> {
+    crate::validate_evidence_budget(artifacts.values().map(Vec::as_slice))?;
     for node in &graph.nodes {
         let bytes = artifacts.get(&node.path).ok_or_else(|| {
             TransactionPassportError::MissingEvidenceGraphArtifact(node.path.clone())
@@ -916,11 +920,10 @@ fn parse_artifact_for_role<T: DeserializeOwned>(
     graph: &TransactionEvidenceGraph,
     artifacts: &BTreeMap<String, Vec<u8>>,
     role: EvidenceNodeRole,
-    label: &'static str,
+    _label: &'static str,
 ) -> Result<T, TransactionPassportError> {
     let bytes = artifact_bytes_for_role(graph, artifacts, role)?;
-    serde_json::from_slice(bytes)
-        .map_err(|error| minimal_governed_action_binding_error(format!("invalid {label}: {error}")))
+    crate::decode_evidence_json(bytes)
 }
 
 fn artifact_digest_for_governed_policy_anchor(
@@ -1148,9 +1151,7 @@ fn verify_signed_role_artifact(
         minimal_governed_action_binding_error(format!("{label} signature invalid: {error}"))
     })?;
     let bytes = artifact_bytes_for_role(graph, artifacts, role)?;
-    let mut artifact: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        minimal_governed_action_binding_error(format!("invalid {label}: {error}"))
-    })?;
+    let mut artifact: serde_json::Value = crate::decode_evidence_json(bytes)?;
     let object = artifact.as_object_mut().ok_or_else(|| {
         minimal_governed_action_binding_error(format!("{label} artifact must be an object"))
     })?;
@@ -1299,54 +1300,39 @@ pub(super) fn validate_graph_references<'a>(
     Ok(())
 }
 
+// Iterative traversal keeps attacker-controlled graph depth off the stack.
 pub(super) fn validate_graph_acyclic<'a>(
     node_ids: impl IntoIterator<Item = &'a str>,
     edge_refs: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) -> Result<(), TransactionPassportError> {
-    let mut adjacency = BTreeMap::new();
+    let mut adjacency: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for node_id in node_ids {
-        adjacency.entry(node_id).or_insert_with(Vec::new);
+        adjacency.entry(node_id).or_default();
     }
     for (from, to) in edge_refs {
-        adjacency.entry(from).or_insert_with(Vec::new).push(to);
+        adjacency.entry(from).or_default().push(to);
     }
-
-    let mut visit_state = BTreeMap::new();
-    let nodes: Vec<_> = adjacency.keys().copied().collect();
-    for node_id in nodes {
-        visit_graph_node(node_id, &adjacency, &mut visit_state)?;
-    }
-    Ok(())
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum GraphVisitState {
-    Visiting,
-    Visited,
-}
-
-fn visit_graph_node<'a>(
-    node_id: &'a str,
-    adjacency: &BTreeMap<&'a str, Vec<&'a str>>,
-    visit_state: &mut BTreeMap<&'a str, GraphVisitState>,
-) -> Result<(), TransactionPassportError> {
-    match visit_state.get(node_id).copied() {
-        Some(GraphVisitState::Visiting) => {
-            return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-                format!("cyclic evidence graph: {node_id}"),
-            ));
-        }
-        Some(GraphVisitState::Visited) => return Ok(()),
-        None => {}
-    }
-
-    visit_state.insert(node_id, GraphVisitState::Visiting);
-    if let Some(children) = adjacency.get(node_id) {
-        for child in children {
-            visit_graph_node(child, adjacency, visit_state)?;
+    let mut visited = BTreeSet::new();
+    let mut active = BTreeSet::new();
+    for &node in adjacency.keys() {
+        let mut stack = vec![(node, false)];
+        while let Some((node, exiting)) = stack.pop() {
+            if exiting {
+                active.remove(node);
+                visited.insert(node);
+            } else if !visited.contains(node) {
+                if !active.insert(node) {
+                    return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
+                        format!("cyclic evidence graph: {node}"),
+                    ));
+                }
+                stack.push((node, true));
+                if let Some(children) = adjacency.get(node) {
+                    stack.extend(children.iter().rev().map(|child| (*child, false)));
+                }
+            }
         }
     }
-    visit_state.insert(node_id, GraphVisitState::Visited);
     Ok(())
 }
 

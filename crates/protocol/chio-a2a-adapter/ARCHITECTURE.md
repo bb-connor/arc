@@ -128,3 +128,16 @@ client-credential headers; `url` parses and rewrites request URLs;
 `async-trait` provides the `ToolServerConnection` trait's async methods;
 `thiserror` derives `AdapterError`. Dev-only: `tokio` (async tests), `rcgen`
 (test TLS certificates).
+
+`clock.rs` owns the injected clock handle shared by OAuth and registry readers;
+`oauth_cache.rs` owns finite cached-token deadlines. Acquisition starts the TTL,
+so response latency cannot extend authority. Missing expiry and lifetimes at or
+below the cache skew are never cached; zero or elapsed issued lifetimes refuse
+outgoing use. `with_clock` installs the shared clock before discovery.
+
+HTTP and registry JSON use original-byte duplicate-aware decoding with a 16 MiB
+ceiling in addition to the egress contract. SSE also bounds total bytes, lines,
+events and chunks. Registry loads bind each map key to its record task ID and
+validate time ordering. The registry is local correlation state; it does not
+replace signed kernel admission or durable receipt storage. Named test modules
+under `tests.rs` replace the root textual test inclusion.

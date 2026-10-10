@@ -3,6 +3,11 @@ use std::sync::Arc;
 
 use chio_cohere_tools_adapter::transport::MockTransport;
 use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig};
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
 use serde_json::{json, Value};
 
@@ -15,15 +20,57 @@ struct TaxonomyRow {
     envelope: Value,
 }
 
-fn adapter() -> CohereAdapter {
+fn adapter() -> Result<CohereAdapter, String> {
+    let signer = Keypair::from_seed(&[76; 32]);
     let config = CohereAdapterConfig::new(
         "cohere-1",
         "Cohere v2 chat",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "org_chio_demo",
     );
-    CohereAdapter::new(config, Arc::new(MockTransport::new()))
+    let manifest = taxonomy_manifest(
+        &config.server_id,
+        &config.server_name,
+        &config.server_version,
+        &config.public_key,
+    );
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)
+        .map_err(|error| format!("failed to sign Cohere taxonomy manifest: {error}"))?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| format!("failed to admit Cohere taxonomy manifest: {error}"))?;
+    CohereAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
+        .map_err(|error| format!("failed to bind Cohere taxonomy adapter: {error}"))
+}
+
+fn taxonomy_manifest(server_id: &str, name: &str, version: &str, public_key: &str) -> ToolManifest {
+    ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: name.to_string(),
+        description: None,
+        version: version.to_string(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Get weather".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: public_key.to_string(),
+    }
 }
 
 fn raw(value: Value) -> Result<ProviderRequest, String> {
@@ -59,6 +106,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
         "TransportTimeout",
         "VerdictBudgetExceeded",
         "Malformed",
+        "UntrustedInput",
     ] {
         if !classes.contains(required) {
             return Err(format!(
@@ -77,7 +125,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in ["BadToolArgs", "UntrustedInput", "VerdictBudgetExceeded"] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -85,13 +133,13 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         }
     }
 
-    let adapter = adapter();
+    let adapter = adapter()?;
 
     let bad_args = adapter.lift_batch(raw(json!({
         "message": {
             "role": "assistant",
             "tool_calls": [
-                {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "not-json"}}
+                {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "[]"}}
             ]
         }
     }))?);
@@ -101,7 +149,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         .gate_sse_stream(b"event: tool-call-end\ndata: not-json\n\n", |_invocation| {
             Ok(allow_verdict())
         });
-    require_provider_error(nonjson, "Malformed")?;
+    require_provider_error(nonjson, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&tool_call_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -212,6 +260,11 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

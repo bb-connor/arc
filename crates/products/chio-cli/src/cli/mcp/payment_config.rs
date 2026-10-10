@@ -8,8 +8,14 @@ use chio_kernel::{AcpPaymentAdapter, PaymentAdapter, X402PaymentAdapter};
 #[derive(Debug, Clone)]
 pub enum PaymentAdapterConfig {
     Sim,
-    HttpX402 { base_url: String, bearer_token: Option<String> },
-    HttpAcp { base_url: String, bearer_token: Option<String> },
+    HttpX402 {
+        base_url: String,
+        bearer_token: Option<String>,
+    },
+    HttpAcp {
+        base_url: String,
+        bearer_token: Option<String>,
+    },
 }
 
 impl PaymentAdapterConfig {
@@ -38,8 +44,14 @@ impl PaymentAdapterConfig {
         let bearer_token = std::env::var("CHIO_PAYMENT_BEARER_TOKEN").ok();
         match kind.as_str() {
             "sim" | "" => Ok(None),
-            "http-x402" => Ok(Some(Self::HttpX402 { base_url, bearer_token })),
-            "http-acp" => Ok(Some(Self::HttpAcp { base_url, bearer_token })),
+            "http-x402" => Ok(Some(Self::HttpX402 {
+                base_url,
+                bearer_token,
+            })),
+            "http-acp" => Ok(Some(Self::HttpAcp {
+                base_url,
+                bearer_token,
+            })),
             other => Err(format!(
                 "CHIO_PAYMENT_ADAPTER: unrecognized adapter kind {:?}; \
                  expected one of: sim, http-x402, http-acp",
@@ -67,14 +79,20 @@ impl PaymentAdapterConfig {
     pub fn build_adapter(&self) -> Box<dyn PaymentAdapter> {
         match self {
             Self::Sim => Box::new(SimPaymentAdapter::new()),
-            Self::HttpX402 { base_url, bearer_token } => {
+            Self::HttpX402 {
+                base_url,
+                bearer_token,
+            } => {
                 let mut adapter = X402PaymentAdapter::new(base_url.clone());
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token.clone());
                 }
                 Box::new(adapter)
             }
-            Self::HttpAcp { base_url, bearer_token } => {
+            Self::HttpAcp {
+                base_url,
+                bearer_token,
+            } => {
                 let mut adapter = AcpPaymentAdapter::new(base_url.clone());
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token.clone());
@@ -92,7 +110,10 @@ mod tests {
 
     #[test]
     fn default_is_sim_and_safe() {
-        assert!(matches!(PaymentAdapterConfig::default_safe(), PaymentAdapterConfig::Sim));
+        assert!(matches!(
+            PaymentAdapterConfig::default_safe(),
+            PaymentAdapterConfig::Sim
+        ));
     }
 
     #[test]
@@ -116,7 +137,9 @@ mod tests {
             base_url: "   ".to_string(),
             bearer_token: None,
         };
-        let error = cfg.validate().test_expect_err("blank base_url must reject at load time");
+        let error = cfg
+            .validate()
+            .test_expect_err("blank base_url must reject at load time");
         assert!(error.contains("base_url"));
     }
 
@@ -134,13 +157,15 @@ mod tests {
     }
 
     #[test]
-    fn governed_mustprepay_via_cli_sim() {
+    fn governed_mustprepay_via_cli_sim() -> Result<(), Box<dyn std::error::Error>> {
         use chio_core::capability::governance::{
             GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
             GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
             MeteredSettlementMode,
         };
-        use chio_core::capability::scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant};
+        use chio_core::capability::scope::{
+            ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant,
+        };
         use chio_core::crypto::Keypair;
         use chio_kernel::{
             ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
@@ -206,6 +231,8 @@ mod tests {
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         });
         kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+        let approver = Keypair::generate();
+        kernel.set_governed_approval_policy("cli-sim-test".into(), vec![approver.public_key()])?;
 
         kernel.register_tool_server(Box::new(FlatCostServer { cost_units: 75 }));
 
@@ -220,7 +247,9 @@ mod tests {
             operations: vec![Operation::Invoke],
             constraints: vec![
                 Constraint::GovernedIntentRequired,
-                Constraint::RequireApprovalAbove { threshold_units: 50 },
+                Constraint::RequireApprovalAbove {
+                    threshold_units: 50,
+                },
             ],
             max_invocations: None,
             max_cost_per_invocation: Some(MonetaryAmount {
@@ -233,17 +262,17 @@ mod tests {
             }),
             dpop_required: None,
         };
-        let scope = ChioScope { grants: vec![grant], ..ChioScope::default() };
+        let scope = ChioScope {
+            grants: vec![grant],
+            ..ChioScope::default()
+        };
         let cap = kernel
             .issue_capability(&agent_kp.public_key(), scope, 3600)
             .test_unwrap();
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = cap.issued_at;
 
-        let intent = GovernedTransactionIntent {
+        let mut intent = GovernedTransactionIntent {
             id: "intent-cli-sim-1".to_string(),
             server_id: "cli-sim-srv".to_string(),
             tool_name: "compute".to_string(),
@@ -277,11 +306,19 @@ mod tests {
             body: Default::default(),
         };
 
+        chio_kernel::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &cap,
+            &serde_json::json!({}),
+            "req-cli-sim-1",
+            kernel.policy_hash(),
+            "cli-sim-test",
+        )?;
         let intent_hash = intent.binding_hash().test_unwrap();
         let approval_token = GovernedApprovalToken::sign(
             GovernedApprovalTokenBody {
                 id: "approval-cli-sim-1".to_string(),
-                approver: kernel_kp.public_key(),
+                approver: approver.public_key(),
                 subject: agent_kp.public_key(),
                 governed_intent_hash: intent_hash,
                 request_id: "req-cli-sim-1".to_string(),
@@ -290,7 +327,7 @@ mod tests {
                 expires_at: now + 300,
                 decision: GovernedApprovalDecision::Approved,
             },
-            &kernel_kp,
+            &approver,
         )
         .test_unwrap();
 
@@ -310,11 +347,16 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).test_unwrap();
 
-        assert_eq!(response.verdict, Verdict::Allow, "MustPrepay call must be allowed");
+        assert_eq!(
+            response.verdict,
+            Verdict::Allow,
+            "MustPrepay call must be allowed"
+        );
 
         let financial = response
             .receipt
@@ -331,5 +373,6 @@ mod tests {
             payment_ref.starts_with("sim-"),
             "payment_reference must carry a sim- id from SimPaymentAdapter; got {payment_ref}"
         );
+        Ok(())
     }
 }

@@ -14,6 +14,16 @@ use chio_kernel::{ApprovalStore, ReceiptStore, RevocationStore, SignedExecutionN
 use chio_openapi::PolicyDecision;
 use serde_json::Value;
 
+#[path = "evaluator/route_matching.rs"]
+mod route_matching;
+
+#[path = "evaluator/diagnostics.rs"]
+mod diagnostics;
+
+#[cfg(test)]
+#[path = "evaluator/capability_diagnostics_tests.rs"]
+mod capability_diagnostics_tests;
+
 /// Backend label reported through the sidecar health endpoint. A durable store
 /// survives restart; an ephemeral one does not.
 const BACKEND_DURABLE: &str = "durable";
@@ -39,6 +49,7 @@ pub struct RouteEntry {
 /// The request evaluator holds the loaded route table and shared HTTP authority.
 pub struct RequestEvaluator {
     routes: Vec<RouteEntry>,
+    allow_anonymous_reads: bool,
     authority: HttpAuthority,
     receipt_backend: &'static str,
     revocation_backend: &'static str,
@@ -49,6 +60,9 @@ pub(crate) struct DurableAdmissionStores {
     pub(crate) store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
     pub(crate) outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
     pub(crate) fence: chio_kernel::admission_operation::StoreMutationFence,
+    /// The authority's own budget store. Durable operations, their preflight
+    /// holds and their executable holds live in one authority.
+    pub(crate) budget_store: Arc<dyn chio_kernel::budget_store::BudgetStore>,
 }
 
 impl RequestEvaluator {
@@ -140,6 +154,7 @@ impl RequestEvaluator {
     ) -> Self {
         Self {
             routes,
+            allow_anonymous_reads: false,
             authority: HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
                 keypair,
                 policy_hash,
@@ -179,6 +194,7 @@ impl RequestEvaluator {
     ) -> Self {
         Self {
             routes,
+            allow_anonymous_reads: false,
             authority: HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
                 keypair,
                 policy_hash,
@@ -217,6 +233,7 @@ impl RequestEvaluator {
             revocation_store,
             None,
             allow_ephemeral,
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 
@@ -231,6 +248,7 @@ impl RequestEvaluator {
         revocation_store: Option<Arc<dyn RevocationStore>>,
         durable_admission: Option<DurableAdmissionStores>,
         allow_ephemeral: bool,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, HttpAuthorityError> {
         let receipt_backend = if receipt_store.is_some() {
             BACKEND_DURABLE
@@ -258,6 +276,7 @@ impl RequestEvaluator {
         // an embedder with durable receipts can never silently re-accept a
         // capability revoked before a restart from in-memory revocation state.
         let mut builder = HttpAuthority::builder()
+            .clock(clock)
             .approval_store(approval_store)
             .trusted_capability_issuers(trusted_capability_issuers)
             .allow_ephemeral_receipt_log(allow_ephemeral)
@@ -279,10 +298,29 @@ impl RequestEvaluator {
 
         Ok(Self {
             routes,
+            allow_anonymous_reads: false,
             authority,
             receipt_backend,
             revocation_backend,
         })
+    }
+
+    /// Permit anonymous calls only on known routes classified as reads by local policy.
+    /// This opt-in never authorizes an unmatched route.
+    #[must_use]
+    pub fn with_anonymous_reads(mut self, allow: bool) -> Self {
+        self.allow_anonymous_reads = allow;
+        self
+    }
+
+    fn authority_policy(&self, policy: PolicyDecision, matched: bool) -> HttpAuthorityPolicy {
+        if !matched {
+            HttpAuthorityPolicy::DenyAll
+        } else if self.allow_anonymous_reads && policy == PolicyDecision::SessionAllow {
+            HttpAuthorityPolicy::SessionAllow
+        } else {
+            HttpAuthorityPolicy::DenyByDefault
+        }
     }
 
     /// Health label for the embedded kernel's receipt backend.
@@ -353,7 +391,7 @@ impl RequestEvaluator {
             |nonce| nonce.nonce.bound_to.request_id.clone(),
         );
         let caller = caller_identity_from_headers(headers);
-        let (route_pattern, matched_policy) = self.match_route(method, path);
+        let (route_pattern, matched_policy, matched) = self.match_route_with_status(method, path);
         let result = self.authority.evaluate(HttpAuthorityInput {
             request_id,
             method,
@@ -372,7 +410,7 @@ impl RequestEvaluator {
             execution_nonce,
             model_metadata: None,
             unsupported_authorization_extension: None,
-            policy: policy_mode(matched_policy),
+            policy: self.authority_policy(matched_policy, matched),
         })?;
         Ok(result.into())
     }
@@ -403,7 +441,7 @@ impl RequestEvaluator {
             execution_nonce,
             ..
         } = request;
-        let (route_pattern, matched_policy, _) = self.match_route_with_status(method, &path);
+        let (route_pattern, matched_policy, matched) = self.match_route_with_status(method, &path);
         let raw_capability =
             presented_capability.or_else(|| extract_presented_capability(&headers, &query));
         let arguments = arguments.unwrap_or(Value::Null);
@@ -425,38 +463,9 @@ impl RequestEvaluator {
             execution_nonce: execution_nonce.as_ref(),
             model_metadata: model_metadata.as_ref(),
             unsupported_authorization_extension,
-            policy: policy_mode(matched_policy),
+            policy: self.authority_policy(matched_policy, matched),
         })?;
         Ok(result.into())
-    }
-
-    /// Match a request path against the route table.
-    /// Returns (matched_pattern, policy). Falls back to a catch-all.
-    fn match_route(&self, method: HttpMethod, path: &str) -> (String, PolicyDecision) {
-        let (pattern, policy, _) = self.match_route_with_status(method, path);
-        (pattern, policy)
-    }
-
-    fn match_route_with_status(
-        &self,
-        method: HttpMethod,
-        path: &str,
-    ) -> (String, PolicyDecision, bool) {
-        // Try exact pattern match first, then prefix match.
-        for route in &self.routes {
-            if route.method == method && path_matches_pattern(path, &route.pattern) {
-                return (route.pattern.clone(), route.policy, true);
-            }
-        }
-
-        // Fallback: use method-based default policy.
-        let pattern = path.to_string();
-        let policy = if method.is_safe() {
-            PolicyDecision::SessionAllow
-        } else {
-            PolicyDecision::DenyByDefault
-        };
-        (pattern, policy, false)
     }
 }
 
@@ -466,13 +475,6 @@ fn extract_presented_capability<'a>(
 ) -> Option<&'a str> {
     header_value(headers, "x-chio-capability")
         .or_else(|| query.get("chio_capability").map(String::as_str))
-}
-
-fn policy_mode(policy: PolicyDecision) -> HttpAuthorityPolicy {
-    match policy {
-        PolicyDecision::SessionAllow => HttpAuthorityPolicy::SessionAllow,
-        PolicyDecision::DenyByDefault => HttpAuthorityPolicy::DenyByDefault,
-    }
 }
 
 impl RequestEvaluator {
@@ -489,6 +491,9 @@ impl RequestEvaluator {
 
 impl From<HttpAuthorityEvaluation> for EvaluationResult {
     fn from(value: HttpAuthorityEvaluation) -> Self {
+        if let Some(source) = &value.capability_input_error {
+            diagnostics::record_capability_input_error(source);
+        }
         Self {
             verdict: value.verdict,
             receipt: value.receipt,
@@ -501,6 +506,7 @@ impl From<HttpAuthorityEvaluation> for EvaluationResult {
 impl From<HttpAuthorityError> for crate::error::ProtectError {
     fn from(value: HttpAuthorityError) -> Self {
         match value {
+            HttpAuthorityError::Clock(source) => Self::Clock(source),
             HttpAuthorityError::CallerIdentity(message)
             | HttpAuthorityError::ContentHash(message)
             | HttpAuthorityError::Kernel(message) => Self::Evaluation(message),
@@ -532,7 +538,7 @@ fn path_matches_pattern(path: &str, pattern: &str) -> bool {
 }
 
 fn path_segment_matches_pattern(path_segment: &str, pattern_segment: &str) -> bool {
-    pattern_segment.starts_with('{') && pattern_segment.ends_with('}')
+    !path_segment.is_empty() && pattern_segment.starts_with('{') && pattern_segment.ends_with('}')
         || path_segment == pattern_segment
 }
 
@@ -605,6 +611,27 @@ mod tests {
 
     use chio_test_support::prelude::*;
 
+    fn registered_test_routes() -> Vec<RouteEntry> {
+        [
+            ("/pets", HttpMethod::Get),
+            ("/pets", HttpMethod::Post),
+            ("/chio/tools/{server}/{tool}", HttpMethod::Get),
+            ("/chio/tools/{server}/{tool}", HttpMethod::Post),
+        ]
+        .into_iter()
+        .map(|(path, method)| RouteEntry {
+            pattern: path.into(),
+            method,
+            operation_id: None,
+            policy: if method.is_safe() {
+                PolicyDecision::SessionAllow
+            } else {
+                PolicyDecision::DenyByDefault
+            },
+        })
+        .collect()
+    }
+
     #[test]
     fn durable_evaluator_reports_durable_backends() -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
@@ -634,7 +661,7 @@ mod tests {
             &authority_locks,
         )?;
         let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
-            Vec::new(),
+            registered_test_routes(),
             Keypair::generate(),
             chio_core_types::sha256_hex(b"test-policy"),
             Arc::new(chio_kernel::InMemoryApprovalStore::new()),
@@ -645,9 +672,12 @@ mod tests {
                 store: Arc::new(authority.admission_operation_store()),
                 outcome_store: Arc::new(authority.tool_outcome_store()),
                 fence: authority.mutation_fence(),
+                budget_store: Arc::new(authority.budget_store()),
             }),
             false,
-        )?;
+            Arc::new(chio_security_types::clock::SystemClock),
+        )?
+        .with_anonymous_reads(true);
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");
         let evaluated = evaluator.evaluate(
@@ -686,7 +716,7 @@ mod tests {
                 chio_store_sqlite::SqliteReceiptStore::open(dir.path().join(file))?,
             );
             Ok(RequestEvaluator::new_with_durable_stores(
-                vec![],
+                registered_test_routes(),
                 keypair.clone(),
                 "test-policy".to_string(),
                 Arc::new(chio_kernel::InMemoryApprovalStore::new()),
@@ -740,7 +770,8 @@ mod tests {
     fn deprecated_constructor_shims_delegate_to_ephemeral() {
         let keypair = Keypair::generate();
 
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string())
+            .with_anonymous_reads(true);
         assert_eq!(evaluator.receipt_backend(), "ephemeral");
         assert_eq!(evaluator.revocation_backend(), "ephemeral");
 
@@ -867,7 +898,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_get_allowed() {
+    fn evaluate_get_allowed_with_explicit_anonymous_policy() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -876,7 +907,8 @@ mod tests {
             policy: PolicyDecision::SessionAllow,
         }];
         let evaluator =
-            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string())
+                .with_anonymous_reads(true);
 
         let result = evaluator
             .evaluate(
@@ -905,7 +937,8 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string())
+            .with_anonymous_reads(true);
         let mut request = ChioHttpRequest::new(
             "req-unsupported-approvals".to_string(),
             HttpMethod::Get,
@@ -940,7 +973,8 @@ mod tests {
             policy: PolicyDecision::DenyByDefault,
         }];
         let evaluator =
-            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string())
+                .with_anonymous_reads(true);
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-math-only",
@@ -989,7 +1023,12 @@ mod tests {
     #[test]
     fn evaluate_denies_get_reserved_tools_path_without_capability() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair,
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
 
         let result = evaluator
             .evaluate(
@@ -1013,8 +1052,12 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_reserved_tools_path_context() {
         let keypair = Keypair::generate();
-        let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair.clone(),
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-read",
@@ -1060,8 +1103,12 @@ mod tests {
     #[test]
     fn evaluate_chio_request_denies_unmatched_http_path_with_spoofed_synthetic_pattern() {
         let keypair = Keypair::generate();
-        let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair.clone(),
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-admin-delete",
@@ -1100,19 +1147,22 @@ mod tests {
         assert!(result.verdict.is_denied());
         assert_eq!(result.receipt.route_pattern, "/admin/delete");
         assert!(result.receipt.capability_id.is_none());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| {
-                details.contains("capability does not authorize tool authorize_http_request")
-            }));
+        assert_eq!(result.receipt.evidence[0].guard_name, "RouteGuard");
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("route is not registered in local policy")
+        );
     }
 
     #[test]
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
-        let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair.clone(),
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-tool-scope",
@@ -1158,8 +1208,12 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
-        let evaluator =
-            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair.clone(),
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-model-scope",
@@ -1216,7 +1270,7 @@ mod tests {
         let signer = Keypair::generate();
         let external_issuer = Keypair::generate();
         let evaluator = RequestEvaluator::new_ephemeral_with_trusted_capability_issuers(
-            vec![],
+            registered_test_routes(),
             signer,
             "test-policy".to_string(),
             vec![external_issuer.public_key()],
@@ -1254,7 +1308,8 @@ mod tests {
             policy: PolicyDecision::DenyByDefault,
         }];
         let evaluator =
-            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string())
+                .with_anonymous_reads(true);
 
         let result = evaluator
             .evaluate(
@@ -1285,7 +1340,8 @@ mod tests {
             policy: PolicyDecision::DenyByDefault,
         }];
         let evaluator =
-            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string())
+                .with_anonymous_reads(true);
 
         let mut headers = HashMap::new();
         headers.insert(
@@ -1321,7 +1377,8 @@ mod tests {
             policy: PolicyDecision::DenyByDefault,
         }];
         let evaluator =
-            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string())
+                .with_anonymous_reads(true);
 
         let mut headers = HashMap::new();
         headers.insert(
@@ -1355,7 +1412,8 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string())
+            .with_anonymous_reads(true);
 
         let decision = evaluator
             .evaluate(
@@ -1443,7 +1501,8 @@ mod tests {
             operation_id: Some("getData".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string())
+            .with_anonymous_reads(true);
 
         let result = evaluator
             .evaluate(
@@ -1462,9 +1521,14 @@ mod tests {
     #[test]
     fn fallback_policy_for_unmatched_route() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(
+            registered_test_routes(),
+            keypair,
+            "test-policy".to_string(),
+        )
+        .with_anonymous_reads(true);
 
-        // GET to unknown route should still be allowed (safe method)
+        // Unknown routes remain denied even with the local read opt-in.
         let result = evaluator
             .evaluate(
                 HttpMethod::Get,
@@ -1475,7 +1539,7 @@ mod tests {
                 0,
             )
             .test_unwrap();
-        assert!(result.verdict.is_allowed());
+        assert!(result.verdict.is_denied());
 
         // DELETE to unknown route should be denied (side-effect method)
         let result = evaluator
@@ -1500,7 +1564,8 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string())
+            .with_anonymous_reads(true);
         let mut headers = HashMap::new();
         headers.insert("X-Chio-Capability".to_string(), "not-json".to_string());
 
@@ -1528,7 +1593,8 @@ mod tests {
             operation_id: Some("search".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string())
+            .with_anonymous_reads(true);
         let mut query_a = HashMap::new();
         query_a.insert("q".to_string(), "cats".to_string());
         let mut query_b = HashMap::new();
@@ -1556,5 +1622,38 @@ mod tests {
             .test_unwrap();
 
         assert_ne!(result_a.receipt.content_hash, result_b.receipt.content_hash);
+    }
+
+    #[test]
+    fn inbound_authority_http_projection_cannot_downgrade_required_proof() {
+        let issuer = Keypair::generate();
+        let mut grant = chio_http_core::http_authority_tool_grant();
+        grant.dpop_required = Some(true);
+        let token = signed_capability_token_json_with_scope(
+            &issuer,
+            "proof-bound-http",
+            ChioScope {
+                grants: vec![grant],
+                ..ChioScope::default()
+            },
+        );
+        let evaluator = RequestEvaluator::new_ephemeral_with_trusted_capability_issuers(
+            registered_test_routes(),
+            Keypair::generate(),
+            "local".into(),
+            vec![issuer.public_key()],
+        );
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::from([("x-chio-capability".into(), token)]),
+                None,
+                0,
+            )
+            .test_unwrap();
+        assert!(matches!(result.verdict, Verdict::Deny { .. }));
+        assert_eq!(result.receipt.capability_id, None);
     }
 }

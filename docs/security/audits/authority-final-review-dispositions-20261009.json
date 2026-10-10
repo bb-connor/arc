@@ -1,0 +1,117 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "observed_utc": "2026-10-09T23:10:50.771349+00:00",
+  "reviewed_source": "7a51be236383a291d3938a026fe285d98b1607d9",
+  "reviewer": "Claude independent read-only F11 lane",
+  "integrator": "codex",
+  "evidence": {
+    "root-f11-authority-review.md": {
+      "sha256": "9152233a92e463c80bbc1c592786b780670050842c8d15e02ec707cf7f134ffb",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f11-authority-review.md"
+    },
+    "root-f11-authority-review-repro.patch": {
+      "sha256": "1dea1185738de3ece265bb0ec2a6acc953d954b2695f5f891ad0800e026084de",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f11-authority-review-repro.patch"
+    },
+    "root-f11-authority-review-repro.log": {
+      "sha256": "b8c33ae21129e3397dac246f7fafe5e414aad3dd7ed4454367e6dc819002ce02",
+      "retained_path": "claude-pr1160-evidence/hammer/root-f11-authority-review-repro.log"
+    }
+  },
+  "diagnostic_reproducer": "Three diagnostic tests pass because each asserts unsafe behavior. This is confirmation, not expected-safe Original RED; repair lane must retain failing safe-behavior controls before implementation.",
+  "findings": [
+    {
+      "label": "F11-REVIEW-P1-1",
+      "reported_priority": "P1",
+      "priority": "P1",
+      "scope": "now",
+      "state": "confirmed-repair-open",
+      "requirement": "An elected former custodian cannot serve or issue with a superseded issuer merely because it still holds the old key.",
+      "remaining_acceptance": [
+        "Expected-safe Original RED at lowest-URL former custodian; current-term authenticated authority evidence gates both reads and issuance; stale health refuses; legitimate recovery remains possible."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P2-1",
+      "reported_priority": "P2",
+      "priority": "P2",
+      "scope": "now",
+      "state": "confirmed-repair-open",
+      "requirement": "A successful nonleader relay cannot displace follower authority confirmed by the elected leader or mark consistent older relays as authority loss.",
+      "remaining_acceptance": [
+        "Three-node current/older relay controls; leader confirmation and healthy admitted status survive successful rounds; genuine conflicts and replay still refuse."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P2-2",
+      "reported_priority": "P2",
+      "priority": "P2",
+      "scope": "now",
+      "state": "confirmed-repair-open",
+      "requirement": "Governance evaluators and local penalty issuance must derive trusted signers from admitted live service authority.",
+      "remaining_acceptance": [
+        "Expected-safe Original RED for expired/stale follower governance; audit remaining raw production status readers; accepted path uses the same admitted status."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P3-1",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "later",
+      "state": "open-followup",
+      "requirement": "Distinguish temporarily busy authority-health inspection from verified authority loss.",
+      "remaining_acceptance": [
+        "Separate health-state refinement with bounded observation freshness; no stale health success substituted for unknown authority."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P3-2",
+      "reported_priority": "P3",
+      "priority": "P2",
+      "scope": "now",
+      "state": "effect-triage-open",
+      "requirement": "Authenticated authority endpoints must not perform bounded but expensive signature-chain verification on async workers.",
+      "remaining_acceptance": [
+        "Confirm call path, move blocking verification behind bounded cancellation-safe admission where needed, retain authentication before work and deterministic permit lifetime controls."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P3-3",
+      "reported_priority": "P3",
+      "priority": "P2",
+      "scope": "now",
+      "state": "effect-triage-open",
+      "requirement": "Configured authority issue-time skew and the selected owner clock must reach production opens that serve or validate replicated authority.",
+      "remaining_acceptance": [
+        "Inventory startup/service/policy opens; reproduce valid configured-skew restart/read refusal; preserve expiry and owner clock-floor behavior."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P3-4",
+      "reported_priority": "P3",
+      "priority": "P2",
+      "scope": "now",
+      "state": "effect-triage-open",
+      "requirement": "Discovery cannot imply current admitted authority while signing with a revoked local key or nesting a separately read authority generation.",
+      "remaining_acceptance": [
+        "Retired-custodian signing control, require admitted current signing custody or refuse; construct nested discovery from the same admitted status."
+      ]
+    },
+    {
+      "label": "F11-REVIEW-P3-5",
+      "reported_priority": "P3",
+      "priority": "P3",
+      "scope": "later",
+      "state": "coverage-required-minors-open",
+      "requirement": "Add missing negative controls with the required authority repairs; track remaining deterministic-clock cleanup separately.",
+      "remaining_acceptance": [
+        "Required lowest-URL custodian, three-node relay, governance and quorum/term-change controls accompany P1/P2 repairs. Remaining fixture clock cleanup is a separate minor follow-up if no correctness defect is found."
+      ]
+    }
+  ],
+  "prior_component_evidence": "The152 producer passes and test-only correction campaign remain evidence for their selected scenarios, not qualification of the new authority findings.",
+  "repair_owner": "codex helper cluster_recovery, new isolated lane after immutable test-only addendum; Root integration only",
+  "qualification_reopened": true,
+  "merged": false,
+  "hosted_qualified": false
+}

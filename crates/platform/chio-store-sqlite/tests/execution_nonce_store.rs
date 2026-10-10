@@ -1,132 +1,147 @@
-//! Contract tests for `SqliteExecutionNonceStore`.
-//!
-//! Exercises the `ExecutionNonceStore` trait contract plus the durable
-//! replay-prevention guarantees specific to the SQLite backend:
-//!
-//! * `reserve(id)` returns `Ok(true)` on first call, `Ok(false)` on
-//!   replay within the retention window.
-//! * Consumed nonces persist across store reopen so a kernel restart
-//!   does not open a replay window.
-//! * Expiry + retention grace period allows a slot to be recycled only
-//!   after `expires_at` is in the past.
-
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use chio_kernel::ExecutionNonceStore;
+//! Public nonce custody contract with an injected clock and exact signed expiry.
+use chio_kernel::{ExecutionNonceStore, KernelError};
+use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use chio_store_sqlite::SqliteExecutionNonceStore;
-
 use chio_test_support::prelude::*;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+struct TestClock(AtomicU64);
+impl TestClock {
+    fn new() -> Arc<Self> {
+        Arc::new(Self(AtomicU64::new(10_000)))
+    }
+    fn set(&self, seconds: u64) {
+        self.0.store(seconds, Ordering::SeqCst);
+    }
 }
-
-fn now_secs() -> i64 {
-    i64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_expect("time before epoch")
-            .as_secs(),
-    )
-    .test_expect("timestamp fits i64")
+impl Clock for TestClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let seconds = self.0.load(Ordering::SeqCst);
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(seconds)?,
+            MonotonicInstant::from_nanos(
+                seconds
+                    .checked_mul(1_000_000_000)
+                    .ok_or(ClockError::Overflow)?,
+            ),
+        ))
+    }
+}
+fn store(capacity: usize, clock: Arc<TestClock>) -> SqliteExecutionNonceStore {
+    SqliteExecutionNonceStore::open_in_memory_with_clock(capacity, clock).test_expect("store")
 }
 
 #[test]
 fn fresh_nonce_is_reserved() {
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    assert!(store.reserve("nonce-a").test_unwrap());
+    let store = store(4, TestClock::new());
+    assert!(store
+        .reserve_until("nonce-a", 10_030)
+        .test_expect("reserve"));
 }
 
 #[test]
 fn replayed_nonce_is_rejected_within_retention() {
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    // Use try_reserve directly to lock the clock so retention is
-    // guaranteed to still apply on the second call.
-    let now = now_secs();
-    let expires_at = now + 60;
-    assert!(store.try_reserve("nonce-b", now, expires_at).test_unwrap());
-    assert!(!store
-        .try_reserve("nonce-b", now + 1, expires_at)
-        .test_unwrap());
+    let store = store(4, TestClock::new());
+    assert!(store
+        .reserve_until("nonce-b", 10_030)
+        .test_expect("reserve"));
+    assert!(!store.reserve_until("nonce-b", 10_100).test_expect("replay"));
 }
 
 #[test]
 fn expired_row_is_pruned_and_slot_becomes_free() {
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    let now = now_secs();
-    assert!(store.try_reserve("nonce-c", now, now + 10).test_unwrap());
+    let clock = TestClock::new();
+    let store = store(1, clock.clone());
     assert!(store
-        .try_reserve("nonce-c", now + 20, now + 80)
-        .test_unwrap());
+        .reserve_until("nonce-c", 10_010)
+        .test_expect("reserve"));
+    clock.set(10_069);
+    assert!(matches!(
+        store.reserve_until("next", 10_100),
+        Err(KernelError::ExecutionNonceCapacity)
+    ));
+    clock.set(10_070);
+    assert!(store
+        .reserve_until("next", 10_100)
+        .test_expect("reclaimed capacity"));
 }
 
 #[test]
 fn persists_consumed_marker_across_reopen() {
-    let path = unique_db_path("chio-exec-nonce-persist");
-    let now = i64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_expect("time before epoch")
-            .as_secs(),
-    )
-    .test_expect("wall clock fits i64");
-    let expires_at = now.saturating_add(120);
+    let directory = tempfile::tempdir().test_expect("directory");
+    let path = directory.path().join("replay.sqlite");
+    let clock = TestClock::new();
     {
-        let store = SqliteExecutionNonceStore::open(&path).test_unwrap();
-        let now = now_secs();
+        let store =
+            SqliteExecutionNonceStore::open_with_clock(&path, 4, clock.clone()).test_expect("open");
         assert!(store
-            .try_reserve("persistent-id", now, expires_at)
-            .test_unwrap());
-        assert!(store.is_consumed("persistent-id").test_unwrap());
+            .reserve_until("persistent-id", 10_120)
+            .test_expect("reserve"));
+        assert!(store.is_consumed("persistent-id").test_expect("read"));
     }
-    let reopened = SqliteExecutionNonceStore::open(&path).test_unwrap();
-    assert!(reopened.is_consumed("persistent-id").test_unwrap());
-    assert!(!reopened
-        .try_reserve("persistent-id", now, expires_at)
-        .test_unwrap());
-    let _ = std::fs::remove_file(path);
+    let store = SqliteExecutionNonceStore::open_with_clock(&path, 4, clock).test_expect("reopen");
+    assert!(store.is_consumed("persistent-id").test_expect("read"));
+    assert!(!store
+        .reserve_until("persistent-id", 10_120)
+        .test_expect("replay"));
 }
 
 #[test]
-fn expired_consumed_marker_does_not_block_a_validated_nonce() {
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    let now = now_secs();
+fn expired_nonce_is_refused_without_creating_a_marker() {
+    let store = store(1, TestClock::new());
+    assert!(matches!(
+        store.reserve_until("expired", 10_000),
+        Err(KernelError::Clock(ClockError::Expired))
+    ));
+    assert!(!store.is_consumed("expired").test_expect("absent marker"));
     assert!(store
-        .try_reserve("expired-id", now, now.saturating_sub(1))
-        .test_unwrap());
-    assert!(!store.is_consumed("expired-id").test_unwrap());
+        .reserve_until("valid", 10_030)
+        .test_expect("capacity remains"));
 }
 
 #[test]
 fn distinct_ids_each_succeed() {
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    assert!(store.reserve("a").test_unwrap());
-    assert!(store.reserve("b").test_unwrap());
-    assert!(store.reserve("c").test_unwrap());
-    assert!(!store.reserve("a").test_unwrap());
-    assert!(!store.reserve("b").test_unwrap());
+    let store = store(4, TestClock::new());
+    for id in ["a", "b", "c"] {
+        assert!(store.reserve_until(id, 10_030).test_expect("reserve"));
+    }
+    for id in ["a", "b", "c"] {
+        assert!(!store.reserve_until(id, 10_030).test_expect("replay"));
+    }
 }
 
 #[test]
-fn trait_reserve_uses_wall_clock_now() {
-    // Sanity: the trait impl goes through try_reserve with a now
-    // derived from SystemTime, so it should succeed for a fresh id.
-    let store = SqliteExecutionNonceStore::open_in_memory().test_unwrap();
-    assert!(
-        <SqliteExecutionNonceStore as ExecutionNonceStore>::reserve(&store, "trait-path")
-            .test_unwrap()
-    );
+fn owned_rollback_cannot_release_another_attempt() {
+    let store = store(1, TestClock::new());
+    assert!(store
+        .reserve_for_dispatch("a", 10_030, "owner")
+        .test_expect("reserve"));
+    assert!(!store
+        .rollback_dispatch_reservation("a", "other")
+        .test_expect("wrong owner"));
+    assert!(store
+        .rollback_dispatch_reservation("a", "owner")
+        .test_expect("rollback"));
+    assert!(store
+        .reserve_for_dispatch("a", 10_030, "next")
+        .test_expect("retry"));
+    assert!(!store
+        .rollback_dispatch_reservation("a", "owner")
+        .test_expect("old owner"));
 }
 
 #[test]
-fn configured_capacity_denies_new_ids_without_evicting_replay_markers() {
-    let store = SqliteExecutionNonceStore::open_in_memory_with_capacity(1).test_unwrap();
-    let now = now_secs();
-    assert!(store.try_reserve("capacity-a", now, now + 60).test_unwrap());
-    assert!(store.try_reserve("capacity-b", now, now + 60).is_err());
-    assert!(!store.try_reserve("capacity-a", now, now + 60).test_unwrap());
+fn configured_capacity_preserves_live_markers() {
+    let store = store(1, TestClock::new());
+    assert!(store.reserve_until("a", 10_030).test_expect("reserve"));
+    assert!(matches!(
+        store.reserve_until("b", 10_030),
+        Err(KernelError::ExecutionNonceCapacity)
+    ));
+    assert!(!store
+        .reserve_until("a", 10_030)
+        .test_expect("replay retained"));
 }

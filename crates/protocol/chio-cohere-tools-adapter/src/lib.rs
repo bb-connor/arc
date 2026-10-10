@@ -24,6 +24,7 @@ pub mod native;
 pub mod streaming;
 pub mod transport;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -86,12 +87,61 @@ impl CohereAdapterConfig {
 pub struct CohereAdapter {
     config: CohereAdapterConfig,
     transport: Arc<dyn Transport>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl CohereAdapter {
-    /// Build a new adapter from a config and a transport handle.
+    /// Build a projection-only adapter from a config and a transport handle.
+    ///
+    /// Batch lifting remains available for capture compatibility, but emitted
+    /// invocations have no manifest authority and cannot enter the streaming
+    /// evaluator. Use [`Self::new_with_registry`] for execution paths.
     pub fn new(config: CohereAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            admitted_security: None,
+        }
+    }
+
+    /// Build an execution-capable adapter bound to one admitted manifest.
+    pub fn new_with_registry(
+        config: CohereAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, CohereAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| CohereAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(CohereAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(&config.server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| CohereAdapterError::RegistryToolSidecarUnavailable {
+                    server_id: config.server_id.clone(),
+                    tool_name: tool.name.clone(),
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+
+        Ok(Self {
+            config,
+            transport,
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -158,6 +208,14 @@ impl CohereAdapter {
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
         self.ensure_supported_api_version()?;
+        // A body without `stream: true` makes Cohere answer with plain JSON,
+        // which the SSE gate must never be asked to interpret.
+        let request: serde_json::Value = chio_provider_adapter_core::input::json(request_body)?;
+        if request.get("stream").and_then(serde_json::Value::as_bool) != Some(true) {
+            return Err(ProviderError::Malformed(
+                "Cohere chat_stream requires a request body with stream: true".to_string(),
+            ));
+        }
         let body = self.transport.send_chat_stream(request_body).await?;
         self.gate_sse_stream(&body, evaluate)
     }
@@ -185,12 +243,7 @@ impl CohereAdapter {
         self.ensure_supported_api_version()?;
         validate_tool_call(call)?;
         let parsed_args: Value =
-            serde_json::from_str(&call.function.arguments).map_err(|error| {
-                ProviderError::BadToolArgs(format!(
-                    "Cohere tool_call `{}` arguments did not parse as JSON: {error}",
-                    call.function.name
-                ))
-            })?;
+            chio_provider_adapter_core::input::arguments(&call.function.arguments)?;
         if !parsed_args.is_object() {
             return Err(ProviderError::BadToolArgs(format!(
                 "Cohere tool_call `{}` arguments did not parse as a JSON object",
@@ -202,8 +255,19 @@ impl CohereAdapter {
                 "Cohere tool_call args failed canonical JSON encoding: {error}"
             ))
         })?;
+        let bridge_security = match &self.admitted_security {
+            Some(bindings) => {
+                Some(bindings.get(&call.function.name).cloned().ok_or_else(|| {
+                    ProviderError::Malformed(format!(
+                        "admitted security sidecar is missing for Cohere tool `{}`",
+                        call.function.name
+                    ))
+                })?)
+            }
+            None => None,
+        };
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Cohere,
             tool_name: call.function.name.clone(),
             arguments,
@@ -216,6 +280,7 @@ impl CohereAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 
@@ -256,12 +321,23 @@ pub enum CohereAdapterError {
     /// Raised while lifting or lowering a Cohere payload through the kernel.
     #[error(transparent)]
     Provider(#[from] ProviderError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Cohere server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher.
+    #[error("Cohere adapter configuration does not match admitted manifest {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// Every admitted tool must have an exact registry-derived sidecar.
+    #[error("verified manifest registry has no Cohere sidecar for {server_id}/{tool_name}")]
+    RegistryToolSidecarUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallBlock>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("Cohere /v2/chat payload was not JSON: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = chio_provider_adapter_core::response_body(value, "Cohere /v2/chat")?;
     extract_tool_calls(&body)
 }
@@ -277,9 +353,8 @@ fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallBlock>, ProviderError>
     };
     let mut calls = Vec::with_capacity(array.len());
     for entry in array {
-        let parsed: ToolCallBlock = serde_json::from_value(entry.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Cohere tool_call block was malformed: {error}"))
-        })?;
+        let parsed: ToolCallBlock =
+            chio_provider_adapter_core::input::typed(entry.clone()).map_err(ProviderError::from)?;
         calls.push(parsed);
     }
     Ok(calls)
@@ -298,9 +373,7 @@ fn validate_tool_call(call: &ToolCallBlock) -> Result<(), ProviderError> {
 }
 
 fn parse_value(bytes: &[u8]) -> Result<Value, ProviderError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(bytes).map_err(ProviderError::from)
 }
 
 fn apply_redactions(
@@ -505,6 +578,28 @@ mod tests {
             .expect_err("drifted Cohere API version must fail before transport");
 
         assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_stream_requires_a_streaming_request_before_transport_call() {
+        let mock = Arc::new(transport::MockTransport::new());
+        let adapter = CohereAdapter::new(config(), mock.clone());
+        for body in [
+            &b"{\"model\":\"command-r\"}"[..],
+            b"{\"stream\":false}",
+            b"not json",
+        ] {
+            let result = adapter
+                .chat_stream(body, |_invocation| {
+                    Ok(VerdictResult::Allow {
+                        redactions: vec![],
+                        receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_stream".to_string()),
+                    })
+                })
+                .await;
+            assert!(result.is_err(), "non-streaming body must be refused");
+        }
         assert!(mock.calls().is_empty());
     }
 
@@ -769,12 +864,7 @@ mod tests {
     async fn chat_propagates_upstream_status_error() {
         let cfg = config();
         let mock = transport::MockTransport::new();
-        mock.push_error(
-            chio_provider_adapter_core::http::HttpTransportError::Status {
-                code: 503,
-                body: "service unavailable".to_string(),
-            },
-        );
+        mock.push_error(chio_provider_adapter_core::http::HttpTransportError::Status { code: 503 });
         let adapter = CohereAdapter::new(cfg, Arc::new(mock));
         let err = adapter.chat(b"{}").await.unwrap_err();
         assert!(matches!(

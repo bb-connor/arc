@@ -1,3 +1,8 @@
+#![allow(
+    clippy::panic,
+    reason = "This feature-gated test support deliberately rejects malformed fixture identifiers."
+)]
+
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
@@ -59,6 +64,128 @@ pub fn returned_value(
     Ok((blob, outcome))
 }
 
+/// Construct record data for a canonical adversarial candidate. Physical
+/// mutation still requires its original captured operation and real lease.
+pub fn record_returned_blob(
+    operation: &AdmissionOperationV1,
+    blob: &CanonicalInvocationBlobV1,
+    recording_fence: StoreMutationFence,
+    recorded_at_unix_ms: u64,
+) -> Result<ToolOutcomeRecordV1, ToolOutcomeError> {
+    let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
+    ToolOutcomeRecordV1::record_tool_returned(
+        operation,
+        &raw,
+        blob,
+        recording_fence,
+        recorded_at_unix_ms,
+    )
+}
+
+/// Exact fixture inputs, not native capture or release authority.
+pub struct NativeReturnedValueContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub security_context: &'a crate::SecurityInvocationContext,
+    pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    pub receipt_signing_public_key: chio_core::PublicKey,
+    pub receipt_crypto_floor: chio_core::receipt::crypto_floor::ReceiptCryptoFloor,
+}
+
+/// Build native return data for physical journal tests. This bypasses connector
+/// execution, not native capture, and is compiled only as test support.
+pub fn native_returned_value(
+    operation: &AdmissionOperationV1,
+    recording_fence: StoreMutationFence,
+    recorded_at_unix_ms: u64,
+    input: NativeReturnedValueContext<'_>,
+    value: Value,
+) -> Result<(CanonicalInvocationBlobV1, ToolOutcomeRecordV1), ToolOutcomeError> {
+    let NativeReturnedValueContext {
+        request,
+        security_context: context,
+        ledger,
+        receipt_signing_public_key,
+        receipt_crypto_floor,
+    } = input;
+    let live =
+        crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
+            request, context,
+        )
+        .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+    let original = crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_ledger(
+        ledger, context,
+    )
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?
+    .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
+    if live != original || operation.native_dispatch_ledger_digest() != Some(&ledger.record_digest)
+    {
+        return Err(ToolOutcomeError::Binding("test_support.original_dispatch"));
+    }
+    let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?
+        .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
+    let (blob, _) = returned_value(
+        operation,
+        recording_fence.clone(),
+        recorded_at_unix_ms,
+        value,
+        None,
+    )?;
+    let mut raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?.to_persisted();
+    raw.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA.into();
+    raw.tool_server = identifier(&request.server_id);
+    raw.tool_name = identifier(&request.tool_name);
+    let retained = crate::admission_operation::RetainedToolAdmissionRequestV1::request_without_transient_credentials(request);
+    raw.request_canonical_json = Some(
+        String::from_utf8(
+            canonical_json_bytes(&retained)
+                .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        )
+        .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+    );
+    raw.security_invocation_context = Some(context.clone());
+    raw.security_release_required = Some(true);
+    let raw = RawInvocationOutcomeV1::from_persisted(raw)?
+        .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
+            receipt_signing_public_key,
+            receipt_crypto_floor,
+        )?)?
+        .with_original_security_dispatch_binding(Some(Box::new(original)))?;
+    let blob = raw.canonical_blob()?;
+    let outcome = ToolOutcomeRecordV1::record_tool_returned(
+        operation,
+        &raw,
+        &blob,
+        recording_fence,
+        recorded_at_unix_ms,
+    )?;
+    Ok((blob, outcome))
+}
+
+/// Inspect resolved test artifacts through the real payload binding validator.
+/// This constructs no lifecycle owner, release acknowledgement or execution
+/// permit. The borrowed context cannot escape the callback.
+pub fn with_security_release_output<T>(
+    operation: &AdmissionOperationV1,
+    raw: &RawInvocationOutcomeV1,
+    outcome: &ToolOutcomeRecordV1,
+    evaluation: &PostReturnEvaluationRecordV1,
+    output: &crate::ToolCallOutput,
+    inspect: impl FnOnce(&DurableSecurityReleaseContext<'_>) -> T,
+) -> Result<T, ToolOutcomeError> {
+    let preimage = crate::receipt_support::receipt_content_for_output(Some(output), None)
+        .map_err(|_| ToolOutcomeError::Binding("test_support.output"))?
+        .canonical_content;
+    SecurityReleaseArtifacts {
+        operation,
+        raw,
+        outcome,
+        evaluation,
+        output,
+        resolved_output: &preimage,
+    }
+    .inspect_for_test(inspect)
+}
+
 pub fn prepared_evaluation(
     operation: &AdmissionOperationV1,
     outcome: &ToolOutcomeRecordV1,
@@ -87,6 +214,26 @@ pub fn prepared_evaluation(
                 },
             },
         ],
+        trusted_time_unix_ms,
+        PostReturnNormalizedRequestContextV1::from_verified_normalization(json!({
+            "request": "normalized"
+        }))?,
+    )
+}
+
+pub fn prepared_pure_evaluation(
+    operation: &AdmissionOperationV1,
+    outcome: &ToolOutcomeRecordV1,
+    trusted_time_unix_ms: u64,
+) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeError> {
+    let mut steps = prepared_evaluation(operation, outcome, trusted_time_unix_ms)?.frozen_steps;
+    for step in &mut steps {
+        step.mode = EvaluationModeV1::Pure;
+    }
+    PostReturnEvaluationRecordV1::prepare(
+        operation,
+        outcome,
+        steps,
         trusted_time_unix_ms,
         PostReturnNormalizedRequestContextV1::from_verified_normalization(json!({
             "request": "normalized"
@@ -159,10 +306,32 @@ pub fn resolve_with_blob(
     ),
     ToolOutcomeError,
 > {
+    resolve_output_with_blob(
+        outcome,
+        evaluation,
+        settlement_disposition,
+        &crate::ToolCallOutput::Value(json!({"allowed": true})),
+    )
+}
+
+pub fn resolve_output_with_blob(
+    outcome: &ToolOutcomeRecordV1,
+    evaluation: &PostReturnEvaluationRecordV1,
+    settlement_disposition: SettlementDispositionV1,
+    output: &crate::ToolCallOutput,
+) -> Result<
+    (
+        PostReturnEvaluationRecordV1,
+        ToolOutcomeRecordV1,
+        CanonicalResolvedOutputBlobV1,
+    ),
+    ToolOutcomeError,
+> {
+    let content = crate::receipt_support::receipt_content_for_output(Some(output), None)
+        .map_err(|_| ToolOutcomeError::Binding("test_support.output"))?;
     let (resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
         evaluation,
-        canonical_json_bytes(&json!({"allowed": true}))
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        content.canonical_content,
         digest("test-output-guard-decision"),
         digest("test-pricing-verdict"),
         settlement_disposition,

@@ -6,15 +6,19 @@ pub(crate) async fn handle_local_reputation(
     Query(query): Query<LocalReputationQuery>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if state.config.receipt_db_path.is_none() {
+    let Some(receipt_store) = state.receipt_store.as_deref() else {
         return plain_http_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "trust service is missing receipt_db_path for local reputation queries",
         );
-    }
+    };
 
     let read_context = ReceiptReadContext::admin_service();
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -28,9 +32,9 @@ pub(crate) async fn handle_local_reputation(
             );
         }
     };
-    match issuance::inspect_local_reputation_with_read_context(
+    match issuance::inspect_local_reputation_with_store(
         &subject_key,
-        state.config.receipt_db_path.as_deref(),
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         query.since,
         query.until,
@@ -39,22 +43,17 @@ pub(crate) async fn handle_local_reputation(
         &read_context,
     ) {
         Ok(mut inspection) => {
-            if let Some(receipt_db_path) = state.config.receipt_db_path.as_deref() {
-                match reputation::build_imported_trust_report(
-                    receipt_db_path,
-                    &inspection.subject_key,
-                    inspection.since,
-                    inspection.until,
-                    unix_timestamp_now(),
-                    &inspection.scoring,
-                ) {
-                    Ok(report) => inspection.imported_trust = Some(report),
-                    Err(error) => {
-                        return plain_http_error(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            &error.to_string(),
-                        );
-                    }
+            match reputation::build_imported_trust_report(
+                receipt_store,
+                &inspection.subject_key,
+                inspection.since,
+                inspection.until,
+                clock_now,
+                &inspection.scoring,
+            ) {
+                Ok(report) => inspection.imported_trust = Some(report),
+                Err(error) => {
+                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
                 }
             }
             Json(inspection).into_response()
@@ -69,15 +68,19 @@ pub(crate) async fn handle_reputation_compare(
     headers: HeaderMap,
     Json(request): Json<ReputationCompareRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if state.config.receipt_db_path.is_none() {
+    let Some(receipt_store) = state.receipt_store.as_deref() else {
         return plain_http_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "trust service is missing receipt_db_path for reputation compare queries",
         );
-    }
+    };
 
     let read_context = ReceiptReadContext::admin_service();
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -91,9 +94,9 @@ pub(crate) async fn handle_reputation_compare(
             );
         }
     };
-    let local = match issuance::inspect_local_reputation_with_read_context(
+    let local = match issuance::inspect_local_reputation_with_store(
         &subject_key,
-        state.config.receipt_db_path.as_deref(),
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         request.since,
         request.until,
@@ -106,48 +109,39 @@ pub(crate) async fn handle_reputation_compare(
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
-    let shared_evidence = {
-        let store = match open_receipt_store(&state.config) {
-            Ok(store) => store,
-            Err(response) => return response,
-        };
-        match store.query_shared_evidence_report(&SharedEvidenceQuery {
-            agent_subject: Some(local.subject_key.clone()),
-            since: request.since,
-            until: request.until,
-            read_context: Some(chio_kernel::ReceiptReadContext::admin_service()),
-            ..SharedEvidenceQuery::default()
-        }) {
-            Ok(report) => report,
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-            }
+    let shared_evidence = match receipt_store.query_shared_evidence_report(&SharedEvidenceQuery {
+        agent_subject: Some(local.subject_key.clone()),
+        since: request.since,
+        until: request.until,
+        read_context: Some(chio_kernel::ReceiptReadContext::admin_service()),
+        ..SharedEvidenceQuery::default()
+    }) {
+        Ok(report) => report,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
-    let imported_trust = match state.config.receipt_db_path.as_deref() {
-        Some(receipt_db_path) => match reputation::build_imported_trust_report(
-            receipt_db_path,
-            &local.subject_key,
-            local.since,
-            local.until,
-            unix_timestamp_now(),
-            &local.scoring,
-        ) {
-            Ok(report) => Some(report),
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-            }
-        },
-        None => None,
+    let imported_trust = match reputation::build_imported_trust_report(
+        receipt_store,
+        &local.subject_key,
+        local.since,
+        local.until,
+        clock_now,
+        &local.scoring,
+    ) {
+        Ok(report) => Some(report),
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
     };
     match reputation::build_reputation_comparison(
         local,
         &request.passport,
         request.verifier_policy.as_ref(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0),
+        match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        },
         shared_evidence,
         imported_trust,
     ) {
@@ -168,6 +162,7 @@ pub(crate) async fn handle_issue_portable_reputation_summary(
     }
     match service_runtime::reputation::issue_signed_portable_reputation_summary(
         &state.config,
+        state.receipt_store.as_deref(),
         &request,
     ) {
         Ok(artifact) => Json(artifact).into_response(),

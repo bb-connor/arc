@@ -21,11 +21,10 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
-use super::bedrock::classify_status_error;
 use super::http_egress;
 use super::{ExternalGuard, ExternalGuardError, GuardCallContext};
 
@@ -73,7 +72,7 @@ impl AzureCategory {
 #[derive(Clone)]
 pub struct AzureContentSafetyConfig {
     /// Content Safety API key (`Ocp-Apim-Subscription-Key` header).
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Content Safety endpoint (e.g.
     /// `https://<region>.api.cognitive.microsoft.com`).
     pub endpoint: String,
@@ -107,7 +106,7 @@ impl AzureContentSafetyConfig {
     /// Construct a minimal config with defaults.
     pub fn new(api_key: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             endpoint: endpoint.into(),
             api_version: DEFAULT_API_VERSION.to_string(),
             timeout: DEFAULT_TIMEOUT,
@@ -148,15 +147,13 @@ struct AnalyzeRequest<'a> {
 
 #[derive(Debug, Clone, Deserialize)]
 struct AnalyzeResponse {
-    #[serde(default, rename = "categoriesAnalysis")]
+    #[serde(rename = "categoriesAnalysis")]
     categories_analysis: Vec<CategoryResult>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct CategoryResult {
-    #[serde(default)]
     category: String,
-    #[serde(default)]
     severity: u32,
 }
 
@@ -272,7 +269,7 @@ impl ExternalGuard for AzureContentSafetyGuard {
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(
             "Ocp-Apim-Subscription-Key",
-            HeaderValue::from_str(self.cfg.api_key.as_str())
+            HeaderValue::from_str(self.cfg.api_key.expose_secret())
                 .map_err(|e| ExternalGuardError::Permanent(format!("invalid api key: {e}")))?,
         );
 
@@ -283,17 +280,29 @@ impl ExternalGuard for AzureContentSafetyGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
+        let parsed: AnalyzeResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
-        if !status.is_success() {
-            return Err(classify_status_error("azure-content-safety", status, &text));
+        let expected = body
+            .categories
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        let actual = parsed
+            .categories_analysis
+            .iter()
+            .map(|entry| entry.category.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        if actual != expected
+            || actual.len() != parsed.categories_analysis.len()
+            || parsed
+                .categories_analysis
+                .iter()
+                .any(|entry| entry.severity > 6)
+        {
+            return Err(ExternalGuardError::Permanent(
+                "incomplete or invalid Azure category verdicts".into(),
+            ));
         }
-
-        let parsed: AnalyzeResponse = serde_json::from_str(&text).map_err(|e| {
-            ExternalGuardError::Transient(format!("parse azure content safety response: {e}"))
-        })?;
-
         let mut max_severity = 0_u32;
         for entry in &parsed.categories_analysis {
             if entry.severity > max_severity {

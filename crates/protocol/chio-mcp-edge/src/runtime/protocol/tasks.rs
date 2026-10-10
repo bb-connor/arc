@@ -4,14 +4,6 @@ use super::*;
 pub(in crate::runtime) struct RequestedTask {
     pub(in crate::runtime) ttl: Option<u64>,
 }
-pub(in crate::runtime) fn iso8601_now() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
-}
-
-pub(in crate::runtime) fn unix_now_millis() -> u64 {
-    Utc::now().timestamp_millis().max(0) as u64
-}
-
 pub(in crate::runtime) fn parse_requested_task(
     id: &Value,
     params: &Value,

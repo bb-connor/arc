@@ -1,0 +1,280 @@
+{
+  "schema": "chio.pr1160.required-ci-replacement.v1",
+  "observed_utc": "2026-10-10T21:54:45.632809+00:00",
+  "published_candidate": "ddb7cad0068633acdbf0e7b016d1b313f37571fd",
+  "composed_source": "bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a",
+  "components": {
+    "CI-FIPS-WIRE-INVENTORY": {
+      "commit": "d0ea4b2b81e231777cdb2862865d762b3d23e4cd",
+      "requirement": "Exact FIPS inventory must enroll all selected wire controls.",
+      "files": {
+        ".github/workflows/chio-tee-fips.yml": "9cc3d9d2613279f170b0f3e44b35d2babf0dccc2343ee4dbce8059e922e70a0e",
+        "scripts/check-security-ci-contract.py": "07d5897d528245f8aef7925c462a7de97cf084fb6e0e148b97106d8fbd300c58"
+      },
+      "original": "Hosted job114285760407:18 tests passed but exact17-name inventory refused the existing new control.",
+      "local": "18 real wire tests, two wasm builds, owning strict lint, exact checker, full security contract mutation suite passed.",
+      "review": "Claude LAND19:52 and full mutation PASS19:58"
+    },
+    "CI-ADAPTER-INVENTORY": {
+      "commit": "53091665f3189754a378ea535f0c47877076ae8b",
+      "requirement": "Exact flow inventory must enroll existing tripwire argument controls.",
+      "files": {
+        "scripts/check-flow-security.sh": "822e86a42aebccbe4f4f70ccd01eae791397fbb2a11f6556685d51d43ce4a0ad",
+        "scripts/tests/check-flow-security.test.sh": "08087f974e30e66479ece15a0d682464a20a3c544f496ba0cfe6e2225858034e"
+      },
+      "original": "Hosted job114288638934:49 tests passed but exact34-name inventory refused15 controls.",
+      "local": "Original checker RED and repaired49-name checker GREEN against real hosted output;69 inventory selftest passed.",
+      "review": "Claude LAND19:54"
+    },
+    "CI-NATIVE-RECOVERY-EVIDENCE": {
+      "commit": "7a3c25adce8ad3c220402ef3fcf86ea16c535ff3",
+      "requirement": "Persist bounded redacted failed-profile evidence before preserving the original failure assertion.",
+      "files": {
+        "examples/mini-swe-recovery/qualify_native.py": "2d442eb285cbaa996a222bca80d7a36e8600edb2e88e0de20511df2279db9a48"
+      },
+      "original": "Original acceptance check refused three absent failed-profile artifacts.",
+      "local": "Repaired fake-host acceptance passed including1MiB cap, redaction, unchanged assertion and unchanged success artifacts; Ruff check/format96 files passed. Native recovery runtime failure remains open.",
+      "review": "Claude reviewed minimal producer; Root reviewed exact composition"
+    },
+    "CI-DECEPTION-INVENTORY": {
+      "commit": "09d2374252bc56d5c1e9bf0d115c38f2b54f50a7",
+      "requirement": "Enroll the15 existing tripwire argument controls selected by the deception filter, including their child module.",
+      "files": {
+        "scripts/check-deception-security.sh": "39bffa6bcc280f3225a464f3f3fe4622c2c5ccbbb42e208b96124b251e818eb4",
+        "scripts/tests/check-deception-security.test.sh": "dddfa8abeee477f2647b9091c6d5dfbe4d500fac414cfd51731c01e1ada434c3"
+      },
+      "original": "New owning selftest rejects Original gate inventory.",
+      "local": "Repaired selftest passed12 inventories/100 controls. Filtered synthesized hosted summary is diagnostic only, not a Rust execution result.",
+      "review": "Claude producer reviewed; Root reviewed exact composition"
+    },
+    "CI-LATENT-INVENTORIES": {
+      "commit": "8409219103c9cc610fdab9cf6c138090a6254a68",
+      "requirement": "Enroll three existing caller tests and retain all five broker controls under their actual selectors.",
+      "files": {
+        "scripts/check-authenticated-caller-delivery.sh": "ff543d19a0712704c6230b2ce2970ff975bfb2ad065ef3a52ed2ae1d4ae7973d",
+        "scripts/check-secret-broker-boundary.sh": "8e5eeab80e34c5eae1b6b72270bd63013c9c4bc17b845412a73d94fe6b162c80",
+        "scripts/tests/check-secret-broker-boundary.test.py": "a21db3d1b8945b4376b7bb0de9e0c40b0b5689d309efdabefcf2cc00a94edfb7"
+      },
+      "original": "Real compiled caller binary lists22 versus Original19; new broker probes fail twice against Original.",
+      "local": "Caller22-name exact list and four broker regression probes pass; broker release coverage remains fixture/source checks, not a new native release run.",
+      "review": "Claude LAND20:47"
+    },
+    "CI-MSRV-CLUSTER-HEALTH": {
+      "commit": "a599e4ffe697225635652e65a97630d8c8c7121c",
+      "requirement": "Preserve late-leader budget snapshot replay while explicitly asserting unavailable authority without signing custody.",
+      "files": {
+        "crates/products/chio-cli/tests/trust_cluster.rs": "df362f622a7d593da06bc67acca5c3b9bfe774bca63d6cc1e7e3792399f8002d"
+      },
+      "original": "Three focused runs at d0ea each failed waiting for late-node healthy authority. Source identical to ddb7.",
+      "local": "Three focused passes; complete owning binary8passed/0failed/3pre-existingignored; strict owning target Clippy passed; unchanged source throughout.",
+      "review": "Claude LAND2026-10-10T21:29:15Z, exactdf362f622a7d",
+      "scope": "Native aarch64 Rust1.95 local qualification; does not substitute for hosted MSRV."
+    },
+    "CI-STORE-INVENTORIES": {
+      "commit": "bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a",
+      "requirement": "Enroll all existing durable clock, native retention/session and lineage controls; compile the three required image observer controls with their owning feature.",
+      "files": {
+        "scripts/check-authenticated-caller-delivery.sh": "bac9a19979e83003e5e686edab99df1dc1673d6614589fa0aad8dc76b4649205",
+        "scripts/check-flow-security.sh": "cbbcbb0b6a61ef3385f96acb6277fbf0af8d89a830460fa31facfb9e8ef8a639",
+        "scripts/tests/check-flow-security.test.sh": "eab0d1e65cd2c6be729f25771c13c79571c1f6c4990f7d7081b7a5682c7189f1"
+      },
+      "original": "Three compiled list checks refused Original inventories:9vs11,117vs137withoutfeature,12vs17. No Original runtime failure is claimed.",
+      "local": "Actual feature-enabled list exactly140, all3image observer runtime controls, caller ledger11 and native authority17 pass. Flow selftest69inventories includes required-feature deletion refusal. Full security CI contract passes.",
+      "review": "Claude LAND2026-10-10T21:44:34Z conditioned on140actual and3imagePASS; conditions verified.",
+      "scope": "Inventory enrollment and test compilation feature only. Full140native flow controls were listed, not run; no new formal or release execution."
+    }
+  },
+  "hosted_required": {
+    "run": 38076931064,
+    "Build/lint/test": {
+      "job": 114285760329,
+      "state": "in_progress"
+    },
+    "MSRV": {
+      "job": 114285760132,
+      "state": "failure",
+      "cause": "Original fixture required healthy authority from an elected node without signing custody. Repair explicitly verifies HTTP503 with unavailable authority and preserves independent budget replay; locally qualified a599e4ffe6."
+    },
+    "Cargo Vet": {
+      "job": 114285760333,
+      "state": "success"
+    },
+    "Cargo Deny": {
+      "job": 114285760294,
+      "state": "success"
+    }
+  },
+  "evidence": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/fips-component.json",
+      "sha256": "dcd790b6dfa92a3cfeedb85e8f4691f67442057c3d462ba88b3b2073a4b53bfe"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/adapter-component.json",
+      "sha256": "be813a97f262f56da2d0366d556ef8a88e130c80209b7ee01b65c1ba465bb8df"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/native-evidence-component.json",
+      "sha256": "d6ebed4f63e1363593f80fa6b486148831aad3dcbce173f364628b6a8b7aa1ac"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/deception-component.json",
+      "sha256": "94acdf1b87b0db260a0a995a012f8d0eb28dc5b97b4512198d66e06b70a86603"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/latent-inventories-component.json",
+      "sha256": "acd8a14a56b82841dbfa65a3a4b1f3f4520b0b8b24c475a5ff9297c5e5c6ea75"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/workspace-build-v1/summary.json",
+      "sha256": "55f9fc5b9792b76c27ad501cfade286c50c7b06f99fdd6405c45a1ad1e9d9a76"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/workspace-lib-tests-v1/cancellation-ruling.json",
+      "sha256": "2d29d6aadd8f540b99252a5ae6c85ba6ff5919555f4650d8c9bcb21b70235540"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/trust-cluster-repro-v1/summary.json",
+      "sha256": "bebd454bd7508b00b7edc888d716c0089bc6e4ab61eaa09a1df023d50f35e1d4"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/thread-source-pins-current.json",
+      "sha256": "b18dfdc56c80f3a77cb0888e05ee21a80cdf4a09b6dadba329dde5d28d5acbe3"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-fixture-component.json",
+      "sha256": "6b2a6bac2cd356675612ee2a04c1ed01c855a30c382bb2caf4af6424a479ce94"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-fixture-preservation.json",
+      "sha256": "e1e1e512fa4c0515466825e97e17e5a446245a4f0ccf922e873c06ce76664d56"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/trust-cluster-green-v1/summary.json",
+      "sha256": "7734661f04ea4ca32e7d98a1eba0d1888c678fcfd9b3d9bbdf5221496a7c7450"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/store-inventories-component.json",
+      "sha256": "7c426318ef89171e344f1e93d0f6351a2256f8d84dd4c7486d34cb05e793f3fd"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/store-inventories-original.json",
+      "sha256": "06e70c9c7ca43b0d6e104a8946739c9d25ce118c795e7692b5a436228ebf9dee"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/store-feature-list-verified.json",
+      "sha256": "4a86870bc157875adc6246d9cee71242d33f73290f0d3510c1abaaaed1617a19"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/store-inventory-development.json",
+      "sha256": "d5d9266efcc4d840255e5fe579465e4cf8e8e3d0a610d7d2d205b42fe0aa3651"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/store-inventories-green-v1/summary.json",
+      "sha256": "c11d7ff5769dd0bc840f5f39c7ae0e53bc2ce779a2b77c0f695462c8dcda9e3d"
+    }
+  ],
+  "local_workspace": {
+    "build": "d0ea native aarch64 locked workspace build passed in13m36s",
+    "library_tests": "CANCELLED/INCOMPLETE to prioritize required MSRV failure.31 completed targets1450 passed/0 failed/4 ignored. No full-workspace pass.",
+    "msrv_reproduction": "Three native aarch64 focused executions at d0ea failed on the same late-node health wait. Original test source unchanged from ddb7; not an MSRV toolchain run."
+  },
+  "post_merge": [
+    "stale d0496c controller/enterprise authorization and older definition pin",
+    "missing CHIO_COMMITTED_LINUX_EVIDENCE_SHA",
+    "KANI-PROOF-QUAL open and unproved; ddb7 job114285760316 timed out1800s without verdict",
+    "cold-state readiness open P1; no preview/release readiness claim"
+  ],
+  "other_failures": {
+    "114295424603": "Classified unresolved operational failure: native dispatch policy deadline exhausted during retain/capture under a10000ms fixture fence. Replay-only control succeeds; fence crossing refuses fail-closed. Hosted latency cause unmeasured. Evidence patch improves diagnosis, not runtime closure. Independent Claude classification review2026-10-10T21:38:13Z.",
+    "114300979876": "Dependent aggregate of114295424603",
+    "38076930715": "Intentionally cancelled standalone proof workflow; no proof pass"
+  },
+  "qualification": {
+    "replacement_published": false,
+    "four_required_green": false,
+    "unclassified_failures": false,
+    "merged": false,
+    "release_ready": false,
+    "merge_authorization": "Wait for explicit new Connor go-ahead after exact-head readiness report.",
+    "failure_classification_scope": "All observed terminal failures classified; required Build still in progress and every later result must be triaged."
+  },
+  "review_threads": {
+    "observed_utc": "2026-10-10T21:25:19Z",
+    "head": "ddb7cad0068633acdbf0e7b016d1b313f37571fd",
+    "total": 65,
+    "unresolved": 33,
+    "unresolved_with_latest_external_reply": 0,
+    "scope": "Answered threads are not automatically resolved. Existing dispositions and source pins preserved.",
+    "evidence_sha256": "d9b263c9f9bfd9840689b7bd34da19f1e62d298f09fd1c86314b292649e8bf44"
+  },
+  "composed_security_ci_contract": {
+    "status": "pass",
+    "source": "a599e4ffe697225635652e65a97630d8c8c7121c",
+    "command": [
+      "python3",
+      "scripts/check-security-ci-contract.py"
+    ],
+    "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+  },
+  "native_diagnostic_scope": "Run2 at ddb7 plus pinned test-only controls: local aarch64 debug resolve396ms, retain4171ms, store873ms, resolve-to-capture5441ms, whole evaluation15656ms. Five selected tests passed: four diagnostic controls plus one existing scheduler test. Exact source/environment retained in manifest; no hosted timing or runtime repair claim. Run1 earlier source not retained byte-exact; run3notcited.",
+  "native_diagnostic_provenance": {
+    "directory": "/home/connor/lanes/claude-pr1160-evidence/native-repro",
+    "verified": {
+      "manifest.txt": "f54439cf46fe8f364b53b593b0a7b476cf25116b20ea948f92b737d076ae7453",
+      "report.md": "4670a80c3dbc32dd8d115756f238a969148e064048125554a5cd03ca4e817659",
+      "control-plane-run1.log": "ec1b94350ccfdb059761902c56e901b7164071cbd4464e1c0934a1eedb1d80b2",
+      "control-plane-run2.log": "10581aa56183ff095adcd92553f1b4a459221a549c729eb1200da4ea50a2d980"
+    },
+    "run2_source_sha256": "ad40671e88a469479f0063c7ad2df1c56cfd7ce7987dc966781437f5b5814661",
+    "preserved_formatted_commit": "c5b97ed1cae976f2ec8a2d73d2cbfc1be4011bcd",
+    "formatted_source_equivalent": true,
+    "run1_source_limitation": "Earlier revision not retained byte-exact; no claim it ran the later source.",
+    "report_scope": "Necessary/sufficient and replay causality claims apply only to these deterministic controls. Hosted latency attribution remains unmeasured.",
+    "integration": "Diagnostic branch preserved; not integrated."
+  },
+  "composed_files": {
+    ".github/workflows/chio-tee-fips.yml": "9cc3d9d2613279f170b0f3e44b35d2babf0dccc2343ee4dbce8059e922e70a0e",
+    "crates/products/chio-cli/tests/trust_cluster.rs": "df362f622a7d593da06bc67acca5c3b9bfe774bca63d6cc1e7e3792399f8002d",
+    "examples/mini-swe-recovery/qualify_native.py": "2d442eb285cbaa996a222bca80d7a36e8600edb2e88e0de20511df2279db9a48",
+    "scripts/check-authenticated-caller-delivery.sh": "bac9a19979e83003e5e686edab99df1dc1673d6614589fa0aad8dc76b4649205",
+    "scripts/check-deception-security.sh": "39bffa6bcc280f3225a464f3f3fe4622c2c5ccbbb42e208b96124b251e818eb4",
+    "scripts/check-flow-security.sh": "cbbcbb0b6a61ef3385f96acb6277fbf0af8d89a830460fa31facfb9e8ef8a639",
+    "scripts/check-secret-broker-boundary.sh": "8e5eeab80e34c5eae1b6b72270bd63013c9c4bc17b845412a73d94fe6b162c80",
+    "scripts/check-security-ci-contract.py": "07d5897d528245f8aef7925c462a7de97cf084fb6e0e148b97106d8fbd300c58",
+    "scripts/tests/check-deception-security.test.sh": "dddfa8abeee477f2647b9091c6d5dfbe4d500fac414cfd51731c01e1ada434c3",
+    "scripts/tests/check-flow-security.test.sh": "eab0d1e65cd2c6be729f25771c13c79571c1f6c4990f7d7081b7a5682c7189f1",
+    "scripts/tests/check-secret-broker-boundary.test.py": "a21db3d1b8945b4376b7bb0de9e0c40b0b5689d309efdabefcf2cc00a94edfb7"
+  },
+  "component_fingerprint_scope": "Each component file fingerprint identifies its own named commit. Overlapping gate files changed again in later components; composed_files pins the final reviewed bytes.",
+  "inventory_audit": {
+    "source": "ddb7cad0068633acdbf0e7b016d1b313f37571fd",
+    "calls": 199,
+    "distinct_compiled_targets": 97,
+    "original_matches": 191,
+    "original_mismatches": 8,
+    "remaining_known_mismatches": 0,
+    "audit_sha256": "94518fc0ed719549413ebf4bfb16d664c7f02a71c7dfa5a3fcb099367b6ae417",
+    "scope": "Actual aarch64 Cargo lists plus source/filter comparison, not execution of199test suites. Original audit suggestion to drop3image names superseded by feature-enabled140 preserving all controls.",
+    "composed_followup": {
+      "source": "a599e4ffe697225635652e65a97630d8c8c7121c",
+      "calls": 200,
+      "matching": 197,
+      "remaining_at_that_source": 3,
+      "all_remaining_repaired_by": "bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a",
+      "audit_sha256": "5e653d2b68443f5975ca5bbccd048cb2c656478442a004d053ce442af01aac61",
+      "scope": "Re-extracted current commands compared to unchanged compiled Rust lists; extra governed broker call included. Root separately verified feature-enabled140 and owning runtime controls."
+    }
+  },
+  "final_composition_review": {
+    "reviewer": "Claude external session",
+    "observed_utc": "2026-10-10T21:52:35Z",
+    "base": "ddb7cad0068633acdbf0e7b016d1b313f37571fd",
+    "head": "bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a",
+    "verdict": "LAND as replacement candidate after original required Build is terminal; not merge authorization",
+    "scope": "11files,+197/-27; component patch identities, overlapping repairs, all8inventory findings, retained no-waiver controls and diagnostic-only native evidence behavior."
+  },
+  "original_required_observed_utc": "2026-10-10T21:54:40.963180+00:00",
+  "snapshot_boundary": "Prepared before the original Build job completes. Its final result and every later failure must be triaged before the single replacement push. This audit records current bounded local acceptance, not hosted qualification.",
+  "push_barrier": "All four original ddb7 required checks terminal, all genuine repairs batched; then one replacement push. No merge without new Connor go-ahead."
+}

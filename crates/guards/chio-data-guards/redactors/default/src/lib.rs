@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Default redactor for `chio:guards/redact@0.1.0`.
 //!
 //! The WIT shape lives in `wit/chio-guards-redact/world.wit`. This

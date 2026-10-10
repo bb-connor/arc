@@ -94,13 +94,13 @@ fn signing_keys() -> LocalAuthoritySigningKeysDocument {
         schema: LOCAL_SIGNING_KEYS_SCHEMA.to_string(),
         lease_authority_seeds: vec![crate::NamedSeedHex {
             id: "did:chio:buyer-kernel".to_string(),
-            seed_hex: hex::encode([11u8; 32]),
+            seed_hex: hex::encode([11u8; 32]).into(),
         }],
         governance_authority_seeds: vec![crate::NamedSeedHex {
             id: "did:chio:buyer-governance".to_string(),
-            seed_hex: hex::encode([12u8; 32]),
+            seed_hex: hex::encode([12u8; 32]).into(),
         }],
-        revocation_authority_seed_hex: hex::encode([13u8; 32]),
+        revocation_authority_seed_hex: hex::encode([13u8; 32]).into(),
     }
 }
 
@@ -536,4 +536,96 @@ fn trust_bundle_assembly_requires_reference_workflow_classes() {
     assert!(error
         .to_string()
         .contains(WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID));
+}
+
+#[test]
+fn authority_readers_reject_duplicate_fields_before_validation() {
+    let json = crate::authority_profile_json(&profile()).expect("profile");
+    let duplicate = json.replacen("{", "{\"schema\":\"duplicate\",", 1);
+    assert!(matches!(
+        crate::authority_profile_from_json(&duplicate),
+        Err(crate::ChioAuthorityError::UntrustedInput(
+            chio_core_types::canonical::UntrustedJsonError::SignedInput(_)
+        ))
+    ));
+}
+
+#[test]
+fn signing_key_custody_is_canonical_zeroizing_and_redacted() {
+    let keys = signing_keys();
+    let encoded = crate::signing_keys_json(&keys).expect("canonical custody");
+    assert_eq!(
+        crate::signing_keys_json(&crate::signing_keys_from_json(&encoded).expect("decode"))
+            .expect("export decoded custody"),
+        encoded
+    );
+    let debug = format!("{keys:?} {:?}", keys.lease_authority_seeds);
+    for seed in [11, 12, 13] {
+        assert!(!debug.contains(&hex::encode([seed; 32])));
+    }
+    let altered = format!(" {}", &*encoded);
+    assert!(matches!(
+        crate::signing_keys_from_json(&altered),
+        Err(crate::ChioAuthorityError::UntrustedInput(
+            chio_core_types::canonical::UntrustedJsonError::NonCanonical
+        ))
+    ));
+}
+
+#[test]
+fn signing_key_custody_roundtrips_long_escaped_ids_and_multiple_seed_sets() {
+    use secrecy::ExposeSecret;
+
+    fn entries(label: &str, first: u8) -> Vec<crate::NamedSeedHex> {
+        (first..first + 6)
+            .map(|seed| crate::NamedSeedHex {
+                id: format!(
+                    "did:chio:{label}:{seed}:{}",
+                    "\"\\\n\u{0001}\u{1f600}".repeat(513)
+                ),
+                seed_hex: hex::encode([seed; 32]).into(),
+            })
+            .collect()
+    }
+    let keys = LocalAuthoritySigningKeysDocument {
+        schema: LOCAL_SIGNING_KEYS_SCHEMA.to_string(),
+        lease_authority_seeds: entries("lease", 21),
+        governance_authority_seeds: entries("governance", 41),
+        revocation_authority_seed_hex: hex::encode([61; 32]).into(),
+    };
+    let encoded = crate::signing_keys_json(&keys).expect("long canonical custody");
+    assert!(encoded.len() > 64 * 1024);
+    assert_eq!(encoded.capacity(), encoded.len());
+    let decoded = crate::signing_keys_from_json(&encoded).expect("decode long custody");
+    for (actual, expected) in decoded
+        .lease_authority_seeds
+        .iter()
+        .zip(&keys.lease_authority_seeds)
+        .chain(
+            decoded
+                .governance_authority_seeds
+                .iter()
+                .zip(&keys.governance_authority_seeds),
+        )
+    {
+        assert_eq!(actual.id, expected.id);
+        assert_eq!(
+            actual.seed_hex.expose_secret(),
+            expected.seed_hex.expose_secret()
+        );
+    }
+    assert_eq!(decoded.lease_authority_seeds.len(), 6);
+    assert_eq!(decoded.governance_authority_seeds.len(), 6);
+    assert_eq!(
+        decoded.revocation_authority_seed_hex.expose_secret(),
+        keys.revocation_authority_seed_hex.expose_secret()
+    );
+    assert_eq!(
+        crate::signing_keys_json(&decoded).expect("re-export long custody"),
+        encoded
+    );
+    let debug = format!("{decoded:?} {:?}", decoded.lease_authority_seeds);
+    for seed in (21..27).chain(41..47).chain(core::iter::once(61)) {
+        assert!(!debug.contains(&hex::encode([seed; 32])));
+    }
 }

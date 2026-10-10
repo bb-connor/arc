@@ -99,8 +99,8 @@ pub struct FinancialReceiptMetadata {
     pub grant_index: u32,
     pub cost_charged: u64,
     pub currency: String,
-    pub budget_remaining: u64,
-    pub budget_total: u64,
+    pub budget_remaining: Option<u64>,
+    pub budget_total: Option<u64>,
     pub delegation_depth: u32,
     pub root_budget_holder: String,
     pub payment_reference: Option<String>,
@@ -111,6 +111,11 @@ pub struct FinancialReceiptMetadata {
 ```
 
 `cost_charged` and `budget_remaining` are in the same minor-unit denomination as `MonetaryAmount.units`. A denial receipt due to budget exhaustion sets `cost_charged` to 0 and populates `attempted_cost` with the cost that would have been charged.
+
+For a capped grant, remaining budget equals the grant ceiling minus cumulative
+committed usage. Both budget fields are explicit `null` values for an uncapped
+grant; omitted fields are invalid. A full-width `u64::MAX` amount is a real cap,
+and an invocation's reserved exposure never substitutes for the grant ceiling.
 
 `settlement_status` uses the canonical receipt-side enum:
 

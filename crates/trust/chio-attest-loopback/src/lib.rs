@@ -419,13 +419,13 @@ pub fn authority_signing_keys_document() -> LocalAuthoritySigningKeysDocument {
         schema: LOCAL_SIGNING_KEYS_SCHEMA.to_string(),
         lease_authority_seeds: vec![NamedSeedHex {
             id: BUYER_KERNEL_ID.to_string(),
-            seed_hex: hex_encode_seed(BUYER_SEED),
+            seed_hex: hex_encode_seed(BUYER_SEED).into(),
         }],
         governance_authority_seeds: vec![NamedSeedHex {
             id: GOVERNANCE_KERNEL_ID.to_string(),
-            seed_hex: hex_encode_seed(GOVERNANCE_SEED),
+            seed_hex: hex_encode_seed(GOVERNANCE_SEED).into(),
         }],
-        revocation_authority_seed_hex: hex_encode_seed(REVOCATION_SEED),
+        revocation_authority_seed_hex: hex_encode_seed(REVOCATION_SEED).into(),
     }
 }
 

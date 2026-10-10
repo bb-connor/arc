@@ -440,7 +440,7 @@ mod tests {
 
     fn signed_frame() -> (Frame, [u8; 32]) {
         let keypair = chio_core::crypto::Keypair::from_seed(&[7u8; 32]);
-        let public_key = *keypair.public_key().as_bytes();
+        let public_key = keypair.public_key_bytes();
         let mut frame = good_frame();
         frame.tenant_sig = format!(
             "ed25519:{}",
@@ -580,7 +580,7 @@ mod tests {
     fn signed_validation_rejects_wrong_key() {
         let (frame, _) = signed_frame();
         let wrong_keypair = chio_core::crypto::Keypair::from_seed(&[8u8; 32]);
-        let wrong_public_key = *wrong_keypair.public_key().as_bytes();
+        let wrong_public_key = wrong_keypair.public_key_bytes();
         let err = validate_signed(&frame, &wrong_public_key).unwrap_err();
         assert!(matches!(err, SchemaError::TenantSigVerification(_)));
     }

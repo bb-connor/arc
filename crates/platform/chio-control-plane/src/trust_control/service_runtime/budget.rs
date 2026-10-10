@@ -4,6 +4,8 @@ use super::*;
 
 #[path = "budget/lifecycle.rs"]
 mod lifecycle;
+#[path = "budget/recovery.rs"]
+mod recovery;
 #[path = "budget/structured.rs"]
 mod structured;
 
@@ -24,8 +26,11 @@ pub fn build_remote_budget_store(
 pub(crate) fn build_shared_remote_budget_store(
     control_url: &str,
     control_token: &str,
+    recovery_fence: chio_kernel::admission_operation::StoreMutationFence,
 ) -> Result<Arc<RemoteBudgetStore>, CliError> {
-    remote_budget_store(control_url, control_token).map(Arc::new)
+    let mut store = remote_budget_store(control_url, control_token)?;
+    store.recovery_fence = Some(recovery_fence);
+    Ok(Arc::new(store))
 }
 
 fn remote_budget_store(
@@ -34,6 +39,7 @@ fn remote_budget_store(
 ) -> Result<RemoteBudgetStore, CliError> {
     Ok(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
+        recovery_fence: None,
         cached_usage: Mutex::new(HashMap::new()),
     })
 }
@@ -155,6 +161,13 @@ fn reject_unsupported_remote_hard_authority(
 }
 
 impl BudgetStore for RemoteBudgetStore {
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<chio_kernel::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.load_retained_budget_hold(hold_id)
+    }
+
     fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
         BudgetGuaranteeLevel::AdvisoryPosthoc
     }
@@ -839,7 +852,7 @@ impl BudgetStore for RemoteBudgetStore {
         );
         let decision = match response.decision {
             BudgetAuthorizeExposureDecision::Authorized => {
-                BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
+                BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
                     hold_id: request.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: request.requested_exposure_units,
@@ -991,7 +1004,7 @@ impl BudgetStore for RemoteBudgetStore {
     ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
         let grant_index_u32 = remote_budget_grant_index(grant_index)?;
         if let Some(cached) = self.cached_entry(capability_id, grant_index) {
-            if cached.cost_authoritative {
+            if cached.observed.is_complete() {
                 cached.record.committed_cost_units()?;
                 return Ok(Some(cached.record));
             }
@@ -1028,38 +1041,8 @@ impl RemoteBudgetStore {
             Err(poisoned) => poisoned.into_inner(),
         };
         let key = (capability_id.to_string(), grant_index);
-        let updated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs() as i64)
-            .unwrap_or(0);
-        let existing_cost_authoritative = cached_usage
-            .get(&key)
-            .is_some_and(|entry| entry.cost_authoritative);
-
         if let Some(existing) = cached_usage.get(&key).map(|entry| &entry.record) {
-            if seq == Some(existing.seq) {
-                // Totals defaulted by a partial response were never observed, so they
-                // cannot conflict with the ones a later response actually carries.
-                let conflicts = invocation_count
-                    .is_some_and(|value| value != existing.invocation_count)
-                    || existing_cost_authoritative
-                        && (total_cost_exposed
-                            .is_some_and(|value| value != existing.total_cost_exposed)
-                            || total_cost_realized_spend
-                                .is_some_and(|value| value != existing.total_cost_realized_spend));
-                if conflicts {
-                    return Err(BudgetStoreError::Invariant(
-                        "remote budget cache replay changed state at the same sequence".to_string(),
-                    ));
-                }
-                let upgrades_costs = !existing_cost_authoritative
-                    && (total_cost_exposed.is_some() || total_cost_realized_spend.is_some());
-                if !upgrades_costs {
-                    existing.committed_cost_units()?;
-                    return Ok(existing.clone());
-                }
-            } else if seq.is_some_and(|seq| seq < existing.seq) || seq.is_none() && existing.seq > 0
-            {
+            if seq.is_some_and(|seq| seq < existing.seq) || seq.is_none() && existing.seq > 0 {
                 existing.committed_cost_units()?;
                 return Ok(existing.clone());
             }
@@ -1068,6 +1051,7 @@ impl RemoteBudgetStore {
         if invocation_count.is_none()
             && total_cost_exposed.is_none()
             && total_cost_realized_spend.is_none()
+            && seq.is_none()
         {
             return Ok(cached_usage
                 .get(&key)
@@ -1076,47 +1060,54 @@ impl RemoteBudgetStore {
                     capability_id: capability_id.to_string(),
                     grant_index: grant_index_u32,
                     invocation_count: 0,
-                    updated_at,
+                    updated_at: 0,
                     seq: 0,
                     total_cost_exposed: 0,
                     total_cost_realized_spend: 0,
                 }));
         }
 
-        let mut projected = cached_usage
-            .get(&key)
-            .map(|entry| entry.record.clone())
-            .unwrap_or(BudgetUsageRecord {
-                capability_id: capability_id.to_string(),
-                grant_index: grant_index_u32,
-                invocation_count: 0,
-                updated_at,
-                seq: seq.unwrap_or(0),
-                total_cost_exposed: 0,
-                total_cost_realized_spend: 0,
-            });
-        if let Some(seq) = seq {
-            projected.seq = seq;
-        }
+        let prior = cached_usage.get(&key);
+        let same_sequence = prior.filter(|entry| seq == Some(entry.record.seq));
+        let (mut projected, mut observed) = match same_sequence {
+            Some(entry) => (entry.record.clone(), entry.observed),
+            None => (
+                BudgetUsageRecord {
+                    capability_id: capability_id.to_string(),
+                    grant_index: grant_index_u32,
+                    invocation_count: 0,
+                    updated_at: 0,
+                    seq: seq.unwrap_or(0),
+                    total_cost_exposed: 0,
+                    total_cost_realized_spend: 0,
+                },
+                BudgetUsageProvenance::default(),
+            ),
+        };
         if let Some(invocation_count) = invocation_count {
             projected.invocation_count = invocation_count;
+            observed.invocation_count = true;
         }
         if let Some(total_cost_exposed) = total_cost_exposed {
             projected.total_cost_exposed = total_cost_exposed;
+            observed.total_cost_exposed = true;
         }
         if let Some(total_cost_realized_spend) = total_cost_realized_spend {
             projected.total_cost_realized_spend = total_cost_realized_spend;
+            observed.total_cost_realized_spend = true;
         }
-        projected.updated_at = updated_at;
+        if same_sequence.is_some_and(|entry| !entry.observed.agrees_with(&entry.record, &projected))
+        {
+            return Err(BudgetStoreError::Invariant(
+                "remote budget cache replay changed state at the same sequence".to_string(),
+            ));
+        }
         projected.committed_cost_units()?;
-        let cost_authoritative = existing_cost_authoritative
-            || total_cost_exposed.is_some()
-            || total_cost_realized_spend.is_some();
         cached_usage.insert(
             key,
             CachedBudgetUsage {
                 record: projected.clone(),
-                cost_authoritative,
+                observed,
             },
         );
         Ok(projected)
@@ -1173,32 +1164,34 @@ impl RemoteBudgetStore {
                     continue;
                 }
                 if usage.seq == existing.record.seq {
-                    // Totals defaulted by a partial response were never observed, so a
-                    // list that carries them upgrades the entry rather than conflicting.
-                    if usage.invocation_count != existing.record.invocation_count
-                        || existing.cost_authoritative
-                            && (usage.total_cost_exposed != existing.record.total_cost_exposed
-                                || usage.total_cost_realized_spend
-                                    != existing.record.total_cost_realized_spend)
+                    if existing.observed.is_complete() && existing.record != *usage
+                        || !existing.observed.agrees_with(&existing.record, usage)
                     {
                         return Err(BudgetStoreError::Invariant(
                             "remote budget cache replay changed state at the same sequence"
                                 .to_string(),
                         ));
                     }
-                    if existing.cost_authoritative {
+                    if existing.observed.is_complete() {
                         continue;
                     }
                 }
             }
-            // List responses always carry both monetary totals.
+            // List responses carry the full durable usage projection.
             merged.insert(
                 key.clone(),
                 CachedBudgetUsage {
                     record: usage.clone(),
-                    cost_authoritative: true,
+                    observed: BudgetUsageProvenance::complete(),
                 },
             );
+        }
+        if merged.iter().any(|(key, entry)| {
+            capability_id.is_none_or(|expected| key.0 == expected) && !entry.observed.is_complete()
+        }) {
+            return Err(BudgetStoreError::Invariant(
+                "remote budget list could not complete a known usage projection".to_string(),
+            ));
         }
         let merged_usages = keyed_usages
             .iter()

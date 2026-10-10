@@ -81,22 +81,58 @@ pub struct PortablePassportEnvelope {
 
 /// The subset of a verified portable passport that callers actually
 /// need downstream. Mirrors [`crate::VerifiedCapability`] in shape.
+/// Only the owning verifier can construct this result. Projections may expose
+/// its values, but cannot be converted back into verification evidence.
+///
+/// ```compile_fail
+/// use chio_kernel_core::VerifiedPassport;
+/// fn forge(bytes: &[u8]) {
+///     let _ = serde_json::from_slice::<VerifiedPassport>(bytes);
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedPassport {
     /// Subject identifier the envelope binds to.
-    pub subject: String,
+    subject: String,
     /// Issuer public key that signed the envelope.
-    pub issuer: PublicKey,
+    issuer: PublicKey,
     /// Unix timestamp the envelope was issued at.
-    pub issued_at: u64,
+    issued_at: u64,
     /// Unix timestamp the envelope expires at.
-    pub expires_at: u64,
+    expires_at: u64,
     /// Clock value at which verification succeeded.
-    pub evaluated_at: u64,
+    evaluated_at: u64,
     /// Canonical-JSON bytes of the authenticated payload (caller may
     /// decode these into the native `AgentPassport` or any other
     /// projection downstream).
-    pub payload_canonical_bytes: Vec<u8>,
+    payload_canonical_bytes: Vec<u8>,
+}
+
+impl VerifiedPassport {
+    #[must_use]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+    #[must_use]
+    pub fn issuer(&self) -> &PublicKey {
+        &self.issuer
+    }
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+    #[must_use]
+    pub fn evaluated_at(&self) -> u64 {
+        self.evaluated_at
+    }
+    #[must_use]
+    pub fn payload_canonical_bytes(&self) -> &[u8] {
+        &self.payload_canonical_bytes
+    }
 }
 
 /// Errors raised by [`verify_passport`].
@@ -141,8 +177,10 @@ pub fn verify_passport(
     authority_keys: &[PublicKey],
     clock: &dyn Clock,
 ) -> Result<VerifiedPassport, VerifyError> {
-    let envelope: PortablePassportEnvelope = serde_json::from_slice(envelope_bytes)
-        .map_err(|error| VerifyError::InvalidEnvelope(error.to_string()))?;
+    let envelope: PortablePassportEnvelope =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(envelope_bytes, 16 * 1024 * 1024)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| VerifyError::InvalidEnvelope(error.to_string()))?;
     verify_parsed_passport(&envelope, authority_keys, clock)
 }
 
@@ -177,7 +215,10 @@ pub fn verify_parsed_passport(
         return Err(VerifyError::InvalidSignature);
     }
 
-    let now = clock.now_unix_secs();
+    let now = clock
+        .unix_millis()
+        .map_err(|error| VerifyError::Internal(error.to_string()))?
+        .as_secs();
     if now < envelope.body.issued_at {
         return Err(VerifyError::NotYetValid);
     }
@@ -214,11 +255,15 @@ mod payload_bytes_hex {
         decode_hex(&hex_str).map_err(serde::de::Error::custom)
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Each masked nibble is in 0..16 and NIBBLES has 16 entries."
+    )]
     fn encode_hex(bytes: &[u8]) -> String {
         let mut out = String::with_capacity(bytes.len() * 2);
         for byte in bytes {
-            let hi = NIBBLES[(byte >> 4) as usize];
-            let lo = NIBBLES[(byte & 0x0f) as usize];
+            let hi = NIBBLES[usize::from(byte >> 4)];
+            let lo = NIBBLES[usize::from(byte & 0x0f)];
             out.push(hi);
             out.push(lo);
         }
@@ -231,12 +276,8 @@ mod payload_bytes_hex {
         }
         let bytes_in = hex_str.as_bytes();
         let mut out = Vec::with_capacity(bytes_in.len() / 2);
-        let mut idx = 0;
-        while idx < bytes_in.len() {
-            let hi = from_hex_nibble(bytes_in[idx])?;
-            let lo = from_hex_nibble(bytes_in[idx + 1])?;
-            out.push((hi << 4) | lo);
-            idx += 2;
+        for [hi, lo] in bytes_in.as_chunks::<2>().0 {
+            out.push((from_hex_nibble(*hi)? << 4) | from_hex_nibble(*lo)?);
         }
         Ok(out)
     }

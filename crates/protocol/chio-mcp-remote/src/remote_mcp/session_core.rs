@@ -1,40 +1,15 @@
+#[cfg(test)]
+use chio_mcp_adapter::edge::ingress::McpInboxReceiver;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::Infallible;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
+use std::sync::{Arc, Mutex as StdMutex, Weak};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
-use chio_core::session::{
-    ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
-    OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
-    SessionId,
-};
-use chio_kernel::operator_report::{
-    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
-    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER,
-    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
-    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER,
-};
-use chio_kernel::{
-    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig, DpopNonceStore,
-    DpopProof, GovernedAuthorizationDetail, GovernedAuthorizationTransactionContext, KernelError,
-    PeerCapabilities, RevocationStore, ToolServerConnection,
-    CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
-    CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
-    CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
-};
-use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
-use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
-use chio_mcp_adapter::server::AdaptedMcpServer;
-use chio_mcp_adapter::transport::StdioMcpTransport;
 use async_stream::stream;
 use axum::extract::{Form, Path as AxumPath, Query, Request, State};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, WWW_AUTHENTICATE};
@@ -45,7 +20,36 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::capability::token::CapabilityToken;
+use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
+use chio_core::session::{
+    ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
+    OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
+    SessionId,
+};
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_kernel::operator_report::{
+    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
+    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
+};
+use chio_kernel::{
+    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig,
+    DpopNonceStore, DpopProof, GovernedAuthorizationDetail,
+    GovernedAuthorizationTransactionContext, KernelError, PeerCapabilities, RevocationStore,
+    ToolServerConnection, CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
+    CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
+    CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
+    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
+};
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
+use chio_mcp_adapter::edge::ingress::{
+    mcp_inbox, AccountedMessage, McpInboxSender, McpRequestGeneration, McpResponseContext,
+};
+use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
+use chio_mcp_adapter::server::AdaptedMcpServer;
+use chio_mcp_adapter::transport::StdioMcpTransport;
+use hmac::{Hmac, Mac};
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
 use reqwest::Client as HttpClient;
@@ -57,25 +61,26 @@ use serde::de::{DeserializeOwned, Deserializer};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{error, info, warn};
 use url::Url;
+use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
+use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority_with_clock;
 use chio_control_plane::trust_control::{
     self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
 };
 use chio_control_plane::{
-    authority_public_key_from_seed_file, build_kernel, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    durable_admission_sidecar_path,
+    authority_public_key_from_seed_file, configure_budget_store, configure_capability_authority,
+    configure_receipt_store, configure_revocation_store, durable_admission_sidecar_path,
     enterprise_federation::{
         EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
     },
-    issue_default_capabilities, load_or_create_authority_keypair,
-    open_durable_admission_runtime, require_control_token, rotate_authority_keypair,
-    validate_distinct_database_paths, validate_durable_admission_participant_paths,
-    DurableAdmissionRuntime,
+    issue_default_capabilities, load_or_create_authority_keypair, open_durable_admission_runtime,
+    require_control_token, rotate_authority_keypair, validate_distinct_database_paths,
+    validate_durable_admission_participant_paths, DurableAdmissionRuntime,
 };
 
 const MCP_ENDPOINT_PATH: &str = "/mcp";
@@ -107,7 +112,6 @@ const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
 const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
 const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
-const DEFAULT_NOTIFICATION_STREAM_IDLE_MILLIS: u64 = 100;
 const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
 const DEFAULT_SHARED_NOTIFICATION_POLL_MILLIS: u64 = 25;
 const DEFAULT_ADMIN_LIST_LIMIT: usize = 50;
@@ -119,7 +123,12 @@ const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
-const REMOTE_SESSION_RESUME_INTEGRITY_LABEL: &[u8] = b"chio.remote_mcp.resume_integrity.v1";
+const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] = b"chio.remote_mcp.resume_record_hmac.v2";
+const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_tombstone_hmac.v2";
+const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_fence_hmac.v2";
+const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str = "chio.remote-mcp.resume-hmac-keyring.v1";
+const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
+const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
 const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
 const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
@@ -132,7 +141,12 @@ type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
+    pub clock: RemoteClock,
     pub listen: SocketAddr,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
+    /// Explicit authenticated proxy trust for TLS and attestation binding evidence.
+    pub trusted_proxy: Option<TrustedProxyConfig>,
     pub auth_token: Option<String>,
     pub auth_jwt_public_key: Option<String>,
     pub auth_jwt_discovery_url: Option<String>,
@@ -146,8 +160,16 @@ pub struct RemoteServeHttpConfig {
     pub auth_jwt_issuer: Option<String>,
     pub auth_jwt_audience: Option<String>,
     pub admin_token: Option<String>,
+    /// Explicit operator principals and activated native approval replay custody.
+    pub approval: Option<RemoteApprovalConfig>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
+    /// Dedicated trust-control bearer used only for remote capability issuance.
+    pub remote_authority_workload_token: Option<String>,
+    /// Exact current capability-authority key expected from trust-control.
+    pub control_authority_public_key: Option<PublicKey>,
+    /// Exact trusted capability-authority key set expected from trust-control.
+    pub control_authority_trusted_public_keys: Vec<PublicKey>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,
@@ -164,11 +186,26 @@ pub struct RemoteServeHttpConfig {
     pub authority_db_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub session_db_path: Option<PathBuf>,
+    /// Dedicated, operator-managed HMAC keyring for durable session records.
+    /// This keyring must remain independent from authority and bearer secrets.
+    pub resume_hmac_keyring_path: Option<PathBuf>,
     pub policy_path: PathBuf,
     pub server_id: String,
     pub server_name: String,
     pub server_version: String,
+    pub signed_manifest_path: Option<PathBuf>,
     pub manifest_public_key: Option<String>,
+    /// Pinned authority that prepares every native launch. The factory must
+    /// fail closed when its policy, migration state, or manifest binding no
+    /// longer authorizes the exact subprocess.
+    #[cfg(test)]
+    pub(crate) test_transport: Option<Arc<dyn McpTransport>>,
+    #[cfg(test)]
+    pub(crate) test_lifecycle_policy: Option<SessionLifecyclePolicy>,
+    /// A session output line bound below the production bound.
+    #[cfg(test)]
+    pub(crate) test_session_line_bytes: Option<usize>,
+    pub native_launch_factory: Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>,
     pub page_size: usize,
     pub tools_list_changed: bool,
     pub shared_hosted_owner: bool,
@@ -195,7 +232,11 @@ struct RemoteAppState {
 
 struct RemoteSessionFactory {
     config: RemoteServeHttpConfig,
+    manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    runtime_contract_fingerprint: String,
     durable_admission: Option<DurableAdmissionRuntime>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
 }
@@ -235,14 +276,101 @@ struct RemoteSessionResumeRecord {
     auth_mode_fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     policy_fingerprint: Option<String>,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle: RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
     peer_capabilities: PeerCapabilities,
     initialize_params: Value,
     issued_capabilities: Vec<CapabilityToken>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    resume_integrity_tag: Option<String>,
+    resume_generation: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+struct RemoteSessionIntegrityTag {
+    key_id: String,
+    key_version: u64,
+    tag: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RemoteSessionTombstoneRecord {
+    record: RemoteSessionDiagnosticRecord,
+    resume_generation: u64,
+    terminal_epoch: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RemoteSessionTerminalFence {
+    session_id: String,
+    terminal_at: u64,
+    terminal_state: RemoteSessionState,
+    resume_generation: u64,
+    terminal_epoch: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionHmacKeyringFile {
+    schema: String,
+    current: RemoteSessionHmacKeyFile,
+    #[serde(default)]
+    previous: Vec<RemoteSessionPreviousHmacKeyFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionHmacKeyFile {
+    key_id: String,
+    version: u64,
+    key_base64: String,
+}
+
+impl Drop for RemoteSessionHmacKeyFile {
+    fn drop(&mut self) {
+        self.key_base64.zeroize();
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionPreviousHmacKeyFile {
+    key_id: String,
+    version: u64,
+    key_base64: String,
+    verify_until_millis: u64,
+}
+
+impl Drop for RemoteSessionPreviousHmacKeyFile {
+    fn drop(&mut self) {
+        self.key_base64.zeroize();
+    }
+}
+
+struct RemoteSessionHmacKey {
+    key_id: String,
+    version: u64,
+    key: Zeroizing<[u8; 32]>,
+    verify_until_millis: Option<u64>,
+}
+
+struct RemoteSessionHmacKeyring {
+    current: RemoteSessionHmacKey,
+    previous: Vec<RemoteSessionHmacKey>,
+}
+
+impl std::fmt::Debug for RemoteSessionHmacKeyring {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RemoteSessionHmacKeyring")
+            .field("current_key_id", &self.current.key_id)
+            .field("current_version", &self.current.version)
+            .field("previous_key_count", &self.previous.len())
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -253,10 +381,12 @@ enum RemoteSessionEntry {
 
 #[derive(Clone)]
 struct RemoteSessionLedger {
+    clock: RemoteClock,
     active: Arc<Mutex<HashMap<String, Arc<RemoteSession>>>>,
     terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
     tombstone_db_path: Option<PathBuf>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
 }
 
 #[derive(Clone)]
@@ -270,6 +400,8 @@ struct SharedUpstreamOwner {
     upstream_server: Arc<AdaptedMcpServer>,
     notification_subscribers: NotificationSubscriberList,
     notification_stats: Arc<SharedUpstreamNotificationStats>,
+    notification_pump_stop: Arc<AtomicBool>,
+    notification_pump_thread: StdMutex<Option<thread::JoinHandle<()>>>,
 }
 
 struct SharedUpstreamNotificationTap {
@@ -309,13 +441,21 @@ struct RemoteSessionEvent {
     seq: u64,
     event_id: String,
     kind: RemoteSessionEventKind,
+    request_generation: Option<McpRequestGeneration>,
     message: Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RemoteSessionEventKind {
     Notification,
+    StandaloneRequest,
     RequestCorrelated,
+}
+
+impl RemoteSessionEventKind {
+    fn is_session_owned(self) -> bool {
+        matches!(self, Self::Notification | Self::StandaloneRequest)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -339,10 +479,16 @@ impl RemoteSessionState {
             Self::Closed => "closed",
         }
     }
+
+    fn is_terminal(self) -> bool {
+        matches!(self, Self::Deleted | Self::Expired | Self::Closed)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct RemoteSessionLifecycleSnapshot {
+    #[serde(skip)]
+    deadline: Option<AuthorityDeadline>,
     state: RemoteSessionState,
     created_at: u64,
     last_seen_at: u64,
@@ -477,6 +623,7 @@ impl Default for RemoteSessionOwnershipSnapshot {
 
 #[derive(Debug)]
 struct RemoteSession {
+    clock: RemoteClock,
     session_id: String,
     agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
@@ -484,23 +631,43 @@ struct RemoteSession {
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
     policy_fingerprint: String,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
     peer_capabilities: StdMutex<Option<PeerCapabilities>>,
     initialize_params: StdMutex<Option<Value>>,
     lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
-    input_tx: mpsc::Sender<Value>,
+    input_tx: McpInboxSender,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     active_request_stream: Arc<Mutex<()>>,
+    worker_serving_closed: tokio::sync::watch::Sender<bool>,
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
-    resume_integrity_secret: Option<[u8; 32]>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    resume_generation: AtomicU64,
+    terminalization: Mutex<()>,
+    upstream_transport: RemoteSessionUpstreamTransport,
+}
+
+struct RemoteSessionUpstreamTransport {
+    inner: Arc<dyn McpTransport>,
+}
+
+impl std::fmt::Debug for RemoteSessionUpstreamTransport {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RemoteSessionUpstreamTransport")
+            .finish_non_exhaustive()
+    }
 }
 
 struct RemoteSessionInit {
+    clock: RemoteClock,
     session_id: String,
     agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
@@ -508,18 +675,23 @@ struct RemoteSessionInit {
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
     policy_fingerprint: String,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: Option<String>,
     peer_capabilities: Option<PeerCapabilities>,
     initialize_params: Option<Value>,
     lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
-    input_tx: mpsc::Sender<Value>,
+    input_tx: McpInboxSender,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
-    resume_integrity_secret: Option<[u8; 32]>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    resume_generation: u64,
+    upstream_transport: Arc<dyn McpTransport>,
 }
 
 struct NotificationStreamAttachment {
@@ -577,6 +749,7 @@ enum JwtVerificationKeySource {
 
 #[derive(Clone)]
 struct JwtBearerVerifier {
+    clock: RemoteClock,
     key_source: JwtVerificationKeySource,
     issuer: Option<String>,
     audience: Option<String>,
@@ -589,6 +762,7 @@ struct JwtBearerVerifier {
 
 #[derive(Clone)]
 struct IntrospectionBearerVerifier {
+    clock: RemoteClock,
     client: HttpClient,
     introspection_url: Url,
     client_id: Option<String>,
@@ -625,6 +799,7 @@ struct AuthorizationServerMetadata {
 
 #[derive(Clone)]
 struct LocalAuthorizationServer {
+    clock: RemoteClock,
     signing_key: Keypair,
     issuer: String,
     default_audience: String,
@@ -659,6 +834,7 @@ impl RemoteAppState {
 
 #[derive(Clone, Debug)]
 struct AuthorizationCodeGrant {
+    deadline: AuthorityDeadline,
     client_id: String,
     redirect_uri: String,
     resource: String,
@@ -673,7 +849,10 @@ struct AuthorizationCodeGrant {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(
+    rename_all = "camelCase",
+    try_from = "sender_constraint::ConfirmationWire"
+)]
 struct ChioSenderConstraintClaims {
     #[serde(
         default,
@@ -762,7 +941,10 @@ struct JwtClaims {
     authorization_details: Option<Value>,
     #[serde(default)]
     chio_transaction_context: Option<Value>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "sender_constraint::deserialize_confirmation"
+    )]
     cnf: Option<ChioSenderConstraintClaims>,
     #[serde(default)]
     exp: Option<u64>,
@@ -847,94 +1029,25 @@ struct RemoteSessionCapability {
     subject_public_key: String,
 }
 
-
-#[path = "session_core/session.rs"]
-mod session_core_session;
+#[path = "session_core/authority_mode.rs"]
+mod session_core_authority_mode;
 #[path = "session_core/factory.rs"]
 mod session_core_factory;
 #[path = "session_core/ledger.rs"]
 mod session_core_ledger;
+#[path = "session_core/session.rs"]
+mod session_core_session;
 
-struct BroadcastJsonRpcWriter {
-    event_tx: broadcast::Sender<RemoteSessionEvent>,
-    retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
-    next_event_id: Arc<AtomicU64>,
-    session_id: String,
-    buffer: Vec<u8>,
-}
+#[path = "session_core/writer.rs"]
+mod session_core_writer;
+use session_core_writer::BroadcastJsonRpcWriter;
 
-impl BroadcastJsonRpcWriter {
-    fn new(
-        event_tx: broadcast::Sender<RemoteSessionEvent>,
-        retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
-        next_event_id: Arc<AtomicU64>,
-        session_id: String,
-    ) -> Self {
-        Self {
-            event_tx,
-            retained_notification_events,
-            next_event_id,
-            session_id,
-            buffer: Vec::new(),
+impl RemoteServeHttpConfig {
+    fn lifecycle_policy(&self) -> SessionLifecyclePolicy {
+        #[cfg(test)]
+        if let Some(policy) = &self.test_lifecycle_policy {
+            return policy.clone();
         }
-    }
-
-    fn next_event(&self, message: Value) -> RemoteSessionEvent {
-        let next = self.next_event_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let event_id = format!("{}-{next}", self.session_id);
-        let kind = classify_remote_session_event(&message);
-        if kind == RemoteSessionEventKind::Notification {
-            if let Ok(mut retained) = self.retained_notification_events.lock() {
-                retained.push_back(RetainedRemoteSessionEvent {
-                    seq: next,
-                    event_id: event_id.clone(),
-                    message: message.clone(),
-                });
-                while retained.len() > DEFAULT_NOTIFICATION_REPLAY_WINDOW {
-                    retained.pop_front();
-                }
-            }
-        }
-
-        RemoteSessionEvent {
-            seq: next,
-            event_id,
-            kind,
-            message,
-        }
-    }
-
-    fn flush_complete_lines(&mut self) -> io::Result<()> {
-        while let Some(position) = self.buffer.iter().position(|byte| *byte == b'\n') {
-            let mut line = self.buffer.drain(..=position).collect::<Vec<_>>();
-            if line.last() == Some(&b'\n') {
-                line.pop();
-            }
-            if line.is_empty() {
-                continue;
-            }
-
-            let message: Value = serde_json::from_slice(&line).map_err(|error| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("failed to parse JSON-RPC output from edge worker: {error}"),
-                )
-            })?;
-            let _ = self.event_tx.send(self.next_event(message));
-        }
-
-        Ok(())
-    }
-}
-
-impl Write for BroadcastJsonRpcWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buffer.extend_from_slice(buf);
-        self.flush_complete_lines()?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.flush_complete_lines()
+        SessionLifecyclePolicy::from_env()
     }
 }

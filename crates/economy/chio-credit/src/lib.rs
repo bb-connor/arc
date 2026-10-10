@@ -16,6 +16,8 @@
 
 #![forbid(unsafe_code)]
 
+mod input;
+
 pub use chio_appraisal as appraisal;
 pub use chio_core_types::{capability, crypto, receipt};
 pub use chio_underwriting as underwriting;

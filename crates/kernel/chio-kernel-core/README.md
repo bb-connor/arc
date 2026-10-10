@@ -14,6 +14,14 @@ directly when you need enforcement logic on a constrained or non-native
 target; the portable-kernel contract is documented in
 `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`.
 
+Portable `evaluate` entry points reject signed capabilities carrying
+`BindSecurityContext` before guards or budget admission because `EvaluateInput`
+has no authoritative security invocation context. Pure `verify_capability`
+entry points remain cryptographic verification only and are used by the native
+kernel, which retains the original token and separately enforces its context.
+A `VerifiedCapability` alone does not authorize context-bound dispatch. This
+containment does not add a portable context bridge or alter other caveat checks.
+
 ## Responsibilities
 
 - Evaluate a `(capability, request, guards)` tuple to an Allow/Deny verdict:
@@ -52,6 +60,14 @@ target; the portable-kernel contract is documented in
 
 `Verdict` (`Allow` / `Deny` / `PendingApproval`) lives at the crate root; the
 core itself only ever produces the first two.
+
+`verify_capability_full_with_evidence` accepts a `CapabilityEvidenceContext`
+containing original signed ancestors for narrowed recursive chains. It checks
+each ancestor and scope transition before admitting a budget. The matching
+`evaluate_with_full_floor_and_evidence` entry point also evaluates subject,
+scope and guards. Existing entry points continue to reject narrowed multi-hop
+chains without this evidence. See `tests/signed_lineage.rs`; these behavioral
+tests do not extend the bounded formal-proof claims to the new lineage code.
 
 ## Feature flags
 

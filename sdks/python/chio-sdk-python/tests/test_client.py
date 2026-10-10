@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
 import respx
 
 from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
+from chio_sdk._generated.kernel.caller_delivery_report_schema import (
+    ChioSignedCallerDeliveryReport,
+)
+from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
+    ChioSignedCallerDispatchAuthorization,
+)
 from chio_sdk.errors import (
     ChioDeniedError,
     ChioError,
+    ChioTimeoutError,
+    ChioValidationError,
 )
 from chio_sdk.models import (
     ChioReceipt,
@@ -30,6 +39,8 @@ from chio_sdk.models import (
 # ---------------------------------------------------------------------------
 
 BASE = "http://127.0.0.1:9090"
+# RFC 8032 Ed25519 public key, test vector 1. No private material is transmitted.
+CALLER_PUBLIC_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 
 
 def _make_token_dict() -> dict:
@@ -213,8 +224,10 @@ class TestHealth:
 class TestCreateCapability:
     @respx.mock
     async def test_create(self) -> None:
-        respx.post(f"{BASE}/v1/capabilities").mock(
-            return_value=httpx.Response(200, json=_make_token_dict())
+        response_token = _make_token_dict()
+        response_token["subject"] = CALLER_PUBLIC_KEY
+        route = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=response_token)
         )
         async with ChioClient(BASE) as client:
             scope = ChioScope(
@@ -226,9 +239,59 @@ class TestCreateCapability:
                     )
                 ]
             )
-            token = await client.create_capability(subject="bb", scope=scope)
+            token = await client.create_capability(subject=CALLER_PUBLIC_KEY, scope=scope)
             assert isinstance(token, CapabilityToken)
             assert token.id == "tok-1"
+            assert "authorization" not in route.calls[0].request.headers
+            assert token.subject == CALLER_PUBLIC_KEY
+            assert json.loads(route.calls[0].request.content)["subject"] == CALLER_PUBLIC_KEY
+
+    @respx.mock
+    async def test_control_token_is_sent_only_on_mint(self, caplog: pytest.LogCaptureFixture) -> None:
+        control_token = "operator-mint-control-token"
+        caplog.set_level("DEBUG")
+        response_token = _make_token_dict()
+        response_token["subject"] = CALLER_PUBLIC_KEY
+        minted = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=response_token)
+        )
+        health = respx.get(f"{BASE}/chio/health").mock(
+            return_value=httpx.Response(200, json={"status": "healthy"})
+        )
+        evaluated = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json={"status": "deny"})
+        )
+        async with ChioClient(BASE, control_token=control_token) as client:
+            assert control_token not in repr(client)
+            token = await client.create_capability(subject=CALLER_PUBLIC_KEY, scope=ChioScope())
+            assert token.subject == CALLER_PUBLIC_KEY
+            await client.health()
+            result = await client.evaluate_tool_call_mediated(
+                capability=response_token, tool_server="s", tool_name="t", parameters={}
+            )
+            assert result["status"] == "deny"
+        assert minted.calls[0].request.headers["authorization"] == f"Bearer {control_token}"
+        assert "authorization" not in health.calls[0].request.headers
+        assert "authorization" not in evaluated.calls[0].request.headers
+        for route in [minted, health, evaluated]:
+            assert control_token.encode() not in route.calls[0].request.content
+        assert control_token not in caplog.text
+
+    @respx.mock
+    @pytest.mark.parametrize("subject", ["job/default/demo", "bb", "", " "])
+    async def test_rejected_subject_is_not_replaced_or_retried(self, subject: str) -> None:
+        route = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(400, json={
+                "error": "chio_bad_request",
+                "message": "subject must be a valid public key",
+            })
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as error:
+                await client.create_capability(subject=subject, scope=ChioScope())
+        assert error.value.code == "HTTP_400"
+        assert route.call_count == 1
+        assert json.loads(route.calls[0].request.content)["subject"] == subject
 
 
 class TestValidateCapability:
@@ -464,7 +527,10 @@ class TestEvaluateToolCall:
     @respx.mock
     async def test_evaluate_tool_call_mediated_returns_mediated_response(self) -> None:
         expected = {
-            "status": "authorized",
+            "status": "reserved",
+            "protocol": "chio.caller-delivery.v1",
+            "execution_authorized": False,
+            "start_required": True,
             "receipt": _make_receipt_dict(),
             "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
         }
@@ -484,7 +550,7 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in request_body
 
     @respx.mock
-    async def test_reconcile_mediated_authorization_posts_nonce_and_cost(self) -> None:
+    async def test_legacy_unsigned_reconciliation_is_rejected_without_http(self) -> None:
         nonce = {"nonce_id": "n-1", "signature": "e" * 128}
         arguments = {"path": "/tmp"}
         realized_cost = {"units": 30, "currency": "USD", "breakdown": None}
@@ -493,19 +559,14 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(200, json=expected)
         )
         async with ChioClient(BASE) as client:
-            result = await client.reconcile_mediated_authorization(
-                control_token="ctl-secret",
-                execution_nonce=nonce,
-                arguments=arguments,
-                realized_cost=realized_cost,
-            )
-        assert result == expected
-        request = route.calls.last.request
-        assert request.headers["authorization"] == "Bearer ctl-secret"
-        body = json.loads(request.content)
-        assert body["execution_nonce"] == nonce
-        assert body["arguments"] == arguments
-        assert body["realized_cost"] == realized_cost
+            with pytest.raises(ChioValidationError, match="Unsigned caller reconciliation"):
+                await client.reconcile_mediated_authorization(
+                    control_token="ctl-secret",
+                    execution_nonce=nonce,
+                    arguments=arguments,
+                    realized_cost=realized_cost,
+                )
+        assert not route.called
 
     @respx.mock
     async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
@@ -517,7 +578,10 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(
                 200,
                 json={
-                    "status": "authorized",
+                    "status": "reserved",
+                    "protocol": "chio.caller-delivery.v1",
+                    "execution_authorized": False,
+                    "start_required": True,
                     "receipt": _make_receipt_dict(),
                     "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
                 },
@@ -696,6 +760,63 @@ class TestEvaluateToolCall:
                     parameters={"path": "/tmp"},
                 )
             assert exc_info.value.guard == "BudgetGuard"
+
+
+class TestAuthenticatedCallerDelivery:
+    @respx.mock
+    async def test_reservation_only_authorization_is_not_execution_permission(self) -> None:
+        respx.post(f"{BASE}/v1/evaluate").mock(return_value=httpx.Response(200, json={
+            "status": "authorized", "execution_nonce": {"legacy": True},
+        }))
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioValidationError, match="Reservation-only"):
+                await client.evaluate_tool_call_mediated(
+                    capability=_make_token_dict(), tool_server="srv", tool_name="read", parameters={},
+                )
+
+    @respx.mock
+    async def test_start_and_report_are_separate_control_requests(self) -> None:
+        # These are transport fixtures, not cryptographically verified permits.
+        corpus = json.loads(
+            (
+                Path(__file__).resolve().parents[4]
+                / "tests/bindings/fixtures/protocol-primitives-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        fixtures = {case["name"]: case["instance"] for case in corpus["cases"]}
+        authorization = fixtures["caller-dispatch-authorization"]
+        report = fixtures["caller-delivery-report-explicit-null"]
+        started = {"status": "dispatch_committed", "protocol": "chio.caller-delivery.v1", "authorization": authorization}
+        completed = {"status": "reconciled", "protocol": "chio.caller-delivery.v1", "execution_authorized": False, "receipt": _make_receipt_dict()}
+        start = respx.post(f"{BASE}/v1/caller/start").mock(return_value=httpx.Response(200, json=started))
+        delivered = respx.post(f"{BASE}/v1/caller/report").mock(return_value=httpx.Response(200, json=completed))
+        async with ChioClient(BASE) as client:
+            assert await client.start_mediated_execution(
+                control_token="executor-control", execution_nonce={"nonce": "original"}, arguments={"x": 1},
+            ) == started
+            assert not delivered.called, "start cannot implicitly report or execute a tool"
+            assert await client.report_mediated_execution(
+                control_token="executor-control",
+                authorization=ChioSignedCallerDispatchAuthorization.model_validate(authorization),
+                report=ChioSignedCallerDeliveryReport.model_validate(report),
+            ) == completed
+        assert start.call_count == 1
+        assert delivered.call_count == 1
+        for route in (start, delivered):
+            request = route.calls.last.request
+            assert request.headers["authorization"] == "Bearer executor-control"
+            assert json.loads(request.content)["protocol"] == "chio.caller-delivery.v1"
+        assert json.loads(delivered.calls.last.request.content)["report"] == report
+
+    @respx.mock
+    async def test_lost_start_reply_is_not_retried(self) -> None:
+        route = respx.post(f"{BASE}/v1/caller/start").mock(side_effect=httpx.ReadTimeout("lost reply"))
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioTimeoutError):
+                await client.start_mediated_execution(
+                    control_token="executor-control", execution_nonce={}, arguments={},
+                )
+        assert route.call_count == 1
 
 
 class TestEvaluateHttpRequest:

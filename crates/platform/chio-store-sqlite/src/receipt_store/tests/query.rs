@@ -27,8 +27,7 @@ fn bounded_cost_page_and_count_queries_use_scope_appropriate_indexes() {
         ("(?12 IS NULL)", None, "idx_chio_tool_receipts_cost_global"),
     ] {
         let (data_sql, count_sql) =
-            crate::receipt_store::evidence_retention::receipt_query_sql(&query, tenant_fragment)
-                .test_unwrap();
+            crate::receipt_query::receipt_query_sql(&query, tenant_fragment).test_unwrap();
         for sql in [data_sql, count_sql] {
             let plan = connection
                 .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
@@ -126,8 +125,8 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
                 grant_index: 0,
                 cost_charged,
                 currency: "USD".to_string(),
-                budget_remaining: 1_000,
-                budget_total: 2_000,
+                budget_remaining: Some(1_000),
+                budget_total: Some(2_000),
                 delegation_depth: 0,
                 root_budget_holder: "root-agent".to_string(),
                 payment_reference: None,
@@ -350,8 +349,8 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
                 grant_index: 0,
                 cost_charged,
                 currency: "USD".to_string(),
-                budget_remaining: 900,
-                budget_total: 1_000,
+                budget_remaining: Some(900),
+                budget_total: Some(1_000),
                 delegation_depth,
                 root_budget_holder: root_budget_holder.to_string(),
                 payment_reference: None,
@@ -576,8 +575,8 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
                     grant_index: 0,
                     cost_charged: 400,
                     currency: "USD".to_string(),
-                    budget_remaining: 600,
-                    budget_total: 1_000,
+                    budget_remaining: Some(600),
+                    budget_total: Some(1_000),
                     delegation_depth: 0,
                     root_budget_holder: subject_hex.clone(),
                     payment_reference: Some("payref-economic-1".to_string()),
@@ -671,8 +670,8 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
                             grant_index: 0,
                             cost_charged: 400,
                             currency: "USD".to_string(),
-                            budget_remaining: 600,
-                            budget_total: 1_000,
+                            budget_remaining: Some(600),
+                            budget_total: Some(1_000),
                             delegation_depth: 0,
                             root_budget_holder: subject_hex.clone(),
                             attempted_cost: Some(450),
@@ -793,7 +792,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
 #[test]
 fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_artifacts() {
     let path = unique_db_path("chio-receipts-economic-flow");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt_kp = Keypair::generate();
     let subject_key = "subject-flow";
     let capability_id = format!("cap-{subject_key}");
@@ -838,8 +837,8 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
                     grant_index: 0,
                     cost_charged: 400,
                     currency: "USD".to_string(),
-                    budget_remaining: 600,
-                    budget_total: 1_000,
+                    budget_remaining: Some(600),
+                    budget_total: Some(1_000),
                     delegation_depth: 0,
                     root_budget_holder: subject_key.to_string(),
                     payment_reference: Some("payref-flow-1".to_string()),
@@ -928,8 +927,8 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
                             grant_index: 0,
                             cost_charged: 400,
                             currency: "USD".to_string(),
-                            budget_remaining: 600,
-                            budget_total: 1_000,
+                            budget_remaining: Some(600),
+                            budget_total: Some(1_000),
                             delegation_depth: 0,
                             root_budget_holder: subject_key.to_string(),
                             attempted_cost: Some(450),
@@ -1115,8 +1114,8 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
                 grant_index: 0,
                 cost_charged: if attempted_cost.is_some() { 0 } else { 250 },
                 currency: "USD".to_string(),
-                budget_remaining: 750,
-                budget_total: 1000,
+                budget_remaining: Some(750),
+                budget_total: Some(1000),
                 delegation_depth: 0,
                 root_budget_holder: subject_hex.clone(),
                 payment_reference: None,
@@ -1286,8 +1285,8 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
                     grant_index: 0,
                     cost_charged: 250,
                     currency: "USD".to_string(),
-                    budget_remaining: 750,
-                    budget_total: 1_000,
+                    budget_remaining: Some(750),
+                    budget_total: Some(1_000),
                     delegation_depth: 0,
                     root_budget_holder: subject_hex.clone(),
                     payment_reference: None,

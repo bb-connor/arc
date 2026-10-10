@@ -3,8 +3,10 @@
 # Invoked by `make ci`. For the heavier local gate (formal proof report), use
 # `make ci-workspace` which runs scripts/ci-workspace.sh.
 set -euo pipefail
+umask 022
 
 cd "$(dirname "$0")/.."
+export CHIO_CHECKOUT_ROOT="$PWD"
 
 # Mirror .github/workflows/ci.yml workflow env and per-step cargo settings so
 # `make ci` matches the PR-tier "Build, lint, test" job coverage and warning
@@ -15,6 +17,8 @@ export RUSTFLAGS="${RUSTFLAGS:-${CHIO_CI_RUSTFLAGS} -C debuginfo=0}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
 ./scripts/check-proptest-coverage.sh
+./scripts/check-protocol-peer-negotiation.sh
+./scripts/check-consumer-boundaries.sh
 
 ./scripts/check-release-inputs.sh
 ./scripts/check-workspace-layering.sh
@@ -24,6 +28,14 @@ bash scripts/tests/check-sidecar-image-workflow.test.sh
 python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
+./scripts/check-security-provenance.sh
+python3 scripts/check-enterprise-provenance.py
+python3 scripts/check-linux-enforcement-stack.py
+./scripts/check-security-dependencies.sh
+bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-enterprise-provenance.test.sh
+bash scripts/tests/check-linux-enforcement-stack.test.sh
+bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-sre-metrics-registry.sh
 ./scripts/check-log-redaction.sh
 ./scripts/check-http-egress-contract.sh

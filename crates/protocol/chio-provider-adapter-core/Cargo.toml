@@ -17,6 +17,7 @@ chio-tool-call-fabric = { workspace = true }
 async-trait = { workspace = true }
 reqwest = { workspace = true, features = ["json", "query", "rustls"] }
 serde_json = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 

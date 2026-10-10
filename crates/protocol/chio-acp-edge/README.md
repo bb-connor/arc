@@ -4,8 +4,7 @@ Edge crate that projects Chio tool manifests outward as ACP (Agent Client
 Protocol) capabilities, so ACP-compatible editors and IDEs can discover and
 invoke Chio tools over ACP-shaped permission and invocation surfaces.
 Kernel-backed entry points route through `chio-cross-protocol`'s orchestrator
-and emit signed Chio receipts; a feature-gated passthrough surface exists for
-compatibility but never produces receipts.
+and emit signed Chio receipts. Every invocation uses kernel admission.
 
 This is the opposite direction from `chio-acp-proxy`, which proxies a
 third-party ACP agent and enforces Chio checks on its calls; `chio-acp-edge`
@@ -32,19 +31,16 @@ instead exposes Chio's own tools as an ACP server.
 
 ## Public API
 
-- `ChioAcpEdge::new(AcpEdgeConfig, Vec<ToolManifest>) -> Result<Self, AcpEdgeError>`
+- `ChioAcpEdge::new(AcpEdgeConfig, &VerifiedManifestRegistry) -> Result<Self, AcpEdgeError>`
   and `capabilities` / `capability` / `capability_ids` / `bridge_fidelity` for
   discovery.
 - `evaluate_permission` / `evaluate_permission_with_kernel` for permission
   preview.
 - `invoke` / `invoke_with_mcp_target` for kernel-backed blocking invocation.
-- `handle_jsonrpc(message, kernel, execution) -> AcpJsonRpcResponse` - the
+- `handle_jsonrpc(bytes, kernel, execution) -> Result<AcpJsonRpcResponse, AcpEdgeError>` - the
   JSON-RPC entry point for `session/list_capabilities`,
   `session/request_permission`, `tool/invoke`, `tool/stream`, `tool/cancel`,
   `tool/resume`.
-- `compatibility()` (feature `compatibility-surface`, or `cfg(test)`) -
-  `ChioAcpEdgeCompatibility`'s non-authoritative `preview_permission`,
-  `invoke`, and `handle_jsonrpc` against a raw `ToolServerConnection`.
 - Wire types: `AcpEdgeConfig`, `AcpEdgeError`, `AcpCapability`, `AcpCategory`,
   `PermissionRequest`, `PermissionDecision`, `AcpInvocationResult`,
   `AcpInvocationTask`, `AcpTaskStatus`, `AcpJsonRpcResponse`,
@@ -57,8 +53,7 @@ instead exposes Chio's own tools as an ACP server.
 
 | Flag | Effect |
 |------|--------|
-| `compatibility-surface` | Exposes `ChioAcpEdge::compatibility()`, the explicit non-authoritative passthrough surface that bypasses the kernel. Also compiled under `cfg(test)`. |
-| `fuzz` | Exposes `fuzz::fuzz_acp_envelope_decode`, the libFuzzer entry point over the NDJSON-decode-then-`handle_jsonrpc` pipeline. Off by default; pulls in `arbitrary`. Enabled only by the standalone `chio-fuzz` workspace. |
+| `fuzz` | Exposes `fuzz::fuzz_acp_envelope_decode`, the libFuzzer entry point over the original-byte `handle_jsonrpc` boundary. Off by default; pulls in `arbitrary`. Enabled only by the standalone `chio-fuzz` workspace. |
 
 ## Testing
 

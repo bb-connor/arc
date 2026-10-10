@@ -27,6 +27,12 @@ fn assurance_run_export(
     report: &Path,
 ) -> Result<(), XtaskError> {
     fs::create_dir_all(out_bundle).map_err(|err| XtaskError::Io(display(out_bundle), err))?;
+    let custody = ScratchDir::new("assurance-export-key")?;
+    let signing_key = custody.join("signing-key.json");
+    stage_signing_fixture(
+        &assurance_dir.join("relay-alert-assurance-export-signing-key.json"),
+        &signing_key,
+    )?;
     require_cli(
         root,
         &[
@@ -48,7 +54,7 @@ fn assurance_run_export(
             "--retention-profile",
             &display(&assurance_dir.join("relay-alert-assurance-retention-profile.json")),
             "--signing-key",
-            &display(&assurance_dir.join("relay-alert-assurance-export-signing-key.json")),
+            &display(&signing_key),
             "--now-unix-ms", ASSURANCE_ARTIFACT_NOW_UNIX_MS,
             "--out-dir", &display(out_bundle),
             "--report", &display(report),
@@ -425,7 +431,11 @@ fn assurance_archive_package_orchestration(root: &Path, facet: &Facet) -> Result
     let trusted_packagers = assurance_dir.join("relay-alert-assurance-trusted-archive-packagers.json");
     let archive_profile = assurance_dir.join("relay-alert-assurance-archive-profile.json");
     let retention_profile = assurance_dir.join("relay-alert-assurance-retention-profile.json");
-    let signing_key = assurance_dir.join("relay-alert-assurance-export-signing-key.json");
+    let signing_key = scratch.join("archive-signing-key.json");
+    stage_signing_fixture(
+        &assurance_dir.join("relay-alert-assurance-export-signing-key.json"),
+        &signing_key,
+    )?;
     let handoff_profile = assurance_dir.join("relay-alert-assurance-retention-handoff-profile.json");
 
     // The script relaxes the legal hold so closeout accepts (a package needs an

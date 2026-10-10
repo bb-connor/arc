@@ -477,7 +477,7 @@ pub fn verifier_trust_bundle_from_json(
     json: &str,
 ) -> Result<ChioVerifierTrustBundle, ChioPackageError> {
     let document: ChioVerifierTrustBundleDocument =
-        serde_json::from_str(json).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        crate::input::decode(json.as_bytes()).map_err(ChioPackageError::from)?;
     ChioVerifierTrustBundle::from_document(document)
 }
 

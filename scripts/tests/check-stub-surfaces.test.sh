@@ -55,6 +55,26 @@ write_file "$vendored_comments/third_party/aws-lc-rs-chio/src/cipher.rs" \
 assert_rc "$(run_checker "$vendored_comments" "$work/vendor-code.out" "$work/vendor-code.err")" 1 \
   "vendored executable incomplete implementation still fails"
 
+vendored_other="$work/vendored-other"
+init_case "$vendored_other"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO."
+write_file "$vendored_other/third_party/ignore-chio/src/walk.rs" \
+  "// Placeholder implementation to allow compiling on non-standard platforms"
+track_case "$vendored_other"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-other.out" "$work/vendor-other.err")" 0 \
+  "exact reviewed dependency comments are allowed"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  "// TODO: skip validation"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-comment.out" "$work/vendor-new-comment.err")" 1 \
+  "new dependency TODO remains rejected"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  'pub fn search() { todo!(); }'
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-code.out" "$work/vendor-new-code.err")" 1 \
+  "new dependency executable TODO remains rejected"
+
 patch_context="$work/patch-context"
 init_case "$patch_context"
 write_file "$patch_context/third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json" \
@@ -77,6 +97,8 @@ write_file "$non_production/tests/replay.rs" "fn test_stub() {}"
 write_file "$non_production/examples/demo/src/main.rs" "fn main() { /* placeholder */ }"
 write_file "$non_production/scripts/example.sh" "# FIXME: script fixture"
 write_file "$non_production/crates/chio-demo/src/_generated/wire.rs" "// not_yet_implemented generated fixture"
+write_file "$non_production/fuzz/corpus/peers_lock_decode/shipped-lockfile.toml" \
+  "# Unpublished peer placeholder in parser input, not executable code"
 track_case "$non_production"
 assert_rc "$(run_checker "$non_production" "$work/non-production.out" "$work/non-production.err")" 0 \
   "non-production stub-surface hits pass"
@@ -109,10 +131,14 @@ write_file "$production_fail/crates/chio-demo/src/lib.rs" \
   "pub fn evaluate() {" \
   "    // TODO: replace placeholder implementation" \
   "}"
+write_file "$production_fail/fuzz/corpus_support/src/lib.rs" \
+  "pub fn parse() { todo!(); }"
 track_case "$production_fail"
 assert_rc "$(run_checker "$production_fail" "$work/production-fail.out" "$work/production-fail.err")" 1 \
   "unallowlisted production stub hit fails"
 grep -F "production stub-surface hit is not allowlisted" \
+  "$work/production-fail.err" >/dev/null
+grep -F "fuzz/corpus_support/src/lib.rs:1" \
   "$work/production-fail.err" >/dev/null
 
 lowercase_fail="$work/lowercase-fail"
@@ -226,5 +252,104 @@ assert_rc "$(run_checker "$supply_chain_unrelated" "$work/supply-chain-unrelated
   "cargo-vet package-name exception rejects trailing text"
 grep -F "does not match reviewed allowlist patterns" \
   "$work/supply-chain-unrelated.err" >/dev/null
+
+denied_lints="$work/denied-lints"
+init_case "$denied_lints"
+write_file "$denied_lints/crates/chio-demo/src/lib.rs" \
+  '#![deny(clippy::todo)]' \
+  '#![cfg_attr(' \
+  '    not(test),' \
+  '    deny(' \
+  '        clippy::indexing_slicing,' \
+  '        clippy::todo,' \
+  '        clippy::unimplemented,' \
+  '    )' \
+  ')]' \
+  '#[forbid(clippy::todo, clippy::unimplemented)]' \
+  'pub fn evaluate() {}'
+track_case "$denied_lints"
+assert_rc "$(run_checker "$denied_lints" "$work/denied-lints.out" "$work/denied-lints.err")" 0 \
+  "exact todo selectors in denying lint attributes pass"
+
+lint_case=0
+for body in \
+  'clippy::todo,' \
+  '#![allow(clippy::todo)]' \
+  '#![warn(clippy::todo)]' \
+  '#![cfg_attr(test, deny(clippy::todo))]' \
+  '#![cfg_attr(any(), deny(clippy::todo))]' \
+  '#![deny(clippy::todo, todo)]' \
+  '#![deny(clippy::todo)] // TODO: wire enforcement' \
+  '#![deny(clippy::todo)] pub fn evaluate() { todo!(); }' \
+  '#![deny(clippy::todo)] pub fn evaluate() { unimplemented!(); }' \
+  '#![deny(clippy::todo!())]' \
+  '#![deny(clippy::todo' \
+  'pub fn evaluate() { clippy::todo!(); }'; do
+  lint_case=$((lint_case + 1))
+  write_file "$denied_lints/crates/chio-demo/src/lib.rs" "$body"
+  assert_rc "$(run_checker "$denied_lints" "$work/lint-$lint_case.out" "$work/lint-$lint_case.err")" 1 \
+    "lint selector classification rejects hostile case $lint_case"
+done
+write_file "$denied_lints/crates/chio-demo/src/lib.rs" \
+  '#![cfg_attr(not(test), deny(clippy::todo))]' \
+  'pub fn evaluate() { todo!(); }' \
+  'pub fn parse() { unimplemented!(); }'
+assert_rc "$(run_checker "$denied_lints" "$work/denied-live.out" "$work/denied-live.err")" 1 \
+  "denying attributes do not hide subsequent executable macros"
+grep -F 'pub fn evaluate() { todo!(); }' "$work/denied-live.err" >/dev/null
+grep -F 'pub fn parse() { unimplemented!(); }' "$work/denied-live.err" >/dev/null
+grep -F 'crates/chio-demo/src/lib.rs:2:' "$work/denied-live.err" >/dev/null
+grep -F 'crates/chio-demo/src/lib.rs:3:' "$work/denied-live.err" >/dev/null
+
+non_rust_lints="$work/non-rust-lints"
+init_case "$non_rust_lints"
+write_file "$non_rust_lints/.config/example.toml" '#![deny(clippy::todo)]'
+track_case "$non_rust_lints"
+assert_rc "$(run_checker "$non_rust_lints" "$work/non-rust-lints.out" "$work/non-rust-lints.err")" 1 \
+  "Rust lint syntax is not an exception in non-Rust files"
+
+review_case=0
+while IFS='|' read -r reviewed_path reviewed_text; do
+  review_case=$((review_case + 1))
+  reviewed="$work/reviewed-$review_case"
+  init_case "$reviewed"
+  write_file "$reviewed/$reviewed_path" "$reviewed_text"
+  track_case "$reviewed"
+  assert_rc "$(run_checker "$reviewed" "$work/review-$review_case.out" "$work/review-$review_case.err")" 0 \
+    "reviewed description $review_case matches exact text and owner"
+  write_file "$reviewed/$reviewed_path" "$reviewed_text TODO: bypass validation"
+  assert_rc "$(run_checker "$reviewed" "$work/review-changed-$review_case.out" "$work/review-changed-$review_case.err")" 1 \
+    "reviewed description $review_case rejects changed text"
+  write_file "$reviewed/$reviewed_path" "$reviewed_text" \
+    'pub fn evaluate() { todo!(); }' \
+    'pub fn parse() { unimplemented!(); }'
+  assert_rc "$(run_checker "$reviewed" "$work/review-code-$review_case.out" "$work/review-code-$review_case.err")" 1 \
+    "reviewed description $review_case cannot allow executable incomplete code"
+  grep -F 'pub fn evaluate() { todo!(); }' "$work/review-code-$review_case.err" >/dev/null
+  grep -F 'pub fn parse() { unimplemented!(); }' "$work/review-code-$review_case.err" >/dev/null
+  write_file "$reviewed/$reviewed_path" "$reviewed_text"
+  write_file "$reviewed/crates/chio-other/src/lib.rs" "$reviewed_text"
+  assert_rc "$(run_checker "$reviewed" "$work/review-copy-$review_case.out" "$work/review-copy-$review_case.err")" 1 \
+    "reviewed description $review_case cannot move to an unreviewed path"
+done <<'REVIEWED'
+.config/miri-crates.toml|reason = "syscall: memfd_create (aarch64 number 279) is not implemented by Miri"
+crates/core/chio-response-model/src/simulation.rs|// A local model placeholder, never installed or passed to a port.
+crates/platform/chio-store-sqlite/src/receipt_query/read.rs|// but must still bind placeholders if we reuse `params!`;
+REVIEWED
+
+obsolete="$work/obsolete"
+init_case "$obsolete"
+write_file "$obsolete/crates/core/chio-core-types/src/crypto.rs" \
+  '// 32-byte placeholder'
+write_file "$obsolete/crates/kernel/chio-kernel-browser/src/clock.rs" \
+  '// stub intentionally returns `0`'
+write_file "$obsolete/crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs" \
+  '// but must still bind placeholders if we reuse `params!`;'
+track_case "$obsolete"
+assert_rc "$(run_checker "$obsolete" "$work/obsolete.out" "$work/obsolete.err")" 1 \
+  "obsolete allowances cannot be revived at prior owners"
+grep -F 'crates/core/chio-core-types/src/crypto.rs:1' "$work/obsolete.err" >/dev/null
+grep -F 'crates/kernel/chio-kernel-browser/src/clock.rs:1' "$work/obsolete.err" >/dev/null
+grep -F 'crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:1' "$work/obsolete.err" >/dev/null
 
 echo "check-stub-surfaces.test.sh: all assertions passed"

@@ -16,11 +16,13 @@ chio-core = { workspace = true }
 chio-kernel = { workspace = true }
 chio-guards = { workspace = true }
 chio-metering = { workspace = true }
+chio-security-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 regex = "1"
+regex-syntax = "0.8"
 sqlparser = "0.61"
 
 [lints]

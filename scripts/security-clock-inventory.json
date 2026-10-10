@@ -1,0 +1,1407 @@
+{
+  "schema": "chio.security-clock-inventory.v2",
+  "status": "Remaining ambient calls and independent ports, including test fixtures; migration is incomplete.",
+  "sites": {
+    "crates/guards/chio-guards/src/behavioral_profile.rs::default_now": 1,
+    "crates/guards/chio-guards/tests/behavioral_profile.rs::unique_db_path": 1,
+    "crates/guards/chio-policy/tests/compile_policy.rs::write_temp_threat_intel_pattern_db": 1,
+    "crates/guards/chio-wasm-guards/src/host.rs::core_module_get_time_unix_secs": 1,
+    "crates/guards/chio-wasm-guards/src/host.rs::get_time_unix_secs": 1,
+    "crates/guards/chio-wasm-guards/src/incident.rs::utc_timestamp": 1,
+    "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": 1,
+    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_without_receipt_store_denies_before_dispatch_or_cosign": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_cosigner_not_called_when_local_persistence_fails": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_receipt_context_fixture": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::installed_artifact_store_preserves_cosign_evidence_across_cache_eviction": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs::revoke": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_capability": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_proof_body": 1,
+    "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs::now_unix_ms": 1,
+    "crates/kernel/chio-kernel/tests/retention.rs::unique_db_path": 1,
+    "crates/kernel/chio-process/src/mailboxes/mod.rs::now_ms": 1,
+    "crates/kernel/chio-process/src/store/children.rs::caller": 1,
+    "crates/kernel/chio-process/tests/mailbox_effect_boundary.rs::mailbox_claims_do_not_fence_independent_resource_mutations": 1,
+    "crates/kernel/chio-process/tests/nonce_recovery.rs::strict_nonce_subprocess": 1,
+    "crates/kernel/chio-process/tests/worker_protocol.rs::expired_credential_rejects_even_inspection": 1,
+    "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs::new": 1,
+    "crates/kernel/chio-runtime-core/tests/runtime_store/replay_source/destination.rs::now_ms": 1,
+    "crates/kernel/chio-runtime-harness/src/lib.rs::runtime_loopback_rejects_authority_before_startup_mutates_paths": 1,
+    "crates/kernel/chio-runtime-harness/src/lib.rs::temp_root": 1,
+    "crates/platform/chio-control-plane/src/attestation/tests.rs::current_unix_time": 1,
+    "crates/platform/chio-control-plane/src/economic_admission_cancellation.rs::now_ms": 1,
+    "crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs::now_ms": 1,
+    "crates/platform/chio-control-plane/src/enterprise_federation.rs::temp_discovery_path": 1,
+    "crates/platform/chio-control-plane/src/enterprise_federation.rs::temp_registry_path": 1,
+    "crates/platform/chio-control-plane/src/evidence_export/tests.rs::unique_test_dir": 1,
+    "crates/platform/chio-control-plane/src/federation_policy.rs::temp_registry_path": 1,
+    "crates/platform/chio-control-plane/src/issuance/tests.rs::unique_path": 1,
+    "crates/platform/chio-control-plane/src/lib.rs::unique_receipt_db_path": 1,
+    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_materializes_threshold_approval_against_runtime_policy_hash": 1,
+    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": 1,
+    "crates/platform/chio-control-plane/src/security/active_response/tests.rs::system_now_unix_ms": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/tests.rs::now_unix_ms": 1,
+    "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": 1,
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/tests.rs::current_unix_ms": 1,
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::capability_revoke_observes_revocation_lag": 1,
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::temp_budget_db": 1,
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs::unique_temp_path": 1,
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::unique_temp_path": 1,
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support.rs::unique_temp_path": 1,
+    "crates/platform/chio-control-plane/tests/active_defense_recovery.rs::now_unix_ms": 1,
+    "crates/platform/chio-control-plane/tests/issuance_freeze_backend.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/benches/store_receipt_analytics_report.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/benches/store_receipt_write_throughput.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_02.inc::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs::unix_now": 1,
+    "crates/platform/chio-store-sqlite/src/approval_store.rs::open_colocated_creates_parent_dirs_for_a_file_uri_with_query": 1,
+    "crates/platform/chio-store-sqlite/src/authority.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/src/economic_state_cache_tests.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/src/evidence_export.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_query/tests/support.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::disconnected_reseed_flips_writer_liveness_dead_immediately": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::earlier_success_does_not_clear_a_later_queued_timeout": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::run_write_executes_jobs_serially_on_the_writer_thread": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_decrements_inflight_before_returning_to_caller": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_job_holds_inflight_for_its_duration": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retained_commitments.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::size_trigger_applies_when_time_cutoff_is_a_noop": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/schema_archive.rs::unique_archive_path": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::open_creates_parent_dirs_for_a_file_uri_with_query": 1,
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs::joint_capture_replays_after_supplemental_authorization_expires": 2,
+    "crates/platform/chio-store-sqlite/tests/approval_store.rs::unique_path": 1,
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::expired_permission_can_replay_a_retained_report_but_cannot_execute": 3,
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::fixture": 1,
+    "crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/egress_restrictions.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution.rs::restart_keeps_a_live_caller_reservation": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::an_expired_caller_share_stays_owned_until_recovery_compensates_it": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::caller_share_snapshot_is_complete_scoped_and_fenced": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share/boundaries.rs::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/dispatch_context.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/external_delivery.rs::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::expired_issuance_denies_execution_and_is_compensated_by_startup_recovery": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::live_issuance_survives_startup_recovery_until_it_expires": 1,
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle/security_binding.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/formal_projection.rs::temp_path": 1,
+    "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs::now_secs": 1,
+    "crates/platform/chio-store-sqlite/tests/integration_smoke.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/tests/issuance_freezes.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/memory_provenance_store.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/tests/native_authority_binding.rs::now_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/response_dispatch.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/security_release_recovery/integrity.rs::ensure_final_release": 1,
+    "crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_01.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs::current_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/session_throttles.rs::now_unix_ms": 1,
+    "crates/platform/chio-store-sqlite/tests/tenant_isolation.rs::unique_db_path": 1,
+    "crates/platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs::now": 1,
+    "crates/protocol/chio-a2a-adapter/src/tests/support.rs::unique_path": 1,
+    "crates/protocol/chio-a2a-edge/src/tests/all.rs::unix_now": 1,
+    "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
+    "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
+    "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": 1,
+    "crates/protocol/chio-acp-proxy/src/tests/core_guards.rs::fs_guard_blocks_symlink_escape_by_default": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::signed_manifest_rejects_discovered_tool_surface_drift": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::write_stdio_server_script": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unique_test_dir": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unix_now": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support_config.rs::test_dir": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::expected_resume_agent_id_is_revalidated_from_identity_federation_seed": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::identity_federation_derives_stable_keypair_per_principal": 1,
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs::private_remote_admission_directory": 1,
+    "crates/security/chio-cage-init/src/status.rs::unix_time_ms": 1,
+    "crates/security/chio-keyring/tests/independent_services.rs::now_millis": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs::now_unix_seconds": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs::run_native_delivery_with_cutpoint": 2,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_cutpoints.rs::verify_capture_and_replay": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::initialize_native": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::new": 2,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::new_with_interruption": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs::reject_signed_capture_substitutions": 1,
+    "crates/security/chio-secret-broker/src/service/ipc/prepared/tests.rs::now": 1,
+    "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": 1
+  },
+  "kernel_sqlite_review_2026_09_28": {
+    "crates/kernel/chio-kernel/src/checkpoint.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/session_ops/reports.rs::record_session_report": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::federated_origin_without_runtime_hook_or_context_fails_closed": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_without_receipt_store_denies_before_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_cosigner_not_called_when_local_persistence_fails": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_receipt_context_fixture": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::installed_artifact_store_preserves_cosign_evidence_across_cache_eviction": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs::revoke": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/request_matching.rs::nested_child_request_id": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Wall time removed; child identifier uses UUID v4 entropy and existing parent/request binding."
+    },
+    "crates/kernel/chio-kernel/src/session.rs::current_unix_timestamp": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Session uses the kernel-injected shared Clock and a shared fence across clones. Outage/regression rejects before anchor rotation, close or request tracking."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_capability": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_proof_body": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/retention.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_receipt_analytics_report.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_receipt_write_throughput.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_01.inc::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_02.inc::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs::observe_authority_time": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/approval_store.rs::open_colocated_creates_parent_dirs_for_a_file_uri_with_query": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/authority.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/authority.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/budget_store/tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/economic_state_cache_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/evidence_export.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_payload_store.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_query/tests/support.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::disconnected_reseed_flips_writer_liveness_dead_immediately": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::earlier_success_does_not_clear_a_later_queued_timeout": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::run_write_executes_jobs_serially_on_the_writer_thread": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_decrements_inflight_before_returning_to_caller": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_job_holds_inflight_for_its_duration": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/federated.rs::import_federated_evidence_share": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::delete_archived_prefix_in_tx": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::resolve_rotation_cutoff": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::retention_repair_on_writer": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/query_matching.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::unix_timestamp_now_i64": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retained_commitments.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::size_trigger_applies_when_time_cutoff_is_a_noop": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/schema_archive.rs::unique_archive_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::open_creates_parent_dirs_for_a_file_uri_with_query": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::revoke": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs::joint_capture_replays_after_supplemental_authorization_expires": {
+      "occurrences": 2,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/approval_store.rs::unique_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::expired_permission_can_replay_a_retained_report_but_cannot_execute": {
+      "occurrences": 3,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::fixture": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/egress_restrictions.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution.rs::restart_keeps_a_live_caller_reservation": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::an_expired_caller_share_stays_owned_until_recovery_compensates_it": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::caller_share_snapshot_is_complete_scoped_and_fenced": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share/boundaries.rs::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/dispatch_context.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/external_delivery.rs::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::expired_issuance_denies_execution_and_is_compensated_by_startup_recovery": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::live_issuance_survives_startup_recovery_until_it_expires": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle/security_binding.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/formal_projection.rs::temp_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/integration_smoke.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/issuance_freezes.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/memory_provenance_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/native_authority_binding.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/response_dispatch.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_release_recovery/integrity.rs::ensure_final_release": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_01.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/session_throttles.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/tenant_isolation.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs::now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    }
+  },
+  "authority_owners_review_2026_09_28": {
+    "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs::new": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/kernel/chio-runtime-core/tests/runtime_store/replay_source/destination.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/attestation/tests.rs::current_unix_time": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/certify/helpers.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/economic_admission_cancellation.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/enterprise_federation.rs::temp_discovery_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/enterprise_federation.rs::temp_registry_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/evidence_export.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/evidence_export/tests.rs::unique_test_dir": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/federation_policy.rs::temp_registry_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/issuance/tests.rs::unique_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/issuance/util.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/lib.rs::unique_receipt_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/passport_verifier.rs::unix_timestamp_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_materializes_threshold_approval_against_runtime_policy_hash": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/reputation.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/security/active_response.rs::system_now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/budget_handlers.rs::generated_budget_event_id": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs::observe_capability_revocation_lag": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::capability_revoke_observes_revocation_lag": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::temp_budget_db": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs::unique_temp_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::now_unix_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::unique_temp_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs::unix_timestamp_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs::handle_publish_live_finding_status": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/fiscal_runtime.rs::trusted_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/risk_finance_handlers/reputation.rs::handle_reputation_compare": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/budget.rs::cache_usage": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support.rs::unique_temp_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::report_clock": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
+    },
+    "crates/platform/chio-control-plane/tests/active_defense_recovery.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/tests/issuance_freeze_backend.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs::now_unix_seconds": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs::run_native_delivery_with_cutpoint": {
+      "occurrences": 2,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_cutpoints.rs::verify_capture_and_replay": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::initialize_native": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::new": {
+      "occurrences": 2,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::new_with_interruption": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs::reject_signed_capture_substitutions": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/tests.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/service/ipc/prepared/tests.rs::now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    }
+  },
+  "protocol_owners_review_2026_09_29": {
+    "contract": "Four adapter owners have no production ambient wall reads. StdIO I/O waits use checked monotonic Instant. UTC spellings now scanned as well as SystemTime; two previously uncounted policy reads are explicitly remaining work.",
+    "newly_classified": {
+      "crates/protocol/chio-a2a-adapter/src/tests/support.rs::unique_path": "filesystem nonce fixture only",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::legacy_launch_rejects_discovered_tool_surface_drift": "filesystem nonce fixture only",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::write_stdio_server_script": "filesystem nonce fixture only",
+      "crates/guards/chio-policy/src/receipt.rs::evaluate_audited": "policy production debt, pending owner migration",
+      "crates/guards/chio-policy/src/conditions.rs::resolve_current_time": "policy production debt, pending owner migration"
+    }
+  },
+  "native_protocol_review_2026_09_29": {
+    "contract": "Policy and A2A migrations recorded by the preceding batch. The remote production readers below are now migrated by remote_acp_lifecycle_review_2026_09_29.",
+    "sites": {
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::unix_now": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::session_now_millis": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
+      },
+      "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs::capability_for_tool": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unix_now": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unique_test_dir": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/platform/chio-control-plane/src/security/active_response/tests.rs::system_now_unix_ms": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::expected_resume_agent_id_is_revalidated_from_identity_federation_seed": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::identity_federation_derives_stable_keypair_per_principal": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs::stored_capabilities_are_current": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs::private_remote_admission_directory": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/local_server.rs::sign_access_token": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support_config.rs::test_dir": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs::unique_db_path": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-a2a-edge/src/tests/all.rs::unix_now": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::mcp_rate_limit_now": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
+      },
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::signed_manifest_rejects_discovered_tool_surface_drift": {
+        "occurrences": 1,
+        "disposition": "fixture",
+        "contract": "Test fixture wall time only; no production authority."
+      },
+      "crates/guards/chio-policy/src/conditions.rs::resolve_current_time": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Explicit shared fallible clock sampled before condition composition and audited receipt emission."
+      },
+      "crates/guards/chio-policy/src/receipt.rs::evaluate_audited": {
+        "occurrences": 1,
+        "disposition": "migrated",
+        "contract": "Explicit shared fallible clock sampled before condition composition and audited receipt emission."
+      },
+      "crates/platform/chio-control-plane/src/security/active_response.rs::system_now_unix_ms": {
+        "occurrences": 1,
+        "disposition": "relocated-or-removed",
+        "contract": "Test fixture extraction or removal of legacy launch path; see current fixture keys."
+      },
+      "crates/platform/chio-store-sqlite/src/budget_store/tests.rs::unique_db_path": {
+        "occurrences": 1,
+        "disposition": "relocated-or-removed",
+        "contract": "Test fixture extraction or removal of legacy launch path; see current fixture keys."
+      },
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::legacy_launch_rejects_discovered_tool_surface_drift": {
+        "occurrences": 1,
+        "disposition": "relocated-or-removed",
+        "contract": "Test fixture extraction or removal of legacy launch path; see current fixture keys."
+      }
+    }
+  },
+  "remote_acp_lifecycle_review_2026_09_29": {
+    "remote_contract": "RemoteClock shares a fallible high-water owner across OAuth, replay, lifecycle, stores, rate windows and kernel authority. Five production ambient readers removed. Deadlines and counters use checked operations; failures retain custody.",
+    "new_scan_roots": [
+      "crates/protocol/chio-acp-edge/",
+      "crates/protocol/chio-acp-proxy/"
+    ],
+    "newly_inventoried_sites": {
+      "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs::capability_for_tool": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      },
+      "crates/protocol/chio-acp-proxy/src/compliance.rs::generate_compliance_certificate": {
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
+      },
+      "crates/protocol/chio-acp-proxy/src/kernel_signer.rs::sign_acp_receipt": {
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
+      },
+      "crates/protocol/chio-acp-proxy/src/receipt.rs::now_unix_secs": {
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
+      },
+      "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      },
+      "crates/protocol/chio-acp-proxy/src/tests/core_guards.rs::fs_guard_blocks_symlink_escape_by_default": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      }
+    },
+    "tests": [
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs",
+      "crates/protocol/chio-mcp-remote/src/rate_limit.rs",
+      "crates/protocol/chio-acp-edge/src/tests/original_input.rs"
+    ]
+  },
+  "acp_receipt_clock_review_2026_09_29": {
+    "owner": "crates/protocol/chio-acp-proxy/src/clock.rs",
+    "tests": "crates/protocol/chio-acp-proxy/src/tests/attestation_clock.rs",
+    "restart_contract": "New owners reject persisted future audit/authorization time; this does not claim a durable global wall-clock high-water store."
+  },
+  "scope_evidence": "docs/security/clock-scope-evidence-2026-10-02.json",
+  "expanded_preexisting_sites": {
+    "crates/core/chio-supervisor/src/time.rs::now_unix_ms": 1,
+    "crates/economy/chio-anchor/src/witness/ots.rs::chrono_now_unix": 1,
+    "crates/economy/chio-anchor/src/witness/rekor.rs::new::native-adapter": 1,
+    "crates/economy/chio-link/src/lib.rs::now_unix": 1,
+    "crates/economy/chio-settle/tests/runtime_devnet.rs::unique_runtime_devnet_deployment_path": 1,
+    "crates/economy/chio-settle/tests/web3_e2e_qualification.rs::build_fx_oracle_evidence": 1,
+    "crates/economy/chio-settle/tests/web3_e2e_qualification.rs::unique_runtime_devnet_deployment_path": 1,
+    "crates/guards/chio-data-guards/src/sql_parser.rs::parses_postgres_dialect::sql-clock": 1,
+    "crates/guards/chio-data-guards/tests/sql_guard.rs::parses_postgres_dialect_when_configured::sql-clock": 1,
+    "crates/kernel/chio-kernel-mobile/src/clock.rs::read::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/authority.rs::new::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/authority/aggregate.rs::backend_aggregate_root_retains_governed_signing_custody::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/authority/aggregate.rs::backend_capability_budget_preserves_its_exact_scope_and_limit::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/budget_store/in_memory.rs::default::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/dpop.rs::new_with_identity_byte_capacity::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/dpop/authority/tests.rs::legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/dpop/authority/tests.rs::old_proofs_and_schema_downgrades_never_enter_the_durable_domain::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::source_clock_anomaly_and_poisoned_mutex_refuse_without_repair::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::unrepresentable_inventory_is_refused_without_reset_or_retirement::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/execution_nonce/store.rs::new::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/governed_approval_replay.rs::default::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/governed_approval_replay.rs::new::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/kernel/construction.rs::new::native-adapter": 1,
+    "crates/kernel/chio-kernel/src/session.rs::new::native-adapter": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification::native-adapter": 1,
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_oversized_identity_is_refused_before_signature_canonicalization::native-adapter": 1,
+    "crates/kernel/chio-runtime-core/src/store/sqlite.rs::open::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/certify/helpers.rs::unix_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/evidence_export.rs::unix_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/lib.rs::build_kernel::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/lib.rs::build_kernel_with_active_defense::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/passport_verifier.rs::unix_timestamp_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/reputation.rs::unix_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security.rs::runtime::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::new_for_test_with_same_process_policy::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/protocol.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/protocol.rs::new_for_test_with_same_process_policy::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/tests.rs::saturated_unix_backlog_cannot_extend_the_connect_deadline::native-adapter": 4,
+    "crates/platform/chio-control-plane/src/security/active_response_authority/transport.rs::now_unix_seconds::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/declassification_outbox.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/alert.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::new_with_scheduler::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs::observe_capability_revocation_lag::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs::state_with_cluster::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs::now_unix_secs::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator/constructors.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator/constructors.rs::new_with_signing_backends::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs::unix_timestamp_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_retraction_resolver.rs::read::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::handle_submit_finding_status_intent::native-adapter": 2,
+    "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::service_state::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::status_clock_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/finding_status_verifier.rs::new::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/fiscal_runtime.rs::trusted_now::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/budget.rs::cache_usage::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests/route_fixture.rs::challenge_route_state::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs::market_state::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs::market_state::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs::serve_async_inner::native-adapter": 1,
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs::metrics_state::native-adapter": 1,
+    "crates/platform/chio-finding-hosted-edge/src/server.rs::new::native-adapter": 1,
+    "crates/platform/chio-finding-hosted-edge/src/tls.rs::now": 1,
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/resource.rs::seed": 1,
+    "crates/platform/chio-finding-market-store-postgres/src/lib.rs::bridge_legacy_migration_ledger::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/src/spend.rs::finish_monthly_spend_in_transaction::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/src/spend.rs::reserve_monthly_spend::sql-clock": 2,
+    "crates/platform/chio-finding-market-store-postgres/tests/postgres_store.rs::tenant_isolation_exact_replay_and_lease_recovery": 2,
+    "crates/platform/chio-finding-market-store-postgres/tests/postgres_store.rs::tenant_isolation_exact_replay_and_lease_recovery::sql-clock": 2,
+    "crates/platform/chio-finding-market-store-postgres/tests/support/mod.rs::assert_multi_replica_leases_and_shutdown_refunds::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/tests/support/mod.rs::assert_prior_release_writes_keep_accumulators::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/tests/support/mod.rs::assert_spend_accumulator_underflow_denies::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/tests/support/mod.rs::install_legacy_migration_fixture::sql-clock": 1,
+    "crates/platform/chio-finding-market-store-postgres/tests/worker_lease_api.rs::public_worker_lease_methods_preserve_role_and_fence_boundaries": 1,
+    "crates/platform/chio-finding-worker/src/executor.rs::unix_time::native-adapter": 1,
+    "crates/platform/chio-http-core/src/authority.rs::build::native-adapter": 1,
+    "crates/platform/chio-http-core/src/authority/tests.rs::signed_capability_token_json_with_scope": 1,
+    "crates/platform/chio-http-core/src/authority/tests.rs::signed_direct_v2_capability_token_json": 1,
+    "crates/platform/chio-http-core/src/request.rs::new": 1,
+    "crates/platform/chio-http-core/src/session.rs::is_expired": 1,
+    "crates/platform/chio-http-core/src/session.rs::new": 1,
+    "crates/platform/chio-manifest/tests/manifest_v2.rs::unique_manifest_path": 1,
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_01.inc::unix_now::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/authority.rs::open::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/budget_store/store.rs::open::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs::open::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs::provision::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/dead_letters.rs::<module>::sql-clock": 1,
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::now_secs::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::open_in_memory_with_capacity::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::open_with_capacity::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::recover_clock_high_water::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs::open_qualified::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::now_secs::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::open_in_memory_with_capacity::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::open_with_capacity::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::recover_clock_high_water::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store/replay_source/opening.rs::open::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::current_unix_ms::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/security_state.rs::open::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/security_state.rs::open_with_isolation_epoch_verifier::native-adapter": 1,
+    "crates/platform/chio-store-sqlite/src/security_state/flow_state/tests.rs::join_and_fence_wait_for_the_outer_commit::native-adapter": 3,
+    "crates/platform/chio-store-sqlite/src/serving_owner.rs::open_serving::native-adapter": 1,
+    "crates/platform/chio-transaction-passport/src/minimal.rs::verify_minimal_passport_schema": 1,
+    "crates/products/chio-api-protect/src/evaluator.rs::durable_evaluator_reports_durable_backends::native-adapter": 1,
+    "crates/products/chio-api-protect/src/evaluator.rs::new_with_durable_stores::native-adapter": 1,
+    "crates/products/chio-api-protect/src/evaluator.rs::signed_capability_token_json_with_scope": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::batch_respond_approvals_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::create_threshold_proposal_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::deliver_threshold_approval_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::get_threshold_proposal_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::operator_respond_approval_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::respond_approval_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::submit_approval_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/approval.rs::submit_threshold_approval_handler": 1,
+    "crates/products/chio-api-protect/src/proxy/clock.rs::default::native-adapter": 1,
+    "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs::service_clock_is_shared_by_durable_admission_and_configured_budget_owners::native-adapter": 1,
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs::dpop_proof_for": 1,
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs::governed_approval_token": 1,
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs::governed_mustprepay_intent": 1,
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs::delegated_child_capability": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::child_token_with_chain_ancestor": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::sidecar_advisory_json_fallback_preserves_trust_header": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::sidecar_validate_capability_checks_issuer_trust_before_walking_chain": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::sidecar_verify_receipt_rejects_action_parameter_hash_mismatch": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::sidecar_verify_receipt_rejects_capability_issuer_as_receipt_signer": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::sidecar_verify_receipt_rejects_untrusted_signer": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::signed_approval_response_token": 1,
+    "crates/products/chio-api-protect/src/proxy/tests.rs::signed_capability_token_json": 1,
+    "crates/products/chio-api-protect/src/spec_discovery.rs::load_spec_from_existing_file": 1,
+    "crates/products/chio-cli/src/archive.rs::staging_dir_name": 1,
+    "crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs::live_buy_fixture": 1,
+    "crates/products/chio-cli/src/cli/dispatch/proof/archive.rs::create_proof_tempdir": 1,
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs::runtime_swarm_loopback_temp_root": 1,
+    "crates/products/chio-cli/src/cli/dispatch/proof/unit_tests.rs::agent_web_replay_test_env": 1,
+    "crates/products/chio-cli/src/cli/input/time.rs::millis::native-adapter": 1,
+    "crates/products/chio-cli/src/cli/mcp/cage_policy.rs::cage_receipt_persistence": 1,
+    "crates/products/chio-cli/src/cli/mcp/governed_sim.rs::cmd_mcp_governed_sim": 1,
+    "crates/products/chio-cli/src/cli/mcp/payment_config.rs::invoke_with_cost": 1,
+    "crates/products/chio-cli/src/cli/process_host/keyring.rs::verifier::native-adapter": 1,
+    "crates/products/chio-cli/src/cli/process_host/native_broker/config.rs::validate::native-adapter": 1,
+    "crates/products/chio-cli/src/cli/trust/receipt/health.rs::unique_temp_path": 1,
+    "crates/products/chio-cli/src/commands/bind.rs::cmd_bind": 1,
+    "crates/products/chio-cli/src/market.rs::uuid_like": 1,
+    "crates/products/chio-cli/src/policies/mod.rs::tempdir_in_ci_friendly": 1,
+    "crates/products/chio-cli/tests/capability_lineage.rs::conflicting_runtime_attestation": 1,
+    "crates/products/chio-cli/tests/capability_lineage.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/certify.rs::unique_path": 1,
+    "crates/products/chio-cli/tests/evidence_export.rs::unique_path": 1,
+    "crates/products/chio-cli/tests/federation_policy.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/init.rs::unique_test_dir": 1,
+    "crates/products/chio-cli/tests/local_reputation.rs::current_unix_secs": 1,
+    "crates/products/chio-cli/tests/local_reputation.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/mcp_auth_server.rs::mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion": 1,
+    "crates/products/chio-cli/tests/mcp_auth_server.rs::mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange": 1,
+    "crates/products/chio-cli/tests/mcp_auth_server.rs::unique_test_dir": 1,
+    "crates/products/chio-cli/tests/mcp_auth_server.rs::unix_now": 1,
+    "crates/products/chio-cli/tests/mcp_serve/test_directory.rs::unique_test_dir": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_admin_health_reports_runtime_state": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_dedicated_jwt_sessions_require_exact_bearer_continuity_and_separate_admin_token": 2,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_identity_federation_derives_stable_subjects_from_jwt_principals": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_oidc_discovery_verifies_es256_tokens": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_oidc_discovery_verifies_jwt_and_uses_azure_ad_profile_mapping": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_oidc_discovery_verifies_rs256_tokens": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_rejects_jwt_with_wrong_audience": 1,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_rejects_session_reuse_when_authenticated_principal_changes": 2,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_shared_owner_jwt_sessions_keep_weak_compatibility_continuity": 2,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::mcp_serve_http_token_introspection_verifies_opaque_tokens_and_derives_stable_subjects": 2,
+    "crates/products/chio-cli/tests/mcp_serve_http.rs::unique_test_dir": 1,
+    "crates/products/chio-cli/tests/passport.rs::current_unix_secs": 1,
+    "crates/products/chio-cli/tests/passport_trust_tier.rs::unique_output_path": 1,
+    "crates/products/chio-cli/tests/proof_cli_contract/support.rs::standard_webhooks_clock_env": 1,
+    "crates/products/chio-cli/tests/proof_doctor.rs::standard_webhooks_clock_env": 1,
+    "crates/products/chio-cli/tests/proof_verify/support.rs::standard_webhooks_clock_env": 1,
+    "crates/products/chio-cli/tests/provider_admin.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/receipt_db.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/receipt_list_tenant_scope.rs::unique_db_path": 1,
+    "crates/products/chio-cli/tests/reputation_issuance.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/scim_lifecycle.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/support/fixture_paths.rs::unique_path": 1,
+    "crates/products/chio-cli/tests/support/receipt_query.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/support/receipt_query.rs::unix_now_secs": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::post_internal_json_status": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::set_cluster_partition": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::trust_control_cluster_internal_status_requires_signed_node_identity": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::trust_control_cluster_multi_region_partition_qualification": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::try_internal_cluster_status": 1,
+    "crates/products/chio-cli/tests/trust_cluster.rs::unique_test_dir": 1,
+    "crates/products/chio-cli/tests/trust_revocation.rs::unique_dir": 1,
+    "crates/products/chio-cli/tests/trust_revocation.rs::unique_revocation_db_path": 1,
+    "crates/products/chio-proof-room/src/bundle_b.rs::create_negative_case_work_dir": 1,
+    "crates/products/chio-proof-room/src/fixture_b.rs::proof_room_swarm_verification_time": 1,
+    "crates/products/chio-proof-room/src/server.rs::create": 1,
+    "crates/products/chio-proof-room/src/tests/support.rs::standard_webhooks_clock_env": 1,
+    "crates/protocol/chio-a2a-adapter/src/clock.rs::default::native-adapter": 1,
+    "crates/protocol/chio-acp-edge/src/bridge.rs::current_unix_timestamp::native-adapter": 1,
+    "crates/protocol/chio-acp-edge/src/edge.rs::evaluate_permission_with_dpop_policy::native-adapter": 1,
+    "crates/protocol/chio-acp-proxy/src/clock.rs::default::native-adapter": 1,
+    "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs::invocation_from_tool_use": 1,
+    "crates/protocol/chio-bedrock-converse-adapter/src/adapter.rs::invocation_from_tool_use": 1,
+    "crates/protocol/chio-bedrock-converse-adapter/tests/batch.rs::lift_batch_provider_metadata_uses_receive_time": 2,
+    "crates/protocol/chio-bedrock-converse-adapter/tests/principal.rs::temp_dir": 1,
+    "crates/protocol/chio-cohere-tools-adapter/src/lib.rs::invocation_from_tool_call": 1,
+    "crates/protocol/chio-gemini-tools-adapter/src/adapter.rs::invocation_from_function_call": 1,
+    "crates/protocol/chio-groq-tools-adapter/src/lib.rs::invocation_from_function_call": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::default::native-adapter": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::now_unix_ms::native-adapter": 1,
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs::make_kernel::native-adapter": 1,
+    "crates/protocol/chio-mcp-remote/src/clock.rs::default::native-adapter": 1,
+    "crates/protocol/chio-mistral-tools-adapter/src/lib.rs::invocation_from_function_call": 1,
+    "crates/protocol/chio-ollama-tools-adapter/src/lib.rs::invocation_from_tool_call": 1,
+    "crates/protocol/chio-openai-adapter/src/adapter.rs::new::native-adapter": 1,
+    "crates/protocol/chio-openai-adapter/src/adapter.rs::new_with_registry::native-adapter": 1,
+    "crates/protocol/chio-provider-conformance/src/bin/record/invoke.rs::tool_invocation": 1,
+    "crates/protocol/chio-provider-conformance/src/bin/record/util.rs::now_ts": 1,
+    "crates/protocol/chio-tower/src/evaluator.rs::valid_capability_token_json": 1,
+    "crates/protocol/chio-tower/src/service.rs::valid_capability_token_json": 1,
+    "crates/protocol/chio-tower/tests/axum_integration.rs::valid_capability_token_json": 1,
+    "crates/protocol/chio-tower/tests/tonic_integration.rs::valid_capability_token_json": 1,
+    "crates/security/chio-keyring/src/bin/chio-keylog-audit.rs::<module>::native-adapter": 1,
+    "crates/security/chio-keyring/src/bin/chio-keylog-audit.rs::run::native-adapter": 1,
+    "crates/security/chio-keyring/src/bin/chio-keylog-witness.rs::run::native-adapter": 1,
+    "crates/security/chio-keyring/src/ipc.rs::readiness_nonce_prefix::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/authority_ipc.rs::now_unix_seconds::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/daemon_runtime.rs::build_with_https_override::native-adapter": 2,
+    "crates/security/chio-secret-broker/src/ipc_client.rs::new::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/kernel_admission/tests/kernel.rs::registered_composite_execution::native-adapter": 2,
+    "crates/security/chio-secret-broker/src/kernel_admission/tests/registration_peer.rs::new::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::new::native-adapter": 2,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::new_with_interruption::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::rotate_process_host_authority::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::verify_parent::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/service/ipc/prepared.rs::prepared_connection_binding::native-adapter": 1,
+    "crates/security/chio-secret-broker/src/service/lifecycle.rs::new_production::native-adapter": 1,
+    "crates/security/chio-security-kernel/src/session_throttle.rs::with_system_clock::native-adapter": 1,
+    "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::unique_temp_dir": 1,
+    "crates/trust/chio-attest-verify/src/nitro.rs::new": 1,
+    "crates/trust/chio-attest-verify/src/sev_snp.rs::new": 1,
+    "crates/trust/chio-attest-verify/src/sigstore/bundle_verify.rs::bundle_rekor_metadata": 1,
+    "crates/trust/chio-attest-verify/src/sigstore/core.rs::verify_bytes": 1,
+    "crates/trust/chio-attest-verify/src/sigstore/tests.rs::bundle_rekor_metadata_falls_back_to_now_when_integrated_time_is_negative": 2,
+    "crates/trust/chio-attest-verify/src/sigstore/tests.rs::bundle_rekor_metadata_falls_back_to_now_when_integrated_time_is_zero": 2,
+    "crates/trust/chio-attest-verify/src/sigstore/tests.rs::bundle_rekor_metadata_returns_zero_index_and_now_when_no_entry": 2,
+    "crates/trust/chio-attest-verify/src/sigstore/tests.rs::certificate_validity_returns_unix_offset_for_not_before_and_not_after": 1,
+    "crates/trust/chio-attest-verify/src/sigstore/validators.rs::validate_against_fulcio": 1,
+    "crates/trust/chio-attest-verify/src/tdx.rs::new": 1,
+    "crates/trust/chio-custody-hw/src/issuer.rs::durable_stores_handle_shares_the_revocation_oracle_with_the_issuer": 1,
+    "crates/trust/chio-custody-hw/src/nonce_store.rs::current_unix_seconds": 1,
+    "crates/trust/chio-custody-hw/src/nonce_store.rs::unique_db_path": 1,
+    "crates/trust/chio-custody-hw/src/revocation.rs::unique_db_path": 1,
+    "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs::future_exp": 1,
+    "crates/trust/chio-custody-hw/tests/replay_resistance.rs::record_outcome_distinguishes_fresh_and_replay": 1,
+    "crates/trust/chio-federation-transport-iroh/examples/revocation_catchup.rs::scratch_dir": 1,
+    "crates/trust/chio-federation-transport-iroh/src/catchup.rs::fsstore_publish_read_verify_round_trip": 1,
+    "crates/trust/chio-federation-transport-iroh/src/catchup.rs::temp_fs_store": 1,
+    "crates/trust/chio-federation-transport-iroh/src/lanes/revocation.rs::now_unix_ms": 1,
+    "crates/trust/chio-federation-transport-iroh/src/lanes/revocation/tests.rs::temp_fs_store": 1,
+    "crates/trust/chio-pheromone-relay/src/service.rs::system_unix_ms": 1,
+    "crates/trust/chio-tee/src/main.rs::default_run_id": 1
+  },
+  "composition_sites": [
+    "crates/guards/chio-guards/src/external/cache.rs::default::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter",
+    "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter",
+    "crates/platform/chio-control-plane/src/durable_admission.rs::open::native-adapter",
+    "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority::native-adapter",
+    "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority_with_deferred_lineage::native-adapter",
+    "crates/platform/chio-control-plane/src/issuance/reputation.rs::build_local_reputation_corpus_with_read_context::native-adapter",
+    "crates/platform/chio-control-plane/src/issuance/reputation.rs::inspect_local_reputation_with_read_context::native-adapter",
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_composition::native-adapter",
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_keyring_runtime_from_authority_seed::native-adapter",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::production::native-adapter",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_pinned_remote_capability_authority::native-adapter",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs::build_remote_capability_authority::native-adapter",
+    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::open_in_memory::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::open_in_memory::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::open_in_memory::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_payload_store.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/finding_payload_store.rs::open_in_memory::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs::open_existing_for_finding_pool::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs::open_existing_with_options::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs::open_for_finding_pool::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs::open_with_options::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/writer_accounting.rs::default::native-adapter",
+    "crates/platform/chio-store-sqlite/src/receipt_store/writer_accounting.rs::receipt_commit_channel::native-adapter",
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::open::native-adapter",
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::open_replication_source::native-adapter",
+    "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::export_for_relocation::native-adapter",
+    "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated::native-adapter",
+    "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked::native-adapter",
+    "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked_with_phase::native-adapter",
+    "crates/products/chio-cli/src/cli/process_host/state.rs::kernel::native-adapter",
+    "crates/security/chio-keyring/src/sqlite/opening.rs::open::native-adapter",
+    "crates/security/chio-keyring/src/sqlite/opening.rs::open_existing::native-adapter",
+    "crates/security/chio-keyring/src/sqlite/opening.rs::open_observer::native-adapter",
+    "crates/security/chio-keyring/src/sqlite/opening.rs::open_with_topology::native-adapter",
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::report_clock::native-adapter"
+  ]
+}

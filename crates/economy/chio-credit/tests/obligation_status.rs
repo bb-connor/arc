@@ -416,7 +416,8 @@ fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult
     noncanonical.extend_from_slice(&canonical);
     assert!(matches!(
         SignedObligationStatusProofV1::from_canonical_bytes(&noncanonical),
-        Err(ObligationError::Canonicalization(_))
+        Err(ObligationError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
     assert!(matches!(
         verify_obligation_status_proof(
@@ -431,7 +432,8 @@ fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult
                 trusted_now_unix_ms: 1_050,
             },
         ),
-        Err(ObligationError::Canonicalization(_))
+        Err(ObligationError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
     Ok(())
 }

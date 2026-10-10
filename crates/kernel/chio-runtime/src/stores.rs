@@ -1,4 +1,5 @@
 use serde::Serialize;
+mod replay_source;
 use std::{fmt, path::Path};
 
 use crate::{
@@ -10,6 +11,16 @@ use crate::{
 };
 
 pub trait ChioRuntimeAdmissionStore: Send + Sync {
+    fn verify_operation_owned_replay_source(
+        &self,
+        _expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(Err(RuntimeCoreError::Rejected {
+            code: "operation_owned_runtime_source_unsupported",
+            detail: "runtime backend does not qualify sealed operation-owned replay".into(),
+        }))
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -445,44 +456,67 @@ impl SqliteRuntimeOrchestrationStore {
         wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
     }
 
+    pub fn register_run(&self, run_id: &str) -> Result<bool, ChioRuntimeError> {
+        wrap_runtime(self.inner.register_run(run_id))
+    }
+
     pub fn record_run_state(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         status: &str,
         failure_code: Option<&str>,
-        now_unix_ms: u64,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            self.inner
-                .record_run_state(run_id, status, failure_code, now_unix_ms),
-        )
+        wrap_runtime(self.inner.record_run_state(lease, status, failure_code))
     }
 
     pub fn record_step_state(
         &self,
+        lease: &RuntimeRunLease,
         state: RuntimeOrchestrationStepState,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.record_step_state(state))
+        wrap_runtime(self.inner.record_step_state(lease, state))
     }
 
     pub fn record_run_step_state(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         state: RuntimeOrchestrationStepState,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.record_run_step_state(run_id, state))
+        wrap_runtime(self.inner.record_run_step_state(lease, state))
+    }
+
+    pub fn complete_run_write(
+        &self,
+        lease: &RuntimeRunLease,
+        status: &str,
+        failure_code: Option<&str>,
+        steps: &[RuntimeOrchestrationStepState],
+        artifacts: &[RuntimeEvidenceManifestEntry],
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(
+            self.inner
+                .complete_run_write(lease, status, failure_code, steps, artifacts),
+        )
+    }
+
+    pub fn acquire_current_run_lease(
+        &self,
+        run_id: &str,
+        owner_id: &str,
+        ttl_ms: u64,
+    ) -> Result<RuntimeRunLease, ChioRuntimeError> {
+        wrap_runtime(
+            self.inner
+                .acquire_current_run_lease(run_id, owner_id, ttl_ms),
+        )
     }
 
     pub fn record_evidence_artifact(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         entry: &RuntimeEvidenceManifestEntry,
-        recorded_at_unix_ms: u64,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            self.inner
-                .record_evidence_artifact(run_id, entry, recorded_at_unix_ms),
-        )
+        wrap_runtime(self.inner.record_evidence_artifact(lease, entry))
     }
 
     pub fn recorded_run_ids(&self) -> Result<Vec<String>, ChioRuntimeError> {
@@ -586,6 +620,13 @@ impl SqliteRuntimeOrchestrationStore {
 macro_rules! impl_chio_runtime_admission_store_for_inner {
     ($type:ty) => {
         impl ChioRuntimeAdmissionStore for $type {
+            fn verify_operation_owned_replay_source(
+                &self,
+                expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+            ) -> Result<(), ChioRuntimeError> {
+                wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::verify_operation_owned_replay_source(&self.inner, expected))
+            }
+
             fn bundle(
                 &self,
                 admission_id: &str,
@@ -903,6 +944,13 @@ pub(crate) struct RuntimeCoreAdmissionStoreAdapter<'a> {
 }
 
 impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapter<'_> {
+    fn verify_operation_owned_replay_source(
+        &self,
+        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), RuntimeCoreError> {
+        unwrap_runtime(self.inner.verify_operation_owned_replay_source(expected))
+    }
+
     fn bundle(
         &self,
         admission_id: &str,

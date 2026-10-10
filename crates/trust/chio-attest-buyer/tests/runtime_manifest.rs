@@ -18,3 +18,20 @@ fn runtime_evidence_manifest_from_json_rejects_manifest_without_artifacts() {
 
     assert_eq!(error.code(), "runtime_evidence_manifest_missing_entries");
 }
+
+#[test]
+fn buyer_readers_reject_original_duplicates_without_exposing_payloads() {
+    let raw = r#"{"schema":"secret-sentinel","schema":"replacement"}"#;
+    for result in [
+        runtime_evidence_manifest_from_json(raw).map(|_| ()),
+        chio_attest_buyer::buyer_attestation_packet_from_json(raw).map(|_| ()),
+        chio_attest_buyer::buyer_attestation_review_package_from_json(raw).map(|_| ()),
+    ] {
+        let error = match result {
+            Ok(_) => panic!("ambiguous import rejected"),
+            Err(error) => error,
+        };
+        assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
+        assert!(std::error::Error::source(&error).is_some());
+    }
+}

@@ -5,15 +5,19 @@
 //! the verified market handshake and buyer proof. This store preserves that
 //! canonical bundle under the Finding identity with exact-replay semantics.
 
+use chio_security_types::clock::{Clock, SystemClock};
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use chio_core::sha256_hex;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use thiserror::Error;
+
+mod capacity;
+use capacity::{seller_database_bytes, seller_finding_artifact_bytes};
 
 fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
@@ -213,6 +217,8 @@ pub enum FindingOperatorSellerArtifactCapacityOutcome {
 
 #[derive(Debug, Error)]
 pub enum FindingOperatorBundleStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding operator bundle store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding operator bundle is invalid: {0}")]
@@ -243,11 +249,20 @@ pub enum FindingOperatorBundleStoreError {
 
 #[derive(Clone)]
 pub struct SqliteFindingOperatorBundleStore {
+    clock: crate::store_clock::StoreClock,
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteFindingOperatorBundleStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FindingOperatorBundleStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingOperatorBundleStoreError> {
         let path = path.as_ref();
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(parent)
@@ -258,18 +273,30 @@ impl SqliteFindingOperatorBundleStore {
             .max_size(8)
             .build(manager)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     pub fn open_in_memory() -> Result<Self, FindingOperatorBundleStoreError> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingOperatorBundleStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
         let pool = Pool::builder()
             .max_size(1)
             .build(manager)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -437,6 +464,7 @@ impl SqliteFindingOperatorBundleStore {
         bundle_json: &[u8],
         indexes: &[FindingOperatorBundleArtifactIndex],
     ) -> Result<FindingOperatorBundleWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_finding_id(finding_id)?;
         validate_canonical_bundle(bundle_json)?;
         validate_artifact_indexes(indexes)?;
@@ -478,7 +506,7 @@ impl SqliteFindingOperatorBundleStore {
             }
             tx.execute(
                 "INSERT INTO chio_finding_operator_bundles (finding_id, bundle_sha256, bundle_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![finding_id, bundle_sha256, bundle_json, now_secs()],
+                params![finding_id, bundle_sha256, bundle_json, now],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
             FindingOperatorBundleWriteOutcome::Inserted
@@ -644,6 +672,7 @@ impl SqliteFindingOperatorBundleStore {
         policy_role: FindingOperatorRetainedPolicyRole,
         policy_json: &[u8],
     ) -> Result<FindingOperatorBundleWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(
             artifact_envelope_sha256,
             "retained policy artifact envelope_sha256",
@@ -700,7 +729,7 @@ impl SqliteFindingOperatorBundleStore {
                     policy_role.as_str(),
                     policy_sha256,
                     policy_json,
-                    now_secs()
+                    now
                 ],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
@@ -765,6 +794,7 @@ impl SqliteFindingOperatorBundleStore {
         epoch_envelope_sha256: &str,
         round_json: &[u8],
     ) -> Result<FindingOperatorBundleWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(epoch_envelope_sha256, "audit round epoch envelope_sha256")?;
         validate_canonical_json(round_json, MAX_RETAINED_AUDIT_ROUND_BYTES, "audit round")?;
         let round_sha256 = sha256_hex(round_json);
@@ -804,7 +834,7 @@ impl SqliteFindingOperatorBundleStore {
             }
             tx.execute(
                 "INSERT INTO chio_finding_operator_audit_rounds (epoch_envelope_sha256, round_sha256, round_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![epoch_envelope_sha256, round_sha256, round_json, now_secs()],
+                params![epoch_envelope_sha256, round_sha256, round_json, now],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
             FindingOperatorBundleWriteOutcome::Inserted
@@ -1004,6 +1034,7 @@ impl SqliteFindingOperatorBundleStore {
         finding_id: &str,
         proof_json: &[u8],
     ) -> Result<FindingOperatorBundleWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_finding_id(finding_id)?;
         validate_canonical_json(proof_json, MAX_PROOF_BYTES, "proof bundle")?;
         let proof_sha256 = sha256_hex(proof_json);
@@ -1036,7 +1067,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_proofs (finding_id, proof_sha256, proof_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-            params![finding_id, proof_sha256, proof_json, now_secs()],
+            params![finding_id, proof_sha256, proof_json, now],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1102,6 +1133,7 @@ impl SqliteFindingOperatorBundleStore {
         request_sha256: &str,
         job_json: &[u8],
     ) -> Result<FindingOperatorBundleWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1143,7 +1175,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_purchase_jobs (request_id, principal_id, request_sha256, job_sha256, job_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![request_id, principal_id, request_sha256, job_sha256, job_json, now_secs()],
+            params![request_id, principal_id, request_sha256, job_sha256, job_json, now],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1182,6 +1214,7 @@ impl SqliteFindingOperatorBundleStore {
         request_sha256: &str,
         result_json: &[u8],
     ) -> Result<FindingOperatorTerminalWriteOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1235,7 +1268,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_terminals (request_id, principal_id, request_sha256, result_sha256, result_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![request_id, principal_id, request_sha256, result_sha256, result_json, now_secs()],
+            params![request_id, principal_id, request_sha256, result_sha256, result_json, now],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.execute(
@@ -1276,6 +1309,7 @@ impl SqliteFindingOperatorBundleStore {
         requested_bytes: i64,
         maximum_retained_bytes: i64,
     ) -> Result<FindingOperatorTerminalCapacityOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1346,7 +1380,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_terminal_capacity (request_id, principal_id, request_sha256, reserved_bytes, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()],
+            params![request_id, principal_id, request_sha256, requested_bytes, now],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1406,6 +1440,7 @@ impl SqliteFindingOperatorBundleStore {
         principal_id: &str,
         request_sha256: &str,
     ) -> Result<bool, FindingOperatorBundleStoreError> {
+        self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1475,6 +1510,7 @@ impl SqliteFindingOperatorBundleStore {
         principal_id: &str,
         request_sha256: &str,
     ) -> Result<bool, FindingOperatorBundleStoreError> {
+        self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1522,7 +1558,10 @@ impl SqliteFindingOperatorBundleStore {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn reserve_seller_artifact_capacity_with_limits(
         &self,
         request_id: &str,
@@ -1533,6 +1572,7 @@ impl SqliteFindingOperatorBundleStore {
         requested_bytes: i64,
         maximum_aggregate_bytes: i64,
     ) -> Result<FindingOperatorSellerArtifactCapacityOutcome, FindingOperatorBundleStoreError> {
+        let now = self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1606,7 +1646,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_seller_artifact_capacity (request_id, principal_id, request_sha256, reserved_bytes, committed_finding_id, created_at) VALUES (?1, ?2, ?3, ?4, NULL, ?5)",
-            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()],
+            params![request_id, principal_id, request_sha256, requested_bytes, now],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1623,6 +1663,7 @@ impl SqliteFindingOperatorBundleStore {
         request_sha256: &str,
         finding_id: &str,
     ) -> Result<FindingOperatorSellerArtifactCapacityOutcome, FindingOperatorBundleStoreError> {
+        self.now_secs()?;
         validate_digest(request_id, "request_id")?;
         validate_identifier(principal_id, "principal_id")?;
         validate_digest(request_sha256, "request_sha256")?;
@@ -1721,66 +1762,6 @@ impl SqliteFindingOperatorBundleStore {
             FindingOperatorBundleStoreError::Unavailable("negative row count".to_owned())
         })
     }
-}
-
-fn seller_database_bytes(
-    conn: &rusqlite::Connection,
-) -> Result<i64, FindingOperatorBundleStoreError> {
-    let page_count: i64 = conn
-        .query_row("PRAGMA page_count", [], |row| row.get(0))
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    let page_size: i64 = conn
-        .query_row("PRAGMA page_size", [], |row| row.get(0))
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    if page_count < 0 || page_size <= 0 {
-        return Err(FindingOperatorBundleStoreError::DigestMismatch);
-    }
-    page_count
-        .checked_mul(page_size)
-        .ok_or(FindingOperatorBundleStoreError::SellerArtifactCapacity)
-}
-
-fn seller_finding_artifact_bytes(
-    conn: &rusqlite::Connection,
-    finding_id: &str,
-) -> Result<Option<i64>, FindingOperatorBundleStoreError> {
-    let payload_bytes: Option<i64> = conn
-        .query_row(
-            "SELECT length(ciphertext) FROM chio_finding_payloads WHERE finding_id = ?1",
-            [finding_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    let bundle_bytes: Option<i64> = conn
-        .query_row(
-            "SELECT length(bundle_json) FROM chio_finding_operator_bundles WHERE finding_id = ?1",
-            [finding_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    let proof_bytes: Option<i64> = conn
-        .query_row(
-            "SELECT length(proof_json) FROM chio_finding_operator_proofs WHERE finding_id = ?1",
-            [finding_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    let (Some(payload_bytes), Some(bundle_bytes), Some(proof_bytes)) =
-        (payload_bytes, bundle_bytes, proof_bytes)
-    else {
-        return Ok(None);
-    };
-    if payload_bytes < 0 || bundle_bytes < 0 || proof_bytes < 0 {
-        return Err(FindingOperatorBundleStoreError::DigestMismatch);
-    }
-    payload_bytes
-        .checked_add(bundle_bytes)
-        .and_then(|value| value.checked_add(proof_bytes))
-        .map(Some)
-        .ok_or(FindingOperatorBundleStoreError::SellerArtifactCapacity)
 }
 
 fn load_terminal(
@@ -1958,14 +1939,17 @@ fn validate_identifier(
     Ok(())
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
+impl SqliteFindingOperatorBundleStore {
+    fn now_secs(&self) -> Result<i64, FindingOperatorBundleStoreError> {
+        Ok(self.clock.now_secs()?)
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "finding_operator_bundle_store_tests.rs"]
 mod tests;

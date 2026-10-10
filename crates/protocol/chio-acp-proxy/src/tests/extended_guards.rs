@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn fs_guard_path_with_trailing_slash() {
     let guard = FsGuard::new(vec!["/home/user/project".to_string()]);

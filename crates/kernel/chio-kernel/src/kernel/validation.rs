@@ -22,6 +22,24 @@ use crate::budget_store::{
     BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+#[path = "validation/aggregate.rs"]
+mod aggregate;
+#[path = "validation/caller_budget.rs"]
+mod caller_budget;
+#[path = "validation/capability_evidence.rs"]
+mod capability_evidence;
+#[path = "validation/cumulative.rs"]
+mod cumulative;
+#[path = "validation/issuance.rs"]
+mod issuance;
+#[path = "validation/issuer_trust.rs"]
+mod issuer_trust;
+#[path = "validation/lineage.rs"]
+mod lineage;
+#[path = "validation/payment_amount.rs"]
+mod payment_amount;
+#[path = "validation/portable.rs"]
+mod portable;
 #[path = "validation/revocation_trace.rs"]
 mod revocation_trace;
 
@@ -31,38 +49,15 @@ pub(crate) struct ReservedPrepayment {
 }
 
 impl ChioKernel {
-    /// Issue a new capability for an agent.
-    ///
-    /// The kernel delegates issuance to the configured capability authority.
-    pub fn issue_capability(
+    pub(crate) fn resolve_security_invocation_context(
         &self,
-        subject: &chio_core::PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-    ) -> Result<CapabilityToken, KernelError> {
-        crate::ensure_capability_issuance_supported(&scope)?;
-        let capability =
-            self.capability_authority
-                .issue_capability(subject, scope.clone(), ttl_seconds)?;
-        crate::validate_issued_capability_response(
-            &capability,
-            subject,
-            &scope,
-            ttl_seconds,
-            &self.capability_authority.authority_public_key(),
-        )?;
-
-        info!(
-            capability_id = %capability.id,
-            subject = %subject.to_hex(),
-            ttl = ttl_seconds,
-            issuer = %capability.issuer.to_hex(),
-            "issuing capability"
-        );
-
-        self.record_observed_capability_snapshot(&capability)?;
-
-        Ok(capability)
+        context: &chio_core::session::OperationContext,
+        operation: &chio_core::session::ToolCallOperation,
+    ) -> Result<Option<SecurityInvocationContext>, KernelError> {
+        self.security_invocation_context_authority
+            .as_ref()
+            .map(|authority| authority.resolve_security_invocation_context(context, operation))
+            .transpose()
     }
 
     /// Whether a capability id is present in the installed revocation store.
@@ -95,8 +90,18 @@ impl ChioKernel {
     }
 
     #[must_use]
+    pub fn guard_names(&self) -> Vec<&str> {
+        self.guards.iter().map(|guard| guard.name()).collect()
+    }
+
+    #[must_use]
     pub fn post_invocation_hook_count(&self) -> usize {
         self.post_invocation_pipeline.len()
+    }
+
+    #[must_use]
+    pub fn post_invocation_hook_names(&self) -> Vec<&str> {
+        self.post_invocation_pipeline.names()
     }
 
     pub async fn drain_tool_server_events_async(
@@ -238,6 +243,69 @@ impl ChioKernel {
         self.config.ca_public_keys.len()
     }
 
+    /// Whether the registered tool server declares this tool free of side
+    /// effects. Unregistered servers and unannotated tools are side-effecting.
+    pub fn tool_is_read_only(&self, server_id: &str, tool_name: &str) -> bool {
+        self.tool_servers
+            .get(server_id)
+            .is_some_and(|server| server.tool_is_read_only(tool_name))
+    }
+
+    /// Whether an unknown tool outcome can be attempted under a new identity.
+    /// This is a conservative classifier, never dispatch permission: every new
+    /// attempt still needs full kernel evaluation. Any matching constrained
+    /// grant excludes retry, even if another matching grant could be selected.
+    /// Unrelated grants use the ordinary invocation/argument/model matcher and
+    /// do not withdraw eligibility. Matcher or authority-profile errors refuse.
+    pub fn can_redispatch_unknown_read(&self, request: &ToolCallRequest) -> bool {
+        if !self.tool_is_read_only(&request.server_id, &request.tool_name)
+            || request.dpop_proof.is_some()
+            || request.execution_nonce.is_some()
+            || request.declassification_grant.is_some()
+            || request.governed_intent.is_some()
+            || request.approval_token.is_some()
+            || !request.approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some()
+            || request.supplemental_authorization.is_some()
+            || request.capability.aggregate_invocation_budget.is_some()
+            || request
+                .arguments
+                .get(crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT)
+                .is_some()
+            || !matches!(request.capability.security_binding(), Ok(None))
+        {
+            return false;
+        }
+        let Ok(profile) = self.admission_authority_profile() else {
+            return false;
+        };
+        if profile.has_operation_owned_authority()
+            || profile.selection().runtime_hook_installed
+            || profile.selection().swarm_admission_required
+        {
+            return false;
+        }
+        let Ok(matching) = resolve_required_matching_grants(
+            &request.capability,
+            &request.tool_name,
+            &request.server_id,
+            &request.arguments,
+            request.model_metadata.as_ref(),
+        ) else {
+            return false;
+        };
+        matching.iter().all(|matching| {
+            let grant = matching.grant;
+            grant.max_invocations.is_none()
+                && grant.max_cost_per_invocation.is_none()
+                && grant.max_total_cost.is_none()
+                && grant.dpop_required != Some(true)
+                && grant.constraints.is_empty()
+        })
+    }
+
+    /// Classical local capability authority. The ordinary receipt signer is
+    /// available separately through [`Self::receipt_signing_public_key`].
     pub fn public_key(&self) -> chio_core::PublicKey {
         self.config.keypair.public_key()
     }
@@ -246,35 +314,10 @@ impl ChioKernel {
     ///
     /// Boot paths that load `policy.crypto_floor` must call this before
     /// accepting traffic when they do not use [`Self::with_hybrid_signing_backend`].
+    /// This capability-only setter neither installs a receipt signer nor changes
+    /// its boot floor. Use the boot method to configure hybrid receipt signing.
     pub fn set_capability_crypto_floor(&mut self, floor: KernelCryptoFloor) {
         self.capability_crypto_floor = floor;
-    }
-
-    pub fn capability_issuer_is_trusted(&self, issuer: &chio_core::PublicKey) -> bool {
-        self.trusted_issuer_keys().contains(issuer)
-    }
-
-    /// Verify the capability's signature against the trusted CA keys or the
-    /// kernel's own key (for locally-issued capabilities).
-    /// Resolve the trusted-issuer set for capability verification.
-    ///
-    /// This combines the configured CA public keys, the capability
-    /// authority's trusted keys, and the kernel's own public key. The
-    /// method is also used by the chio-kernel-core delegation path
-    /// so the portable TCB verifier sees the same trust set as the
-    /// inline check.
-    pub(crate) fn trusted_issuer_keys(&self) -> Vec<chio_core::PublicKey> {
-        let mut trusted = self.config.ca_public_keys.clone();
-        for authority_pk in self.capability_authority.trusted_public_keys() {
-            if !trusted.contains(&authority_pk) {
-                trusted.push(authority_pk);
-            }
-        }
-        let kernel_pk = self.config.keypair.public_key();
-        if !trusted.contains(&kernel_pk) {
-            trusted.push(kernel_pk);
-        }
-        trusted
     }
 
     /// Spec: PROTOCOL.md requires production kernels to route every
@@ -286,79 +329,35 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
-        let trusted = self.trusted_issuer_keys();
-        let clock = chio_kernel_core::FixedClock::new(now);
-        let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
-        let trust_resolver = self.capability_trust_root_resolver_snapshot();
-        let mut budgets = chio_kernel_core::NoopBudgetRegistry;
-        let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
-
-        chio_kernel_core::verify_capability_full_with_root(
-            cap,
-            &trusted,
-            &clock,
-            capability_crypto_floor(self.capability_crypto_floor),
-            chio_kernel_core::CapabilityFeatureContext {
-                peer: &peer_profile,
-                direct_root: direct_root.as_ref(),
-            },
-            &trust_resolver,
-            &mut budgets,
-        )
-        .map_err(|error| {
-            chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
-        })?;
-        Ok(())
+        self.verify_capability_full_pre_admit_with_clock(cap, remote_kernel_id, now, |kernel| {
+            // Sample after authority/lineage lookups, retaining the fresh
+            // caller's admission floor and its owned clock refusal.
+            let fresh_now = kernel
+                .read_authority_time()
+                .map_err(|error| KernelError::Clock(error).to_string())?
+                .as_secs();
+            Ok(chio_kernel_core::FixedClock::new(now.max(fresh_now)))
+        })
     }
 
-    /// Resolve the signed root token that the negotiated family-budget verifiers
-    /// require for a delegated capability.
-    ///
-    /// Migration prerequisite: once a peer negotiates either family budget feature,
-    /// every delegated capability from that peer needs a receipt-store snapshot
-    /// carrying `signed_capability` for its root. Snapshots written before signed
-    /// token retention carry no signed token, so enabling a feature against a store
-    /// that still holds them denies those capabilities with "has no signed token
-    /// evidence", which is distinct from the missing-row and tamper reasons.
-    /// Backfill signed root snapshots before turning either feature on.
-    pub(crate) fn negotiated_capability_root(
+    pub(super) fn verify_active_response_immutable_capability_pre_admit(
         &self,
         cap: &CapabilityToken,
-        peer: &chio_core::capability::features::CapabilityNegotiation,
-    ) -> Result<Option<CapabilityToken>, String> {
-        let features = &peer.features;
-        let lineage_required = features
-            .get(chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET)
-            .copied()
-            .unwrap_or(false)
-            || features
-                .get(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET)
-                .copied()
-                .unwrap_or(false);
-        if !lineage_required || cap.delegation_chain.is_empty() {
-            return Ok(None);
-        }
-
-        let root_id = cap
-            .delegation_chain
-            .first()
-            .map(|link| link.capability_id.as_str())
-            .ok_or_else(|| "delegated capability has no root delegation link".to_string())?;
-        let snapshot = self
-            .with_receipt_store(|store| Ok(store.get_capability_snapshot(root_id)?))
-            .map_err(|error| format!("failed to resolve signed capability root: {error}"))?
-            .flatten()
-            .ok_or_else(|| format!("missing signed capability root snapshot for {root_id}"))?;
-        let signed_root = snapshot.signed_capability.ok_or_else(|| {
-            format!("capability root snapshot {root_id} has no signed token evidence")
-        })?;
-        if signed_root.id != root_id {
-            return Err(format!(
-                "signed capability root {} does not match requested root {root_id}",
-                signed_root.id
-            ));
-        }
-        Ok(Some(signed_root))
+        recorded_at_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        let authority_now = self
+            .read_authority_time()
+            .map_err(KernelError::Clock)?
+            .as_secs();
+        self.verify_capability_full_pre_admit_with_clock(
+            cap,
+            None,
+            authority_now,
+            |_| Ok(chio_kernel_core::FixedClock::new(recorded_at_unix_secs)),
+        )
+        .map_err(|reason| KernelError::GovernedTransactionDenied(format!(
+            "active-response authorization denied: operator capability verification failed: {reason}"
+        )))
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain
@@ -400,34 +399,7 @@ impl ChioKernel {
     /// would return a re-admitting sibling's live share and let an
     /// oversubscribing sibling bypass the parent cap.
     pub(crate) fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<bool, String> {
-        if let Some(parent_link) = cap.delegation_chain.last() {
-            self.enforce_restart_reserved_hold_gate()?;
-            use chio_kernel_core::BudgetRegistry;
-            let proposed_share = cap
-                .budget_share_bps
-                .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
-            let mut budgets = match self.budget_registry.lock() {
-                Ok(guard) => guard,
-                Err(_poisoned) => {
-                    // Fail closed on a poisoned monetary lock: a half-mutated
-                    // budget registry must never admit a child on a lucky recovery.
-                    self.record_tcb_lock_poison("budget_registry");
-                    return Err("budget registry lock poisoned; failing closed".to_string());
-                }
-            };
-            budgets
-                .try_admit_child(
-                    parent_link.capability_id.as_str(),
-                    cap.id.clone(),
-                    proposed_share,
-                )
-                .map_err(|err| err.to_string())?;
-            // The admit succeeded against a parent link, so this evaluation now
-            // holds a lease it is responsible for releasing on cleanup.
-            return Ok(true);
-        }
-
-        Ok(false)
+        self.admit_capability_budget_for_dispatch(cap, None)
     }
 
     pub(crate) fn release_admitted_capability_budget(
@@ -592,96 +564,6 @@ impl ChioKernel {
         }
     }
 
-    /// Run the portable pure-compute verdict path provided by
-    /// `chio-kernel-core`.
-    ///
-    /// This exposes the same synchronous checks the core kernel performs
-    /// (capability signature, issuer trust, time bounds, subject binding,
-    /// scope match, sync guard pipeline) in isolation from the
-    /// `chio-kernel`-only concerns (budget mutation, revocation lookup,
-    /// governed-transaction evaluation, tool dispatch, receipt
-    /// persistence).
-    ///
-    /// Adapters that run the kernel on constrained platforms (wasm32,
-    /// edge workers, mobile via FFI) should prefer this entry point --
-    /// it does not require a tokio runtime, a sqlite database, or any
-    /// IO adapter. The full `evaluate_tool_call_*` API remains the
-    /// authoritative path for the desktop sidecar.
-    ///
-    /// Verified-core boundary note:
-    /// `formal/proof-manifest.toml` treats this shell method as the one
-    /// `chio-kernel` entrypoint inside the current bounded verified core,
-    /// because it delegates directly to `chio_kernel_core::evaluate` after
-    /// supplying trusted issuers and portable guard/context wiring.
-    pub fn evaluate_portable_verdict<'a>(
-        &self,
-        capability: &'a CapabilityToken,
-        request: &chio_kernel_core::PortableToolCallRequest,
-        guards: &'a [&'a dyn chio_kernel_core::Guard],
-        clock: &'a dyn chio_kernel_core::Clock,
-        session_filesystem_roots: Option<&'a [String]>,
-    ) -> chio_kernel_core::EvaluationVerdict {
-        let trusted = self.trusted_issuer_keys();
-        let peer_profile = match self.capability_negotiation_for_remote(None, clock.now_unix_secs())
-        {
-            Ok(profile) => profile,
-            // Fail closed: a negotiation error denies rather than falling back
-            // to the permissive default profile.
-            Err(reason) => {
-                return chio_kernel_core::EvaluationVerdict {
-                    verdict: chio_kernel_core::Verdict::Deny,
-                    reason: Some(format!(
-                        "capability negotiation failed; denying fail-closed: {reason}"
-                    )),
-                    matched_grant_index: None,
-                    verified: None,
-                };
-            }
-        };
-        let trust_resolver = self.capability_trust_root_resolver_snapshot();
-        let direct_root = match self.negotiated_capability_root(capability, &peer_profile) {
-            Ok(root) => root,
-            Err(reason) => {
-                return chio_kernel_core::EvaluationVerdict {
-                    verdict: chio_kernel_core::Verdict::Deny,
-                    reason: Some(reason),
-                    matched_grant_index: None,
-                    verified: None,
-                };
-            }
-        };
-        let mut budgets = match self.budget_registry.lock() {
-            Ok(guard) => guard,
-            Err(_poisoned) => {
-                // The monetary lock is poisoned: a panic left the registry in an
-                // unknown state. Deny fail-closed and trip the degraded flag so
-                // later evaluations are denied at the pre-dispatch gate too.
-                self.record_tcb_lock_poison("budget_registry");
-                return chio_kernel_core::EvaluationVerdict {
-                    verdict: chio_kernel_core::Verdict::Deny,
-                    reason: Some("budget registry lock poisoned; denying fail-closed".to_string()),
-                    matched_grant_index: None,
-                    verified: None,
-                };
-            }
-        };
-        chio_kernel_core::evaluate_with_full_floor_and_root(
-            chio_kernel_core::EvaluateInput {
-                request,
-                capability,
-                trusted_issuers: &trusted,
-                clock,
-                guards,
-                session_filesystem_roots,
-            },
-            capability_crypto_floor(self.capability_crypto_floor),
-            &peer_profile,
-            direct_root.as_ref(),
-            &trust_resolver,
-            &mut *budgets,
-        )
-    }
-
     pub fn register_budget_parent(
         &self,
         parent_token_id: String,
@@ -739,7 +621,11 @@ impl ChioKernel {
         // dispatch even if the chain is otherwise valid. This is a
         // no-op (`Ok(())`) when no view is installed.
         #[cfg(feature = "delegation")]
-        delegation::consult_revocation_view(cap, self.revocation_view.as_ref())?;
+        delegation::consult_revocation_view(
+            cap,
+            self.revocation_view.as_ref(),
+            self.trusted_now_millis()?,
+        )?;
 
         if cap.delegation_chain.is_empty() {
             return Ok(());
@@ -777,7 +663,9 @@ impl ChioKernel {
                         link.capability_id, index
                     ))
                 })?;
-            let expected_depth = index as u64;
+            let expected_depth = u64::try_from(index).map_err(|_| {
+                KernelError::DelegationInvalid("delegation depth exceeds lineage range".into())
+            })?;
             if snapshot.delegation_depth != expected_depth {
                 return Err(KernelError::DelegationInvalid(format!(
                     "delegation ancestor {} at link index {} has stored depth {}, expected {}",
@@ -787,7 +675,8 @@ impl ChioKernel {
 
             let expected_parent_capability_id = index
                 .checked_sub(1)
-                .map(|parent_index| cap.delegation_chain[parent_index].capability_id.as_str());
+                .and_then(|parent_index| cap.delegation_chain.get(parent_index))
+                .map(|parent| parent.capability_id.as_str());
             if snapshot.parent_capability_id.as_deref() != expected_parent_capability_id {
                 let observed_parent = snapshot.parent_capability_id.as_deref().unwrap_or("<root>");
                 let expected_parent = expected_parent_capability_id.unwrap_or("<root>");
@@ -800,8 +689,12 @@ impl ChioKernel {
             ancestor_snapshots.push(snapshot);
         }
 
-        for (index, link) in cap.delegation_chain.iter().enumerate() {
-            let parent_snapshot = &ancestor_snapshots[index];
+        for (index, (link, parent_snapshot)) in cap
+            .delegation_chain
+            .iter()
+            .zip(&ancestor_snapshots)
+            .enumerate()
+        {
             let parent_scope = scope_from_capability_snapshot(parent_snapshot)?;
 
             if parent_snapshot.subject_key != link.delegator.to_hex() {
@@ -1190,270 +1083,6 @@ impl ChioKernel {
             .incr(&[reconciliation]);
     }
 
-    fn cumulative_approval_request_for_grant(
-        &self,
-        request: &ToolCallRequest,
-        matching: &MatchingGrant<'_>,
-        admission: Option<&DurableToolAdmission>,
-        now: u64,
-    ) -> Result<Option<BudgetCumulativeApprovalRequest>, KernelError> {
-        let cumulative_constraint_count = matching
-            .grant
-            .constraints
-            .iter()
-            .filter(|constraint| {
-                matches!(
-                    constraint,
-                    Constraint::RequireCumulativeApprovalAbove { .. }
-                )
-            })
-            .count();
-        if cumulative_constraint_count == 0 {
-            return Ok(None);
-        }
-        if cumulative_constraint_count != 1 {
-            return Err(KernelError::GovernedTransactionDenied(
-                "a matching grant must contain exactly one cumulative approval constraint"
-                    .to_owned(),
-            ));
-        }
-        let admission = admission.ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "cumulative approval requires a durable admission operation".to_owned(),
-            )
-        })?;
-        let peer = self
-            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
-            .map_err(KernelError::GovernedTransactionDenied)?;
-        if !peer.supports(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET) {
-            return Err(KernelError::GovernedTransactionDenied(
-                "cumulative approval budgets were not negotiated".to_owned(),
-            ));
-        }
-        let direct_root = self
-            .negotiated_capability_root(&request.capability, &peer)
-            .map_err(KernelError::GovernedTransactionDenied)?;
-        let verified =
-            chio_core::capability::cumulative_approval::verify_cumulative_approval_constraints(
-                &request.capability,
-                &self.trusted_issuer_keys(),
-                direct_root.as_ref(),
-            )
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let mut matching_constraints = verified
-            .into_iter()
-            .filter(|constraint| constraint.grant_index == matching.index);
-        let constraint = matching_constraints.next().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "cumulative approval verification omitted the matching grant".to_owned(),
-            )
-        })?;
-        if matching_constraints.next().is_some() {
-            return Err(KernelError::GovernedTransactionDenied(
-                "cumulative approval verification produced an ambiguous grant".to_owned(),
-            ));
-        }
-        let intent = request.governed_intent.as_ref().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "cumulative approval requires a governed transaction intent".to_owned(),
-            )
-        })?;
-        if intent.server_id != request.server_id || intent.tool_name != request.tool_name {
-            return Err(KernelError::GovernedTransactionDenied(
-                "cumulative approval intent target does not match the request".to_owned(),
-            ));
-        }
-        let requested_authorized = intent.max_amount.clone().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "cumulative approval intent requires a maximum amount".to_owned(),
-            )
-        })?;
-        if requested_authorized.currency != constraint.threshold.currency {
-            return Err(KernelError::GovernedTransactionDenied(
-                "cumulative approval intent currency does not match the capability".to_owned(),
-            ));
-        }
-        Ok(Some(BudgetCumulativeApprovalRequest {
-            operation_id: admission.operation_id().to_owned(),
-            account_key: BudgetCumulativeApprovalAccountKey {
-                authority_id: constraint.authority_id.to_hex(),
-                owner_id: constraint.owner_id,
-                approval_budget_id: constraint.approval_budget_id,
-                approval_budget_epoch: constraint.approval_budget_epoch,
-                root_grant_hash: constraint.root_grant_hash,
-                delegation_root_id: constraint.delegation_root_id,
-                root_binding_digest: constraint.root_binding_digest,
-                currency: constraint.threshold.currency.clone(),
-            },
-            authority_threshold: constraint.authority_threshold,
-            effective_threshold: constraint.threshold,
-            requested_authorized,
-        }))
-    }
-
-    fn ensure_cumulative_approval_proposal(
-        &self,
-        request: &ToolCallRequest,
-        required: &ApprovalRequiredBudgetHold,
-        admission: &mut DurableToolAdmission,
-        trusted_now_unix_ms: u64,
-    ) -> Result<chio_core::capability::governance::ThresholdApprovalProposal, KernelError> {
-        if admission.operation.state() == AdmissionOperationState::ApprovalRequired {
-            if admission
-                .operation
-                .budget_hold_id()
-                .is_none_or(|hold_id| hold_id.as_str() != required.hold_id)
-            {
-                return Err(KernelError::DurableAdmission(
-                    "retained approval proposal changed its budget hold".to_owned(),
-                ));
-            }
-            return admission
-                .operation
-                .threshold_proposal()
-                .cloned()
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "approval-required operation omitted its stored proposal".to_owned(),
-                    )
-                });
-        }
-        let now = trusted_now_unix_ms / 1_000;
-        let requirement = self.threshold_approval_requirement(request, now)?;
-        let intent = request.governed_intent.as_ref().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "cumulative approval requires a governed transaction intent".to_owned(),
-            )
-        })?;
-        let intent_hash = intent
-            .binding_hash()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let capability_digest = sha256_hex(
-            &canonical_json_bytes(&request.capability)
-                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
-        );
-        let proposal_created_at = required.metadata.recorded_at_unix_seconds.ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "cumulative approval authorization omitted its durable timestamp".to_owned(),
-            )
-        })?;
-        let proposal_deadline =
-            chio_core::capability::governance::ThresholdApprovalProposalBody::proposal_deadline(
-                proposal_created_at,
-                requirement.timeout_seconds,
-                request.capability.expires_at,
-                intent.governed_operation_expires_at(),
-            )
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let proposal = chio_core::capability::governance::ThresholdApprovalProposal::sign(
-            chio_core::capability::governance::ThresholdApprovalProposalBody {
-                schema: chio_core::capability::governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA
-                    .to_owned(),
-                proposal_id: admission.operation_id().to_owned(),
-                request_id: request.request_id.clone(),
-                governed_intent_hash: intent_hash,
-                subject: request.capability.subject.clone(),
-                authorizing_capability_digest: capability_digest,
-                policy_hash: requirement.policy_hash,
-                threshold: requirement.threshold,
-                eligible_set_digest: requirement.eligible_set_digest,
-                proposal_created_at,
-                proposal_deadline,
-                policy_authority: self.config.keypair.public_key(),
-            },
-            &self.config.keypair,
-        )
-        .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let proposal_hash = AdmissionDigest::try_new(
-            "threshold_proposal_hash",
-            proposal
-                .artifact_digest()
-                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
-        )?;
-        admission.operation = self.apply_admission_command(
-            admission.operation.clone(),
-            vec![
-                AdmissionAttachment::ThresholdProposalHash(proposal_hash),
-                AdmissionAttachment::BudgetHoldId(AdmissionIdentifier::try_new(
-                    "budget_hold_id",
-                    required.hold_id.clone(),
-                )?),
-                AdmissionAttachment::ThresholdProposal(Box::new(proposal.clone())),
-            ],
-            AdmissionOperationState::ApprovalRequired,
-            trusted_now_unix_ms,
-        )?;
-        Ok(proposal)
-    }
-
-    fn authorize_cumulative_approval(
-        &self,
-        request: &ToolCallRequest,
-        grant_index: usize,
-        required: &ApprovalRequiredBudgetHold,
-        admission: &mut DurableToolAdmission,
-        trusted_now_unix_ms: u64,
-    ) -> Result<crate::budget_store::BudgetHoldMutationDecision, KernelError> {
-        let proposal = self.ensure_cumulative_approval_proposal(
-            request,
-            required,
-            admission,
-            trusted_now_unix_ms,
-        )?;
-        if request.threshold_approval_proposal.as_ref() != Some(&proposal) {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold approval request does not carry the stored proposal".to_owned(),
-            ));
-        }
-        let intent_hash = request
-            .governed_intent
-            .as_ref()
-            .ok_or_else(|| {
-                KernelError::GovernedTransactionDenied(
-                    "cumulative approval requires a governed transaction intent".to_owned(),
-                )
-            })?
-            .binding_hash()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let verified = self.validate_threshold_approval_set(
-            request,
-            &request.capability,
-            &intent_hash,
-            trusted_now_unix_ms / 1_000,
-        )?;
-        let approval_set_digest = verified
-            .body
-            .approval_set_hash()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let decision = self.with_budget_store(|store| {
-            Ok(
-                store.authorize_cumulative_approval(BudgetAuthorizeCumulativeApprovalRequest {
-                    capability_id: request.capability.id.clone(),
-                    grant_index,
-                    operation_id: admission.operation_id().to_owned(),
-                    hold_id: required.hold_id.clone(),
-                    admission_binding: required.admission_binding.clone(),
-                    approval_set_digest,
-                    event_id: format!("{}:authorize-cumulative", required.hold_id),
-                    authority: required.metadata.authority.clone(),
-                })?,
-            )
-        })?;
-        let mutation = match decision {
-            BudgetCumulativeApprovalAuthorizationDecision::Authorized(mutation)
-            | BudgetCumulativeApprovalAuthorizationDecision::AlreadyAuthorized(mutation) => {
-                mutation
-            }
-        };
-        admission.operation = self.apply_admission_command(
-            admission.operation.clone(),
-            Vec::new(),
-            AdmissionOperationState::BudgetAuthorized,
-            trusted_now_unix_ms,
-        )?;
-        Ok(mutation)
-    }
-
     /// Check and decrement the invocation budget for a capability.
     ///
     /// Returns the matched grant index and the exact pre-execution budget mutation.
@@ -1480,6 +1109,27 @@ impl ChioKernel {
             let grant = matching.grant;
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
+            let durable_nonce_preflight = nonce_preflight
+                && durable_admission
+                    .as_deref()
+                    .is_some_and(DurableToolAdmission::requires_execution_nonce);
+            if durable_nonce_preflight {
+                // A retried preflight already owns its internal hold. Replay the
+                // deterministic cleanup instead of authorizing a second identity;
+                // the execution request carries the authoritative budget check.
+                if let Some(admission) = durable_admission.as_deref() {
+                    if let Some(preflight) = admission.nonce_preflight() {
+                        self.release_durable_nonce_preflight_hold(
+                            admission.operation(),
+                            preflight,
+                        )?;
+                        return Ok(BudgetAdmissionOutcome::Authorized {
+                            grant_index: matching.index,
+                            mutation: Box::new(PreExecutionBudgetMutation::None),
+                        });
+                    }
+                }
+            }
 
             if has_monetary
                 || (nonce_preflight && grant.max_invocations.is_some())
@@ -1499,16 +1149,29 @@ impl ChioKernel {
                     .unwrap_or_else(|| "USD".to_string());
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
-                let budget_total = max_total.unwrap_or(u64::MAX);
+                let budget_total = max_total;
                 let (budget_hold_id, authorize_event_id, admission_binding, authority) =
                     if let Some(admission) = durable_admission.as_deref() {
-                        let (binding, authority) = self.durable_budget_binding(admission, cap)?;
-                        (
-                            admission.budget_hold_id(matching.index),
-                            admission.budget_authorize_event_id(matching.index),
-                            Some(binding),
-                            authority,
-                        )
+                        let (mut binding, authority) =
+                            self.durable_budget_binding(admission, cap)?;
+                        if durable_nonce_preflight {
+                            let identity = admission.nonce_preflight_identity(matching.index)?;
+                            binding.operation_id =
+                                identity.budget_operation_id().as_str().to_owned();
+                            (
+                                identity.hold_id().as_str().to_owned(),
+                                identity.authorization_event_id().as_str().to_owned(),
+                                Some(binding),
+                                authority,
+                            )
+                        } else {
+                            (
+                                admission.budget_hold_id(matching.index),
+                                admission.budget_authorize_event_id(matching.index),
+                                Some(binding),
+                                authority,
+                            )
+                        }
                     } else {
                         let budget_hold_id = if nonce_preflight {
                             format!(
@@ -1563,12 +1226,20 @@ impl ChioKernel {
                     }
                 }
                 invocation_quotas.sort_by(|left, right| left.key.cmp(&right.key));
-                let cumulative_approval = self.cumulative_approval_request_for_grant(
-                    request,
-                    matching,
-                    durable_admission.as_deref(),
-                    trusted_now_unix_ms / 1_000,
-                )?;
+                // A strict nonce preflight authorizes a provisional hold that
+                // is reversed before issuance; the executable hold the
+                // execution request takes is the one that decides cumulative
+                // approval, so the preflight never evaluates it.
+                let cumulative_approval = if durable_nonce_preflight {
+                    None
+                } else {
+                    self.cumulative_approval_request_for_grant(
+                        request,
+                        matching,
+                        durable_admission.as_deref(),
+                        trusted_now_unix_ms / 1_000,
+                    )?
+                };
                 let authorization_request = BudgetAuthorizeHoldRequest {
                     capability_id: cap.id.clone(),
                     grant_index: matching.index,
@@ -1584,67 +1255,84 @@ impl ChioKernel {
                     authority: Some(authority.clone()),
                 };
                 let decision = if let Some(admission) = durable_admission.as_deref_mut() {
-                    let payment_journal = if admission.requires_payment() {
-                        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "durable monetary authorization lost its payment adapter"
-                                    .to_owned(),
-                            )
-                        })?;
-                        let rail_mode = adapter.rail_mode().ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "durable monetary authorization lost its payment rail mode"
-                                    .to_owned(),
-                            )
-                        })?;
-                        let journal = crate::payment::PaymentJournalRecord {
-                            operation_id: admission.operation_id().to_owned(),
-                            journal_version: 1,
-                            request_namespace_digest: admission
-                                .operation()
-                                .binding()
-                                .request_namespace_digest()
-                                .as_str()
-                                .to_owned(),
-                            request_id: admission
-                                .operation()
-                                .binding()
-                                .request_id()
-                                .as_str()
-                                .to_owned(),
-                            capability_id: cap.id.clone(),
-                            grant_index: u32::try_from(matching.index).map_err(|_| {
+                    if durable_nonce_preflight {
+                        // The internal preflight hold has no payment participant:
+                        // it can be reversed but never captured or settled.
+                        self.authorize_durable_nonce_preflight(
+                            admission,
+                            authorization_request,
+                            trusted_now_unix_ms,
+                        )?
+                    } else {
+                        let payment_journal = if admission.requires_payment() {
+                            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                                 KernelError::DurableAdmission(
-                                    "payment grant index exceeds the durable journal range"
+                                    "durable monetary authorization lost its payment adapter"
                                         .to_owned(),
                                 )
-                            })?,
-                            hold_id: Some(budget_hold_id.clone()),
-                            rail: adapter.rail_id().to_owned(),
-                            rail_mode,
-                            authorization_id: None,
-                            transaction_id: None,
-                            amount_units: cost_units,
-                            settle_action: None,
-                            settle_amount_units: None,
-                            release_authority: None,
-                            currency: currency.clone(),
-                            state: crate::payment::PaymentJournalState::HoldPlaced,
-                            created_at_unix_ms: trusted_now_unix_ms.max(1),
+                            })?;
+                            let rail_mode = adapter.rail_mode().ok_or_else(|| {
+                                KernelError::DurableAdmission(
+                                    "durable monetary authorization lost its payment rail mode"
+                                        .to_owned(),
+                                )
+                            })?;
+                            let authorized_amount_units = Self::durable_payment_authorized_amount(
+                                request, cost_units, &currency,
+                            )?;
+                            let journal = crate::payment::PaymentJournalRecord {
+                                operation_id: admission.operation_id().to_owned(),
+                                journal_version: 1,
+                                request_namespace_digest: admission
+                                    .operation()
+                                    .binding()
+                                    .request_namespace_digest()
+                                    .as_str()
+                                    .to_owned(),
+                                request_id: admission
+                                    .operation()
+                                    .binding()
+                                    .request_id()
+                                    .as_str()
+                                    .to_owned(),
+                                capability_id: cap.id.clone(),
+                                grant_index: u32::try_from(matching.index).map_err(|_| {
+                                    KernelError::DurableAdmission(
+                                        "payment grant index exceeds the durable journal range"
+                                            .to_owned(),
+                                    )
+                                })?,
+                                hold_id: Some(budget_hold_id.clone()),
+                                rail: adapter.rail_id().to_owned(),
+                                rail_mode,
+                                authorization_id: None,
+                                transaction_id: None,
+                                amount_units: cost_units,
+                                authorized_amount_units: Some(authorized_amount_units),
+                                authorization_attempt: Some(
+                                    crate::payment::PaymentAuthorizationAttempt::NotStarted,
+                                ),
+                                settle_action: None,
+                                settle_amount_units: None,
+                                release_authority: None,
+                                currency: currency.clone(),
+                                state: crate::payment::PaymentJournalState::HoldPlaced,
+                                created_at_unix_ms: trusted_now_unix_ms.max(1),
+                            };
+                            journal.validate().map_err(|error| {
+                                KernelError::DurableAdmission(error.to_string())
+                            })?;
+                            Some(journal)
+                        } else {
+                            None
                         };
-                        journal
-                            .validate()
-                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                        Some(journal)
-                    } else {
-                        None
-                    };
-                    self.authorize_durable_budget_hold(
-                        admission,
-                        authorization_request,
-                        payment_journal,
-                        trusted_now_unix_ms,
-                    )?
+                        self.authorize_durable_budget_hold(
+                            admission,
+                            authorization_request,
+                            payment_journal,
+                            trusted_now_unix_ms,
+                        )?
+                    }
                 } else {
                     self.with_budget_store(|store| {
                         Ok(store.authorize_budget_hold(authorization_request)?)
@@ -1916,7 +1604,10 @@ impl ChioKernel {
             .is_none_or(|server| server.measures_realized_cost())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn finalize_unmeasured_cost_provisional_allow(
         &self,
         request: &ToolCallRequest,
@@ -1934,14 +1625,21 @@ impl ChioKernel {
             self.reverse_budget_charge(&cap.id, &charge)?
         };
         let financial = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: 0,
             currency: charge.currency.clone(),
-            budget_remaining: charge
-                .budget_total
-                .saturating_sub(reverse.committed_cost_units_after),
+            budget_remaining: financial_budget_remaining(
+                charge.budget_total,
+                reverse.committed_cost_units_after,
+            )?,
             budget_total: charge.budget_total,
-            delegation_depth: cap.delegation_chain.len() as u32,
+            delegation_depth: crate::receipt_support::checked_receipt_count(
+                cap.delegation_chain.len(),
+                "delegation depth",
+            )?,
             root_budget_holder: cap.issuer.to_hex(),
             payment_reference: None,
             settlement_status: SettlementStatus::Pending,
@@ -1989,7 +1687,10 @@ impl ChioKernel {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,
@@ -2000,6 +1701,7 @@ impl ChioKernel {
         cost_context: FinalizeToolOutputCostContext<'_>,
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         let FinalizeToolOutputCostContext {
             charge_result,
@@ -2061,12 +1763,18 @@ impl ChioKernel {
                 }
                 let (payment_reference, settlement_status) = settlement.into_receipt_parts();
                 let financial = FinancialReceiptMetadata {
-                    grant_index: matched_grant_index as u32,
+                    grant_index: crate::receipt_support::checked_receipt_count(
+                        matched_grant_index,
+                        "grant index",
+                    )?,
                     cost_charged: quoted_units,
                     currency: quoted_currency,
-                    budget_remaining: 0,
-                    budget_total: quoted_units,
-                    delegation_depth: cap.delegation_chain.len() as u32,
+                    budget_remaining: None,
+                    budget_total: None,
+                    delegation_depth: crate::receipt_support::checked_receipt_count(
+                        cap.delegation_chain.len(),
+                        "delegation depth",
+                    )?,
                     root_budget_holder: cap.issuer.to_hex(),
                     payment_reference,
                     settlement_status,
@@ -2086,6 +1794,7 @@ impl ChioKernel {
                     matched_grant_index,
                     metadata,
                     verified_payee_binding,
+                    security_context,
                 );
             }
             return self.finalize_tool_output_with_metadata_and_payee_binding(
@@ -2096,6 +1805,7 @@ impl ChioKernel {
                 matched_grant_index,
                 extra_metadata,
                 verified_payee_binding,
+                security_context,
             );
         };
 
@@ -2133,6 +1843,7 @@ impl ChioKernel {
                     }));
                     (converted_units, false)
                 }
+                Err(error @ KernelError::Clock(_)) => return Err(error),
                 Err(error) => {
                     warn!(
                         request_id = %request.request_id,
@@ -2256,10 +1967,12 @@ impl ChioKernel {
             actual_cost
         };
 
-        let budget_remaining = charge
-            .budget_total
-            .saturating_sub(running_committed_cost_units);
-        let delegation_depth = cap.delegation_chain.len() as u32;
+        let budget_remaining =
+            financial_budget_remaining(charge.budget_total, running_committed_cost_units)?;
+        let delegation_depth = crate::receipt_support::checked_receipt_count(
+            cap.delegation_chain.len(),
+            "delegation depth",
+        )?;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) = settlement.into_receipt_parts();
         let payment_breakdown = payment_authorization.as_ref().map(|authorization| {
@@ -2274,7 +1987,10 @@ impl ChioKernel {
         });
 
         let financial_meta = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: recorded_cost,
             currency: charge.currency.clone(),
             budget_remaining,
@@ -2314,7 +2030,8 @@ impl ChioKernel {
                         ))
                     },
                 )?;
-                let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+                let now = i64::try_from(self.trusted_now_millis()?.as_secs())
+                    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
                 let binding = crate::execution_nonce::NonceBinding {
                     subject_id: cap.subject.to_hex(),
                     request_id: request.request_id.clone(),
@@ -2449,6 +2166,8 @@ impl ChioKernel {
                 })?;
         let rate =
             self.block_on_price_oracle(oracle.get_rate(&reported_cost.currency, grant_currency))?;
+        // Oracle I/O may advance time beyond the caller's trusted reading.
+        let timestamp = self.trusted_now_millis()?.as_secs().max(timestamp);
         let converted_units =
             convert_supported_units(reported_cost.units, &rate, rate.conversion_margin_bps)
                 .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;
@@ -2502,7 +2221,7 @@ impl ChioKernel {
             }
             return Ok(None);
         };
-        let durable_journal = durable_admission
+        let mut durable_journal = durable_admission
             .filter(|_| charge_result.is_some())
             .map(|admission| {
                 self.load_durable_payment_journal(admission)
@@ -2510,14 +2229,12 @@ impl ChioKernel {
             })
             .transpose()?;
         if let Some(journal) = durable_journal.as_ref() {
-            let rail_mode = adapter.rail_mode().ok_or_else(|| {
-                PaymentError::RailError("durable payment adapter omitted its rail mode".to_owned())
-            })?;
-            if adapter.rail_id() != journal.rail || rail_mode != journal.rail_mode {
-                return Err(PaymentError::RailError(
-                    "durable payment adapter does not match the persisted rail profile".to_owned(),
-                ));
-            }
+            Self::validate_durable_payment_authorization_intent(
+                adapter.as_ref(),
+                journal,
+                amount_units,
+                &currency,
+            )?;
             match (journal.state, journal.rail_mode) {
                 (
                     crate::payment::PaymentJournalState::Authorized,
@@ -2656,6 +2373,13 @@ impl ChioKernel {
             governed,
             commerce,
         };
+        if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
+            durable_journal = Some(self.begin_durable_payment_authorization_attempt(
+                admission,
+                journal,
+                trusted_now_unix_ms,
+            )?);
+        }
         let authorization = run_payment_adapter_operation("authorize", || {
             adapter.authorize(&authorization_request)
         })?;

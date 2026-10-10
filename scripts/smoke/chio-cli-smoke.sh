@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 CHIO_VERSION="${CHIO_VERSION:-0.1.0}"
 TMP_ROOT="${CHIO_SMOKE_TMP:-$(mktemp -d -t chio-cli-smoke.XXXXXX)}"
 ARTIFACT_ROOT="${CHIO_SMOKE_ARTIFACT_ROOT:-${TMP_ROOT}/artifacts}"
@@ -393,7 +394,7 @@ smoke_core() {
 
   run_cmd "core" "receipt-list" "${CHIO_BIN}" \
     --receipt-db "${receipt_db}" \
-    receipt list --limit 20
+    receipt list --admin-all --limit 20
   [[ -s "${ARTIFACT_ROOT}/core/receipt-list.out" ]]
 
   run_cmd "core" "evidence-export" "${CHIO_BIN}" \
@@ -539,7 +540,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-chio, receipt_db, policy, server, artifact_dir = sys.argv[1:]
+chio, receipt_db, policy, artifact_dir = sys.argv[1:5]
+launch = sys.argv[5:]
+separator = launch.index("--")
+launch_flags, wrapped_command = launch[:separator], launch[separator + 1 :]
 artifact_dir = Path(artifact_dir)
 artifact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -548,6 +552,8 @@ proc = subprocess.Popen(
         chio,
         "--receipt-db",
         receipt_db,
+        "--session-db",
+        str(Path(receipt_db).with_name("sessions.sqlite3")),
         "mcp",
         "serve",
         "--policy",
@@ -556,9 +562,11 @@ proc = subprocess.Popen(
         "smoke-mcp",
         "--server-name",
         "Smoke MCP",
+        "--server-version",
+        "1",
+        *launch_flags,
         "--",
-        "python3",
-        server,
+        *wrapped_command,
     ],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
@@ -619,17 +627,22 @@ smoke_mcp() {
   local dir="${TMP_ROOT}/mcp"
   local receipt_db="${dir}/receipts.sqlite3"
   write_mcp_smoke_fixture "${dir}"
+  chio_provision_mcp_launch \
+    "${CHIO_BIN}" "${dir}/security" smoke-mcp "Smoke MCP" 1 "${dir}" \
+    python3 "${dir}/mock_mcp_server.py"
 
   run_cmd "mcp" "stdio-flow" python3 \
     "${dir}/mcp_client.py" \
     "${CHIO_BIN}" \
     "${receipt_db}" \
     "${dir}/policy.yaml" \
-    "${dir}/mock_mcp_server.py" \
-    "${ARTIFACT_ROOT}/mcp/client"
+    "${ARTIFACT_ROOT}/mcp/client" \
+    "${CHIO_LAUNCH_FLAGS[@]}" \
+    -- \
+    "${CHIO_LAUNCH_COMMAND[@]}"
   run_cmd "mcp" "receipt-list" "${CHIO_BIN}" \
     --receipt-db "${receipt_db}" \
-    receipt list --limit 20
+    receipt list --admin-all --limit 20
   [[ -s "${ARTIFACT_ROOT}/mcp/receipt-list.out" ]]
 }
 

@@ -86,8 +86,8 @@ fn build_signed_receipt(scenario: &ReceiptScenario, kp: &Keypair) -> ChioReceipt
             grant_index: 0,
             cost_charged: scenario.cost_charged,
             currency: scenario.currency.clone(),
-            budget_remaining: 1_000_000,
-            budget_total: 1_000_000,
+            budget_remaining: Some(1_000_000),
+            budget_total: Some(1_000_000),
             delegation_depth: 1,
             root_budget_holder: scenario
                 .tenant_id

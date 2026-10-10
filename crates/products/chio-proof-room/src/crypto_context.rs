@@ -20,19 +20,19 @@ pub fn crypto_context_verified_report_bytes_with_bbs(
     fixture_id: &str,
 ) -> Result<Vec<u8>, String> {
     let context: chio_selective_disclosure::CryptoVerificationContext =
-        serde_json::from_slice(context_bytes).map_err(|error| {
+        crate::input::decode(context_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-invalid: {fixture_id}: {error}")
         })?;
     let report: chio_disclosure_lineage::DisclosureCryptoContextReport =
-        serde_json::from_slice(report_bytes).map_err(|error| {
+        crate::input::decode(report_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-report-invalid: {fixture_id}: {error}")
         })?;
     let proof: chio_selective_disclosure::SelectiveDisclosureProof =
-        serde_json::from_slice(proof_bytes).map_err(|error| {
+        crate::input::decode(proof_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-proof-invalid: {fixture_id}: {error}")
         })?;
     let privacy_profile: chio_selective_disclosure::DisclosureVerifierPrivacyProfile =
-        serde_json::from_slice(privacy_profile_bytes).map_err(|error| {
+        crate::input::decode(privacy_profile_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-profile-invalid: {fixture_id}: {error}")
         })?;
     if report.schema != chio_disclosure_lineage::DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1 {
@@ -129,15 +129,15 @@ pub fn crypto_context_rejected_report_bytes_with_bbs(
     fixture_id: &str,
 ) -> Result<Vec<u8>, String> {
     let context: chio_selective_disclosure::CryptoVerificationContext =
-        serde_json::from_slice(context_bytes).map_err(|error| {
+        crate::input::decode(context_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-invalid: {fixture_id}: {error}")
         })?;
     let proof: chio_selective_disclosure::SelectiveDisclosureProof =
-        serde_json::from_slice(proof_bytes).map_err(|error| {
+        crate::input::decode(proof_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-proof-invalid: {fixture_id}: {error}")
         })?;
     let privacy_profile: chio_selective_disclosure::DisclosureVerifierPrivacyProfile =
-        serde_json::from_slice(privacy_profile_bytes).map_err(|error| {
+        crate::input::decode(privacy_profile_bytes).map_err(|error| {
             format!("proof-room.fixture.crypto-context-profile-invalid: {fixture_id}: {error}")
         })?;
     let report = recompute_crypto_context_report(&context, &proof, &privacy_profile, fixture_id)?;

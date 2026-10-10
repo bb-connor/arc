@@ -12,11 +12,18 @@ fn internal_cluster_http_error(context: &'static str, error: &dyn std::fmt::Disp
 /// propagation delay. This is emitted from the capability revoke paths (local
 /// revoke and cluster-delta upserts) so the capability-revocation SLO reflects
 /// real capability revocations rather than passport lifecycle events.
+#[allow(
+    clippy::as_conversions,
+    reason = "Prometheus lag is an approximate observation and never authorizes an operation."
+)]
 pub(crate) fn observe_capability_revocation_lag(revoked_at: i64) {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs() as i64)
-        .unwrap_or(0);
+    use chio_security_types::clock::{Clock, SystemClock};
+    let Ok(now) = SystemClock.unix_millis() else {
+        return;
+    };
+    let Ok(now) = i64::try_from(now.as_secs()) else {
+        return;
+    };
     let lag_seconds = now.saturating_sub(revoked_at).max(0) as f64;
     chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG
         .observe(&["control_plane"], lag_seconds);
@@ -117,7 +124,7 @@ pub(crate) async fn handle_internal_tool_receipts_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -151,7 +158,7 @@ pub(crate) async fn handle_internal_child_receipts_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -265,7 +272,7 @@ pub(crate) async fn handle_internal_lineage_delta(
     {
         return response;
     }
-    let store = match open_receipt_store(&state.config) {
+    let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -385,7 +392,7 @@ fn visit_peers_until_shutdown<F>(
     }
 }
 
-fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> {
+pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> {
     if peer_is_partitioned(state, peer_url) {
         return Ok(());
     }
@@ -404,6 +411,7 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
             return Err(error);
         }
     };
+    super::authority_evidence::observe_peer_authority_identity(state, peer_url, &peer_status);
     update_peer_reachable(state, peer_url);
     let revocation_contract =
         match prepare_peer_revocation_sync(state, peer_url, &peer_status.replication) {
@@ -430,7 +438,17 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // the witness set. The advertised heads are captured in `peer_status` and
     // recorded only in `finalize_peer_sync_round`, after the pull round.
     if peer_should_force_snapshot(state, peer_url) {
-        let snapshot = client.cluster_snapshot()?;
+        let authority_context = super::authority_evidence::authority_sync_context(state);
+        let snapshot = match client.cluster_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                // Status proved transport reachability, but this failed round
+                // cannot renew issuer trust from an earlier authority import.
+                // Keep independent quorum eligibility and clear that trust.
+                update_peer_authority_error(state, peer_url, error.to_string());
+                return Err(error);
+            }
+        };
         let snapshot_contract = match revocation_peer_contract(&snapshot.replication) {
             Ok(contract) => contract,
             Err(error) => {
@@ -447,11 +465,14 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
             update_peer_failure(state, peer_url, error.to_string());
             return Err(error);
         }
-        apply_cluster_snapshot(state, peer_url, snapshot)?;
-    }
-    if let Err(error) = sync_peer_authority(state, &client) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
+        if let Err(error) = super::snapshots::recover_cluster_snapshot(
+            state,
+            peer_url,
+            snapshot,
+            authority_context,
+        )? {
+            update_peer_authority_error(state, peer_url, error.to_string());
+        }
     }
     let mut delta_records = 0u64;
     // Lane 1: the budget/receipt/lineage streams share ONE per-peer round budget,
@@ -510,7 +531,27 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         &peer_status.budget_ack_heads,
         delta_records,
     );
-    Ok(())
+    // Lane 3: signed authority replicates last, after finalization, so a refused
+    // envelope (no pinned anchor, clock skew beyond the configured bound, a relayed
+    // envelope older than the one held) can never starve revocation propagation
+    // or ack finalization. The refusal stays the peer's reported error, through
+    // later stream finalizations, until an authority import from it succeeds.
+    // Like lane 2 it skips a peer demoted this round.
+    if peer_was_demoted(state, peer_url) {
+        return Ok(());
+    }
+    match super::authority_evidence::sync_authority_serving_evidence(
+        state,
+        peer_url,
+        &client,
+        &peer_status,
+    ) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            update_peer_authority_error(state, peer_url, error.to_string());
+            Err(error)
+        }
+    }
 }
 
 fn prepare_peer_revocation_sync(
@@ -633,17 +674,22 @@ pub(crate) fn route_pull(
     }
 }
 
-fn sync_peer_authority(
+#[cfg(test)]
+pub(crate) fn sync_peer_authority(
     state: &TrustServiceState,
     client: &TrustControlClient,
-) -> Result<(), CliError> {
+) -> Result<Option<String>, CliError> {
     let Some(path) = state.config.authority_db_path.as_deref() else {
-        return Ok(());
+        return Ok(None);
     };
-    let authority = SqliteCapabilityAuthority::open(path)?;
-    let snapshot = authority_snapshot_from_view(client.authority_snapshot()?);
-    authority.apply_snapshot(&snapshot)?;
-    Ok(())
+    let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+        path,
+        state.finding_challenge_clock.clone(),
+        state.config.authority_replication_clock_policy()?,
+    )?;
+    let snapshot = client.authority_snapshot()?;
+    authority.apply_signed_snapshot(&snapshot)?;
+    Ok(Some(snapshot.envelope_digest()?))
 }
 
 fn sync_peer_revocations(
@@ -727,7 +773,10 @@ fn sync_current_peer_revocations(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Version 4 pages advance through a dense append-only revocation log
@@ -785,7 +834,10 @@ fn sync_legacy_peer_revocations(
             clear_peer_revocation_cursor(state, peer_url);
             break;
         }
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         let page_head =
@@ -823,10 +875,9 @@ fn sync_peer_tool_receipts(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {
@@ -842,7 +893,10 @@ fn sync_peer_tool_receipts(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Tool receipts are a NON-DENSE append-only seq stream: `seq` is an
@@ -878,10 +932,9 @@ fn sync_peer_child_receipts(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {
@@ -897,7 +950,10 @@ fn sync_peer_child_receipts(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Child receipts are a NON-DENSE append-only seq stream (AUTOINCREMENT +
@@ -1126,7 +1182,10 @@ pub(crate) fn import_budget_delta_response(
     }
     // Local per-round pull cap: stop the round WITHOUT demoting; the next sync
     // round resumes from the unchanged cursor.
-    if round.charge_page(record_count as u64).is_err() {
+    if round
+        .charge_page(crate::integer::count(record_count))
+        .is_err()
+    {
         return Ok(BudgetDeltaImportOutcome {
             applied_count: 0,
             next_cursor: current_cursor,
@@ -1252,7 +1311,7 @@ pub(crate) fn import_budget_delta_response(
             page_max_seq,
         }));
     }
-    let applied_count = mutation_records.len() as u64;
+    let applied_count = crate::integer::count(mutation_records.len());
 
     Ok(BudgetDeltaImportOutcome {
         applied_count,
@@ -1267,10 +1326,9 @@ fn sync_peer_lineage(
     peer_url: &str,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
-    let Some(path) = state.config.receipt_db_path.as_deref() else {
+    let Some(store) = state.receipt_store.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         if round.is_exhausted() {
@@ -1286,7 +1344,10 @@ fn sync_peer_lineage(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Lineage snapshots paginate on the capability_lineage rowid, which is
@@ -1513,9 +1574,10 @@ fn cluster_peer_count(state: &TrustServiceState) -> usize {
 ///
 /// The single background sync loop visits peers SERIALLY, and one `sync_peer`
 /// visit is FAR more than a single HTTP call: it performs cluster_status, an
-/// optional cluster_snapshot, an authority_snapshot, and then the delta pull
-/// rounds (a shared budget/receipt/lineage round and an independent revocation
-/// round), each blocking call up to `CONTROL_HTTP_TIMEOUT` and each delta round
+/// optional cluster_snapshot, an authority_snapshot, an admitted authority
+/// status and a final cluster_status, alongside the delta pull rounds (a shared
+/// budget/receipt/lineage round and an independent revocation round), each
+/// blocking call up to `CONTROL_HTTP_TIMEOUT` and each delta round
 /// bounded by its wall-clock budget. If a slow-but-reachable peer is visited
 /// before the peer whose ack makes quorum, the wait must outlast a full serial
 /// visit for every preceding peer, or it 503s a write the next peer would have
@@ -1537,18 +1599,21 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize
         .max(Duration::from_secs(5))
         .min(Duration::from_secs(30));
     // Worst-case cost of ONE serial sync_peer visit that must complete for every
-    // peer preceding the quorum peer: the three fixed blocking HTTP stages
-    // (cluster_status, cluster_snapshot, authority_snapshot) each up to
+    // peer preceding the quorum peer: the five fixed blocking HTTP stages
+    // (cluster_status, cluster_snapshot, authority_snapshot, admitted authority
+    // status and final cluster_status) each up to
     // CONTROL_HTTP_TIMEOUT, plus the two wall-clock-bounded delta pull rounds (the
     // shared budget/receipt/lineage round and the independent revocation round).
     let per_peer_sync = CONTROL_HTTP_TIMEOUT
-        .checked_mul(3)
-        .unwrap_or(Duration::from_secs(45))
+        .checked_mul(5)
+        .unwrap_or(Duration::from_secs(75))
         .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET)
         .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET);
     // One worst-case cycle over all peers preceding the quorum peer, plus one extra
     // cycle for a mid-cycle write arrival.
-    let cycles = (peer_count as u32).saturating_add(1);
+    let cycles = u32::try_from(peer_count)
+        .unwrap_or(u32::MAX)
+        .saturating_add(1);
     let peer_bound = per_peer_sync
         .checked_mul(cycles)
         .unwrap_or(MAX_QUORUM_COMMIT_TIMEOUT)

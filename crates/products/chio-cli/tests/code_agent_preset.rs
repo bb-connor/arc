@@ -21,6 +21,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+const UNUSED_CAGE_POLICY_SIGNER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+
 fn chio_cli_binary() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_BIN_EXE_chio"));
     assert!(
@@ -98,6 +101,10 @@ fn mcp_serve_rejects_unknown_preset() {
             "nope",
             "--server-id",
             "test",
+            "--cage-policy",
+            "unused-by-preset-validation.json",
+            "--cage-policy-signer",
+            UNUSED_CAGE_POLICY_SIGNER,
             "--",
             "/bin/true",
         ])
@@ -119,7 +126,18 @@ fn mcp_serve_requires_policy_or_preset() {
     // Neither --policy nor --preset supplied: the command should
     // refuse to start rather than picking an implicit default.
     let output = Command::new(chio_cli_binary())
-        .args(["mcp", "serve", "--server-id", "test", "--", "/bin/true"])
+        .args([
+            "mcp",
+            "serve",
+            "--server-id",
+            "test",
+            "--cage-policy",
+            "unused-by-policy-validation.json",
+            "--cage-policy-signer",
+            UNUSED_CAGE_POLICY_SIGNER,
+            "--",
+            "/bin/true",
+        ])
         .output()
         .expect("spawn chio");
     assert!(!output.status.success());
@@ -401,4 +419,41 @@ fn check_full_mode_uses_output_fixture_for_output_sensitive_policy() {
     assert_eq!(body["verdict"].as_str(), Some("ALLOW"));
     assert_eq!(body["check_mode"].as_str(), Some("full"));
     assert_eq!(body["output_fixture"].as_bool(), Some(true));
+}
+
+#[test]
+fn inbound_authority_check_signs_with_its_owned_subject_key() {
+    let directory = tempfile::tempdir().unwrap();
+    let policy = directory.path().join("proof.yaml");
+    std::fs::write(
+        &policy,
+        "hushspec: '0.1.0'\nrules:\n  tool_access:\n    default: block\n    allow: ['*']\n    dpop_required: true\n",
+    )
+    .unwrap();
+    let (_stores, receipt_db, session_db) = private_store_paths();
+    let output = Command::new(chio_cli_binary())
+        .args(["--format", "json", "check", "--policy"])
+        .arg(&policy)
+        .arg("--receipt-db")
+        .arg(receipt_db)
+        .arg("--session-db")
+        .arg(session_db)
+        .args([
+            "--server",
+            "proof-srv",
+            "--tool",
+            "read_file",
+            "--params",
+            r#"{"path":"README.md"}"#,
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(body["verdict"], "ALLOW");
 }

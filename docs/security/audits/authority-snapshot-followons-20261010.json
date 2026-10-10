@@ -1,0 +1,105 @@
+{
+  "schema": "chio.security.authority-snapshot-followons.v1",
+  "observed_utc": "2026-10-10T01:30:15.777203+00:00",
+  "source_stage_head": "c757bd40709b0cc264f0caf664ebd81bb001f2be",
+  "reviews": [
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-signer-a0f5-review.md",
+      "sha256": "650f1e26adc9ba4868d44024d32e2f9934256eac9ab7ac0756684ab14e08c596"
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/triage-final-12-13-original.md",
+      "sha256": "c5b7cc6063003bb2fb818b65e6c53ca66d41ae3b401ac8e1e50ea45f831c41a0"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/triage-final-12-13-repro.patch",
+      "sha256": "abc26484c757127873fe65ee808ec57128a6ec582289104574fc78d39bb44a7e"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/triage-final-12-13-repro.log",
+      "sha256": "83a4b9b649b0c37920e8aedac6218aa1e22d60f6c176b7bb61f65b25db2dc70c"
+    }
+  ],
+  "report_history": "Live triage report appended Root initial ruling, changing its hash. The exact original bytes were recovered and hash-verified before this audit; no evidence was rewritten.",
+  "coordination_commit": "7a14c654cbae73301bc3d6c40c95a82ed74944be",
+  "scope_rulings": [
+    "Planner01:24:31Z classifies snapshot crash-orphan accumulation as a persistent-denial landing blocker, superseding Root initial post-landing assessment.",
+    "Versioned liveness custody; unknown-liveness legacy preservation; no indefinite parent-lock wait; bounded progressive scan; existing data-directory derivation without a new operator knob.",
+    "FINAL-13 is bounded walker performance, not unbounded request work, and remains post-landing P2.",
+    "No proof campaigns or baseline/cap waivers."
+  ],
+  "signer_review": {
+    "producer": "a0f54fc5d5c3ebcd17adbccf3b535c0ccbb210c5",
+    "integration": "92c63a5ea182edb3a8bf845d17ae6aa7bb1841a4",
+    "verdict": "No blocking source finding in the three OID4VCI issuance handlers; final core and parallel composition remain open.",
+    "runtime": "Reviewer128serialPASS; eight-thread127PASS1FAIL then128PASS. Failure duplicates global registry lane admission. Further old-source repeats skipped per Root ruling.",
+    "finding_mapping": {
+      "F1": "F11-PASSPORT-SIGNER exact-refusal test hardening",
+      "F2": "SIGNER-AUTHORITY-READ-COST",
+      "F3": "F11-PLAIN-SEED-PROVISION",
+      "F4": "SIGNER-BACKEND-COVERAGE",
+      "F5": "Existing core authority discovery-custody obligation",
+      "F6": "F11-PASSPORT-SIGNER touched-test comment cleanup"
+    }
+  },
+  "findings": [
+    {
+      "label": "F11-PLAIN-SEED-PROVISION",
+      "priority": "P2",
+      "scope": "now",
+      "state": "source-observation-original-pending",
+      "requirement": "Owner startup provisions configured plain seed; requests load existing custody and cannot recreate a lost seed.",
+      "remaining_acceptance": [
+        "Expected-safe Original pinned to current core source and disclosed fixture seam.",
+        "Healthy first issuance, missing-after-startup no-recreation, unchanged keyring/SQLite controls and owning qualification."
+      ]
+    },
+    {
+      "label": "V1160-FINAL-12",
+      "priority": "P2",
+      "scope": "now",
+      "state": "confirmed-repair-assigned",
+      "requirement": "Abnormal termination must not permanently consume snapshot disk capacity across restart. Reclaim only proven abandoned versioned backing with bounded progress.",
+      "remaining_acceptance": [
+        "Expected-safe crash cleanup RED; current diagnostic witness asserts observed leak and passes.",
+        "Versioned parent/child liveness, descriptor-relative custody, nonblocking parent lock, live/foreign/legacy/symlink controls and creation race.",
+        "Existing data-directory backing, over-budget head/tail progress and startup or early-error recovery."
+      ]
+    },
+    {
+      "label": "V1160-FINAL-13",
+      "priority": "P2",
+      "scope": "later",
+      "state": "confirmed-bounded-performance-followup",
+      "requirement": "Avoid scanning all signed receipts during an unsigned-subject refresh and preserve the snapshot lineage when bounded incremental work suffices.",
+      "remaining_acceptance": [
+        "Partial unsigned-subject index and targeted refresh query in a post-landing wave.",
+        "Bounded-step controls at 2000 and 50000 signed rows plus lineage-id preservation."
+      ]
+    },
+    {
+      "label": "SIGNER-AUTHORITY-READ-COST",
+      "priority": "P3",
+      "scope": "later",
+      "state": "review-performance-followup",
+      "requirement": "Reduce redundant admitted-authority reads while preserving exact before/after signer binding and cancellation-safe registry custody.",
+      "remaining_acceptance": [
+        "Retain source review observation of 10 reads on success and 6 on invalid token input.",
+        "Measure and optimize with unchanged refusal and state-race controls after landing."
+      ]
+    },
+    {
+      "label": "SIGNER-BACKEND-COVERAGE",
+      "priority": "P3",
+      "scope": "later",
+      "state": "review-test-coverage-followup",
+      "requirement": "Extend passport signer acceptance across seed, keyring, offer/token rotation and cluster backends.",
+      "remaining_acceptance": [
+        "Preserve current SQLite and core provisioning evidence with exact scope.",
+        "Add backend-specific tests in follow-up; do not infer all-backend qualification from current component passes."
+      ]
+    }
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

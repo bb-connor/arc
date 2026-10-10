@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json",
+  "title": "Chio scheduler health receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "response",
+    "event_id",
+    "first_failure_at_unix_ms",
+    "attempts",
+    "scheduler_fencing_token",
+    "error_code",
+    "evidence_hash"
+  ],
+  "properties": {
+    "header": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+    "response": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/response" },
+    "event_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+    "first_failure_at_unix_ms": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/time" },
+    "attempts": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "scheduler_fencing_token": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+    "evidence_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" }
+  }
+}

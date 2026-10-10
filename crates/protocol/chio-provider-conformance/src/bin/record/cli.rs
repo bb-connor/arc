@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_provider_conformance::{
@@ -120,23 +119,29 @@ fn load_seed(provider: ProviderArg, scenario: &str) -> Result<ScenarioSeed, Reco
         return Err(RecordError::ScenarioNotFound { path });
     }
 
-    let body = fs::read_to_string(&path).map_err(|source| RecordError::ReadFixture {
-        path: path.clone(),
-        source,
+    let body = chio_provider_conformance::input::read_fixture(&path).map_err(|source| {
+        RecordError::ReadFixture {
+            path: path.clone(),
+            source,
+        }
     })?;
     let mut records = Vec::new();
     for (line_index, line) in body.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        let record = serde_json::from_str::<CaptureRecord>(line).map_err(|source| {
-            RecordError::ParseFixtureLine {
-                path: path.clone(),
-                line: line_index + 1,
-                source,
-            }
-        })?;
+        let record =
+            chio_provider_conformance::input::text::<CaptureRecord>(line).map_err(|source| {
+                RecordError::ParseFixtureLine {
+                    path: path.clone(),
+                    line: line_index + 1,
+                    source,
+                }
+            })?;
         validate_record(&path, provider, scenario, &record)?;
+        if records.len() >= chio_provider_adapter_core::input::MAX_RECORDS {
+            return Err(invalid_fixture(&path, "fixture record limit exceeded"));
+        }
         records.push(record);
     }
     if records.is_empty() {

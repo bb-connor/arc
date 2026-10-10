@@ -7,9 +7,30 @@ use chio_core::receipt::{
     lineage::{ChildRequestReceipt, ReceiptLineageStatement},
 };
 use chio_log_redact::redacted;
+use chio_security_types::ports::OpaqueReceiptRef;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
+
+/// Durable logical active-defense evidence index backed by signed receipts.
+///
+/// Implementations append the receipt and publish the unique logical evidence
+/// mapping atomically. Repeating the same mapping is idempotent; rebinding an
+/// evidence identifier or receipt identifier must fail closed.
+pub trait IndexedSecurityEvidenceStore: Send + Sync {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError>;
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError>;
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError>;
+}
 
 /// Configuration for receipt retention and archival.
 ///
@@ -30,6 +51,10 @@ pub struct RetentionConfig {
     /// How often the kernel maintenance task evaluates rotation, in seconds.
     /// Default: 3600 (one hour).
     pub check_interval_secs: u64,
+    /// Maximum time the caller waits for a rotation, including queueing.
+    /// The writer retains an accepted rotation after timeout; retry observes
+    /// its durable watermark instead of starting a second concurrent rotation.
+    pub rotation_timeout: std::time::Duration,
     /// Internal: set by `archive_receipts_before` to bypass the day/size
     /// threshold and rotate at an explicit cutoff. Not part of any wire form
     /// (no serialized representation of `RetentionConfig` exists).
@@ -44,6 +69,7 @@ impl Default for RetentionConfig {
             archive_path: "receipts-archive.sqlite3".to_string(),
             tenant_id: None,
             check_interval_secs: 3_600,
+            rotation_timeout: std::time::Duration::from_secs(300),
             explicit_cutoff_unix_secs: None,
         }
     }
@@ -67,60 +93,69 @@ impl RetentionMaintenanceHandle {
     /// Spawn the maintenance worker. `store` is a dedicated `Arc` clone held
     /// by the worker thread for its lifetime, independent of the kernel's own
     /// `receipt_store` handle.
-    pub(crate) fn spawn(store: std::sync::Arc<dyn ReceiptStore>, config: RetentionConfig) -> Self {
+    pub fn spawn(
+        store: std::sync::Arc<dyn ReceiptStore>,
+        config: RetentionConfig,
+    ) -> Result<Self, ReceiptStoreError> {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let worker_stop = std::sync::Arc::clone(&stop);
         let interval = std::time::Duration::from_secs(config.check_interval_secs.max(1));
-        let join = std::thread::spawn(move || {
-            while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                // Sleep in short slices so shutdown is responsive.
-                let mut waited = std::time::Duration::ZERO;
-                let slice = std::time::Duration::from_millis(200);
-                while waited < interval && !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                    std::thread::sleep(slice);
-                    waited += slice;
-                }
-                if worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                    break;
-                }
-                // Never panic: a rotation error OR a caught panic is surfaced
-                // as a warning and retried next interval, rather than
-                // crashing the worker thread (and, unwrapped, the kernel).
-                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    store.rotate_receipts(&config)
-                }));
-                // Persist the outcome into health so a persistent rotation
-                // failure (an unwritable archive path, a missing/replaced
-                // archive that no longer backs the ledger) is observable outside
-                // this log: a store serving under a retention policy that is not
-                // being honored must not keep reporting healthy. A success clears
-                // the prior failure.
-                match outcome {
-                    Ok(Ok(_archived)) => {
-                        store.record_retention_rotation_outcome(None);
+        let join = std::thread::Builder::new()
+            .name("chio-receipt-retention".into())
+            .spawn(move || {
+                while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    // Sleep in short slices so shutdown is responsive.
+                    let mut waited = std::time::Duration::ZERO;
+                    let slice = std::time::Duration::from_millis(200);
+                    while waited < interval
+                        && !worker_stop.load(std::sync::atomic::Ordering::SeqCst)
+                    {
+                        std::thread::sleep(slice);
+                        waited += slice;
                     }
-                    Ok(Err(error)) => {
-                        store.record_retention_rotation_outcome(Some(&error.to_string()));
-                        tracing::warn!(
-                            target: "chio::retention",
-                            error = %redacted!(&error),
-                            "receipt rotation failed; will retry next interval"
-                        );
+                    if worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                        break;
                     }
-                    Err(_panic) => {
-                        store.record_retention_rotation_outcome(Some("receipt rotation panicked"));
-                        tracing::warn!(
-                            target: "chio::retention",
-                            "receipt rotation panicked; will retry next interval"
-                        );
+                    // Never panic: a rotation error OR a caught panic is surfaced
+                    // as a warning and retried next interval, rather than
+                    // crashing the worker thread (and, unwrapped, the kernel).
+                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        store.rotate_receipts(&config)
+                    }));
+                    // Persist the outcome into health so a persistent rotation
+                    // failure (an unwritable archive path, a missing/replaced
+                    // archive that no longer backs the ledger) is observable outside
+                    // this log: a store serving under a retention policy that is not
+                    // being honored must not keep reporting healthy. A success clears
+                    // the prior failure.
+                    match outcome {
+                        Ok(Ok(_archived)) => {
+                            store.record_retention_rotation_outcome(None);
+                        }
+                        Ok(Err(error)) => {
+                            store.record_retention_rotation_outcome(Some(&error.to_string()));
+                            tracing::warn!(
+                                target: "chio::retention",
+                                error = %redacted!(&error),
+                                "receipt rotation failed; will retry next interval"
+                            );
+                        }
+                        Err(_panic) => {
+                            store.record_retention_rotation_outcome(Some(
+                                "receipt rotation panicked",
+                            ));
+                            tracing::warn!(
+                                target: "chio::retention",
+                                "receipt rotation panicked; will retry next interval"
+                            );
+                        }
                     }
                 }
-            }
-        });
-        Self {
+            })?;
+        Ok(Self {
             stop,
             join: Some(join),
-        }
+        })
     }
 }
 
@@ -298,6 +333,10 @@ pub struct AuthorizationReceiptConsumption {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
+    UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
@@ -324,6 +363,10 @@ pub enum ReceiptStoreError {
 
     #[error("receipt read boundary error: {0}")]
     ReadBoundary(String),
+    #[error(transparent)]
+    ReadAuthorization(#[from] crate::receipt_query::ReceiptReadError),
+    #[error(transparent)]
+    QuerySnapshot(#[from] crate::receipt_query::ReceiptQuerySnapshotError),
 
     #[error("conflict: {0}")]
     Conflict(String),
@@ -417,6 +460,11 @@ fn receipt_writer_liveness_unknown_label() -> String {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    /// Whether this store is an authoritative durable sink for signed native
+    /// security release evidence such as cage and broker receipts.
+    fn supports_native_security_receipts(&self) -> bool {
+        false
+    }
     /// Stable identity of the durable sink across process restarts. Features
     /// with a single-delivery outbox must reject stores that cannot provide it.
     fn durable_sink_id(&self) -> Option<&str> {
@@ -481,6 +529,11 @@ pub trait ReceiptStore: Send + Sync {
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.
     ///
+    /// This is a privileged kernel provenance read, not a tenant query API.
+    /// Remote implementations must authenticate the service principal. HTTP
+    /// and operator query adapters use an explicit `ReceiptReadContext`; the
+    /// SQLite user-facing point reader is `load_chio_receipt_with_context`.
+    ///
     /// The kernel consults this BEFORE the bounded in-memory receipt mirror and
     /// falls back to the mirror only on a genuine `Ok(None)` miss. An append-only
     /// or remote store that does NOT override this therefore relies entirely on
@@ -495,6 +548,26 @@ pub trait ReceiptStore: Send + Sync {
         _receipt_id: &str,
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
         Ok(None)
+    }
+    /// Load at most 256 receipts in request order, retaining missing entries.
+    ///
+    /// Implementations may amortize integrity verification only within this
+    /// call. Database implementations must verify and read from the same
+    /// immutable transaction snapshot, with the same validation as point reads.
+    /// No verified state may be reused across calls without mutation detection.
+    fn load_chio_receipts(
+        &self,
+        receipt_ids: &[&str],
+    ) -> Result<Vec<Option<ChioReceipt>>, ReceiptStoreError> {
+        if receipt_ids.len() > 256 {
+            return Err(ReceiptStoreError::Unsupported(
+                "receipt lookup batch exceeds 256 entries".to_owned(),
+            ));
+        }
+        receipt_ids
+            .iter()
+            .map(|id| self.load_chio_receipt(id))
+            .collect()
     }
     /// Load a receipt from the store's complete retained history. Stores with
     /// no separate retention tier inherit the live point lookup. A store that
@@ -829,7 +902,10 @@ pub trait ReceiptStore: Send + Sync {
     }
 
     /// Persist a serialized `RequestLineageRecord` (JSON form).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_request_lineage(
         &self,
         _session_id: &str,
@@ -844,7 +920,10 @@ pub trait ReceiptStore: Send + Sync {
     }
 
     /// Persist a serialized `ReceiptLineageStatement` (JSON form).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_receipt_lineage_statement(
         &self,
         _child_receipt_id: &str,
@@ -922,6 +1001,28 @@ pub struct AdmissionBudgetCapture {
     pub operation: crate::admission_operation::AdmissionOperationV1,
 }
 
+/// Dedicated native capture input. The credential proof borrows the actual
+/// kernel reservation; historical ledger data cannot construct that proof.
+pub struct AdmissionNativeDispatchCapture<'a> {
+    pub custody: crate::admission_operation::NativeSecurityEgressContext<'a>,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub credentials: &'a crate::VerifiedNativeDispatchCredentials<'a>,
+    pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    pub policy_json: &'a [u8],
+}
+
+/// A kernel-produced private context accompanies the existing physical quota
+/// capture. Framing alone is not a complete admission snapshot or an execution
+/// permit. The configured authority must commit all three records atomically.
+pub struct AdmissionCallerDispatchCapture<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub context: &'a crate::admission_operation::AdmissionCallerDispatchContextV1,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct AdmissionPaymentJournalAdvance<'a> {
     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
@@ -987,14 +1088,14 @@ pub const ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND: &str =
 pub struct ThresholdApprovalReplayReservationV1 {
     proposal: chio_core::capability::governance::ThresholdApprovalProposal,
     tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
-    verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+    verified_set: chio_core::capability::governance::ApprovalSetBody,
 }
 
 impl ThresholdApprovalReplayReservationV1 {
     pub fn new(
         proposal: chio_core::capability::governance::ThresholdApprovalProposal,
         mut tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
-        verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+        verified_set: chio_core::capability::governance::ApprovalSetBody,
     ) -> Result<Self, crate::admission_operation::AdmissionOperationStoreError> {
         use std::collections::HashSet;
 
@@ -1066,7 +1167,7 @@ impl ThresholdApprovalReplayReservationV1 {
         }
         tokens_with_digests.sort_by(|left, right| left.0.cmp(&right.0));
         if tokens_with_digests
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].0 == pair[1].0)
             || tokens_with_digests
                 .iter()
@@ -1080,7 +1181,7 @@ impl ThresholdApprovalReplayReservationV1 {
                 ),
             );
         }
-        let reconstructed = chio_core::capability::governance::VerifiedApprovalSetBody::new(
+        let reconstructed = chio_core::capability::governance::ApprovalSetBody::new(
             verified_set.token_digests.clone(),
             &proposal,
         )
@@ -1115,9 +1216,7 @@ impl ThresholdApprovalReplayReservationV1 {
     }
 
     #[must_use]
-    pub const fn verified_set(
-        &self,
-    ) -> &chio_core::capability::governance::VerifiedApprovalSetBody {
+    pub const fn verified_set(&self) -> &chio_core::capability::governance::ApprovalSetBody {
         &self.verified_set
     }
 }
@@ -1141,7 +1240,10 @@ pub trait QualifiedAdmissionProjectionStore:
         begin: AdmissionPaymentSettlementBegin<'_>,
     ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn authorize_budget_and_commit_admission(
         &self,
         operation: &crate::admission_operation::AdmissionOperationV1,
@@ -1161,6 +1263,128 @@ pub trait QualifiedAdmissionProjectionStore:
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
+
+    fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic caller context and dispatch capture are unsupported".into(),
+            ),
+        )
+    }
+
+    fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native dispatch capture is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Atomically retain native caller release custody with the actual native
+    /// credential and budget capture. Implementations default to fail-closed.
+    fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+        _context: &crate::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native caller release capture is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Read the immutable native capture decision with its current operation.
+    /// The read must independently verify the physical budget projection and
+    /// its exact admission commitment. Historical data grants no execution or
+    /// retry authority. Absence after an acknowledged capture is an error.
+    fn load_native_dispatch_capture(
+        &self,
+        _operation_id: &crate::admission_operation::AdmissionOperationId,
+        _active_fence: &crate::admission_operation::StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<AdmissionBudgetCapture>,
+        crate::admission_operation::AdmissionOperationStoreError,
+    > {
+        Err(
+            crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+                "native dispatch capture readback is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Claim recovery of `operation` and authorize its budget hold in the
+    /// joint transaction that commits the admission transition. A store that
+    /// fuses both writes makes them one durable write and rolls the claim
+    /// back with a refused or fenced authorization; this default persists
+    /// and qualifies the claim first.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    fn claim_and_authorize_budget_and_commit_admission(
+        &self,
+        claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError> {
+        let lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            claim,
+            trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(claimed_authorization_error)?;
+        self.authorize_budget_and_commit_admission(
+            operation,
+            &lease,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    /// Claim recovery of `operation` and capture its invocation in the joint
+    /// transaction that commits the dispatch; see
+    /// [`Self::claim_and_authorize_budget_and_commit_admission`].
+    fn claim_and_capture_invocation_and_commit_dispatch(
+        &self,
+        claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        let lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            claim,
+            trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(claimed_capture_error)?;
+        self.capture_invocation_and_commit_dispatch(
+            operation,
+            &lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
 
     fn reserve_threshold_approval_and_commit_admission(
         &self,
@@ -1183,6 +1407,37 @@ pub trait QualifiedAdmissionProjectionStore:
         after_receipt_id: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
+}
+
+fn claimed_authorization_error(
+    error: crate::admission_operation::AdmissionOperationStoreError,
+) -> AdmissionBudgetAuthorizationError {
+    use crate::admission_operation::AdmissionOperationStoreError as Store;
+    match error {
+        Store::Unavailable(detail) => AdmissionBudgetAuthorizationError::Unavailable(detail),
+        Store::Fenced => AdmissionBudgetAuthorizationError::Fenced,
+        Store::NotFound => AdmissionBudgetAuthorizationError::Invariant(
+            "admission operation was not found".to_owned(),
+        ),
+        Store::Invariant(detail) => AdmissionBudgetAuthorizationError::Invariant(detail),
+        Store::OutcomeUnknown(detail) => AdmissionBudgetAuthorizationError::OutcomeUnknown(detail),
+        Store::Operation(error) => AdmissionBudgetAuthorizationError::Operation(error),
+    }
+}
+
+fn claimed_capture_error(
+    error: crate::admission_operation::AdmissionOperationStoreError,
+) -> crate::admission_operation::AdmissionCaptureError {
+    use crate::admission_operation::AdmissionCaptureError as Capture;
+    use crate::admission_operation::AdmissionOperationStoreError as Store;
+    match error {
+        Store::Unavailable(detail) => Capture::Unavailable(detail),
+        Store::Fenced => Capture::Fenced,
+        Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
+        Store::Invariant(detail) => Capture::Invariant(detail),
+        Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),
+        Store::Operation(error) => Capture::Operation(error),
+    }
 }
 
 pub trait AnchoredAdmissionProjectionStore: QualifiedAdmissionProjectionStore {
@@ -1507,7 +1762,7 @@ mod tests {
             check_interval_secs: 1,
             ..RetentionConfig::default()
         };
-        let handle = RetentionMaintenanceHandle::spawn(store.clone(), config);
+        let handle = RetentionMaintenanceHandle::spawn(store.clone(), config).unwrap();
 
         // The worker sleeps one interval (in 200ms slices) before its first
         // rotation, then records the failure into health. Poll until it appears.
@@ -1635,4 +1890,10 @@ pub struct FederatedEvidenceShareSummary {
     pub require_proofs: bool,
     pub tool_receipts: u64,
     pub capability_lineage: u64,
+}
+
+impl From<chio_core::canonical::UntrustedJsonError> for ReceiptStoreError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(std::sync::Arc::new(error))
+    }
 }

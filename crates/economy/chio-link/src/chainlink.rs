@@ -75,11 +75,20 @@ impl ContractJsonRpcTransport {
         if !status.is_success() {
             return Err(TransportErrorKind::http_error(
                 status.as_u16(),
-                String::from_utf8_lossy(body).into_owned(),
+                "JSON-RPC endpoint rejected the request".to_owned(),
             ));
         }
+        let bound = usize::try_from(self.egress_contract.max_response_bytes)
+            .map_err(TransportErrorKind::custom)?;
+        // Alloy retains RawValue payloads. Validate original tokens first, then
+        // project the same bytes through its raw-value-aware deserializer.
+        // JSON-RPC is unsigned: ordinary float spellings remain valid.
+        chio_core::canonical::UntrustedJsonText::from_wire(body, bound)
+            .and_then(|input| input.decode_document::<serde_json::Value>())
+            .map_err(TransportErrorKind::custom)?;
         serde_json::from_slice(body)
-            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body)))
+            .map_err(chio_core::canonical::UntrustedJsonError::Decode)
+            .map_err(TransportErrorKind::custom)
     }
 }
 
@@ -236,20 +245,23 @@ async fn read_chainlink_rate(
     })?;
     let provider = contract_backed_provider(url, egress_contract)?;
     let contract = AggregatorV3Interface::new(address, &provider);
-    let latest = contract.latestRoundData().call().await.map_err(|err| {
-        PriceOracleError::Unavailable(format!(
-            "Chainlink latestRoundData failed for {} at {}: {err}",
-            pair.pair(),
-            feed.address
-        ))
-    })?;
-    let decimals = contract.decimals().call().await.map_err(|err| {
-        PriceOracleError::Unavailable(format!(
-            "Chainlink decimals failed for {} at {}: {err}",
-            pair.pair(),
-            feed.address
-        ))
-    })?;
+    let latest =
+        contract
+            .latestRoundData()
+            .call()
+            .await
+            .map_err(|err| PriceOracleError::Request {
+                operation: "Chainlink latestRoundData failed",
+                source: crate::OracleRequestError::new(err),
+            })?;
+    let decimals = contract
+        .decimals()
+        .call()
+        .await
+        .map_err(|err| PriceOracleError::Request {
+            operation: "Chainlink decimals failed",
+            source: crate::OracleRequestError::new(err),
+        })?;
     if decimals != feed.decimals {
         return Err(PriceOracleError::InvalidFeed(format!(
             "Chainlink decimals mismatch for {} at {}: configured {}, contract returned {}",
@@ -330,6 +342,94 @@ mod tests {
     use crate::OracleBackend;
 
     use super::{read_chainlink_rate, ChainlinkFeedReader};
+
+    #[tokio::test]
+    async fn original_rpc_ignored_duplicate_keys_fail_before_raw_value_projection() {
+        for (body, accepted) in [
+            (
+                r#"{"jsonrpc":"2.0","id":0,"result":"0x0","ignored":{"counter":18446744073709551615}}"#,
+                true,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":0,"result":"0x0","ignored":{"ratio":0.10}}"#,
+                true,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":0,"result":"0x0","ignored":{"private-marker":1,"private-marker":2}}"#,
+                false,
+            ),
+        ] {
+            let (addr, _rx, handle) = spawn_single_response_server(move |_| {
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+            });
+            let contract =
+                chio_egress_contract::HttpEgressContract::permissive_for_tests(&authority(addr));
+            let transport = super::ContractJsonRpcTransport::new(
+                format!("http://{}/rpc", authority(addr))
+                    .parse()
+                    .test_unwrap("URL"),
+                &contract,
+            )
+            .test_unwrap("transport");
+            let result = transport
+                .send_json_rpc(alloy_json_rpc::RequestPacket::Batch(Vec::new()))
+                .await;
+            handle.join().unwrap_or_else(|_| panic!("server"));
+            if accepted {
+                assert!(result.is_ok());
+            } else {
+                let error = result.test_unwrap_err("ambiguous original response");
+                assert!(!format!("{error:?} {error}").contains("private-marker"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn original_rpc_failure_keeps_native_cause_and_hides_payload() {
+        for (status, body) in [
+            ("200 OK", "private-marker"),
+            ("503 Unavailable", "private-marker"),
+            (
+                "200 OK",
+                r#"{"jsonrpc":"2.0","id":0,"error":{"code":-32000,"message":"private-marker"}}"#,
+            ),
+        ] {
+            let (addr, _rx, handle) = spawn_single_response_server(move |_| {
+                format!(
+                    "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+            });
+            let contract =
+                chio_egress_contract::HttpEgressContract::permissive_for_tests(&authority(addr));
+            let pair = pair_with_chainlink("0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70");
+            let error = read_chainlink_rate(
+                &format!("http://{}/rpc", authority(addr)),
+                &pair,
+                pair.chainlink.as_ref().test_unwrap("feed"),
+                1_743_292_780,
+                &contract,
+            )
+            .await
+            .test_unwrap_err("RPC failure");
+            handle.join().unwrap_or_else(|_| panic!("server"));
+            assert!(std::error::Error::source(&error).is_some());
+            assert!(!format!("{error:?} {error}").contains("private-marker"));
+        }
+    }
+
+    fn native_causes(error: &dyn std::error::Error) -> String {
+        let mut result = String::new();
+        let mut current = error.source();
+        while let Some(source) = current {
+            result.push_str(&source.to_string());
+            current = source.source();
+        }
+        result
+    }
 
     fn authority(addr: SocketAddr) -> String {
         format!("{}:{}", addr.ip(), addr.port())
@@ -468,7 +568,8 @@ mod tests {
             .test_unwrap_err("unreachable hostname RPC should fail during dispatch");
         let message = error.to_string();
         assert!(
-            message.contains("rpc.example") && message.contains("oracle backend unavailable"),
+            native_causes(&error).contains("rpc.example")
+                && message.contains("oracle backend unavailable"),
             "unexpected Chainlink hostname dispatch error: {message}"
         );
     }
@@ -501,8 +602,8 @@ mod tests {
         let message = error.to_string();
         assert!(
             message.contains("Chainlink latestRoundData failed")
-                && message.contains("authority")
-                && message.contains("not allowed"),
+                && native_causes(&error).contains("authority")
+                && native_causes(&error).contains("not allowed"),
             "unexpected Chainlink redirect denial: {message}"
         );
         handle
@@ -533,7 +634,7 @@ mod tests {
         let message = error.to_string();
         assert!(
             message.contains("Chainlink latestRoundData failed")
-                && message.contains("response size 6 exceeds maximum 5"),
+                && native_causes(&error).contains("response size 6 exceeds maximum 5"),
             "unexpected Chainlink response-size denial: {message}"
         );
         handle.join().unwrap_or_else(|_| panic!("join body server"));

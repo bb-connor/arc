@@ -61,8 +61,7 @@ impl FindingChallengeCoordinator {
                 "raw finding bytes are not the canonical serialization".to_owned(),
             ));
         }
-        let finding: Finding = serde_json::from_str(raw_finding)
-            .map_err(|error| ChallengeCoordinatorError::FindingArtifact(error.to_string()))?;
+        let finding: Finding = chio_core::canonical::UntrustedJsonText::from_wire((raw_finding).as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(ChallengeCoordinatorError::from)?;
         let typed = canonical_json_bytes(&finding).map_err(|_| {
             ChallengeCoordinatorError::FindingArtifact(
                 "raw finding could not be canonically serialized".to_owned(),

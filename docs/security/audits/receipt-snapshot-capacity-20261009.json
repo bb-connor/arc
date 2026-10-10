@@ -1,0 +1,243 @@
+{
+  "schema": "chio.receipt-snapshot-capacity.v1",
+  "observed_utc": "2026-10-09T12:08:27.425096+00:00",
+  "production_source": "f24a5240e6e50d46400bee27f5e869b79ca2c568",
+  "producer_test_commit": "a1b83c75e5a416e9810d748bafff5f3b8ee667c3",
+  "integrated_test_commit": "0d919c3e582afd2bf47d862ccf412c9c51d9589a",
+  "release_binary_sha256": "62450083ce720243211f414896c6f5a76bed7b7da2ba5798e5d6d74c85656642",
+  "measured_to_committed_change": "Six comment-only edits; non-comment source bytes verified identical. Raw measured copies and diff retained with evidence.",
+  "evidence": [
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/task8/claimed-memory.log",
+      "sha256": "1e5139b7f245cbf8f8928cf4d48dae8631dcef22d7740a1e19e4d9fbcf16865c"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/task8/claimed-linux-file.log",
+      "sha256": "4aadcd474b128f97c27dee9841fadee7a636b44eeca7c70e4223d03bf9efa38a"
+    }
+  ],
+  "memory_projection": {
+    "label": "memory",
+    "n": 10000000,
+    "short_rows": 9900000,
+    "large_rows": 100000,
+    "used_bytes": 5288763392,
+    "bytes_per_row": 528.876,
+    "short_bytes_per_row": 468.28,
+    "large_bytes_per_row": 6527.918,
+    "dimension_bytes": 5495262,
+    "dimensions": 10717,
+    "c16": {
+      "budget": 10000000,
+      "outcome": "receipt_query_work_budget_exhausted",
+      "shape": "s5_unselective_pair",
+      "vm_steps_budget": 20003000
+    },
+    "c20": {
+      "count_rows_compared": 45404,
+      "mismatches": 0,
+      "seconds": 8.545
+    }
+  },
+  "memory_default_quota": {
+    "label": "memory",
+    "quota_bytes": 2147483648,
+    "rows_committed": 4639744,
+    "used_bytes_at_refusal": 2147397632,
+    "refusal": "capacity",
+    "refused_batch_left_no_rows_or_dimensions": true,
+    "count_rows_compared": 35938
+  },
+  "signed_linux": {
+    "label": "linux-file",
+    "n": 1000000,
+    "host": {
+      "cpus": 48,
+      "hostname": "isolated-build-host",
+      "mem_total_kib": 131882484
+    },
+    "history": {
+      "append_rate_per_second": 1121.995,
+      "append_seconds": 891.27,
+      "archived_before_build": 499328,
+      "checkpoints": 886,
+      "large_batch": 100000,
+      "live_before_build": 500672,
+      "receipts": 1000000,
+      "rotate_seconds": 817.004,
+      "signers": 2
+    },
+    "config": {
+      "checkpoint_page": 1024,
+      "insert_rows": 256,
+      "quota_bytes": 2147483648,
+      "step_bytes": 16777216,
+      "step_rows": 1024,
+      "walker_sql_steps": 50000000
+    },
+    "quiet_build": {
+      "entries": 1000000,
+      "signature_checks": 1000000,
+      "seconds": 222.021,
+      "entries_per_second": 4504.081,
+      "used_bytes": 531132416,
+      "backing_file_bytes": 531132416,
+      "steps": {
+        "count": 987,
+        "max": 463.431,
+        "mean": 224.945,
+        "p50": 223.917,
+        "p90": 241.09,
+        "p99": 321.595
+      },
+      "answers": {
+        "count_rows_compared": 500060,
+        "mismatches": 0,
+        "shapes_checked": 4
+      },
+      "process": {
+        "before": {
+          "vm_hwm_kib": 1486484,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1486484,
+          "vm_size_kib": 3925640
+        },
+        "built": {
+          "vm_hwm_kib": 1486488,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1486488,
+          "vm_size_kib": 3925640
+        },
+        "dropped": {
+          "vm_hwm_kib": 1486488,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1486488,
+          "vm_size_kib": 3925640
+        },
+        "peak_reset": true,
+        "peak_rss_growth_kib": 4,
+        "sampled_peak": {
+          "vm_hwm_kib": 1486488,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1486488,
+          "vm_size_kib": 3925652
+        }
+      }
+    },
+    "contended_build": {
+      "entries": 1000000,
+      "signature_checks": 1000000,
+      "seconds": 227.318,
+      "entries_per_second": 4399.133,
+      "used_bytes": 531132416,
+      "steps": {
+        "count": 987,
+        "max": 578.632,
+        "mean": 230.312,
+        "p50": 228.152,
+        "p90": 239.93,
+        "p99": 328.335
+      },
+      "answers": {
+        "count_rows_compared": 500060,
+        "mismatches": 0,
+        "shapes_checked": 4
+      },
+      "process": {
+        "before": {
+          "vm_hwm_kib": 1486616,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1486616,
+          "vm_size_kib": 3925652
+        },
+        "peak_reset": true,
+        "sampled_peak": {
+          "vm_hwm_kib": 1625832,
+          "vm_peak_kib": 4362480,
+          "vm_rss_kib": 1630860,
+          "vm_size_kib": 4284520
+        }
+      },
+      "rotation": {
+        "archived": 249856,
+        "attempts": 1,
+        "cutoff_index": 750000,
+        "finished_at_entry": 1000000,
+        "finished_during_build": false,
+        "first_outcome": {
+          "Ok": 249856
+        },
+        "seconds": 237.546,
+        "started_at_entry": 550528,
+        "started_during_build": true
+      },
+      "wal_bytes": {
+        "after_flush": 111272,
+        "before": 20632,
+        "max_between_steps": 4659752
+      },
+      "append_rate_per_second": 74.128
+    },
+    "quota_refusal": {
+      "entries_authenticated_at_refusal": 33000,
+      "quota_bytes": 16777216,
+      "refusal": "capacity",
+      "seconds": 6.542,
+      "used_bytes_at_refusal": 16711680
+    }
+  },
+  "separate_large_checkpoint_control": {
+    "label": "linux-file",
+    "n": 150000,
+    "large_checkpoint_entries": 100000,
+    "rollover_checkpoint_entries": 50000,
+    "build_seconds": 20.48,
+    "built_used_bytes": 56426496,
+    "hold_steps": {
+      "accept_checkpoint": {
+        "holds": 1,
+        "max_vm_steps": 48,
+        "mean": 48
+      },
+      "entries": 100000,
+      "hold_sql_steps": 5000000,
+      "insert_rows": 256,
+      "insert_tail_rows": {
+        "holds": 391,
+        "max_vm_steps": 264415,
+        "mean": 263705
+      },
+      "max_settled_per_hold": 256,
+      "settle_delete": {
+        "holds": 392,
+        "max_vm_steps": 4658,
+        "mean": 4636
+      },
+      "settle_read": {
+        "holds": 391,
+        "max_vm_steps": 2596,
+        "mean": 2589
+      }
+    },
+    "max_settled_per_hold": 256,
+    "service_c17": {
+      "quota_bytes": 1048576,
+      "reason": "receipt query snapshot quota of 1048576 bytes is exhausted (1003520 bytes used)",
+      "state": "unavailable"
+    }
+  },
+  "limits": [
+    "Synthetic10M is not10M signed and uses a64GiB test quota; the default2GiB quota holds4639744 short rows before typed refusal.",
+    "Broad unselective filters can return the documented work-budget refusal.",
+    "The150k hold control and33k quota-refusal prefix are separate from the1M signed acceptance.",
+    "Contended rotation started during the build and finished after it; successful mid-build relocation is not established.",
+    "Process RSS does not isolate walker allocations; quiet run reused heap already faulted in during fixture generation.",
+    "Measurements bind to production source f24 and exact frozen test files/binary, not later source changes or final hosted/native-product/release qualification."
+  ],
+  "remaining_acceptance": [
+    "Review and repair the newly confirmed checkpoint-publication and lineage-refresh source defects; renew affected qualification and capacity where their effect requires it.",
+    "Finish composed candidate review, exact protected hosted checks and protected merge."
+  ],
+  "candidate_qualified": false,
+  "merged": false
+}

@@ -1,6 +1,6 @@
 // Append-only effect-root refresh storage and lineage checks.
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
 fn try_append_effect_root_refresh(
     transaction: &Transaction<'_>,
     intent: &FindingEffectIntentRecord,

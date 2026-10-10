@@ -7,9 +7,9 @@
 //! signing is exercised by `tests/integration.rs` against the embedded
 //! TUF root and is not duplicated here.
 
-use std::cell::RefCell;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use chio_attest_verify::policy::TenantPolicy;
@@ -32,7 +32,7 @@ struct RecordingVerifier {
     expected_artifact: Vec<u8>,
     expected_signature: Vec<u8>,
     call_seen: AtomicBool,
-    forced_error: RefCell<Option<AttestError>>,
+    forced_error: Mutex<Option<AttestError>>,
 }
 
 impl RecordingVerifier {
@@ -41,20 +41,18 @@ impl RecordingVerifier {
             expected_artifact,
             expected_signature,
             call_seen: AtomicBool::new(false),
-            forced_error: RefCell::new(None),
+            forced_error: Mutex::new(None),
         }
     }
 
     fn force_next_error(&self, err: AttestError) {
-        *self.forced_error.borrow_mut() = Some(err);
+        *self.forced_error.lock().expect("fixture mutex") = Some(err);
     }
 
     fn was_called(&self) -> bool {
         self.call_seen.load(Ordering::SeqCst)
     }
 }
-
-unsafe impl Sync for RecordingVerifier {}
 
 impl AttestVerifier for RecordingVerifier {
     fn verify_blob(
@@ -75,7 +73,7 @@ impl AttestVerifier for RecordingVerifier {
         expected: &ExpectedIdentity,
     ) -> Result<VerifiedAttestation, AttestError> {
         self.call_seen.store(true, Ordering::SeqCst);
-        if let Some(err) = self.forced_error.borrow_mut().take() {
+        if let Some(err) = self.forced_error.lock().expect("fixture mutex").take() {
             return Err(err);
         }
         assert_eq!(

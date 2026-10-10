@@ -268,9 +268,9 @@ impl HostedAuthenticator {
         })
     }
 
-    /// Authenticate one request. Every failure maps to a uniform
-    /// AuthenticationFailed so a caller cannot probe which check denied;
-    /// DPoP admission consults the durable nonce store so replays fail
+    /// Authenticate one request with nonreflective credential refusals. Durable
+    /// integrity, capacity and dependency failures retain their service failure
+    /// classes. DPoP admission consults the durable nonce store so replays fail
     /// across replicas.
     pub async fn authenticate(
         &self,
@@ -624,9 +624,19 @@ fn principal_signer_key(principal: &HostedPrincipal) -> Result<Option<PublicKey>
 
 fn map_store(error: HostedMarketPortError) -> HostedEdgeError {
     match error {
+        HostedMarketPortError::InvalidInput(source) => HostedEdgeError::InvalidCredential(source),
+        HostedMarketPortError::CorruptInput(source) => HostedEdgeError::CorruptInput(source),
+        HostedMarketPortError::Integrity => HostedEdgeError::IntegrityFailure,
         HostedMarketPortError::Capacity => HostedEdgeError::CapacityUnavailable,
-        HostedMarketPortError::Unavailable => HostedEdgeError::DependencyUnavailable,
-        _ => HostedEdgeError::AuthenticationFailed,
+        HostedMarketPortError::Unavailable
+        | HostedMarketPortError::LeaseLost
+        | HostedMarketPortError::RetentionHeld => HostedEdgeError::DependencyUnavailable,
+        HostedMarketPortError::Invalid
+        | HostedMarketPortError::Tenant
+        | HostedMarketPortError::TenantNotFound
+        | HostedMarketPortError::TenantDisabled
+        | HostedMarketPortError::Conflict
+        | HostedMarketPortError::NotFound => HostedEdgeError::AuthenticationFailed,
     }
 }
 
@@ -892,6 +902,7 @@ mod tests {
                 let action_hash = request_action_hash(&unsigned).unwrap_or_default();
                 let proof = DpopProof::sign(
                     DpopProofBody {
+                        replay_authority: None,
                         schema: DPOP_SCHEMA.to_owned(),
                         capability_id: capability.id.clone(),
                         tool_server: audience,

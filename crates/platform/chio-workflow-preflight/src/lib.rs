@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Read-only workflow preflight validation.
 
 mod scope;

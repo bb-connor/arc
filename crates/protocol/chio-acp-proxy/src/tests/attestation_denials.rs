@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn interceptor_required_attestation_blocks_when_signer_is_missing_or_fails() {
     let config = AcpProxyConfig::new("echo", "deadbeef")
@@ -18,48 +20,38 @@ fn interceptor_required_attestation_blocks_when_signer_is_missing_or_fails() {
         }
     });
 
-    let missing =
-        MessageInterceptor::with_kernel(config.clone(), None, None, AcpAttestationMode::Required);
-    match missing
-        .intercept(Direction::AgentToClient, &update)
-        .expect("missing signer should return a JSON-RPC block")
-    {
-        InterceptResult::Block(value) => {
-            assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
-            assert!(value["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("receipt signer is required"));
-        }
-        other => panic!("expected Block for missing signer, got {:?}", other),
-    }
+    let missing = MessageInterceptor::with_kernel(
+        config.clone(),
+        None,
+        None,
+        AcpAttestationMode::Required,
+        AcpClock::default(),
+    );
+    assert!(matches!(
+        missing.intercept_value(Direction::AgentToClient, &update),
+        Err(AcpProxyError::Receipt(ReceiptSignError::SignerUnavailable))
+    ));
 
     let failing = MessageInterceptor::with_kernel(
         config,
         Some(Box::new(FailingSigner)),
         None,
         AcpAttestationMode::Required,
+        AcpClock::default(),
     );
-    match failing
-        .intercept(Direction::AgentToClient, &update)
-        .expect("signer failure should return a JSON-RPC block")
-    {
-        InterceptResult::Block(value) => {
-            assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
-            assert!(value["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("receipt signing failed"));
-        }
-        other => panic!("expected Block for failing signer, got {:?}", other),
-    }
+    assert!(matches!(
+        failing.intercept_value(Direction::AgentToClient, &update),
+        Err(AcpProxyError::Receipt(ReceiptSignError::SignerUnavailable))
+    ));
 }
 
 #[test]
 fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
     let issuer = Keypair::generate();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let request = AcpCapabilityRequest {
         session_id: "session-1".to_string(),
         tool_call_id: None,
@@ -81,15 +73,22 @@ fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
     assert!(!verdict.allowed);
     assert_eq!(verdict.reason, "no capability token presented");
 
-    let malformed = AcpCapabilityRequest {
-        token: Some("{".to_string()),
-        ..request
-    };
-    let verdict = checker
-        .check_access(&malformed)
-        .expect("malformed token should fail closed");
-    assert!(!verdict.allowed);
-    assert!(verdict.reason.contains("failed to parse token"));
+    for token in [
+        "{".to_owned(),
+        r#"{"private_marker":1,"private_marker":2}"#.to_owned(),
+        " ".repeat(64 * 1024 + 1),
+    ] {
+        let malformed = AcpCapabilityRequest {
+            token: Some(token),
+            ..request.clone()
+        };
+        let error = checker
+            .check_access(&malformed)
+            .expect_err("malformed token must retain its cause");
+        assert!(matches!(error, CapabilityCheckError::UntrustedInput(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private_marker"));
+    }
 }
 
 #[test]
@@ -105,7 +104,7 @@ fn kernel_capability_checker_enforces_time_bounds_and_scope() {
             supports_checkpoints: false,
         }))
         .expect("test receipt store should install");
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
 
     let valid = make_capability_token(
         &issuer,
@@ -277,8 +276,10 @@ fn kernel_capability_checker_supports_wildcard_terminal_grants() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -332,7 +333,7 @@ fn kernel_capability_checker_requires_and_forwards_execution_nonce_in_strict_mod
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
     );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -390,7 +391,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
     );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -408,6 +409,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
     let mut read = json!({
         "jsonrpc": "2.0",
@@ -423,7 +425,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
     });
 
     let nonce_value = match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("strict preflight should return a JSON-RPC block")
     {
         InterceptResult::Block(value) => {
@@ -443,7 +445,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
 
     read["params"]["chio"] = json!({ "executionNonce": nonce_value });
     match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("presented nonce should forward once")
     {
         InterceptResult::Forward(value) => assert_eq!(value, read),
@@ -451,7 +453,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
     }
 
     match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("replayed nonce should block")
     {
         InterceptResult::Block(value) => {
@@ -471,8 +473,10 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let trusted_checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let trusted_checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
 
     let token = make_capability_token(
         &issuer,
@@ -485,7 +489,7 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     );
 
     let untrusted_issuer = Keypair::generate();
-    let untrusted_checker = KernelCapabilityChecker::new(
+    let untrusted_checker = test_kernel_capability_checker(
         ChioKernel::new(test_kernel_config(&untrusted_issuer)),
         "proxy-server",
     );
@@ -547,6 +551,7 @@ fn interceptor_checker_allow_path_records_capability_context_for_receipts() {
             "auth-request-377",
         ))),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let read = json!({
@@ -562,7 +567,7 @@ fn interceptor_checker_allow_path_records_capability_context_for_receipts() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("read should be allowed")
     {
         InterceptResult::Forward(value) => assert_eq!(value, read),
@@ -601,7 +606,7 @@ fn interceptor_checker_allow_path_records_capability_context_for_receipts() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &update)
+        .intercept_value(Direction::AgentToClient, &update)
         .expect("session update should produce a receipt")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -630,6 +635,7 @@ fn interceptor_rejects_cryptographic_allow_without_signed_authorization_receipt(
             "cap-without-auth-receipt",
         ))),
         AcpAttestationMode::Required,
+        AcpClock::default(),
     );
 
     let read = json!({
@@ -645,7 +651,7 @@ fn interceptor_rejects_cryptographic_allow_without_signed_authorization_receipt(
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("missing signed authorization receipt should return a block response")
     {
         InterceptResult::Block(value) => {
@@ -713,6 +719,7 @@ fn interceptor_rejects_malformed_checker_verdict_evidence() {
             None,
             Some(Box::new(checker)),
             AcpAttestationMode::BestEffort,
+            AcpClock::default(),
         );
         let id = 384 + index;
         let read = json!({
@@ -728,7 +735,7 @@ fn interceptor_rejects_malformed_checker_verdict_evidence() {
         });
 
         match interceptor
-            .intercept(Direction::AgentToClient, &read)
+            .intercept_value(Direction::AgentToClient, &read)
             .expect("malformed checker evidence should return a block response")
         {
             InterceptResult::Block(value) => {
@@ -780,6 +787,7 @@ fn interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls() {
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     // ACP fs/read_text_file requests do not carry a toolCallId in their
@@ -802,7 +810,7 @@ fn interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls() {
             }
         });
         match interceptor
-            .intercept(Direction::AgentToClient, &read)
+            .intercept_value(Direction::AgentToClient, &read)
             .expect("toolCallId-less fs reads are forwarded after the capability check")
         {
             InterceptResult::Forward(_) => {}
@@ -828,7 +836,7 @@ fn interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls() {
     // indexed and the session/update finds no live capability context,
     // dropping the audit entry to AuditOnly.
     match interceptor
-        .intercept(Direction::AgentToClient, &update)
+        .intercept_value(Direction::AgentToClient, &update)
         .expect("ambiguous update should still produce an audit receipt")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -877,6 +885,7 @@ fn interceptor_pending_capability_buffer_is_bounded() {
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     for index in 0..100 {
@@ -891,7 +900,7 @@ fn interceptor_pending_capability_buffer_is_bounded() {
             }
         });
         match interceptor
-            .intercept(Direction::AgentToClient, &read)
+            .intercept_value(Direction::AgentToClient, &read)
             .expect("toolCallId-less fs reads should forward after the capability check")
         {
             InterceptResult::Forward(_) => {}
@@ -955,6 +964,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let live_read = json!({
@@ -969,7 +979,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &live_read)
+        .intercept_value(Direction::AgentToClient, &live_read)
         .expect("live read should forward after capability and path checks")
     {
         InterceptResult::Forward(_) => {}
@@ -992,7 +1002,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &pending_read)
+        .intercept_value(Direction::AgentToClient, &pending_read)
         .expect("toolCallId-less read should forward and buffer pending context")
     {
         InterceptResult::Forward(_) => {}
@@ -1015,7 +1025,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &blocked_read)
+        .intercept_value(Direction::AgentToClient, &blocked_read)
         .expect("built-in guard denial should return a block response")
     {
         InterceptResult::Block(value) => {
@@ -1047,7 +1057,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &live_complete)
+        .intercept_value(Direction::AgentToClient, &live_complete)
         .expect("live completion should still resolve its authorization context")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -1074,7 +1084,7 @@ fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &pending_start)
+        .intercept_value(Direction::AgentToClient, &pending_start)
         .expect("pending start should bind its preserved pending context")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -1103,6 +1113,7 @@ fn interceptor_session_cancel_clears_pending_capability_contexts() {
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     for index in 0..4 {
@@ -1117,7 +1128,7 @@ fn interceptor_session_cancel_clears_pending_capability_contexts() {
             }
         });
         interceptor
-            .intercept(Direction::AgentToClient, &read)
+            .intercept_value(Direction::AgentToClient, &read)
             .expect("fs/read should forward after the capability check");
     }
     assert_eq!(
@@ -1135,7 +1146,7 @@ fn interceptor_session_cancel_clears_pending_capability_contexts() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &cancel)
+        .intercept_value(Direction::AgentToClient, &cancel)
         .expect("session/cancel should forward")
     {
         InterceptResult::Forward(_) => {}
@@ -1166,6 +1177,7 @@ fn interceptor_session_cancel_rejects_malformed_params_without_draining_contexts
         None,
         Some(Box::new(checker)),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let read = json!({
@@ -1179,7 +1191,7 @@ fn interceptor_session_cancel_rejects_malformed_params_without_draining_contexts
         }
     });
     interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("fs/read should forward and create pending context");
     assert_eq!(
         interceptor.pending_capability_context_count("session-cancel-invalid"),
@@ -1193,11 +1205,11 @@ fn interceptor_session_cancel_rejects_malformed_params_without_draining_contexts
         "method": "session/cancel"
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &missing_params)
+        .intercept_value(Direction::AgentToClient, &missing_params)
         .expect_err("missing cancel params must fail before forwarding");
     assert_eq!(
         err.to_string(),
-        "protocol error: missing params in session/cancel"
+        "urn:chio:error:transport:invalid-request-shape"
     );
     assert_eq!(
         interceptor.pending_capability_context_count("session-cancel-invalid"),
@@ -1214,11 +1226,11 @@ fn interceptor_session_cancel_rejects_malformed_params_without_draining_contexts
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &empty_session)
+        .intercept_value(Direction::AgentToClient, &empty_session)
         .expect_err("empty cancel sessionId must fail before forwarding");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid session/cancel params: sessionId must be a non-empty string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
     assert_eq!(
         interceptor.pending_capability_context_count("session-cancel-invalid"),

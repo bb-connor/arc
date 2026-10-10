@@ -113,6 +113,12 @@ All agent-to-kernel frames are JSON objects with a `type` discriminator.
 | `server_id` | string | Target tool server identifier |
 | `tool` | string | Tool name within the target server |
 | `params` | JSON value | Tool arguments |
+| `governed_intent` | optional `GovernedTransactionIntent` | Governed operation being authorized |
+| `approval_token` | optional `GovernedApprovalToken` | Single approval, exclusive with nonempty `approval_tokens` |
+| `approval_tokens` | optional array of `GovernedApprovalToken` | Collected votes, requiring the exact threshold proposal |
+| `threshold_approval_proposal` | optional `ThresholdApprovalProposal` | Returned proposal, requiring at least one collected vote |
+| `supplemental_authorization` | optional opaque authorization object | Kernel-verified authorization extension |
+| `execution_nonce` | optional `SignedExecutionNonce` | Exact preflight retry token in supported execution-nonce profiles |
 
 #### 2.4.2 KernelMessage
 
@@ -121,7 +127,7 @@ All kernel-to-agent frames are JSON objects with a `type` discriminator.
 | `type` | Required fields | Meaning |
 | --- | --- | --- |
 | `tool_call_chunk` | `id`, `chunk_index`, `data` | Streaming chunk emitted before the final response |
-| `tool_call_response` | `id`, `result`, `receipt` | Terminal result plus signed receipt |
+| `tool_call_response` | `id`, `result`, `receipt` | Execution result, approval wait or failure plus signed receipt |
 | `capability_list` | `capabilities` | Reply to `list_capabilities` |
 | `capability_revoked` | `id` | Notification that a capability identifier is no longer valid |
 | `heartbeat` | none | Liveness reply |
@@ -139,8 +145,9 @@ All kernel-to-agent frames are JSON objects with a `type` discriminator.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `id` | string | Parent request identifier |
-| `result` | `ToolCallResult` object | Terminal execution status |
+| `result` | `ToolCallResult` object | Execution status or non-terminal approval wait |
 | `receipt` | `ChioReceipt` object | Signed receipt for the evaluated action |
+| `execution_nonce` | optional `SignedExecutionNonce` | Exact retry token for a supported execution preflight; absent for approval waits |
 
 `capability_list` fields:
 
@@ -163,9 +170,30 @@ discriminator.
 | --- | --- | --- |
 | `ok` | `value` | Tool completed and returned a value |
 | `stream_complete` | `total_chunks` | Tool completed after streaming chunks |
+| `pending_approval` | `proposal` | Execution is waiting for approvals of this exact signed threshold proposal |
 | `cancelled` | `reason`, `chunks_received` | Explicit cancellation |
 | `incomplete` | `reason`, `chunks_received` | Non-terminal interruption or upstream truncation |
 | `err` | `error` | Denial or failure |
+
+`pending_approval` is not execution success, a terminal denial, or execution
+authority. Its `proposal` is the complete signed `ThresholdApprovalProposal`
+committed by the receipt's content hash. Senders **MUST** preserve the proposal
+without changing its signed fields, algorithm metadata or signature. The response,
+receipt and proposal request identifiers **MUST** match. A pending response
+**MUST NOT** carry an execution nonce or emit tool-output chunks.
+
+An agent retries the original request, preserving its `id`, capability, server,
+tool, parameters and governed intent, and adding the returned proposal as
+`threshold_approval_proposal` plus its collected `approval_tokens`. It **MUST NOT**
+start a replacement request merely because approval is pending. The kernel
+independently revalidates authority, policy, expiry and votes before dispatch.
+Receiving or parsing a proposal does not authenticate current policy authority;
+collectors and receivers still need their configured trust anchors and original
+authenticated request context.
+
+Peers that do not support `pending_approval` must reject that unknown status;
+they **MUST NOT** reinterpret it as `ok` or retry execution without approvals.
+This addition does not alter the encoding of existing result variants.
 
 #### 2.4.4 ToolCallError
 
@@ -183,10 +211,12 @@ discriminator.
 
 ### 2.5 Signed Artifact Requirements
 
-Two nested signed Chio artifacts appear directly on the native wire:
+Nested signed Chio artifacts appear directly on the native wire, including:
 
 - `CapabilityToken`
 - `ChioReceipt`
+- `ThresholdApprovalProposal` and `GovernedApprovalToken`
+- `SignedExecutionNonce`
 
 Normative requirements:
 
@@ -386,13 +416,103 @@ Supported query parameters:
 requires `costCurrency` as exactly three uppercase ASCII letters. When both
 bounds are present, `minCost` must not exceed `maxCost`.
 
+`limit` is clamped to 1 through 200 and defaults to 50. `cursor` is
+forward-only: a page returns receipts with `seq` greater than `cursor`, in
+ascending `seq` order.
+
 Response body:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `totalCount` | integer | Total matched receipts |
-| `nextCursor` | integer or null | Cursor for the next page |
+| `snapshot` | object, optional | Authenticated snapshot version that answered the request |
+| `totalCount` | integer | Receipts matching the filters in that version |
+| `nextCursor` | integer or null | Cursor for the next page; `null` when no page follows |
 | `receipts` | array | Receipt rows serialized as JSON values |
+
+`snapshot` object:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | string | Opaque version identifier, informational only |
+| `throughEntrySeq` | unsigned 64-bit integer | Every claim-log entry at or below this sequence is included, and none above it |
+| `checkpointSeq` | unsigned 64-bit integer or null | Newest verified receipt checkpoint in this version; `null` before the first checkpoint. Entries above its range are authenticated by signature only |
+| `observedAt` | integer, Unix milliseconds | Observation time of the newest receipt log head this version fully covers (the as-of time) |
+| `recertifiedAt` | integer, Unix milliseconds | Completion time of the last full authentication of the whole history |
+
+The same `snapshot` object appears on `GET /v1/agents/{subject_key}/receipts`
+(same body as above) and on `GET /v1/receipts/tools`, including its
+`receiptId` point read.
+
+Snapshot rules:
+
+- A server that answers receipt reads from an authenticated query snapshot
+  **MUST** include `snapshot` on every successful response of those three
+  routes. Clients **MUST** treat an absent `snapshot` as unknown provenance.
+- `snapshot.id` **MUST NOT** be accepted as a request parameter and is never a
+  cursor. There is no version-pinned pagination; each page is answered by the
+  version current at that request.
+- `receipts` and `totalCount` **MUST** come from the same version.
+  `totalCount` is exact for that version and **MAY** change between pages.
+- Every returned receipt **MUST** be re-read, signature-verified and bound to
+  the leaf the snapshot authenticated, in the request that returns it. A
+  mismatch **MUST** fail the request with `receipt_query_snapshot_invalid`.
+- Answers have as-of semantics. The whole history is authenticated when the
+  snapshot is built and again by recertification passes, scheduled no sooner
+  than one recertification interval (1 hour by default) after the previous
+  pass started; an active pass or contention can delay them further. A change
+  to a stored receipt that no response returns is detected only by a later
+  pass, so the delay is at least on the order of the interval, can grow under
+  load, and has no fixed wall-clock bound. No answer reflects the change in
+  the meantime.
+- A page **MAY** hold fewer than `limit` receipts while `nextCursor` is
+  non-null; it stops before the receipt that would exceed 16 MiB of stored
+  receipt JSON. A page always carries at least one receipt, so a single
+  receipt larger than 16 MiB, up to the 128 MiB per-receipt limit, is returned
+  alone. Clients **MUST** continue until `nextCursor` is `null`.
+- A page waits up to 2 seconds for the snapshot to reach the receipt log head
+  read at request start, and is otherwise served only from a version that
+  covered an observed head within the last 30 seconds. A point read that finds
+  no receipt **MUST** reach that head; it has no staleness allowance.
+
+Snapshot errors use the body `{"error": string, "code": string}`. Every other
+error keeps the body `{"error": string}`. `Retry-After` is an integer number
+of seconds.
+
+| `code` | HTTP status | `Retry-After` | Client action |
+| --- | --- | --- | --- |
+| `receipt_query_snapshot_building` | 503 | 5 | retry |
+| `receipt_query_snapshot_stale` | 503 | 2 | retry |
+| `receipt_query_busy` | 503 | 1 | retry |
+| `receipt_query_snapshot_unavailable` | 503 | absent | do not retry; resource outcome |
+| `receipt_query_snapshot_invalid` | 500 | absent | do not retry; integrity failure |
+| `receipt_query_work_budget_exhausted` | 422 | absent | do not retry; narrow the query |
+| `receipt_query_export_refused` | 422 | absent | do not retry; export metadata requires operator action |
+
+Clients **MAY** retry only the three retryable codes, after `Retry-After`, and
+**MUST NOT** automatically retry any other snapshot code or a `503` without
+one of them.
+
+Admission has two non-queued layers, and either refusing returns
+`receipt_query_busy`:
+
+1. the trust-control HTTP read lane, whose permit is taken before the work
+   enters the blocking thread pool and is held until that work stops, even if
+   the request is cancelled;
+2. the snapshot service's own read permit, which bounds every consumer of the
+   snapshot, including non-HTTP callers.
+
+`POST /v1/evidence/export` selects from the authenticated snapshot and returns
+its watermark. Its separate single non-queued HTTP permit covers the export
+through response finalization and refuses a concurrent export with
+`receipt_query_busy`; the snapshot service also applies its own read admission.
+Legacy mutable receipt tables and transport-ineligible lineage or publication
+metadata **MUST** refuse the export with `receipt_query_export_refused` without
+invalidating otherwise authenticated receipt queries. A mismatch or deletion of
+captured unsigned attribution for any selected capability **MUST** instead
+invalidate that snapshot with `receipt_query_snapshot_invalid`, before any
+capability lineage is bounded, decoded or refused.
+SQLite resource failures remain operational snapshot errors, not metadata
+refusals. Local operator exports retain their separate full-history contract.
 
 ### 4.4 Revocation
 

@@ -281,9 +281,9 @@ impl RuntimeAttestationVerifierAdapter for EnterpriseVerifierAdapter {
         now: u64,
     ) -> Result<VerifiedRuntimeAttestation, Self::Error> {
         let signed_evidence: SignedExportEnvelope<RuntimeAttestationEvidence> =
-            serde_json::from_str(evidence).map_err(|error| {
-                EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire((evidence).as_bytes(), 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(EnterpriseVerifierVerificationError::from)?;
         if !signed_evidence.verify_signature().map_err(|error| {
             EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
         })? {
@@ -479,6 +479,9 @@ pub(super) fn default_google_confidential_vm_runtime_tier() -> RuntimeAssuranceT
 
 #[derive(Debug, thiserror::Error)]
 pub enum AzureMaaVerificationError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("Azure MAA verification policy is invalid: {0}")]
     InvalidPolicy(String),
 
@@ -536,6 +539,9 @@ pub enum AzureMaaVerificationError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EnterpriseVerifierVerificationError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("enterprise verifier policy is invalid: {0}")]
     InvalidPolicy(String),
 
@@ -577,6 +583,9 @@ pub enum EnterpriseVerifierVerificationError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GoogleConfidentialVmVerificationError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("Google Confidential VM verification policy is invalid: {0}")]
     InvalidPolicy(String),
 

@@ -74,7 +74,6 @@ flowchart TD
 | `src/receipt_query.rs` | `SqliteReceiptStore::query_receipts`, filtered and cursor-paginated. |
 | `src/budget_store.rs` + `src/budget_store/**` | `SqliteBudgetStore`: per-grant spend limits, authorization holds, replication sequencing. |
 | `src/approval_store.rs` | `SqliteApprovalStore`: human-approval requests, resolutions, consumed-token replay guard. |
-| `src/batch_approval_store.rs` | `SqliteBatchApprovalStore`: standing approvals matched by pattern, call count, and spend cap. |
 | `src/revocation_store.rs` | `SqliteRevocationStore`: durable, monotonic capability revocation list. |
 | `src/execution_nonce_store.rs` | `SqliteExecutionNonceStore`: one-time execution-nonce reservation with retention-extended expiry. |
 | `src/authority.rs` | `SqliteCapabilityAuthority`: kernel signing-key custody, rotation, trusted-key history, cluster-leader fencing. |
@@ -102,6 +101,8 @@ flowchart TD
 | `receipt_store/support/lineage.rs` | Session anchors, request lineage, receipt-lineage statements. |
 | `receipt_store/support/claim_log/**` | The unified `claim_receipt_log_entries` projection: schema, validation, authorization/metadata extraction, query matching, enum codecs. |
 | `receipt_store/support/checkpoint_projection.rs` | Re-derives checkpoint transparency-projection tables for verification; backfill and repair. |
+| `receipt_store/writer_accounting.rs` | Checked command-owned queue, inflight and terminal accounting. |
+| `receipt_store/support/checkpoint_schema.rs` | Typed checkpoint predecessor columns, projection triggers and transactional schema upgrades. |
 | `receipt_store/support/checkpoint_validate.rs` | Checkpoint signature, predecessor-chain, and Merkle-root validation. |
 | `receipt_store/reports/*` | Ten operator report families (analytics, authorization, behavioral, billing, compliance, cost attribution, economic, reconciliation, settlement, shared evidence). |
 | `receipt_store/liability_claims.rs` | Claim to response to dispute to adjudication to payout to settlement persistence. |
@@ -196,7 +197,7 @@ imports and adds methods to the same struct.
 ## Dependencies
 
 Internal: `chio-kernel` defines the store traits this crate implements
-(`ReceiptStore`, `BudgetStore`, `ApprovalStore`, `BatchApprovalStore`,
+(`ReceiptStore`, `BudgetStore`, `ApprovalStore`,
 `RevocationStore`, `ExecutionNonceStore`, `CapabilityAuthority`,
 `MemoryProvenanceStore`) and the protocol-adjacent types persisted here
 (checkpoints, retention config, report and query types). `chio-credit`

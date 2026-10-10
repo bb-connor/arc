@@ -53,14 +53,15 @@ pub fn verify_economic_cancellation_terminal_advance(
     projection: &VerifiedAdmissionTerminalProjectionV1,
 ) -> Result<EconomicEffectSlotV1, AdmissionOperationError> {
     let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
-    if batch.transitions.len() != 1
-        || !batch.effect_slots.is_empty()
+    let [transition] = batch.transitions.as_slice() else {
+        return Err(mismatch());
+    };
+    if !batch.effect_slots.is_empty()
         || !batch.request_replays.is_empty()
-        || batch.transitions[0].prepared_effect.is_some()
+        || transition.prepared_effect.is_some()
     {
         return Err(mismatch());
     }
-    let transition = &batch.transitions[0];
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(mismatch());
     }
@@ -176,7 +177,12 @@ pub fn verify_economic_cancellation_terminal_advance(
                 })
                 .ok_or_else(mismatch)?;
             let result: GovernedEconomicMutationResultBinding =
-                serde_json::from_slice(record.canonical_json()).map_err(|_| mismatch())?;
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    record.canonical_json(),
+                    crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(AdmissionOperationError::from)?;
             result.verify_anchored_cancellation(
                 &resulting_slot,
                 expected_head,

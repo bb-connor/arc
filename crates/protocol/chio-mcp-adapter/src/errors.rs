@@ -16,6 +16,8 @@ pub(crate) fn map_tool_invocation_error(error: AdapterError) -> KernelError {
             Ok(error) => error,
             Err(message) => KernelError::ToolServerError(message),
         },
+        AdapterError::UntrustedInput(error) => KernelError::UntrustedInput(error),
+        AdapterError::Clock(error) => KernelError::Clock(error),
         AdapterError::ConnectionFailed(message) | AdapterError::ParseError(message) => {
             KernelError::RequestIncomplete(message)
         }

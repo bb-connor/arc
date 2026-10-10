@@ -9,7 +9,7 @@ evaluation, signing, and verification live in the crates it wraps
 in `ARCHITECTURE.md`), not in this crate.
 
 Commands span five areas: running and hosting governed agent sessions (`run`,
-`check`, `mcp`, `api`, `start`); trust-plane administration and audit (`trust`,
+`check`, `mcp`, `api`, `start`, `process`); trust-plane administration and audit (`trust`,
 `receipt`, `evidence`, `reputation`, `did`, `passport`); offline verification
 and replay (`proof`, `commerce`, `certify`, `cert`, `attest`, `replay`,
 `workflow`); WASM guard authoring and the guard marketplace (`guard`, `bind`);
@@ -20,8 +20,13 @@ scaffolding.
 
 ## Responsibilities
 
+The experimental [process host](PROCESS_HOST.md) connects Python and JavaScript
+workers to existing MCP tool servers through durable kernel admission. It
+provisions a declared process tree, exports private connection descriptors and
+recovers the same process identities after host restart.
+
 - Parse the `chio` command line (`Cli`/`Commands` in `src/cli/types.rs`) and
-  dispatch each of 29 top-level commands to an implementation function
+  dispatch top-level commands to an implementation function
   (`src/cli/dispatch/mod.rs::run`).
 - Run a policy-governed agent subprocess over a framed stdio transport
   (`chio run`), and evaluate one-off tool calls without a subprocess
@@ -58,7 +63,7 @@ Full flag reference: `chio <command> [<subcommand>...] --help`.
 | `api` | `protect` | Protect an HTTP API behind an OpenAPI spec-backed sidecar. |
 | `mcp` | `wrap`, `serve`, `serve-http` | Wrap or host an MCP-compatible edge behind the kernel. |
 | `trust` | 26 groups: `serve`, `provider`, `federation-policy`, `revoke`, `facility`, `bond`, `loss`, `liability-provider`, `liability-market`, `underwriting-input`, `underwriting-decision`, `underwriting-appeal`, `capital-book`, `capital-instruction`, `capital-allocation`, `credit-scorecard`, `credit-backtest`, `provider-risk-package`, `appraisal`, `behavioral-feed`, `exposure-ledger`, `evidence-share`, `authorization-context`, `federated-issue`, `federated-delegation-policy-create`, `status` | Manage local and remote trust-plane state. |
-| `receipt` | `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Query, audit, and repair the receipt store. |
+| `receipt` | `verify`, `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Verify exported signatures; query, audit, and repair the receipt store. |
 | `evidence` | `export`, `verify`, `import`, `federation-policy` | Export and verify offline evidence packages. |
 | `certify` | `check`, `verify`, `registry` (11 more) | Certify conformance evidence and publish results. |
 | `did` | `resolve` | Resolve `did:chio` identifiers into DID Documents. |
@@ -88,7 +93,9 @@ A few command names collide in ways worth flagging:
 - `chio cert` (ACP session compliance certificates) is unrelated to
   `chio certify` (conformance certification artifacts).
 - `chio trust` and `chio receipt` are separate top-level commands, even though
-  `chio receipt`'s implementation lives under `src/cli/trust/receipt/`.
+  its store operations live under `src/cli/trust/receipt/`. Offline signature
+  verification lives in `src/cli/receipt_verify.rs` and requires a trusted
+  kernel key pin; it does not require a store or re-evaluate policy.
 - `chio runtime pheromone` (evaluate a policy, no state change) is distinct
   from the top-level `chio pheromone` command tree.
 - `chio proof collect --kind replay` (a Proof Room bundle kind) is unrelated
@@ -218,7 +225,7 @@ Accepted before or after the subcommand; every one is optional.
 |---|---|
 | `--json` | Short alias for `--format json`. |
 | `--format <human\|json>` | Output format for results and terminal error reporting. Default `human`. |
-| `--receipt-db <PATH>` | SQLite path for durable receipt persistence. |
+| `--receipt-db <PATH>` | SQLite path for durable receipt persistence. Unsupported by `mcp wrap`, which rejects it before startup. |
 | `--revocation-db <PATH>` | SQLite path for durable capability revocation persistence. |
 | `--authority-seed-file <PATH>` | Persistent capability-authority seed file. |
 | `--authority-db <PATH>` | SQLite path for shared capability-authority state. |
@@ -226,6 +233,45 @@ Accepted before or after the subcommand; every one is optional.
 | `--session-db <PATH>` | SQLite path for durable remote MCP session tombstones. |
 | `--control-url <URL>` | Shared trust-control service base URL; switches supporting commands to the remote backend. |
 | `--control-token <TOKEN>` | Bearer token for the trust-control service. Prefer the `CHIO_CONTROL_TOKEN` env var over argv so the bearer does not leak via `ps`. |
+
+Local `trust ... issue` commands prepare the configured signing authority as an
+explicit owner phase after input parsing, authority configuration and receipt
+storage preflight. A fresh seed or private SQLite authority can be initialized;
+existing custody is validated. Invalid authority choices create no authority
+material, although receipt storage preflight may already have initialized its
+database. Concurrent seed initialization preserves the first published owner.
+Later business validation can refuse issuance
+while retaining that owner material, and refusal emits no signed artifact.
+Signed exports and report reads require existing custody and never recreate a
+lost seed or database. Commands using `--control-url` leave local authority
+material untouched; the remote service owns its provisioning.
+
+`mcp wrap` has no durable per-call receipt store, including with
+`--strict-execution-nonce`. Remove `--receipt-db` from a wrap invocation only
+when that receipt contract meets the caller's requirements. Other commands
+that support the configured receipt store retain their persistence behavior.
+
+Plain `mcp wrap` gates tool names against the manifest and passes calls to the
+child transport. `--strict-execution-nonce` uses the kernel mediation path.
+The strict path installs `InternalNetworkGuard`, `AgentVelocityGuard`, and
+`AdvisoryPipeline` before invocation, plus `SanitizerHook` for observed child
+tool results. Recognized network actions deny private and reserved targets
+before child dispatch; detected output secrets are redacted with signed hook
+evidence retained in the ephemeral kernel log. Its policy digest binds the
+strict mode and the default profile's actual configuration.
+
+Default velocity thresholds are unlimited. The default advisory pipeline has
+no detectors or promotion rules, so these installed components do not establish
+rate limiting or advisory detection.
+Optional configured guards are outside the wrap constructor's default profile;
+their absence does not establish protection for their respective inputs.
+
+Wrap no longer adds `_meta.chio_verified` to successful tool results. The former
+static `urn:chio:attest:tool-call/v1` block had no receipt identity or signature
+binding; consumers must stop using it as verification evidence. The public
+`--self-test-attestation <TOOL>` flag remains recognized and returns an explicit
+unsupported error. Allowed response content, scope denials, strict execution
+nonces, and required signed native launch policies retain their existing roles.
 
 ## Usage
 

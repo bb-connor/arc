@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-admin-mutation-receipt-body-v1.schema.json",
+  "title": "Chio broker admin mutation receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operationId", "requestId", "intentDigest", "authorizationDigest", "operation", "tenantScope", "credential", "completedAtUnixSeconds", "outcome"],
+  "properties": {
+    "schema": { "const": "chio.broker-admin-mutation-receipt.v1" },
+    "operationId": { "$ref": "#/$defs/digest" },
+    "requestId": { "$ref": "#/$defs/identifier" },
+    "intentDigest": { "$ref": "#/$defs/digest" },
+    "authorizationDigest": { "$ref": "#/$defs/digest" },
+    "operation": { "enum": ["provision", "rotate", "disable", "delete"] },
+    "tenantScope": { "$ref": "#/$defs/identifier" },
+    "credential": { "$ref": "broker-capability-body-v1.schema.json#/$defs/credentialRef" },
+    "completedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "outcome": { "const": "applied" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

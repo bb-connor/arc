@@ -47,13 +47,15 @@ pub(super) fn resign_agent_web_receipts_for_policy(
     let passport_issuer = required_json_string(&passport, "issuer", &passport_path)?.to_string();
     let keypair = Keypair::from_seed(&AGENT_WEB_RECEIPT_KERNEL_SIGNATURE_SEED);
     let mut normalized_refs = BTreeSet::new();
+    let mut budget = crate::input::collection::Budget::default();
     for entry in fs::read_dir(&receipts_dir)? {
+        budget.enter(0)?;
         let entry = entry?;
         let receipt_path = entry.path();
         if receipt_path.extension().and_then(OsStr::to_str) != Some("json") {
             continue;
         }
-        let receipt: ChioReceipt = serde_json::from_slice(&fs::read(&receipt_path)?)?;
+        let receipt: ChioReceipt = crate::input::json(&budget.read(&receipt_path)?)?;
         let receipt_ref = receipt
             .action
             .parameters
@@ -193,13 +195,15 @@ fn agent_web_receipt_intents(
 ) -> Result<BTreeMap<String, AgentWebReceiptIntent>, CliError> {
     let passport_scope_sha256 = agent_web_passport_scope_sha256(bundle)?;
     let mut intents = BTreeMap::new();
+    let mut budget = crate::input::collection::Budget::default();
     for entry in fs::read_dir(bundle)? {
+        budget.enter(0)?;
         let entry = entry?;
         let envelope_path = entry.path();
         if envelope_path.extension().and_then(OsStr::to_str) != Some("json") {
             continue;
         }
-        let envelope = read_json_value(&envelope_path)?;
+        let envelope: serde_json::Value = crate::input::json(&budget.read(&envelope_path)?)?;
         if envelope.get("schema").and_then(serde_json::Value::as_str)
             != Some("chio.agent-web-proof-envelope.v2")
         {
@@ -482,7 +486,7 @@ fn agent_web_envelope_signature_payload(
 fn agent_web_passport_scope_sha256(bundle: &Path) -> Result<String, CliError> {
     let passport_path = bundle.join("transaction-passport.json");
     let passport: chio_control_plane::transaction_passport::TransactionPassport =
-        serde_json::from_value(read_json_value(&passport_path)?)?;
+        crate::input::project(read_json_value(&passport_path)?)?;
     chio_control_plane::agent_web::agent_web_passport_scope_sha256(&passport).map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture Agent Web passport scope digest failed: {}: {error}",

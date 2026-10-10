@@ -1,8 +1,13 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use chio_core::Keypair;
 use chio_gemini_tools_adapter::transport::MockTransport;
 use chio_gemini_tools_adapter::{GeminiAdapter, GeminiAdapterConfig};
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
 use serde_json::{json, Value};
 
@@ -15,15 +20,48 @@ struct TaxonomyRow {
     envelope: Value,
 }
 
-fn adapter() -> GeminiAdapter {
+fn adapter() -> Result<GeminiAdapter, String> {
+    let signer = Keypair::from_seed(&[66; 32]);
     let config = GeminiAdapterConfig::new(
         "gemini-1",
         "Gemini generateContent",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "proj_chio_demo",
     );
-    GeminiAdapter::new(config, Arc::new(MockTransport::new()))
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Taxonomy fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)
+        .map_err(|error| format!("failed to sign taxonomy manifest: {error}"))?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| format!("failed to register taxonomy manifest: {error}"))?;
+    GeminiAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
+        .map_err(|error| format!("failed to construct taxonomy adapter: {error}"))
 }
 
 fn raw(value: Value) -> Result<ProviderRequest, String> {
@@ -58,6 +96,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
         "TransportTimeout",
         "VerdictBudgetExceeded",
         "Malformed",
+        "UntrustedInput",
     ] {
         if !classes.contains(required) {
             return Err(format!(
@@ -76,7 +115,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in ["BadToolArgs", "UntrustedInput", "VerdictBudgetExceeded"] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -84,7 +123,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         }
     }
 
-    let adapter = adapter();
+    let adapter = adapter()?;
 
     let bad_args = adapter.lift_batch(raw(json!({
         "candidates": [{
@@ -98,7 +137,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     require_provider_error(bad_args, "BadToolArgs")?;
 
     let nonjson = adapter.gate_sse_stream(b"data: not-json\n\n", |_invocation| Ok(allow_verdict()));
-    require_provider_error(nonjson, "Malformed")?;
+    require_provider_error(nonjson, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&function_call_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -209,6 +248,11 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

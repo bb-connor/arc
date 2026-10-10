@@ -518,6 +518,7 @@ fn commit_valid_per_call_projection(
 }
 
 fn shape_obligation_schema_as_v5(connection: &Connection) -> rusqlite::Result<()> {
+    super::runtime_replay::remove_empty_v19_runtime_tables(connection)?;
     connection.execute_batch(
         r#"
         DROP TABLE obligation_assignment_results;
@@ -809,7 +810,7 @@ fn obligation_lifecycle_and_head_survive_serving_owner_restart() -> AnchoredTest
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let stored = authority
         .admission_operation_store()
         .load_obligation(atom.obligation_id())?
@@ -1027,6 +1028,9 @@ fn obligation_load_rejects_a_tampered_head_commit_preimage() -> AnchoredTestResu
 
 #[test]
 fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> AnchoredTestResult {
+    // Trusted time holds at one fixture instant, so recovery leases claimed
+    // below cannot lapse while the test runs.
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms().div_ceil(1_000));
     let fixture = fixture();
     let committed_at = now_ms();
     let (atom, disposition) =
@@ -1042,7 +1046,7 @@ fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> Anchored
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let fixture = Fixture {

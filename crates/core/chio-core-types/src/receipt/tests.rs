@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+#[path = "tests/backend_identity.rs"]
+mod backend_identity;
+#[path = "tests/strict_evidence.rs"]
+mod strict_evidence;
+
 use super::{
     body::{chio_receipt_id, prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},
     checkpoint::{
@@ -199,8 +204,8 @@ fn make_economic_authorization_receipt_metadata() -> EconomicAuthorizationReceip
             grant_index: 3,
             cost_charged: 250,
             currency: "USD".to_string(),
-            budget_remaining: 750,
-            budget_total: 1000,
+            budget_remaining: Some(750),
+            budget_total: Some(1000),
             delegation_depth: 2,
             root_budget_holder: "agent-root-001".to_string(),
             attempted_cost: None,
@@ -399,6 +404,22 @@ fn receipt_semantics_are_signed_top_level_fields() {
         .get("metadata")
         .and_then(|metadata| metadata.get("receipt_semantics"))
         .is_none());
+}
+
+#[test]
+fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
+    let kp = Keypair::generate();
+    let mut body = make_receipt_body(&kp);
+    body.tool_origin = ToolOrigin::ChioInternal;
+    let receipt = ChioReceipt::sign(body, &kp).unwrap();
+
+    let json = serde_json::to_value(&receipt).unwrap();
+    assert_eq!(json["tool_origin"], "chio_internal");
+    assert_eq!(ToolOrigin::ChioInternal.as_str(), "chio_internal");
+
+    let decoded: ChioReceipt = serde_json::from_value(json).unwrap();
+    assert_eq!(decoded.tool_origin, ToolOrigin::ChioInternal);
+    assert!(decoded.verify_signature().unwrap());
 }
 
 #[test]
@@ -815,8 +836,8 @@ fn financial_receipt_metadata_serde_roundtrip() {
         grant_index: 2,
         cost_charged: 150,
         currency: "USD".to_string(),
-        budget_remaining: 850,
-        budget_total: 1000,
+        budget_remaining: Some(850),
+        budget_total: Some(1000),
         delegation_depth: 1,
         root_budget_holder: "agent-root-001".to_string(),
         payment_reference: Some("ref-abc123".to_string()),
@@ -847,8 +868,8 @@ fn financial_receipt_metadata_under_financial_key() {
         grant_index: 0,
         cost_charged: 200,
         currency: "USD".to_string(),
-        budget_remaining: 800,
-        budget_total: 1000,
+        budget_remaining: Some(800),
+        budget_total: Some(1000),
         delegation_depth: 0,
         root_budget_holder: "agent-root-001".to_string(),
         payment_reference: None,
@@ -872,8 +893,8 @@ fn financial_receipt_metadata_attempted_cost_optional() {
         grant_index: 0,
         cost_charged: 0,
         currency: "USD".to_string(),
-        budget_remaining: 0,
-        budget_total: 1000,
+        budget_remaining: Some(0),
+        budget_total: Some(1000),
         delegation_depth: 0,
         root_budget_holder: "agent-root-001".to_string(),
         payment_reference: None,
@@ -979,8 +1000,8 @@ fn chio_receipt_extracts_typed_financial_and_budget_authority_metadata() {
         grant_index: 0,
         cost_charged: 75,
         currency: "USD".to_string(),
-        budget_remaining: 925,
-        budget_total: 1000,
+        budget_remaining: Some(925),
+        budget_total: Some(1000),
         delegation_depth: 1,
         root_budget_holder: "agent-root-001".to_string(),
         payment_reference: None,

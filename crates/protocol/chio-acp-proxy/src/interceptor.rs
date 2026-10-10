@@ -38,6 +38,7 @@ pub enum InterceptResult {
 }
 
 enum CapabilityGate {
+    Error(CapabilityCheckError),
     Skip,
     Allow(AcpCapabilityAuditContext),
     Block(Value),
@@ -84,8 +85,7 @@ pub struct MessageInterceptor {
     /// receipt deliberately drops to `AuditOnly` rather than guessing
     /// (preserves the ambiguity property tested in
     /// `interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls`).
-    pending_capability_contexts:
-        std::sync::Mutex<HashMap<String, Vec<PendingCapabilityContext>>>,
+    pending_capability_contexts: std::sync::Mutex<HashMap<String, Vec<PendingCapabilityContext>>>,
 }
 
 impl MessageInterceptor {
@@ -93,7 +93,7 @@ impl MessageInterceptor {
     pub fn new(config: AcpProxyConfig) -> Self {
         let fs_guard = FsGuard::new(config.allowed_path_prefixes().to_vec());
         let terminal_guard = TerminalGuard::new(config.allowed_commands().to_vec());
-        let receipt_logger = ReceiptLogger::new(config.server_id());
+        let receipt_logger = ReceiptLogger::new(config.server_id(), AcpClock::default());
         let permission_mapper = PermissionMapper::new(3600);
 
         Self {
@@ -116,10 +116,11 @@ impl MessageInterceptor {
         signer: Option<Box<dyn ReceiptSigner>>,
         checker: Option<Box<dyn CapabilityChecker>>,
         attestation_mode: AcpAttestationMode,
+        clock: AcpClock,
     ) -> Self {
         let fs_guard = FsGuard::new(config.allowed_path_prefixes().to_vec());
         let terminal_guard = TerminalGuard::new(config.allowed_commands().to_vec());
-        let receipt_logger = ReceiptLogger::new(config.server_id());
+        let receipt_logger = ReceiptLogger::new(config.server_id(), clock);
         let permission_mapper = PermissionMapper::new(3600);
 
         Self {
@@ -156,6 +157,14 @@ impl MessageInterceptor {
     /// Returns an `InterceptResult` describing whether to forward,
     /// block, or forward-with-receipt.
     pub fn intercept(
+        &self,
+        direction: Direction,
+        message: &AcpMessage,
+    ) -> Result<InterceptResult, AcpProxyError> {
+        self.intercept_value(direction, message.as_value())
+    }
+
+    fn intercept_value(
         &self,
         direction: Direction,
         message: &Value,
@@ -201,9 +210,7 @@ impl MessageInterceptor {
             // The live capability index is also dropped because every
             // in-flight tool call associated with the session is
             // implicitly cancelled.
-            (_, Some(AcpMethod::SessionCancel)) => {
-                self.intercept_session_cancel(message)
-            }
+            (_, Some(AcpMethod::SessionCancel)) => self.intercept_session_cancel(message),
             // -- Unguarded ACP methods: forward unchanged --
             (_, Some(AcpMethod::Authenticate))
             | (_, Some(AcpMethod::SessionLoad))
@@ -248,7 +255,10 @@ impl MessageInterceptor {
             .ok()
             .map(|contexts| {
                 let prefix = format!("tool:{session_id}:");
-                contexts.keys().filter(|key| key.starts_with(&prefix)).count()
+                contexts
+                    .keys()
+                    .filter(|key| key.starts_with(&prefix))
+                    .count()
             })
             .unwrap_or(0)
     }
@@ -257,22 +267,24 @@ impl MessageInterceptor {
 
     fn jsonrpc_params<'a>(
         message: &'a Value,
-        method_name: &str,
+        method_name: &'static str,
     ) -> Result<&'a Value, AcpProxyError> {
-        message
-            .get("params")
-            .ok_or_else(|| AcpProxyError::Protocol(format!("missing params in {method_name}")))
+        message.get("params").ok_or_else(|| {
+            AcpProxyError::Protocol(AcpProtocolError::MissingParams {
+                method: method_name,
+            })
+        })
     }
 
     fn decode_jsonrpc_params<T>(
         params: &Value,
-        method_name: &str,
+        _method_name: &'static str,
     ) -> Result<T, AcpProxyError>
     where
         T: serde::de::DeserializeOwned,
     {
         serde_json::from_value(params.clone())
-            .map_err(|e| AcpProxyError::Protocol(format!("invalid {method_name} params: {e}")))
+            .map_err(|error| chio_core::canonical::UntrustedJsonError::Decode(error).into())
     }
 
     fn intercept_fs_read(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
@@ -304,6 +316,7 @@ impl MessageInterceptor {
         ) {
             CapabilityGate::Skip => None,
             CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Error(error) => return Err(error.into()),
             CapabilityGate::Block(response) => {
                 self.clear_request_capability_context(&read_params.session_id, params);
                 return Ok(InterceptResult::Block(response));
@@ -356,6 +369,7 @@ impl MessageInterceptor {
         ) {
             CapabilityGate::Skip => None,
             CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Error(error) => return Err(error.into()),
             CapabilityGate::Block(response) => {
                 self.clear_request_capability_context(&write_params.session_id, params);
                 return Ok(InterceptResult::Block(response));
@@ -408,6 +422,7 @@ impl MessageInterceptor {
         ) {
             CapabilityGate::Skip => None,
             CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Error(error) => return Err(error.into()),
             CapabilityGate::Block(response) => {
                 self.clear_request_capability_context(&term_params.session_id, params);
                 return Ok(InterceptResult::Block(response));
@@ -422,8 +437,7 @@ impl MessageInterceptor {
                     .cwd
                     .as_deref()
                     .map_or(Ok(()), |cwd| self.fs_guard.check_cwd(cwd))
-            })
-        {
+            }) {
             Ok(()) => {
                 if let Some(ref context) = capability_context {
                     self.remember_capability_context(&term_params.session_id, context.clone());
@@ -455,8 +469,7 @@ impl MessageInterceptor {
 
         let (session_id, terminal_id) = match op {
             TerminalLifecycleOp::Kill => {
-                let parsed: KillTerminalParams =
-                    Self::decode_jsonrpc_params(params, method_name)?;
+                let parsed: KillTerminalParams = Self::decode_jsonrpc_params(params, method_name)?;
                 parsed.validate_boundary()?;
                 (parsed.session_id, parsed.terminal_id)
             }
@@ -526,6 +539,7 @@ impl MessageInterceptor {
                 return Ok(InterceptResult::Block(error_response));
             }
             CapabilityGate::Allow(context) => context,
+            CapabilityGate::Error(error) => return Err(error.into()),
             CapabilityGate::Block(response) => {
                 tracing::warn!(
                     method = method_name,
@@ -603,10 +617,8 @@ impl MessageInterceptor {
                     &notif.session_id,
                     event,
                     capability_context.as_ref(),
-                );
-                if let Some(block) = self.sign_or_block(message.get("id"), &receipt) {
-                    return Ok(InterceptResult::Block(block));
-                }
+                )?;
+                self.sign_receipt(&receipt)?;
                 tracing::info!(
                     tool_call_id = %receipt.tool_call_id,
                     status = %receipt.status,
@@ -625,10 +637,8 @@ impl MessageInterceptor {
                     &notif.session_id,
                     event,
                     capability_context.as_ref(),
-                ) {
-                    if let Some(block) = self.sign_or_block(message.get("id"), &receipt) {
-                        return Ok(InterceptResult::Block(block));
-                    }
+                )? {
+                    self.sign_receipt(&receipt)?;
                     if should_clear_capability_context(&receipt.status) {
                         self.clear_tool_capability_context(&notif.session_id, &event.tool_call_id);
                     }
@@ -644,7 +654,7 @@ impl MessageInterceptor {
                 }
             }
             SessionUpdate::MalformedToolCall(ref message) => {
-                return Err(AcpProxyError::Protocol(message.clone()));
+                return Err(message.clone().into());
             }
             SessionUpdate::AgentMessageChunk(_)
             | SessionUpdate::AgentThoughtChunk(_)
@@ -664,6 +674,12 @@ impl MessageInterceptor {
         id: Option<&Value>,
         request: AcpCapabilityRequest,
     ) -> CapabilityGate {
+        // A repeated tool identity needs fresh authorization. Retire its old
+        // context before the fallible check so neither an error nor a denial
+        // can lend that authority to a later session/update.
+        if let Some(tool_call_id) = request.tool_call_id.as_deref() {
+            self.clear_tool_capability_context(&request.session_id, tool_call_id);
+        }
         let Some(checker) = self.capability_checker.as_ref() else {
             return CapabilityGate::Skip;
         };
@@ -703,10 +719,7 @@ impl MessageInterceptor {
                 // call (terminal_kill, terminal_release) and other future
                 // explicitly-bound operations must carry the binding here.
                 if requires_tool_call_id_binding(&request.operation)
-                    && request
-                        .tool_call_id
-                        .as_deref()
-                        .is_none_or(str::is_empty)
+                    && request.tool_call_id.as_deref().is_none_or(str::is_empty)
                 {
                     return CapabilityGate::Block(json_rpc_error(
                         id,
@@ -749,7 +762,9 @@ impl MessageInterceptor {
                     authorization_correlation_id: request.authorization_correlation_id.clone(),
                     authorization_operation: Some(request.operation.clone()),
                     authorization_resource: Some(request.resource.clone()),
-                    authorization_parameter_hash: Some(request.authorization_parameter_hash.clone()),
+                    authorization_parameter_hash: Some(
+                        request.authorization_parameter_hash.clone(),
+                    ),
                     authorization_receipt_id: Some(receipt_id),
                     authorization_request_id: Some(receipt_request_id),
                 })
@@ -769,26 +784,18 @@ impl MessageInterceptor {
                     error_data,
                 ))
             }
-            Err(err) => CapabilityGate::Block(json_rpc_error(
-                id,
-                ACP_ERROR_ACCESS_DENIED,
-                &format!("capability check failed closed: {err}"),
-            )),
+            Err(err) => CapabilityGate::Error(err),
         }
     }
 
-    fn sign_or_block(&self, id: Option<&Value>, entry: &AcpToolCallAuditEntry) -> Option<Value> {
+    fn sign_receipt(&self, entry: &AcpToolCallAuditEntry) -> Result<(), AcpProxyError> {
         let Some(signer) = self.receipt_signer.as_ref() else {
-            if self.attestation_mode == AcpAttestationMode::Required {
-                return Some(json_rpc_error(
-                    id,
-                    ACP_ERROR_ACCESS_DENIED,
-                    "ACP attestation required but receipt signer is required and unavailable",
-                ));
-            }
-            return None;
+            return if self.attestation_mode == AcpAttestationMode::Required {
+                Err(ReceiptSignError::SignerUnavailable.into())
+            } else {
+                Ok(())
+            };
         };
-
         let request = AcpReceiptRequest {
             audit_entry: entry.clone(),
             tool_server: self.config.server_id().to_string(),
@@ -796,27 +803,15 @@ impl MessageInterceptor {
         };
         match signer.sign_acp_receipt(&request) {
             Ok(receipt) => {
-                tracing::info!(
-                    receipt_id = %receipt.id,
-                    tool_call_id = %entry.tool_call_id,
-                    "signed ACP audit entry"
-                );
-                None
+                tracing::info!(receipt_id = %receipt.id, tool_call_id = %entry.tool_call_id, "signed ACP audit entry");
+                Ok(())
             }
             Err(error) if self.attestation_mode == AcpAttestationMode::Required => {
-                Some(json_rpc_error(
-                    id,
-                    ACP_ERROR_ACCESS_DENIED,
-                    &format!("receipt signing failed closed: {error}"),
-                ))
+                Err(error.into())
             }
             Err(error) => {
-                tracing::warn!(
-                    tool_call_id = %entry.tool_call_id,
-                    error = %error,
-                    "ACP receipt signing failed in best-effort mode"
-                );
-                None
+                tracing::warn!(tool_call_id = %entry.tool_call_id, error = %error, "ACP receipt signing failed in best-effort mode");
+                Ok(())
             }
         }
     }
@@ -828,7 +823,10 @@ impl MessageInterceptor {
             .filter(|tool_call_id| !tool_call_id.trim().is_empty());
         if let Some(tool_call_id) = tool_call_id {
             if let Ok(mut contexts) = self.live_capability_contexts.lock() {
-                contexts.insert(tool_capability_context_key(session_id, &tool_call_id), context);
+                contexts.insert(
+                    tool_capability_context_key(session_id, &tool_call_id),
+                    context,
+                );
             }
             return;
         }
@@ -1059,7 +1057,7 @@ fn acp_receipt_tool_name(entry: &AcpToolCallAuditEntry) -> String {
 fn authorization_parameter_hash(params: &Value) -> Result<String, AcpProxyError> {
     let payload = authorization_operation_payload(params);
     let bytes = chio_core::canonical::canonical_json_bytes(&payload)
-        .map_err(|e| AcpProxyError::Protocol(format!("hash ACP authorization params: {e}")))?;
+        .map_err(|e| AcpProxyError::Audit(AcpAuditError::Canonical(e)))?;
     Ok(chio_core::sha256_hex(&bytes))
 }
 
@@ -1145,13 +1143,21 @@ fn extract_execution_nonce(
     let value = params
         .get("executionNonce")
         .or_else(|| params.get("execution_nonce"))
-        .or_else(|| params.get("chio").and_then(|chio| chio.get("executionNonce")))
-        .or_else(|| params.get("chio").and_then(|chio| chio.get("execution_nonce")));
+        .or_else(|| {
+            params
+                .get("chio")
+                .and_then(|chio| chio.get("executionNonce"))
+        })
+        .or_else(|| {
+            params
+                .get("chio")
+                .and_then(|chio| chio.get("execution_nonce"))
+        });
     match value {
         None | Some(Value::Null) => Ok(None),
         Some(value) => serde_json::from_value(value.clone())
             .map(Some)
-            .map_err(|error| AcpProxyError::Protocol(format!("invalid execution nonce: {error}"))),
+            .map_err(|error| chio_core::canonical::UntrustedJsonError::Decode(error).into()),
     }
 }
 

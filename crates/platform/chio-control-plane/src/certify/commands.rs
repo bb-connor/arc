@@ -22,6 +22,10 @@ use super::types::{
 };
 use super::verify::certification_artifact_id;
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
     let artifact_id = certification_artifact_id(&artifact)?;
@@ -48,6 +52,10 @@ pub fn cmd_certify_verify(input: &Path, json_output: bool) -> Result<(), CliErro
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_check(
     scenarios_dir: &Path,
     results_dir: &Path,
@@ -116,12 +124,15 @@ pub fn cmd_certify_registry_publish_local(
     json_output: bool,
 ) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
-    let mut registry = CertificationRegistry::load(registry_path)?;
-    let entry = registry.publish(artifact)?;
-    registry.save(registry_path)?;
+    let entry =
+        CertificationRegistry::update(registry_path, |registry| registry.publish(artifact))?;
     emit_registry_entry("published certification artifact", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_list_local(
     registry_path: &Path,
     json_output: bool,
@@ -163,6 +174,10 @@ pub fn cmd_certify_registry_get_local(
     emit_registry_entry("certification artifact", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_resolve_local(
     tool_server_id: &str,
     registry_path: &Path,
@@ -200,9 +215,9 @@ pub fn cmd_certify_registry_revoke_local(
     revoked_at: Option<u64>,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let mut registry = CertificationRegistry::load(registry_path)?;
-    let entry = registry.revoke(artifact_id, reason, revoked_at)?;
-    registry.save(registry_path)?;
+    let entry = CertificationRegistry::update(registry_path, |registry| {
+        registry.revoke(artifact_id, reason, revoked_at)
+    })?;
     emit_registry_entry("revoked certification artifact", &entry, json_output)
 }
 
@@ -232,6 +247,10 @@ fn parse_dispute_state(state: &str) -> Result<CertificationDisputeState, CliErro
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_search(
     discovery_path: Option<&Path>,
     tool_server_id: Option<&str>,
@@ -259,7 +278,7 @@ pub fn cmd_certify_registry_search(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::search_public_certifications_across_network(&network, &query)
+        network::search_public_certifications_across_network(&network, &query)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -286,6 +305,10 @@ pub fn cmd_certify_registry_search(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_transparency(
     discovery_path: Option<&Path>,
     tool_server_id: Option<&str>,
@@ -307,7 +330,7 @@ pub fn cmd_certify_registry_transparency(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::transparency_public_certifications_across_network(&network, &query)
+        network::transparency_public_certifications_across_network(&network, &query)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -328,6 +351,10 @@ pub fn cmd_certify_registry_transparency(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_consume(
     discovery_path: Option<&Path>,
     tool_server_id: &str,
@@ -351,7 +378,7 @@ pub fn cmd_certify_registry_consume(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::consume_public_certification_across_network(&network, &request)
+        network::consume_public_certification_across_network(&network, &request)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -396,14 +423,15 @@ pub fn cmd_certify_registry_dispute(
                     .to_string(),
             )
         })?;
-        let mut registry = CertificationRegistry::load(path)?;
-        let entry = registry.dispute(artifact_id, &request)?;
-        registry.save(path)?;
-        entry
+        CertificationRegistry::update(path, |registry| registry.dispute(artifact_id, &request))?
     };
     emit_registry_entry("updated certification dispute state", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn emit_registry_entry(
     headline: &str,
     entry: &CertificationRegistryEntry,

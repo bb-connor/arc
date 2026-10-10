@@ -916,6 +916,9 @@ fn proof_export_rejects_bundle_with_symlink_member() {
         utf8_path(&output_file).as_str(),
     ]);
 
-    assert_failure(&output, "unsupported proof bundle file type");
+    assert_failure(
+        &output,
+        "artifact collection requires regular files and directories",
+    );
     assert!(!output_file.exists());
 }

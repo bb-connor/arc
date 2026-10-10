@@ -278,12 +278,9 @@ impl EnterpriseProviderRegistry {
                 path.display()
             ))
         })?;
-        let registry = serde_json::from_slice::<Self>(&bytes).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to parse enterprise provider registry {}: {error}",
-                path.display()
-            ))
-        })?;
+        let registry = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<Self>())
+            .map_err(CliError::from)?;
         registry.with_revalidated_records()
     }
 
@@ -361,12 +358,9 @@ impl CertificationDiscoveryNetwork {
                 path.display()
             ))
         })?;
-        let network = serde_json::from_slice::<Self>(&bytes).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to parse certification discovery network {}: {error}",
-                path.display()
-            ))
-        })?;
+        let network = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<Self>())
+            .map_err(CliError::from)?;
         network.with_revalidated_records()
     }
 
@@ -601,6 +595,21 @@ mod tests {
         }
     }
 
+    fn assert_signed_input_error(error: &CliError) {
+        let CliError::SignedJson(source) = error else {
+            panic!("expected a typed signed-input error, got {error:?}");
+        };
+        assert!(matches!(
+            source,
+            chio_core::canonical::UntrustedJsonError::SignedInput(_)
+        ));
+        assert!(std::error::Error::source(source).is_some());
+        assert_eq!(
+            source.code(),
+            "urn:chio:error:attest:signed-json-invalid-input"
+        );
+    }
+
     use chio_test_support::prelude::*;
 
     fn must_err<T: std::fmt::Debug>(result: Result<T, CliError>, context: &str) -> CliError {
@@ -764,7 +773,7 @@ mod tests {
     }
 
     #[test]
-    fn enterprise_provider_registry_local_failures_use_cli_domains() {
+    fn enterprise_provider_registry_local_failures_preserve_typed_domains() {
         let missing_path = temp_registry_path();
         let missing_error = must_err(
             EnterpriseProviderRegistry::load(&missing_path),
@@ -778,7 +787,7 @@ mod tests {
             EnterpriseProviderRegistry::load(&invalid_json_path),
             "invalid registry JSON should fail closed",
         );
-        assert_registry_error(&json_error, "urn:chio:error:cli:json", "cli");
+        assert_signed_input_error(&json_error);
         let _ = fs::remove_file(invalid_json_path);
 
         let unsupported_version_path = temp_registry_path();
@@ -843,14 +852,14 @@ mod tests {
     }
 
     #[test]
-    fn certification_discovery_network_local_failures_use_cli_domains() {
+    fn certification_discovery_network_local_failures_preserve_typed_domains() {
         let invalid_json_path = temp_discovery_path();
         write_test_file(&invalid_json_path, b"{not-json");
         let json_error = must_err(
             CertificationDiscoveryNetwork::load(&invalid_json_path),
             "invalid discovery JSON should fail closed",
         );
-        assert_registry_error(&json_error, "urn:chio:error:cli:json", "cli");
+        assert_signed_input_error(&json_error);
         let _ = fs::remove_file(invalid_json_path);
 
         let unsupported_version_path = temp_discovery_path();

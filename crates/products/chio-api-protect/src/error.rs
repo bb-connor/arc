@@ -5,6 +5,17 @@ use thiserror::Error;
 /// Errors produced by the protect proxy.
 #[derive(Debug, Error)]
 pub enum ProtectError {
+    #[error("policy encoding failed: {0}")]
+    Canonical(#[from] chio_core_types::error::Error),
+    #[error("authority clock rejected the operation: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
+
+    #[error("owned mediation maintenance failed")]
+    MediationMaintenance(#[source] std::sync::Arc<chio_kernel::KernelError>),
+
+    #[error("{0}")]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
+
     #[error("failed to load OpenAPI spec: {0}")]
     SpecLoad(String),
 
@@ -33,6 +44,12 @@ pub enum ProtectError {
 
     #[error("receipt persistence failed: {0}")]
     ReceiptStore(String),
+
+    #[error("receipt evidence persistence failed: {0}")]
+    EvidenceStore(#[from] chio_kernel::ReceiptStoreError),
+
+    #[error("private signing custody rejected")]
+    SigningCustody(#[source] Box<chio_control_plane::CliError>),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

@@ -166,12 +166,13 @@ impl PasskeyCapability {
     /// Decode from canonical JSON bytes. Round-trip with
     /// [`Self::to_canonical_json`].
     ///
-    /// `serde_json::from_slice` is used because RFC 8785 output is itself a
-    /// valid JSON byte sequence; canonicalization is a property of the
-    /// encoder, not the decoder.
+    /// The complete bounded native input must equal its canonical typed encoding.
+    /// Parsing does not perform signature, audience, expiry or revocation checks.
     pub fn from_canonical_json(bytes: &[u8]) -> Result<Self, CustodyError> {
-        serde_json::from_slice(bytes)
-            .map_err(|err| CustodyError::Encoding(format!("canonical-json decode: {err}")))
+        Ok(
+            chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024)?
+                .decode_canonical()?,
+        )
     }
 
     /// Verifier-side audience check. Fail-closed mismatch.

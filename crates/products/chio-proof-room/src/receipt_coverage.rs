@@ -1,3 +1,4 @@
+use crate::{input, ProofRoomError};
 use std::{collections::BTreeSet, path::Path};
 
 use chio_core_types::{PublicKey, Signature};
@@ -17,10 +18,10 @@ pub(crate) fn verify(
     artifacts: &[ProofRoomArtifactRef],
     trusted_kernel_keys: &BTreeSet<String>,
     require_full_matrix: bool,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if coverage.is_empty() {
         return if require_full_matrix {
-            Err("proof-room.receipt-coverage.missing".to_string())
+            Err(("proof-room.receipt-coverage.missing".to_string()).into())
         } else {
             Ok(())
         };
@@ -29,16 +30,16 @@ pub(crate) fn verify(
     let mut categories = BTreeSet::new();
     for entry in coverage {
         if !categories.insert(entry.category.as_str()) {
-            return Err(format!(
-                "proof-room.receipt-coverage.duplicate: {}",
-                entry.category
-            ));
+            return Err(
+                (format!("proof-room.receipt-coverage.duplicate: {}", entry.category)).into(),
+            );
         }
         if !REQUIRED_RECEIPT_COVERAGE_CATEGORIES.contains(&entry.category.as_str()) {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.receipt-coverage.category-unsupported: {}",
                 entry.category
-            ));
+            ))
+            .into());
         }
         match entry.status.as_str() {
             "covered" => {
@@ -46,10 +47,11 @@ pub(crate) fn verify(
             }
             "excluded" => verify_excluded_category(entry, require_full_matrix)?,
             _ => {
-                return Err(format!(
+                return Err((format!(
                     "proof-room.receipt-coverage.status-unsupported: {}",
                     entry.category
-                ));
+                ))
+                .into());
             }
         }
     }
@@ -57,9 +59,10 @@ pub(crate) fn verify(
     if require_full_matrix {
         for required_category in REQUIRED_RECEIPT_COVERAGE_CATEGORIES {
             if !categories.contains(required_category) {
-                return Err(format!(
+                return Err((format!(
                     "proof-room.receipt-coverage.category-missing: {required_category}"
-                ));
+                ))
+                .into());
             }
         }
     }
@@ -71,7 +74,7 @@ fn verify_covered_category(
     entry: &ProofRoomReceiptCoverage,
     artifacts: &[ProofRoomArtifactRef],
     trusted_kernel_keys: &BTreeSet<String>,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let artifact_path = entry.artifact_path.as_deref().ok_or_else(|| {
         format!(
             "proof-room.receipt-coverage.artifact-missing: {}",
@@ -85,10 +88,11 @@ fn verify_covered_category(
         )
     })?;
     if !terminal_status_matches_category(&entry.category, declared_status) {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.status-mismatch: {}",
             entry.category
-        ));
+        ))
+        .into());
     }
     let artifact = artifacts
         .iter()
@@ -100,17 +104,12 @@ fn verify_covered_category(
             )
         })?;
     if !is_receipt_coverage_schema(&artifact.schema) {
-        return Err(format!(
+        return Err((format!(
             "proof-room.schema-mismatch: receipt_coverage expected {PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA}"
-        ));
+        )).into());
     }
     let receipt = verify_manifest_ref(bundle_root, artifact, "receipt_coverage", None)?;
-    let value: serde_json::Value = serde_json::from_slice(&receipt.bytes).map_err(|error| {
-        format!(
-            "proof-room.receipt-coverage.invalid-json: {}: {error}",
-            entry.category
-        )
-    })?;
+    let value: serde_json::Value = input::decode(&receipt.bytes)?;
     let actual_status = value
         .get("terminal_status")
         .and_then(serde_json::Value::as_str)
@@ -123,10 +122,11 @@ fn verify_covered_category(
     if actual_status != declared_status
         || !terminal_status_matches_category(&entry.category, actual_status)
     {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.status-mismatch: {}",
             entry.category
-        ));
+        ))
+        .into());
     }
     let receipt_id = required_receipt_field(&value, "receipt_id", &entry.category)?;
     let _policy_digest = required_receipt_field(&value, "policy_digest", &entry.category)?;
@@ -146,15 +146,13 @@ fn required_receipt_field<'a>(
     value: &'a serde_json::Value,
     field: &str,
     category: &str,
-) -> Result<&'a str, String> {
+) -> Result<&'a str, ProofRoomError> {
     let field_value = value
         .get(field)
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| format!("proof-room.receipt-coverage.{field}-missing: {category}"))?;
     if field_value.is_empty() {
-        return Err(format!(
-            "proof-room.receipt-coverage.{field}-missing: {category}"
-        ));
+        return Err((format!("proof-room.receipt-coverage.{field}-missing: {category}")).into());
     }
     Ok(field_value)
 }
@@ -164,16 +162,14 @@ fn verify_receipt_signature(
     receipt_id: &str,
     receipt: &serde_json::Value,
     trusted_kernel_keys: &BTreeSet<String>,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let signature = required_receipt_field(receipt, "signature", category)?;
     let kernel_key = required_receipt_field(receipt, "kernel_key", category)?;
     let public_key = PublicKey::from_hex(kernel_key).map_err(|error| {
         format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}")
     })?;
     if !trusted_kernel_keys.contains(&public_key.to_hex()) {
-        return Err(format!(
-            "proof-room.receipt-coverage.signer-untrusted: {category}"
-        ));
+        return Err((format!("proof-room.receipt-coverage.signer-untrusted: {category}")).into());
     }
     let signature = Signature::from_hex(signature).map_err(|error| {
         format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}")
@@ -187,15 +183,13 @@ fn verify_receipt_signature(
     if verified {
         return Ok(());
     }
-    Err(format!(
-        "proof-room.receipt-coverage.signature-invalid: {category}: {receipt_id}"
-    ))
+    Err((format!("proof-room.receipt-coverage.signature-invalid: {category}: {receipt_id}")).into())
 }
 
 fn receipt_signature_body(
     category: &str,
     receipt: &serde_json::Value,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, ProofRoomError> {
     if receipt.get("schema").and_then(serde_json::Value::as_str)
         == Some(RUNTIME_TERMINAL_RECEIPT_SCHEMA)
     {
@@ -223,9 +217,7 @@ fn receipt_signature_body(
 
     let mut signed_body = receipt.clone();
     let Some(signed_body_object) = signed_body.as_object_mut() else {
-        return Err(format!(
-            "proof-room.receipt-coverage.invalid-json: {category}"
-        ));
+        return Err((format!("proof-room.receipt-coverage.invalid-json: {category}")).into());
     };
     signed_body_object.remove("signature");
     Ok(signed_body)
@@ -234,30 +226,34 @@ fn receipt_signature_body(
 fn verify_excluded_category(
     entry: &ProofRoomReceiptCoverage,
     require_full_matrix: bool,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if require_full_matrix && terminal_category_requires_artifact(&entry.category) {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.exclusion-forbidden: {}",
             entry.category
-        ));
+        ))
+        .into());
     }
     let Some(reason) = entry.exclusion_reason.as_deref() else {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.exclusion-reason-missing: {}",
             entry.category
-        ));
+        ))
+        .into());
     };
     if reason.is_empty() {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.exclusion-reason-missing: {}",
             entry.category
-        ));
+        ))
+        .into());
     }
     if entry.artifact_path.is_some() || entry.terminal_status.is_some() {
-        return Err(format!(
+        return Err((format!(
             "proof-room.receipt-coverage.exclusion-has-artifact: {}",
             entry.category
-        ));
+        ))
+        .into());
     }
     Ok(())
 }

@@ -44,12 +44,17 @@ TARGETS=(
     manifest_roundtrip
     federation_trust_establishment
     finding_worker_protocol
+    frost_round2_envelope
+    response_authority_protocol
+    response_lifecycle
     underwriting_policy_input
     fuzz_policy_parse_compile
     policy_analyze
     fuzz_sql_parser
     fuzz_merkle_checkpoint
     revocation_oracle_merkle
+    rollback_anchor_slots
+    peers_lock_decode
     fuzz_tool_action
 )
 
@@ -96,7 +101,11 @@ elif [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
 fi
 
 for target in "${selected_targets[@]}"; do
-    cargo +nightly fuzz build "$target" --release --sanitizer "$SANITIZER"
+    features=""
+    case "$target" in
+        response_authority_protocol|response_lifecycle) features="$target" ;;
+    esac
+    cargo +nightly fuzz build "$target" --features "$features" --release --sanitizer "$SANITIZER"
     cp "target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
 
     # Pack the per-target seed corpus when one exists in-tree.

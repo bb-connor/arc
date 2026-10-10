@@ -19,6 +19,8 @@ const MAX_CUSTODY_SECRET_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrostCeremonyError {
+    #[error(transparent)]
+    Sealing(#[from] FrostSealingError),
     #[error("invalid FROST ceremony configuration: {0}")]
     InvalidConfig(&'static str),
     #[error("invalid FROST ceremony secret: {0}")]
@@ -47,6 +49,8 @@ pub struct FrostCeremonyParticipant {
     pub participant_id: String,
     pub transport_key_id: String,
     pub transport_public_key: PublicKey,
+    pub sealing_key_id: String,
+    pub sealing_public_key: X25519PublicKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,27 +143,25 @@ impl FrostCeremonyConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FrostAuthenticatedDkgPackage {
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct DkgPackage {
     schema: String,
     ceremony_id: String,
     participant_set_digest: String,
     key_epoch: u64,
     round: FrostDkgRound,
     sender_participant_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     recipient_participant_id: Option<String>,
     package_digest: String,
-    package_hex: Zeroizing<String>,
+    package_bytes: Zeroizing<Vec<u8>>,
     transport_key_id: String,
     transport_signature: String,
 }
 
-impl std::fmt::Debug for FrostAuthenticatedDkgPackage {
+impl std::fmt::Debug for DkgPackage {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("FrostAuthenticatedDkgPackage")
+            .debug_struct("DkgPackage")
             .field("ceremony_id", &self.ceremony_id)
             .field("round", &self.round)
             .field("sender_participant_id", &self.sender_participant_id)
@@ -170,7 +172,7 @@ impl std::fmt::Debug for FrostAuthenticatedDkgPackage {
     }
 }
 
-impl FrostAuthenticatedDkgPackage {
+impl DkgPackage {
     #[must_use]
     pub const fn round(&self) -> FrostDkgRound {
         self.round
@@ -192,16 +194,13 @@ impl FrostAuthenticatedDkgPackage {
     }
 
     fn package_bytes(&self) -> Result<Zeroizing<Vec<u8>>, FrostCeremonyError> {
-        let bytes = hex::decode(self.package_hex.as_bytes()).map_err(|_| {
-            package_authentication_error(&self.sender_participant_id, "package is not hexadecimal")
-        })?;
-        if bytes.is_empty() || bytes.len() > MAX_DKG_PACKAGE_BYTES {
+        if self.package_bytes.is_empty() || self.package_bytes.len() > MAX_DKG_PACKAGE_BYTES {
             return Err(package_authentication_error(
                 &self.sender_participant_id,
                 "package length is outside the supported range",
             ));
         }
-        Ok(Zeroizing::new(bytes))
+        Ok(self.package_bytes.clone())
     }
 
     fn signing_preimage(&self) -> DkgPackageSigningPreimage<'_> {
@@ -219,16 +218,26 @@ impl FrostAuthenticatedDkgPackage {
     }
 }
 
+#[path = "frost_ceremony/packages.rs"]
+mod packages;
+pub use packages::FrostRound1Package;
+#[path = "frost_ceremony/sealing.rs"]
+mod sealing;
+pub use sealing::{
+    FrostRound2Package, FrostSealingError, FrostSealingKey, SealedFrostRound2Package,
+    X25519PublicKey,
+};
+
 #[derive(Debug)]
 pub struct FrostRound1Transition {
     pub secret: FrostCeremonySecret,
-    pub package: FrostAuthenticatedDkgPackage,
+    pub package: FrostRound1Package,
 }
 
 #[derive(Debug)]
 pub struct FrostRound2Transition {
     pub secret: FrostCeremonySecret,
-    pub packages: Vec<FrostAuthenticatedDkgPackage>,
+    pub packages: Vec<SealedFrostRound2Package>,
     pub round1_transcript_digest: String,
 }
 
@@ -289,9 +298,11 @@ struct TranscriptEntry<'a> {
 pub fn begin_frost_ceremony<R: CryptoRng + RngCore>(
     config: &FrostCeremonyConfig,
     transport_key: &Keypair,
+    sealing_key: &FrostSealingKey,
     rng: &mut R,
 ) -> Result<FrostRound1Transition, FrostCeremonyError> {
     let context = ValidatedCeremony::new(config, transport_key)?;
+    sealing_key.validate_for(config)?;
     let local_identifier = context.local_identifier()?;
     let participant_count = context.participant_count()?;
     let (secret, package) = dkg::part1(local_identifier, participant_count, config.threshold, rng)
@@ -300,13 +311,13 @@ pub fn begin_frost_ceremony<R: CryptoRng + RngCore>(
         FrostCeremonySecretKind::Round1,
         secret.serialize().map_err(crypto_error)?,
     )?;
-    let package = authenticated_package(
+    let package = FrostRound1Package(authenticated_package(
         &context,
         FrostDkgRound::Round1,
         None,
         package.serialize().map_err(crypto_error)?,
         transport_key,
-    )?;
+    )?);
     Ok(FrostRound1Transition { secret, package })
 }
 
@@ -314,7 +325,7 @@ pub fn advance_frost_ceremony(
     config: &FrostCeremonyConfig,
     transport_key: &Keypair,
     secret: FrostCeremonySecret,
-    round1_packages: &[FrostAuthenticatedDkgPackage],
+    round1_packages: &[FrostRound1Package],
 ) -> Result<FrostRound2Transition, FrostCeremonyError> {
     let context = ValidatedCeremony::new(config, transport_key)?;
     if secret.kind != FrostCeremonySecretKind::Round1 {
@@ -330,6 +341,7 @@ pub fn advance_frost_ceremony(
         ));
     }
     let validated = validate_round1_transcript(&context, round1_packages)?;
+    let round1_transcript_digest = transcript_digest(&validated)?;
     let mut packages = BTreeMap::new();
     for package in validated {
         if package.sender_participant_id == config.local_participant_id {
@@ -354,31 +366,32 @@ pub fn advance_frost_ceremony(
         .into_iter()
         .map(|(identifier, package)| {
             let recipient = context.participant_id(identifier)?;
-            authenticated_package(
+            SealedFrostRound2Package::seal(
                 &context,
-                FrostDkgRound::Round2,
-                Some(recipient),
+                recipient,
                 package.serialize().map_err(crypto_error)?,
                 transport_key,
+                &mut rand_core::OsRng,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
     outbound.sort_by(|left, right| {
-        left.recipient_participant_id
-            .cmp(&right.recipient_participant_id)
+        left.recipient_participant_id()
+            .cmp(right.recipient_participant_id())
     });
     Ok(FrostRound2Transition {
         secret: round2_secret,
         packages: outbound,
-        round1_transcript_digest: transcript_digest(round1_packages)?,
+        round1_transcript_digest,
     })
 }
 
 pub fn complete_frost_ceremony(
     config: &FrostCeremonyConfig,
     secret: FrostCeremonySecret,
-    round1_packages: &[FrostAuthenticatedDkgPackage],
-    round2_packages: &[FrostAuthenticatedDkgPackage],
+    round1_packages: &[FrostRound1Package],
+    round2_packages: &[SealedFrostRound2Package],
+    local_packages: Vec<FrostRound2Package>,
 ) -> Result<FrostCeremonyCompletion, FrostCeremonyError> {
     let context = ValidatedCeremony::new_without_key(config)?;
     if secret.kind != FrostCeremonySecretKind::Round2 {
@@ -393,8 +406,30 @@ pub fn complete_frost_ceremony(
             "round-two package belongs to another participant",
         ));
     }
+    let transcript_digest =
+        verify_frost_ceremony_transcript(config, round1_packages, round2_packages)?;
     let round1_packages = validate_round1_transcript(&context, round1_packages)?;
-    let round2_packages = validate_round2_transcript(&context, round2_packages)?;
+    let expected = config
+        .participants
+        .len()
+        .checked_sub(1)
+        .ok_or(FrostSealingError::Context)?;
+    if local_packages.len() != expected {
+        return Err(FrostCeremonyError::Transcript(
+            "incomplete local round-two inbox",
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for package in &local_packages {
+        package.envelope.verify_context(&context, true)?;
+        if !round2_packages.contains(&package.envelope)
+            || !seen.insert(package.envelope.sender_participant_id())
+        {
+            return Err(FrostCeremonyError::Transcript(
+                "local inbox differs from the sealed transcript",
+            ));
+        }
+    }
 
     let mut upstream_round1 = BTreeMap::new();
     for package in &round1_packages {
@@ -413,35 +448,21 @@ pub fn complete_frost_ceremony(
         );
     }
     let mut upstream_round2 = BTreeMap::new();
-    for package in &round2_packages {
-        if package.recipient_participant_id.as_deref() != Some(&config.local_participant_id) {
-            continue;
-        }
-        let bytes = package.package_bytes()?;
+    for package in &local_packages {
         upstream_round2.insert(
-            context.identifier(&package.sender_participant_id)?,
-            round2::Package::deserialize(&bytes).map_err(|_| {
-                package_authentication_error(
-                    &package.sender_participant_id,
-                    "round-two package does not decode",
-                )
-            })?,
+            context.identifier(package.envelope.sender_participant_id())?,
+            round2::Package::deserialize(&package.bytes)
+                .map_err(|_| FrostSealingError::Plaintext)?,
         );
     }
     let (key_package, public_key_package) =
         dkg::part3(&secret_package, &upstream_round1, &upstream_round2).map_err(crypto_error)?;
-    completion_from_packages(
-        &context,
-        key_package,
-        public_key_package,
-        round1_packages,
-        round2_packages,
-    )
+    completion_from_packages(&context, key_package, public_key_package, transcript_digest)
 }
 
 pub fn verify_frost_ceremony_round1_transcript(
     config: &FrostCeremonyConfig,
-    packages: &[FrostAuthenticatedDkgPackage],
+    packages: &[FrostRound1Package],
 ) -> Result<String, FrostCeremonyError> {
     let context = ValidatedCeremony::new_without_key(config)?;
     let packages = validate_round1_transcript(&context, packages)?;
@@ -450,16 +471,52 @@ pub fn verify_frost_ceremony_round1_transcript(
 
 pub fn verify_frost_ceremony_transcript(
     config: &FrostCeremonyConfig,
-    round1_packages: &[FrostAuthenticatedDkgPackage],
-    round2_packages: &[FrostAuthenticatedDkgPackage],
+    round1_packages: &[FrostRound1Package],
+    round2_packages: &[SealedFrostRound2Package],
 ) -> Result<String, FrostCeremonyError> {
     let context = ValidatedCeremony::new_without_key(config)?;
     let round1 = validate_round1_transcript(&context, round1_packages)?;
-    let round2 = validate_round2_transcript(&context, round2_packages)?;
-    let mut transcript = Vec::with_capacity(round1.len() + round2.len());
-    transcript.extend(round1);
-    transcript.extend(round2);
-    transcript_digest(&transcript)
+    let mut round2 = round2_packages.iter().collect::<Vec<_>>();
+    let expected = config
+        .participants
+        .len()
+        .checked_sub(1)
+        .and_then(|peers| config.participants.len().checked_mul(peers))
+        .ok_or(FrostCeremonyError::Transcript(
+            "round-two package count overflow",
+        ))?;
+    if round2.len() != expected {
+        return Err(FrostCeremonyError::Transcript(
+            "incomplete sealed round-two transcript",
+        ));
+    }
+    let mut pairs = BTreeSet::new();
+    for package in &round2 {
+        package.verify_context(&context, false)?;
+        if !pairs.insert((
+            package.sender_participant_id(),
+            package.recipient_participant_id(),
+        )) {
+            return Err(FrostCeremonyError::DuplicatePackage {
+                round: FrostDkgRound::Round2,
+                sender_participant_id: package.sender_participant_id().to_string(),
+            });
+        }
+    }
+    round2.sort_by_key(|p| (p.sender_participant_id(), p.recipient_participant_id()));
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Transcript<'a> {
+        round1_digest: String,
+        round2: Vec<&'a SealedFrostRound2Package>,
+    }
+    canonical_digest(
+        b"chio.frost.sealed-transcript.digest.v1\0",
+        &Transcript {
+            round1_digest: transcript_digest(&round1)?,
+            round2,
+        },
+    )
 }
 
 struct ValidatedCeremony<'a> {
@@ -560,8 +617,7 @@ fn completion_from_packages(
     context: &ValidatedCeremony<'_>,
     key_package: KeyPackage,
     public_key_package: PublicKeyPackage,
-    round1_packages: Vec<&FrostAuthenticatedDkgPackage>,
-    round2_packages: Vec<&FrostAuthenticatedDkgPackage>,
+    transcript_digest: String,
 ) -> Result<FrostCeremonyCompletion, FrostCeremonyError> {
     if public_key_package.min_signers() != Some(context.config.threshold)
         || public_key_package.max_signers() != context.participant_count()?
@@ -581,9 +637,6 @@ fn completion_from_packages(
             "upstream public key package omitted a participant".to_string(),
         ));
     }
-    let mut transcript = Vec::with_capacity(round1_packages.len() + round2_packages.len());
-    transcript.extend(round1_packages);
-    transcript.extend(round2_packages);
     Ok(FrostCeremonyCompletion {
         key_package: FrostCeremonySecret::new(
             FrostCeremonySecretKind::KeyPackage,
@@ -597,7 +650,7 @@ fn completion_from_packages(
                 .map_err(crypto_error)?,
         ),
         verification_shares,
-        transcript_digest: transcript_digest(&transcript)?,
+        transcript_digest,
     })
 }
 
@@ -646,14 +699,36 @@ fn validate_config(config: &FrostCeremonyConfig) -> Result<(), FrostCeremonyErro
     }
     let mut transport_key_ids = BTreeSet::new();
     let mut transport_keys = BTreeSet::new();
+    let mut sealing_ids = BTreeSet::new();
+    let mut sealing_keys = BTreeSet::new();
     for (index, participant) in config.participants.iter().enumerate() {
         validate_identifier(&participant.participant_id)
             .map_err(FrostCeremonyError::InvalidConfig)?;
         validate_identifier(&participant.transport_key_id)
             .map_err(FrostCeremonyError::InvalidConfig)?;
+        validate_identifier(&participant.sealing_key_id)
+            .map_err(FrostCeremonyError::InvalidConfig)?;
+        participant.sealing_public_key.validate()?;
+        if !sealing_ids.insert(&participant.sealing_key_id)
+            || !sealing_keys.insert(&participant.sealing_public_key)
+        {
+            return Err(FrostCeremonyError::InvalidConfig(
+                "sealing keys and ids must be unique",
+            ));
+        }
+        if participant.sealing_key_id == participant.transport_key_id {
+            return Err(FrostCeremonyError::InvalidConfig(
+                "sealing and signing key ids must differ",
+            ));
+        }
         if participant.transport_public_key.algorithm() != SigningAlgorithm::Ed25519 {
             return Err(FrostCeremonyError::InvalidConfig(
                 "transport keys must use Ed25519",
+            ));
+        }
+        if participant.transport_public_key.is_weak_ed25519() {
+            return Err(FrostCeremonyError::InvalidConfig(
+                "transport keys must not be weak Ed25519 keys",
             ));
         }
         if index > 0 && config.participants[index - 1].participant_id >= participant.participant_id
@@ -687,11 +762,12 @@ fn validate_config(config: &FrostCeremonyConfig) -> Result<(), FrostCeremonyErro
 
 fn validate_round1_transcript<'a>(
     context: &ValidatedCeremony<'_>,
-    packages: &'a [FrostAuthenticatedDkgPackage],
-) -> Result<Vec<&'a FrostAuthenticatedDkgPackage>, FrostCeremonyError> {
+    packages: &'a [FrostRound1Package],
+) -> Result<Vec<&'a DkgPackage>, FrostCeremonyError> {
     let mut seen = BTreeSet::new();
     let mut validated = Vec::with_capacity(packages.len());
     for package in packages {
+        let package = &package.0;
         validate_package(context, package, FrostDkgRound::Round1)?;
         if !seen.insert(package.sender_participant_id.as_str()) {
             return Err(FrostCeremonyError::DuplicatePackage {
@@ -716,69 +792,9 @@ fn validate_round1_transcript<'a>(
     Ok(validated)
 }
 
-fn validate_round2_transcript<'a>(
-    context: &ValidatedCeremony<'_>,
-    packages: &'a [FrostAuthenticatedDkgPackage],
-) -> Result<Vec<&'a FrostAuthenticatedDkgPackage>, FrostCeremonyError> {
-    let mut seen = BTreeSet::new();
-    let mut validated = Vec::with_capacity(packages.len());
-    for package in packages {
-        validate_package(context, package, FrostDkgRound::Round2)?;
-        let recipient =
-            package
-                .recipient_participant_id
-                .as_deref()
-                .ok_or(FrostCeremonyError::Transcript(
-                    "round-two package lacks a recipient",
-                ))?;
-        let key = (package.sender_participant_id.as_str(), recipient);
-        if !seen.insert(key) {
-            return Err(FrostCeremonyError::DuplicatePackage {
-                round: FrostDkgRound::Round2,
-                sender_participant_id: package.sender_participant_id.clone(),
-            });
-        }
-        validated.push(package);
-    }
-    let expected = context
-        .config
-        .participants
-        .len()
-        .checked_mul(context.config.participants.len().saturating_sub(1))
-        .ok_or(FrostCeremonyError::Transcript(
-            "round-two package count overflowed",
-        ))?;
-    if seen.len() != expected {
-        return Err(FrostCeremonyError::Transcript(
-            "round two must contain every directed participant package exactly once",
-        ));
-    }
-    for sender in &context.config.participants {
-        for recipient in &context.config.participants {
-            if sender.participant_id != recipient.participant_id
-                && !seen.contains(&(
-                    sender.participant_id.as_str(),
-                    recipient.participant_id.as_str(),
-                ))
-            {
-                return Err(FrostCeremonyError::Transcript(
-                    "round two is missing a directed participant package",
-                ));
-            }
-        }
-    }
-    validated.sort_by(|left, right| {
-        (&left.sender_participant_id, &left.recipient_participant_id).cmp(&(
-            &right.sender_participant_id,
-            &right.recipient_participant_id,
-        ))
-    });
-    Ok(validated)
-}
-
 fn validate_package(
     context: &ValidatedCeremony<'_>,
-    package: &FrostAuthenticatedDkgPackage,
+    package: &DkgPackage,
     expected_round: FrostDkgRound,
 ) -> Result<(), FrostCeremonyError> {
     if package.schema != DKG_PACKAGE_SCHEMA
@@ -861,7 +877,7 @@ fn validate_package(
         canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
     if !sender
         .transport_public_key
-        .verify(&signing_bytes, &signature)
+        .verify_strict(&signing_bytes, &signature)
     {
         return Err(package_authentication_error(
             &package.sender_participant_id,
@@ -877,14 +893,14 @@ fn authenticated_package(
     recipient_participant_id: Option<&str>,
     package_bytes: Vec<u8>,
     transport_key: &Keypair,
-) -> Result<FrostAuthenticatedDkgPackage, FrostCeremonyError> {
+) -> Result<DkgPackage, FrostCeremonyError> {
     if package_bytes.is_empty() || package_bytes.len() > MAX_DKG_PACKAGE_BYTES {
         return Err(FrostCeremonyError::Crypto(
             "upstream DKG package length is outside the supported range".to_string(),
         ));
     }
     let local = context.local_participant()?;
-    let mut package = FrostAuthenticatedDkgPackage {
+    let mut package = DkgPackage {
         schema: DKG_PACKAGE_SCHEMA.to_string(),
         ceremony_id: context.ceremony_id.clone(),
         participant_set_digest: context.participant_set_digest.clone(),
@@ -893,7 +909,7 @@ fn authenticated_package(
         sender_participant_id: local.participant_id.clone(),
         recipient_participant_id: recipient_participant_id.map(str::to_string),
         package_digest: sha256_hex(&package_bytes),
-        package_hex: Zeroizing::new(hex::encode(package_bytes)),
+        package_bytes: Zeroizing::new(package_bytes),
         transport_key_id: local.transport_key_id.clone(),
         transport_signature: String::new(),
     };
@@ -908,7 +924,7 @@ fn authenticated_package(
 }
 
 fn transcript_digest(
-    packages: &[impl std::borrow::Borrow<FrostAuthenticatedDkgPackage>],
+    packages: &[impl std::borrow::Borrow<DkgPackage>],
 ) -> Result<String, FrostCeremonyError> {
     let mut packages = packages
         .iter()
@@ -988,6 +1004,7 @@ fn validate_secret_bytes(
 
 fn validate_identifier(value: &str) -> Result<(), &'static str> {
     if value.is_empty()
+        || value.len() > 128
         || value.trim() != value
         || !value.bytes().all(|byte| byte.is_ascii_graphic())
     {

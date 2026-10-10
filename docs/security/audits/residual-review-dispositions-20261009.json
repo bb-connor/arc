@@ -1,0 +1,141 @@
+{
+  "schema": "chio.residual-review-dispositions.v1",
+  "observed_utc": "2026-10-09T20:28:32.420040+00:00",
+  "reviewed_candidate": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+  "review_source": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/candidate-63ae9a4f5c-review.md",
+    "sha256": "4276fb8b340a50911d3804186c23cfec224e37524f432b2249f2ffa0bcf42fbf",
+    "reviewer": "Claude independent focused review",
+    "scope": "9d7..63ae, source/report/ledger review; no Rust or solver execution"
+  },
+  "severity_ruling": "Root promotes release disclosure and source provenance to P2 before landing, based on report consumer impact. Other observations retain P3.",
+  "findings": [
+    {
+      "id": "RESIDUAL-REPORT-DISCLOSURE",
+      "priority": "P2",
+      "scope": "now",
+      "status": "locally-qualified-stage",
+      "requirement": "Final release-path report must retain the exact OPEN/UNPROVED attestation residual even when earlier output is truncated.",
+      "disposition": "Integrated b36fe5a404 from producer0c82063475. Genuine unchanged-source RED and repaired owning fixtures retained; three composed script suites pass with proof tools inert."
+    },
+    {
+      "id": "PROOF-REPORT-INPUTS",
+      "priority": "P2",
+      "scope": "now",
+      "status": "locally-qualified-stage",
+      "requirement": "Both proof report producer and checker must bind all newly added inputs deciding residual selection, completion and bounds.",
+      "disposition": "Integrated b36fe5a404 from producer0c82063475. Genuine unchanged-source RED and repaired owning fixtures retained; three composed script suites pass with proof tools inert."
+    },
+    {
+      "id": "ENCODER-PROOF-PROVENANCE",
+      "priority": "P3",
+      "scope": "now",
+      "status": "docs-repaired",
+      "requirement": "Identify the historical local encoder run as unretained and not CI-enrolled; do not present it as a reproducible current proof.",
+      "disposition": "Root corrected docs/formal/CRYPTO_PROOF_SCOPE.md; no new proof evidence."
+    },
+    {
+      "id": "ATTESTATION-KEY-DOMAIN",
+      "priority": "P3",
+      "scope": "now",
+      "status": "docs-repaired",
+      "requirement": "Specify that the retained 256-key-seed attestation domain uses P-256 fixtures and does not establish production Ed25519 binding.",
+      "disposition": "Root corrected public scope; append current follow-up acceptance without rewriting the original audit/requirements."
+    },
+    {
+      "id": "REVOCATION-PROOF-CREDIT",
+      "priority": "P3",
+      "scope": "now",
+      "status": "docs-repaired",
+      "requirement": "Credit the current Kani harness only for Boolean revocation denial/retry; preserve epoch installation as a separate TLA abstraction anchor.",
+      "disposition": "Root corrected formal/MAPPING.md and proof-manifest comments; parsed manifest unchanged."
+    },
+    {
+      "id": "HOSTED-PROOF-RUNTIME",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Observe actual hosted real-SHA proof durations before deciding whether per-harness or job budgets require changes.",
+      "disposition": "No correctness defect established; timeouts fail closed. Retain existing caps until actual runner evidence."
+    },
+    {
+      "id": "PROOF-WIRING-NOTES",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Review specialized formal-pr-smoke path coverage for core-types and explicit FIPS feature selection in a separate tooling change.",
+      "disposition": "Unconditional CI manifest job covers core-types changes. force-soft preserves hash output. No speculative filter/backend change."
+    }
+  ],
+  "domain_clarification": {
+    "existing_harness": "chio-attest-verify::public_expect_report_data_determinism_and_binding",
+    "key_family": "Uncompressed SEC1 P-256 fixture",
+    "key_seeds": 256,
+    "receipt_root_positions": 32,
+    "pairs": 8192,
+    "production_binding_outside_this_domain": "The kernel boot self-quote binds its classical Ed25519 key. No Ed25519 proof is established by the P-256 fixture.",
+    "followup": "KANI-ATTEST-DECOMP",
+    "followup_acceptance": "Retain the complete existing P-256 fixture domain and claims; explicitly separate any production Ed25519 extension, which requires a reviewed harness and completed evidence. Neither domain is proved by this disposition.",
+    "proof_passed": false,
+    "proof_source_or_assumption_changed": false
+  },
+  "preservation": {
+    "historical_residual_audit_unchanged": "docs/security/audits/kani-open-residual-20261009.json",
+    "historical_requirements_unchanged": true,
+    "no_new_proof_campaign": true
+  },
+  "hosted_qualified": false,
+  "merged": false,
+  "release_permitted": false,
+  "report_repair": {
+    "producer": "0c8206347558bdf2d12559b23ef0b983596da3d9",
+    "integration": "b36fe5a404",
+    "composed_evidence": [
+      {
+        "name": "gates",
+        "command": [
+          "bash",
+          "scripts/tests/check-rust-verification-gates.test.sh"
+        ],
+        "exit": 0,
+        "seconds": 1.0538251399993896,
+        "sha256": "4fb46f57e613e4a1a9402e302719a2d717298432f5b6eb2e6ffb286074e3893c"
+      },
+      {
+        "name": "residual",
+        "command": [
+          "python3",
+          "scripts/tests/kani-open-residual.test.py"
+        ],
+        "exit": 0,
+        "seconds": 1.1040890216827393,
+        "sha256": "8a693420b3f3f61173b2b8ce6146c73f4f80b61840fa68b1c29fd5af7ed0baad"
+      },
+      {
+        "name": "report",
+        "command": [
+          "bash",
+          "scripts/tests/check-proof-report.test.sh"
+        ],
+        "exit": 0,
+        "seconds": 55.28233051300049,
+        "sha256": "d688cb87044178f47339f25c0cf7a57621f9a355b7213cce2d7b6de641b1b8fa"
+      }
+    ],
+    "ordinary_record_tag_collision": "Draft failure separately retained; production tagged-record repair passes the regression. This is not an Original63ae defect."
+  },
+  "related_fixture_repair": {
+    "id": "CONTRACT-SYNC-FIXTURE",
+    "priority": "P2",
+    "producer": "3663d1586c5565649f5b16143b98c77133d95c90",
+    "integration": "91d990454c",
+    "original": "ModuleNotFoundError at unchanged63ae and producer0c82063475; not relabeled as a proof failure.",
+    "final": {
+      "command": "bash scripts/tests/check-creusot-contract-sync.test.sh",
+      "exit": 0,
+      "seconds": 1.269848346710205,
+      "sha256": "26fb8f037ee87d2f72334732cc5e9d9d2f21a952210fbd4ae8e31b33f1687d78"
+    },
+    "cases_passed": 10
+  }
+}

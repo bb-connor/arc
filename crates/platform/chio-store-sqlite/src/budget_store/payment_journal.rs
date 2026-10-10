@@ -1,4 +1,7 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
+mod record;
+use record::payment_journal_from_row;
 
 pub(crate) fn insert_payment_journal(
     transaction: &rusqlite::Transaction<'_>,
@@ -7,9 +10,14 @@ pub(crate) fn insert_payment_journal(
     record
         .validate()
         .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-    if record.state != PaymentJournalState::HoldPlaced {
+    if record.state != PaymentJournalState::HoldPlaced
+        || record.authorized_amount_units.is_none()
+        || record.authorization_attempt
+            != Some(chio_kernel::payment::PaymentAuthorizationAttempt::NotStarted)
+    {
         return Err(BudgetStoreError::Invariant(
-            "a new payment journal must start in hold_placed".to_owned(),
+            "a new payment journal requires hold_placed, exact debit, and not-started custody"
+                .to_owned(),
         ));
     }
     let hold_id = record.hold_id.as_deref().ok_or_else(|| {
@@ -23,10 +31,11 @@ pub(crate) fn insert_payment_journal(
             transaction_id, amount_units, settle_action, settle_amount_units,
             release_authority_kind, release_authority_evidence_id,
             release_authority_evidence_digest, release_authority_operation_version,
-            currency, state, created_at_unix_ms, updated_at_unix_ms
+            currency, state, created_at_unix_ms, updated_at_unix_ms,
+            authorized_amount_units, authorization_attempt
         ) VALUES (
             ?1, 1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, ?9,
-            NULL, NULL, NULL, NULL, NULL, NULL, ?10, ?11, ?12, ?12
+            NULL, NULL, NULL, NULL, NULL, NULL, ?10, ?11, ?12, ?12, ?13, ?14
         )
         "#,
         params![
@@ -42,6 +51,13 @@ pub(crate) fn insert_payment_journal(
             &record.currency,
             payment_journal_state_text(record.state),
             budget_u64_to_sqlite(record.created_at_unix_ms, "payment created_at_unix_ms")?,
+            record
+                .authorized_amount_units
+                .map(|amount| budget_u64_to_sqlite(amount, "payment authorized_amount_units"))
+                .transpose()?,
+            record
+                .authorization_attempt
+                .map(payment_authorization_attempt_text),
         ],
     )?;
     Ok(())
@@ -59,7 +75,8 @@ pub(crate) fn load_payment_journal(
                    transaction_id, amount_units, settle_action, settle_amount_units,
                    release_authority_kind, release_authority_evidence_id,
                    release_authority_evidence_digest, release_authority_operation_version,
-                   currency, state, created_at_unix_ms, journal_version
+                   currency, state, created_at_unix_ms, journal_version,
+                   authorized_amount_units, authorization_attempt
             FROM payment_journal
             WHERE operation_id = ?1
             "#,
@@ -116,7 +133,7 @@ pub(crate) fn advance_payment_journal(
             release_authority_kind = ?6, release_authority_evidence_id = ?7,
             release_authority_evidence_digest = ?8,
             release_authority_operation_version = ?9,
-            state = ?10, updated_at_unix_ms = ?11
+            state = ?10, updated_at_unix_ms = ?11, authorization_attempt = ?15
         WHERE operation_id = ?12 AND journal_version = ?13 AND state = ?14
         "#,
         params![
@@ -144,6 +161,9 @@ pub(crate) fn advance_payment_journal(
             &expected.operation_id,
             budget_u64_to_sqlite(expected.journal_version, "expected journal_version")?,
             payment_journal_state_text(expected.state),
+            desired
+                .authorization_attempt
+                .map(payment_authorization_attempt_text),
         ],
     )?;
     if changed != 1 {
@@ -169,13 +189,17 @@ fn verify_release_evidence(
     trusted_now_unix_ms: u64,
     insert_allowed: bool,
 ) -> Result<(), BudgetStoreError> {
-    let PaymentJournalTransition::BeginRelease { authority } = transition else {
-        if evidence.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "release evidence was supplied for a non-release transition".to_owned(),
-            ));
+    let authority = match transition {
+        PaymentJournalTransition::BeginRelease { authority }
+        | PaymentJournalTransition::BeginPrepaymentRefund { authority } => authority,
+        _ => {
+            if evidence.is_some() {
+                return Err(BudgetStoreError::Invariant(
+                    "release evidence was supplied for a non-release transition".to_owned(),
+                ));
+            }
+            return Ok(());
         }
-        return Ok(());
     };
     let evidence = evidence.ok_or_else(|| {
         BudgetStoreError::Invariant(
@@ -270,73 +294,23 @@ fn verify_release_evidence(
     Ok(())
 }
 
-fn payment_journal_from_row(
-    row: &rusqlite::Row<'_>,
-) -> Result<PaymentJournalRecord, rusqlite::Error> {
-    let release_kind = row
-        .get::<_, Option<String>>(13)?
-        .map(|value| payment_release_authority_kind(&value))
-        .transpose()?;
-    let release_evidence_id = row.get::<_, Option<String>>(14)?;
-    let release_evidence_digest = row.get::<_, Option<String>>(15)?;
-    let release_operation_version = row
-        .get::<_, Option<i64>>(16)?
-        .map(|value| payment_u64_from_i64(value, "release operation_version"))
-        .transpose()?;
-    let release_authority = match (
-        release_kind,
-        release_evidence_id,
-        release_evidence_digest,
-        release_operation_version,
-    ) {
-        (Some(kind), Some(evidence_id), Some(evidence_digest), Some(operation_version)) => {
-            Some(PaymentReleaseAuthorityBinding {
-                kind,
-                operation_id: row.get(0)?,
-                operation_version,
-                evidence_id,
-                evidence_digest,
-            })
-        }
-        (None, None, None, None) => None,
-        _ => {
-            return Err(invalid_payment_column(
-                "incomplete release authority binding",
-            ))
-        }
-    };
-    let grant_index =
-        u32::try_from(row.get::<_, i64>(4)?).map_err(|_| invalid_payment_column("grant_index"))?;
-    let record = PaymentJournalRecord {
-        operation_id: row.get(0)?,
-        journal_version: payment_u64_from_i64(row.get(20)?, "journal_version")?,
-        request_namespace_digest: row.get(1)?,
-        request_id: row.get(2)?,
-        capability_id: row.get(3)?,
-        grant_index,
-        hold_id: Some(row.get(5)?),
-        rail: row.get(6)?,
-        rail_mode: payment_rail_mode(&row.get::<_, String>(7)?)?,
-        authorization_id: row.get(8)?,
-        transaction_id: row.get(9)?,
-        amount_units: payment_u64_from_i64(row.get(10)?, "amount_units")?,
-        settle_action: row
-            .get::<_, Option<String>>(11)?
-            .map(|value| payment_settle_action(&value))
-            .transpose()?,
-        settle_amount_units: row
-            .get::<_, Option<i64>>(12)?
-            .map(|value| payment_u64_from_i64(value, "settle_amount_units"))
-            .transpose()?,
-        release_authority,
-        currency: row.get(17)?,
-        state: payment_journal_state(&row.get::<_, String>(18)?)?,
-        created_at_unix_ms: payment_u64_from_i64(row.get(19)?, "created_at_unix_ms")?,
-    };
-    record
-        .validate()
-        .map_err(|_| invalid_payment_column("invalid payment journal record"))?;
-    Ok(record)
+fn payment_authorization_attempt_text(
+    attempt: chio_kernel::payment::PaymentAuthorizationAttempt,
+) -> &'static str {
+    match attempt {
+        chio_kernel::payment::PaymentAuthorizationAttempt::NotStarted => "not_started",
+        chio_kernel::payment::PaymentAuthorizationAttempt::Started => "started",
+    }
+}
+
+fn payment_authorization_attempt(
+    value: &str,
+) -> Result<chio_kernel::payment::PaymentAuthorizationAttempt, rusqlite::Error> {
+    match value {
+        "not_started" => Ok(chio_kernel::payment::PaymentAuthorizationAttempt::NotStarted),
+        "started" => Ok(chio_kernel::payment::PaymentAuthorizationAttempt::Started),
+        _ => Err(invalid_payment_column("authorization_attempt")),
+    }
 }
 
 pub(super) const fn payment_journal_state_text(state: PaymentJournalState) -> &'static str {

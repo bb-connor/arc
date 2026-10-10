@@ -22,20 +22,11 @@ pub(crate) async fn sidecar_evaluate_handler(
         }
     };
 
-    let chio_request: ChioHttpRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode ChioHttpRequest: {error}");
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({
-                    "error": "chio_bad_request",
-                    "message": format!("invalid ChioHttpRequest payload: {error}"),
-                })),
-            )
-                .into_response();
-        }
-    };
+    let chio_request: ChioHttpRequest =
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     if let Some(response) =
         revoked_sidecar_evaluate_response(&state, &chio_request, presented_capability.as_deref())
@@ -99,19 +90,9 @@ pub(crate) async fn sidecar_verify_handler(
         }
     };
 
-    let receipt: HttpReceipt = match serde_json::from_slice(&body_bytes) {
+    let receipt: HttpReceipt = match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
         Ok(receipt) => receipt,
-        Err(error) => {
-            warn!("failed to decode HttpReceipt: {error}");
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({
-                    "error": "chio_bad_request",
-                    "message": format!("invalid HttpReceipt payload: {error}"),
-                })),
-            )
-                .into_response();
-        }
+        Err(error) => return input::rejected(error),
     };
 
     let signer_trusted = receipt.kernel_key.to_hex() == state.signer_keypair.public_key().to_hex();
@@ -239,28 +220,33 @@ pub(crate) async fn sidecar_mint_handler(
         }
     };
 
-    let mint_request: SidecarMintRequest = match serde_json::from_slice(&body_bytes) {
+    let mint_request: SidecarMintRequest = match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
         Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode capability mint request: {error}");
-            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
-                .into_response();
-        }
+        Err(error) => return input::rejected(error),
     };
 
-    if mint_request.subject.trim().is_empty() {
-        return sidecar_bad_request("subject must not be empty").into_response();
-    }
+    let subject = match parse_sidecar_subject_key(&mint_request.subject) {
+        Ok(subject) => subject,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
 
     let scope = match build_sidecar_scope(&mint_request.scopes) {
         Ok(scope) => scope,
         Err(error) => return sidecar_bad_request(&error).into_response(),
     };
 
-    let issued_at = chrono::Utc::now().timestamp() as u64;
-    let ttl_seconds = ttl_seconds_from_wire(mint_request.ttl_seconds, mint_request.ttl_nanos);
-    let expires_at = issued_at.saturating_add(ttl_seconds);
-    let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
+    let issued_at = match state.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    let ttl_seconds = match ttl_seconds_from_wire(mint_request.ttl_seconds, mint_request.ttl_nanos)
+    {
+        Ok(ttl) => ttl,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
+    let Some(expires_at) = issued_at.checked_add(ttl_seconds) else {
+        return sidecar_bad_request("capability expiry overflow").into_response();
+    };
     let capability_id = match derive_sidecar_capability_id(
         &mint_request.subject,
         &mint_request.job_uid,
@@ -329,35 +315,17 @@ pub(crate) async fn sidecar_release_handler(
         }
     };
 
-    let release_request: SidecarReleaseRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode capability release request: {error}");
-            return sidecar_bad_request(&format!("invalid capability release payload: {error}"))
-                .into_response();
-        }
-    };
+    let release_request: SidecarReleaseRequest =
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     if release_request.capability_id.trim().is_empty() {
         return sidecar_bad_request("capability_id must not be empty").into_response();
     }
 
     let capability_id = release_request.capability_id.trim().to_string();
-
-    // Record the release in the receipt store's revoked-capabilities table when
-    // a durable receipt database is configured, so a restart reloads it into the
-    // in-memory validate set. In ephemeral mode there is no such table; the
-    // shared revocation store below still makes the release effective in-process.
-    if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        if let Err(error) = store.revoke_capability(&capability_id) {
-            warn!("failed to persist capability revocation: {error}");
-            return internal_json_error_response(
-                "chio_capability_release_failed",
-                &error.to_string(),
-            );
-        }
-    }
 
     // Record in the revocation store shared with the embedded kernel. It is
     // present in every serving mode (the durable sibling database, or an
@@ -407,14 +375,11 @@ pub(crate) async fn sidecar_submit_receipt_handler(
         }
     };
 
-    let receipt_request: SidecarSubmitReceiptRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode receipt submission payload: {error}");
-            return sidecar_bad_request(&format!("invalid receipt submission payload: {error}"))
-                .into_response();
-        }
-    };
+    let receipt_request: SidecarSubmitReceiptRequest =
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     if receipt_request.job_name.trim().is_empty()
         || receipt_request.namespace.trim().is_empty()
@@ -459,19 +424,24 @@ pub(crate) async fn sidecar_submit_receipt_handler(
             method: HttpMethod::Post,
             caller_identity_hash,
             session_id: None,
-            verdict: Verdict::Allow,
-            receipt_kind: chio_core_types::receipt::kinds::ReceiptKind::MediatedDecision,
-            boundary_class: chio_core_types::receipt::kinds::BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: chio_core_types::receipt::kinds::ToolOrigin::CallerExecuted,
+            verdict: Verdict::Incomplete {
+                reason: "operator observation does not authorize execution".into(),
+            },
+            receipt_kind: chio_core_types::receipt::kinds::ReceiptKind::AdvisoryEvaluation,
+            boundary_class: chio_core_types::receipt::kinds::BoundaryClass::AdvisoryOnly,
+            observation_outcome: Some(ObservationOutcome::Observed),
+            tool_origin: chio_core_types::receipt::kinds::ToolOrigin::HostExecutedUnmediated,
             redaction_mode: chio_core_types::receipt::kinds::RedactionMode::None,
             actor_chain: Vec::new(),
             evidence: Vec::new(),
             response_status: StatusCode::OK.as_u16(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: match state.clock.seconds() {
+                Ok(now) => now,
+                Err(error) => return clock::rejection(error),
+            },
             content_hash: chio_core_types::sha256_hex(&body_bytes),
             policy_hash: manual_receipt_policy_hash("chio_api_protect_sidecar_receipt_submission"),
-            trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
+            trust_level: chio_core_types::receipt::kinds::TrustLevel::Advisory,
             capability_id,
             metadata: Some(sidecar_submit_receipt_metadata(&receipt_request)),
             kernel_key: state.signer_keypair.public_key(),
@@ -509,7 +479,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
 /// Differs from [`SidecarMintRequest`] in two ways:
 /// 1. The scope arrives as a structured `ChioScope` object instead of the
 ///    flat `scopes: Vec<String>` shorthand.
-/// 2. There is no `job_uid`; the alias derives one deterministically.
+/// 2. `job_uid` is optional and defaults to an empty public request label.
 ///
 /// The alias accepts both shapes via `serde(untagged)` so existing callers
 /// of `/v1/capabilities/mint` keep working when they happen to call the
@@ -553,20 +523,14 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         }
     };
 
-    let alias_request: SidecarCapabilitiesAliasRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode capability alias mint request: {error}");
-            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
-                .into_response();
-        }
-    };
+    let alias_request: SidecarCapabilitiesAliasRequest =
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     let (subject, scope, job_uid, ttl_seconds_wire, ttl_nanos_wire) = match alias_request {
         SidecarCapabilitiesAliasRequest::Sdk(sdk) => {
-            if sdk.subject.trim().is_empty() {
-                return sidecar_bad_request("subject must not be empty").into_response();
-            }
             let job_uid = sdk.job_uid.unwrap_or_default();
             (
                 sdk.subject,
@@ -577,9 +541,6 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
             )
         }
         SidecarCapabilitiesAliasRequest::Canonical(mint_request) => {
-            if mint_request.subject.trim().is_empty() {
-                return sidecar_bad_request("subject must not be empty").into_response();
-            }
             let scope = match build_sidecar_scope(&mint_request.scopes) {
                 Ok(scope) => scope,
                 Err(error) => return sidecar_bad_request(&error).into_response(),
@@ -594,10 +555,22 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         }
     };
 
-    let issued_at = chrono::Utc::now().timestamp() as u64;
-    let ttl_seconds = ttl_seconds_from_wire(ttl_seconds_wire, ttl_nanos_wire);
-    let expires_at = issued_at.saturating_add(ttl_seconds);
-    let subject_key = derive_sidecar_subject_key(&subject, &job_uid);
+    let subject_key = match parse_sidecar_subject_key(&subject) {
+        Ok(subject) => subject,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
+
+    let issued_at = match state.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    let ttl_seconds = match ttl_seconds_from_wire(ttl_seconds_wire, ttl_nanos_wire) {
+        Ok(ttl) => ttl,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
+    let Some(expires_at) = issued_at.checked_add(ttl_seconds) else {
+        return sidecar_bad_request("capability expiry overflow").into_response();
+    };
     let capability_id = match derive_sidecar_capability_id(&subject, &job_uid, ttl_seconds, &scope)
     {
         Ok(capability_id) => capability_id,
@@ -686,15 +659,9 @@ pub(crate) async fn sidecar_validate_capability_handler(
     };
 
     let validate_request: SidecarValidateCapabilityRequest =
-        match serde_json::from_slice(&body_bytes) {
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
             Ok(request) => request,
-            Err(error) => {
-                warn!("failed to decode capability validate request: {error}");
-                return sidecar_bad_request(&format!(
-                    "invalid capability validate payload: {error}"
-                ))
-                .into_response();
-            }
+            Err(error) => return input::rejected(error),
         };
 
     let token = validate_request.token;
@@ -745,13 +712,16 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
-    let now = chrono::Utc::now().timestamp() as u64;
-    if token.expires_at <= now {
+    let now = match state.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    if token.issued_at > now || token.expires_at <= token.issued_at || token.expires_at <= now {
         return (
             StatusCode::OK,
             axum::Json(SidecarValidateCapabilityResponse {
                 valid: false,
-                reason: Some("capability has expired".to_string()),
+                reason: Some("capability is outside its validity window".to_string()),
                 expires_at,
                 capability_id,
             }),
@@ -949,14 +919,11 @@ pub(crate) async fn sidecar_verify_receipt_handler(
         }
     };
 
-    let verify_request: SidecarVerifyReceiptRequest = match serde_json::from_slice(&body_bytes) {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode ChioReceipt verify request: {error}");
-            return sidecar_bad_request(&format!("invalid receipt verify payload: {error}"))
-                .into_response();
-        }
-    };
+    let verify_request: SidecarVerifyReceiptRequest =
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     let receipt = verify_request.receipt;
     let decision_label = decision_label(&receipt.decision);
@@ -1093,15 +1060,11 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
         }
     };
 
-    let evaluate_request: SidecarEvaluateToolCallRequest = match serde_json::from_slice(&body_bytes)
-    {
-        Ok(request) => request,
-        Err(error) => {
-            warn!("failed to decode evaluate tool-call request: {error}");
-            return sidecar_bad_request(&format!("invalid evaluate payload: {error}"))
-                .into_response();
-        }
-    };
+    let evaluate_request: SidecarEvaluateToolCallRequest =
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     if evaluate_request.capability_id.trim().is_empty() {
         return sidecar_bad_request("capability_id must not be empty").into_response();
@@ -1164,7 +1127,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
     let receipt = match ChioReceipt::sign(
         ChioReceiptBody {
             id: uuid::Uuid::now_v7().to_string(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: match state.clock.seconds() {
+                Ok(now) => now,
+                Err(error) => return clock::rejection(error),
+            },
             capability_id: evaluate_request.capability_id,
             tool_server: evaluate_request.tool_server,
             tool_name: evaluate_request.tool_name,
@@ -1209,126 +1175,26 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
     sidecar_advisory_tool_call_evaluate_response(receipt)
 }
 
-#[allow(clippy::result_large_err)]
-pub(crate) fn require_sidecar_control_request(
-    request: &Request<Body>,
-    expected_bearer_token: Option<&str>,
-) -> Result<(), Response> {
-    if let Some(expected_bearer_token) = expected_bearer_token.map(str::trim) {
-        if expected_bearer_token.is_empty() {
-            warn!("rejecting sidecar control request with blank bearer token configuration");
-            return Err(sidecar_control_forbidden_response(true));
-        }
-        if sidecar_control_bearer_token_matches(request, expected_bearer_token) {
-            return Ok(());
-        }
-        if let Some(peer) = request.extensions().get::<ConnectInfo<CappedPeerAddr>>() {
-            warn!(
-                peer = %peer.0,
-                "rejecting sidecar control request without valid bearer token"
-            );
-        } else {
-            warn!("rejecting sidecar control request without valid bearer token");
-        }
-        return Err(sidecar_control_forbidden_response(true));
-    }
-
-    if let Some(peer) = request.extensions().get::<ConnectInfo<CappedPeerAddr>>() {
-        if peer.0.ip().is_loopback() {
-            return Ok(());
-        }
-    }
-
-    if let Some(peer) = request.extensions().get::<ConnectInfo<CappedPeerAddr>>() {
-        warn!(
-            peer = %peer.0,
-            "rejecting non-loopback sidecar control request without configured bearer token"
-        );
-    } else {
-        warn!("rejecting sidecar control request without peer address");
-    }
-    Err(sidecar_control_forbidden_response(false))
-}
-
-pub(crate) fn sidecar_control_bearer_token_matches(
-    request: &Request<Body>,
-    expected_bearer_token: &str,
-) -> bool {
-    request
-        .headers()
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| {
-            let (scheme, token) = value.split_once(' ')?;
-            if scheme.eq_ignore_ascii_case("bearer") {
-                Some(token)
-            } else {
-                None
-            }
-        })
-        // Constant-time compare so callers cannot recover the configured token
-        // through response timing differences.
-        .is_some_and(|token| {
-            token
-                .as_bytes()
-                .ct_eq(expected_bearer_token.as_bytes())
-                .into()
-        })
-}
-
-pub(crate) fn sidecar_control_forbidden_response(remote_auth_configured: bool) -> Response {
-    let message = if remote_auth_configured {
-        "sidecar control endpoints require a loopback caller or valid bearer token"
-    } else {
-        "sidecar control endpoints require a loopback caller"
-    };
-    (
-        StatusCode::FORBIDDEN,
-        axum::Json(serde_json::json!({
-            "error": "chio_control_forbidden",
-            "message": message,
-        })),
-    )
-        .into_response()
-}
-
 pub(crate) fn ttl_seconds_from_wire(
-    ttl_seconds_wire: Option<u64>,
-    ttl_nanos_wire: Option<u64>,
-) -> u64 {
-    const DEFAULT_TTL_SECONDS: u64 = 3600;
-    const NANOS_PER_SECOND: u64 = 1_000_000_000;
-
-    if let Some(ttl_seconds) = ttl_seconds_wire {
-        return match ttl_seconds {
-            0 => DEFAULT_TTL_SECONDS,
-            ttl_seconds => ttl_seconds,
-        };
+    seconds: Option<u64>,
+    nanos: Option<u64>,
+) -> Result<u64, &'static str> {
+    match (seconds, nanos) {
+        (None, None) => Ok(3600),
+        (Some(0), _) | (_, Some(0)) => Err("capability TTL must be positive"),
+        (Some(_), Some(_)) => Err("specify only one capability TTL unit"),
+        (Some(seconds), None) => Ok(seconds),
+        (None, Some(nanos)) => Ok(nanos.div_ceil(1_000_000_000)),
     }
-
-    if let Some(ttl_nanos) = ttl_nanos_wire {
-        return match ttl_nanos {
-            0 => DEFAULT_TTL_SECONDS,
-            ttl_nanos => std::cmp::max(
-                1,
-                ttl_nanos.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
-            ),
-        };
-    }
-
-    DEFAULT_TTL_SECONDS
 }
 
-pub(crate) fn derive_sidecar_subject_key(
-    subject: &str,
-    job_uid: &str,
-) -> chio_core_types::crypto::PublicKey {
-    let mut hasher = Sha256::new();
-    hasher.update(subject.as_bytes());
-    hasher.update([0]);
-    hasher.update(job_uid.as_bytes());
-    let seed: [u8; 32] = hasher.finalize().into();
-    Keypair::from_seed(&seed).public_key()
+/// Parse caller-owned verification material. Request labels are never signing seeds.
+fn parse_sidecar_subject_key(subject: &str) -> Result<PublicKey, &'static str> {
+    let key = PublicKey::from_hex(subject).map_err(|_| "subject must be a valid public key")?;
+    if key.algorithm() != chio_core_types::SigningAlgorithm::Ed25519 || key.is_weak_ed25519() {
+        return Err("subject must be a strong Ed25519 public key");
+    }
+    Ok(key)
 }
 
 pub(crate) fn derive_sidecar_capability_id(
@@ -1520,4 +1386,26 @@ pub(crate) fn sidecar_submit_receipt_metadata(
         ),
     );
     serde_json::Value::Object(metadata)
+}
+
+#[cfg(test)]
+mod ttl_tests {
+    use super::*;
+    #[test]
+    fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
+        assert_eq!(ttl_seconds_from_wire(None, None), Ok(3600));
+        assert_eq!(ttl_seconds_from_wire(Some(3600), None), Ok(3600));
+        assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000)), Ok(1));
+    }
+    #[test]
+    fn capability_ttl_rejects_ambiguous_or_empty_units_and_rounds_without_overflow() {
+        assert_eq!(
+            ttl_seconds_from_wire(None, Some(u64::MAX)),
+            Ok(18_446_744_074)
+        );
+        assert_eq!(ttl_seconds_from_wire(None, Some(1_000_000_001)), Ok(2));
+        assert!(ttl_seconds_from_wire(Some(1), Some(1)).is_err());
+        assert!(ttl_seconds_from_wire(Some(0), None).is_err());
+        assert!(ttl_seconds_from_wire(None, Some(0)).is_err());
+    }
 }

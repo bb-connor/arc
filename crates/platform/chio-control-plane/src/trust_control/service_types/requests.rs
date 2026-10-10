@@ -8,9 +8,19 @@ pub struct TrustAuthorityStatus {
     pub public_key: Option<String>,
     pub generation: Option<u64>,
     pub rotated_at: Option<u64>,
+    /// Public lifecycle metadata from the authoritative status transaction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer_state: Option<chio_kernel::AuthoritySnapshot>,
     pub applies_to_future_sessions_only: bool,
     #[serde(default)]
     pub trusted_public_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct AuthorityKeyLogSyncRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) base: Option<chio_keyring::KeyLogPin>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -329,7 +339,11 @@ pub(crate) fn ensure_requested_capability_within_parent_snapshot(
     parent_snapshot: &CapabilitySnapshot,
     now: u64,
 ) -> Result<(), CliError> {
-    let parent_scope: ChioScope = serde_json::from_str(&parent_snapshot.grants_json)?;
+    let parent_scope: ChioScope = chio_core::canonical::UntrustedJsonText::from_wire(
+        parent_snapshot.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
     if !capability.scope.is_subset_of(&parent_scope) {
         return Err(CliError::cli_other_error(
             "requested capability scope exceeds the imported upstream capability scope".to_string(),
@@ -359,7 +373,7 @@ pub(crate) fn build_capability_snapshot(
         .delegation_chain
         .last()
         .map(|link| link.capability_id.as_str());
-    if delegation_depth != token.delegation_chain.len() as u64
+    if delegation_depth != crate::integer::count(token.delegation_chain.len())
         || parent_capability_id.as_deref() != signed_parent
     {
         return Err(CliError::cli_other_error(
@@ -506,6 +520,8 @@ pub struct ReputationCompareRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptQueryResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<chio_kernel::receipt_query::ReceiptSnapshotWatermark>,
     pub total_count: u64,
     pub next_cursor: Option<u64>,
     pub receipts: Vec<Value>,

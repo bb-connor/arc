@@ -107,11 +107,10 @@ impl RequestPermissionParams {
             "sessionId",
             &self.session_id,
         )?;
-        for (index, option) in self.options.iter().enumerate() {
-            let field_name = format!("options[{index}].optionId");
+        for option in &self.options {
             validate_non_empty_protocol_field(
                 "session/request_permission",
-                &field_name,
+                "options[].optionId",
                 &option.option_id,
             )?;
         }
@@ -248,7 +247,7 @@ impl SessionUpdateNotification {
 pub enum SessionUpdate {
     ToolCall(ToolCallEvent),
     ToolCallUpdate(ToolCallUpdateEvent),
-    MalformedToolCall(String),
+    MalformedToolCall(chio_core::canonical::SharedUntrustedJsonError),
     AgentMessageChunk(Value),
     AgentThoughtChunk(Value),
     Plan(Value),
@@ -276,11 +275,7 @@ pub struct ToolCallEvent {
 
 impl ToolCallEvent {
     pub(crate) fn validate_receipt_boundary(&self) -> Result<(), AcpProxyError> {
-        validate_non_empty_protocol_field(
-            "session/update",
-            "update.toolCallId",
-            &self.tool_call_id,
-        )
+        validate_non_empty_protocol_field("session/update", "update.toolCallId", &self.tool_call_id)
     }
 }
 
@@ -297,28 +292,26 @@ pub struct ToolCallUpdateEvent {
 
 impl ToolCallUpdateEvent {
     pub(crate) fn validate_receipt_boundary(&self) -> Result<(), AcpProxyError> {
-        validate_non_empty_protocol_field(
-            "session/update",
-            "update.toolCallId",
-            &self.tool_call_id,
-        )
+        validate_non_empty_protocol_field("session/update", "update.toolCallId", &self.tool_call_id)
     }
 }
 
 fn validate_non_empty_protocol_field(
-    method_name: &str,
-    field_name: &str,
+    method_name: &'static str,
+    field_name: &'static str,
     value: &str,
 ) -> Result<(), AcpProxyError> {
     if value.trim().is_empty() {
-        return Err(AcpProxyError::Protocol(format!(
-            "invalid {method_name} params: {field_name} must be a non-empty string"
-        )));
+        return Err(AcpProxyError::Protocol(AcpProtocolError::EmptyField {
+            method: method_name,
+            field: field_name,
+        }));
     }
     if value.trim() != value || value.chars().any(|character| character.is_control()) {
-        return Err(AcpProxyError::Protocol(format!(
-            "invalid {method_name} params: {field_name} must be a non-empty unpadded string"
-        )));
+        return Err(AcpProxyError::Protocol(AcpProtocolError::MalformedField {
+            method: method_name,
+            field: field_name,
+        }));
     }
     Ok(())
 }
@@ -326,30 +319,22 @@ fn validate_non_empty_protocol_field(
 /// Attempt to parse a session update `Value` into a typed `SessionUpdate`.
 pub fn parse_session_update(value: &Value) -> SessionUpdate {
     let tool_call_id = value.get("toolCallId");
-    if let Some(tool_call_id) = tool_call_id {
-        if !tool_call_id.is_string() {
-            return SessionUpdate::MalformedToolCall(
-                "invalid session/update params: update.toolCallId must be a string".to_string(),
-            );
-        }
-    }
-
     // Try tool_call first (has title field)
     if tool_call_id.is_some() && value.get("title").is_some() {
         return match serde_json::from_value::<ToolCallEvent>(value.clone()) {
             Ok(event) => SessionUpdate::ToolCall(event),
-            Err(err) => SessionUpdate::MalformedToolCall(format!(
-                "invalid session/update params: malformed tool call update: {err}"
-            )),
+            Err(err) => SessionUpdate::MalformedToolCall(
+                chio_core::canonical::UntrustedJsonError::Decode(err).into(),
+            ),
         };
     }
     // Try tool_call_update (has toolCallId but no title)
     if tool_call_id.is_some() {
         return match serde_json::from_value::<ToolCallUpdateEvent>(value.clone()) {
             Ok(event) => SessionUpdate::ToolCallUpdate(event),
-            Err(err) => SessionUpdate::MalformedToolCall(format!(
-                "invalid session/update params: malformed tool call update: {err}"
-            )),
+            Err(err) => SessionUpdate::MalformedToolCall(
+                chio_core::canonical::UntrustedJsonError::Decode(err).into(),
+            ),
         };
     }
 

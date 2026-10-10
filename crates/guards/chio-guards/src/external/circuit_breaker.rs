@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use tokio::time::Instant;
+use chio_security_types::clock::MonotonicInstant;
 
 use super::cache::{Clock, TokioClock};
 
@@ -75,18 +75,18 @@ pub struct CircuitBreaker {
 struct CircuitInner {
     state: CircuitState,
     /// Timestamps of recent failures in the Closed state.
-    failures: Vec<Instant>,
+    failures: Vec<MonotonicInstant>,
     /// Count of consecutive successes in the HalfOpen state.
     half_open_successes: u32,
     /// When the breaker was last opened, used to schedule the HalfOpen probe.
-    opened_at: Option<Instant>,
+    opened_at: Option<MonotonicInstant>,
 }
 
 impl CircuitBreaker {
     /// Create a new breaker with the given configuration and the default
     /// ([`TokioClock`]) clock.
     pub fn new(config: CircuitBreakerConfig) -> Self {
-        Self::with_clock(config, Arc::new(TokioClock))
+        Self::with_clock(config, Arc::new(TokioClock::default()))
     }
 
     /// Create a breaker with a custom clock (primarily for tests).
@@ -111,7 +111,9 @@ impl CircuitBreaker {
     /// Current state. Transitions from Open to HalfOpen happen lazily on
     /// observation, so this call also advances state when appropriate.
     pub fn current_state(&self) -> CircuitState {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return CircuitState::Open;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return CircuitState::Open;
         };
@@ -123,7 +125,9 @@ impl CircuitBreaker {
     /// caller should invoke the downstream service; `false` means the
     /// breaker is Open and the caller must fail fast.
     pub fn allow_call(&self) -> bool {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return false;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return false;
         };
@@ -133,7 +137,9 @@ impl CircuitBreaker {
 
     /// Record a successful downstream call.
     pub fn record_success(&self) {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
@@ -160,7 +166,9 @@ impl CircuitBreaker {
 
     /// Record a failed downstream call.
     pub fn record_failure(&self) {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
@@ -198,11 +206,14 @@ impl CircuitBreaker {
         }
     }
 
-    fn tick(&self, inner: &mut CircuitInner, now: Instant) {
+    fn tick(&self, inner: &mut CircuitInner, now: MonotonicInstant) {
         match inner.state {
             CircuitState::Open => {
                 if let Some(opened) = inner.opened_at {
-                    if now.duration_since(opened) >= self.config.reset_timeout {
+                    if now
+                        .duration_since(opened)
+                        .is_ok_and(|elapsed| elapsed >= self.config.reset_timeout)
+                    {
                         inner.state = CircuitState::HalfOpen;
                         inner.half_open_successes = 0;
                     }
@@ -215,9 +226,12 @@ impl CircuitBreaker {
         }
     }
 
-    fn drop_stale_failures(&self, inner: &mut CircuitInner, now: Instant) {
+    fn drop_stale_failures(&self, inner: &mut CircuitInner, now: MonotonicInstant) {
         let window = self.config.failure_window;
-        inner.failures.retain(|ts| now.duration_since(*ts) < window);
+        inner.failures.retain(|ts| {
+            now.duration_since(*ts)
+                .map_or(true, |elapsed| elapsed < window)
+        });
     }
 }
 

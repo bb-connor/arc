@@ -68,9 +68,9 @@ fn standalone_minimal_passport_rejects_duplicate_v2_proof_keys() {
             verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
                 .test_expect_err("duplicate proof keys must deny");
         assert!(
-            error.to_string().contains("duplicate object key"),
-            "{label}: {error}"
+            matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-canonicalization")
         );
+        assert!(std::error::Error::source(&error).is_some());
     }
 }
 
@@ -216,11 +216,9 @@ fn standalone_minimal_passport_rejects_signed_checkpoint_missing_required_body_f
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
             .test_expect_err("a signed partial checkpoint body must deny");
     assert!(
-        error
-            .to_string()
-            .contains("checkpoint statement body is invalid"),
-        "{error}"
+        matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
     );
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -244,10 +242,12 @@ fn standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields() {
     let error =
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
             .test_expect_err("a signed field-smuggled checkpoint body must deny");
-    assert!(
-        error.to_string().contains("unknown field `smuggled`"),
-        "{error}"
-    );
+    assert!(matches!(
+        &error,
+        chio_transaction_passport::TransactionPassportError::Input(_)
+    ));
+    assert!(std::error::Error::source(&error).is_some());
+    assert!(!error.to_string().contains("smuggled"));
 }
 
 #[test]

@@ -1,0 +1,124 @@
+{
+  "schema": "chio.landing-ci-fixtures.v1",
+  "requirement": "LANDING-CLI-CUSTODY-FIXTURES",
+  "observed_utc": "2026-10-09T20:10:07.595496+00:00",
+  "producer_commit": "9f1a5eabc4661f17bf13639b0be55d244e3a7000",
+  "integration_commit": "e9ffbedb7b",
+  "baseline": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+  "repair": "Only the remote evidence-export and remote revocation service fixtures now retain private_tempdir guards. The existing production custody policy and process umask are unchanged.",
+  "original": {
+    "umask": "0022",
+    "passed": 14,
+    "failed": 2,
+    "ignored": 0,
+    "exit": 101,
+    "reason": "Both authority service fixtures were rejected because their database parent was not mode0700."
+  },
+  "producer_green": [
+    {
+      "umask": "0022",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "exit": 0
+    },
+    {
+      "umask": "0002",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "exit": 0
+    }
+  ],
+  "producer_strict_cli_all_targets_exit": 0,
+  "producer_evidence": {
+    "directory": "/home/connor/lanes/claude-pr1160-evidence/vfix/landing-cli-custody-fixtures",
+    "verified_sha256": {
+      "fixture.patch": "be5e6dc81c882e0e701ebdcb9e16a3f56b22f6076c4b110b9524cb59f55a7185",
+      "original-umask022.log": "e5d2aed9b0dac8bdf290bc07f827b90b530ed1917e1bbd3c34ac50fd519cbcbb",
+      "green-umask022.log": "b2e85a2579175fbdae03db86edc640708312ca96c96754a3e2f9d97e3a62985f",
+      "green-umask002.log": "51bff5a9f97e32e7410b80d820c6024fe42143f9318d226067abcfbb30a36949",
+      "clippy.log": "056e0b1ac3b3d8a3f4334dcb1d2c55a8bbdbad57ea3d83a7988b171f0a4c8726",
+      "fmt.log": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "gate-check-negative-assertions.log": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+      "gate-check-rust-file-hygiene.log": "1979219180e7b91093cd6cc3715b5a6cdf3f5851282a8703660cabf9f47ce745",
+      "gate-check-security-clocks.log": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+      "gate-check-trust-boundaries.log": "d8df73d96c8a847f4f23a77869a8a8060ecc5c84cc5b152381915564ec8e0b56"
+    }
+  },
+  "composed": {
+    "source": {
+      "head": "e9ffbedb7bf3b426dde6208fbf792a244adf0e15",
+      "files": {
+        "crates/products/chio-cli/tests/evidence_export.rs": "bf82089422507c8045c3aabd8044d53dcc2b5f278d1ff7ecc373be45246e1bed",
+        "crates/products/chio-cli/tests/trust_revocation.rs": "73904aa1a08a4c8530cdd10c48257fcef93955e08ba9f9b70be737f0a0d0c364"
+      },
+      "producer_files_byte_identical": true,
+      "nonsemantic_manifest_comment_pending": true
+    },
+    "equivalence": {
+      "producer": "9f1a5eabc4661f17bf13639b0be55d244e3a7000",
+      "differing_rust_or_manifest_files": [
+        "crates/core/chio-core-types/Cargo.toml",
+        "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs",
+        "crates/platform/chio-store-sqlite/tests/integration_smoke.rs"
+      ],
+      "runtime_rust_sources_and_cli_tests_byte_identical": true,
+      "cargo_configuration_semantically_identical": true,
+      "only_rust_difference": "Store integration fixtures are independent test targets, not CLI dependencies."
+    },
+    "tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "evidence_export",
+        "--test",
+        "trust_revocation",
+        "--no-fail-fast",
+        "--",
+        "--show-output"
+      ],
+      "umask": "0022",
+      "exit": 0,
+      "seconds": 464.40960216522217,
+      "log_sha256": "b0e0364e4f6a5741009173c0741c0ea250518c109b1cbb147c2dd126724b7f3e",
+      "source_stable": true
+    },
+    "passed": 16,
+    "failed": 0,
+    "ignored": 0,
+    "loopback_skip_notice_present": false,
+    "strict_status": "passed",
+    "strict": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "umask": "0022",
+      "exit": 0,
+      "seconds": 245.55484986305237,
+      "log_sha256": "e97cdc16dc8acc1e9ee3b576d1527d1b0431a6a3d2ff072e67612e718dbabd76",
+      "source_stable": true
+    }
+  },
+  "acceptance_boundary": {
+    "hosted_qualified": false,
+    "merged": false,
+    "whole_workspace_qualified": false,
+    "remaining": [
+      "Final reporting repair, generated metadata, final-review runtime blockers and independent delta review.",
+      "Exact protected hosted checks and normal protected merge."
+    ]
+  }
+}

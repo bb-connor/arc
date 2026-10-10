@@ -132,7 +132,7 @@ pub(super) fn assert_openai_lowered_responses(
                 &single_output_body,
             )?);
             let response = futures_lite_block_on(adapter.lower(verdict, result))?;
-            let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+            let actual_body = crate::input::json::<Value>(&response.0)?;
             let mut outputs = actual_body
                 .get("tool_outputs")
                 .and_then(Value::as_array)
@@ -193,7 +193,7 @@ pub(super) fn assert_anthropic_lowered_responses(
         let verdict = captured_verdict_by_invocation_id(&fixture.path, captured, tool_use_id)?;
         let result = ToolResult(anthropic_tool_result_payload(&fixture.path, expected_body)?);
         let response = futures_lite_block_on(adapter.lower(verdict, result))?;
-        let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+        let actual_body = crate::input::json::<Value>(&response.0)?;
 
         assert_canonical_json_eq(
             format!("{} lowered Anthropic tool_result", fixture.fixture_id),
@@ -236,7 +236,7 @@ pub(super) fn assert_bedrock_lowered_responses(
         let verdict = captured_verdict_by_invocation_id(&fixture.path, captured, tool_use_id)?;
         let result = ToolResult(bedrock_tool_result_payload(&fixture.path, expected_body)?);
         let response = futures_lite_block_on(adapter.lower(verdict, result))?;
-        let actual_body = serde_json::from_slice::<Value>(&response.0)?;
+        let actual_body = crate::input::json::<Value>(&response.0)?;
 
         assert_canonical_json_eq(
             format!("{} lowered Bedrock toolResult", fixture.fixture_id),
@@ -263,7 +263,7 @@ pub(super) fn comparable_invocation(
     Ok(ComparableInvocation {
         provider: invocation.provider,
         tool_name: invocation.tool_name.clone(),
-        arguments: serde_json::from_slice(&invocation.arguments)?,
+        arguments: crate::input::json(&invocation.arguments)?,
         provenance: ComparableProvenance {
             provider: invocation.provenance.provider,
             request_id: invocation.provenance.request_id.clone(),
@@ -278,7 +278,7 @@ pub(super) fn captured_redactions(payload: &Value) -> Result<Vec<Redaction>, Rep
     let Some(redactions) = payload.get("redactions") else {
         return Ok(Vec::new());
     };
-    serde_json::from_value(redactions.clone()).map_err(ReplayError::from)
+    crate::input::typed(redactions.clone()).map_err(ReplayError::from)
 }
 
 pub(super) fn captured_deny_reason(
@@ -288,7 +288,7 @@ pub(super) fn captured_deny_reason(
     let reason = payload
         .get("reason")
         .ok_or_else(|| invalid_fixture(path, "deny kernel_verdict payload was missing reason"))?;
-    serde_json::from_value(reason.clone()).map_err(ReplayError::from)
+    crate::input::typed(reason.clone()).map_err(ReplayError::from)
 }
 
 #[cfg(any(

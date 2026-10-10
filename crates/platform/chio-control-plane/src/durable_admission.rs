@@ -7,7 +7,10 @@ use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
+use chio_store_sqlite::{
+    RelocationImport, RelocationImportPhase, RelocationSeal, SqliteAuthorityStore,
+    SqliteBudgetStore, SqliteRevocationStore,
+};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -15,12 +18,29 @@ use crate::{load_or_create_authority_keypair, CliError};
 #[path = "durable_admission/windows.rs"]
 mod windows;
 
+#[path = "durable_admission/payload_maintenance.rs"]
+mod payload_maintenance;
+pub use payload_maintenance::{
+    LocalTerminalPayloadMaintenance, TerminalPayloadMaintenanceConfig,
+    TerminalPayloadMaintenanceError, TerminalPayloadMaintenanceHealth,
+    TerminalPayloadMaintenanceLifecycle,
+};
+
+#[cfg(test)]
+#[path = "durable_admission/payload_maintenance_tests.rs"]
+pub(crate) mod payload_maintenance_tests;
+
 #[derive(Clone)]
 pub struct DurableAdmissionRuntime {
+    // Drop this shared owner before releasing any authority ports. Its worker
+    // independently retains this same authority until stop and join complete.
+    payload_maintenance: Arc<payload_maintenance::PayloadMaintenanceOwner>,
     operations: Arc<dyn QualifiedAdmissionProjectionStore>,
     outcomes: Arc<dyn QualifiedToolOutcomeStore>,
     budget: Arc<dyn BudgetStore>,
     revocations: Arc<dyn RevocationStore>,
+    local_authority: Option<Arc<SqliteAuthorityStore>>,
+    local_operations: Option<chio_store_sqlite::SqliteAdmissionOperationStore>,
     local_budget: Option<SqliteBudgetStore>,
     local_revocations: Option<SqliteRevocationStore>,
     fence: StoreMutationFence,
@@ -29,6 +49,15 @@ pub struct DurableAdmissionRuntime {
 
 impl DurableAdmissionRuntime {
     pub fn open(path: &Path) -> Result<Self, CliError> {
+        Self::open_with_clock(path, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    /// Use the service's authority clock for the complete joint durable store.
+    pub fn open_with_clock(
+        path: &Path,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, CliError> {
+        clock.read().map_err(std::io::Error::other)?;
         if path
             .to_str()
             .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
@@ -42,7 +71,9 @@ impl DurableAdmissionRuntime {
         let lock_root = durable_admission_lock_root(path)?;
         create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(path, &lock_root)?;
-        let authority = SqliteAuthorityStore::open_serving(path, &lock_root)?;
+        let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+            path, &lock_root, clock,
+        )?);
         let budget = authority.budget_store();
         let revocations = authority.revocation_store();
         let kernel_keypair =
@@ -50,15 +81,106 @@ impl DurableAdmissionRuntime {
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
 
         Ok(Self {
+            payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
             operations: Arc::new(authority.admission_operation_store()),
             outcomes: Arc::new(authority.tool_outcome_store()),
             budget: Arc::new(budget.clone()),
             revocations: Arc::new(revocations.clone()),
+            local_authority: Some(authority.clone()),
+            local_operations: Some(authority.admission_operation_store()),
             local_budget: Some(budget),
             local_revocations: Some(revocations),
             fence: authority.mutation_fence(),
             kernel_keypair,
         })
+    }
+
+    /// Retire the authority at `path` and seal it for import at another
+    /// location. Requires a stopped store; see `SqliteAuthorityStore::export_for_relocation`.
+    pub fn export_relocation(path: &Path) -> Result<RelocationSeal, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        Ok(SqliteAuthorityStore::export_for_relocation(
+            path, &lock_root,
+        )?)
+    }
+
+    /// Import a manifest-verified export, or finish a committed import at the
+    /// same location. Application files must be checked on every retry; the
+    /// callback checks the original exported authority files before mutation.
+    pub fn import_relocation_checked(
+        path: &Path,
+        expected: &RelocationSeal,
+        verify_exported: impl FnOnce() -> Result<(), CliError>,
+    ) -> Result<RelocationImport, CliError> {
+        Self::import_relocation_checked_with_phase(path, expected, |phase| {
+            if phase == RelocationImportPhase::Exported {
+                verify_exported()?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Check relocated files against the owning store's verified import phase.
+    /// A committed retry may retain its authority commit in WAL; only the store
+    /// qualifies that state, before the callback or any recovery mutation.
+    pub fn import_relocation_checked_with_phase(
+        path: &Path,
+        expected: &RelocationSeal,
+        verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), CliError>,
+    ) -> Result<RelocationImport, CliError> {
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        if !durable_admission_kernel_seed_path(path)?.is_file() {
+            return Err(CliError::cli_other_error(
+                "the durable admission kernel seed did not move with its database".to_string(),
+            ));
+        }
+        Ok(SqliteAuthorityStore::import_relocated_checked_with_phase(
+            path,
+            &lock_root,
+            expected,
+            |phase| {
+                verify_files(phase).map_err(|failure| {
+                    chio_store_sqlite::SqliteServingOwnerError::Invalid(failure.to_string())
+                })
+            },
+        )?)
+    }
+
+    /// Re-anchor an exported copy at `path` after validating local seed custody.
+    /// This unchecked API does not authenticate an external relocation seal;
+    /// callers requiring that guarantee must use `import_relocation_checked`.
+    pub fn import_relocation(path: &Path) -> Result<RelocationImport, CliError> {
+        if path
+            .to_str()
+            .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
+        {
+            return Err(CliError::cli_other_error(
+                "an in-memory database cannot be relocated".to_string(),
+            ));
+        }
+        SqliteAuthorityStore::ensure_serving_supported()?;
+        let metadata = fs::symlink_metadata(path)?;
+        if !metadata.is_file() {
+            return Err(CliError::cli_other_error(
+                "relocated authority must be a regular file",
+            ));
+        }
+        crate::load_existing_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
+        let lock_root = durable_admission_lock_root(path)?;
+        create_private_directory(&lock_root)?;
+        let imported = SqliteAuthorityStore::import_relocated(path, &lock_root)?;
+        Ok(imported)
     }
 
     pub fn open_remote(
@@ -91,10 +213,13 @@ impl DurableAdmissionRuntime {
             )?,
         );
         Ok(Self {
+            payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
             operations: stores.operations,
             outcomes: stores.outcomes,
             budget: stores.budget,
             revocations,
+            local_authority: None,
+            local_operations: None,
             local_budget: None,
             local_revocations: None,
             fence: stores.fence,
@@ -107,6 +232,14 @@ impl DurableAdmissionRuntime {
         self.kernel_keypair.clone()
     }
 
+    /// The existing local serving owner for native flow and broker composition.
+    /// This shares the authority attached to the kernel without opening another
+    /// store or creating another mutation fence. Remote profiles have no local port.
+    #[must_use]
+    pub fn local_authority_store(&self) -> Option<Arc<SqliteAuthorityStore>> {
+        self.local_authority.clone()
+    }
+
     #[must_use]
     pub fn local_budget_store(&self) -> Option<SqliteBudgetStore> {
         self.local_budget.clone()
@@ -115,6 +248,20 @@ impl DurableAdmissionRuntime {
     #[must_use]
     pub fn local_revocation_store(&self) -> Option<SqliteRevocationStore> {
         self.local_revocations.clone()
+    }
+
+    /// The local participant and its existing fence, for sealing a runtime
+    /// source before attaching a hook. Remote authorities have no local port.
+    #[must_use]
+    pub fn local_runtime_participant(
+        &self,
+    ) -> Option<(
+        chio_store_sqlite::SqliteAdmissionOperationStore,
+        StoreMutationFence,
+    )> {
+        self.local_operations
+            .clone()
+            .map(|store| (store, self.fence.clone()))
     }
 
     pub fn attach(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {
@@ -180,7 +327,7 @@ pub fn durable_admission_sidecar_path(session_database: &Path) -> Result<PathBuf
 
 pub fn validate_distinct_database_paths(paths: &[(&str, &Path)]) -> Result<(), CliError> {
     for (index, (left_label, left_path)) in paths.iter().enumerate() {
-        for (right_label, right_path) in &paths[index + 1..] {
+        for (right_label, right_path) in paths.iter().skip(index + 1) {
             if database_paths_alias(left_path, right_path)? {
                 return Err(CliError::cli_other_error(format!(
                     "{left_label} must not alias {right_label}"
@@ -331,7 +478,7 @@ impl PreparedPrivateDirectory {
     pub fn write_new(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
         #[cfg(unix)]
         {
-            write_new_private_file_unix(&self.directory, relative, contents)
+            write_new_private_file_unix(&self.directory, relative, contents, 0o666)
         }
         #[cfg(windows)]
         {
@@ -345,6 +492,14 @@ impl PreparedPrivateDirectory {
                 "secure relative-file creation is unavailable on this platform",
             ))
         }
+    }
+
+    /// Creates a new owner-only secret file relative to the pinned directory.
+    /// Unix creation uses mode 0600 from the first write and never follows
+    /// symlinks or replaces an existing entry.
+    #[cfg(unix)]
+    pub fn write_new_secret(&self, relative: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
+        write_new_private_file_unix(&self.directory, relative, contents, 0o600)
     }
 }
 
@@ -836,10 +991,15 @@ fn sync_private_directory_unix(directory: &File) -> Result<(), std::io::Error> {
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::useless_conversion,
+    reason = "mode_t is u16 on macOS and u32 on Linux; checked conversion covers both."
+)]
 fn write_new_private_file_unix(
     root: &File,
     relative: &Path,
     contents: &[u8],
+    mode: u32,
 ) -> Result<(), std::io::Error> {
     use nix::fcntl::{openat, OFlag};
     use nix::sys::stat::Mode;
@@ -857,7 +1017,8 @@ fn write_new_private_file_unix(
         &directory,
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
-        Mode::from_bits_truncate(0o666),
+        // Permission bits fit both macOS's u16 and Linux's u32 mode_t.
+        Mode::from_bits_truncate((mode & 0o7777).try_into().map_err(std::io::Error::other)?),
     )?;
     let mut file = File::from(descriptor);
     let operation = file
@@ -1046,7 +1207,7 @@ fn resolve_database_path_inner(path: &Path, symlink_depth: usize) -> Result<Path
                         } else {
                             resolved.join(target)
                         };
-                        for remaining in &components[index + 1..] {
+                        for remaining in components.iter().skip(index + 1) {
                             redirected.push(remaining.as_os_str());
                         }
                         return resolve_database_path_inner(&redirected, symlink_depth + 1);
@@ -1054,7 +1215,7 @@ fn resolve_database_path_inner(path: &Path, symlink_depth: usize) -> Result<Path
                     Ok(_) => resolved.push(component.as_os_str()),
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                         resolved.push(component.as_os_str());
-                        for remaining in &components[index + 1..] {
+                        for remaining in components.iter().skip(index + 1) {
                             resolved.push(remaining.as_os_str());
                         }
                         return Ok(normalize_path(&resolved));
@@ -1111,6 +1272,88 @@ fn write_durable_admission_kernel_identity(path: &Path, public_key: &str) -> Res
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn unchecked_relocation_validates_seed_before_any_import_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let temp = private_tempdir()?;
+        let original = temp.path().join("original");
+        fs::create_dir(&original)?;
+        fs::set_permissions(&original, fs::Permissions::from_mode(0o700))?;
+        let database = original.join("authority.db");
+        drop(DurableAdmissionRuntime::open(&database)?);
+        DurableAdmissionRuntime::export_relocation(&database)?;
+        for variant in ["missing", "directory", "symlink", "broad", "malformed"] {
+            let destination = temp.path().join(variant);
+            fs::create_dir(&destination)?;
+            fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+            let copied = destination.join("authority.db");
+            fs::copy(&database, &copied)?;
+            let seed = durable_admission_kernel_seed_path(&copied)?;
+            match variant {
+                "missing" => {}
+                "directory" => fs::create_dir(&seed)?,
+                "symlink" => symlink(durable_admission_kernel_seed_path(&database)?, &seed)?,
+                "broad" | "malformed" => {
+                    fs::copy(durable_admission_kernel_seed_path(&database)?, &seed)?;
+                    if variant == "broad" {
+                        fs::set_permissions(&seed, fs::Permissions::from_mode(0o644))?;
+                    } else {
+                        fs::write(&seed, b"bad seed")?;
+                    }
+                }
+                _ => unreachable!(),
+            }
+            let before = fs::read(&copied)?;
+            assert!(
+                DurableAdmissionRuntime::import_relocation(&copied).is_err(),
+                "{variant}"
+            );
+            assert!(fs::read(&copied)? == before, "{variant} mutated authority");
+            assert!(
+                !durable_admission_lock_root(&copied)?.exists(),
+                "{variant} created locks"
+            );
+        }
+        for variant in ["missing-database", "directory-database", "symlink-database"] {
+            let destination = temp.path().join(variant);
+            fs::create_dir(&destination)?;
+            fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+            let copied = destination.join("authority.db");
+            fs::copy(
+                durable_admission_kernel_seed_path(&database)?,
+                durable_admission_kernel_seed_path(&copied)?,
+            )?;
+            match variant {
+                "missing-database" => {}
+                "directory-database" => fs::create_dir(&copied)?,
+                "symlink-database" => symlink(&database, &copied)?,
+                _ => unreachable!(),
+            }
+            let original_bytes = fs::read(&database)?;
+            assert!(DurableAdmissionRuntime::import_relocation(&copied).is_err());
+            assert!(fs::read(&database)? == original_bytes);
+            assert!(!durable_admission_lock_root(&copied)?.exists());
+        }
+        let destination = temp.path().join("valid");
+        fs::create_dir(&destination)?;
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+        let copied = destination.join("authority.db");
+        fs::copy(&database, &copied)?;
+        fs::copy(
+            durable_admission_kernel_seed_path(&database)?,
+            durable_admission_kernel_seed_path(&copied)?,
+        )?;
+        let imported = DurableAdmissionRuntime::import_relocation(&copied)?;
+        assert_eq!(
+            DurableAdmissionRuntime::import_relocation(&copied)?,
+            imported
+        );
+        drop(DurableAdmissionRuntime::open(&copied)?);
+        Ok(())
+    }
 
     #[test]
     fn durable_admission_rejects_split_local_participant_databases() -> Result<(), CliError> {
@@ -1399,8 +1642,11 @@ mod tests {
         // with the working directory.
         let directory = private_directory_test_root()?;
         let state = directory.path().join("state");
-        fs::create_dir(directory.path().join("bin"))?;
+        let bin = directory.path().join("bin");
+        fs::create_dir(&bin)?;
         fs::create_dir(&state)?;
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(&state, fs::Permissions::from_mode(0o700))?;
         let traversed = durable_admission_lock_root(
             &directory
                 .path()
@@ -1534,6 +1780,8 @@ mod tests {
         let target = fs::canonicalize(directory.path())?.join("state");
         fs::create_dir(&first)?;
         fs::create_dir(&second)?;
+        fs::set_permissions(&first, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(&second, fs::Permissions::from_mode(0o700))?;
 
         let prepared = prepare_private_directory(&second.join("..").join("..").join("state"))?;
 
@@ -1600,6 +1848,15 @@ mod tests {
         assert!(prepared.is_empty()?);
         prepared.create_dir_all(Path::new("src/bin"))?;
         prepared.write_new(Path::new("src/bin/demo.rs"), b"fn main() {}\n")?;
+        prepared.write_new_secret(Path::new("worker.json"), b"private connection")?;
+        assert_eq!(fs::read(pinned.join("worker.json"))?, b"private connection");
+        assert_eq!(
+            fs::metadata(pinned.join("worker.json"))?
+                .permissions()
+                .mode()
+                & 0o077,
+            0
+        );
         let mut reference_builder = fs::DirBuilder::new();
         reference_builder.mode(0o755);
         reference_builder.create(pinned.join("reference"))?;
@@ -1646,6 +1903,9 @@ mod tests {
         symlink(&outside, target.join("README.md"))?;
         let redirected = prepared.write_new(Path::new("README.md"), b"redirected");
         assert!(redirected.is_err());
+        assert!(prepared
+            .write_new_secret(Path::new("README.md"), b"secret")
+            .is_err());
         assert_eq!(fs::read(&outside)?, b"outside");
         Ok(())
     }

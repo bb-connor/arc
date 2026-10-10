@@ -192,6 +192,9 @@ pub struct ShellCommandsRule {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolAccessRule {
+    /// Require a subject-signed invocation proof verified by the kernel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_required: Option<bool>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default)]
@@ -340,11 +343,23 @@ pub struct HumanInLoopRule {
     /// `Constraint::RequireApprovalAbove { threshold_units }`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approve_above: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub approve_above_currency: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub timeout_seconds: Option<u64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub on_timeout: HumanInLoopTimeoutAction,
 }
 

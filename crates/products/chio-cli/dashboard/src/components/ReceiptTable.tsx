@@ -143,8 +143,8 @@ function DetailPanel({ receipt, onClose }: DetailPanelProps) {
           <div className="detail-section-title">Financial</div>
           <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div>Cost: <strong>{formatMinorUnits(financial.cost_charged, financial.currency)}</strong></div>
-            <div>Remaining: {formatMinorUnits(financial.budget_remaining, financial.currency)}</div>
-            <div>Budget: {formatMinorUnits(financial.budget_total, financial.currency)}</div>
+            <div>Remaining: {financial.budget_remaining === null ? "Uncapped" : formatMinorUnits(financial.budget_remaining, financial.currency)}</div>
+            <div>Budget: {financial.budget_total === null ? "Uncapped" : formatMinorUnits(financial.budget_total, financial.currency)}</div>
             <div>Depth: {financial.delegation_depth}</div>
             <div>Settlement: {financial.settlement_status}</div>
           </div>

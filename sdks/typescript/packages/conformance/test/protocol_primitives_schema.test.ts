@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
+import { createWireSchemaValidator, parseWireJson } from "@chio-protocol/node-http";
 
 import type {
   Agent_ActiveResponseGovernedIntent,
@@ -13,22 +13,40 @@ import type {
   Capability_ThresholdApprovalProposal,
   Capability_Token,
   Kernel_CombinedCaptureMetadata,
+  Kernel_CallerDeliveryReport,
+  Kernel_CallerDispatchAuthorization,
+  Kernel_ExecutionNonce,
+  Result_PendingApproval,
+  Receipt_Record,
 } from "../src/_generated/index.js";
 
 type ProtocolPrimitive =
+  | Receipt_Record.ChioReceiptRecord
+  | Kernel_CallerDeliveryReport.ChioSignedCallerDeliveryReport
+  | Kernel_CallerDispatchAuthorization.ChioSignedCallerDispatchAuthorization
+  | Kernel_ExecutionNonce.ChioSignedExecutionNonce
   | Agent_ActiveResponseGovernedIntent.ChioGovernedActiveResponseIntentBody
   | Capability_AggregateInvocationBudget.ChioAggregateInvocationBudget
   | Capability_GovernedApprovalToken.ChioGovernedApprovalToken
   | Capability_SupplementalAuthorization.ChioOpaqueSupplementalAuthorization
   | Capability_ThresholdApprovalProposal.ChioThresholdApprovalProposal
-  | Capability_Token.ChioCapabilitytoken
-  | Kernel_CombinedCaptureMetadata.ChioCombinedAdmissionCaptureMetadata;
+  | Capability_Token.ChioCapabilityToken
+  | Kernel_CombinedCaptureMetadata.ChioCombinedAdmissionCaptureMetadata
+  | Result_PendingApproval.ChioToolCallResultPendingApproval;
 
 interface FixtureCase {
   name: string;
   schema_file: string;
   valid: boolean;
   instance: ProtocolPrimitive | Record<string, unknown>;
+}
+
+/** Exact wire bytes; duplicate keys do not survive a parse of the corpus. */
+interface RawFixtureCase {
+  name: string;
+  schema_file: string;
+  valid: false;
+  instance_text: string;
 }
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -38,16 +56,17 @@ const corpus = JSON.parse(
     resolve(workspaceRoot, "tests/bindings/fixtures/protocol-primitives-v1.json"),
     "utf8",
   ),
-) as { cases: FixtureCase[] };
+) as { cases: FixtureCase[]; raw_cases: RawFixtureCase[] };
 
-const schemaFiles = new Set(corpus.cases.map((fixture) => fixture.schema_file));
+const schemaFiles = new Set(
+  [...corpus.cases, ...corpus.raw_cases].map((fixture) => fixture.schema_file),
+);
 schemaFiles.add("capability/aggregate-budget-root.schema.json");
 schemaFiles.add("capability/cumulative-approval-root.schema.json");
 
-const ajv = new Ajv2020({ allErrors: true, strict: false });
-for (const schemaFile of schemaFiles) {
-  ajv.addSchema(JSON.parse(readFileSync(resolve(schemaRoot, schemaFile), "utf8")));
-}
+const validateWire = createWireSchemaValidator(
+  [...schemaFiles].map((file) => JSON.parse(readFileSync(resolve(schemaRoot, file), "utf8"))),
+);
 
 describe("protocol primitive generated schemas", () => {
   it("compile and validate the shared positive and negative fixtures", () => {
@@ -55,12 +74,22 @@ describe("protocol primitive generated schemas", () => {
       const schema = JSON.parse(
         readFileSync(resolve(schemaRoot, fixture.schema_file), "utf8"),
       ) as { $id: string };
-      const validate = ajv.getSchema(schema.$id);
-      expect(validate, fixture.name).toBeDefined();
-      expect(validate?.(fixture.instance), fixture.name).toBe(fixture.valid);
+      expect(validateWire(schema.$id, fixture.instance), fixture.name).toBe(fixture.valid);
       if (fixture.valid) {
         expect(JSON.parse(JSON.stringify(fixture.instance))).toEqual(fixture.instance);
       }
     }
   });
+
+  for (const fixture of corpus.raw_cases) {
+    const schema = JSON.parse(
+      readFileSync(resolve(schemaRoot, fixture.schema_file), "utf8"),
+    ) as { $id: string };
+    it(`raw ${fixture.name} rejects duplicate keys`, () => {
+      expect(fixture.valid).toBe(false);
+      // Valid once JSON.parse collapses duplicates; the wire decoder rejects the text.
+      expect(validateWire(schema.$id, JSON.parse(fixture.instance_text))).toBe(true);
+      expect(() => parseWireJson(fixture.instance_text)).toThrow(SyntaxError);
+    });
+  }
 });

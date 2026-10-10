@@ -4,6 +4,20 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "id", "result", "receipt"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "result": {
+            "properties": { "status": { "const": "pending_approval" } },
+            "required": ["status"]
+          }
+        },
+        "required": ["result"]
+      },
+      "then": { "not": { "required": ["execution_nonce"] } }
+    }
+  ],
   "properties": {
     "type": {
       "const": "tool_call_response"
@@ -175,7 +189,8 @@
               ]
             }
           }
-        }
+        },
+        { "$ref": "../result/pending_approval.schema.json" }
       ]
     },
     "receipt": {

@@ -1,0 +1,900 @@
+{
+  "schema": "chio.security.local-repair-checkpoint.v1",
+  "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
+  "qualified": false,
+  "merged": false,
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "hosted_status": {
+    "success": 118,
+    "failure": 21,
+    "skipped": 12,
+    "scope": "Previously refreshed published source only; no local repair is a hosted pass."
+  },
+  "campaigns": [
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_secret_broker-59ec3034deaa31a6",
+        "kernel_admission::tests::original_selection",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 43.56992745399475,
+      "selected_count": 2,
+      "counts": [
+        [
+          "2",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "a43ff36376cd18e07b4779c77a06cea57595e0e48c81ae5c6b1ad64cefd5948f",
+      "log_sha256": "c83352808f0763b83a309d8cce1a07270e8874e2669223fc0a5931a526319f6b",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/broker-selection-green-05-receipt.json",
+      "receipt_sha256": "4092b8f3ee9c5ffc0175c09bb06e7639d678921ffcc06e0fea8e4aa0cb6ed3a1"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio-e7357d86bff02fa9",
+        "process_host::runner::child::lifetime_tests",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.22393536567687988,
+      "selected_count": 9,
+      "counts": [
+        [
+          "9",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "93fcfbd91a31141df1948e080412f84277037fca619e1cdd7da08bfd5f17d04d",
+      "log_sha256": "412c471882306b029e67047514fca294d6cc8ffe5b26ea1444179e195626bcf8",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cli-lifetime-green-06-receipt.json",
+      "receipt_sha256": "02b869cc4c9eba182484d70d65f1e1b9e1cdf7551f0c8b8fce942ffc8d4cebbf"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio-e7357d86bff02fa9",
+        "process_host::runner::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 144.69772672653198,
+      "selected_count": 34,
+      "counts": [
+        [
+          "33",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "2b57bbf3aa2ccc034091493e8f08404f21d069b892c34c4bacea5acd7230368b",
+      "log_sha256": "977b884d87ff3c7b53c492cc8e039376675811d3b2d55e7437294df4ffc9bf26",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cli-runner-green-05-receipt.json",
+      "receipt_sha256": "002796e0dbc1cea535ff7ee63084ddbefda4f06f019a6c4711f242db174c6303"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio-e7357d86bff02fa9",
+        "process_host::runner::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 112.17555975914001,
+      "selected_count": 34,
+      "counts": [
+        [
+          "34",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "93fcfbd91a31141df1948e080412f84277037fca619e1cdd7da08bfd5f17d04d",
+      "log_sha256": "4f299c559b2484ee438b2f7a9681213e4e23a53189aaef32e576ed23405bcccc",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cli-runner-owning-green-06-receipt.json",
+      "receipt_sha256": "e8c9069dacbc2b4486d90ec3aca5cde63a111ec363f226d1ae4ab54233457edf"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "security::event_consumer::",
+        "receipt_producer_policy_coverage",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 82.59535884857178,
+      "selected_count": 141,
+      "binary_sha256": "1cec8f9657bf65a097c20367828db3d2cb9a7d636d0bc222bc95e33f92970850",
+      "log_sha256": "5c2b495078052fd3879ac8c4ecad74225651aa3e16156fc247acc6f0548b4374",
+      "scope": "Exact successfully emitted control-plane test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-correlation-green-03-receipt.json",
+      "receipt_sha256": "6d0ae5e464213dba284ada944ea3e12c49061a2c3ccf5cefbe8ce36757800bf2"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "security::response_simulation::production_effects_tests::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 1.6572325229644775,
+      "selected_count": 7,
+      "binary_sha256": "1cec8f9657bf65a097c20367828db3d2cb9a7d636d0bc222bc95e33f92970850",
+      "log_sha256": "996adfe43132707bcf87ab040d818e40eb3c3d02b54034c30b32c0a5d408feca",
+      "scope": "Exact successfully emitted control-plane test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-effect-block-b-original-03-receipt.json",
+      "receipt_sha256": "0832433c50032fd7cbd354d0ec1ef9e332370c3ab09c487c193a5cb23ee7ee82"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "security::response_simulation::production_effects_tests::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 6.069628953933716,
+      "selected_count": 21,
+      "counts": [
+        [
+          "14",
+          "7",
+          "0"
+        ]
+      ],
+      "binary_sha256": "ed1edf027689923574a86e606dfcb8cc1f755ee864da48267519db5bc8656a9c",
+      "log_sha256": "0d02054bcc7f0aa05ed54993238ece0a838c010e8e7ccc1715816012a2b0fe42",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-effects-combined-06-receipt.json",
+      "receipt_sha256": "d08b7903ee764a60f81a88986a3eb91f5852b8add9502d6693e4cedfa99d3428"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "capture::fault_class",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 39.533098459243774,
+      "selected_count": 4,
+      "binary_sha256": "1cec8f9657bf65a097c20367828db3d2cb9a7d636d0bc222bc95e33f92970850",
+      "log_sha256": "1e981b5f39875eea335bd9b75c35a231eee3e214e523cf3dda1596b80893cb29",
+      "scope": "Exact successfully emitted control-plane test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-native-diagnostic-green-03-receipt.json",
+      "receipt_sha256": "149d25dbbbe0564994eb82c4e4ffca852fbdd3d81e6c7c443d8b4bd9936c16da"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "teardown_overlay_wait",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 55.40370154380798,
+      "selected_count": 5,
+      "counts": [
+        [
+          "5",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "f187b28268db64349180827d2a07823550e4ce47c12f13361c830d4881367c26",
+      "log_sha256": "97c474186f255cd101d8507cc70f8a0da861b18b74b0a48e03fc1d5df548cda6",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-overlay-retry-green-05-receipt.json",
+      "receipt_sha256": "75f9339b569a96a87d467d272f7b95733b4c952f32a03aa76b4948193172624e"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-9db6014f2cdf0e08",
+        "participant_history_cadence",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1085.4317989349365,
+      "selected_count": 1,
+      "counts": [
+        [
+          "1",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "f187b28268db64349180827d2a07823550e4ce47c12f13361c830d4881367c26",
+      "log_sha256": "27f8b99e233362ac47be0b4044adb572508eccfc0f3da8edb583283745b2bb47",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/cp-participant-history-green-05-receipt.json",
+      "receipt_sha256": "154ac39ce6169279e03ee0f30dc3f1f4f285d65367fb954ac65ffe765041c117"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/issuance_freeze_backend-e8d857226e40af09",
+        "fence_lapse",
+        "duplicate_freeze",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 4.8683857917785645,
+      "selected_count": 8,
+      "counts": [
+        [
+          "7",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "5647504f1ea9920bb462f5a76942668df466f0479215a4d4bcc47b0bc4e2ed3d",
+      "log_sha256": "3659576de16885a962307ce279a863a45e4283115bbf4a2e28586b0d0a4ae3e2",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/issuance-block-b-original-05-receipt.json",
+      "receipt_sha256": "e5753dee0d65dedcae7933c8de7288fe100d9d1d6616c45982e4f58c1097b054"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/issuance_freeze_backend-e8d857226e40af09",
+        "fence_lapse",
+        "duplicate_freeze",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 5.903193473815918,
+      "selected_count": 10,
+      "counts": [
+        [
+          "9",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "5f77fc9047fac91d868feb7056d05e617d0a2a4f501c378ba0b14d2f74ec93ac",
+      "log_sha256": "ad04303d21fe69869eba61a4d8641137c13e1a4d66bd033fa8cda9930a81cd14",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/issuance-combined-06-receipt.json",
+      "receipt_sha256": "3c1d2789a5fba6ad47f061567760bb21df7e8cf10ca60206198c8d149629e661"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_kernel-159846b42396ebb7",
+        "fx_clock",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.3685779571533203,
+      "selected_count": 12,
+      "binary_sha256": "68f18ea4d8ad0521ac9e2538d4ae8049c8ac006f1e268ed0bbb05c18cc3c1cf8",
+      "log_sha256": "1fa367519060a68105ec0de636f4e645d619b69cc5739cf3edf1bd0da8c3fb34",
+      "scope": "Exact successfully emitted kernel test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/kernel-fx-green-03-receipt.json",
+      "receipt_sha256": "5715dc137edff26ab7b5eae10b97abf7e6262f4c7c82f5a046ba759e9fe70c3e"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_kernel-159846b42396ebb7",
+        "native_dispatch_fault",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.010944128036499023,
+      "selected_count": 2,
+      "binary_sha256": "68f18ea4d8ad0521ac9e2538d4ae8049c8ac006f1e268ed0bbb05c18cc3c1cf8",
+      "log_sha256": "a9e21745fdc1b26429cbd0427f1f358f5b92aedeefc687ef9d12e6e2524699ad",
+      "scope": "Exact successfully emitted kernel test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/kernel-native-diagnostic-green-03-receipt.json",
+      "receipt_sha256": "df1c5ae6f7afdb477d3bc72d1c5e3e8219dfe336b39fc696a66930a261a4fff9"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_kernel-159846b42396ebb7",
+        "publication_cleanup_progress",
+        "fx_clock",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.5273733139038086,
+      "selected_count": 26,
+      "counts": [
+        [
+          "26",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "8bdb93eb4e88d8fd381bf973d7f714d14b77154c96c8b41abeaefe4ebfda774c",
+      "log_sha256": "4fb342fe1c333b988322c1e9e610cf16c70f387ae736f6efd59bedcfc3d0808f",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/kernel-recovery-fx-green-05-receipt.json",
+      "receipt_sha256": "3cfc957d9078b078d5f91fb1834bfbc7af6474d922029e544b4ef3ae385567ce"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_kernel-159846b42396ebb7",
+        "publication_cleanup_progress",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 0.10896897315979004,
+      "selected_count": 14,
+      "binary_sha256": "68f18ea4d8ad0521ac9e2538d4ae8049c8ac006f1e268ed0bbb05c18cc3c1cf8",
+      "log_sha256": "f6c81d9566bfe4c44d58c9bed4f98f9223906152b0dd5527ec01f7402d922c26",
+      "scope": "Exact successfully emitted kernel test artifact; overall multi-owner build separately has unrelated SQLite module-path failure.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/kernel-recovery-original-03-receipt.json",
+      "receipt_sha256": "a0f43afe74276b3ea645f428dcb128463bbb82388ea14e51a46f622158aca0d5"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 143.57662320137024,
+      "selected_count": 192,
+      "counts": [
+        [
+          "191",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "323dc4a386f53a8f8a86b5b01f8604f62abcc4da08e7cea66184f75c2778c14a",
+      "log_sha256": "f0a88daaa3879ddc25393e68d4ae4673a6caf5f692d1a3da93e7a75b8bbab566",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-owning-capture-06-receipt.json",
+      "receipt_sha256": "c6b15b8a66287ec7a41420dc60798871af251054c1d390ffaf0b2b58dcb882f4"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "mcp_projection_original_unsigned_result_extensions",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 2.802363872528076,
+      "selected_count": 1,
+      "counts": [
+        [
+          "0",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "b0b34f01935692f76be3d2df74d1bd48f18a6e537395fa26024028187bc7ca9f",
+      "log_sha256": "52af38e59e2bfcdfe28fd44e733ee2a157f6c5f6433b91dca233b5b79be4f880",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-projection-extension-original-05-receipt.json",
+      "receipt_sha256": "1fa765c3ff9bc4f1788135a46563906c04c814513bbc00cf46ba172d33c5895e"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "mcp_projection",
+        "completed_result::tests",
+        "delivery_writer_refuses_event_sized",
+        "delivery_writer_preserves_decoded_decimal",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 14.120811939239502,
+      "selected_count": 10,
+      "counts": [
+        [
+          "9",
+          "1",
+          "0"
+        ]
+      ],
+      "binary_sha256": "323dc4a386f53a8f8a86b5b01f8604f62abcc4da08e7cea66184f75c2778c14a",
+      "log_sha256": "d0fa8c17bc6805208078c5b930e86fed8a7ba0b0e17090e924b081abb574670b",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-projection-green-06-receipt.json",
+      "receipt_sha256": "4ca98934aae30e7794d838aa6d80fbbb1d0b85d58e943eccff95cb78c08158f0"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "mcp_reserve_original",
+        "session_credentials::reservation::tests",
+        "mcp_generation_original",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.2160258293151855,
+      "selected_count": 7,
+      "counts": [
+        [
+          "7",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "b0b34f01935692f76be3d2df74d1bd48f18a6e537395fa26024028187bc7ca9f",
+      "log_sha256": "6cda6ea4d13f31ab5a000ff15cafbd3575c723ea5b3c6208f66d19268eb478bf",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-reserve-generation-green-05-receipt.json",
+      "receipt_sha256": "3cd5c3e1ce99b95343811d9f8c952017819c918198c0dc9c8073c5445ed004fc"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_mcp_remote-986c5d05fbe3d2c1",
+        "delivery_writer_refuses_event_sized_outcome_before_replacing_pending_rows",
+        "delivery_writer_preserves_decoded_decimal_native_replay_and_acknowledgement",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.4858629703521729,
+      "selected_count": 2,
+      "counts": [
+        [
+          "2",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "b0b34f01935692f76be3d2df74d1bd48f18a6e537395fa26024028187bc7ca9f",
+      "log_sha256": "ff523dc7780d33acef311aa9c21a424bb3784843cda7e4f0c769b9b98d4c9231",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mcp-signed-durable-controls-05-receipt.json",
+      "receipt_sha256": "0730b47b19fdf124220b5289529fec8ec22243a0b5d3c7fc06d49d9b4b56bc51"
+    },
+    {
+      "source": "d5309244b759641f745c2d48f6f540983fb321c8",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-mcp-remote",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std,chio-store-sqlite/admission-test-support",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "issuance_freeze_backend",
+        "--test",
+        "response_dispatch",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 285.8871729373932,
+      "log_sha256": "c149878366d9212275a3616bc0117506611459f8f4de56569c22cc3f7051666e",
+      "stderr_sha256": "900cd18af9c9ddca82586b3f1745af1aa71b066c93055f859dabee64896d75cc",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-03-build-receipt.json",
+      "receipt_sha256": "dc54cef61dfe3da7e50c76dbfa6c641fc06f2f6b748bd639ce1fb6e60d267b1b"
+    },
+    {
+      "source": "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-mcp-remote",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std,chio-store-sqlite/admission-test-support",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "issuance_freeze_backend",
+        "--test",
+        "response_dispatch",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 239.98042726516724,
+      "log_sha256": "c5d332cc845ba2b894ca71de3199398a8a7fea63053011db3fa7178f6a4f93cb",
+      "stderr_sha256": "6cc8bc7d9374cc1f59cb0ab55634eb791e222d683edbdc071b111d8c3bc8e8ba",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-04-build-receipt.json",
+      "receipt_sha256": "27417d8f656d1a1a0658f6fe2eee764b3f3570f9fb3555ed11461219dadaa5f4"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-mcp-remote",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std,chio-store-sqlite/admission-test-support",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "issuance_freeze_backend",
+        "--test",
+        "response_dispatch",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 251.15428686141968,
+      "log_sha256": "6059e6aa52dee5d5fd7cba18359405e2b7e1ff1afcecac60d88cf6b1ccfd9c54",
+      "stderr_sha256": "250bbeabfbc83d46f6eb906546fc7f3a87c0db1d5f9b223c4d7238b005200817",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-05-build-receipt.json",
+      "receipt_sha256": "254cd1e70a7cb831b34a0e3a776305bb07e10ec064f3d0b3211dfafa662f97e9"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-mcp-remote",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std,chio-store-sqlite/admission-test-support",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "issuance_freeze_backend",
+        "--test",
+        "response_dispatch",
+        "--test",
+        "response",
+        "--test",
+        "containment_overlay_commands",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 360.2011935710907,
+      "log_sha256": "fb3bcc668c2a0dd1d39d3e033ad96e491f8890353fac9aed7268fd989c9e446e",
+      "stderr_sha256": "9206f8c5020bef0b02dc41cf528c8bdcce651639e272210a6af42dbf17dc6840",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mixed-06-build-receipt.json",
+      "receipt_sha256": "4be435e73c8ff7ee9245427d9aad4e0eb1bd9c310b4fc0a3b8eea563fb339943"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/response-eab8d9ff521bf6e9",
+        "",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.04177284240722656,
+      "selected_count": 18,
+      "counts": [
+        [
+          "18",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "bc1d45004bc67374a9042d36916d62391f92e97aa184ecf174d549c65666170f",
+      "log_sha256": "ff0af5264aed46cac9b386b28f267b35d4692a2b25aeeafa1b2036a1e20aa4c0",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/security-plan-shape-green-06-receipt.json",
+      "receipt_sha256": "dbfe5ff777f6fb7d1e020797d582ca3190a21183b0edbed871a618d5a72f8b81"
+    },
+    {
+      "source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/containment_overlay_commands-bbd7c547c6a25732",
+        "",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.6253283023834229,
+      "selected_count": 3,
+      "counts": [
+        [
+          "3",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "da83f9df4588fa2ea283649e98f63de2dd79feb47f8d26bc67e28b8661176301",
+      "log_sha256": "2bbcf4efd341a7d838a1cbf12ba9242bd14110e361a20367190bbfcf2cf85669",
+      "build": "mixed-06-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-containment-green-06-receipt.json",
+      "receipt_sha256": "0b0471ce927c24ab1600c1fa9428a846a909566d0110e2ff50beb111bb59bcc8"
+    },
+    {
+      "source": "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_store_sqlite-15d37b71f470e4c8",
+        "checkpoint::image_visit_controls::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 11.328922033309937,
+      "selected_count": 3,
+      "binary_sha256": "c3286747de165a639e7d647a468b0e3bd97039381e78bdd8ea85884e94911c2d",
+      "log_sha256": "a3cbd1bccae7fb6c5685ef9b26efb238a0e26f9723605725fafe4d4dc2c53877",
+      "scope": "Exact successfully emitted SQLite unit-test artifact; overall multi-owner build separately has unrelated kernel test missing import.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-image-controls-04-receipt.json",
+      "receipt_sha256": "18b959fdfac89b858c7af1f9d406f81a1f08d8ca7d6f2d03fd94dbcdc3258aa6"
+    },
+    {
+      "source": "98d5c49600a80fca736bb4d55bb640cdfedd9638",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/response_dispatch-5e656ad2f442adc5",
+        "overlay_inventory",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.1347911357879639,
+      "selected_count": 4,
+      "counts": [
+        [
+          "4",
+          "0",
+          "0"
+        ]
+      ],
+      "binary_sha256": "7eb4f6cda92ad846a5ce3a882905a71e22a8b33e00b21b226bad48a5b5a9c769",
+      "log_sha256": "0d665cff6dd38ef796b4d09813685e4e3a56f491d202ddfcfe1e6d47c5c6efcc",
+      "build": "mixed-05-build",
+      "scope": "Exact emitted test artifact; independent of overall build completion. Owning, native and hosted gates recorded separately.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-inventory-green-05-receipt.json",
+      "receipt_sha256": "9db760f91779226948177fdec52a4063106679501329a3cb9cb6ab3ef6157169"
+    },
+    {
+      "source": "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/response_dispatch-5e656ad2f442adc5",
+        "overlay_inventory_rejects_unreadable_scheduler_retry_schema",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 0.17099738121032715,
+      "selected_count": 1,
+      "binary_sha256": "aae7aa7e40dd2f5e428766b84829d93a7593850a008f1c839ddac02763be7aa7",
+      "log_sha256": "4c5227bd157b625c7d282592a6948bb6176bcc90b21fe2ac1c86ba4166a4577a",
+      "scope": "Exact successfully emitted SQLite integration-test artifact; overall multi-owner build separately has unrelated kernel test missing import.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-inventory-original-04-receipt.json",
+      "receipt_sha256": "66125dda52a8d077a30f034a18dbfeb39a0b132be775e650ebb0b06e3c419b4f"
+    },
+    {
+      "source": "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9",
+      "argv": [
+        "/home/connor/lanes/integration/target/debug/deps/chio_store_sqlite-15d37b71f470e4c8",
+        "critical_catalog_keeps_the_immutable_revision0_bytes_and_seal",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.0694329738616943,
+      "selected_count": 1,
+      "binary_sha256": "c3286747de165a639e7d647a468b0e3bd97039381e78bdd8ea85884e94911c2d",
+      "log_sha256": "69aa94f673d6965b0c296b2cd71ce0a7dfc9c8d8c7bc81cd1a2378b6603d0d9f",
+      "scope": "Exact successfully emitted SQLite unit-test artifact; overall multi-owner build separately has unrelated kernel test missing import.",
+      "receipt_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/store-legacy0-capture-04-receipt.json",
+      "receipt_sha256": "4a6791c128c5d0b07ba4b02603a9d77f12e6444d56f4200b6fd45940c2fbd030"
+    }
+  ],
+  "interpretation": [
+    "mixed03 and mixed04 overall builds failed on test-only module/import setup; emitted successful test artifacts retain independent binary/source receipts. mixed05 and mixed06 builds passed.",
+    "Original02 is the retained genuine pre-repair baseline. Later Original extension failures are separate from setup failures, preservation controls and repaired subsets.",
+    "F016 and FX combined26 pass; F042/F044 correlation140 pass with1ignored. No total across overlapping campaigns is claimed.",
+    "TTL rollback store4 and host5 pass. Broker real collision and unique/replay2 pass; additional integrity controls are separate.",
+    "The16-call native participant-history test passes with earlier custody preserved. Current-image work remains45 traversals percall and linear retained rows; native production10-second acceptance is not established.",
+    "Runner33pass/1fixturefail remains failed evidence. After the proved serial stdout framing correction, all9 lifetime cases pass.",
+    "MCP signed-output projection Originals and nonce/durable controls pass9 at29e9; the genuine-v2 positive fixture failed while retrieving a normally erased terminal request. Its repair and later owning acceptance are separate.",
+    "BlockB production effects14pass/7fail and issuance9pass/1fail at29e9 include seven intended Original failures and one distinct capability-set historical-query obligation. Neither campaign is Green.",
+    "The original Legacy0 source inode, seal, expectation and critical catalog are retained for schema compatibility checks; no copied fixture substitutes for that evidence.",
+    "The broader remote MCP library is191pass/1fixturefailure at29e9. The whole runner module passes34/0 at29e9 after the framing correction. Neither record substitutes for current enforcing native acceptance."
+  ],
+  "source_repairs": {
+    "F016": [
+      "4c4ad56354e2743f501dd0b9589f8b9a855700f2",
+      "50beba7348c1ba28ea5089c2dbaf858a8baf88f4"
+    ],
+    "FX-CLOCK": [
+      "300a5854cc33522999ba4805ac3e64976099ef8d"
+    ],
+    "F042": [
+      "aa90b156650071cccc49e7120aa7a9a5361ed778",
+      "a508cdc67bb92cdc38b52e440ce9d4424a32d354"
+    ],
+    "F044": [
+      "51dca5ea83d0690533f6ebe2c8c600bb166babbb",
+      "cc35993f4d528d8e28f87b7fc5b3e0b2cf09feaf",
+      "b6adad5d49b4bc39d8af536a2190bb0d8284b2d5"
+    ],
+    "TEARDOWN-TTL": [
+      "e0b21a96e06433be463b86e37fa542575de39041"
+    ],
+    "PG-HISTORY": [
+      "5ec396fd53bb451ff46c974154abaec5ed06b57b"
+    ],
+    "BROKER-SELECT": [
+      "5fbd2ca6ab8bea7957182aa36c824ac26225f9d9"
+    ],
+    "MCP-RESERVE": [
+      "2b871d042d9236d4d64809ed0975b8b05f460bbe",
+      "eff2300695a054b4ac4b8b1c0f318ad60ebe201d"
+    ],
+    "MCP-GENERATION": [
+      "915ab03924910ac8cbfb31003fbbef496da3c4fe"
+    ],
+    "MCP-PROJECTION": [
+      "73fc114f53ac845d7a2931c02d54770158c7bfbc",
+      "2a544d51275fd3068d6917f0727c49123807155b",
+      "c7e94c207a0f8e1e23ea2c6d5702af4c57ffeca9",
+      "ecae2736b2e664543d629f07c3279f0fbdd32888",
+      "43f53d340f823f168b2200c8c9966a3c866ec04c"
+    ],
+    "MINISW-PDEATH": [
+      "791ac469442d667d6fa9a33eb7745b8b07133d4e",
+      "8476fb40d1be9fb334d7a8bc3a094c9a045b794e"
+    ],
+    "NATIVE-DIAGNOSTICS": [
+      "dab61de13859d8396b50e76a4c492d064b06ba60"
+    ],
+    "BLOCK-B": [
+      "10e4fc1bd3ff7a33c21741b007eaf7499c8b01a5",
+      "5d4d50f2bbd5907980cb108b9a8410f4771d7c61",
+      "60c4e895424925d579c02d91a611959978aefbe4",
+      "125ae37d5f984dd1612a0b136dec1f2c539f8880",
+      "f268ee5d951bdd0cdb7dce0ccba3f962f4b4ff88",
+      "c2275b364e1e65edd8056f8846d8b14da355acc5"
+    ],
+    "C2": [
+      "ba6e6fd8224b148d0c91ac6cb98e6d9eda59f513"
+    ]
+  },
+  "remaining_acceptance": [
+    "Complete effect finality, same-lineage freeze and authenticated historical result-query repairs with Original and preservation controls.",
+    "Complete MCP genuine-v2 positive fixture and extra broker integrity controls; fresh owning and strict checks for the composed source.",
+    "Measure and qualify actual production native trajectory with eight receipts, the unchanged10000ms fence and current enforcing artifacts; bounded journal tests do not establish this.",
+    "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
+  ],
+  "new_requirement": {
+    "id": "EF-REPLAY",
+    "priority": "P2",
+    "requirement": "An exact historical capability-set Apply query recognizes authenticated removal while refusing an unexplained missing active contribution.",
+    "source_path": "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs",
+    "reviewed_source": "29e9a39d19ec944a60ebf2f0c813eccbf54b8d9e",
+    "status": "genuine-original-red-repair-and-tamper-preservation-control-pending",
+    "acceptance": [
+      "Real Apply/Remove then exact Apply query returns its original authenticated result without reinstalling a contribution.",
+      "Direct removal of an active contribution without a matching authenticated completed Remove remains IntegrityFailure.",
+      "Malformed, foreign or unavailable removal evidence cannot authorize historical completion."
+    ]
+  },
+  "independent_review": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/review-blockb/REPORT.md",
+    "sha256": "b69df97483f36741f0d6ba15d5058ffafedd0a4c6c11b2af486df54a79336a1c",
+    "scope": "Finite static BlockB review, producer source equivalence, new EF-REPLAY obligation and egress CAS preservation control; no runtime or whole-candidate approval."
+  },
+  "queued_acceptance": {
+    "C2": "Reproduced Original at29e9; source repair integrated; Green pending.",
+    "MCP-v2-fixture": "Capture the actual fenced request during live dispatch before terminal erasure; test-only43f53d340f; Green pending.",
+    "broker-integrity": "72f15a6aa8..511184b15b separate owner poisoning from private selector corruption; runtime pending."
+  }
+}

@@ -5,6 +5,19 @@
 
 use super::*;
 
+#[test]
+fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn std::error::Error>> {
+    let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &Keypair::generate())?;
+    checkpoint.body.kernel_key =
+        PublicKey::from_hex("0100000000000000000000000000000000000000000000000000000000000000")?;
+    checkpoint.signature = Signature::from_hex(concat!(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    ))?;
+    assert!(!verify_checkpoint_signature(&checkpoint)?);
+    Ok(())
+}
+
 fn make_receipt_bytes(n: usize) -> Vec<Vec<u8>> {
     (0..n)
         .map(|i| format!("{{\"receipt_id\":\"rcpt-{i:04}\",\"seq\":{i}}}").into_bytes())
@@ -538,7 +551,7 @@ fn checkpoint_log_id_preserves_historical_ed25519_hashing() {
 
     assert_eq!(
         checkpoint_log_id(&checkpoint),
-        format!("local-log-{}", sha256_hex(kp.public_key().as_bytes()))
+        format!("local-log-{}", sha256_hex(&kp.public_key_bytes()))
     );
 }
 

@@ -276,11 +276,16 @@ fn pump_client_messages_stops_after_read_error() {
         ClientInbound::ReadError(message) => {
             assert!(message.contains("synthetic reader failure"));
         }
-        ClientInbound::Message(_) => panic!("expected read error, got message"),
+        ClientInbound::Accounted(_) | ClientInbound::Message(_) => {
+            panic!("expected read error, got message")
+        }
         ClientInbound::ParseError(message) => {
             panic!("expected read error, got parse error: {message}")
         }
         ClientInbound::Closed => panic!("expected read error, got closed"),
+        ClientInbound::HostProtocolRefusal(_) => {
+            panic!("unexpected host control in reader-error fixture")
+        }
     }
     assert!(
         receiver.recv_timeout(Duration::from_millis(50)).is_err(),

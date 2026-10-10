@@ -1,5 +1,3 @@
-use std::env;
-use std::fs;
 use std::process::Command;
 
 use chio_provider_conformance::CaptureDirection;
@@ -11,7 +9,6 @@ use crate::invoke::{captured_invocations, extract_bedrock_invocations, CapturedI
 use crate::record::{
     capture_record, insert_payload_field, live_request_record, request_body, stamp_bedrock_headers,
 };
-use crate::util::{now_ts, sanitize_id};
 use crate::RecordError;
 
 pub(crate) const BEDROCK_REGION: &str = "us-east-1";
@@ -108,14 +105,8 @@ pub(crate) fn bedrock_caller_identity(
     if let Some(profile) = profile {
         command.args(["--profile", profile]);
     }
-    let output = command.output().map_err(|source| RecordError::AwsCli {
-        message: format!("failed to run `aws sts get-caller-identity`: {source}"),
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(RecordError::AwsCli { message: stderr });
-    }
-    let value = serde_json::from_slice::<Value>(&output.stdout)?;
+    let output = crate::process::capture(command)?;
+    let value: Value = chio_provider_conformance::input::json(&output)?;
     let caller_arn = value
         .get("Arn")
         .and_then(Value::as_str)
@@ -143,14 +134,16 @@ pub(crate) fn bedrock_caller_identity(
 }
 
 fn bedrock_converse(profile: Option<&str>, request_body: &Value) -> Result<Value, RecordError> {
-    let input_path = env::temp_dir().join(format!("chio-bedrock-{}.json", sanitize_id(&now_ts())));
-    fs::write(&input_path, serde_json::to_vec(request_body)?).map_err(|source| {
-        RecordError::WriteFixture {
-            path: input_path.clone(),
-            source,
-        }
-    })?;
-
+    use std::io::Write;
+    let mut input = tempfile::NamedTempFile::new()?;
+    let bytes = chio_core::canonical_json_bytes(request_body)
+        .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?;
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        chio_provider_conformance::input::MAX_DOCUMENT_BYTES,
+    )?;
+    input.write_all(&bytes)?;
+    input.flush()?;
     let mut command = Command::new("aws");
     command.args([
         "bedrock-runtime",
@@ -158,20 +151,13 @@ fn bedrock_converse(profile: Option<&str>, request_body: &Value) -> Result<Value
         "--region",
         BEDROCK_REGION,
         "--cli-input-json",
-        &format!("file://{}", input_path.display()),
+        &format!("file://{}", input.path().display()),
         "--output",
         "json",
     ]);
     if let Some(profile) = profile {
         command.args(["--profile", profile]);
     }
-    let output = command.output().map_err(|source| RecordError::AwsCli {
-        message: format!("failed to run `aws bedrock-runtime converse`: {source}"),
-    })?;
-    let _ = fs::remove_file(&input_path);
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(RecordError::AwsCli { message: stderr });
-    }
-    serde_json::from_slice::<Value>(&output.stdout).map_err(RecordError::from)
+    let output = crate::process::capture(command)?;
+    chio_provider_conformance::input::json(&output).map_err(RecordError::from)
 }

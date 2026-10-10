@@ -1,3 +1,4 @@
+use super::*;
 // Hot-path deadline and writer-watchdog behavior: a hung guard or tool server
 // fails closed within budget without pinning a worker, a dispatch deadline runs
 // the full cancellation unwind, and a wedged writer denies before any tool side
@@ -45,10 +46,10 @@ impl Guard for RecordingGuard {
 }
 
 /// A tool server whose `invoke` never returns, modeling a wedged tool server.
-struct HangingToolServer {
-    id: String,
-    tools: Vec<String>,
-    invocations: Arc<AtomicU64>,
+pub(super) struct HangingToolServer {
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
+    pub(super) invocations: Arc<AtomicU64>,
 }
 
 #[async_trait::async_trait]
@@ -754,7 +755,7 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
         );
         let worker = std::thread::current().id();
         let outcome = kernel
-            .run_guards_within_budget(&request, &scope, None, None)
+            .run_guards_within_budget(&request, &scope, None, None, None)
             .await;
         assert!(outcome.is_ok(), "the recording guard allows");
         let guard = guard_thread
@@ -804,7 +805,7 @@ fn always_offload_moves_guards_off_the_worker_without_a_timer_even_with_a_budget
         );
         let worker = std::thread::current().id();
         let outcome = kernel
-            .run_guards_within_budget(&request, &scope, None, None)
+            .run_guards_within_budget(&request, &scope, None, None, None)
             .await;
         assert!(outcome.is_ok(), "the recording guard allows");
         let guard = guard_thread
@@ -845,8 +846,9 @@ fn always_offload_runs_guards_inline_without_a_tokio_runtime(
     let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
 
     // Drive the future with the futures executor: no Tokio runtime is entered.
-    let outcome =
-        futures::executor::block_on(kernel.run_guards_within_budget(&request, &scope, None, None));
+    let outcome = futures::executor::block_on(
+        kernel.run_guards_within_budget(&request, &scope, None, None, None),
+    );
 
     assert!(
         outcome.is_ok(),

@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn parse_json_rpc_message() {
     let raw = json!({
@@ -123,8 +125,11 @@ fn parse_session_update_malformed_tool_call_id_fails_closed() {
 
     match parse_session_update(&raw) {
         SessionUpdate::MalformedToolCall(message) => {
-            assert!(message.contains("toolCallId"));
-            assert!(message.contains("must be a string"));
+            assert_eq!(
+                message.code(),
+                "urn:chio:error:attest:signed-json-invalid-shape"
+            );
+            assert!(std::error::Error::source(&message).is_some());
         }
         other => panic!("expected MalformedToolCall, got {:?}", other),
     }
@@ -140,8 +145,11 @@ fn parse_session_update_tool_call_id_takes_precedence_over_known_type() {
 
     match parse_session_update(&raw) {
         SessionUpdate::MalformedToolCall(message) => {
-            assert!(message.contains("toolCallId"));
-            assert!(message.contains("must be a string"));
+            assert_eq!(
+                message.code(),
+                "urn:chio:error:attest:signed-json-invalid-shape"
+            );
+            assert!(std::error::Error::source(&message).is_some());
         }
         other => panic!("expected MalformedToolCall, got {:?}", other),
     }

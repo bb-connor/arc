@@ -24,7 +24,7 @@ use crate::validation::{
 pub fn buyer_attestation_packet_from_json(
     json: &str,
 ) -> Result<BuyerAttestationPacket, BuyerAttestationError> {
-    let packet = serde_json::from_str::<BuyerAttestationPacket>(json)
+    let packet = crate::input::decode::<BuyerAttestationPacket>(json.as_bytes())
         .map_err(|error| json_error("Chio buyer attestation packet JSON", error))?;
     validate_buyer_attestation_packet_boundary(&packet)?;
     Ok(packet)
@@ -33,7 +33,7 @@ pub fn buyer_attestation_packet_from_json(
 pub fn buyer_attestation_review_package_from_json(
     json: &str,
 ) -> Result<BuyerAttestationReviewPackage, BuyerAttestationError> {
-    let package = serde_json::from_str::<BuyerAttestationReviewPackage>(json)
+    let package = crate::input::decode::<BuyerAttestationReviewPackage>(json.as_bytes())
         .map_err(|error| json_error("Chio buyer attestation review package JSON", error))?;
     validate_buyer_attestation_review_package_boundary(&package)?;
     Ok(package)
@@ -220,7 +220,7 @@ pub fn verify_proof_package_json(
 }
 
 fn parse_json_value(label: &str, json: &str) -> Result<serde_json::Value, BuyerAttestationError> {
-    serde_json::from_str(json).map_err(|error| json_error(label, error))
+    crate::input::decode(json.as_bytes()).map_err(|error| json_error(label, error))
 }
 
 fn replay_core_verifier(

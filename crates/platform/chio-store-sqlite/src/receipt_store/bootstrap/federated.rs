@@ -116,15 +116,13 @@ fn persist_immutable_federated_lineage_bridge(
 
 impl SqliteReceiptStore {
     pub fn import_federated_evidence_share(
-        &mut self,
+        &self,
         import: &FederatedEvidenceShareImport,
     ) -> Result<FederatedEvidenceShareSummary, ReceiptStoreError> {
-        let imported_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0);
+        let clock = self.clock.clone();
         let import_owned = import.clone();
         self.writer_handle().run_write(move |connection| {
+            let imported_at = clock.unix_millis()?.as_secs();
             let import = &import_owned;
             let imported_at_sqlite = sqlite_i64(imported_at, "federated share imported_at")?;
             let exported_at_sqlite = sqlite_i64(import.exported_at, "federated share exported_at")?;
@@ -311,8 +309,8 @@ impl SqliteReceiptStore {
                 partner: import.partner.clone(),
                 signer_public_key: import.signer_public_key.clone(),
                 require_proofs: import.require_proofs,
-                tool_receipts: import.tool_receipts.len() as u64,
-                capability_lineage: import.capability_lineage.len() as u64,
+                tool_receipts: crate::integer::count(import.tool_receipts.len()),
+                capability_lineage: crate::integer::count(import.capability_lineage.len()),
             })
         })
     }
@@ -322,8 +320,15 @@ impl SqliteReceiptStore {
         capability_id: &str,
     ) -> Result<Option<(FederatedEvidenceShareSummary, CapabilitySnapshot)>, ReceiptStoreError>
     {
-        let row = self
-            .connection()?
+        Self::get_federated_share_for_capability_on_connection(&*self.connection()?, capability_id)
+    }
+
+    pub(crate) fn get_federated_share_for_capability_on_connection(
+        connection: &Connection,
+        capability_id: &str,
+    ) -> Result<Option<(FederatedEvidenceShareSummary, CapabilitySnapshot)>, ReceiptStoreError>
+    {
+        let row = connection
             .query_row(
                 r#"
                 SELECT
@@ -622,7 +627,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_federated_lineage_bridge(
-        &mut self,
+        &self,
         local_capability_id: &str,
         parent_capability_id: &str,
         share_id: Option<&str>,
@@ -646,7 +651,7 @@ impl SqliteReceiptStore {
 
     /// Persist a federated issuance lineage as one all-or-nothing operation.
     pub fn persist_federated_delegation_lineage(
-        &mut self,
+        &self,
         anchor: &CapabilitySnapshot,
         upstream_bridge: Option<(&str, &str)>,
         child: &CapabilitySnapshot,
@@ -718,25 +723,39 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        if let Some(snapshot) = self
-            .get_lineage(capability_id)
-            .map_err(|error| match error {
+        Self::get_combined_lineage_on_connection(&*self.connection()?, capability_id)
+    }
+
+    pub(crate) fn get_combined_lineage_on_connection(
+        connection: &Connection,
+        capability_id: &str,
+    ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+        if let Some(snapshot) = Self::get_lineage_on_connection(connection, capability_id).map_err(
+            |error| match error {
                 chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
                 chio_kernel::CapabilityLineageError::Sqlite(error) => {
                     ReceiptStoreError::Sqlite(error)
                 }
                 chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-            })?
-        {
+            },
+        )? {
             return Ok(Some(snapshot));
         }
-        Ok(self
-            .get_federated_share_for_capability(capability_id)?
-            .map(|(_, snapshot)| snapshot))
+        Ok(
+            Self::get_federated_share_for_capability_on_connection(connection, capability_id)?
+                .map(|(_, snapshot)| snapshot),
+        )
     }
 
     pub fn get_combined_delegation_chain(
         &self,
+        capability_id: &str,
+    ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+        Self::get_combined_delegation_chain_on_connection(&*self.connection()?, capability_id)
+    }
+
+    pub(crate) fn get_combined_delegation_chain_on_connection(
+        connection: &Connection,
         capability_id: &str,
     ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
         const MAX_CHAIN_LENGTH: usize = 32;
@@ -756,7 +775,9 @@ impl SqliteReceiptStore {
                     "combined delegation chain for {capability_id} exceeds {MAX_CHAIN_LENGTH} capabilities"
                 )));
             }
-            let Some(snapshot) = self.get_combined_lineage(&current_capability_id)? else {
+            let Some(snapshot) =
+                Self::get_combined_lineage_on_connection(connection, &current_capability_id)?
+            else {
                 if chain.is_empty() {
                     return Ok(Vec::new());
                 }

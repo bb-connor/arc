@@ -1,0 +1,56 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
+extern crate self as chio_quarantine;
+pub mod approval;
+pub mod blast;
+pub mod correlation;
+pub mod executor;
+mod executor_proof;
+mod native_receipts;
+pub mod rules;
+pub mod scheduler;
+pub mod state_machine;
+
+pub use approval::{
+    opaque_admission_artifact, AdmissionArtifactDefect, ApprovalCoordinatorError,
+    ResponseApprovalCoordinator,
+};
+pub use blast::{CausalBlastRadiusResolver, FenceValidationOutcome};
+pub use correlation::{
+    CorrelationError, CorrelationOutcome, CorrelationPolicy, CorrelationStatus, TemporalCorrelator,
+};
+pub use executor::{
+    validate_response_dispatch_authorization, ActiveResponseRecordEvidence,
+    AppliedResponseEffectEvidence, DurableActiveResponseOutcome, ExecutorError, ResponseExecutor,
+};
+pub use rules::{GroupingKey, RuleError, RuleLimits, TemporalRule, TemporalStage};
+pub use scheduler::{
+    lineage_fence_lapsed_error, LineageFenceLapsed, ResponseScheduler, ScheduledResponseExecutor,
+    SchedulerError, SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
+    LINEAGE_FENCE_LAPSED_ERROR_CODE,
+};
+pub use state_machine::{
+    build_response_plan, decode_response_record, CanonicalFailure, EffectMutation,
+    EffectMutationRequest, EffectReceiptContext, FreezeBindingField, PlanDefect, RecordDefect,
+    ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
+};
+
+pub mod simulation;
+
+mod rejection_codes;
+
+#[cfg(any(test, feature = "fuzz"))]
+pub mod fuzz;

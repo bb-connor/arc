@@ -3,10 +3,21 @@ use super::*;
 
 #[path = "config_and_public/generic_listing.rs"]
 mod generic_listing;
+#[path = "config_and_public/public_authority_read.rs"]
+mod public_authority_read;
 
+use chio_security_types::clock::Clock;
 pub(crate) use generic_listing::{
     build_public_generic_listing_report, build_signed_generic_namespace,
     public_generic_registry_publisher,
+};
+#[cfg(test)]
+pub(crate) use public_authority_read::public_passport_credential_issuer;
+use public_authority_read::resolve_public_authority_signing_key_for_status;
+pub(crate) use public_authority_read::{
+    public_authority_status, public_authority_verification_status,
+    public_passport_credential_issuer_with_status, public_replicated_authority_verification_status,
+    resolve_public_oid4vp_verifier_trusted_public_keys, resolve_public_registry_signing_key,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -345,14 +356,13 @@ pub(crate) fn load_verifier_policy_registry(
     path: Option<&std::path::Path>,
     surface: &str,
 ) -> Result<Option<Arc<VerifierPolicyRegistry>>, CliError> {
+    let clock_now = unix_timestamp_now()?;
     let Some(path) = path else {
         return Ok(None);
     };
     let registry = VerifierPolicyRegistry::load(path)?;
     for document in registry.policies.values() {
-        if let Err(error) =
-            ensure_signed_passport_verifier_policy_active(document, unix_timestamp_now())
-        {
+        if let Err(error) = ensure_signed_passport_verifier_policy_active(document, clock_now) {
             warn!(
                 surface,
                 policy_id = %document.body.policy_id,
@@ -439,8 +449,16 @@ fn configured_passport_issuance_registry_path(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn configured_passport_credential_issuer(
     config: &TrustServiceConfig,
+) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
+    passport_credential_issuer_with(config, resolve_oid4vp_verifier_signing_key)
+}
+
+pub(crate) fn passport_credential_issuer_with(
+    config: &TrustServiceConfig,
+    signing_key: impl FnOnce(&TrustServiceConfig) -> Result<Keypair, CliError>,
 ) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -450,7 +468,7 @@ pub(crate) fn configured_passport_credential_issuer(
     let passport_status_distribution = default_passport_status_distribution(config);
     let portable_signing_public_key =
         if config.authority_seed_path.is_some() || config.authority_db_path.is_some() {
-            Some(resolve_oid4vp_verifier_signing_key(config)?.public_key())
+            Some(signing_key(config)?.public_key())
         } else {
             None
         };
@@ -483,6 +501,7 @@ fn configured_certification_discovery_path(config: &TrustServiceConfig) -> Resul
 pub(crate) fn configured_public_certification_metadata(
     config: &TrustServiceConfig,
 ) -> Result<CertificationPublicMetadata, CliError> {
+    let clock_now = unix_timestamp_now()?;
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
             "public certification metadata requires --advertise-url on the trust-control service"
@@ -495,7 +514,7 @@ pub(crate) fn configured_public_certification_metadata(
             "public certification metadata requires a non-empty advertise_url".to_string(),
         ));
     }
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     Ok(CertificationPublicMetadata {
         schema: "chio.certify.discovery-metadata.v1".to_string(),
         generated_at,
@@ -850,6 +869,7 @@ pub(crate) fn authority_status_for_config(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -859,7 +879,7 @@ pub(crate) fn authority_status_for_config(
     }
 }
 
-fn trusted_public_keys_from_status(
+pub(crate) fn trusted_public_keys_from_status(
     status: &TrustAuthorityStatus,
 ) -> Result<Vec<PublicKey>, CliError> {
     if !status.configured {
@@ -872,10 +892,14 @@ fn trusted_public_keys_from_status(
         .iter()
         .map(|value| PublicKey::from_hex(value))
         .collect::<Result<Vec<_>, _>>()?;
-    if let Some(current) = status.public_key.as_deref() {
-        let current = PublicKey::from_hex(current)?;
-        if !trusted.iter().any(|public_key| public_key == &current) {
-            trusted.push(current);
+    // A lifecycle projection's live list is authoritative. Its head may be a
+    // future successor that has not acquired verification authority yet.
+    if status.issuer_state.is_none() {
+        if let Some(current) = status.public_key.as_deref() {
+            let current = PublicKey::from_hex(current)?;
+            if !trusted.iter().any(|public_key| public_key == &current) {
+                trusted.push(current);
+            }
         }
     }
     if trusted.is_empty() {
@@ -886,14 +910,9 @@ fn trusted_public_keys_from_status(
     Ok(trusted)
 }
 
-pub(crate) fn resolve_oid4vp_verifier_trusted_public_keys(
-    config: &TrustServiceConfig,
-) -> Result<Vec<PublicKey>, CliError> {
-    trusted_public_keys_from_status(&authority_status_for_config(config)?)
-}
-
 pub(crate) fn build_oid4vp_verifier_metadata(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<Oid4vpVerifierMetadata, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -901,8 +920,28 @@ pub(crate) fn build_oid4vp_verifier_metadata(
                 .to_string(),
         )
     })?;
-    let status = authority_status_for_config(config)?;
-    let trusted_public_keys = trusted_public_keys_from_status(&status)?;
+    let status = public_authority_status(config, clock)?;
+    oid4vp_verifier_metadata_from_status(advertise_url, &status)
+}
+
+pub(crate) fn build_oid4vp_verifier_metadata_from_status(
+    config: &TrustServiceConfig,
+    status: &TrustAuthorityStatus,
+) -> Result<Oid4vpVerifierMetadata, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "OID4VP verifier metadata requires --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    oid4vp_verifier_metadata_from_status(advertise_url, status)
+}
+
+fn oid4vp_verifier_metadata_from_status(
+    advertise_url: &str,
+    status: &TrustAuthorityStatus,
+) -> Result<Oid4vpVerifierMetadata, CliError> {
+    let trusted_public_keys = trusted_public_keys_from_status(status)?;
     let metadata = Oid4vpVerifierMetadata {
         verifier_id: advertise_url.to_string(),
         client_id: advertise_url.to_string(),
@@ -928,6 +967,7 @@ pub(crate) fn build_oid4vp_verifier_metadata(
 
 pub(crate) fn build_oid4vp_verifier_jwks(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<PortableJwkSet, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -935,23 +975,28 @@ pub(crate) fn build_oid4vp_verifier_jwks(
                 .to_string(),
         )
     })?;
-    let trusted_public_keys = resolve_oid4vp_verifier_trusted_public_keys(config)?;
+    let trusted_public_keys = resolve_public_oid4vp_verifier_trusted_public_keys(config, clock)?;
     build_portable_jwks(advertise_url, &trusted_public_keys)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-pub(crate) fn now_unix_secs() -> Result<u64, CliError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| CliError::cli_other_error(format!("system clock error: {error}")))
-        .map(|duration| duration.as_secs())
+pub(crate) fn build_oid4vp_verifier_jwks_from_status(
+    config: &TrustServiceConfig,
+    status: &TrustAuthorityStatus,
+) -> Result<PortableJwkSet, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "OID4VP verifier jwks requires --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    build_portable_jwks(advertise_url, &trusted_public_keys_from_status(status)?)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-fn public_discovery_version(config: &TrustServiceConfig) -> Result<u64, CliError> {
-    Ok(authority_status_for_config(config)?
-        .generation
-        .unwrap_or(1)
-        .max(1))
+pub(crate) fn now_unix_secs() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn public_discovery_guardrails() -> PublicDiscoveryImportGuardrails {
@@ -960,9 +1005,26 @@ fn public_discovery_guardrails() -> PublicDiscoveryImportGuardrails {
 
 pub(crate) fn build_public_issuer_discovery(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicIssuerDiscovery, CliError> {
-    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
-    let metadata = configured_passport_credential_issuer(config)?;
+    build_public_issuer_discovery_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_issuer_discovery_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicIssuerDiscovery, CliError> {
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
+    };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let metadata = passport_credential_issuer_with(config, |_| Ok(signing_key.clone()))?;
     let now = now_unix_secs()?;
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     let credential_configuration_ids = metadata
@@ -980,7 +1042,7 @@ pub(crate) fn build_public_issuer_discovery(
         chio_credentials::SignedPublicIssuerDiscoveryInput {
             discovery_id: format!("issuer-discovery:{}", metadata.credential_issuer),
             issuer: metadata.credential_issuer.clone(),
-            version: public_discovery_version(config)?,
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             metadata_url: format!(
@@ -999,9 +1061,26 @@ pub(crate) fn build_public_issuer_discovery(
 
 pub(crate) fn build_public_verifier_discovery(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicVerifierDiscovery, CliError> {
-    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
-    let metadata = build_oid4vp_verifier_metadata(config)?;
+    build_public_verifier_discovery_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_verifier_discovery_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicVerifierDiscovery, CliError> {
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
+    };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let metadata = build_oid4vp_verifier_metadata_from_status(config, status)?;
     let now = now_unix_secs()?;
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     create_signed_public_verifier_discovery(
@@ -1009,7 +1088,7 @@ pub(crate) fn build_public_verifier_discovery(
         chio_credentials::SignedPublicVerifierDiscoveryInput {
             discovery_id: format!("verifier-discovery:{}", metadata.verifier_id),
             verifier: metadata.verifier_id.clone(),
-            version: public_discovery_version(config)?,
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             metadata_url: format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
@@ -1024,10 +1103,27 @@ pub(crate) fn build_public_verifier_discovery(
 
 pub(crate) fn build_public_discovery_transparency(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<SignedPublicDiscoveryTransparency, CliError> {
-    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
-    let issuer = build_public_issuer_discovery(config)?;
-    let verifier = build_public_verifier_discovery(config)?;
+    build_public_discovery_transparency_with_status(config, clock, None)
+}
+
+pub(crate) fn build_public_discovery_transparency_with_status(
+    config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
+    status: Option<&TrustAuthorityStatus>,
+) -> Result<SignedPublicDiscoveryTransparency, CliError> {
+    let loaded;
+    let status = match status {
+        Some(status) => status,
+        None => {
+            loaded = public_authority_status(config, clock)?;
+            &loaded
+        }
+    };
+    let signing_key = resolve_public_authority_signing_key_for_status(config, clock, status)?;
+    let issuer = build_public_issuer_discovery_with_status(config, clock, Some(status))?;
+    let verifier = build_public_verifier_discovery_with_status(config, clock, Some(status))?;
     let now = now_unix_secs()?;
     let publisher = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
@@ -1058,7 +1154,7 @@ pub(crate) fn build_public_discovery_transparency(
         chio_credentials::SignedPublicDiscoveryTransparencyInput {
             transparency_id: format!("public-discovery-transparency:{publisher}"),
             publisher: publisher.to_string(),
-            version: public_discovery_version(config)?,
+            version: status.generation.unwrap_or(1).max(1),
             published_at: now,
             expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
             entries,
@@ -1201,103 +1297,9 @@ pub(crate) fn resolve_oid4vp_verifier_signing_key(
     load_or_create_authority_keypair(path)
 }
 
-pub(crate) fn resolve_portable_issuer_public_keys(
-    config: &TrustServiceConfig,
-    issuer: &str,
-) -> Result<Vec<PublicKey>, CliError> {
-    if config.advertise_url.as_deref() == Some(issuer) {
-        return resolve_oid4vp_verifier_trusted_public_keys(config);
-    }
-    let jwks_url = format!("{issuer}{OID4VCI_JWKS_PATH}");
-    let response = ureq::get(&jwks_url).call().map_err(|error| match error {
-        ureq::Error::Status(status, response) => {
-            let body = response.into_string().unwrap_or_default();
-            CliError::cli_other_error(format!(
-                "failed to fetch portable issuer JWKS from `{jwks_url}` with status {status}: {body}"
-            ))
-        }
-        ureq::Error::Transport(transport) => CliError::cli_other_error(format!(
-            "failed to fetch portable issuer JWKS from `{jwks_url}`: {transport}"
-        )),
-    })?;
-    let jwks: chio_credentials::PortableJwkSet = serde_json::from_reader(response.into_reader())
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to decode portable issuer JWKS from `{jwks_url}`: {error}"
-            ))
-        })?;
-    jwks.keys.first().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "portable issuer JWKS at `{jwks_url}` did not publish any keys"
-        ))
-    })?;
-    let mut public_keys = Vec::with_capacity(jwks.keys.len());
-    for entry in &jwks.keys {
-        public_keys.push(
-            entry
-                .jwk
-                .to_public_key()
-                .map_err(|error| CliError::cli_other_error(error.to_string()))?,
-        );
-    }
-    if public_keys.is_empty() {
-        return Err(CliError::cli_other_error(format!(
-            "portable issuer JWKS at `{jwks_url}` did not publish any keys"
-        )));
-    }
-    Ok(public_keys)
-}
-
-pub(crate) fn resolve_oid4vp_passport_lifecycle(
-    config: &TrustServiceConfig,
-    passport_id: &str,
-    status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
-) -> Result<Option<PassportLifecycleResolution>, CliError> {
-    if let Some(path) = config.passport_statuses_file.as_deref() {
-        let registry = PassportStatusRegistry::load(path)?;
-        return Ok(Some(registry.resolve_at(passport_id, unix_timestamp_now())));
-    }
-    let Some(status_ref) = status_ref else {
-        return Ok(None);
-    };
-    let resolve_url = status_ref
-        .distribution
-        .resolve_urls
-        .first()
-        .cloned()
-        .ok_or_else(|| {
-            CliError::cli_other_error(
-                "OID4VP passport status validation requires at least one resolve URL".to_string(),
-            )
-        })?;
-    let url = format!(
-        "{}/{}",
-        resolve_url.trim_end_matches('/'),
-        utf8_percent_encode(passport_id, NON_ALPHANUMERIC)
-    );
-    let response = ureq::get(&url).call().map_err(|error| match error {
-        ureq::Error::Status(status, response) => {
-            let body = response.into_string().unwrap_or_default();
-            CliError::cli_other_error(format!(
-                "failed to resolve portable passport lifecycle from `{url}` with status {status}: {body}"
-            ))
-        }
-        ureq::Error::Transport(transport) => CliError::cli_other_error(format!(
-            "failed to resolve portable passport lifecycle from `{url}`: {transport}"
-        )),
-    })?;
-    let lifecycle: PassportLifecycleResolution = serde_json::from_reader(response.into_reader())
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to decode portable passport lifecycle from `{url}`: {error}"
-            ))
-        })?;
-    lifecycle
-        .validate()
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    Ok(Some(lifecycle))
-}
-
+#[path = "config_and_public/portable_issuer_fetch.rs"]
+mod portable_issuer_fetch;
+pub(crate) use portable_issuer_fetch::*;
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
@@ -1569,19 +1571,23 @@ pub(crate) fn build_scim_deprovision_receipt(
 #[cfg(test)]
 mod config_and_public_tests {
     use super::*;
-    use chio_credentials::verify_signed_public_issuer_discovery;
     use chio_test_support::prelude::*;
     use std::path::PathBuf;
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
+            receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -1601,6 +1607,7 @@ mod config_and_public_tests {
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
@@ -1686,6 +1693,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: false,
             trusted_public_keys: Vec::new(),
         })
@@ -1701,6 +1709,7 @@ mod config_and_public_tests {
             public_key: Some(current.clone()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.clone()],
         })
@@ -1714,6 +1723,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         })
@@ -1774,8 +1784,9 @@ mod config_and_public_tests {
         );
         assert_eq!(status.trusted_public_keys.len(), 1);
 
-        let metadata =
-            build_oid4vp_verifier_metadata(&config).test_expect("build OID4VP verifier metadata");
+        let clock = chio_test_support::clock::clock();
+        let metadata = build_oid4vp_verifier_metadata(&config, &clock)
+            .test_expect("build OID4VP verifier metadata");
         assert_eq!(metadata.verifier_id, "https://trust.example.com");
         assert_eq!(metadata.client_id, "https://trust.example.com");
         assert_eq!(
@@ -1789,32 +1800,48 @@ mod config_and_public_tests {
         assert_eq!(metadata.trusted_key_count, 1);
         assert!(metadata.authority_generation.is_none());
 
-        let jwks = build_oid4vp_verifier_jwks(&config).test_expect("build verifier JWKS");
+        let jwks = build_oid4vp_verifier_jwks(&config, &clock).test_expect("build verifier JWKS");
         assert_eq!(jwks.keys.len(), 1);
         assert_eq!(jwks.keys[0].alg, "EdDSA");
         assert_eq!(jwks.keys[0].use_, "sig");
 
-        let discovery_version =
-            public_discovery_version(&config).test_expect("derive public discovery version");
-        assert_eq!(discovery_version, 1);
+        let discovery = build_public_issuer_discovery(&config, &clock)
+            .test_expect("build issuer discovery with admitted seed");
+        assert_eq!(discovery.body.version, 1);
     }
 
     #[test]
-    fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-trust-control-authority-source", "sqlite");
-        let follower_path = unique_temp_path("chio-trust-control-authority-follower", "sqlite");
+    fn public_discovery_refuses_local_db_signer_after_replica_snapshot() {
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let source_path = directory.path().join("source.sqlite3");
+        let follower_path = directory.path().join("follower.sqlite3");
         let source =
             SqliteCapabilityAuthority::open(&source_path).test_expect("open source authority");
         let follower =
             SqliteCapabilityAuthority::open(&follower_path).test_expect("open follower authority");
         let follower_local_key = follower.local_keypair().test_expect("read follower seed");
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_expect("rotate source authority");
-        let snapshot = source.snapshot().test_expect("snapshot source authority");
+        let snapshot = source
+            .signed_snapshot()
+            .test_expect("snapshot source authority");
         assert!(follower
-            .apply_snapshot(&snapshot)
+            .apply_signed_snapshot(&snapshot)
             .test_expect("apply source snapshot"));
-        assert!(follower.current_keypair().is_err());
+        let current_custody = follower.current_keypair().test_unwrap_err();
+        assert!(matches!(
+            current_custody,
+            chio_kernel::AuthorityStoreError::Fence(reason)
+                if reason == format!(
+                    "local signing seed public key {} does not match replicated authority public key {}",
+                    follower_local_key.public_key().to_hex(),
+                    snapshot.snapshot.public_key_hex,
+                )
+        ));
 
         let mut config = base_config();
         config.advertise_url = Some("https://trust.example.com".to_string());
@@ -1824,11 +1851,18 @@ mod config_and_public_tests {
             resolve_oid4vp_verifier_signing_key(&config).test_expect("resolve follower signer");
         assert_eq!(signing_key.public_key(), follower_local_key.public_key());
 
-        let issuer = build_public_issuer_discovery(&config).test_expect("build issuer discovery");
-        assert_eq!(
-            issuer.body.signer_public_key,
-            follower_local_key.public_key()
+        let error = build_public_issuer_discovery(&config, &chio_test_support::clock::clock())
+            .test_expect_err("former local signer must not sign admitted replica discovery");
+        assert!(
+            matches!(error, CliError::Chio(_)),
+            "unexpected refusal: {error}"
         );
-        verify_signed_public_issuer_discovery(&issuer).test_expect("verify issuer discovery");
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "public discovery signer does not own the admitted live authority head".to_string()
+            )
+            .to_string()
+        );
     }
 }

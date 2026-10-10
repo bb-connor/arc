@@ -1,9 +1,10 @@
 # Chio Binary Distribution
 
 This page defines the release distribution contract for future tagged releases.
-The current repository state is pre-release: no GitHub Release binaries,
-Homebrew formula, or registry-published container image are available yet. Build
-from source unless release truth evidence for a tagged version is present.
+Publication and hosted acceptance must be checked for the exact intended tag;
+this page does not establish them. Authenticate signed artifacts using the
+canonical `bb-connor/arc` policy in [VERIFY.md](VERIFY.md) before execution.
+Historical release publication is separate from acceptance of this pipeline.
 
 ## Supported Platforms
 
@@ -21,7 +22,7 @@ release workflow publishes them.
 ## Install via Homebrew After A Tagged Release
 
 ```bash
-curl -fsSL -o /tmp/chio.rb https://github.com/backbay-labs/chio/releases/latest/download/chio.rb
+curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/arc/releases/latest/download/chio.rb
 brew install --formula /tmp/chio.rb
 chio --version
 ```
@@ -35,13 +36,13 @@ details.
 
 ```bash
 # Pull the latest published image
-docker pull ghcr.io/backbay-labs/chio-sidecar:latest
+docker pull ghcr.io/bb-connor/chio-sidecar:latest
 
 # Pin to a specific version
-docker pull ghcr.io/backbay-labs/chio-sidecar:0.1.0
+docker pull ghcr.io/bb-connor/chio-sidecar:0.1.0
 
 # Run the published image
-docker run --rm ghcr.io/backbay-labs/chio-sidecar:latest --help
+docker run --rm ghcr.io/bb-connor/chio-sidecar:latest --help
 ```
 
 The published image must satisfy this contract:
@@ -53,10 +54,13 @@ The published image must satisfy this contract:
 - uses `tini` as PID 1 for correct signal handling;
 - stores sidecar state under `/var/lib/chio` (mount a volume to persist it).
 
-## Install via `curl | sh` After A Tagged Release
+## Install a verified native archive after an accepted tagged release
 
 ```bash
-VERSION=0.1.0
+set -euo pipefail
+VERSION=0.1.1-rc.1
+TAG="v${VERSION}"
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
 TARGET=$(uname -m | sed 's/x86_64/x86_64/; s/arm64/aarch64/; s/aarch64/aarch64/')
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$OS" in
@@ -66,31 +70,45 @@ case "$OS" in
 esac
 
 ARCHIVE="chio-${VERSION}-${TRIPLE}.tar.gz"
-BASE="https://github.com/backbay-labs/chio/releases/download/v${VERSION}"
+BASE="https://github.com/bb-connor/arc/releases/download/${TAG}"
 
 curl -fsSL "${BASE}/${ARCHIVE}"        -o "${ARCHIVE}"
 curl -fsSL "${BASE}/${ARCHIVE}.sha256" -o "${ARCHIVE}.sha256"
+curl -fsSL "${BASE}/${ARCHIVE}.sig" -o "${ARCHIVE}.sig"
+curl -fsSL "${BASE}/${ARCHIVE}.pem" -o "${ARCHIVE}.pem"
+# Run from a trusted reviewed source checkout with cosign v2.4.1 installed.
+python3 scripts/verify-release-identity.py verify \
+  --channel binaries --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARCHIVE"
 shasum -a 256 -c "${ARCHIVE}.sha256"
 tar xf "${ARCHIVE}"
 sudo install -m 0755 "chio-${VERSION}-${TRIPLE}/chio" /usr/local/bin/chio
 chio --version
 ```
 
+The expected source SHA must come from independent accepted release qualification
+or a reviewed, trusted checkout, as described in [VERIFY.md](VERIFY.md). The
+illustrative tag above does not establish publication. Missing signatures
+must stop installation. Homebrew formula and OCI verification have separate
+contracts; see [homebrew.md](homebrew.md) and
+[PUBLISHING.md](PUBLISHING.md#sidecar-image-signing).
+
 ## Signature and Checksum Verification
 
 Every tagged release must publish:
 
+- Per-archive `.sig` and `.pem` files for exact-tag signature verification.
 - Per-archive `.sha256` files (one line each: `<hash>  <archive>`).
 - A combined `SHA256SUMS` file covering every archive in the release.
 
-Verify a downloaded archive with:
+Authenticate the archive with [VERIFY.md](VERIFY.md) first. The following
+checksum checks detect byte mismatches but provide no signer authentication:
 
 ```bash
 # Single archive
 shasum -a 256 -c chio-0.1.0-aarch64-apple-darwin.tar.gz.sha256
 
 # All archives at once
-curl -fsSL https://github.com/backbay-labs/chio/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL https://github.com/bb-connor/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
 ```
 
@@ -99,7 +117,7 @@ Container image provenance must be attested by the build workflow
 workflow logs:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/backbay-labs/chio-sidecar:0.1.0
+docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.1.0
 ```
 
 ## Troubleshooting
@@ -120,5 +138,5 @@ docker buildx imagetools inspect ghcr.io/backbay-labs/chio-sidecar:0.1.0
 | Asset                                          | Built by                                              |
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
-| `ghcr.io/backbay-labs/chio-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
+| `ghcr.io/bb-connor/chio-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
 | Homebrew formula template                      | `packaging/homebrew/chio.rb.tmpl` rendered into release asset `chio.rb` |

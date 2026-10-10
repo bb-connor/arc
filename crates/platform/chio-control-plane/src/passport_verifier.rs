@@ -22,6 +22,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::CliError;
 
+#[cfg(test)]
+#[path = "passport_verifier/tests/signed_readback.rs"]
+mod signed_readback_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/bounded_persistence.rs"]
+mod bounded_persistence_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/fixtures.rs"]
+pub(crate) mod test_fixtures;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/revocation_capacity.rs"]
+pub(crate) mod revocation_capacity_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/older_registry_files.rs"]
+mod older_registry_files_tests;
+
+#[cfg(test)]
+#[path = "passport_verifier/tests/registry_writer_lock.rs"]
+mod registry_writer_lock_tests;
+
+#[cfg(all(test, unix))]
+#[path = "passport_verifier/tests/adjacent_registry_transactions.rs"]
+mod adjacent_registry_transactions;
+
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
@@ -67,17 +95,19 @@ impl Default for VerifierPolicyRegistry {
 
 impl VerifierPolicyRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != VERIFIER_POLICY_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported verifier policy registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = VERIFIER_POLICY_REGISTRY_VERSION.to_string();
-                for document in registry.policies.values() {
+                for (key, document) in &registry.policies {
+                    if key != &document.body.policy_id {
+                        return Err(CliError::RecordBinding("policy_id"));
+                    }
                     verify_signed_passport_verifier_policy(document)
                         .map_err(|error| CliError::policy_error(error.to_string()))?;
                 }
@@ -88,12 +118,31 @@ impl VerifierPolicyRegistry {
         }
     }
 
+    /// Updates the latest verified registry under its stable writer lock,
+    /// returning the outcome only after durable bounded persistence.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES,
+            change,
+        )
+    }
+
+    #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
     }
 
     pub fn get(&self, policy_id: &str) -> Option<&SignedPassportVerifierPolicy> {
@@ -127,6 +176,87 @@ impl VerifierPolicyRegistry {
 
     pub fn remove(&mut self, policy_id: &str) -> bool {
         self.policies.remove(policy_id).is_some()
+    }
+}
+
+/// A registry transaction failure, preserving the caller's typed refusal.
+#[derive(Debug)]
+pub enum RegistryTransactionError<E> {
+    /// The lock, verified load, or durable persistence failed.
+    Registry(RegistryUpdateError),
+    /// The operation refused to change the verified current registry.
+    Refused(E),
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for RegistryTransactionError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Registry(error) => std::fmt::Display::fmt(error, f),
+            Self::Refused(error) => std::fmt::Display::fmt(error, f),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for RegistryTransactionError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Registry(error) => Some(error),
+            Self::Refused(error) => Some(error),
+        }
+    }
+}
+
+impl From<RegistryTransactionError<CliError>> for CliError {
+    fn from(error: RegistryTransactionError<CliError>) -> Self {
+        match error {
+            RegistryTransactionError::Registry(error) => error.into(),
+            RegistryTransactionError::Refused(error) => error,
+        }
+    }
+}
+
+/// Why a registry update wrote nothing, or did not finish writing.
+#[derive(Debug)]
+pub enum RegistryUpdateError {
+    /// Another writer holds the registry's lock. Nothing was read or written;
+    /// the update may be retried.
+    Busy,
+    /// This platform has no writer lock, so registries are never written.
+    Unsupported,
+    /// The registry could not be locked or loaded. Nothing was written.
+    Load(CliError),
+    /// The change was refused. Nothing was written.
+    Refused(CliError),
+    /// The changed registry could not be persisted.
+    Persist(CliError),
+}
+
+impl std::fmt::Display for RegistryUpdateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Busy => f.write_str(
+                "the registry file is being written by another writer; nothing was changed, retry",
+            ),
+            Self::Unsupported => f.write_str(
+                "registry files can be written only where an exclusive writer lock is available",
+            ),
+            Self::Load(error) | Self::Refused(error) | Self::Persist(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for RegistryUpdateError {}
+
+impl From<RegistryUpdateError> for CliError {
+    fn from(error: RegistryUpdateError) -> Self {
+        match error {
+            RegistryUpdateError::Busy | RegistryUpdateError::Unsupported => {
+                CliError::cli_other_error(error.to_string())
+            }
+            RegistryUpdateError::Load(error)
+            | RegistryUpdateError::Refused(error)
+            | RegistryUpdateError::Persist(error) => error,
+        }
     }
 }
 
@@ -219,22 +349,24 @@ impl Default for PassportIssuanceOfferRegistry {
 
 impl PassportStatusRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != PASSPORT_STATUS_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport status registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = PASSPORT_STATUS_REGISTRY_VERSION.to_string();
-                for record in registry.passports.values_mut() {
-                    if record.updated_at == 0 {
-                        record.updated_at = record.revoked_at.unwrap_or(record.published_at);
+                for (key, record) in &registry.passports {
+                    if key != &record.passport_id {
+                        return Err(CliError::RecordBinding("passport_id"));
                     }
-                }
-                for record in registry.passports.values() {
+                    if record.updated_at == 0 {
+                        return Err(CliError::policy_error(
+                            "passport updated_at must be present and nonzero",
+                        ));
+                    }
                     verify_passport_lifecycle_record(record)?;
                 }
                 Ok(registry)
@@ -244,12 +376,28 @@ impl PassportStatusRegistry {
         }
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+    /// Loads the registry at `path` under its writer lock, applies `change`,
+    /// and persists the result, keeping room for every record to be revoked,
+    /// before the lock is released. This is the registry's only writer.
+    ///
+    /// `change` receives the registry freshly loaded under the lock and must
+    /// change it in place. Replacing it with a different or earlier value
+    /// would persist that value and defeat the single-writer guarantee, so
+    /// callers are trusted to only mutate the loaded registry, as the
+    /// trust-control handlers and CLI commands do.
+    pub fn update<R>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, CliError>,
+    ) -> Result<R, RegistryUpdateError> {
+        crate::signed_input::update_registry(path, Self::load, change)
+    }
+
+    /// Persists this copy under the writer lock without loading the file
+    /// first; test fixtures only.
+    #[cfg(test)]
+    pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
+        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        crate::signed_input::write_reserving_registry(&lock, self)
     }
 
     pub fn get(&self, passport_id: &str) -> Option<&PassportLifecycleRecord> {
@@ -269,17 +417,6 @@ impl PassportStatusRegistry {
             return Ok(existing.clone());
         }
 
-        for existing in self.passports.values_mut() {
-            if existing.subject == verification.subject
-                && existing.issuers == verification.issuers
-                && existing.status == PassportLifecycleState::Active
-            {
-                existing.status = PassportLifecycleState::Superseded;
-                existing.superseded_by = Some(verification.passport_id.clone());
-                existing.updated_at = published_at;
-            }
-        }
-
         let record = PassportLifecycleRecord {
             passport_id: verification.passport_id.clone(),
             subject: verification.subject.clone(),
@@ -294,6 +431,33 @@ impl PassportStatusRegistry {
             distribution,
             valid_until: verification.valid_until.clone(),
         };
+        // Load refuses an invalid record, so neither the new record nor a
+        // record it supersedes is changed unless load would accept the result.
+        verify_passport_lifecycle_record(&record)?;
+        let mut superseded = Vec::new();
+        for existing in self.passports.values() {
+            if existing.subject == verification.subject
+                && existing.issuers == verification.issuers
+                && existing.status == PassportLifecycleState::Active
+            {
+                if published_at < existing.published_at {
+                    return Err(CliError::policy_error(format!(
+                        "passport `{}` published at {published_at} cannot supersede passport `{}`, published later at {}",
+                        verification.passport_id, existing.passport_id, existing.published_at
+                    )));
+                }
+                let mut replaced = existing.clone();
+                replaced.status = PassportLifecycleState::Superseded;
+                replaced.superseded_by = Some(verification.passport_id.clone());
+                replaced.updated_at = published_at;
+                verify_passport_lifecycle_record(&replaced)?;
+                superseded.push(replaced);
+            }
+        }
+        for replaced in superseded {
+            self.passports
+                .insert(replaced.passport_id.clone(), replaced);
+        }
         self.passports
             .insert(verification.passport_id, record.clone());
         Ok(record)
@@ -326,8 +490,12 @@ impl PassportStatusRegistry {
             }))
     }
 
-    pub fn resolve(&self, passport_id: &str) -> PassportLifecycleResolution {
-        self.resolve_at(passport_id, unix_timestamp_now())
+    pub fn resolve(
+        &self,
+        passport_id: &str,
+    ) -> Result<PassportLifecycleResolution, crate::CliError> {
+        let clock_now = unix_timestamp_now()?;
+        Ok(self.resolve_at(passport_id, clock_now))
     }
 
     pub fn resolve_at(&self, passport_id: &str, at: u64) -> PassportLifecycleResolution {
@@ -361,8 +529,27 @@ impl PassportStatusRegistry {
                 "passport `{passport_id}` was not found in the lifecycle registry"
             )));
         };
+        // The reason bound is the one the save reserve accounts for; a blank
+        // reason or a time before publication would make load refuse the file.
+        if let Some(reason) = reason {
+            crate::signed_input::check_revocation_text("revocation reason", reason)?;
+            if reason.trim().is_empty() {
+                return Err(CliError::policy_error(
+                    "revocation reason must not be blank when present",
+                ));
+            }
+        }
+        let revoked_at = match revoked_at {
+            Some(at) => at,
+            None => unix_timestamp_now()?,
+        };
+        if revoked_at < entry.published_at {
+            return Err(CliError::policy_error(format!(
+                "passport `{passport_id}` cannot be revoked at {revoked_at}, before its publication at {}",
+                entry.published_at
+            )));
+        }
         entry.status = PassportLifecycleState::Revoked;
-        let revoked_at = revoked_at.unwrap_or_else(unix_timestamp_now);
         entry.revoked_at = Some(revoked_at);
         entry.updated_at = revoked_at;
         entry.revoked_reason = reason.map(str::to_string);
@@ -422,19 +609,33 @@ impl PassportStatusRegistry {
     }
 }
 
+impl crate::signed_input::RevocationReserve for PassportStatusRegistry {
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let mut reserved = 0usize;
+        for record in self.passports.values() {
+            let largest = largest_revoked_lifecycle_record(record)?;
+            reserved = reserved
+                .saturating_add(crate::signed_input::revocation_headroom(record, &largest)?);
+        }
+        Ok(reserved)
+    }
+}
+
 impl PassportIssuanceOfferRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != PASSPORT_ISSUANCE_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport issuance registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = PASSPORT_ISSUANCE_REGISTRY_VERSION.to_string();
-                for record in registry.offers.values() {
+                for (key, record) in &registry.offers {
+                    if key != &record.offer_id {
+                        return Err(CliError::RecordBinding("offer_id"));
+                    }
                     verify_passport_issuance_offer_record(record)?;
                 }
                 Ok(registry)
@@ -444,12 +645,78 @@ impl PassportIssuanceOfferRegistry {
         }
     }
 
+    /// Updates a live redemption under the registry's stable writer lock.
+    /// No outcome is returned before the bounded file replacement is durable.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES,
+            change,
+        )
+    }
+
+    /// Updates offer issuance while preserving its existing redemption reserve.
+    ///
+    /// `change` receives freshly verified state under the lock and must change
+    /// it in place, preserving signatures and domain invariants. It is a
+    /// trusted Rust caller: replacing state with an earlier copy defeats writer
+    /// exclusion. Persistence does not revalidate arbitrary mutations.
+    pub fn update_for_issuance<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            Self::load,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES
+                - crate::signed_input::ISSUANCE_RESERVE_BYTES,
+            change,
+        )
+    }
+
+    #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+        crate::signed_input::write_bounded_json(path, self)
+    }
+
+    /// Persists after an issuance, refusing to fill the reserve that live
+    /// redemptions need.
+    #[cfg(test)]
+    pub fn save_for_issuance(&self, path: &Path) -> Result<(), CliError> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        crate::signed_input::write_bounded_json_with_limit(
+            path,
+            self,
+            crate::signed_input::MAX_SIGNED_FILE_BYTES
+                - crate::signed_input::ISSUANCE_RESERVE_BYTES,
+        )
+    }
+
+    /// Removes offers that can never be redeemed again: fully redeemed,
+    /// already expired, or past their own expiry at `now`.
+    pub fn prune_dead(&mut self, now: u64) -> usize {
+        let before = self.offers.len();
+        self.offers.retain(|_, record| {
+            !matches!(
+                record.state,
+                PassportIssuanceOfferState::CredentialIssued | PassportIssuanceOfferState::Expired
+            ) && !passport_issuance_offer_expired(record, now)
+        });
+        before - self.offers.len()
     }
 
     pub fn issue_offer(
@@ -465,6 +732,7 @@ impl PassportIssuanceOfferRegistry {
                 "passport issuance offers require ttl_secs greater than zero".to_string(),
             ));
         }
+        self.prune_dead(now);
         let credential_configuration_id = credential_configuration_id
             .unwrap_or(CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID);
         metadata
@@ -575,6 +843,55 @@ impl PassportIssuanceOfferRegistry {
         })
     }
 
+    /// Check current wallet redemption authority without refreshing or consuming it.
+    pub(crate) fn validate_credential_entitlement(
+        &self,
+        configured_credential_issuer: &str,
+        access_token: &str,
+        now: u64,
+    ) -> Result<&PassportIssuanceOfferRecord, CliError> {
+        let record = self
+            .offers
+            .values()
+            .find(|record| record.access_token.as_deref() == Some(access_token))
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "access token is not present in the issuance registry".to_string(),
+                )
+            })?;
+        match record.state {
+            PassportIssuanceOfferState::TokenIssued => {}
+            PassportIssuanceOfferState::Offered => {
+                return Err(CliError::cli_other_error(
+                    "access token has not been issued for this offer".to_string(),
+                ));
+            }
+            PassportIssuanceOfferState::CredentialIssued => {
+                return Err(CliError::cli_other_error(
+                    "credential has already been issued for this access token".to_string(),
+                ));
+            }
+            PassportIssuanceOfferState::Expired => {
+                return Err(CliError::cli_other_error(
+                    "access token entitlement has expired".to_string(),
+                ));
+            }
+        }
+        if passport_issuance_offer_expired(record, now) {
+            return Err(CliError::cli_other_error(
+                "access token entitlement has expired".to_string(),
+            ));
+        }
+        if normalize_credential_issuer(&record.offer.credential_issuer)?
+            != normalize_credential_issuer(configured_credential_issuer)?
+        {
+            return Err(CliError::policy_error(
+                "offer credential_issuer does not match the configured issuer metadata".to_string(),
+            ));
+        }
+        Ok(record)
+    }
+
     pub fn redeem_credential(
         &mut self,
         metadata: &Oid4vciCredentialIssuerMetadata,
@@ -586,47 +903,16 @@ impl PassportIssuanceOfferRegistry {
     ) -> Result<Oid4vciCredentialResponse, CliError> {
         request.validate()?;
         metadata.validate()?;
-        let Some(offer_id) = self
-            .offers
-            .iter()
-            .find(|(_, record)| record.access_token.as_deref() == Some(access_token))
-            .map(|(offer_id, _)| offer_id.clone())
-        else {
-            return Err(CliError::cli_other_error(
-                "access token is not present in the issuance registry".to_string(),
-            ));
-        };
+        let offer_id = self
+            .validate_credential_entitlement(&metadata.credential_issuer, access_token, now)?
+            .offer_id
+            .clone();
         let Some(record) = self.offers.get_mut(&offer_id) else {
             return Err(CliError::cli_other_error(
                 "access token resolved to a missing issuance offer".to_string(),
             ));
         };
         refresh_passport_issuance_offer_state(record, now);
-        if normalize_credential_issuer(&record.offer.credential_issuer)?
-            != normalize_credential_issuer(&metadata.credential_issuer)?
-        {
-            return Err(CliError::policy_error(
-                "offer credential_issuer does not match the configured issuer metadata".to_string(),
-            ));
-        }
-        match record.state {
-            PassportIssuanceOfferState::TokenIssued => {}
-            PassportIssuanceOfferState::Offered => {
-                return Err(CliError::cli_other_error(
-                    "access token has not been issued for this offer".to_string(),
-                ))
-            }
-            PassportIssuanceOfferState::CredentialIssued => {
-                return Err(CliError::cli_other_error(
-                    "credential has already been issued for this access token".to_string(),
-                ))
-            }
-            PassportIssuanceOfferState::Expired => {
-                return Err(CliError::cli_other_error(
-                    "issuance offer has expired".to_string(),
-                ))
-            }
-        }
 
         let credential_configuration_id = request
             .validate_against_metadata(metadata)
@@ -863,7 +1149,13 @@ impl PassportVerifierChallengeStore {
                 "challenge `{challenge_id}` expired before it could be fetched"
             )));
         }
-        let challenge: PassportPresentationChallenge = serde_json::from_str(&challenge_json)?;
+        let challenge: PassportPresentationChallenge =
+            crate::signed_input::decode(challenge_json.as_bytes())?;
+        if challenge_identifier(&challenge) != challenge_id
+            || unix_from_rfc3339(&challenge.expires_at)? != expires_at
+        {
+            return Err(CliError::RecordBinding("challenge_id/expires_at"));
+        }
         verify_passport_presentation_challenge(&challenge, now)
             .map_err(|error| CliError::policy_error(error.to_string()))?;
         transaction.commit()?;
@@ -1098,7 +1390,10 @@ impl Oid4vpVerifierTransactionStore {
                 "OID4VP request `{request_id}` expired before it could be fetched"
             )));
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
+        let request: Oid4vpRequestObject = crate::signed_input::decode(request_json.as_bytes())?;
+        if request.jti != request_id || request.exp != expires_at {
+            return Err(CliError::RecordBinding("request_id/expires_at"));
+        }
         transaction.commit()?;
         Ok((request, request_jwt))
     }
@@ -1155,11 +1450,9 @@ impl Oid4vpVerifierTransactionStore {
             )?;
             status = WalletExchangeTransactionStatus::Expired;
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
-        if request.jti != request_id {
-            return Err(CliError::cli_other_error(format!(
-                "stored OID4VP request payload did not match request_id `{request_id}`"
-            )));
+        let request: Oid4vpRequestObject = crate::signed_input::decode(request_json.as_bytes())?;
+        if request.jti != request_id || request.iat != issued_at || request.exp != expires_at {
+            return Err(CliError::RecordBinding("request_id/issued_at/expires_at"));
         }
         let transaction_state = build_wallet_exchange_transaction_state(
             &request.jti,
@@ -1406,17 +1699,33 @@ fn unix_from_rfc3339(value: &str) -> Result<u64, CliError> {
         .map_err(|_| CliError::cli_other_error(format!("invalid RFC3339 timestamp: {value}")))
 }
 
-fn unix_timestamp_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn verify_passport_lifecycle_record(record: &PassportLifecycleRecord) -> Result<(), CliError> {
     record
         .validate()
         .map_err(|error| CliError::policy_error(error.to_string()))
+}
+
+/// `record` with every field a revocation writes set to the larger, by JSON
+/// encoding, of its current value and the largest value a revocation may
+/// write. Revoking `record` any number of times leaves it no larger than
+/// this form, and never makes this form larger.
+fn largest_revoked_lifecycle_record(
+    record: &PassportLifecycleRecord,
+) -> Result<PassportLifecycleRecord, CliError> {
+    use crate::signed_input::{encoded_len, largest_revocation_reason};
+    let mut largest = record.clone();
+    if encoded_len(&record.status)? < encoded_len(&PassportLifecycleState::Revoked)? {
+        largest.status = PassportLifecycleState::Revoked;
+    }
+    largest.updated_at = u64::MAX;
+    largest.revoked_at = Some(u64::MAX);
+    largest.revoked_reason = Some(largest_revocation_reason(record.revoked_reason.as_deref())?);
+    Ok(largest)
 }
 
 fn passport_lifecycle_resolution_from_record(
@@ -1506,13 +1815,16 @@ fn refresh_passport_issuance_offer_state(record: &mut PassportIssuanceOfferRecor
     if record.state == PassportIssuanceOfferState::CredentialIssued {
         return;
     }
-    if now > record.expires_at
+    if passport_issuance_offer_expired(record, now) {
+        record.state = PassportIssuanceOfferState::Expired;
+    }
+}
+
+fn passport_issuance_offer_expired(record: &PassportIssuanceOfferRecord, now: u64) -> bool {
+    now > record.expires_at
         || record
             .access_token_expires_at
             .is_some_and(|expires_at| now > expires_at)
-    {
-        record.state = PassportIssuanceOfferState::Expired;
-    }
 }
 
 fn normalize_credential_issuer(value: &str) -> Result<String, CliError> {
@@ -1569,7 +1881,8 @@ mod revocation_lag_tests {
         let mut before = String::new();
         chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut before);
 
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let revoked_at = now.saturating_sub(45);
         let _ = registry
             .revoke(&passport_id, Some("compromise"), Some(revoked_at))

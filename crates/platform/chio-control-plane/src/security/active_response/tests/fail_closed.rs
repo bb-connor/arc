@@ -1,0 +1,165 @@
+use super::*;
+
+#[test]
+fn response_dispatch_refusal_dry_run_executor_preserves_source_before_dispatch_or_effects() {
+    use std::error::Error;
+    let harness = Harness::new();
+    let mut response_plan = harness.automatic_request().response_plan;
+    response_plan.execution = chio_security_types::ResponseExecutionBinding::new(
+        chio_security_types::ResponseExecutionMode::DryRun,
+    );
+    let body = require_success(
+        serde_json::to_value(response_plan.authorization_body()),
+        "dry-run authorization body",
+    );
+    response_plan.plan_hash = Digest32::new(
+        *require_success(
+            chio_core::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(
+                &body,
+            ),
+            "dry-run authorization hash",
+        )
+        .as_bytes(),
+    );
+    let request = raw_request(
+        response_plan,
+        harness.identity.clone(),
+        ActiveResponseExecutionApproval::Automatic,
+    );
+
+    let error = require_error(harness.executor.execute_source(&request));
+    let rejection = error
+        .source()
+        .and_then(|source| source.downcast_ref::<chio_security_types::DispatchRejection>())
+        .unwrap_or_else(|| panic!("dispatch rejection source lost: {error:?}"));
+    assert_eq!(
+        rejection,
+        &chio_security_types::DispatchRejection::ExecutionMode {
+            observed: chio_security_types::ResponseExecutionMode::DryRun,
+        },
+    );
+    assert_eq!(
+        rejection.code(),
+        "urn:chio:error:kernel:response-dispatch-execution-mode",
+    );
+    assert!(matches!(
+        require_success(
+            harness.store.load_dispatch(&ResponseDispatchKey {
+                tenant_id: request.response_plan.tenant_id.clone(),
+                dispatch_id: request.dispatch_id.clone(),
+            }),
+            "dispatch after refused dry-run request",
+        ),
+        ResponseDispatchLoadOutcome::Missing
+    ));
+    assert_eq!(
+        harness
+            .effects
+            .state
+            .lock()
+            .unwrap_or_else(|error| panic!("effect state: {error}"))
+            .executions,
+        0
+    );
+}
+
+#[test]
+fn expired_request_and_approval_mode_mismatch_fail_before_commit() {
+    let harness = Harness::new();
+    let expired_plan = plan(
+        harness.now_unix_ms,
+        &harness.identity,
+        ResponseApprovalRequirement::Automatic,
+        true,
+    );
+    let expired = raw_request(
+        expired_plan,
+        harness.identity.clone(),
+        ActiveResponseExecutionApproval::Automatic,
+    );
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&expired)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+
+    let mut wrong_automatic = harness.automatic_request();
+    wrong_automatic.approval = ActiveResponseExecutionApproval::Governed {
+        admission_operation_id: "admission-operation-42".to_string(),
+        admission_operation_version: 3,
+        approval_set_hash: digest_hex(&digest(44)),
+    };
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&wrong_automatic)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+
+    let mut wrong_governed = harness.governed_request();
+    wrong_governed.approval = ActiveResponseExecutionApproval::Automatic;
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&wrong_governed)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+}
+
+#[test]
+fn malformed_hash_record_and_authority_mismatch_fail_closed() {
+    let harness = Harness::new();
+    let mut zero_dispatch = harness.automatic_request();
+    zero_dispatch.dispatch_id = record_id(&format!("active_response_dispatch_{}", "0".repeat(64)));
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&zero_dispatch)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+
+    let mut malformed_hash = harness.automatic_request();
+    malformed_hash.governed_intent_hash = "ABCDEF".to_string();
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&malformed_hash)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+
+    let mut malformed_record = harness.governed_request();
+    malformed_record.approval = ActiveResponseExecutionApproval::Governed {
+        admission_operation_id: " invalid-operation".to_string(),
+        admission_operation_version: 3,
+        approval_set_hash: digest_hex(&digest(44)),
+    };
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&malformed_record)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+
+    let mut wrong_authority = harness.automatic_request();
+    wrong_authority.executor_authority = identity(8);
+    assert!(matches!(
+        require_error(harness.executor.execute_source(&wrong_authority)),
+        ActiveResponseExecutorError::RejectedBeforeCommit(_)
+    ));
+}
+
+#[test]
+fn ambiguous_effect_port_error_reports_unknown_and_remains_retryable() {
+    let harness = Harness::new();
+    let request = harness.automatic_request();
+    harness.effects.set_mode(EffectMode::Unavailable);
+
+    let error = require_error(harness.executor.execute_source(&request));
+    assert!(matches!(
+        error,
+        ActiveResponseExecutorError::OutcomeUnknown(_)
+    ));
+    harness.effects.set_mode(EffectMode::Normal);
+    let evidence = require_success(
+        harness.executor.execute_source(&request),
+        "retry ambiguous effect outcome",
+    );
+    assert!(evidence.recovered());
+}
+
+#[test]
+fn rejects_oversized_execution_lease() {
+    assert!(matches!(
+        validate_lease_duration(MAX_ACTIVE_RESPONSE_LEASE_DURATION_MS + 1),
+        Err(DurableActiveResponseExecutorConfigError::LeaseDurationTooLong { .. })
+    ));
+}

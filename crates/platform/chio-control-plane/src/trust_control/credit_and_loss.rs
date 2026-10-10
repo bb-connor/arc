@@ -3,7 +3,6 @@ use super::*;
 
 pub(crate) fn build_credit_provider_risk_package_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -11,6 +10,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     query: &CreditProviderRiskPackageQuery,
     read_context: chio_kernel::ReceiptReadContext,
 ) -> Result<CreditProviderRiskPackage, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     if let Err(message) = normalized.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -49,7 +49,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let scorecard_report = build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         &exposure_query,
@@ -60,7 +59,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let facility_report = build_credit_facility_report_from_store_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -70,7 +68,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     )?;
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&exposure_query),
@@ -90,7 +87,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
         .map(|row| row.timestamp)
         .max()
         .is_none_or(|timestamp| {
-            unix_timestamp_now().saturating_sub(timestamp)
+            clock_now.saturating_sub(timestamp)
                 > UnderwritingDecisionPolicy::default().maximum_receipt_age_seconds
         });
 
@@ -99,7 +96,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
 
     Ok(CreditProviderRiskPackage {
         schema: CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         subject_key,
         filters: normalized.clone(),
         support_boundary: CreditProviderRiskPackageSupportBoundary::default(),
@@ -152,7 +149,6 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
 
 pub(crate) fn build_credit_scorecard_report(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
@@ -160,7 +156,6 @@ pub(crate) fn build_credit_scorecard_report(
 ) -> Result<CreditScorecardReport, TrustHttpError> {
     build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -169,15 +164,19 @@ pub(crate) fn build_credit_scorecard_report(
     )
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Exposure is converted only for the statistical anomaly detector; monetary authority uses integer units."
+)]
 pub(crate) fn build_credit_scorecard_report_with_context(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditScorecardReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -201,9 +200,9 @@ pub(crate) fn build_credit_scorecard_report_with_context(
         ));
     }
 
-    let mut inspection = issuance::inspect_local_reputation_with_read_context(
+    let mut inspection = issuance::inspect_local_reputation_with_store(
         &subject_key,
-        Some(receipt_db_path),
+        receipt_store,
         budget_db_path,
         normalized_query.since,
         normalized_query.until,
@@ -215,11 +214,11 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
     inspection.imported_trust = Some(
         reputation::build_imported_trust_report(
-            receipt_db_path,
+            receipt_store,
             &inspection.subject_key,
             inspection.since,
             inspection.until,
-            unix_timestamp_now(),
+            clock_now,
             &inspection.scoring,
         )
         .map_err(|error| TrustHttpError::internal(error.to_string()))?,
@@ -254,7 +253,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
     Ok(CreditScorecardReport {
         schema: CREDIT_SCORECARD_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: normalized_query,
         support_boundary: CreditScorecardSupportBoundary::default(),
         summary: CreditScorecardSummary {
@@ -267,7 +266,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
             confidence,
             band,
             overall_score: round_credit_score_value(overall_score),
-            anomaly_count: anomalies.len() as u64,
+            anomaly_count: crate::integer::count(anomalies.len()),
             probationary: probation.probationary,
         },
         reputation: CreditScorecardReputationContext {
@@ -290,7 +289,6 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
 pub(crate) fn build_credit_facility_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -299,7 +297,6 @@ pub(crate) fn build_credit_facility_report_from_store(
 ) -> Result<CreditFacilityReport, TrustHttpError> {
     build_credit_facility_report_from_store_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -311,7 +308,6 @@ pub(crate) fn build_credit_facility_report_from_store(
 
 fn build_credit_facility_report_from_store_with_context(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
@@ -319,9 +315,9 @@ fn build_credit_facility_report_from_store_with_context(
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditFacilityReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report_with_context(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -330,7 +326,6 @@ fn build_credit_facility_report_from_store_with_context(
     )?;
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&scorecard.filters),
@@ -400,7 +395,7 @@ fn build_credit_facility_report_from_store_with_context(
 
     Ok(CreditFacilityReport {
         schema: CREDIT_FACILITY_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: scorecard.filters.clone(),
         scorecard: scorecard.summary,
         disposition,
@@ -413,16 +408,15 @@ fn build_credit_facility_report_from_store_with_context(
 
 pub(crate) fn build_credit_bond_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBondReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         issuance_policy,
         query,
@@ -438,7 +432,6 @@ pub(crate) fn build_credit_bond_report_from_store(
     }
     let underwriting_input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &underwriting_input_query_from_exposure_query(&scorecard.filters),
@@ -448,7 +441,6 @@ pub(crate) fn build_credit_bond_report_from_store(
 
     let facility_policy = build_credit_facility_report_from_store(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -553,7 +545,7 @@ pub(crate) fn build_credit_bond_report_from_store(
 
     Ok(CreditBondReport {
         schema: CREDIT_BOND_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: scorecard.filters.clone(),
         exposure: exposure.summary,
         scorecard: scorecard.summary,
@@ -574,8 +566,9 @@ pub(crate) fn build_credit_bond_report_from_store(
 pub(crate) fn issue_signed_credit_bond_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditBond, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -584,15 +577,13 @@ pub(crate) fn issue_signed_credit_bond_detailed(
         query,
         supersedes_artifact_id,
     } = args;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set; reuse it to sign the bond artifact below.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_bond_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
@@ -600,14 +591,14 @@ pub(crate) fn issue_signed_credit_bond_detailed(
         &trusted_kernel_keys,
     )?;
     let latest_facility_expires_at = latest_active_granted_credit_facility(
-        &receipt_store,
+        receipt_store,
         report.filters.capability_id.as_deref(),
         report.filters.agent_subject.as_deref(),
         report.filters.tool_server.as_deref(),
         report.filters.tool_name.as_deref(),
     )?
     .map(|facility| facility.body.expires_at);
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_credit_bond_artifact(
         report,
         issued_at,
@@ -663,6 +654,7 @@ pub(crate) fn build_credit_bonded_execution_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CreditBondedExecutionSimulationRequest,
 ) -> Result<CreditBondedExecutionSimulationReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     request
         .query
         .validate()
@@ -716,7 +708,7 @@ pub(crate) fn build_credit_bonded_execution_simulation_report_from_store(
 
     Ok(CreditBondedExecutionSimulationReport {
         schema: CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: request.query.clone(),
         policy: request.policy.clone(),
         support_boundary,
@@ -1110,8 +1102,9 @@ pub(crate) use loss_lifecycle::{
 pub(crate) fn issue_signed_credit_facility_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditFacility, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -1120,22 +1113,20 @@ pub(crate) fn issue_signed_credit_facility_detailed(
         query,
         supersedes_artifact_id,
     } = args;
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set; reuse it to sign the facility artifact.
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_credit_facility_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         issuance_policy,
         query,
         &trusted_kernel_keys,
     )?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_credit_facility_artifact(
         report,
         issued_at,
@@ -1216,28 +1207,18 @@ pub(crate) fn build_credit_facility_terms(
         [position] => position,
         _ => return None,
     };
-    let base_units = position.governed_max_exposure_units.max(
-        position
-            .settled_units
-            .saturating_add(position.pending_units),
-    );
+    let base_units = position
+        .governed_max_exposure_units
+        .max(position.settled_units.checked_add(position.pending_units)?);
     if base_units == 0 {
         return None;
     }
 
-    let band_factor = match scorecard.summary.band {
-        CreditScorecardBand::Prime => 1.0,
-        CreditScorecardBand::Standard => 0.85,
-        CreditScorecardBand::Guarded => 0.65,
-        CreditScorecardBand::Probationary => 0.40,
-        CreditScorecardBand::Restricted => 0.0,
-    };
-    let confidence_factor = match scorecard.summary.confidence {
-        CreditScorecardConfidence::High => 1.0,
-        CreditScorecardConfidence::Medium => 0.9,
-        CreditScorecardConfidence::Low => 0.75,
-    };
-    let credit_limit_units = ((base_units as f64) * band_factor * confidence_factor).floor() as u64;
+    let credit_limit_units = credit_limit_units(
+        base_units,
+        scorecard.summary.band,
+        scorecard.summary.confidence,
+    )?;
     if credit_limit_units == 0 {
         return None;
     }
@@ -1261,6 +1242,30 @@ pub(crate) fn build_credit_facility_terms(
         ttl_seconds,
         capital_source: CreditFacilityCapitalSource::OperatorInternal,
     })
+}
+
+fn credit_limit_units(
+    base_units: u64,
+    band: CreditScorecardBand,
+    confidence: CreditScorecardConfidence,
+) -> Option<u64> {
+    let band_percent = match band {
+        CreditScorecardBand::Prime => 100_u32,
+        CreditScorecardBand::Standard => 85,
+        CreditScorecardBand::Guarded => 65,
+        CreditScorecardBand::Probationary => 40,
+        CreditScorecardBand::Restricted => 0,
+    };
+    let confidence_percent = match confidence {
+        CreditScorecardConfidence::High => 100_u32,
+        CreditScorecardConfidence::Medium => 90,
+        CreditScorecardConfidence::Low => 75,
+    };
+    // Multiply before dividing to round down exactly once, including above 2^53.
+    let scaled = u128::from(base_units)
+        .checked_mul(u128::from(band_percent))?
+        .checked_mul(u128::from(confidence_percent))?;
+    u64::try_from(scaled / 10_000).ok()
 }
 
 fn build_credit_facility_findings(
@@ -1487,5 +1492,58 @@ pub(crate) fn credit_backtest_utilization_bps(
         .saturating_add(position.failed_units)
         .saturating_add(position.provisional_loss_units)
         .saturating_sub(position.recovered_units);
-    Some(((utilized_units as u128) * 10_000 / (denominator as u128)).min(u32::MAX as u128) as u32)
+    Some(
+        u32::try_from(u128::from(utilized_units) * 10_000 / u128::from(denominator))
+            .unwrap_or(u32::MAX),
+    )
+}
+
+#[cfg(test)]
+mod credit_limit_tests {
+    use super::*;
+
+    #[test]
+    fn credit_limits_preserve_large_integer_units_and_round_down_once() {
+        let cases = [
+            (
+                u64::MAX,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                u64::MAX,
+            ),
+            (
+                (1_u64 << 53) + 1,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                (1_u64 << 53) + 1,
+            ),
+            (
+                101,
+                CreditScorecardBand::Standard,
+                CreditScorecardConfidence::Medium,
+                77,
+            ),
+            (
+                101,
+                CreditScorecardBand::Guarded,
+                CreditScorecardConfidence::Low,
+                49,
+            ),
+            (
+                u64::MAX,
+                CreditScorecardBand::Restricted,
+                CreditScorecardConfidence::High,
+                0,
+            ),
+            (
+                0,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                0,
+            ),
+        ];
+        for (base, band, confidence, expected) in cases {
+            assert_eq!(credit_limit_units(base, band, confidence), Some(expected));
+        }
+    }
 }

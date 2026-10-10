@@ -89,7 +89,7 @@
         },
         {
           "kind": "rust_test",
-          "ref": "crates/core/chio-core-types/src/capability/tests.rs::attenuation_witness_roundtrip_and_forgery_rejection"
+          "ref": "crates/core/chio-core-types/src/capability/tests/authority_readers.rs::attenuation_witness_roundtrip_and_forgery_rejection"
         },
         {
           "kind": "conformance_test",

@@ -1,8 +1,27 @@
 use super::*;
 
+impl SqliteReceiptStore {
+    /// Point lookup for user-facing reads. The read context comes from the
+    /// authenticated adapter; a receipt ID or tenant hint grants no authority.
+    pub fn load_chio_receipt_with_context(
+        &self,
+        receipt_id: &str,
+        read_context: &chio_kernel::receipt_query::ReceiptReadContext,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        let scope = chio_kernel::ReceiptQuery::default()
+            .with_read_context(read_context.clone())
+            .effective_read_scope()?;
+        self.with_retained_snapshot(|snapshot| {
+            snapshot.receipt(receipt_id, scope.tenant.as_deref())
+        })
+    }
+}
+
 /// Flatten a capability-lineage error into the receipt-store error the
 /// `ReceiptStore` trait surface speaks.
-fn capability_lineage_store_error(error: chio_kernel::CapabilityLineageError) -> ReceiptStoreError {
+pub(crate) fn capability_lineage_store_error(
+    error: chio_kernel::CapabilityLineageError,
+) -> ReceiptStoreError {
     match error {
         chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
         chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
@@ -18,17 +37,36 @@ fn trusted_retention_archive(
     store: &SqliteReceiptStore,
 ) -> Result<Option<Connection>, ReceiptStoreError> {
     let connection = store.connection()?;
-    let recorded = retention_watermark(&connection)?.unwrap_or(0);
+    trusted_retention_archive_for_connection(&connection)
+}
+
+pub(crate) fn trusted_retention_archive_for_connection(
+    connection: &Connection,
+) -> Result<Option<Connection>, ReceiptStoreError> {
+    trusted_retention_archive_for_connection_with_preflight(connection, |_, _| Ok(()))
+}
+
+/// Inspect original archive bytes in the very transaction subsequently
+/// authenticated and served. A preflight never establishes archive trust.
+pub(crate) fn trusted_retention_archive_for_connection_with_preflight(
+    connection: &Connection,
+    mut preflight: impl FnMut(&Connection, u64) -> Result<(), ReceiptStoreError>,
+) -> Result<Option<Connection>, ReceiptStoreError> {
+    let recorded = retention_watermark(connection)?.unwrap_or(0);
     if recorded == 0 {
         return Ok(None);
     }
-    let archive_path = latest_watermark_archive_path(&connection)?.ok_or_else(|| {
+    let archive_path = latest_watermark_archive_path(connection)?.ok_or_else(|| {
         ReceiptStoreError::ReadBoundary(
             "retention watermark does not name an authenticated archive".to_owned(),
         )
     })?;
     let mut archive = open_retention_archive(&archive_path)?;
-    if !retention_archive_connection_is_trusted(&connection, &mut archive, recorded)? {
+    // Keep validation and subsequent point reads in one snapshot, including
+    // when another connection can modify the same archive inode.
+    archive.execute_batch("BEGIN DEFERRED TRANSACTION")?;
+    preflight(&archive, recorded)?;
+    if !retention_archive_connection_is_trusted(connection, &mut archive, recorded)? {
         return Err(ReceiptStoreError::ReadBoundary(
             "configured retention archive does not authenticate the recorded prefix".to_owned(),
         ));
@@ -52,18 +90,10 @@ fn load_retained_chio_receipt_with_archive_hook<F>(
 where
     F: FnOnce() -> Result<(), ReceiptStoreError>,
 {
-    let Some(archive) = trusted_retention_archive(store)? else {
-        return store.load_chio_receipt(receipt_id);
-    };
-    after_archive_trusted()?;
-    let connection = store.connection()?;
-    if let Some(receipt) =
-        load_chio_receipt_row(&connection, receipt_id, "retained live tool receipt")?
-    {
-        return Ok(Some(receipt));
-    }
-    drop(connection);
-    load_chio_receipt_row(&archive, receipt_id, "retained archived tool receipt")
+    store.with_retained_snapshot(|snapshot| {
+        after_archive_trusted()?;
+        snapshot.receipt(receipt_id, None)
+    })
 }
 
 #[cfg(test)]
@@ -91,9 +121,71 @@ fn load_chio_receipt_row(
         )
         .optional()?
         .map(|(seq, raw_json)| {
-            decode_verified_chio_receipt(&raw_json, context, Some(seq.max(0) as u64))
+            decode_verified_chio_receipt(
+                &raw_json,
+                context,
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
+            )
         })
         .transpose()
+}
+
+pub(crate) fn load_chio_receipt_batch_with_snapshot_hook(
+    store: &SqliteReceiptStore,
+    receipt_ids: &[&str],
+    after_verification: impl FnOnce() -> Result<(), ReceiptStoreError>,
+) -> Result<Vec<Option<ChioReceipt>>, ReceiptStoreError> {
+    if receipt_ids.len() > 256 {
+        return Err(ReceiptStoreError::Unsupported(
+            "receipt lookup batch exceeds 256 entries".to_owned(),
+        ));
+    }
+    if receipt_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut connection = store.connection()?;
+    let guard_count: i64 = connection.query_row(
+        "SELECT count(*) FROM sqlite_schema WHERE type = 'trigger' AND name IN (
+            'kernel_checkpoints_reject_update',
+            'kernel_checkpoints_reject_delete',
+            'kernel_checkpoints_enforce_append_only')",
+        [],
+        |row| row.get(0),
+    )?;
+    if guard_count != 3 {
+        // Restoring missing immutability guards is a write. Preserve the point
+        // lookup's repair behavior, but route it through the single writer;
+        // healthy batches must also work with a query-only reader pool.
+        drop(connection);
+        store
+            .writer_handle()
+            .run_write(|connection| ensure_checkpoint_transparency_guards(connection))?;
+        connection = store.connection()?;
+    }
+    // Verification and every lookup share a read snapshot. A writer cannot
+    // substitute receipt or checkpoint bytes between verification and reads.
+    // The next batch starts a new transaction and verifies again.
+    let transaction = connection.transaction()?;
+    verify_latest_checkpoint_integrity(&transaction)?;
+    after_verification()?;
+    let receipts = receipt_ids
+        .iter()
+        .map(|receipt_id| {
+            let receipt =
+                load_chio_receipt_row(&transaction, receipt_id, "persisted tool receipt batch")?;
+            if receipt
+                .as_ref()
+                .is_some_and(|receipt| receipt.id != *receipt_id)
+            {
+                return Err(ReceiptStoreError::Conflict(
+                    "persisted tool receipt batch id differs from the requested receipt".to_owned(),
+                ));
+            }
+            Ok(receipt)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    transaction.commit()?;
+    Ok(receipts)
 }
 
 fn load_chio_receipt_commitment_row(
@@ -151,7 +243,7 @@ fn load_receipt_lineage_statement_row(
             |row| row.get::<_, String>(0),
         )
         .optional()?
-        .map(|raw| serde_json::from_str(&raw).map_err(ReceiptStoreError::from))
+        .map(|raw| decode_verified_lineage_statement(&raw, receipt_id))
         .transpose()
 }
 
@@ -188,7 +280,10 @@ impl SqliteReceiptStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_request_lineage_record(
         &self,
         session_id: &str,
@@ -224,7 +319,10 @@ impl SqliteReceiptStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_receipt_lineage_statement_record(
         &self,
         child_receipt_id: &str,
@@ -284,22 +382,7 @@ impl SqliteReceiptStore {
         let receipt_id = receipt_id.to_string();
         self.writer_handle().run_write_anchored_metadata(move |tx| {
             ensure_receipt_lineage_statement_for_receipt_id_tx(tx, &receipt_id)?;
-            let raw = tx
-                .query_row(
-                    "SELECT raw_json FROM receipt_lineage_statements WHERE receipt_id = ?1",
-                    params![&receipt_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?;
-            let statement = raw
-                .map(|raw| {
-                    serde_json::from_str::<chio_core::receipt::lineage::ReceiptLineageStatement>(
-                        &raw,
-                    )
-                    .map_err(ReceiptStoreError::from)
-                })
-                .transpose()?;
-            Ok(statement)
+            load_receipt_lineage_statement_row(tx, &receipt_id)
         })
     }
 
@@ -479,6 +562,10 @@ impl ReceiptStore for SqliteReceiptStore {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
+    fn supports_native_security_receipts(&self) -> bool {
+        self.durable_sink_id.is_some()
+    }
+
     fn durable_sink_id(&self) -> Option<&str> {
         self.durable_sink_id.as_deref()
     }
@@ -550,7 +637,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 decode_verified_chio_receipt(
                     &raw_json,
                     "persisted tool receipt",
-                    Some(seq.max(0) as u64),
+                    Some(u64::try_from(seq.max(0)).unwrap_or_default()),
                 )
             })
             .transpose()
@@ -561,6 +648,13 @@ impl ReceiptStore for SqliteReceiptStore {
         receipt_id: &str,
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
         load_retained_chio_receipt_with_archive_hook(self, receipt_id, || Ok(()))
+    }
+
+    fn load_chio_receipts(
+        &self,
+        receipt_ids: &[&str],
+    ) -> Result<Vec<Option<ChioReceipt>>, ReceiptStoreError> {
+        load_chio_receipt_batch_with_snapshot_hook(self, receipt_ids, || Ok(()))
     }
 
     fn load_retained_chio_receipt_commitment(
@@ -606,7 +700,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 decode_verified_child_receipt(
                     &raw_json,
                     "persisted child receipt",
-                    Some(seq.max(0) as u64),
+                    Some(u64::try_from(seq.max(0)).unwrap_or_default()),
                 )
             })
             .transpose()
@@ -832,7 +926,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 root.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
                     && root.parent_capability_id.is_none()
                     && root.delegation_depth == 0
-            }) && chain.windows(2).all(|pair| {
+            }) && chain.array_windows::<2>().all(|pair| {
                 let parent = &pair[0];
                 let child = &pair[1];
                 child.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
@@ -1012,7 +1106,161 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 }
 
+impl IndexedSecurityEvidenceStore for SqliteReceiptStore {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::ensure_indexed_security_evidence_ready(self)
+    }
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        SqliteReceiptStore::append_indexed_security_evidence(self, evidence_id, receipt)
+    }
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        SqliteReceiptStore::load_indexed_security_evidence(self, evidence_id)
+    }
+}
+
+fn load_retained_indexed_security_evidence(
+    connection: &Connection,
+    evidence_id: &OpaqueReceiptRef,
+) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+    let receipt_id: Option<String> = connection
+        .query_row(
+            "SELECT receipt_id FROM chio_security_evidence_index WHERE evidence_id = ?1",
+            params![evidence_id.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(receipt_id) = receipt_id else {
+        return Ok(None);
+    };
+    let receipt =
+        match load_chio_receipt_row(connection, &receipt_id, "indexed live security receipt")? {
+            Some(receipt) => receipt,
+            None => {
+                let archive =
+                    trusted_retention_archive_for_connection(connection)?.ok_or_else(|| {
+                        ReceiptStoreError::ReadBoundary(
+                            "indexed security receipt is missing without an archive".to_string(),
+                        )
+                    })?;
+                load_chio_receipt_row(&archive, &receipt_id, "indexed archived security receipt")?
+                    .ok_or_else(|| {
+                    ReceiptStoreError::ReadBoundary(
+                        "indexed security receipt is absent from its authenticated archive"
+                            .to_string(),
+                    )
+                })?
+            }
+        };
+    validate_indexed_security_receipt(evidence_id, &receipt)?;
+    Ok(Some(receipt))
+}
+
 impl SqliteReceiptStore {
+    pub fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError> {
+        ensure_chio_receipt_verified(receipt)?;
+        validate_indexed_security_receipt(evidence_id, receipt)?;
+        let raw_json = serde_json::to_string(receipt)?;
+        let logical_evidence_id = evidence_id.clone();
+        let evidence_id = evidence_id.as_str().to_string();
+        let receipt = receipt.clone();
+        self.writer_handle().run_write_receipt(move |connection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            if let Some(existing) = load_retained_indexed_security_evidence(connection, &logical_evidence_id)? {
+                if !same_unsigned_receipt_and_bbs_binding(&existing, &receipt)? {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "active-defense evidence `{evidence_id}` is already mapped to a different receipt"
+                    )));
+                }
+                return Ok(existing);
+            }
+
+            let existing_for_receipt = connection
+                .query_row(
+                    "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+                    params![receipt.id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|existing_raw_json| {
+                    decode_verified_chio_receipt(
+                        &existing_raw_json,
+                        "preexisting active-defense receipt",
+                        None,
+                    )
+                })
+                .transpose()?;
+            let persisted = match existing_for_receipt {
+                Some(existing) => {
+                    if !same_unsigned_receipt_and_bbs_binding(&existing, &receipt)? {
+                        return Err(ReceiptStoreError::Conflict(format!(
+                            "active-defense receipt `{}` already exists with different unsigned content",
+                            receipt.id
+                        )));
+                    }
+                    existing
+                }
+                None => {
+                    append_chio_receipt_tx(connection, &receipt, &raw_json)?;
+                    ensure_receipt_lineage_statement_for_receipt_id_tx(connection, &receipt.id)?;
+                    receipt
+                }
+            };
+            if let Some(existing_evidence_id) = connection
+                .query_row(
+                    "SELECT evidence_id FROM chio_security_evidence_index WHERE receipt_id = ?1",
+                    params![persisted.id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+            {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "active-defense receipt `{}` is already mapped to evidence `{existing_evidence_id}`",
+                    persisted.id
+                )));
+            }
+            connection.execute(
+                "INSERT INTO chio_security_evidence_index (evidence_id, receipt_id) VALUES (?1, ?2)",
+                params![evidence_id.as_str(), persisted.id.as_str()],
+            )?;
+            Ok(persisted)
+        })
+    }
+
+    pub fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        verify_latest_checkpoint_integrity(&connection)?;
+        load_retained_indexed_security_evidence(&connection, evidence_id)
+    }
+
+    pub fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {
+        self.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
+        let health = self.receipt_store_health()?;
+        if !health.healthy {
+            return Err(ReceiptStoreError::Conflict(
+                "indexed security evidence store is not healthy".to_string(),
+            ));
+        }
+        let connection = self.connection()?;
+        validate_indexed_security_evidence_schema(&connection)
+    }
+
     pub fn record_checkpoint_publication_trust_anchor_binding(
         &self,
         checkpoint_seq: u64,
@@ -1059,7 +1307,8 @@ impl SqliteReceiptStore {
             match existing {
                 Some(binding_json) => {
                     let existing_binding: chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding =
-                        serde_json::from_str(&binding_json)?;
+                        chio_core::canonical::UntrustedJsonText::from_wire(binding_json.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())?;
                     if existing_binding == normalized_binding {
                         return Ok(());
                     }

@@ -3,6 +3,9 @@ use crate::validation::validate_non_empty;
 use crate::*;
 use chio_swarm_authority::SwarmAuthorityBundle;
 
+/// JSON-backed state with trust-floor transitions serialized across clones of one instance.
+/// Independently opened handles and other processes are not coordinated. Use the SQLite
+/// runtime store when transitions must be serialized across independent database connections.
 #[derive(Debug, Clone)]
 pub struct JsonRuntimeAdmissionStore {
     path: PathBuf,
@@ -43,19 +46,14 @@ impl JsonRuntimeAdmissionStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
         let path = path.as_ref().to_path_buf();
         let state = if path.exists() {
-            let json = fs::read_to_string(&path).map_err(|error| {
-                ChioRuntimeError::Io(format!(
-                    "failed to read runtime admission store {}: {error}",
-                    path.display()
-                ))
-            })?;
+            let json = fs::read_to_string(&path).map_err(ChioRuntimeError::Io)?;
             let state: JsonRuntimeAdmissionStoreState =
-                serde_json::from_str(&json).map_err(|error| {
-                    ChioRuntimeError::Json(format!(
-                        "failed to parse runtime admission store {}: {error}",
-                        path.display()
-                    ))
-                })?;
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    json.as_bytes(),
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(ChioRuntimeError::from)?;
             if !is_runtime_admission_store_schema(&state.schema) {
                 return Err(ChioRuntimeError::Rejected {
                     code: "unsupported_runtime_store_schema",
@@ -219,22 +217,11 @@ impl JsonRuntimeAdmissionStore {
     ) -> Result<(), ChioRuntimeError> {
         if let Some(parent) = self.path.parent() {
             if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    ChioRuntimeError::Io(format!(
-                        "failed to create runtime admission store directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
+                fs::create_dir_all(parent).map_err(ChioRuntimeError::Io)?;
             }
         }
-        let json = serde_json::to_string_pretty(state)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
-        fs::write(&self.path, format!("{json}\n")).map_err(|error| {
-            ChioRuntimeError::Io(format!(
-                "failed to write runtime admission store {}: {error}",
-                self.path.display()
-            ))
-        })
+        let json = serde_json::to_string_pretty(state).map_err(ChioRuntimeError::Json)?;
+        fs::write(&self.path, format!("{json}\n")).map_err(ChioRuntimeError::Io)
     }
 }
 
@@ -391,6 +378,31 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
+        if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
+            existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
+        }) {
+            *existing = entry;
+        } else {
+            state.trust_floors.push(entry);
+        }
+        Self::validate_state(&state)?;
+        self.persist_state(&state)
+    }
+
+    fn validate_and_record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+        previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
+        let mut state = self.lock_state()?;
+        let existing = state
+            .trust_floors
+            .iter()
+            .find(|existing| {
+                existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
+            })
+            .cloned();
+        validate_runtime_trust_floor_transition(existing, &entry, previous_hash_sha256)?;
         if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {

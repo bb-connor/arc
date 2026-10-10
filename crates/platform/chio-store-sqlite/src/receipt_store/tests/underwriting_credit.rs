@@ -4,7 +4,7 @@ use super::support::*;
 #[test]
 fn underwriting_decision_report_tracks_supersession_and_appeal_filters() {
     let path = unique_db_path("chio-underwriting-decision-report");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_key = "subject-underwriting";
 
     let initial = signed_underwriting_decision_fixture(
@@ -183,7 +183,7 @@ fn underwriting_decision_report_tracks_supersession_and_appeal_filters() {
 #[test]
 fn credit_facility_report_tracks_effective_lifecycle_states() {
     let path = unique_db_path("chio-credit-facility-report");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_key = "subject-credit";
     let far_future = 4_102_444_800;
 

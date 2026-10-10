@@ -3,7 +3,9 @@
 //! Evaluates an action against a policy and returns a decision
 //! (allow/warn/deny).
 
-use crate::conditions::{evaluate_condition, validate_condition_keys, Condition, RuntimeContext};
+use crate::conditions::{
+    evaluate_condition_at, observed_time, validate_condition_keys, Condition, RuntimeContext,
+};
 use crate::models::{
     ComputerUseMode, ComputerUseRule, DefaultAction, ForbiddenPathsRule, HushSpec,
     InputInjectionRule, OriginDefaultBehavior, OriginMatch, OriginProfile, PatchIntegrityRule,
@@ -19,4 +21,6 @@ include!("evaluate/context.rs");
 include!("evaluate/engine.rs");
 include!("evaluate/matchers.rs");
 include!("evaluate/outcomes.rs");
-include!("evaluate/tests.rs");
+#[cfg(test)]
+#[path = "evaluate/tests.rs"]
+mod tests;

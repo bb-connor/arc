@@ -1192,7 +1192,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             revision: 2,
             event_sha256: history[1].event_sha256.clone(),
             previous_checkpoint_sha256: None,
-            created_at: 1_700_000_004,
+            created_at: (1_u64 << 53) + 1,
         },
         &checkpoint_signer,
     )?;

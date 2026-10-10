@@ -215,13 +215,7 @@ fn validate_settlement_dispatch_receipt(
 fn parse_settlement_dispatch_receipt(
     artifact: &CommerceEventAuthorityReceiptArtifact,
 ) -> Result<ChioReceipt, CommerceOrderError> {
-    let value: serde_json::Value =
-        serde_json::from_slice(&artifact.receipt_bytes).map_err(|error| {
-            CommerceOrderError::SettlementFailed(format!(
-                "settlement dispatch receipt JSON invalid: {}: {error}",
-                artifact.receipt_ref
-            ))
-        })?;
+    let value: serde_json::Value = crate::input::decode(&artifact.receipt_bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -237,12 +231,7 @@ fn parse_settlement_dispatch_receipt(
             schema: schema.to_string(),
         });
     }
-    serde_json::from_value(value).map_err(|error| {
-        CommerceOrderError::SettlementFailed(format!(
-            "settlement dispatch receipt invalid: {}: {error}",
-            artifact.receipt_ref
-        ))
-    })
+    crate::input::project(value)
 }
 
 fn require_receipt_action_string(

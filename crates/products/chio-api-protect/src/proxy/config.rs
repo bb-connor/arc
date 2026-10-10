@@ -15,8 +15,15 @@ pub struct ProtectConfig {
     pub spec_content: Option<String>,
     /// Optional OpenAPI spec path. When omitted, the proxy auto-discovers the spec.
     pub spec_path: Option<String>,
+    /// SHA-256 of the exact local spec bytes. Required to honor permissive
+    /// side-effect overrides; valid only together with spec_path.
+    pub spec_sha256: Option<String>,
+    /// Local operator opt-in for anonymous reads on registered routes.
+    pub allow_anonymous_reads: bool,
     /// Address to listen on (e.g., "127.0.0.1:9090").
     pub listen_addr: String,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
     /// Optional SQLite path for receipt persistence.
     pub receipt_db: Option<String>,
     /// Explicit opt-in to run without a durable receipt store. A durable audit
@@ -25,12 +32,24 @@ pub struct ProtectConfig {
     /// proxy runs with in-memory receipts and revocations that are lost on every
     /// restart. Leave it `false` for durable-by-default embedding.
     pub allow_ephemeral_receipts: bool,
-    /// Optional bearer token that authorizes remote sidecar control requests.
+    /// Bearer token required for all sidecar control requests, including loopback.
+    /// Missing or blank configuration disables control routes without disabling
+    /// public liveness or the independently authorized proxy path. Keep this
+    /// operator/tool-server credential separate from agent credentials.
+    /// Nonempty values must use the RFC 6750 bearer-token alphabet and be at most
+    /// 512 bytes after trimming; invalid configuration rejects before startup I/O.
+    /// Proxy routes reject this token's bytes in any header value before egress.
     pub sidecar_control_token: Option<String>,
-    /// Optional seed used to keep the sidecar signer stable across restarts.
+    /// Explicit archive policy. Disabled when absent.
+    pub receipt_retention: Option<super::ProtectRetentionConfig>,
+    /// Existing private signing custody, required with a durable receipt store.
+    pub signer_seed_file: Option<std::path::PathBuf>,
+    /// Inline seed for explicit ephemeral embedding only; conflicts with a file.
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
+    /// Explicit ordinary approval authority and authenticated executor.
+    pub approval: Option<super::approval_authority::ProtectApprovalConfig>,
     /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
     pub control_url: Option<String>,
     /// Bearer token for the control-plane budget endpoints.
@@ -72,8 +91,12 @@ impl std::fmt::Debug for ProtectConfig {
                 &self.spec_content.as_ref().map(|_| "<inline>"),
             )
             .field("spec_path", &self.spec_path)
+            .field("spec_sha256", &self.spec_sha256)
+            .field("allow_anonymous_reads", &self.allow_anonymous_reads)
             .field("listen_addr", &self.listen_addr)
             .field("receipt_db", &self.receipt_db)
+            .field("receipt_retention", &self.receipt_retention)
+            .field("signer_seed_file", &self.signer_seed_file)
             .field("allow_ephemeral_receipts", &self.allow_ephemeral_receipts)
             .field(
                 "sidecar_control_token",

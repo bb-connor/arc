@@ -1,0 +1,29 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "observed_utc": "2026-10-10T00:02:41.144335+00:00",
+  "reviewed_source": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+  "source_files": [
+    {
+      "path": "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+      "sha256": "22c2e4b67018fe7950bee89f5d73f811e89695ddf2e2739eb8a63c1bec67e2de"
+    }
+  ],
+  "scope": "Three passport handlers rewritten by the adjacent registry transaction repair. Fresh registry serialization alone does not admit the configured authority signer. Same-class F11 repair, required before landing.",
+  "findings": [
+    {
+      "label": "F11-PASSPORT-SIGNER",
+      "priority": "P1",
+      "scope": "now",
+      "state": "source-confirmed-original-and-repair-open",
+      "requirement": "Rewritten passport offer, token and credential routes must bind configured authority metadata and actual credential signers to the current admitted live authority head.",
+      "remaining_acceptance": [
+        "Genuine expected-safe current-source Original with refused former custodian and revoked local signer.",
+        "Use a shared synchronous admitted-view guard inside the existing bounded registry transaction; stable role/term/quorum and exact live authority view before and after work.",
+        "Validate credential entitlement before private signer resolution; require selected key equals the admitted live head before and after signing, with all refusal checks before registry persistence.",
+        "Preserve unsigned/unconfigured behavior and exact refusal domains; healthy issuer progress, negative and owning strict checks, source-composed independent review."
+      ]
+    }
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

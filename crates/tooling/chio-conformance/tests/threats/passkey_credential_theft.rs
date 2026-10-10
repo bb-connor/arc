@@ -32,16 +32,12 @@
 //      counter-vector to the replay arm.
 //
 // Production call sites:
-//   `crates/chio-custody-hw/src/nonce_store.rs:194`
+//   `crates/trust/chio-custody-hw/src/nonce_store.rs`
 //     (`InMemoryPasskeyNonceStore::record_if_fresh`).
 //
 // Revert-to-prove-it-fails recipe:
-// In `crates/chio-custody-hw/src/nonce_store.rs`, locate the
-// duplicate-detection branch inside
-// `InMemoryPasskeyNonceStore::record_if_fresh` (the
-// `if let Some(existing_exp) = map.get(&key) { ... return
-// Ok(RecordOutcome::Replayed); }` block). Replace the return with
-// `Ok(RecordOutcome::Fresh)`. Re-run
+// In `crates/trust/chio-custody-hw/src/nonce_store.rs`, make
+// `retained_replay_outcome` return `None` for retained keys. Re-run
 // `cargo test -p chio-conformance --test threats -- passkey_credential_theft`
 // and the `assert_eq!(second, RecordOutcome::Replayed)` arm in
 // `replay_attack_rejected` MUST then fail because production now

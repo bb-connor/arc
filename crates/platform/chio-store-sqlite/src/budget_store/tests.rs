@@ -4,92 +4,9 @@ use chio_kernel::InMemoryBudgetStore;
 #[path = "tests/composite.rs"]
 mod composite_lifecycle;
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
-
-fn usage_record(
-    capability_id: &str,
-    grant_index: u32,
-    invocation_count: u32,
-    updated_at: i64,
-    seq: u64,
-    total_cost_exposed: u64,
-    total_cost_realized_spend: u64,
-) -> BudgetUsageRecord {
-    BudgetUsageRecord {
-        capability_id: capability_id.to_string(),
-        grant_index,
-        invocation_count,
-        updated_at,
-        seq,
-        total_cost_exposed,
-        total_cost_realized_spend,
-    }
-}
-
-fn install_usage_anchor(store: &SqliteBudgetStore, record: &BudgetUsageRecord) {
-    install_usage_anchors(store, std::slice::from_ref(record));
-}
-
-fn install_usage_anchors(store: &SqliteBudgetStore, records: &[BudgetUsageRecord]) {
-    let mut connection = store.connection().unwrap();
-    let transaction = store.begin_write(&mut connection).unwrap();
-    transaction
-        .execute(
-            "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
-            [],
-        )
-        .unwrap();
-    for record in records {
-        SqliteBudgetStore::upsert_usage_in_transaction(&transaction, record).unwrap();
-        transaction
-            .execute(
-                r#"
-                INSERT INTO budget_usage_history_anchors (
-                    capability_id, grant_index, invocation_count, updated_at, seq,
-                    total_cost_exposed, total_cost_realized_spend, anchored_schema_version
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
-                "#,
-                params![
-                    &record.capability_id,
-                    i64::from(record.grant_index),
-                    i64::from(record.invocation_count),
-                    record.updated_at,
-                    budget_u64_to_sqlite(record.seq, "seq").unwrap(),
-                    budget_u64_to_sqlite(record.total_cost_exposed, "total_cost_exposed").unwrap(),
-                    budget_u64_to_sqlite(
-                        record.total_cost_realized_spend,
-                        "total_cost_realized_spend",
-                    )
-                    .unwrap(),
-                ],
-            )
-            .unwrap();
-    }
-    transaction
-        .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
-        .unwrap();
-    transaction.commit().unwrap();
-}
-
-fn assert_usage_totals(record: &BudgetUsageRecord, exposed: u64, realized: u64) {
-    assert_eq!(record.total_cost_exposed, exposed);
-    assert_eq!(record.total_cost_realized_spend, realized);
-    assert_eq!(record.committed_cost_units().unwrap(), exposed + realized);
-}
-
-fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEventAuthority {
-    BudgetEventAuthority {
-        authority_id: authority_id.to_string(),
-        lease_id: lease_id.to_string(),
-        lease_epoch,
-    }
-}
+#[path = "tests/support.rs"]
+mod support;
+use support::*;
 
 #[test]
 fn sqlite_budget_store_persists_across_reopen() {
@@ -1168,7 +1085,7 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
         assert_eq!(snapshot.covered_head, last_event.event_seq);
         assert!(snapshot
             .mutation_events
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[1].event_seq == pair[0].event_seq + 1));
         let usage = snapshot
             .usages
@@ -1322,7 +1239,7 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
         .expect("existing authorize event");
     conflicting_event.authority = Some(conflicting_authority);
 
-    let imported_usage = usage_record("cap-import-rollback", 0, 2, unix_now(), 88, 40, 5);
+    let imported_usage = usage_record("cap-import-rollback", 0, 2, 1_700_000_000, 88, 40, 5);
 
     let error = store
         .import_snapshot_records(&[imported_usage], &[conflicting_event])
@@ -2123,7 +2040,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     Ok(())
 }
 
-fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecord {
+pub(super) fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecord {
     BudgetMutationRecord {
         event_id: event_id.to_string(),
         hold_id: None,
@@ -2477,3 +2394,6 @@ fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dy
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[path = "tests/statement_caching.rs"]
+mod statement_caching;

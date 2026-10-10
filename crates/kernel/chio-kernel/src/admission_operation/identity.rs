@@ -576,6 +576,11 @@ impl AdmissionOperationBindingV1 {
     }
 
     #[must_use]
+    pub fn authorization_capability_hash(&self) -> &AdmissionDigest {
+        &self.authorization_capability_hash
+    }
+
+    #[must_use]
     pub fn action_parameter_hash(&self) -> &AdmissionDigest {
         &self.request_binding.action_parameter_hash
     }

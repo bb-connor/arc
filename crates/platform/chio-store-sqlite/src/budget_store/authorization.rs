@@ -1,9 +1,62 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl SqliteBudgetStore {
+    /// Replay an existing standalone authorization for a leader that renewed its
+    /// lease since admitting it. `current` is the caller's valid lease. Within one
+    /// write transaction the original event must exist, match `request`, and have
+    /// been admitted by the same authority no later than `current`; the replay
+    /// returns the original decision and metadata and never admits a new mutation.
+    pub fn replay_budget_authorization(
+        &self,
+        request: &BudgetAuthorizeHoldRequest,
+        current: &BudgetEventAuthority,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        request.validate()?;
+        if !request.invocation_quotas.is_empty()
+            || request.cumulative_approval.is_some()
+            || request.admission_binding.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget authorization replay supports only standalone authorizations".to_string(),
+            ));
+        }
+        self.require_standalone_mutation("unbound authorization")?;
+        self.authorize_budget_hold_atomic(request, Some(current))
+    }
+
+    /// The replay counterpart of `try_charge_cost_with_ids_and_authority`. A
+    /// charge is recorded through the same atomic authorization with the
+    /// charge path's own checks (no hold identity required), so its replay
+    /// takes exactly those checks, in replay-only mode, under the same rules.
+    pub fn replay_cost_charge(
+        &self,
+        request: &BudgetAuthorizeHoldRequest,
+        current: &BudgetEventAuthority,
+    ) -> Result<bool, BudgetStoreError> {
+        if !request.invocation_quotas.is_empty()
+            || request.cumulative_approval.is_some()
+            || request.admission_binding.is_some()
+        {
+            return Err(BudgetStoreError::Invariant(
+                "budget charge replay supports only standalone charges".to_string(),
+            ));
+        }
+        self.require_standalone_mutation("unbound charge")?;
+        validate_budget_grant_index(request.grant_index)?;
+        Ok(matches!(
+            self.authorize_budget_hold_atomic(request, Some(current))?,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ))
+    }
+
+    /// `replay_under` selects replay-only mode: the original event must already
+    /// exist and is validated against its own authority, which must be
+    /// replayable under that lease.
     pub(super) fn authorize_budget_hold_atomic(
         &self,
         request: &BudgetAuthorizeHoldRequest,
+        replay_under: Option<&BudgetEventAuthority>,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         validate_budget_grant_index(request.grant_index)?;
         budget_u64_to_sqlite(request.requested_exposure_units, "requested_exposure_units")?;
@@ -26,6 +79,30 @@ impl SqliteBudgetStore {
             Some(event_id) => Self::load_mutation_event(&transaction, event_id)?,
             None => None,
         };
+        let replay_authority = match replay_under {
+            None => None,
+            Some(current) => {
+                let event_id = request.event_id.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "budget authorization replay is missing its event id".to_string(),
+                    )
+                })?;
+                let original = request_event.as_ref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "budget event_id `{event_id}` has no authorization to replay"
+                    ))
+                })?;
+                Some(Self::renewed_lease_replay_authority(
+                    event_id,
+                    original.authority.as_ref(),
+                    current,
+                )?)
+            }
+        };
+        let authority = match replay_under {
+            None => request.authority.as_ref(),
+            Some(_) => replay_authority.as_ref(),
+        };
         let existing = Self::existing_event_allowed(
             &transaction,
             request.event_id.as_deref(),
@@ -33,13 +110,18 @@ impl SqliteBudgetStore {
             &request.capability_id,
             request.grant_index,
             request.hold_id.as_deref(),
-            request.authority.as_ref(),
+            authority,
             request.requested_exposure_units,
             0,
             request.max_invocations,
             request.max_cost_per_invocation,
             request.max_total_cost_units,
         )?;
+        if existing.is_none() && replay_under.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "budget authorization replay found no original authorization".to_string(),
+            ));
+        }
         if existing.is_none() {
             if let Some(hold_id) = request.hold_id.as_deref() {
                 if Self::load_hold(&transaction, hold_id)?.is_some() {
@@ -117,7 +199,10 @@ impl SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![&request.capability_id, request.grant_index as i64],
+                params![
+                    &request.capability_id,
+                    crate::integer::checked::<_, i64>(request.grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u64_from_row(row, 0, "seq")?,
@@ -132,17 +217,20 @@ impl SqliteBudgetStore {
 
         let allowed = Self::authorize_limits_allow(request, current.1, current.2, current.3)?;
         let authorized_usage = if allowed {
-            let exposed_after = current
-                .2
-                .checked_add(request.requested_exposure_units)
-                .ok_or_else(|| {
+            let exposed_after = ExposureUnits::new(current.2)
+                .try_add(ExposureUnits::new(request.requested_exposure_units))
+                .map(ExposureUnits::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow(
                         "total_cost_exposed + requested exposure overflowed u64".to_string(),
                     )
                 })?;
-            let invocation_count_after = current.1.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
-            })?;
+            let invocation_count_after = InvocationCount::new(current.1)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
+                    BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
+                })?;
             budget_u64_to_sqlite(exposed_after, "total_cost_exposed")?;
             Some((invocation_count_after, exposed_after))
         } else {
@@ -151,7 +239,7 @@ impl SqliteBudgetStore {
         let event_seq = allocate_budget_replication_seq(&transaction)?;
         let (usage_seq, invocation_count_after, exposed_after, realized_after) =
             if let Some((invocation_count_after, exposed_after)) = authorized_usage {
-                transaction.execute(
+                let changed = transaction.execute(
                     r#"
                 INSERT INTO capability_grant_budgets (
                     capability_id, grant_index, invocation_count, updated_at, seq,
@@ -163,19 +251,31 @@ impl SqliteBudgetStore {
                     seq = excluded.seq,
                     total_cost_exposed = excluded.total_cost_exposed,
                     total_cost_realized_spend = excluded.total_cost_realized_spend
+                WHERE capability_grant_budgets.seq = ?8
+                  AND capability_grant_budgets.invocation_count = ?9
+                  AND capability_grant_budgets.total_cost_exposed = ?10
+                  AND capability_grant_budgets.total_cost_realized_spend = ?7
                 "#,
                     params![
                         &request.capability_id,
-                        request.grant_index as i64,
+                        crate::integer::checked::<_, i64>(request.grant_index)?,
                         i64::from(invocation_count_after),
-                        unix_now(),
+                        self.unix_now()?,
                         budget_u64_to_sqlite(event_seq, "seq")?,
                         budget_u64_to_sqlite(exposed_after, "total_cost_exposed")?,
                         budget_u64_to_sqlite(current.3, "total_cost_realized_spend")?,
+                        budget_u64_to_sqlite(current.0, "previous_seq")?,
+                        i64::from(current.1),
+                        budget_u64_to_sqlite(current.2, "previous_exposure")?,
                     ],
                 )?;
+                if changed != 1 {
+                    return Err(BudgetStoreError::Invariant(
+                        "budget authorization compare-and-set failed".into(),
+                    ));
+                }
                 if let Some(hold_id) = request.hold_id.as_deref() {
-                    Self::create_hold(
+                    self.create_hold(
                         &transaction,
                         hold_id,
                         &request.capability_id,
@@ -193,7 +293,7 @@ impl SqliteBudgetStore {
             } else {
                 (None, current.1, current.2, current.3)
             };
-        let event = Self::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             request.event_id.as_deref(),
             request.hold_id.as_deref(),
@@ -260,7 +360,7 @@ impl SqliteBudgetStore {
         };
         if original.kind != BudgetMutationKind::AuthorizeExposure
             || original.capability_id != request.capability_id
-            || original.grant_index != request.grant_index as u32
+            || original.grant_index != crate::integer::checked::<_, u32>(request.grant_index)?
             || original.exposure_units != request.requested_exposure_units
             || original.max_invocations != request.max_invocations
             || original.max_cost_per_invocation != request.max_cost_per_invocation
@@ -326,13 +426,9 @@ impl SqliteBudgetStore {
             return Ok(false);
         }
         let committed = checked_committed_cost_units(exposed, realized)?;
-        let requested = committed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "committed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
+        let requested = ExposureUnits::new(committed)
+            .try_add(ExposureUnits::new(request.requested_exposure_units))?
+            .get();
         Ok(request
             .max_total_cost_units
             .is_none_or(|max| requested <= max))
@@ -359,7 +455,7 @@ impl SqliteBudgetStore {
         };
         if event.allowed == Some(true) {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
-                AuthorizedBudgetHold {
+                BudgetHoldAuthorizationRecord {
                     hold_id: event.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: event.exposure_units,

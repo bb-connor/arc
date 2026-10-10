@@ -54,11 +54,36 @@ cargo run -p chio-wall -- siem-export --receipt-db kernel-receipts.sqlite3 --cur
 | `CHIO_SIEM_WEBHOOK_URL`, `CHIO_SIEM_WEBHOOK_BEARER_TOKEN` | Configures the generic webhook SOC export sink. |
 | `CHIO_SIEM_ALERT_PAGERDUTY_ROUTING_KEY`, `CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT` | Configures the PagerDuty alert backend. |
 | `CHIO_SIEM_ALERT_OPSGENIE_API_KEY`, `CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT` | Configures the OpsGenie alert backend. |
+| `CHIO_SIEM_TRUSTED_KERNEL_KEYS` | JSON array of independent kernel public-key pins; required when paging is configured. |
 | `CHIO_SIEM_METRICS_ADDR` | Overrides the Prometheus scrape bind address (default `127.0.0.1:9090`). |
 
 At least one real SOC export sink must be configured or `siem-export` fails
 closed at startup; a configured alert backend alone does not satisfy this (see
 `ARCHITECTURE.md`).
+
+Paging also requires `CHIO_SIEM_TRUSTED_KERNEL_KEYS`, a JSON array containing
+1 through 64 unique algorithm-aware public-key strings. Set it from independently
+managed kernel signer configuration, never from an event or receipt database:
+
+```sh
+export CHIO_SIEM_TRUSTED_KERNEL_KEYS='["<independently-configured-kernel-public-key>"]'
+```
+
+Replace the placeholder with an actual key accepted by `PublicKey::from_hex`
+(bare Ed25519 hex, or the existing `p256:`, `p384:`, or hybrid wire format).
+Algorithm support still depends on the verifier's compiled features. The value
+must be at most 1 MiB; malformed, empty, duplicate or weak Ed25519 keys reject
+startup. Non-Unicode values reject too. Supplied malformed configuration also
+rejects SOC-only startup; an absent value is allowed when no paging backend is
+configured. The existing decoder checks key encoding, while receipt verification
+checks cryptographic validity.
+
+Existing paging deployments must add these independent pins before upgrading.
+For signer rotation, explicitly include both accepted identities. The library's
+`AlertingExporterBuilder::with_trusted_kernel_keys` takes typed public keys;
+its default empty set sends no pages. Each dispatch rechecks the original receipt
+ID, strict signature and action hash against its own pins. Mutable SIEM event
+annotations cannot enable paging.
 
 ## Testing
 

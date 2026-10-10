@@ -15,10 +15,15 @@ do
   fi
 done
 
-python3 - <<'PY'
+# Validates every gate configuration and prints one notice per open proof
+# residual; the notices are repeated after the executed checks.
+open_residual_notices="$(python3 - <<'PY'
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, "scripts")
+from kani_open_residual import FOLLOWUP, validate_open_residuals
 
 try:
     import tomllib
@@ -54,9 +59,19 @@ if multi.get("schema") != "chio.kani.multi-crate.v1":
 entries = multi.get("harness")
 if not isinstance(entries, list) or not entries:
     raise SystemExit(f"{multi_rel} must contain a non-empty harness array")
+try:
+    open_residuals = validate_open_residuals(entries, require_expected=True)
+except ValueError as error:
+    raise SystemExit(str(error)) from error
 required_keys = {"crate", "harness", "default_unwind", "timeout_secs", "lane"}
 allowed_keys = required_keys | {
     "unwinding_checks",
+    "require_cover",
+    "open_residual",
+    "memcmp_unwind",
+    "public_key_eq_unwind",
+    "public_key_hex_unwind",
+    "p256_encoder_bounds",
     "features",
     "primary_rust_symbol",
     "notes",
@@ -88,6 +103,43 @@ for index, entry in enumerate(entries):
         raise SystemExit(f"{label}.lane must be pr or nightly")
     if type(entry.get("unwinding_checks", False)) is not bool:
         raise SystemExit(f"{label}.unwinding_checks must be a boolean")
+    require_cover = entry.get("require_cover", False)
+    if type(require_cover) is not bool:
+        raise SystemExit(f"{label}.require_cover must be a boolean")
+    if require_cover and not entry.get("unwinding_checks", False):
+        raise SystemExit(f"{label} cover requires unwinding checks")
+    memcmp_unwind = entry.get("memcmp_unwind")
+    if memcmp_unwind is not None:
+        if type(memcmp_unwind) is not int or not 1 <= memcmp_unwind <= 2**32 - 1:
+            raise SystemExit(f"{label}.memcmp_unwind must be a positive u32")
+        if not require_cover:
+            raise SystemExit(f"{label} memcmp override requires checked reachability")
+    public_key_eq_unwind = entry.get("public_key_eq_unwind")
+    if public_key_eq_unwind is not None:
+        if type(public_key_eq_unwind) is not int or not 1 <= public_key_eq_unwind <= 2**32 - 1:
+            raise SystemExit(f"{label}.public_key_eq_unwind must be a positive u32")
+        if not require_cover or memcmp_unwind is not None:
+            raise SystemExit(f"{label} key recursion override requires checked reachability and no memcmp override")
+    public_key_hex_unwind = entry.get("public_key_hex_unwind")
+    if public_key_hex_unwind is not None:
+        if type(public_key_hex_unwind) is not int or not 0 <= public_key_hex_unwind <= 2**32 - 1:
+            raise SystemExit(f"{label}.public_key_hex_unwind must be a u32")
+        if not require_cover or memcmp_unwind is not None or public_key_eq_unwind is not None:
+            raise SystemExit(f"{label} key hex override requires checked reachability and no other override")
+    p256_encoder_bounds = entry.get("p256_encoder_bounds", False)
+    if type(p256_encoder_bounds) is not bool:
+        raise SystemExit(f"{label}.p256_encoder_bounds must be boolean")
+    if p256_encoder_bounds and (
+        public_key_hex_unwind is not None
+        or public_key_eq_unwind is not None
+        or memcmp_unwind is not None
+        or not require_cover
+        or not entry.get("unwinding_checks", False)
+        or entry["crate"] != "chio-attest-verify"
+        or entry["harness"] != "public_expect_report_data_determinism_and_binding"
+        or entry["default_unwind"] != 136
+    ):
+        raise SystemExit(f"{label} standalone encoder profile requires checked reachability, the original P256 domain and no other override")
     features = entry.get("features", [])
     if not isinstance(features, list) or not all(
         isinstance(feature, str) and feature for feature in features
@@ -131,12 +183,21 @@ if stale_symbols:
     raise SystemExit(
         "covered_symbols entries missing from contract_twin: " + ", ".join(stale_symbols)
     )
+for crate, harness in sorted(open_residuals):
+    print(f"OPEN/UNPROVED: {crate}::{harness} ({FOLLOWUP}); not executed or counted as passed")
 PY
+)"
+if [[ -z "${open_residual_notices}" ]]; then
+  echo "Rust verification lost the open proof residual notice" >&2
+  exit 1
+fi
 
+python3 scripts/check-kani-crypto-scope.py
 ./scripts/check-creusot-body-sync.sh
 
 if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
   echo "Rust verification gate metadata passed; strict Creusot/Kani execution explicitly disabled"
+  printf '%s\n' "${open_residual_notices}"
   exit 0
 fi
 
@@ -157,4 +218,7 @@ fi
 ./scripts/check-kani-public-core.sh
 ./scripts/run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core
 
-echo "Strict Rust verification tools and registered Kani checks passed"
+# Last, so a truncated output tail still separates executed checks from each
+# registered proof that is open and was not run.
+echo "Strict Rust verification tools and executed registered Kani checks passed"
+printf '%s\n' "${open_residual_notices}"

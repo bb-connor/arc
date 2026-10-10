@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::{ConnectInfo, Path, Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{header::AUTHORIZATION, Request, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -13,15 +13,12 @@ use axum::routing::{any, get, post};
 use axum::Json;
 use axum::Router;
 use chio_http_serve::{CappedPeerAddr, MaxConnListener};
-use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use subtle::ConstantTimeEq;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use chio_core_types::capability::{
-    governance::{GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody},
+    governance::GovernedApprovalToken,
     scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -44,50 +41,69 @@ use chio_http_core::{
 use chio_kernel::{
     ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore,
     InMemoryThresholdApprovalCollectorStore, ThresholdApprovalCollector,
-    ThresholdApprovalCollectorStore,
+    ThresholdApprovalCollectorStore, ThresholdApprovalContextResolver,
 };
 use chio_openapi::{ChioExtensions, DefaultPolicy};
 use chio_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
 use crate::evaluator::{DurableAdmissionStores, RequestEvaluator, RouteEntry};
-use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, load_spec_from_file};
+use crate::spec_discovery::default_upstream_egress_contract;
+
+#[path = "proxy/approval_authority.rs"]
+mod approval_authority;
+pub use approval_authority::ProtectApprovalConfig;
 
 #[path = "proxy/approval.rs"]
 mod approval;
 #[path = "proxy/attenuation.rs"]
 mod attenuation;
+#[path = "proxy/clock.rs"]
+mod clock;
 #[path = "proxy/config.rs"]
 mod config;
+#[path = "proxy/control.rs"]
+mod control;
 #[path = "proxy/decision.rs"]
 mod decision;
+#[path = "proxy/evidence.rs"]
+mod evidence;
+mod retention;
+use evidence::SqliteReceiptStore;
+pub use retention::ProtectRetentionConfig;
+
 #[path = "proxy/errors.rs"]
 mod errors;
 #[path = "proxy/http.rs"]
 mod http;
+#[path = "proxy/input.rs"]
+mod input;
 #[path = "proxy/mediated.rs"]
 pub(crate) mod mediated;
-#[path = "proxy/nonce_middleware.rs"]
-mod nonce_middleware;
 #[path = "proxy/receipts.rs"]
 mod receipts;
+#[path = "proxy/request_ids.rs"]
+mod request_ids;
 #[path = "proxy/router.rs"]
 mod router;
 #[path = "proxy/scope_subset.rs"]
 mod scope_subset;
 #[path = "proxy/sidecar.rs"]
 mod sidecar;
+#[path = "proxy/spec_authority.rs"]
+mod spec_authority;
 #[path = "proxy/state.rs"]
 mod state;
+use request_ids::*;
 
 pub(crate) use self::approval::*;
 pub(crate) use self::attenuation::*;
+pub(crate) use self::control::*;
 pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;
 pub(crate) use self::mediated::{
     build_budget_store, build_mediation_kernel, load_revocation_db_ids,
-    reap_expired_reserved_holds_once,
 };
 pub(crate) use self::receipts::*;
 pub(crate) use self::router::*;

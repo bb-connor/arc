@@ -227,9 +227,9 @@ fn challenge_from_assertion(assertion: &PublicKeyCredential) -> Result<String, C
             "assertion clientDataJSON is empty".into(),
         ));
     }
-    let parsed: ClientDataChallenge = serde_json::from_slice(raw).map_err(|err| {
-        CustodyError::AssertionRejected(format!("assertion clientDataJSON parse failed: {err}"))
-    })?;
+    let parsed: ClientDataChallenge =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(raw, 64 * 1024)?
+            .decode_external()?;
     if parsed.challenge.is_empty() {
         return Err(CustodyError::AssertionRejected(
             "assertion clientDataJSON challenge is empty".into(),
@@ -336,8 +336,11 @@ mod tests {
             Ok(_) => panic!("malformed clientDataJSON must fail closed"),
             Err(e) => e,
         };
-        assert!(matches!(err, CustodyError::AssertionRejected(_)));
-        assert_eq!(err.urn(), crate::error::URN_ASSERTION_REJECTED);
+        assert!(matches!(err, CustodyError::Input(_)));
+        assert_eq!(
+            err.urn(),
+            "urn:chio:error:attest:signed-json-canonicalization"
+        );
     }
 
     #[test]
@@ -347,7 +350,7 @@ mod tests {
         );
         let res = challenge_from_assertion(&cred);
         assert!(
-            matches!(res, Err(CustodyError::AssertionRejected(_))),
+            matches!(res, Err(CustodyError::Input(_))),
             "a clientDataJSON without a challenge must be rejected"
         );
     }
@@ -382,6 +385,22 @@ mod tests {
         match store.record_if_fresh(cred, challenge, retain_until) {
             Ok(RecordOutcome::Replayed) => {}
             other => panic!("second observation of the same pair must be a replay: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn original_client_data_rejects_hidden_duplicate_fields_and_lossy_numbers() {
+        for raw in [
+            r#"{"challenge":"nonce","extension":{"role":"secret-sentinel","role":"admin"}}"#,
+            r#"{"challenge":"nonce","extension":9007199254740993}"#,
+        ] {
+            let assertion = assertion_with_client_data(raw);
+            let error = match challenge_from_assertion(&assertion) {
+                Ok(_) => panic!("original client data must be strict"),
+                Err(error) => error,
+            };
+            assert!(matches!(error, CustodyError::Input(_)));
+            assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
         }
     }
 }

@@ -4,6 +4,8 @@ use chio_data_guards::{
 use chio_guards::ContentReviewConfig;
 use serde::{Deserialize, Serialize};
 
+use super::GuardApiKey;
+
 /// Guard configuration from the policy.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -116,7 +118,7 @@ pub struct AzureContentSafetyPolicyConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
     pub endpoint: String,
-    pub api_key: String,
+    pub api_key: GuardApiKey,
     #[serde(default)]
     pub api_version: Option<String>,
     #[serde(default)]
@@ -136,7 +138,7 @@ pub struct AzureContentSafetyPolicyConfig {
 pub struct SafeBrowsingPolicyConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
-    pub api_key: String,
+    pub api_key: GuardApiKey,
     #[serde(default)]
     pub base_url: Option<String>,
     #[serde(default)]

@@ -98,7 +98,12 @@ impl JwtResolvedJwkPublicKey {
         )
     }
 
-    pub(super) fn verify(&self, alg: JwtSignatureAlgorithm, signed_input: &[u8], signature: &[u8]) -> bool {
+    pub(super) fn verify(
+        &self,
+        alg: JwtSignatureAlgorithm,
+        signed_input: &[u8],
+        signature: &[u8],
+    ) -> bool {
         if !self.supports_alg(alg) {
             return false;
         }
@@ -224,6 +229,12 @@ pub(super) fn decode_jwt_parts(
     token: &str,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Result<(JwtHeader, JwtClaims, String, Vec<u8>), Response> {
+    if token.len() > MAX_AUTH_JSON_BYTES {
+        return Err(unauthorized_bearer_response(
+            "JWT bearer token exceeds input limit",
+            protected_resource_metadata,
+        ));
+    }
     let mut parts = token.split('.');
     let Some(header_b64) = parts.next() else {
         return Err(unauthorized_bearer_response(
@@ -250,22 +261,41 @@ pub(super) fn decode_jwt_parts(
         ));
     }
 
-    let header: JwtHeader =
-        serde_json::from_slice(&URL_SAFE_NO_PAD.decode(header_b64).map_err(|_| {
-            unauthorized_bearer_response("invalid JWT header", protected_resource_metadata)
-        })?)
-        .map_err(|_| {
-            unauthorized_bearer_response("invalid JWT header", protected_resource_metadata)
-        })?;
-    let claims: JwtClaims =
-        serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload_b64).map_err(|_| {
-            unauthorized_bearer_response("invalid JWT payload", protected_resource_metadata)
-        })?)
-        .map_err(|_| {
-            unauthorized_bearer_response("invalid JWT payload", protected_resource_metadata)
-        })?;
-    let signature_bytes = URL_SAFE_NO_PAD.decode(signature_b64).map_err(|_| {
-        unauthorized_bearer_response("invalid JWT signature", protected_resource_metadata)
+    let header: JwtHeader = decode_json(
+        &URL_SAFE_NO_PAD.decode(header_b64).map_err(|error| {
+            input::with_source(
+                unauthorized_bearer_response("invalid JWT header", protected_resource_metadata),
+                error,
+            )
+        })?,
+        MAX_AUTH_JSON_BYTES,
+    )
+    .map_err(|error| {
+        input::with_source(
+            unauthorized_bearer_response(error.code(), protected_resource_metadata),
+            error,
+        )
+    })?;
+    let claims: JwtClaims = decode_json(
+        &URL_SAFE_NO_PAD.decode(payload_b64).map_err(|error| {
+            input::with_source(
+                unauthorized_bearer_response("invalid JWT payload", protected_resource_metadata),
+                error,
+            )
+        })?,
+        MAX_AUTH_JSON_BYTES,
+    )
+    .map_err(|error| {
+        input::with_source(
+            unauthorized_bearer_response(error.code(), protected_resource_metadata),
+            error,
+        )
+    })?;
+    let signature_bytes = URL_SAFE_NO_PAD.decode(signature_b64).map_err(|error| {
+        input::with_source(
+            unauthorized_bearer_response("invalid JWT signature", protected_resource_metadata),
+            error,
+        )
     })?;
     Ok((
         header,

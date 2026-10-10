@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # hello-tool
 //!
 //! Reusable native Chio service construction for the hello-tool example. The

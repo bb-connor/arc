@@ -2,27 +2,260 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-gate_source="${root}/scripts/check-chio-owned-v1-only.sh"
-work="$(mktemp -d)"
-trap 'rm -rf "${work}"' EXIT
+fixture="$(mktemp -d)"
+trap 'rm -rf "${fixture}"' EXIT
 
-# Version digits are spliced in at runtime so this file never matches the gate.
-authority() { printf '"chio.security-check-authority.v%s"' "$1"; }
-publication() { printf '"chio.security-check-publication.v%s"' "$1"; }
+mkdir -p "${fixture}"/{crates,spec,sdks,scripts,docs,formal,xtask}
+cp "${root}/scripts/check-chio-owned-v1-only.sh" "${fixture}/scripts/"
 
+printf '%s\n' \
+  'const SCHEMA: &str = "chio.cage-migration-posture.v2";' \
+  > "${fixture}/crates/independent-security.rs"
+printf 'struct ChioSignedBrokerExecutionReceipt%s; const ChioBrokerExecutionReceipt%s: &str = "broker";\n' 'V2' 'V2' \
+  >> "${fixture}/crates/independent-security.rs"
+bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null
+
+printf 'struct CapabilityToken%s;\n' 'V2' > "${fixture}/crates/core-capability.rs"
+if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then
+  echo "future capability token unexpectedly passed the core v1 gate" >&2
+  exit 1
+fi
+
+rm "${fixture}/crates/core-capability.rs"
+printf 'struct ChioSignedBrokerExecutionReceipt%s; struct Receipt%s;\n' 'V2' 'V2' \
+  > "${fixture}/crates/core-receipt.rs"
+if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then
+  echo "a broker envelope hid a future core receipt on the same line" >&2
+  exit 1
+fi
+printf 'const PATH: &str = "receipt/%s.schema.json";\n' 'v2' \
+  > "${fixture}/crates/core-receipt.rs"
+if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then
+  echo "future receipt schema unexpectedly passed the core v1 gate" >&2
+  exit 1
+fi
+
+
+# Internal App authority metadata is confined to exact reviewed paths and
+# literals: quoted v3 in the reviewed producers, validators and regression
+# suites, backtick-quoted v3 in the reviewed evidence narrative, and quoted v2
+# only as the legacy record that the contract checker and identity regressions
+# must refuse.
+rm "${fixture}/crates/core-receipt.rs"
+gate="${fixture}/scripts/check-chio-owned-v1-only.sh"
 auditor=scripts/audit-security-merge-qualification.py
-definitions=scripts/tests/check-security-definitions.test.py
-auditor_v2_line="            and value.get(\"schema\") == $(authority 2)"
-auditor_v3_line="            and value.get(\"schema\") == $(authority 3), \"invalid v3 authority metadata\")"
-definitions_publication_line="                \"schema\": $(publication 2),"
-definitions_authority_line="                    \"schema\": $(authority 3), \"identity\": IDENTITY,"
+contract_checker=scripts/check-security-ci-contract.py
+definitions_suite=scripts/tests/check-security-definitions.test.py
+identity_suite=scripts/tests/trusted-ci-identity-regressions.test.py
+landing_suite=scripts/tests/trusted-ci-landing-regressions.test.py
+revocation_suite=scripts/tests/trusted-ci-revocation-regressions.test.py
+main_codegen_suite=scripts/tests/trusted-main-codegen-regressions.test.py
+evidence_doc=docs/security/committed-linux-evidence.md
+authority_paths=(
+  "$auditor"
+  "$contract_checker"
+  "$definitions_suite"
+  "$identity_suite"
+  "$landing_suite"
+  "$revocation_suite"
+  "$main_codegen_suite"
+)
+legacy_marker_paths=("$contract_checker" "$identity_suite")
+legacy_refusing_paths=("$auditor" "$definitions_suite" "$landing_suite" "$revocation_suite" "$main_codegen_suite")
+unreviewed_paths=(
+  scripts/unreviewed.py
+  "scripts/tests/nested/${identity_suite##*/}"
+  "crates/${contract_checker}"
+  "${identity_suite}.orig"
+)
 
+# Fixture text is assembled from parts so this suite is not itself a gate site.
+authority() { printf 'chio.security-check-authority.v%s' "$1"; }
+core_receipt="struct Receipt""V2;"
+core_token="CapabilityToken""V2"
+normative_claim="Current protocol is v""2"
+
+contract_failures=()
+expect_gate() {
+  local expectation="$1" label="$2" path="$3" text="$4"
+  local status=0 output
+  mkdir -p "$(dirname "${fixture}/${path}")"
+  printf '%s\n' "$text" > "${fixture}/${path}"
+  output="$(bash "$gate" 2>&1)" || status=$?
+  rm "${fixture}/${path}"
+  if [[ "$expectation" == allow ]]; then
+    if ((status == 0)); then
+      printf 'ok %s\n' "$label"
+      return
+    fi
+  elif ((status == 1)) &&
+       [[ "$output" == *"Core capability or receipt v1 contract remnants found:"* ]] &&
+       [[ "$output" == *"  ${path}:1:${text}"* ]]; then
+    printf 'ok %s\n' "$label"
+    return
+  fi
+  printf 'FAILED %s (status %s)\n' "$label" "$status"
+  contract_failures+=("${label}: status ${status}: ${output}")
+}
+
+for path in "${authority_paths[@]}"; do
+  expect_gate allow "reviewed quoted v3 in ${path}" "$path" "SCHEMA = \"$(authority 3)\""
+done
+for path in "${legacy_marker_paths[@]}"; do
+  expect_gate allow "legacy quoted v2 refusal record in ${path}" "$path" "SCHEMA = \"$(authority 2)\""
+done
+expect_gate allow "reviewed backtick v3 in ${evidence_doc}" "$evidence_doc" \
+  "Its strict \`$(authority 3)\` text carries \`I\` and \`K\`."
+
+# Every other authority version stays refused, in reviewed paths too.
+for path in "${authority_paths[@]}"; do
+  expect_gate refuse "quoted v4 in ${path}" "$path" "SCHEMA = \"$(authority 4)\""
+done
+for version in 9 10 11 20 30 33 90; do
+  expect_gate refuse "quoted v${version} in ${auditor}" "$auditor" "SCHEMA = \"$(authority "$version")\""
+done
+for path in "${legacy_marker_paths[@]}"; do
+  for version in 20 22; do
+    expect_gate refuse "quoted v${version} in ${path}" "$path" "SCHEMA = \"$(authority "$version")\""
+  done
+done
+for version in 2 4 30; do
+  expect_gate refuse "backtick v${version} in ${evidence_doc}" "$evidence_doc" "Its strict \`$(authority "$version")\` text"
+done
+
+# The legacy v2 record is not producer-wide.
+for path in "${legacy_refusing_paths[@]}"; do
+  expect_gate refuse "quoted v2 in ${path}" "$path" "SCHEMA = \"$(authority 2)\""
+done
+
+# Unreviewed and near-miss paths get no exemption.
+for path in "${unreviewed_paths[@]}"; do
+  for version in 2 3; do
+    expect_gate refuse "quoted v${version} in unreviewed ${path}" "$path" "SCHEMA = \"$(authority "$version")\""
+  done
+done
+expect_gate refuse "backtick v3 in unreviewed docs/security/other-evidence.md" \
+  docs/security/other-evidence.md "Its strict \`$(authority 3)\` text"
+
+# Each exemption covers only its exact reviewed quoting.
+for path in "$auditor" "$contract_checker" "$identity_suite"; do
+  expect_gate refuse "backtick v3 in ${path}" "$path" "SCHEMA = \`$(authority 3)\`"
+  expect_gate refuse "single-quoted v3 in ${path}" "$path" "SCHEMA = '$(authority 3)'"
+  expect_gate refuse "bare v3 in ${path}" "$path" "SCHEMA = $(authority 3)"
+done
+for path in "${legacy_marker_paths[@]}"; do
+  expect_gate refuse "backtick v2 in ${path}" "$path" "SCHEMA = \`$(authority 2)\`"
+  expect_gate refuse "single-quoted v2 in ${path}" "$path" "SCHEMA = '$(authority 2)'"
+done
+expect_gate refuse "quoted v3 in ${evidence_doc}" "$evidence_doc" "SCHEMA = \"$(authority 3)\""
+expect_gate refuse "single-quoted v3 in ${evidence_doc}" "$evidence_doc" "SCHEMA = '$(authority 3)'"
+expect_gate refuse "bare v3 in ${evidence_doc}" "$evidence_doc" "Its strict $(authority 3) text"
+
+# An exempt identifier cannot hide an adjacent core-wire, normative or
+# authority claim on the same line.
+for adjacent in "$core_receipt" "$core_token" "$normative_claim" "\"$(authority 4)\""; do
+  for path in "${authority_paths[@]}"; do
+    expect_gate refuse "quoted v3 beside ${adjacent} in ${path}" "$path" "SCHEMA = \"$(authority 3)\"; ${adjacent}"
+  done
+  for path in "${legacy_marker_paths[@]}"; do
+    expect_gate refuse "quoted v2 beside ${adjacent} in ${path}" "$path" "SCHEMA = \"$(authority 2)\"; ${adjacent}"
+  done
+  expect_gate refuse "backtick v3 beside ${adjacent} in ${evidence_doc}" "$evidence_doc" \
+    "Its strict \`$(authority 3)\` text; ${adjacent}"
+done
+for path in "${legacy_refusing_paths[@]}"; do
+  expect_gate refuse "quoted v3 beside quoted v2 in ${path}" "$path" \
+    "SCHEMA = \"$(authority 3)\"; LEGACY = \"$(authority 2)\""
+done
+expect_gate refuse "backtick v3 beside quoted v2 in ${evidence_doc}" "$evidence_doc" \
+  "Its strict \`$(authority 3)\` text; \"$(authority 2)\""
+
+# Existing explicitly declared negative corpora retain their fixture policy.
+expect_gate allow "declared negative corpus keeps its fixture policy" \
+  scripts/negative-fixture-corpus/future.py "SCHEMA = \"$(authority 90)\""
+
+# A scanner I/O error must fail the gate instead of authorizing the exemption.
 real_rg="$(command -v rg)"
-mkdir "${work}/tools"
-cat > "${work}/tools/rg" <<'MOCK_RG'
+mkdir "${fixture}/tools"
+cat > "${fixture}/tools/rg" <<'MOCK_RG'
 #!/usr/bin/env bash
-# Fails only the scanner phase named by CHIO_V1_TEST_FAIL and records what that
-# phase received, so each error case proves its target phase was reached.
+# Only the broad post-strip recheck of an exempt line gets an I/O error.
+# The later authority-namespace query must use the real scanner result.
+if [[ "${1:-}" == "-q" && "${2:-}" == *'ReceiptV[2-9]'* ]]; then
+  scanner_input="$(cat)"
+  if [[ "$scanner_input" == 'SCHEMA = ' ]]; then
+    printf '%s\n' 'authority-post-strip-recheck' >> "$CHIO_V1_TEST_TARGET_REACHED"
+    exit 2
+  fi
+  printf '%s\n' "$scanner_input" | "$CHIO_V1_TEST_REAL_RG" "$@"
+  exit "$?"
+fi
+exec "$CHIO_V1_TEST_REAL_RG" "$@"
+MOCK_RG
+chmod +x "${fixture}/tools/rg"
+scanner_target_reached="${fixture}/scanner-target-reached"
+expect_scanner_failure() {
+  local label="$1" path="$2" text="$3"
+  local status=0
+  rm -f "$scanner_target_reached"
+  printf '%s\n' "$text" > "${fixture}/${path}"
+  CHIO_V1_TEST_REAL_RG="$real_rg" CHIO_V1_TEST_TARGET_REACHED="$scanner_target_reached" PATH="${fixture}/tools:$PATH" \
+    bash "$gate" >/dev/null 2>&1 || status=$?
+  rm "${fixture}/${path}"
+  if [[ -f "$scanner_target_reached" ]] &&
+     [[ "$(cat "$scanner_target_reached")" == 'authority-post-strip-recheck' ]] &&
+     ((status == 2)); then
+    printf 'ok %s\n' "$label"
+    return
+  fi
+  printf 'FAILED %s (status %s)\n' "$label" "$status"
+  contract_failures+=("${label}: status ${status}: post-strip recheck fault not reached exactly once with its operational exit")
+}
+expect_scanner_failure "scanner error on the quoted v3 recheck in ${auditor}" \
+  "$auditor" "SCHEMA = \"$(authority 3)\""
+expect_scanner_failure "scanner error on the quoted v2 recheck in ${contract_checker}" \
+  "$contract_checker" "SCHEMA = \"$(authority 2)\""
+expect_scanner_failure "scanner error on the quoted v2 recheck in ${identity_suite}" \
+  "$identity_suite" "SCHEMA = \"$(authority 2)\""
+expect_scanner_failure "scanner error on the backtick v3 recheck in ${evidence_doc}" \
+  "$evidence_doc" "SCHEMA = \`$(authority 3)\`"
+
+# Carry the five compatible controls from the thin-main59 suite without
+# changing Source's core/authority scanner policy or its existing112 cases.
+expect_scanner_failure "scanner error on the quoted v3 recheck in ${definitions_suite}" \
+  "$definitions_suite" "SCHEMA = \"$(authority 3)\""
+
+compatibility_tree=""
+new_compatibility_tree() {
+  compatibility_tree="$(mktemp -d "${fixture}/compatibility.XXXXXX")"
+  mkdir -p "${compatibility_tree}"/{crates,spec,sdks,scripts,docs,formal,xtask}
+  cp "${root}/scripts/check-chio-owned-v1-only.sh" "${compatibility_tree}/scripts/"
+}
+
+new_compatibility_tree
+compatibility_status=0
+compatibility_output="$(bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || compatibility_status=$?
+if ((compatibility_status == 0)) &&
+   [[ "$compatibility_output" == 'Core capability and receipt surfaces remain v1-only.' ]]; then
+  printf 'ok %s\n' 'empty-tree baseline admission'
+else
+  contract_failures+=("empty-tree baseline: status ${compatibility_status}: ${compatibility_output}")
+fi
+
+mkdir -p "${compatibility_tree}/docs/reference"
+printf '%s\n' "$normative_claim" > "${compatibility_tree}/docs/reference/version.md"
+compatibility_status=0
+compatibility_output="$(bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || compatibility_status=$?
+compatibility_expected='Core capability or receipt v1 contract remnants found:'$'\n'"  docs/reference/version.md:1:${normative_claim}"
+if ((compatibility_status == 1)) && [[ "$compatibility_output" == "$compatibility_expected" ]]; then
+  printf 'ok %s\n' 'standalone normative-root claim refusal'
+else
+  contract_failures+=("standalone normative-root claim: status ${compatibility_status}: ${compatibility_output}")
+fi
+
+mkdir "${fixture}/compatibility-tools"
+cat > "${fixture}/compatibility-tools/rg" <<'MOCK_COMPATIBILITY_RG'
+#!/usr/bin/env bash
 phase=generic
 for arg in "$@"; do
   if [[ "$arg" == '*.md' ]]; then
@@ -32,190 +265,41 @@ done
 if [[ "${1:-}" == -q ]]; then
   phase=recheck
 fi
-if [[ "$phase" == "${CHIO_V1_TEST_FAIL:-}" ]]; then
-  if [[ "$phase" == recheck ]]; then
-    cat >> "$CHIO_V1_TEST_REACHED"
-  else
-    printf '%s\n' "$phase" >> "$CHIO_V1_TEST_REACHED"
-  fi
+if [[ "$phase" == "$CHIO_V1_COMPATIBILITY_FAIL" ]]; then
+  printf '%s\n' "$phase" >> "$CHIO_V1_COMPATIBILITY_REACHED"
   exit 2
 fi
-exec "$CHIO_V1_TEST_REAL_RG" "$@"
-MOCK_RG
-chmod +x "${work}/tools/rg"
+exec "$CHIO_V1_COMPATIBILITY_REAL_RG" "$@"
+MOCK_COMPATIBILITY_RG
+chmod +x "${fixture}/compatibility-tools/rg"
 
-tree=""
-new_tree() {
-  tree="$(mktemp -d "${work}/tree.XXXXXX")"
-  mkdir -p "${tree}"/{crates,spec,sdks,scripts,docs,formal,xtask}
-  cp "$gate_source" "${tree}/scripts/check-chio-owned-v1-only.sh"
-}
-
-put() {
-  mkdir -p "${tree}/$(dirname "$1")"
-  printf '%s\n' "$2" >> "${tree}/$1"
-}
-
-failures=0
-pass() { printf 'ok - %s\n' "$1"; }
-fail() {
-  printf 'FAILED - %s: %s\n' "$1" "$2" >&2
-  failures=$((failures + 1))
-}
-
-gate_status=0
-gate_output=""
-run_gate() {
-  gate_status=0
-  gate_output="$(bash "${tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || gate_status=$?
-}
-
-expect_admitted() {
-  run_gate
-  if ((gate_status == 0)) && [[ "$gate_output" == "No Chio-owned pre-release version remnants found." ]]; then
-    pass "$1"
-  else
-    fail "$1" "expected admission, got status ${gate_status}: ${gate_output}"
+expect_compatibility_scan_failure() {
+  local phase="$1" expected_error="$2" reached observed='' status=0 output
+  new_compatibility_tree
+  if [[ "$phase" == normative ]]; then
+    mkdir -p "${compatibility_tree}/docs/reference"
+    printf '%s\n' 'Chio protocol reference.' > "${compatibility_tree}/docs/reference/version.md"
   fi
-}
-
-# The refused tree holds exactly one hit, at line 1 of the named path.
-expect_refused() {
-  local expected
-  expected="Chio-owned pre-release version remnants found:"$'\n'"  $2:1:$3"
-  run_gate
-  if ((gate_status == 1)) && [[ "$gate_output" == "$expected" ]]; then
-    pass "$1"
-  else
-    fail "$1" "expected refusal of $2:1, got status ${gate_status}: ${gate_output}"
-  fi
-}
-
-refuse_single() {
-  new_tree
-  put "$2" "$3"
-  expect_refused "$1" "$2" "$3"
-}
-
-expect_scanner_error() {
-  local name="$1" phase="$2" message="$3" reached_input="$4"
-  local reached="${tree}.reached" observed=""
-  gate_status=0
-  gate_output="$(CHIO_V1_TEST_FAIL="$phase" CHIO_V1_TEST_REACHED="$reached" CHIO_V1_TEST_REAL_RG="$real_rg" \
-    PATH="${work}/tools:${PATH}" bash "${tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || gate_status=$?
+  reached="${compatibility_tree}/scanner-phase-reached"
+  output="$(CHIO_V1_COMPATIBILITY_FAIL="$phase" CHIO_V1_COMPATIBILITY_REACHED="$reached" \
+    CHIO_V1_COMPATIBILITY_REAL_RG="$real_rg" PATH="${fixture}/compatibility-tools:$PATH" \
+    bash "${compatibility_tree}/scripts/check-chio-owned-v1-only.sh" 2>&1)" || status=$?
   if [[ -f "$reached" ]]; then
     observed="$(cat "$reached")"
   fi
-  if ((gate_status == 2)) && [[ "$gate_output" == "$message"* ]] && [[ "$observed" == "$reached_input" ]]; then
-    pass "$name"
+  if ((status == 2)) && [[ "$output" == "$expected_error" ]] && [[ "$observed" == "$phase" ]]; then
+    printf 'ok %s\n' "${phase} scanner error propagated after exact phase reach"
   else
-    fail "$name" "expected ${phase} scanner failure, got status ${gate_status}, reached [${observed}]: ${gate_output}"
+    contract_failures+=("${phase} scanner fault: status ${status}: reached [${observed}]: ${output}")
   fi
 }
+expect_compatibility_scan_failure generic 'ripgrep failed while scanning Chio-owned version remnants'
+expect_compatibility_scan_failure normative 'ripgrep failed while scanning normative version claims'
 
-new_tree
-expect_admitted baseline_empty_tree_passes
-
-# Reviewed internal App check metadata literals, each in its exact reviewed path.
-new_tree
-put "$auditor" "$auditor_v3_line"
-expect_admitted auditor_v3_authority_admitted
-new_tree
-put "$definitions" "$definitions_authority_line"
-expect_admitted definitions_v3_authority_admitted
-new_tree
-put "$definitions" "$definitions_publication_line"
-expect_admitted definitions_v2_publication_admitted
-new_tree
-put "$auditor" "$auditor_v3_line"
-put "$definitions" "$definitions_publication_line"
-put "$definitions" "$definitions_authority_line"
-expect_admitted trusted_definition_shape_admitted
-
-# The auditor reads only the v3 authority; its superseded v2 literal is refused.
-refuse_single auditor_v2_authority_refused "$auditor" "$auditor_v2_line"
-
-# The same literals are refused in every path that was not reviewed for them.
-reviewed_lines=("$auditor_v3_line" "$definitions_authority_line" "$definitions_publication_line")
-unreviewed_paths=(
-  scripts/unreviewed.py
-  scripts/tests/unreviewed.test.py
-  crates/vendor/scripts/audit-security-merge-qualification.py
-  crates/vendor/scripts/tests/check-security-definitions.test.py
-  "${auditor}.orig"
-  "${definitions}.orig"
-)
-for index in "${!reviewed_lines[@]}"; do
-  for path in "${unreviewed_paths[@]}"; do
-    refuse_single "unreviewed_path_refused[${index}:${path}]" "$path" "${reviewed_lines[$index]}"
-  done
-done
-refuse_single auditor_refuses_definitions_publication "$auditor" "$definitions_publication_line"
-refuse_single definitions_refuse_auditor_v2_authority "$definitions" "$auditor_v2_line"
-
-# Unreviewed versions stay refused in the reviewed paths.
-for version in 4 8 30; do
-  refuse_single "auditor_authority_v${version}_refused" "$auditor" \
-    "            and value.get(\"schema\") == $(authority "$version")"
-  refuse_single "definitions_authority_v${version}_refused" "$definitions" \
-    "                    \"schema\": $(authority "$version"), \"identity\": IDENTITY,"
-done
-for version in 3 4 30; do
-  refuse_single "definitions_publication_v${version}_refused" "$definitions" \
-    "                \"schema\": $(publication "$version"),"
-done
-
-# A reviewed literal never hides an adjacent core-wire or normative claim.
-reviewed_paths=("$auditor" "$definitions" "$definitions")
-adjacent_claims=(
-  "$(printf '  # Receipt%s' V2)"
-  "$(printf '  # CapabilityToken%s' V2)"
-  "$(printf '  # current protocol is v%s' 2)"
-)
-for index in "${!reviewed_lines[@]}"; do
-  for claim_index in "${!adjacent_claims[@]}"; do
-    refuse_single "adjacent_claim_refused[${index}:${claim_index}]" "${reviewed_paths[$index]}" \
-      "${reviewed_lines[$index]}${adjacent_claims[$claim_index]}"
-  done
-done
-refuse_single auditor_adjacent_publication_refused "$auditor" "${auditor_v3_line}, $(publication 2)"
-refuse_single definitions_adjacent_auditor_v2_refused "$definitions" "${definitions_authority_line} $(authority 2)"
-
-# Other generic hits in the reviewed paths, including inexact spellings of the
-# reviewed literals, remain refused.
-refuse_single auditor_receipt_refused "$auditor" "$(printf 'struct Receipt%s:' V2)"
-refuse_single auditor_unquoted_authority_refused "$auditor" "$(printf '# requires chio.security-check-authority.v%s' 3)"
-refuse_single auditor_single_quoted_authority_refused "$auditor" "$(printf "SCHEMA = 'chio.security-check-authority.v%s'" 3)"
-refuse_single definitions_receipt_schema_refused "$definitions" "$(printf 'SCHEMA = "chio.receipt.v%s"' 2)"
-refuse_single definitions_unquoted_publication_refused "$definitions" "$(printf '# emits chio.security-check-publication.v%s' 2)"
-refuse_single definitions_single_quoted_authority_refused "$definitions" "$(printf "SCHEMA = 'chio.security-check-authority.v%s'" 3)"
-refuse_single core_capability_token_refused crates/core.rs "$(printf 'struct CapabilityToken%s;' V2)"
-refuse_single normative_claim_refused docs/reference/version.md "$(printf 'The current protocol is v%s.' 2)"
-
-# Scanner failures exit with the scanner status instead of admitting a line.
-new_tree
-put "$auditor" "$auditor_v3_line"
-expect_scanner_error generic_scan_error_fails_closed generic \
-  "ripgrep failed while scanning Chio-owned version remnants" generic
-new_tree
-put docs/reference/version.md "Chio protocol reference."
-expect_scanner_error normative_scan_error_fails_closed normative \
-  "ripgrep failed while scanning normative version claims" normative
-new_tree
-put "$auditor" "$auditor_v3_line"
-expect_scanner_error auditor_v3_recheck_error_fails_closed recheck \
-  "ripgrep failed while rechecking" '            and value.get("schema") == , "invalid v3 authority metadata")'
-new_tree
-put "$definitions" "$definitions_authority_line"
-expect_scanner_error definitions_authority_recheck_error_fails_closed recheck \
-  "ripgrep failed while rechecking" '                    "schema": , "identity": IDENTITY,'
-new_tree
-put "$definitions" "$definitions_publication_line"
-expect_scanner_error definitions_publication_recheck_error_fails_closed recheck \
-  "ripgrep failed while rechecking" '                "schema": ,'
-
-if ((failures)); then
-  printf 'check-chio-owned-v1-only.test.sh: %d case(s) failed\n' "$failures" >&2
+if ((${#contract_failures[@]})); then
+  printf '%s\n' "Authority namespace contract failures:" >&2
+  printf '  %s\n' "${contract_failures[@]}" >&2
   exit 1
 fi
-echo "check-chio-owned-v1-only.test.sh: version gate contract passed"
+
+echo "Core v1 version gate contract passed"

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

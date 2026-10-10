@@ -49,6 +49,9 @@ pub enum FrostRosterResolutionError {
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum FrostAnchorError {
+    #[error(transparent)]
+    UntrustedInput(chio_core_types::canonical::SharedUntrustedJsonError),
+
     #[error("FROST external anchor unavailable: {0}")]
     Unavailable(String),
     #[error("FROST external anchor returned invalid data: {0}")]

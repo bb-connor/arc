@@ -20,13 +20,12 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
-use chio_core::receipt::decision::Decision;
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 /// On-the-wire format for the Sumo Logic batch body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SumoLogicFormat {
-    /// Newline-delimited JSON, one full [`crate::event::SiemEvent`] per line.
+    /// Newline-delimited JSON, one unsigned sink projection per line.
     #[default]
     Json,
     /// Compact single-line text per event.
@@ -170,39 +169,27 @@ impl SumoLogicExporter {
     }
 
     fn format_event(&self, event: &SiemEvent) -> Result<String, ExportError> {
-        let reason = redact_for_operator_log(decision_reason(event));
+        let projection = event.sink_projection();
         match self.config.format {
-            SumoLogicFormat::Json => serde_json::to_string(event).map_err(|e| {
-                ExportError::SerializationError(format!(
-                    "failed to serialize receipt {}: {e}",
-                    event.receipt.id
-                ))
+            SumoLogicFormat::Json => serde_json::to_string(&projection).map_err(|error| {
+                ExportError::SerializationError(format!("failed to serialize receipt projection: {error}"))
             }),
             SumoLogicFormat::Text => Ok(format!(
-                "ts={} id={} tool={} tool_server={} receipt_kind={} boundary_class={} authorized={} decision={} reason={}",
-                event.receipt.timestamp,
-                event.receipt.id,
-                event.receipt.tool_name,
-                event.receipt.tool_server,
-                event.receipt_kind.as_str(),
-                event.boundary_class.as_str(),
-                event.authorized,
-                decision_label(event),
-                reason.replace('\n', " "),
+                "ts={} id={} tool_sha256={} tool_server_sha256={} receipt_kind={} boundary_class={} authorized={} decision={} result={} parameter_hash={} payload_included=false original_retrieval_required=true projection_signed=false signature_scope=original_receipt",
+                projection.timestamp, projection.event_reference(),
+                projection.tool_name_sha256.as_str(), projection.tool_server_sha256.as_str(),
+                projection.receipt_kind.as_str(), projection.boundary_class.as_str(),
+                projection.authorized, projection.decision_label(), projection.result_label(),
+                projection.parameter_hash.as_ref().map(|hash| hash.as_str()).unwrap_or("absent"),
             )),
             SumoLogicFormat::KeyValue => Ok(format!(
-                "receipt_id={} timestamp={} tool={} tool_server={} capability={} receipt_kind={} boundary_class={} authorized={} decision={} result=\"{}\" reason=\"{}\"",
-                event.receipt.id,
-                event.receipt.timestamp,
-                event.receipt.tool_name,
-                event.receipt.tool_server,
-                event.receipt.capability_id,
-                event.receipt_kind.as_str(),
-                event.boundary_class.as_str(),
-                event.authorized,
-                decision_label(event),
-                event.result.replace('"', "'"),
-                reason.replace('"', "'"),
+                "receipt_id={} timestamp={} tool_sha256={} tool_server_sha256={} capability_sha256={} receipt_kind={} boundary_class={} authorized={} decision={} result=\"{}\" parameter_hash={} payload_included=false original_retrieval_required=true projection_signed=false signature_scope=original_receipt",
+                projection.event_reference(), projection.timestamp,
+                projection.tool_name_sha256.as_str(), projection.tool_server_sha256.as_str(),
+                projection.capability_id_sha256.as_str(), projection.receipt_kind.as_str(),
+                projection.boundary_class.as_str(), projection.authorized,
+                projection.decision_label(), projection.result_label(),
+                projection.parameter_hash.as_ref().map(|hash| hash.as_str()).unwrap_or("absent"),
             )),
         }
     }
@@ -281,32 +268,6 @@ impl Exporter for SumoLogicExporter {
                 "Sumo Logic returned {status}: {body_text}"
             )))
         })
-    }
-}
-
-fn decision_label(event: &SiemEvent) -> &str {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return event.receipt_kind.as_str();
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "allow",
-        Some(Decision::Deny { .. }) => "deny",
-        Some(Decision::Cancelled { .. }) => "cancelled",
-        Some(Decision::Incomplete { .. }) => "incomplete",
-        None => event.receipt_kind.as_str(),
-    }
-}
-
-fn decision_reason(event: &SiemEvent) -> String {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return event.result.clone();
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "allowed".to_string(),
-        Some(Decision::Deny { reason, guard }) => format!("{guard}: {reason}"),
-        Some(Decision::Cancelled { reason }) => reason.clone(),
-        Some(Decision::Incomplete { reason }) => reason.clone(),
-        None => event.result.clone(),
     }
 }
 

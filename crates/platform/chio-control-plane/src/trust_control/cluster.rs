@@ -1,14 +1,16 @@
 use super::report_rendering::{
-    authority_snapshot_from_view, authority_snapshot_view, budget_cursor_view,
-    json_response_with_leader_visibility, json_response_with_leader_visibility_and_budget_commit,
-    revocation_cursor_from_view, revocation_cursor_view, stored_child_receipt_views,
-    stored_lineage_views, stored_tool_receipt_views,
+    budget_cursor_view, json_response_with_leader_visibility,
+    json_response_with_leader_visibility_and_budget_commit, revocation_cursor_from_view,
+    revocation_cursor_view, stored_child_receipt_views, stored_lineage_views,
+    stored_tool_receipt_views,
 };
 use super::report_validation::{
     normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_auth,
 };
 use super::*;
 
+#[path = "cluster/authority_evidence.rs"]
+mod authority_evidence;
 #[path = "cluster/consensus.rs"]
 mod consensus;
 #[path = "cluster/deltas.rs"]
@@ -22,9 +24,11 @@ mod snapshots;
 
 pub(crate) use consensus::{
     budget_authority_guarantee_level, budget_authority_metadata_view, build_cluster_state,
-    cluster_authority_lease_view, cluster_consensus_and_authority_lease_view,
-    cluster_consensus_view, cluster_self_url, compute_cluster_consensus_locked,
-    current_budget_event_authority, current_leader_url, handle_internal_cluster_status,
+    cluster_authority_lease_view, cluster_authority_read_role,
+    cluster_consensus_and_authority_lease_view, cluster_consensus_view, cluster_self_url,
+    compute_cluster_consensus_locked, current_budget_event_authority, current_leader_url,
+    handle_internal_cluster_status, ClusterAuthorityReadContext, ClusterAuthorityReadRole,
+    ClusterAuthorityServingEvidence,
 };
 pub(crate) use deltas::{
     budget_cursor_from_event, budget_mutation_event_view, budget_mutation_record_from_view,
@@ -36,13 +40,14 @@ pub(crate) use deltas::{
     wait_for_budget_write_quorum_commit, BudgetWriteToken,
 };
 pub(crate) use partition::{
-    clamp_down_peer_budget_acks, clear_peer_revocation_cursor, handle_internal_cluster_partition,
-    peer_budget_cursor, peer_child_seq, peer_is_partitioned, peer_lineage_seq,
-    peer_revocation_cursor, peer_should_force_snapshot, peer_tool_seq,
-    request_peer_snapshot_recovery, update_peer_budget_acks, update_peer_budget_cursor,
-    update_peer_child_seq, update_peer_delta_records, update_peer_failure, update_peer_lineage_seq,
-    update_peer_reachable, update_peer_revocation_cursor, update_peer_state, update_peer_success,
-    update_peer_sync_error, update_peer_tool_seq,
+    clamp_down_peer_budget_acks, clear_peer_authority_error, clear_peer_revocation_cursor,
+    handle_internal_cluster_partition, peer_budget_cursor, peer_child_seq, peer_is_partitioned,
+    peer_lineage_seq, peer_revocation_cursor, peer_should_force_snapshot, peer_tool_seq,
+    request_peer_snapshot_recovery, update_peer_authority_error, update_peer_budget_acks,
+    update_peer_budget_cursor, update_peer_child_seq, update_peer_delta_records,
+    update_peer_failure, update_peer_lineage_seq, update_peer_reachable,
+    update_peer_revocation_cursor, update_peer_state, update_peer_success, update_peer_sync_error,
+    update_peer_tool_seq,
 };
 pub(crate) use pull_budget::{
     current_revocation_cursor_requires_snapshot, ensure_current_revocation_cursor,
@@ -52,8 +57,7 @@ pub(crate) use pull_budget::{
     PullError, PullRoundBudget, RevocationPeerContract, PEER_ROUND_WALL_CLOCK_BUDGET,
 };
 pub(crate) use snapshots::{
-    apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,
-    handle_internal_cluster_snapshot,
+    cluster_replication_heads, handle_internal_authority_snapshot, handle_internal_cluster_snapshot,
 };
 
 #[cfg(test)]
@@ -63,11 +67,12 @@ pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_loc
 pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, finalize_peer_sync_round,
-    import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull,
+    import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull, sync_peer,
+    sync_peer_authority,
 };
 
 // Non-test: peer_was_demoted (in deltas) reads peer health via with_peer_state.
 pub(crate) use partition::with_peer_state;
 
 #[cfg(test)]
-pub(crate) use snapshots::build_cluster_state_snapshot;
+pub(crate) use snapshots::{apply_cluster_snapshot, build_cluster_state_snapshot};

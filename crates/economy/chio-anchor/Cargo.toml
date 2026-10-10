@@ -19,6 +19,7 @@ web3 = [
     "dep:alloy-sol-types",
     "dep:async-trait",
     "dep:chio-core",
+    "dep:chio-security-types",
     "dep:chio-egress-contract",
     "dep:chio-kernel",
     "dep:chio-web3-bindings",
@@ -50,6 +51,7 @@ fuzz = ["web3", "dep:arbitrary"]
 kani = ["web3"]
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"], optional = true }
 chio-core = { workspace = true, optional = true }
 chio-egress-contract = { workspace = true, features = ["reqwest-egress"], optional = true }
 chio-kernel = { workspace = true, optional = true }
@@ -78,10 +80,13 @@ tokio = { workspace = true }
 rand = { workspace = true }
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 # `cfg(kani)` is set automatically by the Kani toolchain (see
 # `crates/economy/chio-anchor/src/kani_public_harnesses.rs`). Register the
 # cfg with check-cfg so default `cargo build` / `cargo clippy` passes

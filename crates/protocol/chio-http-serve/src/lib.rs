@@ -37,7 +37,15 @@
 mod drain;
 mod hygiene;
 mod listener;
+mod private_pem;
 mod signal;
+mod transport;
+pub use private_pem::PemError;
+pub use transport::{
+    PreparedServerTransport, ServerTransportConfig, TransportError, TransportListener,
+};
+#[cfg(test)]
+mod transport_tests;
 
 pub use drain::{run_until_drained, DrainOutcome, ServeError};
 pub use hygiene::{

@@ -33,12 +33,6 @@ pub fn verify_dsse_envelope(
     }
 
     let (statement, statement_bytes) = envelope.decode_statement()?;
-    let canonical_statement_bytes = statement.canonical_bytes()?;
-    if canonical_statement_bytes != statement_bytes {
-        return Err(BilateralCoSigningError::CanonicalJson(
-            "statement.malformed: payload is not canonical JSON".to_string(),
-        ));
-    }
 
     if statement.statement_type != STATEMENT_TYPE_V1 {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
@@ -192,12 +186,6 @@ fn verify_chio_bilateral_dsse_envelope_inner(
     }
 
     let (statement, statement_bytes) = envelope.decode_statement()?;
-    let canonical_statement_bytes = statement.canonical_bytes()?;
-    if canonical_statement_bytes != statement_bytes {
-        return Err(BilateralCoSigningError::CanonicalJson(
-            "statement.malformed: payload is not canonical JSON".to_string(),
-        ));
-    }
 
     if statement.statement_type != STATEMENT_TYPE_V1 {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
@@ -619,17 +607,12 @@ fn decode_embedded_receipt(
             "predicate.schema_invalid: receipt_canonical_json is required".to_string(),
         )
     })?;
-    let receipt: ChioReceipt = serde_json::from_str(receipt_canonical_json)
-        .map_err(|e| BilateralCoSigningError::CanonicalJson(format!("receipt json: {e}")))?;
-    let canonical = canonical_json_bytes(&receipt)
-        .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
-    let canonical_json = String::from_utf8(canonical)
-        .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
-    if &canonical_json != receipt_canonical_json {
-        return Err(BilateralCoSigningError::CanonicalJson(
-            "predicate.schema_invalid: receipt_canonical_json is not canonical".to_string(),
-        ));
-    }
+    let receipt: ChioReceipt = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        receipt_canonical_json.as_bytes(),
+        4 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_canonical())
+    .map_err(|e| BilateralCoSigningError::CanonicalJson(format!("receipt json: {e}")))?;
     Ok(receipt)
 }
 

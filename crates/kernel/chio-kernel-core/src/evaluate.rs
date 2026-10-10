@@ -84,8 +84,9 @@ pub struct EvaluationVerdict {
     pub reason: Option<String>,
     /// Grant index that admitted the request. Populated on Allow.
     pub matched_grant_index: Option<usize>,
-    /// Verified capability snapshot. Populated when signature + time
-    /// checks succeeded, even if a later guard denied.
+    /// Verified capability snapshot. May be populated after signature and time
+    /// checks succeed, including when a later guard denies. Unsupported security
+    /// bindings are refused without exposing this snapshot.
     pub verified: Option<VerifiedCapability>,
 }
 
@@ -349,18 +350,38 @@ pub fn evaluate_with_full_floor_and_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
+    evaluate_with_full_floor_and_evidence(
+        input,
+        crypto_floor,
+        crate::capability_verify::CapabilityEvidenceContext {
+            features: crate::capability_verify::CapabilityFeatureContext { peer, direct_root },
+            ancestors: &[],
+        },
+        trust_root,
+        budgets,
+    )
+}
+
+/// Evaluate with signed intermediate capability evidence for recursive chains.
+pub fn evaluate_with_full_floor_and_evidence(
+    input: EvaluateInput<'_>,
+    crypto_floor: CapabilityCryptoFloor,
+    evidence: crate::capability_verify::CapabilityEvidenceContext<'_>,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> EvaluationVerdict {
     // Step 1: capability verification with all defenses except
     // persistent sibling-sum admission. Admission mutates the supplied
     // registry, so defer it until subject, scope, and guard checks have
     // passed. Otherwise a validly signed token for the wrong request can
     // consume sibling share and starve later valid siblings.
     let mut verify_only_budgets = NoopBudgetRegistry;
-    let verified = match crate::capability_verify::verify_capability_full_with_root(
+    let verified = match crate::capability_verify::verify_capability_full_with_evidence(
         input.capability,
         input.trusted_issuers,
         input.clock,
         crypto_floor,
-        crate::capability_verify::CapabilityFeatureContext { peer, direct_root },
+        evidence,
         trust_root,
         &mut verify_only_budgets,
     ) {
@@ -397,17 +418,42 @@ fn finish_verified_evaluation(
     verified: VerifiedCapability,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
+    // Pure verification is shared with native admission, which retains the
+    // original token and enforces an authoritative security context. Portable
+    // evaluation has no such context and must refuse before guards or budgets.
+    match input.capability.security_binding() {
+        Ok(Some(_)) => {
+            return deny(
+                KernelCoreError::UnsupportedCapabilityFeature {
+                    feature: "authenticated security context".to_string(),
+                },
+                None,
+                None,
+            );
+        }
+        Ok(None) => {}
+        Err(error) => {
+            return deny(
+                KernelCoreError::InvalidCapability(CapabilityError::AttenuationViolation(
+                    error.to_string(),
+                )),
+                None,
+                None,
+            );
+        }
+    }
+
     // Step 2: subject binding.
-    if verified.subject_hex != input.request.agent_id {
+    if verified.subject_hex() != input.request.agent_id {
         let core_err = KernelCoreError::SubjectMismatch {
-            expected: verified.subject_hex.clone(),
+            expected: verified.subject_hex().to_string(),
             actual: input.request.agent_id.clone(),
         };
         return deny(core_err, None, Some(verified));
     }
 
     // Step 3: scope match.
-    let matched_grant_index = match resolve_matched_grant_index(&verified.scope, input.request) {
+    let matched_grant_index = match resolve_matched_grant_index(verified.scope(), input.request) {
         Ok(index) => index,
         Err(error) => return deny(error, None, Some(verified)),
     };
@@ -415,7 +461,7 @@ fn finish_verified_evaluation(
     // Step 4: guard pipeline.
     let ctx = GuardContext {
         request: input.request,
-        scope: &verified.scope,
+        scope: verified.scope(),
         agent_id: &input.request.agent_id,
         server_id: &input.request.server_id,
         session_filesystem_roots: input.session_filesystem_roots,
@@ -729,7 +775,7 @@ mod tests {
             Some(split) => split,
             None => panic!("registered parent budget split was missing"),
         };
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
         assert!(split.children.is_empty());
     }
 
@@ -774,7 +820,7 @@ mod tests {
             Some(split) => split,
             None => panic!("registered parent budget split was missing"),
         };
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
         assert!(split.children.is_empty());
     }
 

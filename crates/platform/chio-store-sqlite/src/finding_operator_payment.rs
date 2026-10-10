@@ -5,9 +5,10 @@
 //! payment request. It is suitable for the single-operator pilot where the
 //! operator's venue ledger is the settlement rail.
 
+use chio_security_types::clock::{Clock, SystemClock};
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use chio_core::sha256_hex;
 #[cfg(test)]
@@ -37,11 +38,17 @@ const MAX_TEXT_BYTES: usize = 512;
 /// Durable local-credit settlement adapter for the operator pilot.
 #[derive(Clone)]
 pub struct SqliteFindingOperatorPaymentAdapter {
+    clock: crate::store_clock::StoreClock,
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteFindingOperatorPaymentAdapter {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, String> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(path: impl AsRef<Path>, clock: Arc<dyn Clock>) -> Result<Self, String> {
         let path = path.as_ref();
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -51,18 +58,28 @@ impl SqliteFindingOperatorPaymentAdapter {
             .max_size(8)
             .build(manager)
             .map_err(|error| error.to_string())?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     pub fn open_in_memory() -> Result<Self, String> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, String> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
         let pool = Pool::builder()
             .max_size(1)
             .build(manager)
             .map_err(|error| error.to_string())?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -114,6 +131,7 @@ impl SqliteFindingOperatorPaymentAdapter {
         &self,
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, String> {
+        let now = self.now_secs()?;
         validate_request(request)?;
         let authorization_id = authorization_id(request);
         let governed_intent_id = request
@@ -156,12 +174,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                           AND governed_intent_id IS NULL
                           AND governed_intent_hash IS NULL
                         "#,
-                        params![
-                            existing.authorization_id,
-                            intent_id,
-                            intent_hash,
-                            now_secs()
-                        ],
+                        params![existing.authorization_id, intent_id, intent_hash, now],
                     )
                     .map_err(|error| error.to_string())?;
                 }
@@ -176,12 +189,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                           AND governed_intent_id = ?4
                           AND governed_intent_hash IS NULL
                         "#,
-                        params![
-                            existing.authorization_id,
-                            intent_hash,
-                            now_secs(),
-                            intent_id
-                        ],
+                        params![existing.authorization_id, intent_hash, now, intent_id],
                     )
                     .map_err(|error| error.to_string())?;
                 }
@@ -194,7 +202,6 @@ impl SqliteFindingOperatorPaymentAdapter {
             tx.commit().map_err(|error| error.to_string())?;
             return Ok(held_authorization(existing.authorization_id, true));
         }
-        let now = now_secs();
         tx.execute(
             r#"
             INSERT INTO chio_finding_operator_payments
@@ -225,6 +232,7 @@ impl SqliteFindingOperatorPaymentAdapter {
         authorization_id: &str,
         action: SettlementAction<'_>,
     ) -> Result<PaymentResult, String> {
+        let now = self.now_secs()?;
         validate_text(authorization_id, "authorization_id")?;
         let mut conn = self.pool.get().map_err(|error| error.to_string())?;
         let tx = conn
@@ -315,7 +323,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                 authorization_id,
                 target_state,
                 transaction_id,
-                now_secs(),
+                now,
                 prior_transaction_id,
             ],
         )
@@ -347,6 +355,7 @@ impl SqliteFindingOperatorPaymentAdapter {
         amount_units: u64,
         currency: &str,
     ) -> Result<(), String> {
+        self.now_secs()?;
         validate_reconciliation_binding(payer, amount_units, currency)?;
         validate_text(reference, "reference")?;
         let conn = self.pool.get().map_err(|error| error.to_string())?;
@@ -367,6 +376,7 @@ impl SqliteFindingOperatorPaymentAdapter {
         amount_units: u64,
         currency: &str,
     ) -> Result<(), String> {
+        let now = self.now_secs()?;
         validate_reconciliation_binding(payer, amount_units, currency)?;
         validate_text(governed_intent_id, "governed_intent_id")?;
         validate_text(request_id, "request_id")?;
@@ -383,6 +393,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                 payer,
                 amount_units,
                 currency,
+                now,
             )?;
         }
         if record.is_none() {
@@ -482,6 +493,7 @@ fn bind_legacy_payment_from_journal(
     payer: &str,
     amount_units: u64,
     currency: &str,
+    now: i64,
 ) -> Result<Option<PaymentRecord>, String> {
     let journal_exists: bool = tx
         .query_row(
@@ -537,7 +549,7 @@ fn bind_legacy_payment_from_journal(
               AND governed_intent_id IS NULL
               AND governed_intent_hash IS NULL
             "#,
-            params![authorization_id, governed_intent_id, now_secs()],
+            params![authorization_id, governed_intent_id, now],
         )
         .map_err(|error| error.to_string())?;
     if changed != 1 {
@@ -772,7 +784,7 @@ fn validate_request(request: &PaymentAuthorizeRequest) -> Result<(), String> {
     validate_text(&request.reference, "reference")?;
     validate_text(&request.payer, "payer")?;
     validate_text(&request.payee, "payee")?;
-    if request.amount_units == 0 || request.amount_units > i64::MAX as u64 {
+    if request.amount_units == 0 || request.amount_units > i64::MAX.unsigned_abs() {
         return Err("payment amount is outside the supported range".to_owned());
     }
     if request.currency.len() != 3
@@ -796,7 +808,7 @@ fn validate_reconciliation_binding(
     currency: &str,
 ) -> Result<(), String> {
     validate_text(payer, "payer")?;
-    if amount_units == 0 || amount_units > i64::MAX as u64 {
+    if amount_units == 0 || amount_units > i64::MAX.unsigned_abs() {
         return Err("payment amount is outside the supported range".to_owned());
     }
     if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
@@ -859,15 +871,18 @@ fn payment_result(
     }
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
+impl SqliteFindingOperatorPaymentAdapter {
+    fn now_secs(&self) -> Result<i64, String> {
+        self.clock.now_secs().map_err(|error| error.to_string())
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 

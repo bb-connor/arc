@@ -1,5 +1,6 @@
-struct DurableUrlElicitationServer {
-    store: std::sync::Arc<TestAdmissionOperationStore>,
+use super::*;
+pub(super) struct DurableUrlElicitationServer {
+    pub(super) store: std::sync::Arc<TestAdmissionOperationStore>,
 }
 
 #[async_trait::async_trait]

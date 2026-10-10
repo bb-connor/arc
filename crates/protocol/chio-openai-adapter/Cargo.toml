@@ -21,6 +21,7 @@ async-trait = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-kernel = { workspace = true }
+chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true, optional = true }
 chio-tool-call-fabric = { workspace = true, optional = true }

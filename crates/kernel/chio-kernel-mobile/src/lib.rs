@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! Mobile FFI for the Chio kernel core.
 //!
 //! This adapter wraps the portable [`chio_kernel_core`](chio_kernel_core)
@@ -28,7 +42,7 @@
 //! - [`verify_app_attest_evidence`] -- App Attest evidence verifier.
 //! - [`attest_play_integrity`] -- Play Integrity challenge entry point.
 //! - [`verify_play_integrity_evidence`] -- Play Integrity JWS verifier.
-//! - [`verify_mobile_receipt`] -- mobile attestation receipt verifier.
+//! - [`inspect_mobile_receipt_envelopes`] -- non-authoritative mobile envelope inspection.
 //!
 //! # Offline guarantees
 //!
@@ -55,7 +69,10 @@
 // clippy in the strict workspace configuration flag that as
 // `empty-line-after-doc-comments`; since we don't author the
 // generated file, we allow it crate-wide here.
-#![allow(clippy::empty_line_after_doc_comments)]
+#![allow(
+    clippy::empty_line_after_doc_comments,
+    reason = "The platform crate separates generated binding documentation from its implementation."
+)]
 
 mod clock;
 mod errors;
@@ -74,7 +91,7 @@ use chio_core_types::capability::{
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_custody_hw::{
-    verify_app_attest, verify_mobile_receipt_chain, verify_play_integrity,
+    parse_mobile_receipt_envelopes, verify_app_attest, verify_play_integrity,
     AppAttestVerificationInput, AttestationError, PlayIntegrityVerificationInput,
 };
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
@@ -87,7 +104,7 @@ use chio_kernel_core::{
 };
 
 // ---------------------------------------------------------------------------
-// UniFFI record types (mirror `VerifiedCapability` / `VerifiedPassport`).
+// UniFFI record types (mirror `CapabilityVerificationRecord` / `VerifiedPassport`).
 // ---------------------------------------------------------------------------
 
 /// Verified capability snapshot projected across the FFI.
@@ -97,7 +114,7 @@ use chio_kernel_core::{
 /// callers that want to inspect the scope pass `scope_json` through
 /// their host-side Chio SDK decoder.
 #[derive(Debug, Clone)]
-pub struct VerifiedCapability {
+pub struct CapabilityVerificationRecord {
     pub id: String,
     pub subject_hex: String,
     pub issuer_hex: String,
@@ -285,11 +302,7 @@ fn chio_hash(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
-    if now_secs < 0 {
-        None
-    } else {
-        Some(FixedClock::new(now_secs as u64))
-    }
+    u64::try_from(now_secs).ok().map(FixedClock::new)
 }
 
 fn seed_budget_registry(
@@ -376,7 +389,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
     // honour it (useful for deterministic testing harnesses on the
     // Swift/Kotlin side); otherwise fall back to `MobileClock`.
     let fixed_clock: Option<FixedClock> = match parsed.now_secs {
-        Some(secs) if secs > 0 => Some(FixedClock::new(secs as u64)),
+        Some(secs) if secs > 0 => fixed_clock_from_secs(secs),
         _ => None,
     };
     let mobile_clock = MobileClock::new();
@@ -571,7 +584,7 @@ pub fn sign_receipt_relaying_trusted_body(
 pub fn verify_capability(
     token_json: String,
     authority_pub_hex: String,
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let token: CapabilityToken =
         serde_json::from_str(&token_json).map_err(|error| ChioMobileError::InvalidJson {
             message: format!("capability token: {error}"),
@@ -600,7 +613,7 @@ pub fn verify_capability(
 /// delegated tokens.
 pub fn verify_capability_with_context(
     request_json: String,
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let parsed: VerifyCapabilityRequest =
         serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
             message: format!("verify capability request: {error}"),
@@ -641,7 +654,7 @@ fn verify_capability_with_parts(
     direct_root_capability: Option<CapabilityToken>,
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     parent_budget_snapshots: &[ParentBudgetSnapshot],
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let fixed_clock = now_secs.and_then(fixed_clock_from_secs);
     let mobile_clock = MobileClock::new();
     let clock: &dyn Clock = match &fixed_clock {
@@ -693,18 +706,18 @@ fn verify_capability_with_parts(
     })?;
 
     let scope_json =
-        serde_json::to_string(&verified.scope).map_err(|error| ChioMobileError::Internal {
+        serde_json::to_string(verified.scope()).map_err(|error| ChioMobileError::Internal {
             message: format!("serialize capability scope: {error}"),
         })?;
 
-    Ok(VerifiedCapability {
-        id: verified.id,
-        subject_hex: verified.subject_hex,
-        issuer_hex: verified.issuer_hex,
+    Ok(CapabilityVerificationRecord {
+        id: verified.id().to_owned(),
+        subject_hex: verified.subject_hex().to_owned(),
+        issuer_hex: verified.issuer_hex().to_owned(),
         scope_json,
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
     })
 }
 
@@ -724,7 +737,7 @@ pub fn verify_passport(
         })?;
 
     let fixed_clock: Option<FixedClock> = if now_secs > 0 {
-        Some(FixedClock::new(now_secs as u64))
+        fixed_clock_from_secs(now_secs)
     } else {
         None
     };
@@ -768,12 +781,12 @@ pub fn verify_passport(
         })?;
 
     Ok(PortablePassportMetadata {
-        subject: verified.subject,
-        issuer_hex: verified.issuer.to_hex(),
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
-        payload_canonical_hex: hex::encode(&verified.payload_canonical_bytes),
+        subject: verified.subject().to_owned(),
+        issuer_hex: verified.issuer().to_hex(),
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
+        payload_canonical_hex: hex::encode(verified.payload_canonical_bytes()),
     })
 }
 
@@ -909,23 +922,14 @@ pub fn verify_play_integrity_evidence(
 /// This does not authorize a capability or prove device integrity. It returns
 /// an explicit non-authoritative status until full receipt-chain verification
 /// is wired to trusted issuer pins and challenge binding.
-pub fn verify_mobile_receipt(
+pub fn inspect_mobile_receipt_envelopes(
     receipt_json: String,
     evidence_json: String,
 ) -> Result<String, ChioMobileError> {
-    let _: serde_json::Value =
-        serde_json::from_str(&receipt_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("mobile receipt: {error}"),
-        })?;
-    let _: serde_json::Value =
-        serde_json::from_str(&evidence_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("mobile attestation evidence: {error}"),
-        })?;
-
-    let verified = verify_mobile_receipt_chain(&receipt_json, &evidence_json)
+    let verified = parse_mobile_receipt_envelopes(&receipt_json, &evidence_json)
         .map_err(map_attestation_error)?;
     serde_json::to_string(&serde_json::json!({
-        "schema": "chio.mobile.receipt-verification.v1",
+        "schema": "chio.mobile.receipt-inspection.v1",
         "status": "shape_only",
         "receipt_kind": "trace_observation",
         "boundary_class": "detect_only",

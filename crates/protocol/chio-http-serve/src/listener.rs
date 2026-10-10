@@ -8,7 +8,6 @@ use std::task::{Context, Poll};
 use axum::extract::connect_info::Connected;
 use axum::serve::{IncomingStream, Listener};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio::net::TcpListener;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Wrap any [`axum::serve::Listener`] with a hard cap on concurrent
@@ -82,7 +81,7 @@ where
 }
 
 /// Peer socket address for a connection accepted through a
-/// [`MaxConnListener`] over a [`TcpListener`].
+/// [`MaxConnListener`] over a socket-addressed listener, including TLS.
 ///
 /// axum's built-in connect-info impl for [`SocketAddr`] is bound to the concrete
 /// `TcpListener`, so a capped site cannot ask for `ConnectInfo<SocketAddr>`
@@ -106,8 +105,12 @@ impl std::fmt::Display for CappedPeerAddr {
     }
 }
 
-impl Connected<IncomingStream<'_, MaxConnListener<TcpListener>>> for CappedPeerAddr {
-    fn connect_info(stream: IncomingStream<'_, MaxConnListener<TcpListener>>) -> Self {
+impl<L> Connected<IncomingStream<'_, MaxConnListener<L>>> for CappedPeerAddr
+where
+    L: Listener<Addr = SocketAddr>,
+    L::Io: Unpin,
+{
+    fn connect_info(stream: IncomingStream<'_, MaxConnListener<L>>) -> Self {
         Self(*stream.remote_addr())
     }
 }

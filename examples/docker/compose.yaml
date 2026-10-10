@@ -8,9 +8,10 @@ services:
       dockerfile: deploy/docker/Dockerfile
       target: chio-trust-demo
     environment:
-      CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
+      CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
     ports:
-      - "${CHIO_TRUST_PORT:-8940}:8940"
+      - "127.0.0.1:${CHIO_TRUST_PORT:-8940}:8940"
     volumes:
       - chio_demo_state:/var/lib/chio
     healthcheck:
@@ -21,6 +22,7 @@ services:
       start_period: 5s
 
   chio-mcp-demo:
+    profiles: [enforced-native]
     image: chio-mcp-demo:local
     build:
       context: ../..
@@ -28,10 +30,20 @@ services:
       target: chio-mcp-demo
     environment:
       CHIO_AUTH_TOKEN: ${CHIO_AUTH_TOKEN:-demo-token}
+      CHIO_ADMIN_TOKEN: ${CHIO_ADMIN_TOKEN:-demo-admin-token}
       CHIO_CONTROL_URL: http://chio-trust-demo:8940
-      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-token}
+      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
+      CHIO_CAGE_INIT: ${CHIO_CAGE_INIT:-}
+      CHIO_RECEIPT_ANCHOR_ROOT: ${CHIO_RECEIPT_ANCHOR_ROOT:-}
+      CHIO_CAGE_READ_PATHS_FILE: ${CHIO_CAGE_READ_PATHS_FILE:-}
+    # A qualified host override must mount the configured static cage helper,
+    # independent receipt anchor and reviewed read grants at these exact paths.
+    # The entrypoint requires Enforced provisioning; there is no inactive fallback.
+    tmpfs:
+      - /run/chio-provision:rw,noexec,nosuid,nodev,size=67108864,mode=0700,uid=10001,gid=10001
     ports:
-      - "${CHIO_EDGE_PORT:-8931}:8931"
+      - "127.0.0.1:${CHIO_EDGE_PORT:-8931}:8931"
     depends_on:
       chio-trust-demo:
         condition: service_healthy
@@ -43,7 +55,7 @@ services:
       dockerfile: deploy/docker/Dockerfile
       target: chio-proof-room-quickstart
     ports:
-      - "${CHIO_PROOF_ROOM_PORT:-7391}:7391"
+      - "127.0.0.1:${CHIO_PROOF_ROOM_PORT:-7391}:7391"
 
 volumes:
   chio_demo_state:

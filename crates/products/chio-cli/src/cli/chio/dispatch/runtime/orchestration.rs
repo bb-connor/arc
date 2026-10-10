@@ -59,33 +59,27 @@ pub(crate) fn cmd_chio_runtime_orchestrate_plan(
             CliError::cli_other_error(format!("Chio runtime orchestration plan: {error}"))
         })?;
     if plan.accepted {
+        let lease = begin_runtime_write(&store, &plan.run_id)?;
+        let steps = plan
+            .planned_steps
+            .iter()
+            .map(|step| chio_runtime::RuntimeOrchestrationStepState {
+                step_index: step.step_index,
+                admission_id: step.admission_id.clone(),
+                state: step.state.clone(),
+                destructive: false,
+                admission_report_sha256: None,
+                tool_receipt_sha256: None,
+                lease_id: None,
+            })
+            .collect::<Vec<_>>();
         store
-            .record_run_state(&plan.run_id, "planned", None, now_unix_ms)
+            .complete_run_write(&lease, "planned", None, &steps, &[])
             .map_err(|error| {
                 CliError::cli_other_error(format!(
-                    "Chio runtime orchestration planned run state: {error}"
+                    "Chio runtime orchestration planned progress: {error}"
                 ))
             })?;
-        for step in &plan.planned_steps {
-            store
-                .record_run_step_state(
-                    &plan.run_id,
-                    chio_runtime::RuntimeOrchestrationStepState {
-                        step_index: step.step_index,
-                        admission_id: step.admission_id.clone(),
-                        state: step.state.clone(),
-                        destructive: false,
-                        admission_report_sha256: None,
-                        tool_receipt_sha256: None,
-                        lease_id: None,
-                    },
-                )
-                .map_err(|error| {
-                    CliError::cli_other_error(format!(
-                        "Chio runtime orchestration planned step state: {error}"
-                    ))
-                })?;
-        }
     }
     write_pretty_json(report, &plan, "Chio runtime orchestration plan")
 }
@@ -112,17 +106,13 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
         CliError::cli_other_error(format!("Chio runtime orchestration store: {error}"))
     })?;
     ensure_runtime_evidence_dir(evidence_dir)?;
+    let lease = begin_runtime_write(&store, &run_contract.run_id)?;
     let evidence = match chio_runtime::load_runtime_orchestration_evidence(evidence_dir) {
         Ok(evidence) => evidence,
         Err(error) => {
             let failure_code = error.code().to_string();
             store
-                .record_run_state(
-                    &run_contract.run_id,
-                    "terminal_failure",
-                    Some(&failure_code),
-                    now_unix_ms,
-                )
+                .complete_run_write(&lease, "terminal_failure", Some(&failure_code), &[], &[])
                 .map_err(|store_error| {
                     CliError::cli_other_error(format!(
                         "Chio runtime orchestration failed run state: {store_error}"
@@ -189,16 +179,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
     } else {
         "terminal_failure"
     };
-    store
-        .record_run_state(
-            &run_contract.run_id,
-            status,
-            failure_code.as_deref(),
-            now_unix_ms,
-        )
-        .map_err(|error| {
-            CliError::cli_other_error(format!("Chio runtime orchestration run state: {error}"))
-        })?;
     let mut step_states = Vec::new();
     for step in evidence.workflow_run_report.step_evidence {
         let state = chio_runtime::RuntimeOrchestrationStepState {
@@ -210,22 +190,21 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
             tool_receipt_sha256: Some(step.tool_receipt_sha256),
             lease_id: step.lease_id,
         };
-        store
-            .record_run_step_state(&run_contract.run_id, state.clone())
-            .map_err(|error| {
-                CliError::cli_other_error(format!("Chio runtime orchestration step state: {error}"))
-            })?;
         step_states.push(state);
     }
-    for entry in &evidence.manifest.entries {
-        store
-            .record_evidence_artifact(&run_contract.run_id, entry, now_unix_ms)
-            .map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "Chio runtime orchestration evidence artifact: {error}"
-                ))
-            })?;
-    }
+    store
+        .complete_run_write(
+            &lease,
+            status,
+            failure_code.as_deref(),
+            &step_states,
+            &evidence.manifest.entries,
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "Chio runtime orchestration committed progress: {error}"
+            ))
+        })?;
     let report_value = chio_runtime::RuntimeOrchestrationRunReport {
         schema: chio_runtime::CHIO_RUNTIME_ORCHESTRATION_RUN_REPORT_SCHEMA.to_string(),
         run_id: run_contract.run_id,
@@ -261,14 +240,9 @@ pub(crate) fn cmd_chio_runtime_orchestrate_resume(
     report: &Path,
 ) -> Result<(), CliError> {
     let profile = load_runtime_orchestration_profile(profile)?;
-    let mut resolved: chio_runtime::RuntimeOrchestrationResumePlan = serde_json::from_str(
+    let mut resolved: chio_runtime::RuntimeOrchestrationResumePlan = crate::input::text(
         &read_utf8_json_file(resume_plan, "Chio runtime orchestration resume plan")?,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "Chio runtime orchestration resume plan parse: {error}"
-        ))
-    })?;
+    )?;
     chio_runtime::validate_runtime_orchestration_resume_plan(&resolved).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration resume plan: {error}"))
     })?;
@@ -453,4 +427,19 @@ pub(crate) fn cmd_chio_runtime_orchestrate_drift(
         ));
     };
     write_pretty_json(report, &drift, "Chio runtime proof drift report")
+}
+
+// Report time is an input to evidence evaluation, not run-lease authority.
+// Store-owned time is observed under SQLite's committing transaction.
+fn begin_runtime_write(
+    store: &chio_runtime::SqliteRuntimeOrchestrationStore,
+    run_id: &str,
+) -> Result<chio_runtime::RuntimeRunLease, CliError> {
+    store.register_run(run_id).map_err(|error| {
+        CliError::cli_other_error(format!("Chio runtime run registration: {error}"))
+    })?;
+    let owner = format!("chio-cli:{}", uuid::Uuid::new_v4());
+    store
+        .acquire_current_run_lease(run_id, &owner, 60_000)
+        .map_err(|error| CliError::cli_other_error(format!("Chio runtime run lease: {error}")))
 }

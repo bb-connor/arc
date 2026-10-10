@@ -106,6 +106,11 @@ def transport_response_to_dict(response: TransportResponse) -> dict:
     }
 
 
+# A session that declared roots answers server requests carried by any of
+# its request streams with the router it was initialized with.
+SESSION_NESTED_ROUTERS: dict[str, tuple[NestedCallbackRouter, ChioSession, str]] = {}
+
+
 def post_rpc(
     base_url: str,
     auth_token: str,
@@ -114,6 +119,13 @@ def post_rpc(
     protocol_version: str | None = None,
     on_message=None,
 ) -> dict:
+    if on_message is None and session_id in SESSION_NESTED_ROUTERS:
+        router, session, step_prefix = SESSION_NESTED_ROUTERS[session_id]
+        on_message = lambda message: router.handle(
+            message,
+            session,
+            step_prefix=f"{step_prefix}rpc/nested",
+        )
     return transport_response_to_dict(
         sdk_post_rpc(
             client=None,
@@ -249,6 +261,7 @@ def initialize_session(
                     "messages": session.handshake.initialized_response.messages,
                 }
             )
+            SESSION_NESTED_ROUTERS[session.session_id] = (nested_router, session, step_prefix)
             return session
         except Exception as error:  # noqa: BLE001
             if attempt == 29:

@@ -128,6 +128,16 @@ flowchart TD
    represent (for example workload-identity gating, or selective confirmation
    under a wildcard scope) compiles to an empty or minimal grant rather than
    silently widening access.
+
+   Automatic default grants require an enabled `rules.tool_access` block.
+   Missing rules, a missing tool block, or a disabled tool block produce an
+   empty default scope. Other configured guards still compile. The pure
+   evaluator continues to report no additional restriction for an absent
+   tool rule; it does not mint capability authority. The development
+   `permissive` builtin opts into wildcard tool access explicitly, while
+   `remote-desktop` remains guard-only until a caller supplies tool rules.
+   This replaces the former implicit wildcard default scope without
+   changing enabled tool-rule default/allowlist semantics.
 6. **Optional wrappers.** `evaluate_audited` wraps step 4 with elapsed-time
    measurement and a SHA-256 hash of the policy's canonical JSON into a
    `DecisionReceipt`. `detection::evaluate_with_detection` wraps step 4 with
@@ -205,6 +215,8 @@ timestamps, `thiserror` for error types.
 - The root prefix `/` matches all canonical workload paths.
 - Trailing slash input in policy prefixes normalizes to the same segment
   boundary.
-- Tool allow/block/default semantics, runtime-assurance checks, warning-only
-  workload identity preferences, posture checks, conditions, and default-scope
-  compilation are stable.
+- Enabled tool allow/block/default semantics, runtime-assurance checks,
+  warning-only workload identity preferences, posture checks, and conditions
+  retain their existing contracts. Default-scope compilation requires an
+  enabled tool rule; it does not turn omission or disabled enforcement into
+  signed wildcard authority.

@@ -292,9 +292,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         &trust.trusted_checkpoint_signer_keys,
     )?;
 
-    let graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
     let nodes = graph
         .get("nodes")
         .and_then(Value::as_array)
@@ -328,12 +326,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         .transpose()?;
     let finding_bytes = artifact_bytes(artifacts, finding_node.path)?;
     require_exact_canonical_json(finding_node.path, finding_bytes)?;
-    let finding: Finding = serde_json::from_slice(finding_bytes).map_err(|error| {
-        invalid_artifact(
-            finding_node.path,
-            format!("invalid signed Finding: {error}"),
-        )
-    })?;
+    let finding: Finding = crate::decode_evidence_json(finding_bytes)?;
     verify_finding(&finding)
         .map_err(|error| invalid_artifact(finding_node.path, error.to_string()))?;
 
@@ -382,13 +375,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
 
     let report_bytes = artifact_bytes(artifacts, report_node.path)?;
     require_exact_canonical_json(report_node.path, report_bytes)?;
-    let report: SignedFindingVerifierReport =
-        serde_json::from_slice(report_bytes).map_err(|error| {
-            invalid_artifact(
-                report_node.path,
-                format!("invalid signed verifier report: {error}"),
-            )
-        })?;
+    let report: SignedFindingVerifierReport = crate::decode_evidence_json(report_bytes)?;
     let typed_report_bytes = canonical_json_bytes(&report).map_err(|error| {
         invalid_artifact(
             report_node.path,
@@ -579,12 +566,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         let purchase_record_bytes = artifact_bytes(artifacts, purchase_record_node.path)?;
         require_exact_canonical_json(purchase_record_node.path, purchase_record_bytes)?;
         let purchase_record: SignedFindingPurchaseRecord =
-            serde_json::from_slice(purchase_record_bytes).map_err(|error| {
-                invalid_artifact(
-                    purchase_record_node.path,
-                    format!("invalid signed Finding purchase record: {error}"),
-                )
-            })?;
+            crate::decode_evidence_json(purchase_record_bytes)?;
         let typed_purchase_record_bytes =
             canonical_json_bytes(&purchase_record).map_err(|error| {
                 invalid_artifact(
@@ -1414,12 +1396,7 @@ fn parse_cognition_claim_set(
     artifacts: &BTreeMap<String, Vec<u8>>,
 ) -> Result<ClaimSet, TransactionPassportError> {
     let bytes = artifact_bytes(artifacts, &passport.claim_set_path)?;
-    let claim_set: ClaimSet = serde_json::from_slice(bytes).map_err(|error| {
-        invalid_artifact(
-            &passport.claim_set_path,
-            format!("invalid ClaimSet: {error}"),
-        )
-    })?;
+    let claim_set: ClaimSet = crate::decode_evidence_json(bytes)?;
     if claim_set.schema != "chio.transaction.claim-set.v1"
         || claim_set.id.is_empty()
         || claim_set.issued_at.is_empty()
@@ -1557,8 +1534,7 @@ fn parse_recipe(
     bytes: &[u8],
 ) -> Result<FindingReplayRecipeInput, TransactionPassportError> {
     require_exact_canonical_json(path, bytes)?;
-    let recipe: FindingReplayRecipeInput = serde_json::from_slice(bytes)
-        .map_err(|error| invalid_artifact(path, format!("invalid replay recipe: {error}")))?;
+    let recipe: FindingReplayRecipeInput = crate::decode_evidence_json(bytes)?;
     recipe
         .validate()
         .map_err(|error| invalid_artifact(path, error.to_string()))?;

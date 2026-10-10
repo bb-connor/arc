@@ -17,11 +17,10 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
-use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
 /// Guard name reported by [`VirusTotalGuard::name`].
@@ -36,11 +35,30 @@ pub const DEFAULT_MIN_DETECTIONS: u64 = 5;
 /// Default request timeout.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Policy for a documented VirusTotal `NotFoundError`, distinct from service failure.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VirusTotalUnseenPolicy {
+    /// Unknown reputation cannot authorize the operation (the default).
+    #[default]
+    Deny,
+    /// Explicitly permit targets VirusTotal has never seen.
+    Allow,
+}
+
+impl VirusTotalUnseenPolicy {
+    fn verdict(self) -> Verdict {
+        match self {
+            Self::Deny => Verdict::Deny,
+            Self::Allow => Verdict::Allow,
+        }
+    }
+}
+
 /// Configuration for [`VirusTotalGuard`].
 #[derive(Clone)]
 pub struct VirusTotalConfig {
     /// `x-apikey` header.
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Override the base URL (test hook).
     pub base_url: Option<String>,
     /// Detection threshold. Calls are denied when
@@ -48,6 +66,8 @@ pub struct VirusTotalConfig {
     pub min_detections: u64,
     /// Per-request HTTP timeout.
     pub timeout: Duration,
+    /// Decision for a valid, documented unseen result. Provider failures still error.
+    pub unseen_policy: VirusTotalUnseenPolicy,
 }
 
 impl std::fmt::Debug for VirusTotalConfig {
@@ -57,6 +77,7 @@ impl std::fmt::Debug for VirusTotalConfig {
             .field("base_url", &self.base_url)
             .field("min_detections", &self.min_detections)
             .field("timeout", &self.timeout)
+            .field("unseen_policy", &self.unseen_policy)
             .finish()
     }
 }
@@ -65,10 +86,11 @@ impl VirusTotalConfig {
     /// Construct a config with defaults.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             base_url: None,
             min_detections: DEFAULT_MIN_DETECTIONS,
             timeout: DEFAULT_TIMEOUT,
+            unseen_policy: VirusTotalUnseenPolicy::default(),
         }
     }
 
@@ -81,6 +103,12 @@ impl VirusTotalConfig {
     /// Override the detection threshold.
     pub fn with_min_detections(mut self, threshold: u64) -> Self {
         self.min_detections = threshold.max(1);
+        self
+    }
+
+    /// Choose the decision for unseen URLs and hashes, independently of circuit policy.
+    pub fn with_unseen_policy(mut self, policy: VirusTotalUnseenPolicy) -> Self {
+        self.unseen_policy = policy;
         self
     }
 
@@ -109,6 +137,21 @@ struct VirusTotalResponse {
     data: Option<VirusTotalData>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VirusTotalErrorResponse {
+    error: VirusTotalApiError,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VirusTotalApiError {
+    code: String,
+    // Require the documented string shape, but never expose provider text.
+    #[serde(rename = "message")]
+    _message: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct VirusTotalData {
     #[serde(default)]
@@ -123,9 +166,7 @@ struct VirusTotalAttributes {
 
 #[derive(Debug, Clone, Deserialize)]
 struct VirusTotalStats {
-    #[serde(default)]
     malicious: u64,
-    #[serde(default)]
     suspicious: u64,
 }
 
@@ -206,7 +247,7 @@ impl ExternalGuard for VirusTotalGuard {
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
-        let args: VirusTotalArgs = serde_json::from_str(&ctx.arguments_json).ok()?;
+        let args: VirusTotalArgs = super::super::input::arguments(&ctx.arguments_json).ok()?;
         if let Some(h) = args.hash.as_deref().and_then(normalize_sha256_hex) {
             return Some(format!("vt:file:{h}"));
         }
@@ -224,9 +265,7 @@ impl ExternalGuard for VirusTotalGuard {
     }
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
-        let args: VirusTotalArgs = serde_json::from_str(&ctx.arguments_json).map_err(|e| {
-            ExternalGuardError::Permanent(format!("invalid virustotal arguments: {e}"))
-        })?;
+        let args: VirusTotalArgs = super::super::input::arguments(&ctx.arguments_json)?;
 
         let endpoint = if let Some(raw_hash) = args.hash.as_deref() {
             let Some(hash) = normalize_sha256_hex(raw_hash) else {
@@ -251,7 +290,7 @@ impl ExternalGuard for VirusTotalGuard {
         let mut headers = HeaderMap::new();
         headers.insert(
             "x-apikey",
-            HeaderValue::from_str(self.cfg.api_key.as_str())
+            HeaderValue::from_str(self.cfg.api_key.expose_secret())
                 .map_err(|e| ExternalGuardError::Permanent(format!("invalid api key: {e}")))?,
         );
 
@@ -262,30 +301,22 @@ impl ExternalGuard for VirusTotalGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
-
-        // 404 -> not found in VT database. We allow-by-default so that a
-        // previously-unseen hash/URL doesn't block benign traffic. Upstream
-        // callers can layer additional controls.
-        if status.as_u16() == 404 {
-            tracing::info!(guard = GUARD_NAME, "virustotal: target not found");
-            return Ok(Verdict::Allow);
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            let error: VirusTotalErrorResponse = super::super::input::response(resp.body())?;
+            if error.error.code == "NotFoundError" {
+                return Ok(self.cfg.unseen_policy.verdict());
+            }
         }
-
-        if !status.is_success() {
-            return Err(classify_status_error("virustotal", status, &text));
-        }
-
-        let parsed: VirusTotalResponse = serde_json::from_str(&text)
-            .map_err(|e| ExternalGuardError::Transient(format!("parse vt response: {e}")))?;
+        let parsed: VirusTotalResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
         let (malicious, suspicious) = parsed
             .data
             .and_then(|d| d.attributes)
             .and_then(|a| a.last_analysis_stats)
             .map(|s| (s.malicious, s.suspicious))
-            .unwrap_or((0, 0));
+            .ok_or_else(|| {
+                ExternalGuardError::Permanent("missing VirusTotal analysis statistics".into())
+            })?;
 
         let detections = malicious.saturating_add(suspicious);
         tracing::info!(

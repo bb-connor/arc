@@ -45,6 +45,8 @@ The crate owns lift/lower and transport only; it has no dependency on
   already-fetched response payload without going through the transport.
 - `GeminiAdapter::lower_function_response` - lower a verdict and tool result
   into a `FunctionResponsePart`.
+- `GeminiAdapter::lower_function_call_response` - the same, echoing the
+  call's `id` so parallel calls to one function stay matched.
 - `GeminiAdapterConfig::new` - builds a config with `api_version` pinned to
   `GEMINI_API_VERSION`; also carries `server_id`, `server_name`,
   `server_version`, `public_key`, and `project_id`.
@@ -82,7 +84,8 @@ one valid inline JSON object.
 | `ProviderError::Upstream5xx` | `{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}` | HTTP transport boundary | Any 5xx status from the Generative Language API. |
 | `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://generativelanguage.googleapis.com","timeout_ms":60000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (60s default). |
 | `ProviderError::VerdictBudgetExceeded` | `{"provider":"gemini","event":"functionCall","observed_ms":300,"budget_ms":250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
-| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | current adapter path | `lift_batch` requires at least one `functionCall` part; also non-JSON bytes, an unparseable envelope, or a malformed `functionCall` / `functionResponse` shape. |
+| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | current adapter path | `lift_batch` requires at least one `functionCall` part; also non-stream JSON bytes, an unparseable envelope, or a malformed `functionCall` / `functionResponse` shape. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 ## Testing

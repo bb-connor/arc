@@ -148,9 +148,8 @@ pub struct EvmSignature {
     pub s: String,
 }
 
-#[derive(Clone, PartialEq, Eq)]
 pub struct DualSignReleaseInput {
-    pub(super) operator_private_key_hex: zeroize::Zeroizing<String>,
+    pub(super) operator_private_key_hex: secrecy::SecretString,
     pub observed_amount: MonetaryAmount,
 }
 
@@ -161,7 +160,7 @@ impl DualSignReleaseInput {
         observed_amount: MonetaryAmount,
     ) -> Self {
         Self {
-            operator_private_key_hex: zeroize::Zeroizing::new(operator_private_key_hex.into()),
+            operator_private_key_hex: secrecy::SecretString::from(operator_private_key_hex.into()),
             observed_amount,
         }
     }

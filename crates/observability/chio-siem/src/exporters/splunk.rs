@@ -149,16 +149,17 @@ impl Exporter for SplunkHecExporter {
             // CRITICAL: HEC expects newline-separated objects, NOT a JSON array.
             let mut parts: Vec<String> = Vec::with_capacity(events.len());
             for ev in events {
+                let projection = ev.sink_projection();
                 let mut envelope = serde_json::json!({
-                    "time": ev.receipt.timestamp as f64,
+                    "time": projection.timestamp,
                     "sourcetype": &self.config.sourcetype,
                     "fields": {
-                        "receipt_kind": ev.receipt_kind.clone(),
-                        "boundary_class": ev.boundary_class.clone(),
-                        "result": ev.result.clone(),
-                        "authorized": ev.authorized,
+                        "receipt_kind": projection.receipt_kind,
+                        "boundary_class": projection.boundary_class,
+                        "result": projection.result_label(),
+                        "authorized": projection.authorized,
                     },
-                    "event": &ev.receipt,
+                    "event": &projection,
                 });
 
                 if let Some(index) = &self.config.index {

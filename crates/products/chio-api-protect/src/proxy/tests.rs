@@ -7,8 +7,7 @@ use chio_core_types::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_http_core::{
-    http_status_scope, AuthMethod, RespondResponse, CHIO_HTTP_STATUS_SCOPE_DECISION,
-    CHIO_HTTP_STATUS_SCOPE_FINAL,
+    http_status_scope, AuthMethod, CHIO_HTTP_STATUS_SCOPE_DECISION, CHIO_HTTP_STATUS_SCOPE_FINAL,
 };
 use chio_kernel::{ApprovalOutcome, ApprovalRequest};
 use chio_openapi::PolicyDecision;
@@ -24,6 +23,14 @@ mod upstream_failures;
 
 #[path = "tests/health.rs"]
 mod health;
+
+#[path = "tests/control_auth.rs"]
+mod control_auth;
+
+#[path = "tests/control_containment.rs"]
+mod control_containment;
+
+use control_auth::{with_authenticated_control_peer, with_peer_addr, TEST_CONTROL_TOKEN};
 
 const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"
@@ -161,7 +168,7 @@ impl MockUpstreamServer {
     }
 }
 
-fn test_state(routes: Vec<RouteEntry>, upstream: String) -> Arc<ProxyState> {
+pub(super) fn test_state(routes: Vec<RouteEntry>, upstream: String) -> Arc<ProxyState> {
     test_state_with_receipt_db(routes, upstream, None)
 }
 
@@ -172,7 +179,8 @@ fn test_state_with_receipt_db(
 ) -> Arc<ProxyState> {
     let keypair = Keypair::generate();
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
-        Arc::new(SqliteApprovalStore::open(path).test_unwrap())
+        let _receipt = chio_store_sqlite::SqliteReceiptStore::open(path).test_unwrap();
+        Arc::new(SqliteApprovalStore::open_colocated_with_receipt_store(path).test_unwrap())
     } else {
         Arc::new(InMemoryApprovalStore::new())
     };
@@ -209,18 +217,21 @@ fn test_state_with_receipt_db(
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
-    );
+    )
+    .with_anonymous_reads(true);
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
         .build()
         .test_unwrap();
     Arc::new(ProxyState {
+        clock: clock::ProxyClock::default(),
         evaluator,
         signer_keypair: keypair,
         upstream,
         http_client,
         egress_contract,
         approval_admin: ApprovalAdmin::new(approval_store),
+        approval_config: None,
         receipt_log: Mutex::new(ReceiptLog { receipts }),
         tool_receipt_log: Mutex::new(ToolReceiptLog {
             receipts: tool_receipts,
@@ -230,14 +241,13 @@ fn test_state_with_receipt_db(
         revoked_capability_ids: Mutex::new(revoked_capability_ids),
         trusted_capability_issuers,
         trusted_receipt_signers,
-        sidecar_control_token: None,
+        sidecar_control_token: Some(TEST_CONTROL_TOKEN.to_owned()),
         budget_store: None,
         mediation_hold_capable: false,
         mediation_kernel: None,
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
-        reaper_handle: Mutex::new(None),
         allow_advisory: true,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
@@ -296,16 +306,6 @@ fn temp_receipt_db_path() -> String {
     let mut path = std::env::temp_dir();
     path.push(format!("chio-api-protect-test-{}.db", uuid::Uuid::now_v7()));
     path.to_string_lossy().to_string()
-}
-
-fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {
-    // The capped serve listener exposes the peer address as `CappedPeerAddr`, so
-    // the sidecar-control checks read `ConnectInfo<CappedPeerAddr>`; mirror that
-    // extension type here rather than the bare `SocketAddr`.
-    request
-        .extensions_mut()
-        .insert(ConnectInfo(CappedPeerAddr(peer)));
-    request
 }
 
 fn with_loopback_peer(request: Request<Body>) -> Request<Body> {
@@ -462,7 +462,7 @@ paths:
 }
 
 #[test]
-fn x_chio_side_effects_false_overrides_mutating_method() {
+fn unpinned_side_effects_false_cannot_override_mutating_method() {
     let spec = r#"
 openapi: 3.1.0
 info:
@@ -484,7 +484,7 @@ paths:
         .find(|route| route.pattern == "/safe-post" && route.method == HttpMethod::Post)
         .test_unwrap();
 
-    assert_eq!(route.policy, PolicyDecision::SessionAllow);
+    assert_eq!(route.policy, PolicyDecision::DenyByDefault);
 }
 
 #[test]
@@ -600,7 +600,7 @@ async fn approval_routes_are_handled_before_proxy_catch_all() {
         &approver,
         GovernedApprovalDecision::Approved,
     );
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(format!("/approvals/{}/respond", approval.approval_id))
@@ -621,20 +621,20 @@ async fn approval_routes_are_handled_before_proxy_catch_all() {
         .oneshot(request)
         .await
         .test_unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     let body = to_bytes(response.into_body(), 1024 * 1024)
         .await
         .test_unwrap();
-    let json: RespondResponse = serde_json::from_slice(&body).test_unwrap();
-    assert_eq!(json.approval_id, "ap-route-1");
-    assert_eq!(json.outcome, ApprovalOutcome::Approved);
+    let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
+    assert_eq!(json["error"], "approval_rejected");
+    assert_eq!(json["message"], "approval authority is not configured");
     assert!(state
         .approval_admin
         .store()
         .get_pending("ap-route-1")
         .test_unwrap()
-        .is_none());
+        .is_some());
 }
 
 #[tokio::test]
@@ -644,7 +644,7 @@ async fn metrics_route_serves_rule_pack_families_when_authorized() {
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("GET")
             .uri("/metrics")
@@ -677,7 +677,7 @@ async fn metrics_route_serves_rule_pack_families_when_authorized() {
 #[tokio::test]
 async fn metrics_route_is_gated() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    // No loopback peer and no bearer token: the sidecar-control gate must refuse.
+    // No bearer token: the sidecar-control gate must refuse.
     let request = Request::builder()
         .method("GET")
         .uri("/metrics")
@@ -695,219 +695,59 @@ async fn metrics_route_is_gated() {
 }
 
 #[tokio::test]
-async fn submit_approval_creates_pending_record_signed_by_sidecar() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let subject = Keypair::generate();
-    let payload = serde_json::json!({
-        "capability_id": "cap-submit-1",
-        "tool_server": "shell",
-        "tool_name": "run_command",
-        "parameter_hash": "a".repeat(64),
-        "requested_by": subject.public_key().to_hex(),
-        "summary": "rm -rf old_build/",
-        "ttl_seconds": 300,
-        "triggered_by": ["shell.requires_approval"],
-    });
-    let request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri("/approvals/submit")
-            .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_vec(&payload).test_unwrap()))
-            .test_unwrap(),
-    );
-
-    let response = build_app(Arc::clone(&state))
-        .oneshot(request)
-        .await
-        .test_unwrap();
-    assert_eq!(response.status(), StatusCode::CREATED);
-
-    let body = to_bytes(response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
-    let approval_id = json["approval_id"].as_str().test_unwrap().to_string();
-    assert!(approval_id.starts_with("ap-"));
-    assert_eq!(
-        json["trusted_approvers"][0],
-        state.signer_keypair.public_key().to_hex()
-    );
-
-    let stored = state
-        .approval_admin
-        .store()
-        .get_pending(&approval_id)
-        .test_unwrap()
-        .test_unwrap();
-    assert_eq!(stored.tool_server, "shell");
-    assert_eq!(stored.tool_name, "run_command");
-    assert_eq!(stored.subject_id, subject.public_key().to_hex());
-    assert!(stored
-        .trusted_approvers
-        .contains(&state.signer_keypair.public_key()));
-}
-
-#[tokio::test]
-async fn operator_respond_resolves_pending_via_sidecar_signature() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let subject = Keypair::generate();
-
-    // Submit a pending approval first.
-    let submit_payload = serde_json::json!({
-        "capability_id": "cap-op-1",
-        "tool_server": "shell",
-        "tool_name": "run_command",
-        "parameter_hash": "b".repeat(64),
-        "requested_by": subject.public_key().to_hex(),
-        "ttl_seconds": 300,
-    });
-    let submit_request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri("/approvals/submit")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&submit_payload).test_unwrap(),
-            ))
-            .test_unwrap(),
-    );
-    let submit_response = build_app(Arc::clone(&state))
-        .oneshot(submit_request)
-        .await
-        .test_unwrap();
-    assert_eq!(submit_response.status(), StatusCode::CREATED);
-    let submit_body = to_bytes(submit_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let submit_json: serde_json::Value = serde_json::from_slice(&submit_body).test_unwrap();
-    let approval_id = submit_json["approval_id"]
-        .as_str()
-        .test_unwrap()
-        .to_string();
-
-    // Operator-respond approves with sidecar-signed token.
-    let respond_payload = serde_json::json!({
-        "outcome": "approved",
-        "reason": "ok via slash command",
-    });
-    let respond_request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri(format!("/approvals/{approval_id}/operator-respond"))
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&respond_payload).test_unwrap(),
-            ))
-            .test_unwrap(),
-    );
-    let respond_response = build_app(Arc::clone(&state))
-        .oneshot(respond_request)
-        .await
-        .test_unwrap();
-    assert_eq!(respond_response.status(), StatusCode::OK);
-
-    let respond_body = to_bytes(respond_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let resolved: RespondResponse = serde_json::from_slice(&respond_body).test_unwrap();
-    assert_eq!(resolved.approval_id, approval_id);
-    assert_eq!(resolved.outcome, ApprovalOutcome::Approved);
-
-    // Pending must be cleared.
+async fn legacy_id_only_approval_submission_is_rejected() -> Result<(), Box<dyn std::error::Error>>
+{
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".into());
+    let request = with_authenticated_control_peer(Request::builder().method("POST")
+        .uri("/approvals/submit").header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&serde_json::json!({
+            "capability_id": "cap-submit-1", "tool_server": "shell", "tool_name": "run_command",
+            "parameter_hash": "a".repeat(64), "requested_by": Keypair::generate().public_key().to_hex(),
+        }))?))?);
+    let response = build_app(state.clone()).oneshot(request).await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), 1024 * 1024).await?)?;
+    assert_eq!(body["error"], "bad_request");
     assert!(state
         .approval_admin
         .store()
-        .get_pending(&approval_id)
-        .test_unwrap()
-        .is_none());
+        .list_pending(&chio_kernel::ApprovalFilter::default())?
+        .is_empty());
+    Ok(())
 }
 
 #[tokio::test]
-async fn submit_then_operator_respond_works_without_subject_pubkey() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-
-    // requested_by left blank: the sidecar must fall back to its
-    // own pubkey for both subject_id and subject_public_key so the
-    // operator-respond shortcut can sign a binding token.
-    let submit_payload = serde_json::json!({
-        "capability_id": "cap-no-sub",
-        "tool_server": "shell",
-        "tool_name": "run_command",
-        "parameter_hash": "c".repeat(64),
-        "requested_by": "",
-        "ttl_seconds": 300,
-    });
-    let submit_request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri("/approvals/submit")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&submit_payload).test_unwrap(),
-            ))
-            .test_unwrap(),
-    );
-    let submit_response = build_app(Arc::clone(&state))
-        .oneshot(submit_request)
-        .await
-        .test_unwrap();
-    assert_eq!(submit_response.status(), StatusCode::CREATED);
-    let submit_body = to_bytes(submit_response.into_body(), 1024 * 1024)
-        .await
-        .test_unwrap();
-    let submit_json: serde_json::Value = serde_json::from_slice(&submit_body).test_unwrap();
-    let approval_id = submit_json["approval_id"]
-        .as_str()
-        .test_unwrap()
-        .to_string();
-
-    let stored = state
+async fn operator_bearer_cannot_replace_an_approver_signature(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".into());
+    let (pending, _, _) = pending_approval_request("ap-unsigned");
+    state.approval_admin.store().store_pending(&pending)?;
+    for id in ["ap-unsigned", "ap-missing"] {
+        let request = with_authenticated_control_peer(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/approvals/{id}/operator-respond"))
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"outcome":"approved"}"#))?,
+        );
+        let response = build_app(state.clone()).oneshot(request).await?;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body: serde_json::Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 1024 * 1024).await?)?;
+        assert_eq!(body["error"], "bad_request");
+    }
+    assert!(state
         .approval_admin
         .store()
-        .get_pending(&approval_id)
-        .test_unwrap()
-        .test_unwrap();
-    assert_eq!(
-        stored.subject_id,
-        state.signer_keypair.public_key().to_hex()
-    );
-
-    let respond_payload = serde_json::json!({"outcome": "approved"});
-    let respond_request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri(format!("/approvals/{approval_id}/operator-respond"))
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&respond_payload).test_unwrap(),
-            ))
-            .test_unwrap(),
-    );
-    let respond_response = build_app(Arc::clone(&state))
-        .oneshot(respond_request)
-        .await
-        .test_unwrap();
-    assert_eq!(respond_response.status(), StatusCode::OK);
-}
-
-#[tokio::test]
-async fn operator_respond_rejects_unknown_approval() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let payload = serde_json::json!({"outcome": "approved"});
-    let request = with_loopback_peer(
-        Request::builder()
-            .method("POST")
-            .uri("/approvals/ap-missing/operator-respond")
-            .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_vec(&payload).test_unwrap()))
-            .test_unwrap(),
-    );
-    let response = build_app(Arc::clone(&state))
-        .oneshot(request)
-        .await
-        .test_unwrap();
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        .get_pending(&pending.approval_id)?
+        .is_some());
+    assert!(state
+        .approval_admin
+        .store()
+        .get_resolution(&pending.approval_id)?
+        .is_none());
+    Ok(())
 }
 
 #[tokio::test]
@@ -1405,14 +1245,14 @@ async fn sidecar_verify_does_not_authorize_self_signed_receipts() {
 #[tokio::test]
 async fn sidecar_mint_returns_canonical_capability_tokens() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
                     "job_uid": "job-uid-1",
                 }))
@@ -1440,14 +1280,14 @@ async fn sidecar_mint_returns_canonical_capability_tokens() {
 async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let request_body = serde_json::to_vec(&serde_json::json!({
-        "subject": "job/default/demo",
+        "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
         "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
         "job_uid": "job-uid-1",
         "ttl_seconds": 300,
     }))
     .test_unwrap();
 
-    let first_request = with_loopback_peer(
+    let first_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1455,7 +1295,7 @@ async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
             .body(Body::from(request_body.clone()))
             .test_unwrap(),
     );
-    let second_request = with_loopback_peer(
+    let second_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1488,14 +1328,14 @@ async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
 async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
 
-    let search_request = with_loopback_peer(
+    let search_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -1503,14 +1343,14 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
             ))
             .test_unwrap(),
     );
-    let fetch_request = with_loopback_peer(
+    let fetch_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tool:server-a:fetch:invoke"],
                     "job_uid": "job-uid-1",
                 }))
@@ -1542,7 +1382,7 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
 #[tokio::test]
 async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/receipts")
@@ -1580,13 +1420,6 @@ async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
 }
 
 #[test]
-fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
-    assert_eq!(ttl_seconds_from_wire(None, None), 3600);
-    assert_eq!(ttl_seconds_from_wire(Some(3600), None), 3600);
-    assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000)), 1);
-}
-
-#[test]
 fn parse_sidecar_operation_shorthand_read_preserves_read_scope() {
     assert_eq!(
         parse_sidecar_operation("read", true).test_unwrap(),
@@ -1608,7 +1441,7 @@ async fn sidecar_release_persists_revocation_and_blocks_reuse() {
         Some(&receipt_db),
     );
 
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1687,7 +1520,7 @@ async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
     );
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1853,15 +1686,21 @@ async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
 #[tokio::test]
 async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some(PETSTORE_YAML.to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:1".to_string(),
         receipt_db: None,
         allow_ephemeral_receipts: false,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: None,
@@ -1888,15 +1727,21 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
 async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
     for receipt_db in [":memory:", "file:receipts.db?mode=memory"] {
         let config = ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some(PETSTORE_YAML.to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: "127.0.0.1:1".to_string(),
             receipt_db: Some(receipt_db.to_string()),
             allow_ephemeral_receipts: false,
             sidecar_control_token: None,
+            receipt_retention: None,
+            signer_seed_file: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -1934,7 +1779,7 @@ async fn sidecar_release_revokes_in_process_without_a_receipt_store() {
         "ephemeral serving mode has no durable receipt store"
     );
 
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1981,7 +1826,7 @@ async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
     );
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/receipts")
@@ -2065,7 +1910,7 @@ async fn sidecar_control_endpoints_reject_non_loopback_callers() {
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2123,7 +1968,7 @@ async fn sidecar_control_endpoints_reject_non_loopback_callers() {
     assert_eq!(json["error"], "chio_control_forbidden");
     assert_eq!(
         json["message"],
-        "sidecar control endpoints require a loopback caller"
+        "sidecar control endpoints require a configured control token and valid bearer credentials"
     );
 }
 
@@ -2147,7 +1992,7 @@ async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
             .header("authorization", "Bearer cluster-control-token")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2218,7 +2063,7 @@ async fn sidecar_control_endpoints_accept_lowercase_bearer_scheme() {
             .header("authorization", "bearer cluster-control-token")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2245,7 +2090,7 @@ async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configu
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2264,7 +2109,7 @@ async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configu
     assert_eq!(json["error"], "chio_control_forbidden");
     assert_eq!(
         json["message"],
-        "sidecar control endpoints require a loopback caller or valid bearer token"
+        "sidecar control endpoints require a configured control token and valid bearer credentials"
     );
 }
 
@@ -2282,7 +2127,7 @@ async fn sidecar_control_endpoints_reject_blank_control_token_configuration() {
             .header("authorization", "Bearer ")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2449,7 +2294,7 @@ async fn persisted_receipts_are_visible_across_proxy_and_sidecar_flows() {
 // -------------------------------------------------------------
 
 fn loopback_post(uri: &str, body: serde_json::Value) -> Request<Body> {
-    with_loopback_peer(
+    with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(uri)
@@ -2505,7 +2350,7 @@ async fn sidecar_capabilities_alias_accepts_canonical_body_shape() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
 
     let body = serde_json::json!({
-        "subject": "agent-via-canonical",
+        "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
         "scopes": ["filesystem:read"],
         "ttl_seconds": 600,
         "job_uid": "job-canonical-1",
@@ -3456,3 +3301,48 @@ async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
         .and_then(|v| v.as_str());
     assert_eq!(alias_outcome, Some("parameter_hash_mismatch"));
 }
+
+#[path = "tests/producer_numbers.rs"]
+mod producer_numbers;
+
+#[tokio::test]
+async fn ap23_invalid_approval_requester_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let request = with_authenticated_control_peer(
+        Request::builder()
+            .method("POST")
+            .uri("/approvals/submit")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&serde_json::json!({
+                "capability": serde_json::from_str::<serde_json::Value>(&signed_capability_token_json(&state.signer_keypair, "cap-invalid-requester"))?,
+                "tool_server": "shell",
+                "tool_name": "run_command",
+                "parameters": {},
+                "requested_by": "not-a-public-key",
+                "ttl_seconds": 300
+            }))?))?,
+    );
+    let response = build_app(state.clone()).oneshot(request).await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), 1024 * 1024).await?)?;
+    assert_eq!(
+        body["message"],
+        "requested_by must be the capability subject public key"
+    );
+    assert!(state
+        .approval_admin
+        .store()
+        .list_pending(&chio_kernel::ApprovalFilter::default())?
+        .is_empty());
+    Ok(())
+}
+
+#[path = "tests/inbound_authority.rs"]
+mod inbound_authority;
+
+#[path = "tests/path_authority.rs"]
+mod path_authority;
+
+#[path = "tests/receipt_evidence.rs"]
+mod receipt_evidence;

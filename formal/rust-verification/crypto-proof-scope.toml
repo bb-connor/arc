@@ -1,0 +1,24 @@
+schema = "chio.crypto-proof-scope.v1"
+# Noncollision is an audited assumption. These obligations have no successful proof.
+
+[[obligation]]
+crate = "chio-weights"
+mandatory_source_sha256 = "955fcf9b793ea69b72a9b16f85bfb1361b2912792e45f745239a77349c64ba9d"
+mandatory_harness = "public_weights_hash_of_determinism_and_shape"
+research_harness = "public_weights_hash_of_determinism_and_tampering"
+assumption_id = "ASSUME-SHA256"
+status = "unproved"
+domain = "All 2^32 four-byte messages and four one-bit flip positions"
+last_strict_result = "timeout at 1800 seconds; no counterexample or proof established"
+source_sha256 = "3eb539056c14a99d199affd38d690d763997428c94e0ba1680dacb736d8420d8"
+
+[[obligation]]
+crate = "chio-attest-verify"
+mandatory_source_sha256 = "ac5332043d20f16d0ff41acaccc9cb35982e8941d20cd5d565521736774348b9"
+mandatory_harness = "public_expect_report_data_determinism_and_binding"
+research_harness = "public_expect_report_data_determinism_under_input_change"
+assumption_id = "ASSUME-SHA256"
+status = "unproved"
+domain = "All 256 key seeds and 32 receipt-root positions"
+last_strict_result = "timeout at 1800 seconds; no counterexample or proof established"
+source_sha256 = "6c0d50525847f04946627c55e01fe3de61fd3b3c4d70868c32efa7bc135cbba4"

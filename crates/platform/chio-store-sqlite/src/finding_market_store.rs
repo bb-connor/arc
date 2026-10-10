@@ -21,10 +21,10 @@
 //! single consumption, fee idempotency, and the atomic activation prepare
 //! and finalization transactions).
 
-use crate::admission_operation_store::verify_active_owner;
 use crate::finding_purchase_store::sales_blocked_tx;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
 use crate::serving_owner::SqliteServingOwner;
+use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
 use chio_finding::{
@@ -33,7 +33,7 @@ use chio_finding::{
 };
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 use thiserror::Error;
 
 #[path = "finding_market_participation.rs"]
@@ -69,6 +69,8 @@ const MAX_SEARCH_PAGE: usize = 200;
 /// rejection denies the mutation and rolls the transaction back.
 #[derive(Debug, Error)]
 pub enum FindingMarketStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("finding market store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding market store fence rejected the caller")]
@@ -302,7 +304,7 @@ const fn fee_event_parts(event: &FindingFeeEvent) -> (&'static str, u64) {
 
 #[derive(Clone)]
 pub struct SqliteFindingMarketStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     /// Read-only WAL companion for discovery reads that tolerate trailing
     /// the writer by one in-flight transaction. Admission and money paths
     /// stay on the serving-owner connection.
@@ -312,7 +314,7 @@ pub struct SqliteFindingMarketStore {
 
 impl SqliteFindingMarketStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         read_companions: Arc<crate::read_companion::ReadCompanionPool>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
@@ -324,9 +326,9 @@ impl SqliteFindingMarketStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingMarketStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingMarketStoreError::Unavailable("sqlite finding market lock poisoned".to_owned())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingMarketStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -663,7 +665,10 @@ impl SqliteFindingMarketStore {
     /// observes a current non-retraction proof under the governance-pinned
     /// status-operator authorization. A concurrent status update therefore
     /// wins before an unsellable listing can open another fee intent.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn begin_live_participation_fee_intent(
         &self,
         intent: &FindingFeeIntent<'_>,
@@ -994,7 +999,10 @@ impl SqliteFindingMarketStore {
     /// envelope and matched to its durable intent in the same transaction.
     /// Another admission cannot prepare for the same finding or listing
     /// while this attempt is pending.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn prepare_listing_activation(
         &self,
         admission_envelope_json: &str,
@@ -1625,8 +1633,12 @@ fn load_allocation_snapshot_tx(
         &backing_envelope_sha256,
         "backing envelope",
     )?;
-    let parsed: SignedFindingBondBacking = serde_json::from_str(&backing_envelope_json)
-        .map_err(|error| invariant(format!("stored backing envelope decode failed: {error}")))?;
+    let parsed: SignedFindingBondBacking = chio_core::canonical::UntrustedJsonText::from_wire(
+        backing_envelope_json.as_bytes(),
+        MAX_ENVELOPE_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(FindingMarketStoreError::from)?;
     let backing = parsed.body;
     if backing.allocation_id != allocation_id
         || backing.seller.to_hex() != seller_hex
@@ -1790,8 +1802,12 @@ fn validate_activation_envelope(
     if admission_envelope_json.is_empty() || admission_envelope_json.len() > MAX_ENVELOPE_BYTES {
         return Err(invariant("admission envelope byte length is out of bounds"));
     }
-    let parsed: SignedFindingAdmission = serde_json::from_str(admission_envelope_json)
-        .map_err(|error| invariant(format!("admission envelope bytes are invalid: {error}")))?;
+    let parsed: SignedFindingAdmission = chio_core::canonical::UntrustedJsonText::from_wire(
+        (admission_envelope_json).as_bytes(),
+        MAX_ENVELOPE_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(FindingMarketStoreError::from)?;
     if parsed.body != *admission {
         return Err(invariant(
             "admission envelope bytes do not carry the supplied admission body",
@@ -1993,11 +2009,12 @@ fn load_activation_attempt_tx(
         &envelope_sha256,
         "activation prepare envelope",
     )?;
-    let parsed: SignedFindingAdmission = serde_json::from_str(&envelope_json).map_err(|error| {
-        invariant(format!(
-            "stored activation prepare envelope decode failed: {error}"
-        ))
-    })?;
+    let parsed: SignedFindingAdmission = chio_core::canonical::UntrustedJsonText::from_wire(
+        envelope_json.as_bytes(),
+        MAX_ENVELOPE_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(FindingMarketStoreError::from)?;
     if parsed.body.admission_id != admission_id
         || parsed.body.finding_id != finding_id
         || parsed.body.listing_id != listing_id
@@ -2253,76 +2270,18 @@ fn finding_market_schema_catalog(
     Ok(entries)
 }
 
-fn require_hex64(value: &str, field: &'static str) -> Result<(), FindingMarketStoreError> {
-    if value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Ok(());
-    }
-    Err(invariant(format!(
-        "{field} is not 64 lowercase hex characters"
-    )))
-}
+mod boundary;
+use boundary::*;
 
-fn require_non_empty(value: &str, field: &'static str) -> Result<(), FindingMarketStoreError> {
-    if value.is_empty() || value.len() > 512 {
-        return Err(invariant(format!("{field} byte length is out of bounds")));
-    }
-    Ok(())
-}
-
-fn require_currency(currency: &str) -> Result<(), FindingMarketStoreError> {
-    if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
-        return Err(invariant("currency is not a three-letter uppercase code"));
-    }
-    Ok(())
-}
-
-fn sqlite_i64(value: u64, field: &'static str) -> Result<i64, FindingMarketStoreError> {
-    i64::try_from(value).map_err(|_| invariant(format!("{field} exceeds SQLite integer range")))
-}
-
-fn stored_u64(value: i64, field: &'static str) -> Result<u64, FindingMarketStoreError> {
-    u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
-}
-
-fn invariant(detail: impl Into<String>) -> FindingMarketStoreError {
-    FindingMarketStoreError::Invariant(detail.into())
-}
-
-fn admission_error(error: AdmissionOperationStoreError) -> FindingMarketStoreError {
-    match error {
-        AdmissionOperationStoreError::Fenced => FindingMarketStoreError::Fenced,
-        AdmissionOperationStoreError::NotFound => FindingMarketStoreError::NotFound,
-        AdmissionOperationStoreError::Unavailable(detail) => {
-            FindingMarketStoreError::Unavailable(detail)
-        }
-        AdmissionOperationStoreError::OutcomeUnknown(detail) => {
-            FindingMarketStoreError::OutcomeUnknown(detail)
-        }
-        AdmissionOperationStoreError::Invariant(detail) => {
-            FindingMarketStoreError::Invariant(detail)
-        }
-        AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
-    }
-}
-
-fn sqlite_error(error: rusqlite::Error) -> FindingMarketStoreError {
-    match error {
-        rusqlite::Error::FromSqlConversionFailure(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..)
-        | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::Utf8Error(..) => invariant(error.to_string()),
-        other => FindingMarketStoreError::Unavailable(other.to_string()),
-    }
-}
 #[path = "finding_market_fee_recovery.rs"]
 mod fee_recovery;
 #[path = "finding_market_status_read.rs"]
 mod status_read;
 #[cfg(test)]
 #[path = "finding_market_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

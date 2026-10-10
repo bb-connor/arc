@@ -4,7 +4,6 @@ use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::StoreMutationFence;
 use chio_kernel::budget_store::{
@@ -18,14 +17,18 @@ use crate::revocation_store::{
     initialize_revocation_schema, verify_admission_authority_invariants,
     REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
 };
+use crate::store_connection::StoreConnection;
 use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
 mod finding_market_snapshot_versions;
 mod global_commit_chain;
 mod lease_history;
 mod path_identity;
+mod relocation;
+mod replay_source_migration;
 mod rollback_anchor;
 
+pub(crate) use global_commit_chain::budget_event_reference_digest;
 use global_commit_chain::{
     append_finding_challenge_projection_if_changed, append_finding_status_projection_if_changed,
 };
@@ -34,6 +37,11 @@ use global_commit_chain::{
     seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
+pub use relocation::{
+    RelocationImport, RelocationImportPhase, RelocationSeal, RELOCATION_SEAL_FORMAT,
+};
+#[cfg(feature = "fuzz")]
+pub(crate) use rollback_anchor::exercise_slot_image;
 use rollback_anchor::{AnchorRecord, RollbackAnchor};
 
 #[cfg(test)]
@@ -131,6 +139,10 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("authority clock rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
     #[error("filesystem error: {0}")]
@@ -145,13 +157,20 @@ pub enum SqliteServingOwnerError {
     Invalid(String),
     #[error("sqlite authority durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+    #[error("sqlite authority store was exported for relocation ({0}); import it before serving")]
+    Exported(String),
+    #[error("relocation destination anchors history beyond the export seal: {0}")]
+    RelocationDestinationAnchored(String),
 }
 
 pub(crate) struct SqliteServingOwner {
+    pub(crate) clock: Arc<dyn chio_security_types::clock::Clock>,
+    pub(crate) clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     rollback_anchor: RollbackAnchor,
     pub(crate) fence: StoreMutationFence,
     poisoned: AtomicBool,
     expected_data_version: AtomicU64,
+    replay_source_migration_in_flight: AtomicBool,
 }
 
 impl SqliteServingOwner {
@@ -275,7 +294,7 @@ impl SqliteServingOwner {
 }
 
 pub struct SqliteAuthorityStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     read_companions: Arc<crate::read_companion::ReadCompanionPool>,
     owner: Arc<SqliteServingOwner>,
 }
@@ -353,8 +372,10 @@ impl SqliteAuthorityStore {
             acquire_serving_lock(&lock_file, &canonical_database_path)?;
             validate_open_lock_file(&lock_root, &lock_file, &record)?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
+            relocation::refuse_exported(&connection)?;
             initialize_offline_authority_schemas(&mut connection)?;
             initialize_serving_lease_schema(&connection)?;
+            relocation::initialize_serving_relocation_schema(&connection)?;
             crate::admission_operation_store::initialize_admission_operation_schema(
                 &mut connection,
             )?;
@@ -508,6 +529,7 @@ impl SqliteAuthorityStore {
         };
         verify_serving_owner_schema(&connection)?;
         initialize_serving_lease_schema(&connection)?;
+        relocation::initialize_serving_relocation_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
         crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
@@ -553,6 +575,18 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<Self, SqliteServingOwnerError> {
+        Self::open_serving_with_clock(
+            database_path,
+            lock_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_serving_with_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
         let database_path = database_path.as_ref();
         validate_database_path_component(database_path)?;
@@ -583,6 +617,7 @@ impl SqliteAuthorityStore {
         acquire_serving_lock(&lock_file, &database_path)?;
         validate_open_lock_file(&lock_root, &lock_file, &record)?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
+        relocation::refuse_exported(&connection)?;
 
         connection.execute_batch(
             r#"
@@ -593,6 +628,7 @@ impl SqliteAuthorityStore {
             "#,
         )?;
         initialize_serving_lease_schema(&connection)?;
+        relocation::initialize_serving_relocation_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
         crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
@@ -720,7 +756,10 @@ impl SqliteAuthorityStore {
                 ));
             }
         }
-        let opened_at_ms = now_ms()?;
+        let mut clock_fence = chio_security_types::clock::ClockFence::default();
+        let opened_at = clock_fence.observe(clock.read()?)?;
+        let opened_at_ms = i64::try_from(opened_at.unix_millis().get())
+            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let changed = transaction.execute(
             r#"
             UPDATE chio_serving_owner
@@ -772,6 +811,8 @@ impl SqliteAuthorityStore {
             ));
         }
         let owner = Arc::new(SqliteServingOwner {
+            clock,
+            clock_fence: Arc::new(Mutex::new(clock_fence)),
             rollback_anchor,
             fence: StoreMutationFence {
                 store_uuid: record.store_uuid,
@@ -780,6 +821,7 @@ impl SqliteAuthorityStore {
             },
             poisoned: AtomicBool::new(false),
             expected_data_version: AtomicU64::new(expected_data_version),
+            replay_source_migration_in_flight: AtomicBool::new(false),
         });
         crate::channel_release_publisher_store::quarantine_incomplete_dispatches_at_startup(
             &mut connection,
@@ -790,11 +832,32 @@ impl SqliteAuthorityStore {
             record.database_device,
             record.database_inode,
         )?;
+        // Every commit on this connection is followed by a rollback-anchor sync,
+        // so a recovered connection serves only once the anchor equals the
+        // database head. A panic between a commit and its sync leaves the
+        // database one commit ahead, which fences the connection until
+        // `open_serving` reconciles the anchor forward.
+        let anchor_owner = owner.clone();
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            connection: Arc::new(StoreConnection::anchored(
+                "authority",
+                connection,
+                move |connection| {
+                    anchor_owner
+                        .verify_authority_anchor(connection)
+                        .map_err(Into::into)
+                },
+            )),
             read_companions: Arc::new(read_companions),
             owner,
         })
+    }
+
+    /// The rollback anchor's generation, which advances once per durable
+    /// anchor write and so counts the authority's durable commits.
+    #[cfg(test)]
+    pub(crate) fn anchor_generation(&self) -> Result<u64, SqliteServingOwnerError> {
+        Ok(self.owner.companion_anchor()?.generation())
     }
 
     #[must_use]
@@ -809,11 +872,10 @@ impl SqliteAuthorityStore {
         expected_path: impl AsRef<Path>,
     ) -> Result<(), SqliteServingOwnerError> {
         let expected_path = fs::canonicalize(expected_path.as_ref())?;
-        let connection = self.connection.lock().map_err(|_| {
-            SqliteServingOwnerError::Invalid(
-                "sqlite authority connection mutex is poisoned".to_string(),
-            )
-        })?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|fenced| SqliteServingOwnerError::Invalid(fenced.to_string()))?;
         self.owner.verify_authority_anchor(&connection)?;
         let record = load_provisioning_record(&connection)?.ok_or_else(|| {
             SqliteServingOwnerError::PartialProvision(expected_path.display().to_string())
@@ -1422,6 +1484,7 @@ fn open_existing_database(path: &Path) -> Result<Connection, SqliteServingOwnerE
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
+    connection.set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
     // Provisioning writes before `open_serving` sets its own pragmas, so the busy
     // timeout has to be in place here or a transient lock aborts it instantly.
     connection.execute_batch("PRAGMA busy_timeout = 5000;")?;
@@ -1595,15 +1658,6 @@ fn path_text(path: &Path) -> Result<String, SqliteServingOwnerError> {
         .ok_or_else(|| SqliteServingOwnerError::Invalid("path is not valid UTF-8".to_string()))
 }
 
-fn now_ms() -> Result<i64, SqliteServingOwnerError> {
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?
-        .as_millis();
-    i64::try_from(millis)
-        .map_err(|_| SqliteServingOwnerError::Invalid("wall clock overflowed i64".to_string()))
-}
-
 fn authority_data_version(connection: &Connection) -> Result<u64, SqliteServingOwnerError> {
     let version = connection.query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0))?;
     read_u64(version, "sqlite data_version")
@@ -1624,6 +1678,7 @@ fn verify_authority_store_invariants(
         )));
     }
     verify_serving_lease_history(connection)?;
+    relocation::verify_serving_relocation_schema(connection)?;
     crate::budget_store::composite_schema::verify_budget_projection_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     verify_admission_authority_invariants(connection)
@@ -1647,8 +1702,27 @@ fn verify_authority_store_invariants(
 
 #[cfg(all(test, unix))]
 #[path = "serving_owner/tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
+
+#[cfg(all(test, unix))]
+#[path = "serving_owner/connection_recovery.rs"]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+mod connection_recovery;
+#[cfg(all(test, unix))]
+pub(crate) use connection_recovery::{
+    authority_panics_after_anchor, authority_panics_after_commit_before_anchor,
+    authority_panics_before_commit, authority_panics_with_rollback_denied, ProvisionedAuthority,
+    PROBE_CAPABILITY,
+};
 
 #[cfg(all(test, windows))]
 mod windows_platform_tests {

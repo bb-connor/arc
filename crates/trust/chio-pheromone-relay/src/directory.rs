@@ -246,7 +246,7 @@ pub fn peer_directory_from_json(
     json: &str,
     now_unix_ms: u64,
 ) -> Result<PeerDirectory, PheromoneRelayError> {
-    let document: PeerDirectoryDocument = serde_json::from_str(json)?;
+    let document: PeerDirectoryDocument = crate::input::decode(json.as_bytes())?;
     PeerDirectory::from_document(document, now_unix_ms)
 }
 
@@ -256,7 +256,7 @@ pub fn peer_directory_from_json_with_profile(
     profile: RelayProfile,
     limits: &RelayProfileLimits,
 ) -> Result<PeerDirectory, PheromoneRelayError> {
-    let document: PeerDirectoryDocument = serde_json::from_str(json)?;
+    let document: PeerDirectoryDocument = crate::input::decode(json.as_bytes())?;
     PeerDirectory::from_document_with_profile(document, now_unix_ms, profile, limits)
 }
 
@@ -572,7 +572,7 @@ pub fn reject_peer_directory_candidate(
 pub fn peer_directory_state_from_json(
     json: &str,
 ) -> Result<PeerDirectoryStateDocument, PheromoneRelayError> {
-    let state: PeerDirectoryStateDocument = serde_json::from_str(json)?;
+    let state: PeerDirectoryStateDocument = crate::input::decode(json.as_bytes())?;
     if state.schema != PHEROMONE_PEER_DIRECTORY_STATE_SCHEMA {
         return Err(PheromoneRelayError::UnsupportedSchema(state.schema));
     }

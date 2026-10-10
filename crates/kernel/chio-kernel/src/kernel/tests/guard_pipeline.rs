@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn guard_denies_request() {
     let mut kernel = make_kernel(make_config());
@@ -505,6 +506,7 @@ fn matched_grant_index_populated_in_guard_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -577,6 +579,7 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // First two invocations allowed.
@@ -699,7 +702,8 @@ fn async_tool_server_event_drain_preserves_partial_events_after_error() {
         .unwrap();
 
     rt.block_on(async {
-        let mut kernel = ChioKernel::new(make_config());
+        let mut kernel =
+            ChioKernel::new_with_clock(make_config(), chio_test_support::clock::clock());
         kernel.register_tool_server(Box::new(EventDrainServer::new(
             "events",
             vec![ToolServerEvent::ResourcesListChanged],

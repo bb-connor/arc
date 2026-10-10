@@ -1,12 +1,12 @@
+use chio_federation_authority::{FrostRound2Package, FrostSealingKey, SealedFrostRound2Package};
 use std::collections::BTreeMap;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_federation_authority::{
     advance_frost_ceremony, begin_frost_ceremony, complete_frost_ceremony,
-    verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript,
-    FrostAuthenticatedDkgPackage, FrostCeremonyConfig, FrostCeremonySecret,
-    FrostCeremonySecretKind,
+    verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript, FrostCeremonyConfig,
+    FrostCeremonySecret, FrostCeremonySecretKind, FrostRound1Package,
 };
 use rand_core::{CryptoRng, RngCore};
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
@@ -23,7 +23,10 @@ use super::{
 };
 use crate::encrypted_blob::{decrypt_blob_with_aad, try_encrypt_blob_with_aad, EncryptedBlob};
 
-const CUSTODY_AAD_FORMAT: &str = "chio.frost.ceremony-custody-aad.v1";
+mod custody_output;
+mod inbox;
+
+const CUSTODY_AAD_FORMAT: &str = "chio.frost.ceremony-custody-aad.v2";
 const RECORD_DIGEST_PREFIX: &[u8] = b"chio.frost.ceremony-record.digest.v1\0";
 
 #[derive(Debug)]
@@ -144,16 +147,30 @@ struct RecordDigestPreimage<'a> {
 }
 
 impl SqliteFrostStore {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn begin_ceremony<R: CryptoRng + RngCore>(
         &self,
         config: &FrostCeremonyConfig,
         transport_key: &chio_core::Keypair,
+        sealing_key: &FrostSealingKey,
         custody: &FrostCustodyKey,
         rng: &mut R,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<FrostCeremonyRound1Record, FrostStoreError> {
+        sealing_key.validate_for(config)?;
+        if config
+            .participants
+            .iter()
+            .find(|p| p.participant_id == config.local_participant_id)
+            .map(|p| &p.transport_public_key)
+            != Some(&transport_key.public_key())
+        {
+            return Err(FrostStoreError::Conflict("local transport key mismatch"));
+        }
         validate_trusted_time(trusted_now_unix_ms)?;
         let ceremony_id = config.ceremony_id()?;
         let config_json = canonical_json_bytes(config)
@@ -203,7 +220,7 @@ impl SqliteFrostStore {
             ));
         }
 
-        let transition = begin_frost_ceremony(config, transport_key, rng)?;
+        let transition = begin_frost_ceremony(config, transport_key, sealing_key, rng)?;
         let state = FrostCeremonyState::Round1Ready;
         let state_version = 1;
         let custody_binding = CustodyBinding {
@@ -215,19 +232,14 @@ impl SqliteFrostStore {
             fence,
             updated_at_unix_ms: trusted_now_unix_ms,
         };
-        let secret = encrypt_material(
-            transition.secret.custody_bytes(),
+        let secret = encrypt_secret(
+            &transition.secret,
+            sealing_key,
             custody,
             &custody_aad("secret", &custody_binding)?,
         )?;
-        let output_bytes = Zeroizing::new(
-            canonical_json_bytes(&StoredCeremonyOutput::Round1(Box::new(
-                transition.package.clone(),
-            )))
-            .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?,
-        );
-        let output = encrypt_material(
-            &output_bytes,
+        let output = custody_output::encrypt(
+            StoredCeremonyOutput::Round1(Box::new(transition.package.clone())),
             custody,
             &custody_aad("output", &custody_binding)?,
         )?;
@@ -277,13 +289,16 @@ impl SqliteFrostStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn advance_ceremony(
         &self,
         config: &FrostCeremonyConfig,
         transport_key: &chio_core::Keypair,
         custody: &FrostCustodyKey,
-        round1_packages: &[FrostAuthenticatedDkgPackage],
+        round1_packages: &[FrostRound1Package],
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<FrostCeremonyRound2Record, FrostStoreError> {
@@ -323,7 +338,7 @@ impl SqliteFrostStore {
                 "ceremony cannot advance from its current state",
             ));
         }
-        let round1_secret = decrypt_secret(&stored, custody)?;
+        let (round1_secret, sealing_key) = decrypt_secrets(&stored, custody)?;
         let transition =
             advance_frost_ceremony(config, transport_key, round1_secret, round1_packages)?;
         if transition.round1_transcript_digest != round1_digest {
@@ -342,17 +357,14 @@ impl SqliteFrostStore {
             fence,
             updated_at_unix_ms: trusted_now_unix_ms,
         };
-        let secret = encrypt_material(
-            transition.secret.custody_bytes(),
+        let secret = encrypt_secret(
+            &transition.secret,
+            &sealing_key,
             custody,
             &custody_aad("secret", &custody_binding)?,
         )?;
-        let output_bytes = Zeroizing::new(
-            canonical_json_bytes(&StoredCeremonyOutput::Round2(transition.packages.clone()))
-                .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?,
-        );
-        let output = encrypt_material(
-            &output_bytes,
+        let output = custody_output::encrypt(
+            StoredCeremonyOutput::Round2(transition.packages.clone()),
             custody,
             &custody_aad("output", &custody_binding)?,
         )?;
@@ -407,8 +419,8 @@ impl SqliteFrostStore {
         &self,
         config: &FrostCeremonyConfig,
         custody: &FrostCustodyKey,
-        round1_packages: &[FrostAuthenticatedDkgPackage],
-        round2_packages: &[FrostAuthenticatedDkgPackage],
+        round1_packages: &[FrostRound1Package],
+        round2_packages: &[SealedFrostRound2Package],
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<StoredFrostCeremonyCompletion, FrostStoreError> {
@@ -440,9 +452,41 @@ impl SqliteFrostStore {
                 "ceremony cannot complete from its current state",
             ));
         }
-        let round2_secret = decrypt_secret(&stored, custody)?;
-        let completion =
-            complete_frost_ceremony(config, round2_secret, round1_packages, round2_packages)?;
+        if stored.input_transcript_digest.as_deref()
+            != Some(verify_frost_ceremony_round1_transcript(config, round1_packages)?.as_str())
+        {
+            return Err(FrostStoreError::Conflict(
+                "round-one transcript changed after advancement",
+            ));
+        }
+        let StoredCeremonyOutput::Round2(outbound) = decrypt_output(&stored, custody)? else {
+            return Err(invalid("round-two state retained another output kind"));
+        };
+        if outbound
+            .iter()
+            .any(|package| !round2_packages.contains(package))
+        {
+            return Err(FrostStoreError::Conflict(
+                "transcript differs from committed outbound packages",
+            ));
+        }
+        inbox::verify_inbox_time(&transaction, &ceremony_id, trusted_now_unix_ms)?;
+        let (round2_secret, sealing_key) = decrypt_secrets(&stored, custody)?;
+        let local_packages = inbox::load_accepted(
+            &transaction,
+            config,
+            &stored,
+            custody,
+            &sealing_key,
+            round2_packages,
+        )?;
+        let completion = complete_frost_ceremony(
+            config,
+            round2_secret,
+            round1_packages,
+            round2_packages,
+            local_packages,
+        )?;
         if completion.transcript_digest != transcript_digest {
             return Err(invalid(
                 "authority returned a different ceremony transcript",
@@ -459,8 +503,9 @@ impl SqliteFrostStore {
             fence,
             updated_at_unix_ms: trusted_now_unix_ms,
         };
-        let secret = encrypt_material(
-            completion.key_package.custody_bytes(),
+        let secret = encrypt_secret(
+            &completion.key_package,
+            &sealing_key,
             custody,
             &custody_aad("secret", &custody_binding)?,
         )?;
@@ -587,6 +632,7 @@ pub(super) fn verify_ceremony_invariants(connection: &Connection) -> Result<(), 
             ));
         }
     }
+    inbox::verify_invariants(connection)?;
     verify_projection_commit_chains(connection)
 }
 
@@ -812,8 +858,7 @@ fn decode_row(row: &Row<'_>) -> Result<StoredCeremonyRow, rusqlite::Error> {
 }
 
 fn verify_stored_row(stored: &StoredCeremonyRow) -> Result<(), FrostStoreError> {
-    let config: FrostCeremonyConfig = serde_json::from_slice(&stored.config_json)
-        .map_err(|error| invalid(format!("ceremony config does not decode: {error}")))?;
+    let config = decode_config(&stored.config_json)?;
     config.validate()?;
     if config.ceremony_id()? != stored.ceremony_id
         || sha256_hex(&stored.config_json) != stored.config_digest
@@ -828,6 +873,10 @@ fn verify_stored_row(stored: &StoredCeremonyRow) -> Result<(), FrostStoreError> 
         FrostCeremonyState::Round1Ready => 1,
         FrostCeremonyState::Round2Ready => 2,
         FrostCeremonyState::Completed => 3,
+        FrostCeremonyState::Failed if matches!(stored.state_version, 3 | 4) => stored.state_version,
+        FrostCeremonyState::Failed => {
+            return Err(invalid("failed ceremony state version is invalid"))
+        }
     };
     if stored.state_version != expected_version {
         return Err(invalid("ceremony state version is invalid"));
@@ -845,6 +894,9 @@ fn verify_exact_config(
     custody: &FrostCustodyKey,
     trusted_now_unix_ms: u64,
 ) -> Result<(), FrostStoreError> {
+    if stored.state == FrostCeremonyState::Failed {
+        return Err(FrostStoreError::CeremonyFailed);
+    }
     if stored.config_digest != config_digest {
         return Err(FrostStoreError::Conflict("ceremony configuration changed"));
     }
@@ -861,22 +913,60 @@ fn verify_exact_config(
     Ok(())
 }
 
+fn encrypt_secret(
+    secret: &FrostCeremonySecret,
+    sealing: &FrostSealingKey,
+    custody: &FrostCustodyKey,
+    aad: &[u8],
+) -> Result<EncryptedBlob, FrostStoreError> {
+    let mut bytes = Zeroizing::new(Vec::with_capacity(32 + secret.custody_bytes().len()));
+    bytes.extend_from_slice(sealing.custody_bytes());
+    bytes.extend_from_slice(secret.custody_bytes());
+    encrypt_material(&bytes, custody, aad)
+}
+
 fn decrypt_secret(
     stored: &StoredCeremonyRow,
     custody: &FrostCustodyKey,
 ) -> Result<FrostCeremonySecret, FrostStoreError> {
+    decrypt_secrets(stored, custody).map(|(secret, _)| secret)
+}
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The plaintext length is checked to exceed the fixed 32-byte seed prefix before either split."
+)]
+fn decrypt_secrets(
+    stored: &StoredCeremonyRow,
+    custody: &FrostCustodyKey,
+) -> Result<(FrostCeremonySecret, FrostSealingKey), FrostStoreError> {
     verify_custody_generation(stored, custody)?;
-    let plaintext = decrypt_blob_with_aad(
-        custody.key(),
-        &stored.secret,
-        &custody_aad("secret", &stored.custody_binding())?,
-    )
-    .map_err(|_| FrostStoreError::Custody("ceremony secret authentication failed"))?;
-    FrostCeremonySecret::from_custody_bytes(
+    let plaintext = Zeroizing::new(
+        decrypt_blob_with_aad(
+            custody.key(),
+            &stored.secret,
+            &custody_aad("secret", &stored.custody_binding())?,
+        )
+        .map_err(|_| FrostStoreError::Custody("ceremony secret authentication failed"))?,
+    );
+    if plaintext.len() <= 32 {
+        return Err(FrostStoreError::Custody("ceremony key bundle is truncated"));
+    }
+    let mut seed = Zeroizing::new([0; 32]);
+    seed.copy_from_slice(&plaintext[..32]);
+    let sealing = FrostSealingKey::from_custody_bytes(seed);
+    sealing.validate_for(&decode_config(&stored.config_json)?)?;
+    let secret = FrostCeremonySecret::from_custody_bytes(
         parse_secret_kind(&stored.secret_kind)?,
-        Zeroizing::new(plaintext),
-    )
-    .map_err(Into::into)
+        Zeroizing::new(plaintext[32..].to_vec()),
+    )?;
+    Ok((secret, sealing))
+}
+
+fn decode_config(bytes: &[u8]) -> Result<FrostCeremonyConfig, FrostStoreError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, 32 * 1024 * 1024)
+        .and_then(|text| text.decode_canonical())
+        .map_err(|_| invalid("ceremony config is not canonical signed JSON"))
 }
 
 fn decrypt_output(
@@ -888,28 +978,24 @@ fn decrypt_output(
         .output
         .as_ref()
         .ok_or_else(|| invalid("ceremony output is absent"))?;
-    let plaintext = Zeroizing::new(
-        decrypt_blob_with_aad(
-            custody.key(),
-            output,
-            &custody_aad("output", &stored.custody_binding())?,
-        )
-        .map_err(|_| FrostStoreError::Custody("ceremony output authentication failed"))?,
-    );
-    serde_json::from_slice(&plaintext)
-        .map_err(|error| invalid(format!("ceremony output does not decode: {error}")))
+    let config = decode_config(&stored.config_json)?;
+    custody_output::decrypt(
+        output,
+        custody,
+        &custody_aad("output", &stored.custody_binding())?,
+        &config,
+    )
 }
 
 fn completion_from_row(
     stored: &StoredCeremonyRow,
 ) -> Result<StoredFrostCeremonyCompletion, FrostStoreError> {
-    let verification_shares = serde_json::from_slice::<BTreeMap<String, String>>(
+    let verification_shares = crate::frost_store::decode_record::<BTreeMap<String, String>>(
         stored
             .verification_shares_json
             .as_deref()
             .ok_or_else(|| invalid("completed ceremony lacks verification shares"))?,
-    )
-    .map_err(|error| invalid(format!("verification shares do not decode: {error}")))?;
+    )?;
     Ok(StoredFrostCeremonyCompletion {
         ceremony_id: stored.ceremony_id.clone(),
         state: stored.state,
@@ -1089,4 +1175,20 @@ fn read_u64(value: i64, field: &'static str) -> Result<u64, FrostStoreError> {
 
 fn invalid(detail: impl Into<String>) -> FrostStoreError {
     FrostStoreError::InvalidState(detail.into())
+}
+
+/// Recheck the key's ceremony before publishing or replaying signer material.
+pub(super) fn require_completed_ceremony(
+    connection: &Connection,
+    id: &str,
+) -> Result<(), FrostStoreError> {
+    let stored = load_ceremony_connection(connection, id)?
+        .ok_or(FrostStoreError::Conflict("signer ceremony is absent"))?;
+    if stored.state == FrostCeremonyState::Failed {
+        return Err(FrostStoreError::CeremonyFailed);
+    }
+    if stored.state != FrostCeremonyState::Completed {
+        return Err(FrostStoreError::Conflict("signer ceremony is not complete"));
+    }
+    Ok(())
 }

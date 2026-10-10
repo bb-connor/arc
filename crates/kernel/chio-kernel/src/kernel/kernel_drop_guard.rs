@@ -6,9 +6,8 @@ use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    current_unix_timestamp, current_unix_timestamp_ms, merge_metadata_objects,
-    scope_pre_invocation_guard_evidence, ChioKernel, KernelError, PreExecutionBudgetMutation,
-    VerifiedGovernedPayeeBinding,
+    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, KernelError,
+    PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -91,7 +90,10 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
 }
 
 impl<'a> PostAdmissionDropGuard<'a> {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn new(
         kernel: &'a ChioKernel,
         request: &'a ToolCallRequest,
@@ -143,8 +145,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// this returns `Ok`; the caller disarms only on success, so the disarmed
     /// drop then flushes an empty buffer and never double-records.
     pub(crate) fn record_buffered_child_receipts(&mut self) -> Result<(), KernelError> {
-        while !self.child_receipts.is_empty() {
-            self.kernel.record_child_receipt(&self.child_receipts[0])?;
+        while let Some(receipt) = self.child_receipts.first() {
+            self.kernel.record_child_receipt(receipt)?;
             self.child_receipts.remove(0);
         }
         Ok(())
@@ -152,16 +154,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
     /// Mark that the tool-server dispatch await has been entered. After this
     /// point a dropped future may correspond to an executed side effect, so
-    /// the drop path must record a cancellation receipt and fail closed on
-    /// reservations.
+    /// the drop path attempts a cancellation receipt and fails closed on
+    /// reservations. Clock, construction or append failures emit an audit fault.
     pub(crate) fn mark_dispatch_started(&mut self) {
         self.dispatch_started = true;
     }
 
     /// Classify a normal error return after the tool completed but before its
     /// replay credentials could be committed. The guard remains armed so its
-    /// drop path records the executed-or-not outcome as a signed terminal
-    /// receipt instead of returning a raw error with no audit trail.
+    /// drop path attempts to record the executed-or-not outcome as a signed
+    /// terminal receipt. Failure to obtain trusted time, construct or append
+    /// that receipt emits an audit fault; signed evidence is not guaranteed.
     pub(crate) fn mark_dispatch_credential_commit_failed(&mut self) {
         self.post_dispatch_reason = POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON;
     }
@@ -169,6 +172,20 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// The caller durably terminalized the admission but still needs the
     /// armed post-dispatch path to record its signed ambiguity receipt and
     /// retain non-durable reservations.
+    /// Terminalize the durable operation as outcome unknown after a transport
+    /// failure that followed the dispatch commit, before the response that
+    /// reports the ambiguity is built. The caller disarms the guard afterwards.
+    pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
+        if let Some(operation) = self.durable_operation {
+            self.kernel.terminalize_dispatch_committed_admission(
+                operation,
+                self.kernel.read_authority_time()?.get(),
+            )?;
+            self.mark_durable_operation_terminalized();
+        }
+        Ok(())
+    }
+
     pub(crate) fn mark_durable_operation_terminalized(&mut self) {
         self.durable_operation = None;
     }
@@ -192,7 +209,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
             .build_cancelled_response_with_metadata_and_payee_binding(
                 self.request,
                 self.post_dispatch_reason,
-                current_unix_timestamp(),
+                self.kernel.read_authority_time()?.as_secs(),
                 self.matched_grant_index,
                 receipt_metadata,
                 self.receipt_context.verified_payee_binding.as_ref(),
@@ -210,10 +227,11 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// monetary hold, an invocation-only budget increment,
     /// runtime-admission reservations, and an admitted child/delegated
     /// capability budget share. A clean unwind records NO receipt
-    /// (the intended receipt-free exit). If ANY step fails, a signed fault
-    /// receipt is recorded so a stuck hold/reservation is on the
-    /// append-only log rather than silently burned. Best-effort from Drop:
-    /// each step is attempted independently and failures are collected.
+    /// (the intended receipt-free exit). If any step fails, a signed fault
+    /// receipt is attempted to identify the stuck hold/reservation. Cleanup and
+    /// receipt publication are best-effort from Drop: each cleanup step is
+    /// attempted independently, and clock, construction or append failure is
+    /// reported through an audit fault without claiming signed evidence.
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
 
@@ -224,6 +242,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 self.cap,
                 self.budget_mutation.charge_result(),
                 self.payment_authorization,
+                self.durable_operation,
             ) {
                 Ok(_) => {}
                 Err(error) => {
@@ -285,10 +304,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
 
         // 3. Runtime-admission reservation release.
-        if let Err(error) = self
-            .kernel
-            .release_runtime_admission_reservations(self.receipt_context.extra_metadata.as_ref())
-        {
+        if let Err(error) = self.kernel.release_runtime_admission_reservations(
+            self.durable_operation,
+            self.receipt_context.extra_metadata.as_ref(),
+        ) {
             let reason = redacted!(&error).to_string();
             warn!(
                 request_id = %self.request.request_id,
@@ -368,7 +387,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
 
         // 5. Fault receipt. Clean cleanup is receipt-free (the
-        //    intended design); any fault records a signed receipt.
+        //    intended design); any fault attempts a signed receipt.
         if !faults.is_empty() {
             self.record_pre_dispatch_cleanup_fault_receipt(&faults);
         }
@@ -400,8 +419,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
     }
 
     /// Record a signed cancellation receipt documenting a pre-dispatch cleanup
-    /// fault. Best-effort from Drop: if even the receipt cannot be recorded,
-    /// log with the `audit_fault` field. The failing steps and the reserved
+    /// fault. Best-effort from Drop: clock, construction or append failure is
+    /// logged with the `audit_fault` field. The failing steps and the reserved
     /// lease/continuation ids (carried in the admission metadata) are folded
     /// into the receipt so an operator can locate the stuck hold.
     fn record_pre_dispatch_cleanup_fault_receipt(&self, faults: &[PreDispatchCleanupFault]) {
@@ -428,17 +447,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self
-            .kernel
-            .build_cancelled_response_with_metadata_and_payee_binding(
-                self.request,
-                PRE_DISPATCH_CLEANUP_FAULT_REASON,
-                current_unix_timestamp(),
-                self.matched_grant_index,
-                metadata,
-                self.receipt_context.verified_payee_binding.as_ref(),
-            )
-        {
+        if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+            self.kernel
+                .build_cancelled_response_with_metadata_and_payee_binding(
+                    self.request,
+                    PRE_DISPATCH_CLEANUP_FAULT_REASON,
+                    now.as_secs(),
+                    self.matched_grant_index,
+                    metadata,
+                    self.receipt_context.verified_payee_binding.as_ref(),
+                )
+        }) {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -459,7 +478,7 @@ impl Drop for PostAdmissionDropGuard<'_> {
             // Pre-dispatch drop (or a panic unwinding before dispatch).
             // Nothing was written to the tool server, so no side effect is
             // possible: fully reverse every pre-execution mutation. A clean
-            // unwind records NO cancellation receipt; a cleanup fault records
+            // unwind records NO cancellation receipt; a cleanup fault attempts
             // a signed fault receipt (see `handle_pre_dispatch_drop`).
             self.handle_pre_dispatch_drop();
             return;
@@ -476,10 +495,10 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
         // admission reservations (releasing a single-use destructive lease
-        // here would license a replay) and ALWAYS record a cancellation
-        // receipt so the executed-or-not side effect is on the append-only
-        // log. The retained reservations are marked in the receipt metadata
-        // so the burned lease is auditable and operator-recoverable.
+        // here would license a replay) and attempt a cancellation receipt for
+        // the executed-or-not side effect. Clock, construction or append failure
+        // emits an audit fault and may leave no signed parent receipt. When
+        // published, receipt metadata identifies the retained reservations.
         let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
             self.budget_mutation,
             self.payment_authorization,
@@ -489,17 +508,17 @@ impl Drop for PostAdmissionDropGuard<'_> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self
-            .kernel
-            .build_cancelled_response_with_metadata_and_payee_binding(
-                self.request,
-                self.post_dispatch_reason,
-                current_unix_timestamp(),
-                self.matched_grant_index,
-                receipt_metadata,
-                self.receipt_context.verified_payee_binding.as_ref(),
-            )
-        {
+        if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+            self.kernel
+                .build_cancelled_response_with_metadata_and_payee_binding(
+                    self.request,
+                    self.post_dispatch_reason,
+                    now.as_secs(),
+                    self.matched_grant_index,
+                    receipt_metadata,
+                    self.receipt_context.verified_payee_binding.as_ref(),
+                )
+        }) {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -510,13 +529,15 @@ impl Drop for PostAdmissionDropGuard<'_> {
 
         // The dispatch commit landed but the return never did, so the operation
         // would stay non-terminal and reject every replay of this request id
-        // until the next startup sweep. Terminalizing here refuses if a durable
-        // outcome exists, so it cannot overwrite a return that did complete.
+        // until the next startup sweep. Terminalization is best-effort and
+        // samples trusted time again; repeated clock failure leaves admission
+        // unreconciled and emits an audit fault. It refuses if a durable outcome
+        // exists, so it cannot overwrite a return that did complete.
         if let Some(operation) = self.durable_operation {
-            if let Err(error) = self
-                .kernel
-                .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())
-            {
+            if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+                self.kernel
+                    .terminalize_dispatch_committed_admission(operation, now.get())
+            }) {
                 warn!(
                     request_id = %self.request.request_id,
                     reason = %redacted!(&error),

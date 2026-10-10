@@ -365,14 +365,14 @@ impl TryFrom<&VerifiedCapability> for NormalizedVerifiedCapability {
     fn try_from(verified: &VerifiedCapability) -> Result<Self, Self::Error> {
         Ok(Self {
             capability: NormalizedCapability {
-                id: verified.id.clone(),
-                issuer_hex: verified.issuer_hex.clone(),
-                subject_hex: verified.subject_hex.clone(),
-                scope: NormalizedScope::try_from(&verified.scope)?,
-                issued_at: verified.issued_at,
-                expires_at: verified.expires_at,
+                id: verified.id().to_string(),
+                issuer_hex: verified.issuer_hex().to_string(),
+                subject_hex: verified.subject_hex().to_string(),
+                scope: NormalizedScope::try_from(verified.scope())?,
+                issued_at: verified.issued_at(),
+                expires_at: verified.expires_at(),
             },
-            evaluated_at: verified.evaluated_at,
+            evaluated_at: verified.evaluated_at(),
         })
     }
 }
@@ -834,19 +834,28 @@ mod tests {
             agent_id: "agent-1".to_string(),
             arguments: serde_json::json!({"path":"/tmp/demo.txt"}),
         };
-        let verified = VerifiedCapability {
-            id: "cap-1".to_string(),
-            subject_hex: "agent-1".to_string(),
-            issuer_hex: "issuer-1".to_string(),
-            scope: ChioScope {
-                grants: vec![grant(vec![Constraint::PathPrefix("/tmp".to_string())])],
-                resource_grants: vec![],
-                prompt_grants: vec![],
+        let issuer = chio_core_types::Keypair::generate();
+        let token = chio_core_types::capability::token::CapabilityToken::sign(
+            chio_core_types::capability::token::CapabilityTokenBody {
+                id: "cap-1".to_string(),
+                subject: chio_core_types::Keypair::generate().public_key(),
+                issuer: issuer.public_key(),
+                scope: ChioScope {
+                    grants: vec![grant(vec![Constraint::PathPrefix("/tmp".to_string())])],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                issued_at: 10,
+                expires_at: 20,
+                delegation_chain: vec![],
+                aggregate_invocation_budget: None,
             },
-            issued_at: 10,
-            expires_at: 20,
-            evaluated_at: 15,
-        };
+            &issuer,
+        )
+        .expect("signed fixture");
+        let verified =
+            crate::verify_capability(&token, &[issuer.public_key()], &crate::FixedClock::new(15))
+                .expect("verified fixture");
         let verdict = EvaluationVerdict {
             verdict: Verdict::Allow,
             reason: None,

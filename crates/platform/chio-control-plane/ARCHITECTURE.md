@@ -172,12 +172,17 @@ not part of the Rust API) for `authority_handlers`, `budget_handlers`,
    term voting, log replication, or election RPC.
 2. `cluster::deltas::run_cluster_sync_loop` runs a serial per-peer pull round
    (via `tokio::task::spawn_blocking` around a synchronous `ureq` client) for
-   cluster status, authority snapshot, and budget/tool-receipt/child-receipt/
-   lineage/revocation deltas.
+   cluster status, budget/tool-receipt/child-receipt/lineage/revocation
+   deltas, and then the signed authority snapshot. Revocations pull on their
+   own round budget, and signed authority is imported last, after the round is
+   finalized, so a refused authority envelope (no pinned anchor, a local clock
+   behind the signer, a stale relayed envelope) is recorded on the peer
+   without starving revocation propagation or ack finalization.
 3. Delta pages enforce strict sequence contiguity (dense streams) or forward
    progress (gap-tolerant streams); a peer that falls behind or overflows the
    per-round pull budget is force-resynced from a full
-   `cluster::snapshots::apply_cluster_snapshot`.
+   `cluster::snapshots::recover_cluster_snapshot`, which recovers every
+   replicated stream before it imports the snapshot's signed authority.
 4. Every internal cluster endpoint authenticates the caller with
    `report_validation::validate_cluster_peer_auth`: a shared-secret keyed
    digest over canonical JSON (`{scheme, serviceToken, nodeId, endpoint,
@@ -208,6 +213,9 @@ not part of the Rust API) for `authority_handlers`, `budget_handlers`,
 - Single-currency-per-book enforcement recurs across `capital_and_liability`,
   `credit_and_loss`, and `underwriting_and_support`: mixed-currency state is
   rejected with a conflict, never blended or auto-netted.
+- A clustered `--authority-db` must already hold its out-of-band pinned
+  authority replication anchor: `cluster::consensus::build_cluster_state`
+  refuses to start without one and never pins an anchor itself.
 - `trust_control::cluster` replication is pull-based and quorum-gated, not a
   consensus protocol. Budget-acknowledgment witnessing only shrinks on
   ambiguity, never grows, and a peer that force-snapshots is excluded from

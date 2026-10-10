@@ -93,12 +93,15 @@ pub struct FindingCheckpointLogPolicy {
 /// Deterministic checkpoint log identity used by the kernel for an
 /// Ed25519 signer. Profiles reject any caller-chosen alias so a pinned
 /// signer always resolves to the log its checkpoints actually inhabit.
-#[must_use]
-pub fn finding_checkpoint_log_id(signer: &PublicKey) -> String {
-    format!(
+pub fn finding_checkpoint_log_id(signer: &PublicKey) -> Result<String, FindingError> {
+    Ok(format!(
         "local-log-{}",
-        chio_core_types::crypto::sha256_hex(signer.as_bytes())
-    )
+        chio_core_types::crypto::sha256_hex(
+            signer
+                .ed25519_bytes()
+                .map_err(|_| FindingError::InvalidField("checkpoint signer algorithm"))?
+        )
+    ))
 }
 
 /// Externally trusted BBS projection issuer pin. The registry reference
@@ -253,7 +256,7 @@ impl FindingChallengeVerifierProfile {
         for log in &self.checkpoint_logs {
             require_bounded_id(&log.log_id, "checkpoint_logs[].log_id")?;
             log.signer.validate("checkpoint_logs[].signer")?;
-            if log.log_id != finding_checkpoint_log_id(&log.signer.key) {
+            if log.log_id != finding_checkpoint_log_id(&log.signer.key)? {
                 return Err(FindingError::InvalidField("checkpoint_logs[].log_id"));
             }
             if !log_ids.insert(log.log_id.as_str()) {

@@ -216,12 +216,13 @@ type ErrorResponse struct {
 	Suggestion string `json:"suggestion,omitempty"`
 }
 
-// UnmarshalJSON rejects receipt-kind and decision combinations that the
-// generated field types alone cannot express.
+// UnmarshalJSON decodes strictly, like every other protocol primitive (no
+// unknown fields, duplicate keys or nulls), then rejects receipt-kind and
+// decision combinations that the generated field types alone cannot express.
 func (r *ReceiptRecord) UnmarshalJSON(data []byte) error {
 	type receiptRecordAlias ReceiptRecord
 	var decoded receiptRecordAlias
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := decodeProtocolObject(data, &decoded); err != nil {
 		return err
 	}
 	record := ReceiptRecord(decoded)

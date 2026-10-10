@@ -20,6 +20,8 @@ use crate::tool_outcome::{
 
 use super::*;
 
+mod capabilities;
+pub use capabilities::AdmissionProjectionCapabilities;
 mod participant_evidence;
 pub use participant_evidence::*;
 mod channel_terminal;
@@ -68,6 +70,44 @@ pub struct AdmissionReceiptMetadataV1 {
     pub compensation_status: AdmissionCompensationStatus,
     pub tool_outcome_id: Option<AdmissionDigest>,
     pub tool_outcome_version: Option<u64>,
+}
+
+impl AdmissionReceiptMetadataV1 {
+    /// Observe an already-retained unknown outcome without claiming a new
+    /// transition or a live recovery lease. Unlike terminal-transition metadata,
+    /// the version is unchanged and the coordinator/fence tuple is the validated
+    /// historical dispatch tuple. This is not `VerifiedAdmissionReceipt` authority.
+    pub(crate) fn retained_unknown_dispatch(
+        operation: &AdmissionOperationV1,
+        trusted_time_unix_ms: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        operation.validate()?;
+        super::state::validate_positive_ijson("trusted_time_unix_ms", trusted_time_unix_ms)?;
+        if operation.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        let dispatch = operation
+            .dispatch_commit()
+            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+        Ok(Self {
+            schema: AdmissionReceiptSchema::V1,
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            request_namespace_digest: operation.binding().request_namespace_digest().clone(),
+            request_binding_hash: operation.binding().request_binding_hash().clone(),
+            projected_operation_version: operation.version(),
+            projected_state: operation.state(),
+            projected_dispatch_state: operation.dispatch_state(),
+            trusted_time_unix_ms,
+            coordinator_lease_id: dispatch.coordinator_lease_id.clone(),
+            coordinator_lease_epoch: dispatch.coordinator_lease_epoch,
+            store_fence: dispatch.store_fence.clone(),
+            retained_dispatch_commit: Some(dispatch.clone()),
+            compensation_status: AdmissionCompensationStatus::NotCompensated,
+            tool_outcome_id: None,
+            tool_outcome_version: None,
+        })
+    }
 }
 
 /// A receipt qualified by the kernel against the exact admission projection.
@@ -138,7 +178,10 @@ impl VerifiedAdmissionReceipt {
     /// attachment: the actual output remains in privileged durable outcome
     /// evidence while the public receipt carries only the deterministic
     /// redaction binding, mirroring the other non-`Completed` terminals.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_kernel_verified_denied_after_delivery(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -166,7 +209,10 @@ impl VerifiedAdmissionReceipt {
     }
 
     #[cfg(any(test, feature = "admission-test-support"))]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn from_kernel_verified_for_test(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -197,7 +243,10 @@ impl VerifiedAdmissionReceipt {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn qualify(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -263,104 +312,6 @@ impl VerifiedAdmissionReceipt {
             compensation_status,
             tool_outcome,
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct AdmissionProjectionCapabilities {
-    pub operation_terminal: bool,
-    pub incident_terminal: bool,
-    pub tool_outcome: bool,
-    pub payment_terminal: bool,
-    pub authorization_consumption: bool,
-    pub outcome_eligibility: bool,
-    pub observation_attempt_zero: bool,
-    pub obligation: bool,
-    pub channel_terminal: bool,
-    pub credit_exposure_terminal: bool,
-    pub economic_mutation_terminal: bool,
-}
-
-impl AdmissionProjectionCapabilities {
-    pub fn validate_for(
-        &self,
-        operation: &AdmissionOperationV1,
-        projection: &AdmissionTerminalProjection,
-    ) -> Result<(), AdmissionOperationError> {
-        let requirements = operation.binding.participant_requirements();
-        let require = |supported, capability| {
-            if supported {
-                Ok(())
-            } else {
-                Err(AdmissionOperationError::MissingProjectionCapability { capability })
-            }
-        };
-        require(self.operation_terminal, "operation_terminal")?;
-        require(
-            !requirements.credit_exposure || self.credit_exposure_terminal,
-            "credit_exposure_terminal",
-        )?;
-        match projection {
-            AdmissionTerminalProjection::Completed(_) => {
-                require(
-                    operation.binding.kind != AdmissionOperationKind::ToolDispatch
-                        || self.tool_outcome,
-                    "tool_outcome",
-                )?;
-                require(
-                    !requirements.payment || self.payment_terminal,
-                    "payment_terminal",
-                )?;
-                require(
-                    !requirements.authorization_consumption || self.authorization_consumption,
-                    "authorization_consumption",
-                )?;
-                require(
-                    !requirements.outcome_eligibility || self.outcome_eligibility,
-                    "outcome_eligibility",
-                )?;
-                require(
-                    !requirements.observation_attempt_zero || self.observation_attempt_zero,
-                    "observation_attempt_zero",
-                )?;
-                require(!requirements.obligation || self.obligation, "obligation")?;
-                require(
-                    !requirements.channel || self.channel_terminal,
-                    "channel_terminal",
-                )
-            }
-            AdmissionTerminalProjection::CompensatedBeforeDispatch { evidence, .. }
-            | AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { evidence, .. } => {
-                require(
-                    !matches!(evidence.as_ref(), AdmissionReceiptOrIncident::Incident(_))
-                        || self.incident_terminal,
-                    "incident_terminal",
-                )
-            }
-            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } => {
-                require(
-                    !matches!(evidence.as_ref(), AdmissionReceiptOrIncident::Incident(_))
-                        || self.incident_terminal,
-                    "incident_terminal",
-                )?;
-                require(
-                    !requirements.payment || self.payment_terminal,
-                    "payment_terminal",
-                )?;
-                require(
-                    !requirements.observation_attempt_zero || self.observation_attempt_zero,
-                    "observation_attempt_zero",
-                )
-            }
-            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { .. } => {
-                require(self.incident_terminal, "incident_terminal")
-            }
-            AdmissionTerminalProjection::EconomicMutationApplied { .. }
-            | AdmissionTerminalProjection::EconomicMutationNotApplied { .. } => require(
-                self.economic_mutation_terminal,
-                "economic_mutation_terminal",
-            ),
-        }
     }
 }
 
@@ -442,8 +393,12 @@ pub struct AdmissionProjectionManifestV1 {
 
 impl AdmissionProjectionManifestV1 {
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, AdmissionOperationError> {
-        let manifest: Self = serde_json::from_slice(bytes)
-            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        let manifest: Self = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_MANIFEST_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
         manifest.validate()?;
         if canonical_json_bytes(&manifest)
             .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
@@ -470,8 +425,12 @@ impl AdmissionProjectionManifestV1 {
     }
 
     pub fn verify_projection_body(&self, bytes: &[u8]) -> Result<(), AdmissionOperationError> {
-        let value: serde_json::Value = serde_json::from_slice(bytes)
-            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
         if canonical_json_bytes(&value)
             .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
             != bytes
@@ -494,7 +453,7 @@ impl AdmissionProjectionManifestV1 {
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
         if self.records.is_empty()
-            || self.records.windows(2).any(|pair| {
+            || self.records.array_windows::<2>().any(|pair| {
                 let left = (pair[0].kind.as_str(), pair[0].record_id.as_str());
                 let right = (pair[1].kind.as_str(), pair[1].record_id.as_str());
                 left >= right
@@ -796,7 +755,11 @@ pub struct GovernedEconomicMutationResultBinding {
 
 impl GovernedEconomicMutationResultBinding {
     #[cfg(test)]
-    #[allow(clippy::too_many_arguments, dead_code)]
+    #[allow(
+        clippy::too_many_arguments,
+        dead_code,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -994,111 +957,8 @@ impl VerifiedEconomicMutationNotApplied {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct VerifiedAuthorizationReceiptConsumption {
-    binding: AdmissionExactProjectionBindingV1,
-    consumption: AuthorizationReceiptConsumption,
-    source_receipt_digest: AdmissionDigest,
-    authorization_capability_hash: AdmissionDigest,
-    outcome_id: AdmissionDigest,
-    outcome_version: u64,
-}
-
-impl VerifiedAuthorizationReceiptConsumption {
-    #[cfg(test)]
-    #[allow(clippy::too_many_arguments, dead_code)]
-    pub(crate) fn from_source_verified(
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-        receipt: &VerifiedAdmissionReceipt,
-        consumption: AuthorizationReceiptConsumption,
-        source_authorization_receipt_id: &AdmissionIdentifier,
-        source_session_id: &AdmissionIdentifier,
-        source_tool_call_id: &AdmissionIdentifier,
-        source_tenant_id: Option<&AdmissionIdentifier>,
-        source_parameter_hash: &AdmissionDigest,
-        source_receipt_digest: AdmissionDigest,
-        outcome_id: AdmissionDigest,
-        outcome_version: u64,
-    ) -> Result<Self, AdmissionOperationError> {
-        let receipt = receipt.receipt();
-        let expected_tenant = expected_receipt_tenant(operation);
-        if consumption.authorization_receipt_id != source_authorization_receipt_id.as_str()
-            || consumption.consumer_receipt_id != receipt.id
-            || consumption.request_id != operation.binding.request_id.as_str()
-            || consumption.session_id != source_session_id.as_str()
-            || consumption.tool_call_id != source_tool_call_id.as_str()
-            || consumption.tenant_id.as_deref() != source_tenant_id.map(AdmissionIdentifier::as_str)
-            || consumption.tenant_id.as_deref() != expected_tenant
-            || receipt.tenant_id.as_deref() != expected_tenant
-            || consumption.parameter_hash != source_parameter_hash.as_str()
-            || consumption.consumed_at_unix_ms != context.trusted_time_unix_ms
-        {
-            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-        }
-        validate_positive_ijson("authorization_outcome_version", outcome_version)?;
-        operation.validate_completed_tool_outcome_attachment(&outcome_id)?;
-        Ok(Self {
-            binding: AdmissionExactProjectionBindingV1::from_verified(
-                operation,
-                context,
-                AdmissionOperationState::Completed,
-            )?,
-            consumption,
-            source_receipt_digest,
-            authorization_capability_hash: operation.binding.authorization_capability_hash.clone(),
-            outcome_id,
-            outcome_version,
-        })
-    }
-
-    pub(super) fn validate_against(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-        receipt: &VerifiedAdmissionReceipt,
-        outcome_id: &AdmissionDigest,
-        outcome_version: u64,
-    ) -> Result<(), AdmissionOperationError> {
-        let receipt = receipt.receipt();
-        self.binding
-            .validate_against(operation, context, AdmissionOperationState::Completed)?;
-        validate_positive_ijson("authorization_outcome_version", self.outcome_version)?;
-        operation.validate_completed_tool_outcome_attachment(outcome_id)?;
-        let expected_tenant = expected_receipt_tenant(operation);
-        if AdmissionIdentifier::try_new(
-            "authorization_receipt_id",
-            self.consumption.authorization_receipt_id.clone(),
-        )
-        .is_err()
-            || AdmissionIdentifier::try_new("session_id", self.consumption.session_id.clone())
-                .is_err()
-            || AdmissionIdentifier::try_new("tool_call_id", self.consumption.tool_call_id.clone())
-                .is_err()
-            || AdmissionDigest::try_new(
-                "authorization_parameter_hash",
-                self.consumption.parameter_hash.clone(),
-            )
-            .is_err()
-            || self.consumption.consumer_receipt_id != receipt.id
-            || self.consumption.request_id != operation.binding.request_id.as_str()
-            || self.consumption.tenant_id.as_deref() != expected_tenant
-            || receipt.tenant_id.as_deref() != expected_tenant
-            || self.consumption.consumed_at_unix_ms != context.trusted_time_unix_ms
-            || self.authorization_capability_hash != operation.binding.authorization_capability_hash
-            || self.outcome_id != *outcome_id
-            || self.outcome_version != outcome_version
-        {
-            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-        }
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn consumption(&self) -> &AuthorizationReceiptConsumption {
-        &self.consumption
-    }
-}
+mod authorization;
+pub use authorization::VerifiedAuthorizationReceiptConsumption;
 
 fn expected_receipt_tenant(operation: &AdmissionOperationV1) -> Option<&str> {
     (operation.binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
@@ -1594,7 +1454,7 @@ impl AdmissionTerminalProjection {
                             "projection_authorization_receipt_id",
                             authorization.consumption().authorization_receipt_id.clone(),
                         )?,
-                        authorization.consumption(),
+                        authorization,
                     )?);
                 }
                 if let Some(eligibility) = &completed.eligibility {

@@ -79,6 +79,7 @@ pub(crate) fn build_credit_loss_lifecycle_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleQuery,
 ) -> Result<CreditLossLifecycleReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     query.validate().map_err(TrustHttpError::bad_request)?;
 
     let bond_row = receipt_store
@@ -396,7 +397,7 @@ pub(crate) fn build_credit_loss_lifecycle_report_from_store(
 
     Ok(CreditLossLifecycleReport {
         schema: CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: query.clone(),
         summary: chio_kernel::CreditLossLifecycleSummary {
             bond_id: bond.body.bond_id.clone(),
@@ -435,14 +436,14 @@ pub(crate) fn build_credit_loss_lifecycle_report_from_store(
 }
 
 pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, TrustHttpError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let mut report = build_credit_loss_lifecycle_report_from_store(&receipt_store, &request.query)?;
-    let issued_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let mut report = build_credit_loss_lifecycle_report_from_store(receipt_store, &request.query)?;
+    let issued_at = clock_now;
     let (
         reserve_control_source_id,
         authority_chain,
@@ -477,7 +478,7 @@ pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
                 )
             })?;
         let reserve_source =
-            resolve_credit_loss_lifecycle_reserve_source(&receipt_store, &bond_row.bond)?;
+            resolve_credit_loss_lifecycle_reserve_source(receipt_store, &bond_row.bond)?;
         let owner_role = capital_execution_role_from_book_role(reserve_source.owner_role);
         ensure_capital_execution_owner_authority(&request.authority_chain, owner_role)?;
         let event_amount = report.summary.event_amount.as_ref().ok_or_else(|| {

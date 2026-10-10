@@ -37,12 +37,27 @@ fn append_chio_receipt_consuming_authorization_rejects_reuse_after_reopen() {
         parameter_hash: "auth-consume-parameter-hash".to_string(),
         consumed_at_unix_ms: 101_000,
     };
+    let foreign =
+        sample_receipt_with_keypair_and_tenant("consumer-foreign", 102, "tenant-foreign", &keypair);
+    let foreign_consumption = AuthorizationReceiptConsumption {
+        consumer_receipt_id: foreign.id.clone(),
+        tenant_id: foreign.tenant_id.clone(),
+        ..consumption.clone()
+    };
+    let assert_foreign_rejected = |store: &SqliteReceiptStore| {
+        assert!(
+            matches!(store.append_chio_receipt_consuming_authorization(&foreign, &foreign_consumption),
+            Err(ReceiptStoreError::Conflict(message)) if message == "authorization receipt tenant id does not match consumption tenant")
+        );
+    };
+    assert_foreign_rejected(&store);
     store
         .append_chio_receipt_consuming_authorization(&consumer, &consumption)
         .test_unwrap();
     drop(store);
 
     let reopened = SqliteReceiptStore::open(&path).test_unwrap();
+    assert_foreign_rejected(&reopened);
     let replay = AuthorizationReceiptConsumption {
         consumer_receipt_id: replay_consumer.id.clone(),
         consumed_at_unix_ms: 102_000,

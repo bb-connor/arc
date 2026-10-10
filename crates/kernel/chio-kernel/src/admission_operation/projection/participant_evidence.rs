@@ -39,7 +39,10 @@ fn validate_delivered_terminal_state(
 }
 
 impl VerifiedTerminalParticipantSourceV1 {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn from_source_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -120,7 +123,7 @@ macro_rules! attached_terminal_participant {
         }
 
         impl $name {
-            #[allow(clippy::too_many_arguments, dead_code)]
+            #[allow(clippy::too_many_arguments, dead_code, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
             pub(crate) fn from_source_verified(
                 operation: &AdmissionOperationV1,
                 context: &AdmissionProjectionContext,
@@ -237,7 +240,10 @@ impl ObligationProjection {
     }
 
     #[cfg(any(test, feature = "admission-test-support"))]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn from_credit_source_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -263,7 +269,10 @@ impl ObligationProjection {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn from_verified_economic_receipt_inner(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -399,7 +408,10 @@ impl ObligationProjection {
     }
 
     #[cfg(any(test, feature = "admission-test-support"))]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn from_source_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,

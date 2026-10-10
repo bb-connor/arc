@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Iroh federation-transport adapter.
 //!
 //! This crate sits strictly underneath `chio-federation` as a transport and

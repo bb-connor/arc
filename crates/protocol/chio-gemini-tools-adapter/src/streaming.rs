@@ -11,7 +11,7 @@ use chio_provider_adapter_core::{
 use chio_tool_call_fabric::{ProviderError, ToolInvocation, VerdictResult};
 use serde_json::Value;
 
-use crate::{native::FunctionCallPart, GeminiAdapter};
+use crate::{adapter::CallIdentities, native::FunctionCallPart, GeminiAdapter};
 
 pub type GatedSseStream = GatedStream;
 
@@ -30,6 +30,7 @@ impl GeminiAdapter {
         let mut output: Vec<u8> = Vec::new();
         let mut invocations = Vec::new();
         let mut verdicts = Vec::new();
+        let mut identities = CallIdentities::default();
 
         for frame in frames {
             let Some(data) = frame.data.as_ref() else {
@@ -41,20 +42,34 @@ impl GeminiAdapter {
             let parts = candidate_parts(data);
             for part in parts {
                 if let Some(call) = function_call_from_part(part)? {
-                    let invocation = self.invocation_from_function_call(&call)?;
-                    let verdict = evaluate(&invocation)?;
-                    ensure_streaming_allow_no_redactions(
-                        "Gemini",
-                        "functionCall",
-                        &call.name,
-                        None,
-                        &verdict,
-                    )?;
+                    let invocation = self.invocation_from_function_call(&call, &mut identities)?;
+                    if !invocation.bridge_security.as_ref().is_some_and(
+                        chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
+                    ) {
+                        return Err(ProviderError::Malformed(
+                            "Gemini stream evaluation requires a registry-admitted security sidecar"
+                                .to_string(),
+                        ));
+                    }
+                    if invocations.len() >= chio_provider_adapter_core::input::MAX_TOOL_CALLS {
+                        return Err(ProviderError::StreamCapacityExceeded);
+                    }
                     invocations.push(invocation);
-                    verdicts.push(verdict);
                 }
             }
             output.extend_from_slice(&frame.raw);
+        }
+
+        for invocation in &invocations {
+            let verdict = evaluate(invocation)?;
+            ensure_streaming_allow_no_redactions(
+                "Gemini",
+                "functionCall",
+                &invocation.tool_name,
+                None,
+                &verdict,
+            )?;
+            verdicts.push(verdict);
         }
 
         Ok(GatedSseStream {
@@ -89,8 +104,7 @@ fn function_call_from_part(part: &Value) -> Result<Option<FunctionCallPart>, Pro
     let Some(call) = part.get("functionCall") else {
         return Ok(None);
     };
-    let parsed: FunctionCallPart = serde_json::from_value(call.clone()).map_err(|error| {
-        ProviderError::Malformed(format!("Gemini functionCall part was malformed: {error}"))
-    })?;
+    let parsed: FunctionCallPart =
+        chio_provider_adapter_core::input::typed(call.clone()).map_err(ProviderError::from)?;
     Ok(Some(parsed))
 }

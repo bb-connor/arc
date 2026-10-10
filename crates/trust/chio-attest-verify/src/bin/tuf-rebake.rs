@@ -16,6 +16,7 @@ use url::Url;
 
 const DEFAULT_METADATA_URL: &str = "https://tuf-repo-cdn.sigstore.dev";
 const DEFAULT_TARGETS_URL: &str = "https://tuf-repo-cdn.sigstore.dev/targets";
+const MAX_ROOT_BYTES: usize = 4 * 1024 * 1024;
 const ROOT_JSON: &str = "root.json";
 const TRUSTED_ROOT_JSON: &str = "trusted_root.json";
 
@@ -186,6 +187,9 @@ async fn read_verified_target(repository: &tough::Repository, name: &str) -> Res
 
     let mut data = Vec::new();
     while let Some(chunk) = stream.try_next().await? {
+        if chunk.len() > MAX_ROOT_BYTES.saturating_sub(data.len()) {
+            return Err(invalid_data("verified trust root exceeds size bound").into());
+        }
         data.extend_from_slice(&chunk);
     }
 
@@ -246,6 +250,11 @@ fn validate_rebaked_outputs(root_json: &[u8], trusted_root_json: &[u8]) -> Resul
 }
 
 fn validate_sigstore_trusted_root(trusted_root_json: &[u8]) -> Result<()> {
+    let _: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        trusted_root_json,
+        MAX_ROOT_BYTES,
+    )?
+    .decode_external()?;
     let trust_root = SigstoreTrustRoot::from_trusted_root_json_unchecked(trusted_root_json)?;
     let fulcio_count = trust_root.fulcio_certs()?.len();
     let rekor_count = trust_root.rekor_keys()?.len();
@@ -265,7 +274,9 @@ fn validate_sigstore_trusted_root(trusted_root_json: &[u8]) -> Result<()> {
 }
 
 fn tuf_root_version(root_json: &[u8]) -> Result<u64> {
-    let value: serde_json::Value = serde_json::from_slice(root_json)?;
+    let value: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(root_json, MAX_ROOT_BYTES)?
+            .decode_external()?;
     value
         .pointer("/signed/version")
         .and_then(serde_json::Value::as_u64)
@@ -273,16 +284,17 @@ fn tuf_root_version(root_json: &[u8]) -> Result<u64> {
 }
 
 async fn read_required(path: &Path) -> Result<Vec<u8>> {
-    fs::read(path).await.map_err(|error| {
-        io::Error::new(
-            error.kind(),
-            format!(
-                "required file `{}` is not readable: {error}",
-                path.display()
-            ),
-        )
-        .into()
-    })
+    use tokio::io::AsyncReadExt;
+    let mut bytes = Vec::new();
+    fs::File::open(path)
+        .await?
+        .take((MAX_ROOT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .await?;
+    if bytes.len() > MAX_ROOT_BYTES {
+        return Err(invalid_data("trust root exceeds size bound").into());
+    }
+    Ok(bytes)
 }
 
 fn default_root_dir() -> Result<PathBuf> {
@@ -333,4 +345,17 @@ fn print_usage() {
     println!(
         "Usage: tuf-rebake [--check|--write] [--root-dir PATH] [--metadata-url URL] [--targets-url URL]"
     );
+}
+
+#[cfg(test)]
+mod reader_tests {
+    use super::*;
+    #[test]
+    fn both_root_readers_reject_original_duplicate_fields() {
+        let raw = br#"{"signed":{"version":1,"version":2},"secret-sentinel":true}"#;
+        assert!(tuf_root_version(raw).is_err());
+        let result = validate_sigstore_trusted_root(raw);
+        assert!(result.is_err());
+        assert!(!format!("{result:?}").contains("secret-sentinel"));
+    }
 }

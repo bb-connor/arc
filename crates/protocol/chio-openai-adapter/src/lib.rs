@@ -8,9 +8,12 @@
 //! - **Chat Completions API** format (function_call / tool_calls)
 //! - **Responses API** format (tool invocations)
 //!
-//! Every function call produces a signed receipt. Guards fail closed by default.
+//! Admitted evaluations produce signed receipts. Invalid or unnegotiated input
+//! rejects before admission; guards fail closed by default.
 
 #![forbid(unsafe_code)]
+
+mod input;
 
 use std::collections::BTreeMap;
 
@@ -27,7 +30,7 @@ use chio_kernel::{
     dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse,
     Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -54,6 +57,10 @@ pub use transport::{
 /// Errors produced by the OpenAI adapter.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiAdapterError {
+    /// Rejected peer bytes, with a redacted code and a retained local cause.
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     /// A tool/function was not found.
     #[error("function not found: {0}")]
     FunctionNotFound(String),
@@ -198,6 +205,7 @@ pub struct OpenAiExecutionContext {
 #[derive(Debug)]
 pub struct ChioOpenAiAdapter {
     manifest: ToolManifest,
+    peer_capabilities: chio_core::capability::features::CapabilityNegotiation,
     /// Maps function name to (server_id, tool_name).
     function_bindings: BTreeMap<String, (String, String)>,
 }
@@ -213,6 +221,12 @@ impl ChioOpenAiAdapter {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                if tool.flow.is_some() {
+                    return Err(OpenAiAdapterError::InvalidRequest(
+                        "flow-required OpenAI tools require the verified cross-protocol host"
+                            .to_string(),
+                    ));
+                }
                 let func_name = tool.name.clone();
                 if function_bindings.contains_key(&func_name) {
                     continue;
@@ -230,7 +244,7 @@ impl ChioOpenAiAdapter {
         }
 
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: config.server_id.clone(),
             name: config.server_name.clone(),
             description: Some("Chio tools exposed via OpenAI function calling".to_string()),
@@ -246,7 +260,21 @@ impl ChioOpenAiAdapter {
         Ok(Self {
             manifest,
             function_bindings,
+            peer_capabilities: Default::default(),
         })
+    }
+
+    /// Bind a peer profile established by the host, never by a model tool call.
+    /// This does not install budget, approval or native release authority.
+    pub fn with_peer_capabilities(
+        mut self,
+        profile: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<Self, OpenAiAdapterError> {
+        profile
+            .validate()
+            .map_err(|error| OpenAiAdapterError::InvalidRequest(error.to_string()))?;
+        self.peer_capabilities = profile.clone();
+        Ok(self)
     }
 
     /// Get the manifest.
@@ -287,8 +315,8 @@ impl ChioOpenAiAdapter {
 
     /// Execute an OpenAI tool call through the Chio kernel.
     ///
-    /// This is the core interception point. Every function call produces
-    /// a signed receipt via the kernel guard pipeline.
+    /// This is the core interception point. Admitted evaluations produce a
+    /// signed receipt; malformed or unnegotiated input rejects before admission.
     pub fn execute_tool_call(
         &self,
         tool_call: &OpenAiToolCall,
@@ -332,7 +360,7 @@ impl ChioOpenAiAdapter {
             }
         };
 
-        let arguments = match serde_json::from_str::<Value>(&tool_call.function.arguments) {
+        let arguments = match input::arguments(&tool_call.function.arguments) {
             Ok(args) => args,
             Err(e) => {
                 return denied_tool_call_result(
@@ -358,7 +386,12 @@ impl ChioOpenAiAdapter {
             supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
+
+        if let Err(error) = request.validate_peer_capabilities(&self.peer_capabilities) {
+            return denied_tool_call_result(tool_call, format!("Error: {error}"));
+        }
 
         let route_plan = match plan_authoritative_route(
             &request.request_id,
@@ -485,10 +518,10 @@ impl ChioOpenAiAdapter {
             .enumerate()
             .map(|(index, call)| {
                 let parsed =
-                    serde_json::from_value::<OpenAiToolCall>(call.clone()).map_err(|e| {
-                        OpenAiAdapterError::InvalidRequest(format!(
-                            "tool_calls[{index}] is malformed: {e}"
-                        ))
+                    serde_json::from_value::<OpenAiToolCall>(call.clone()).map_err(|error| {
+                        OpenAiAdapterError::UntrustedInput(
+                            chio_core::canonical::UntrustedJsonError::Decode(error),
+                        )
                     })?;
                 validate_tool_call(parsed, &format!("tool_calls[{index}]"))
             })
@@ -507,17 +540,21 @@ impl ChioOpenAiAdapter {
             OpenAiAdapterError::InvalidRequest("output must be an array".to_string())
         })?;
 
-        items
-            .iter()
-            .enumerate()
-            .filter_map(|(index, item)| {
-                let item_type = item.get("type").and_then(Value::as_str)?;
-                if item_type == "function_call" {
-                    Some((index, item))
-                } else {
-                    None
-                }
-            })
+        let mut calls = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let item_type = item.get("type").and_then(Value::as_str).ok_or_else(|| {
+                OpenAiAdapterError::InvalidRequest(format!("output[{index}] missing type"))
+            })?;
+            if item_type == "function_call" {
+                calls.push((index, item));
+            } else if !PROVIDER_EXECUTED_ITEM_TYPES.contains(&item_type) {
+                return Err(OpenAiAdapterError::InvalidRequest(format!(
+                    "output[{index}] type {item_type} is not an item the adapter can evaluate"
+                )));
+            }
+        }
+        calls
+            .into_iter()
             .map(|(index, item)| {
                 let context = format!("output[{index}] function_call");
                 let name = required_string_field(item, "name", &context)?;
@@ -535,6 +572,18 @@ impl ChioOpenAiAdapter {
             .collect()
     }
 }
+
+/// Responses output item types the provider executes or renders. They ask the
+/// client to run nothing, so the adapter forwards them without evaluation; every
+/// other non-`function_call` item is rejected.
+pub(crate) const PROVIDER_EXECUTED_ITEM_TYPES: &[&str] = &[
+    "message",
+    "reasoning",
+    "web_search_call",
+    "file_search_call",
+    "code_interpreter_call",
+    "image_generation_call",
+];
 
 fn required_string_field(
     value: &Value,

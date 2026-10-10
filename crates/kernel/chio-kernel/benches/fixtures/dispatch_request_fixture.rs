@@ -20,6 +20,7 @@ use chio_kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use chio_test_support::prelude::*;
 use tokio::runtime::{Builder, Runtime};
 
 const SERVER_ID: &str = "bench-dispatch-srv";
@@ -100,7 +101,8 @@ impl DispatchAllowFixture {
                 SessionId::new(session_id.clone()),
                 guard_agent_id.clone(),
                 vec![capability.clone()],
-            ),
+            )
+            .test_expect("valid dispatch benchmark session"),
         );
 
         let fixture = Self {
@@ -303,6 +305,7 @@ impl DispatchAllowFixture {
             server_id: &self.guard_server_id,
             session_filesystem_roots: None,
             matched_grant_index: Some(0),
+            security_context: None,
         };
 
         match guard.evaluate(&ctx) {
@@ -381,6 +384,7 @@ fn make_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -405,6 +409,7 @@ fn make_deny_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -429,6 +434,7 @@ fn make_guard_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

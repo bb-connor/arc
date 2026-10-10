@@ -14,7 +14,10 @@ use super::ownership::SessionTransport;
 /// This is intentionally separate from Chio capability authorization. A session
 /// may be transport-authenticated and still be denied by capability or guard
 /// checks later during operation evaluation.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "The authentication state retains its owned credential without an additional heap allocation."
+)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionAuthMethod {
@@ -69,6 +72,9 @@ impl SessionAuthMethod {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthBearerFederatedClaims {
+    /// Invocation subject whose possession was verified during authentication.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_public_key: Option<crate::crypto::PublicKey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -85,7 +91,8 @@ pub struct OAuthBearerFederatedClaims {
 
 impl OAuthBearerFederatedClaims {
     pub fn is_empty(&self) -> bool {
-        self.client_id.is_none()
+        self.sender_public_key.is_none()
+            && self.client_id.is_none()
             && self.object_id.is_none()
             && self.tenant_id.is_none()
             && self.organization_id.is_none()

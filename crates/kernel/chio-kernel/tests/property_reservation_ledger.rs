@@ -382,9 +382,9 @@ proptest! {
             }
 
             let split = registry.split(PARENT).expect("registered parent remains present");
-            assert!(split.current_total_child_bps() <= u32::from(PARENT_SHARE));
+            prop_assert!(matches!(split.current_total_child_bps(), Ok(total) if total <= u32::from(PARENT_SHARE)));
             let expected_sum: u32 = admitted.iter().map(|(_, share)| u32::from(*share)).sum();
-            assert_eq!(split.current_total_child_bps(), expected_sum);
+            assert_eq!(split.current_total_child_bps(), Ok(expected_sum));
         }
     }
 }

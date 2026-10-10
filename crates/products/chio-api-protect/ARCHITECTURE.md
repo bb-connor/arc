@@ -97,10 +97,11 @@ flowchart TD
    `revoked_sidecar_evaluate_response`): a revoked capability short-circuits
    to a signed deny receipt without calling `HttpAuthority`.
 3. `RequestEvaluator::evaluate*` matches the path against the OpenAPI route
-   table: each route's pattern is compared segment by segment (literal or
-   `{param}` wildcard) in spec-declaration order, first match wins; an
-   unmatched path falls back to a method-based default (safe methods allow,
-   side-effect methods deny). The matched policy and request go to
+   table using the actual request path and method. Paths that URL parsing
+   would rewrite are denied. Literal segments outrank `{param}` wildcards;
+   equally specific overlaps choose the restrictive policy. Unmatched routes
+   always deny. Anonymous access to registered read routes requires the local
+   `allow_anonymous_reads` opt-in. The matched policy and request go to
    `HttpAuthority::evaluate`, which runs the embedded kernel guard pipeline
    and returns a decision `HttpReceipt`.
 4. A denial returns immediately with a finalized deny receipt. An allow
@@ -119,22 +120,31 @@ flowchart TD
   durable.
 - Fail-closed revocation: `ProxyState::capability_is_revoked` treats a
   durable revocation-store query error as revoked, not as not-revoked.
-- Side-effect methods (`POST`/`PUT`/`PATCH`/`DELETE`) deny by default absent
-  an OpenAPI-extension override; safe methods (`GET`/`HEAD`/`OPTIONS`) allow
-  with an audit receipt.
+- Every route requires capability authority by default. Registered read routes
+  can be opened with `--allow-anonymous-reads`; unknown routes still deny.
+  An OpenAPI extension can relax side-effect classification only when `--spec`
+  names a local file and `--spec-sha256` matches the exact bounded bytes loaded.
+  Inline and discovered specs may tighten policy but cannot relax it.
 - Chio transport headers (`x-chio-capability`, `x-chio-execution-nonce`) and
   hop-by-hop headers are stripped before a request reaches upstream
   (`should_forward_request_header`).
 - `/v1/capabilities/attenuate` always returns `403`: the sidecar never holds
   the parent subject's signing key, so it cannot mint an attenuated child.
-- `/v1/evaluate` is retired (`410`); `/v1/evaluate/advisory` performs local
-  revocation and parameter-hash checks only and is explicitly not
-  kernel-mediated authorization. Kernel-driven tool-call evaluation is not
-  wired through the sidecar.
+- `/v1/evaluate` is a kernel-mediated pre-execution reservation gate. It
+  requires a local hold-capable budget store and a configured control token
+  for downstream reconciliation. It mints execution nonces, never dispatches
+  or settles a tool. `/v1/evaluate/advisory` performs local revocation and
+  parameter-hash checks only and is explicitly not kernel authorization.
 - Sidecar control routes (approvals, mint, release, validate, receipts,
-  `/metrics`) require a loopback caller or a bearer token compared in
-  constant time (`subtle::ConstantTimeEq`); a configured-but-blank token
-  rejects every remote caller.
+  reconciliation, `/metrics`) require a configured token and one matching
+  bearer header, compared in constant time (`subtle::ConstantTimeEq`).
+  Missing or blank configuration disables control access, including loopback.
+  Duplicate headers deny. The shared gate lives in `proxy/control.rs`.
+- Nonempty control tokens are validated before startup I/O against Bearer-token
+  syntax and a 512-byte bound. Before body reads or kernel admission, the proxy
+  rejects their raw bytes in any request header value. A 64 KiB name/value budget
+  bounds the scan, including duplicates. Ordinary upstream credentials stay
+  byte-preserved; this is not body, URL or encoded-secret inspection.
 - The upstream egress contract denies redirect chains beyond 4 hops, caps
   response bodies at 64 MiB, and denies loopback/link-local/IPv6-ULA
   destinations unless the configured upstream host is itself loopback.

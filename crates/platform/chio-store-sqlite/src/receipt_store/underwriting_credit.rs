@@ -2,7 +2,7 @@ use super::*;
 
 impl SqliteReceiptStore {
     pub fn record_underwriting_decision(
-        &mut self,
+        &self,
         decision: &SignedUnderwritingDecision,
     ) -> Result<(), ReceiptStoreError> {
         if !decision
@@ -64,7 +64,8 @@ impl SqliteReceiptStore {
                 .premium
                 .quoted_amount
                 .as_ref()
-                .map(|amount| amount.units as i64);
+                .map(|amount| crate::integer::checked::<_, i64>(amount.units))
+                .transpose()?;
             tx.execute(
                 "INSERT INTO underwriting_decisions (
                 decision_id, issued_at, capability_id, subject_key, tool_server, tool_name,
@@ -73,7 +74,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12, ?13, ?14, ?15)",
                 params![
                     artifact.decision_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact.evaluation.input.filters.capability_id.as_deref(),
                     artifact.evaluation.input.filters.agent_subject.as_deref(),
                     artifact.evaluation.input.filters.tool_server.as_deref(),
@@ -111,10 +112,11 @@ impl SqliteReceiptStore {
     }
 
     pub fn create_underwriting_appeal(
-        &mut self,
+        &self,
         request: &UnderwritingAppealCreateRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let request = &request_owned;
             let tx = connection.transaction()?;
@@ -149,7 +151,7 @@ impl SqliteReceiptStore {
                 )));
             }
 
-            let created_at = unix_now();
+            let created_at = unix_now(&clock)?;
             let appeal_id = format!(
                 "uwa-{}",
                 chio_core::sha256_hex(
@@ -188,8 +190,8 @@ impl SqliteReceiptStore {
                     record.reason,
                     underwriting_appeal_status_label(record.status),
                     record.note.as_deref(),
-                    record.created_at as i64,
-                    record.updated_at as i64,
+                    crate::integer::checked::<_, i64>(record.created_at)?,
+                    crate::integer::checked::<_, i64>(record.updated_at)?,
                 ],
             )?;
             tx.commit()?;
@@ -198,10 +200,11 @@ impl SqliteReceiptStore {
     }
 
     pub fn resolve_underwriting_appeal(
-        &mut self,
+        &self,
         request: &UnderwritingAppealResolveRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
         let request = &request_owned;
         let tx = connection.transaction()?;
@@ -249,7 +252,7 @@ impl SqliteReceiptStore {
             UnderwritingAppealResolution::Accepted => UnderwritingAppealStatus::Accepted,
             UnderwritingAppealResolution::Rejected => UnderwritingAppealStatus::Rejected,
         };
-        record.updated_at = unix_now();
+        record.updated_at = unix_now(&clock)?;
         record.note = request.note.clone().or(record.note);
         record.resolved_by = Some(request.resolved_by.clone());
         record.replacement_decision_id = request.replacement_decision_id.clone();
@@ -262,7 +265,7 @@ impl SqliteReceiptStore {
             params![
                 underwriting_appeal_status_label(record.status),
                 record.note.as_deref(),
-                record.updated_at as i64,
+                crate::integer::checked::<_, i64>(record.updated_at)?,
                 record.resolved_by.as_deref(),
                 record.replacement_decision_id.as_deref(),
                 record.appeal_id,
@@ -302,7 +305,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw) = row?;
-            let decision: SignedUnderwritingDecision = serde_json::from_str(&raw_json)?;
+            let decision: SignedUnderwritingDecision = decode_verified_signed_export(&raw_json)?;
             let lifecycle_state =
                 parse_underwriting_lifecycle_state(&lifecycle_state_raw).map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -343,14 +346,20 @@ impl SqliteReceiptStore {
                 let total = quoted_premium_totals_by_currency
                     .entry(quoted_amount.currency.clone())
                     .or_insert(0);
-                *total = total.saturating_add(quoted_amount.units);
+                *total = super::reports::checked_report_sum(
+                    *total,
+                    quoted_amount.units,
+                    "underwriting quoted-premium total",
+                )?;
             }
 
             if decisions.len() < normalized.limit_or_default() {
-                let open_appeal_count = decision_appeals
-                    .iter()
-                    .filter(|appeal| appeal.status == UnderwritingAppealStatus::Open)
-                    .count() as u64;
+                let open_appeal_count = crate::integer::count(
+                    decision_appeals
+                        .iter()
+                        .filter(|appeal| appeal.status == UnderwritingAppealStatus::Open)
+                        .count(),
+                );
                 decisions.push(UnderwritingDecisionRow {
                     decision,
                     lifecycle_state,
@@ -373,11 +382,11 @@ impl SqliteReceiptStore {
         }
 
         Ok(UnderwritingDecisionListReport {
-            generated_at: unix_now(),
+            generated_at: unix_now(&self.clock)?,
             filters: normalized,
             summary: UnderwritingDecisionSummary {
                 matching_decisions,
-                returned_decisions: decisions.len() as u64,
+                returned_decisions: crate::integer::count(decisions.len()),
                 active_decisions,
                 superseded_decisions,
                 open_appeals,
@@ -392,7 +401,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_credit_facility(
-        &mut self,
+        &self,
         facility: &SignedCreditFacility,
     ) -> Result<(), ReceiptStoreError> {
         if !facility
@@ -405,6 +414,7 @@ impl SqliteReceiptStore {
         }
 
         let facility_owned = facility.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let facility = &facility_owned;
             let artifact = &facility.body;
@@ -447,7 +457,7 @@ impl SqliteReceiptStore {
                 if state.0
                     != credit_facility_lifecycle_state_label(CreditFacilityLifecycleState::Active)
                     || state.1.is_some()
-                    || state.2.max(0) as u64 <= unix_now()
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now(&clock)?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit facility `{supersedes_facility_id}` is not active"
@@ -463,8 +473,8 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13)",
                 params![
                     artifact.facility_id,
-                    artifact.issued_at as i64,
-                    artifact.expires_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
+                    crate::integer::checked::<_, i64>(artifact.expires_at)?,
                     artifact.report.filters.capability_id.as_deref(),
                     artifact.report.filters.agent_subject.as_deref(),
                     artifact.report.filters.tool_server.as_deref(),
@@ -503,7 +513,7 @@ impl SqliteReceiptStore {
         query: &CreditFacilityListQuery,
     ) -> Result<CreditFacilityListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let now = unix_now();
+        let now = unix_now(&self.clock)?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_facility_id
@@ -529,7 +539,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw, superseded_by_facility_id) = row?;
-            let facility: SignedCreditFacility = serde_json::from_str(&raw_json)?;
+            let facility: SignedCreditFacility = decode_verified_signed_export(&raw_json)?;
             let persisted_lifecycle = parse_credit_facility_lifecycle_state(&lifecycle_state_raw)
                 .map_err(|error| {
                 ReceiptStoreError::Conflict(format!(
@@ -566,11 +576,11 @@ impl SqliteReceiptStore {
 
         Ok(CreditFacilityListReport {
             schema: CREDIT_FACILITY_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditFacilityListSummary {
                 matching_facilities,
-                returned_facilities: facilities.len() as u64,
+                returned_facilities: crate::integer::count(facilities.len()),
                 active_facilities,
                 superseded_facilities,
                 denied_facilities,
@@ -582,7 +592,7 @@ impl SqliteReceiptStore {
         })
     }
 
-    pub fn record_credit_bond(&mut self, bond: &SignedCreditBond) -> Result<(), ReceiptStoreError> {
+    pub fn record_credit_bond(&self, bond: &SignedCreditBond) -> Result<(), ReceiptStoreError> {
         if !bond
             .verify_signature()
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
@@ -593,6 +603,7 @@ impl SqliteReceiptStore {
         }
 
         let bond_owned = bond.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let bond = &bond_owned;
             let artifact = &bond.body;
@@ -634,7 +645,7 @@ impl SqliteReceiptStore {
                     })?;
                 if state.0 != credit_bond_lifecycle_state_label(CreditBondLifecycleState::Active)
                     || state.1.is_some()
-                    || state.2.max(0) as u64 <= unix_now()
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now(&clock)?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit bond `{supersedes_bond_id}` is not active"
@@ -650,8 +661,8 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12, ?13, ?14)",
                 params![
                     artifact.bond_id,
-                    artifact.issued_at as i64,
-                    artifact.expires_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
+                    crate::integer::checked::<_, i64>(artifact.expires_at)?,
                     artifact.report.latest_facility_id.as_deref(),
                     artifact.report.filters.capability_id.as_deref(),
                     artifact.report.filters.agent_subject.as_deref(),
@@ -689,7 +700,7 @@ impl SqliteReceiptStore {
         query: &CreditBondListQuery,
     ) -> Result<CreditBondListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let now = unix_now();
+        let now = unix_now(&self.clock)?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_bond_id
@@ -716,7 +727,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw, superseded_by_bond_id) = row?;
-            let bond: SignedCreditBond = serde_json::from_str(&raw_json)?;
+            let bond: SignedCreditBond = decode_verified_signed_export(&raw_json)?;
             let persisted_lifecycle = parse_credit_bond_lifecycle_state(&lifecycle_state_raw)
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -754,11 +765,11 @@ impl SqliteReceiptStore {
 
         Ok(CreditBondListReport {
             schema: CREDIT_BOND_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditBondListSummary {
                 matching_bonds,
-                returned_bonds: bonds.len() as u64,
+                returned_bonds: crate::integer::count(bonds.len()),
                 active_bonds,
                 superseded_bonds,
                 released_bonds,
@@ -772,7 +783,7 @@ impl SqliteReceiptStore {
     }
 
     pub fn record_credit_loss_lifecycle(
-        &mut self,
+        &self,
         event: &SignedCreditLossLifecycle,
     ) -> Result<(), ReceiptStoreError> {
         if !event
@@ -825,7 +836,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     artifact.event_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact.bond_id,
                     artifact.report.summary.facility_id.as_deref(),
                     artifact.report.summary.capability_id.as_deref(),
@@ -878,7 +889,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let raw_json = row?;
-            let event: SignedCreditLossLifecycle = serde_json::from_str(&raw_json)?;
+            let event: SignedCreditLossLifecycle = decode_verified_signed_export(&raw_json)?;
             let body = &event.body;
             let summary = &body.report.summary;
             if normalized
@@ -937,6 +948,8 @@ impl SqliteReceiptStore {
                 continue;
             }
 
+            // Event counters count subsets of the same SQLite row scan; the
+            // signed rowid domain is strictly smaller than u64::MAX.
             matching_events = matching_events.saturating_add(1);
             match body.event_kind {
                 CreditLossLifecycleEventKind::Delinquency => {
@@ -963,11 +976,11 @@ impl SqliteReceiptStore {
 
         Ok(CreditLossLifecycleListReport {
             schema: CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditLossLifecycleListSummary {
                 matching_events,
-                returned_events: events.len() as u64,
+                returned_events: crate::integer::count(events.len()),
                 delinquency_events,
                 recovery_events,
                 reserve_release_events,

@@ -25,6 +25,7 @@
 
 mod checkpoints;
 mod cost;
+mod error;
 mod receipts;
 mod verify;
 

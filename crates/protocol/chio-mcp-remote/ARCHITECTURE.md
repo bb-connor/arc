@@ -26,6 +26,7 @@ those nested modules pull the crate-root namespace back in with
 
 | Path | Responsibility |
 |------|----------------|
+| `src/input.rs` | Bounded original-byte JSON readers, administrative extractor and typed local error custody. |
 | `src/lib.rs` | Crate root: `include!`/`mod` wiring, `pub use chio_control_plane::{CliError, JwtProviderProfile}`. |
 | `src/remote_mcp/http_service.rs` | `serve_http`/`serve_http_async`, Axum router assembly, MCP POST/GET/DELETE handlers, SSE streaming, per-IP rate limiter, peer-capability parsing. |
 | `src/remote_mcp/http_service_auth.rs` | Request admission: session-id header typing, auth-mode construction, discovery-metadata building, request-time authorization-detail/transaction-context parsing and validation, DPoP sender-constraint verification. |
@@ -121,3 +122,18 @@ those nested modules pull the crate-root namespace back in with
   with `rustls` (egress-contracted HTTP client), `rsa`/`p256`/`p384`/`sha2`/
   `subtle` (JWT signature verification and constant-time comparison), `url`,
   `base64`.
+
+## Original-byte and launch boundaries
+
+MCP envelopes and retained session records have an 8 MiB parsing bound;
+administrative, approval and embedded authorization JSON use 64 KiB bounds,
+and credential exchange retains its tighter 16 KiB body limit. JWT/DPoP encoded
+input is bounded before base64 allocation. Duplicate keys are rejected before
+conversion to `Value`. HTTP responses carry typed parser/encoding errors in
+local extensions and expose redacted codes on the wire. The HMAC keyring keeps
+strict typed deserialization, a bounded nofollow read and zeroizing secret owners.
+
+Native runtime factories require `CageRequiredLaunch`. Test transport injection
+and explicit lifecycle configuration exist only under `cfg(test)`; hosted HTTP
+scenarios live in `remote_mcp/hosted_tests`. Remote ambient OAuth/session/rate
+clocks remain queued and are now included in the clock inventory.

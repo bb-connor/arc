@@ -13,11 +13,17 @@
 //!   - ResponseTooLarge (oversized response body amplification).
 //!
 //! Revert-to-prove-it-fails recipe: flip an early-return guard inside
-//! `enforce_url` in `crates/chio-http-core/src/lib.rs` to return
+//! `enforce_url` in `crates/protocol/chio-egress-contract/src/lib.rs` to return
 //! `Ok(())` for one of the loopback / link-local / ULA / redirect /
 //! body-size checks. The deny-arm assertion that pinned the affected
 //! variant fails because the production contract no longer blocks
 //! the corresponding SSRF target.
+//!
+//! Targeted mutation recipe: replace
+//! `HttpEgressContract::enforce_ip_address_class` with `Ok(())`.
+//! Literal internal addresses then bypass address-class enforcement, and the
+//! corresponding deny assertions MUST fail. The public-authority positive
+//! control MUST remain admitted.
 
 use std::collections::BTreeSet;
 
@@ -54,6 +60,13 @@ fn denied(
 fn threat_ssrf_via_http_substrate_is_covered() {
     // covers: ssrf_via_http_substrate
     let contract = contract_for_threat_test();
+
+    let allowed = match contract.enforce_url("https://api.example.com/data", 0) {
+        Ok(target) => target,
+        Err(error) => panic!("allowlisted public authority must be admitted: {error}"),
+    };
+    assert_eq!(allowed.scheme, "https");
+    assert_eq!(allowed.authority, "api.example.com");
 
     assert!(matches!(
         denied(contract.enforce_url("https://127.0.0.1/admin", 0)),

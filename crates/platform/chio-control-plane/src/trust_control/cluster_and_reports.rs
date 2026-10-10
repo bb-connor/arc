@@ -14,8 +14,15 @@ mod cluster_and_reports_tests {
     mod budget_compensation;
     #[path = "budget_delta_authority.rs"]
     mod budget_delta_authority;
+    #[path = "budget_replay_lease_renewal.rs"]
+    mod budget_replay_lease_renewal;
     #[path = "cluster_fence.rs"]
     mod cluster_fence;
+    #[cfg(unix)]
+    #[path = "public_passport_challenge_admission.rs"]
+    mod public_passport_challenge_admission;
+    #[path = "replication_heads.rs"]
+    mod replication_heads;
     #[path = "revocation_replication.rs"]
     mod revocation_replication;
     #[path = "snapshot_budget_authority.rs"]
@@ -23,39 +30,20 @@ mod cluster_and_reports_tests {
     #[path = "structured_authority.rs"]
     mod structured_authority;
 
-    fn base_config() -> TrustServiceConfig {
-        TrustServiceConfig {
-            listen: "127.0.0.1:0".parse().test_unwrap(),
-            service_token: "token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            receipt_db_path: None,
-            revocation_db_path: None,
-            authority_seed_path: None,
-            authority_db_path: None,
-            budget_db_path: None,
-            joint_authority_db_path: None,
-            fiscal_runtime: None,
-            enterprise_providers_file: None,
-            federation_policies_file: None,
-            scim_lifecycle_file: None,
-            verifier_policies_file: None,
-            verifier_challenge_db_path: None,
-            passport_statuses_file: None,
-            passport_issuance_offers_file: None,
-            certification_registry_file: None,
-            certification_discovery_file: None,
-            issuance_policy: None,
-            runtime_assurance_policy: None,
-            advertise_url: None,
-            allow_local_peer_urls: true,
-            certification_public_metadata_ttl_seconds: 300,
-            peer_urls: Vec::new(),
-            cluster_sync_interval: Duration::from_millis(25),
-            roster_policy: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            finding_market: None,
-        }
-    }
+    #[path = "authority_lifecycle.rs"]
+    mod authority_lifecycle;
+    #[path = "authority_replication.rs"]
+    mod authority_replication;
+    #[path = "authority_sync_isolation.rs"]
+    mod authority_sync_isolation;
+    #[path = "leader_forward_admission.rs"]
+    mod leader_forward_admission;
+
+    #[path = "config.rs"]
+    mod config;
+    #[path = "configuration.rs"]
+    mod configuration;
+    use config::base_config;
 
     fn state_with_cluster(
         advertise_url: &str,
@@ -64,13 +52,16 @@ mod cluster_and_reports_tests {
         revocation_db_path: Option<PathBuf>,
         budget_db_path: Option<PathBuf>,
     ) -> TrustServiceState {
+        let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
+            Arc::new(chio_security_types::clock::SystemClock);
         let mut config = base_config();
         config.advertise_url = Some(advertise_url.to_string());
         config.peer_urls = peer_urls.iter().map(|value| value.to_string()).collect();
         config.receipt_db_path = receipt_db_path;
         config.revocation_db_path = revocation_db_path;
         config.budget_db_path = budget_db_path;
-        let cluster = build_cluster_state(&config, config.listen).test_unwrap();
+        let cluster = build_cluster_state(&config, config.listen, finding_challenge_clock.clone())
+            .test_unwrap();
         let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
         let budget_store = config
             .budget_db_path
@@ -86,12 +77,22 @@ mod cluster_and_reports_tests {
             .transpose()
             .test_unwrap()
             .map(Arc::new);
+        let receipt_store =
+            service_runtime::open_service_receipt_store(config.receipt_db_path.as_deref())
+                .test_unwrap();
         let state = TrustServiceState {
+            finding_challenge_clock,
             config,
+            authority_keyring: None,
+            authority_keyring_seed_path: None,
             joint_authority_store: None,
             fiscal_runtime: None,
             budget_store,
             revocation_store,
+            receipt_store,
+            receipt_query_snapshots: None,
+            receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+            evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
             enterprise_provider_registry: None,
             verifier_policy_registry: None,
             federation_admission_rate_limiter: Arc::new(Mutex::new(
@@ -99,6 +100,15 @@ mod cluster_and_reports_tests {
             )),
             cluster,
             cluster_progress,
+            leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
+            authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+            authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
+            operator_registry_write_lane: BlockingLane::new("operator_registry_write", 2),
+            public_passport_issuance_lane: BlockingLane::new("public_passport_issuance", 2),
+            wallet_entitlement_lane: crate::trust_control::ingress_lanes::wallet_entitlement_lane(),
+            public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+                crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+            )),
             finding_rail: None,
             finding_purchase_executor: None,
             finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -200,81 +210,15 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn build_cluster_state_validates_inputs_and_normalizes_peers() {
-        let mut invalid = base_config();
-        invalid.advertise_url = Some("http://127.0.0.1:3200".to_string());
-        invalid.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
-        invalid.authority_seed_path = Some(unique_temp_path("authority", "seed"));
-
-        let error = build_cluster_state(&invalid, invalid.listen).test_unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("--authority-db instead of --authority-seed-file"));
-
-        assert!(
-            build_cluster_state(&base_config(), "127.0.0.1:0".parse().test_unwrap())
-                .test_unwrap()
-                .is_none()
-        );
-
-        let mut standalone_advertised = base_config();
-        standalone_advertised.allow_local_peer_urls = false;
-        standalone_advertised.advertise_url = Some("http://127.0.0.1:3200/".to_string());
-        assert!(
-            build_cluster_state(&standalone_advertised, standalone_advertised.listen)
-                .test_unwrap()
-                .is_none()
-        );
-
-        let mut config = base_config();
-        config.advertise_url = Some("http://127.0.0.1:3200/".to_string());
-        config.peer_urls = vec![
-            "http://127.0.0.1:3200/".to_string(),
-            " http://127.0.0.1:3300/ ".to_string(),
-            "http://127.0.0.1:3300".to_string(),
-        ];
-
-        let cluster = build_cluster_state(&config, config.listen)
-            .test_unwrap()
-            .test_unwrap();
-        let guard = cluster.lock().test_unwrap();
-        assert_eq!(guard.self_url, "http://127.0.0.1:3200");
-        assert_eq!(guard.peers.len(), 1);
-        assert!(guard.peers.contains_key("http://127.0.0.1:3300"));
-    }
-
-    #[test]
-    fn cluster_peer_url_validation_rejects_local_networks_by_default() {
-        let error = normalize_cluster_config_url("http://127.0.0.1:3300", false).test_unwrap_err();
-        assert!(error.to_string().contains("--allow-local-peer-urls"));
-
-        let normalized =
-            normalize_cluster_config_url(" http://127.0.0.1:3300/ ", true).test_unwrap();
-        assert_eq!(normalized, "http://127.0.0.1:3300");
-    }
-
-    #[test]
-    fn cluster_peer_url_validation_rejects_ambient_authority_material() {
-        for peer_url in [
-            "https://user:pass@control.example.test:443",
-            "http://127.0.0.1:3300?token=secret",
-            "http://127.0.0.1:3300#fragment",
-        ] {
-            let error = normalize_cluster_config_url(peer_url, true).test_unwrap_err();
-            assert!(
-                error.to_string().contains("cluster URL"),
-                "unexpected error for peer URL `{peer_url}`: {error}",
-            );
-        }
-    }
-
-    #[test]
     fn compute_cluster_consensus_tracks_role_quorum_and_election_terms() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut cluster = ClusterRuntimeState {
-            self_url: "http://node-a".to_string(),
+            self_url: "https://node-a".to_string(),
             peers: HashMap::from([
-                ("http://node-b".to_string(), PeerSyncState::default()),
-                ("http://node-c".to_string(), PeerSyncState::default()),
+                ("https://node-b".to_string(), PeerSyncState::default()),
+                ("https://node-c".to_string(), PeerSyncState::default()),
             ]),
             election_term: 0,
             last_leader_url: None,
@@ -291,37 +235,37 @@ mod cluster_and_reports_tests {
         assert_eq!(initial.election_term, 0);
         assert!(cluster_authority_lease_view_locked(&mut cluster, &initial).is_none());
 
-        cluster.peers.get_mut("http://node-b").test_unwrap().health = PeerHealth::Healthy;
+        cluster.peers.get_mut("https://node-b").test_unwrap().health = PeerHealth::Healthy;
         cluster
             .peers
-            .get_mut("http://node-b")
+            .get_mut("https://node-b")
             .test_unwrap()
-            .last_contact_at = Some(unix_timestamp_now());
+            .last_contact_at = Some(clock_now);
         let with_quorum = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(with_quorum.role, "leader");
         assert!(with_quorum.has_quorum);
-        assert_eq!(with_quorum.leader_url.as_deref(), Some("http://node-a"));
+        assert_eq!(with_quorum.leader_url.as_deref(), Some("https://node-a"));
         assert_eq!(with_quorum.reachable_nodes, 2);
         assert_eq!(with_quorum.election_term, 1);
         let with_quorum_lease =
             cluster_authority_lease_view_locked(&mut cluster, &with_quorum).test_unwrap();
         assert_eq!(with_quorum_lease.lease_epoch, 1);
-        assert!(with_quorum_lease.lease_id.contains("http://node-a"));
-        assert!(with_quorum_lease.lease_expires_at >= unix_timestamp_now());
+        assert!(with_quorum_lease.lease_id.contains("https://node-a"));
+        assert!(with_quorum_lease.lease_expires_at >= clock_now);
 
-        cluster.peers.get_mut("http://node-c").test_unwrap().health = PeerHealth::Healthy;
+        cluster.peers.get_mut("https://node-c").test_unwrap().health = PeerHealth::Healthy;
         cluster
             .peers
-            .get_mut("http://node-c")
+            .get_mut("https://node-c")
             .test_unwrap()
-            .last_contact_at = Some(unix_timestamp_now());
+            .last_contact_at = Some(clock_now);
         let stable = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(stable.role, "leader");
         assert_eq!(stable.election_term, 1);
         assert_eq!(stable.reachable_nodes, 3);
 
-        cluster.peers.get_mut("http://node-b").test_unwrap().health = PeerHealth::Unhealthy;
-        cluster.peers.get_mut("http://node-c").test_unwrap().health = PeerHealth::Unhealthy;
+        cluster.peers.get_mut("https://node-b").test_unwrap().health = PeerHealth::Unhealthy;
+        cluster.peers.get_mut("https://node-c").test_unwrap().health = PeerHealth::Unhealthy;
         let lost_quorum = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(lost_quorum.role, "candidate");
         assert!(!lost_quorum.has_quorum);
@@ -331,8 +275,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn consensus_and_authority_lease_share_one_consistent_snapshot() {
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
+        let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        update_peer_reachable(&state, "https://node-b");
 
         let (consensus, authority_lease) =
             cluster_consensus_and_authority_lease_view(&state).test_unwrap();
@@ -349,13 +293,16 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn compute_cluster_consensus_drops_stale_peers_after_authority_lease_timeout() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut cluster = ClusterRuntimeState {
-            self_url: "http://node-a".to_string(),
+            self_url: "https://node-a".to_string(),
             peers: HashMap::from([(
-                "http://node-b".to_string(),
+                "https://node-b".to_string(),
                 PeerSyncState {
                     health: PeerHealth::Healthy,
-                    last_contact_at: Some(unix_timestamp_now().saturating_sub(5)),
+                    last_contact_at: Some(clock_now.saturating_sub(5)),
                     ..PeerSyncState::default()
                 },
             )]),
@@ -372,122 +319,21 @@ mod cluster_and_reports_tests {
         assert!(cluster_authority_lease_view_locked(&mut cluster, &consensus).is_none());
     }
 
-    #[tokio::test]
-    async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
-
-        let response = json_response_with_leader_visibility(&state, json!({ "stored": true }));
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .test_unwrap();
-        let body: Value = serde_json::from_slice(&body).test_unwrap();
-        assert_eq!(body["stored"], Value::Bool(true));
-        assert_eq!(
-            body["handledBy"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(
-            body["leaderUrl"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["visibleAtLeader"], Value::Bool(true));
-        assert_eq!(
-            body["clusterAuthority"]["authorityId"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["clusterAuthority"]["term"], Value::from(1));
-        assert_eq!(body["clusterAuthority"]["leaseValid"], Value::Bool(true));
-
-        let scalar = json_response_with_leader_visibility(&state, "not-an-object");
-        assert_eq!(scalar.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let body = to_bytes(scalar.into_body(), usize::MAX).await.test_unwrap();
-        let text = String::from_utf8(body.to_vec()).test_unwrap();
-        assert!(text.contains("success responses must be JSON objects"));
-    }
-
-    #[tokio::test]
-    async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
-        let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
-            None,
-            None,
-            None,
-        );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
-        update_peer_budget_acks(
-            &state,
-            "http://node-b",
-            &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
-                event_seq: 9,
-            }],
-        );
-        update_peer_budget_acks(
-            &state,
-            "http://node-c",
-            &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
-                event_seq: 7,
-            }],
-        );
-
-        let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
-            event_seq: 8,
-            budget_term: 1,
-        };
-        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
-        assert!(commit.quorum_committed);
-        assert_eq!(commit.quorum_size, 2);
-        assert_eq!(commit.committed_nodes, 2); // self + node-b (acked 9 >= 8)
-        assert_eq!(
-            commit.witness_urls,
-            vec!["http://node-a".to_string(), "http://node-b".to_string()]
-        );
-
-        let response = json_response_with_leader_visibility_and_budget_commit(
-            &state,
-            json!({ "allowed": true }),
-            Some(commit),
-        );
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .test_unwrap();
-        let body: Value = serde_json::from_slice(&body).test_unwrap();
-        assert_eq!(body["budgetCommit"]["budgetSeq"], Value::from(8));
-        assert_eq!(body["budgetCommit"]["commitIndex"], Value::from(8));
-        assert_eq!(body["budgetCommit"]["quorumCommitted"], Value::Bool(true));
-        assert_eq!(body["budgetCommit"]["committedNodes"], Value::from(2));
-        assert_eq!(
-            body["budgetCommit"]["authorityId"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["budgetCommit"]["budgetTerm"], Value::from(1));
-        assert_eq!(
-            body["budgetCommit"]["witnessUrls"],
-            json!(["http://node-a", "http://node-b"])
-        );
-    }
-
     #[test]
     fn witness_requires_same_origin_ack() {
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         // A high ack under an UNRELATED origin must not witness the write.
         update_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
                 origin_id: "http://other-origin".to_string(),
                 event_seq: 999,
@@ -495,14 +341,14 @@ mod cluster_and_reports_tests {
         );
         update_peer_budget_acks(
             &state,
-            "http://node-c",
+            "https://node-c",
             &[BudgetOriginAck {
                 origin_id: "http://other-origin".to_string(),
                 event_seq: 999,
             }],
         );
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 41,
             budget_term: 1,
         };
@@ -516,9 +362,9 @@ mod cluster_and_reports_tests {
         // Now node-b acks THIS origin at >= 41: it flips to committed.
         update_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 41,
             }],
         );
@@ -540,50 +386,50 @@ mod cluster_and_reports_tests {
         // max-merge would leave node-b witnessing seq 8; the down-clamp drops it out
         // at the old-high seq.
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         // Both peers previously imported node-a's stream up to seq 10.
         update_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 10,
             }],
         );
         update_peer_budget_acks(
             &state,
-            "http://node-c",
+            "https://node-c",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 10,
             }],
         );
 
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 8,
             budget_term: 1,
         };
         // Precondition: with both peers recorded at 10, the write at seq 8 witnesses
         // on self + node-b + node-c.
         let before = budget_write_quorum_commit_view(&state, &write).test_unwrap();
-        assert!(before.witness_urls.contains(&"http://node-b".to_string()));
+        assert!(before.witness_urls.contains(&"https://node-b".to_string()));
         assert_eq!(before.committed_nodes, 3);
 
         // node-b REGRESSES to seq 5 (lost a suffix of node-a's stream). This is the
         // top-of-round clamp that sync_peer now applies from cluster_status.
         clamp_down_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 5,
             }],
         );
@@ -591,7 +437,7 @@ mod cluster_and_reports_tests {
         // gone the instant the peer disavowed it, not at the end of the round.
         let after = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert!(
-            !after.witness_urls.contains(&"http://node-b".to_string()),
+            !after.witness_urls.contains(&"https://node-b".to_string()),
             "a regressed peer must not witness at the OLD-high seq"
         );
         assert_eq!(
@@ -604,9 +450,9 @@ mod cluster_and_reports_tests {
         // the clamp leaves it at the regressed 5, so it still does not witness seq 8.
         clamp_down_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 20,
             }],
         );
@@ -614,18 +460,18 @@ mod cluster_and_reports_tests {
         assert!(
             !after_increase
                 .witness_urls
-                .contains(&"http://node-b".to_string()),
+                .contains(&"https://node-b".to_string()),
             "the clamp must not RAISE a head on an increase (increases wait for validation)"
         );
 
         // A CLEAR (origin no longer advertised at all) drops the origin entirely, so
         // node-c stops witnessing it too.
-        clamp_down_peer_budget_acks(&state, "http://node-c", &[]);
+        clamp_down_peer_budget_acks(&state, "https://node-c", &[]);
         let after_clear = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert!(
             !after_clear
                 .witness_urls
-                .contains(&"http://node-c".to_string()),
+                .contains(&"https://node-c".to_string()),
             "a peer that no longer advertises the origin must not witness it"
         );
         assert_eq!(after_clear.committed_nodes, 1, "only self remains");
@@ -648,17 +494,17 @@ mod cluster_and_reports_tests {
             ack_c_a in proptest::prelude::prop::option::of(0u64..60),
             ack_c_b in proptest::prelude::prop::option::of(0u64..60),
         ) {
-            let origin_a = "http://node-a";
-            let origin_b = "http://node-b-origin";
+            let origin_a = "https://node-a";
+            let origin_b = "https://node-b-origin";
             let state = state_with_cluster(
-                "http://node-a",
-                &["http://node-b", "http://node-c"],
+                "https://node-a",
+                &["https://node-b", "https://node-c"],
                 None,
                 None,
                 None,
             );
-            update_peer_reachable(&state, "http://node-b");
-            update_peer_reachable(&state, "http://node-c");
+            update_peer_reachable(&state, "https://node-b");
+            update_peer_reachable(&state, "https://node-c");
             let advertise = |peer: &str, ack_a: Option<u64>, ack_b: Option<u64>| {
                 let mut acks = Vec::new();
                 if let Some(seq) = ack_a {
@@ -669,8 +515,8 @@ mod cluster_and_reports_tests {
                 }
                 update_peer_budget_acks(&state, peer, &acks);
             };
-            advertise("http://node-b", ack_b_a, ack_b_b);
-            advertise("http://node-c", ack_c_a, ack_c_b);
+            advertise("https://node-b", ack_b_a, ack_b_b);
+            advertise("https://node-c", ack_c_a, ack_c_b);
 
             let write_origin = if write_under_b { origin_b } else { origin_a };
             let write = BudgetWriteToken {
@@ -785,17 +631,17 @@ mod cluster_and_reports_tests {
             );
 
             let state = state_with_cluster(
-                "http://node-a",
-                &["http://node-b", "http://node-c"],
+                "https://node-a",
+                &["https://node-b", "https://node-c"],
                 None,
                 None,
                 None,
             );
-            update_peer_reachable(&state, "http://node-b");
-            update_peer_reachable(&state, "http://node-c");
+            update_peer_reachable(&state, "https://node-b");
+            update_peer_reachable(&state, "https://node-c");
             let acks = acks_from(&heads);
-            update_peer_budget_acks(&state, "http://node-b", &acks);
-            update_peer_budget_acks(&state, "http://node-c", &acks);
+            update_peer_budget_acks(&state, "https://node-b", &acks);
+            update_peer_budget_acks(&state, "https://node-c", &acks);
             let write = BudgetWriteToken {
                 origin_id: origin_b.to_string(),
                 event_seq: 4,
@@ -832,17 +678,17 @@ mod cluster_and_reports_tests {
             );
 
             let state = state_with_cluster(
-                "http://node-a",
-                &["http://node-b", "http://node-c"],
+                "https://node-a",
+                &["https://node-b", "https://node-c"],
                 None,
                 None,
                 None,
             );
-            update_peer_reachable(&state, "http://node-b");
-            update_peer_reachable(&state, "http://node-c");
+            update_peer_reachable(&state, "https://node-b");
+            update_peer_reachable(&state, "https://node-c");
             let acks = acks_from(&heads);
-            update_peer_budget_acks(&state, "http://node-b", &acks);
-            update_peer_budget_acks(&state, "http://node-c", &acks);
+            update_peer_budget_acks(&state, "https://node-b", &acks);
+            update_peer_budget_acks(&state, "https://node-c", &acks);
             let write = BudgetWriteToken {
                 origin_id: origin_b.to_string(),
                 event_seq: 5,
@@ -867,16 +713,16 @@ mod cluster_and_reports_tests {
         // a LOWER or empty ack set. The stored ack must
         // REGRESS (replace, not max-merge) so that data-losing peer stops being
         // counted as a witness for writes it no longer durably holds.
-        let origin = "http://node-a";
+        let origin = "https://node-a";
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         let ack = |seq: u64| {
             vec![BudgetOriginAck {
                 origin_id: origin.to_string(),
@@ -889,14 +735,14 @@ mod cluster_and_reports_tests {
             budget_term: 1,
         };
         // Both peers ack origin at 10: a write at 8 witnesses on self + both.
-        update_peer_budget_acks(&state, "http://node-b", &ack(10));
-        update_peer_budget_acks(&state, "http://node-c", &ack(10));
+        update_peer_budget_acks(&state, "https://node-b", &ack(10));
+        update_peer_budget_acks(&state, "https://node-c", &ack(10));
         let commit = budget_write_quorum_commit_view(&state, &write(8)).test_unwrap();
         assert_eq!(commit.committed_nodes, 3);
 
         // node-b restored an older DB and re-advertises head 5: the stale 10 must
         // DROP, so a write at 8 no longer witnesses on node-b.
-        update_peer_budget_acks(&state, "http://node-b", &ack(5));
+        update_peer_budget_acks(&state, "https://node-b", &ack(5));
         let commit = budget_write_quorum_commit_view(&state, &write(8)).test_unwrap();
         assert_eq!(
             commit.committed_nodes, 2,
@@ -907,7 +753,7 @@ mod cluster_and_reports_tests {
         assert_eq!(commit.committed_nodes, 3);
 
         // An EMPTY re-advertisement drops node-b's origin entirely.
-        update_peer_budget_acks(&state, "http://node-b", &[]);
+        update_peer_budget_acks(&state, "https://node-b", &[]);
         let commit = budget_write_quorum_commit_view(&state, &write(1)).test_unwrap();
         assert_eq!(
             commit.committed_nodes, 2,
@@ -920,8 +766,8 @@ mod cluster_and_reports_tests {
         // If leadership changes while a write waits, the commit metadata must name
         // the authority that AUTHORED the write, not the current consensus leader
         // (which never wrote the event).
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
+        let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        update_peer_reachable(&state, "https://node-b");
         let write = BudgetWriteToken {
             origin_id: "http://writer".to_string(),
             event_seq: 4,
@@ -942,24 +788,24 @@ mod cluster_and_reports_tests {
         // stale, untrusted acks. Even after a bare
         // reachability probe flips it Healthy and it re-advertises acks, it must
         // NOT witness until the snapshot + delta re-sync clears force_snapshot.
-        let origin = "http://node-a";
+        let origin = "https://node-a";
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         let ack = |seq: u64| {
             vec![BudgetOriginAck {
                 origin_id: origin.to_string(),
                 event_seq: seq,
             }]
         };
-        update_peer_budget_acks(&state, "http://node-b", &ack(10));
-        update_peer_budget_acks(&state, "http://node-c", &ack(10));
+        update_peer_budget_acks(&state, "https://node-b", &ack(10));
+        update_peer_budget_acks(&state, "https://node-c", &ack(10));
         let write = BudgetWriteToken {
             origin_id: origin.to_string(),
             event_seq: 8,
@@ -970,7 +816,7 @@ mod cluster_and_reports_tests {
 
         // node-b is Healthy (probed reachable) but still pending its forced
         // snapshot: its stale acks must not witness.
-        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = true);
+        update_peer_state(&state, "https://node-b", |peer| peer.force_snapshot = true);
         let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert_eq!(
             commit.committed_nodes, 2,
@@ -978,7 +824,7 @@ mod cluster_and_reports_tests {
         );
 
         // Snapshot completed: force_snapshot cleared, node-b witnesses again.
-        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = false);
+        update_peer_state(&state, "https://node-b", |peer| peer.force_snapshot = false);
         let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert_eq!(commit.committed_nodes, 3);
     }
@@ -995,25 +841,25 @@ mod cluster_and_reports_tests {
         // budget_import_acks atomically with force_snapshot, so a peer coming out of
         // snapshot recovery witnesses NOTHING until a completed pull round's finalize
         // re-records a validated ack.
-        let origin = "http://node-a";
+        let origin = "https://node-a";
         // A 2-node cluster (quorum 2): self + node-a is quorum, so node-a's witness
         // decision alone flips quorum_committed.
         let source_state =
-            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        let state = state_with_cluster("http://node-b", &["http://node-a"], None, None, None);
+            state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        let state = state_with_cluster("https://node-b", &["https://node-a"], None, None, None);
 
         // node-a previously validated a high ack and is now pending a forced snapshot
         // (e.g. an oversized delta window routed it to snapshot recovery).
-        update_peer_reachable(&state, "http://node-a");
+        update_peer_reachable(&state, "https://node-a");
         update_peer_budget_acks(
             &state,
-            "http://node-a",
+            "https://node-a",
             &[BudgetOriginAck {
                 origin_id: origin.to_string(),
                 event_seq: 100,
             }],
         );
-        update_peer_state(&state, "http://node-a", |peer| peer.force_snapshot = true);
+        update_peer_state(&state, "https://node-a", |peer| peer.force_snapshot = true);
 
         let write = BudgetWriteToken {
             origin_id: origin.to_string(),
@@ -1032,10 +878,10 @@ mod cluster_and_reports_tests {
         // would now witness at 100, committing quorum on an ack this round never
         // validated; the ack map must be cleared atomically with force_snapshot.
         let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
-        apply_cluster_snapshot(&state, "http://node-a", snapshot).test_unwrap();
+        apply_cluster_snapshot(&state, "https://node-a", snapshot).test_unwrap();
 
         assert_eq!(
-            with_peer_state(&state, "http://node-a", |peer| peer
+            with_peer_state(&state, "https://node-a", |peer| peer
                 .budget_import_acks
                 .get(origin)
                 .copied()),
@@ -1043,7 +889,7 @@ mod cluster_and_reports_tests {
             "snapshot recovery must clear the peer's cached witness ack"
         );
         assert!(
-            !peer_should_force_snapshot(&state, "http://node-a"),
+            !peer_should_force_snapshot(&state, "https://node-a"),
             "the snapshot cleared force_snapshot"
         );
         // The peer is Healthy and no longer force_snapshot, yet it must NOT
@@ -1068,16 +914,16 @@ mod cluster_and_reports_tests {
         // update_peer_failure -> Unhealthy) never has its fresh, unvalidated ack
         // recorded. That closes the over-count window where an early progress wake
         // let a parked writer commit on an ack the fail-closed path then removed.
-        let origin = "http://node-a";
+        let origin = "https://node-a";
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         let acks = vec![BudgetOriginAck {
             origin_id: origin.to_string(),
             event_seq: 9,
@@ -1086,9 +932,9 @@ mod cluster_and_reports_tests {
         // node-b was demoted during its round (route_pull -> update_peer_failure):
         // finalize must NOT record its advertised ack. Under the old code the ack
         // was recorded before the pull and an early wake could have committed on it.
-        update_peer_failure(&state, "http://node-b", "protocol violation".to_string());
-        finalize_peer_sync_round(&state, "http://node-b", &acks, 0);
-        let recorded_b = with_peer_state(&state, "http://node-b", |peer| {
+        update_peer_failure(&state, "https://node-b", "protocol violation".to_string());
+        finalize_peer_sync_round(&state, "https://node-b", &acks, 0);
+        let recorded_b = with_peer_state(&state, "https://node-b", |peer| {
             peer.budget_import_acks.get(origin).copied()
         })
         .flatten();
@@ -1099,8 +945,8 @@ mod cluster_and_reports_tests {
 
         // node-c finished the round Healthy: finalize records its ack, so it can
         // witness. This is the ONLY path that makes a fresh ack countable.
-        finalize_peer_sync_round(&state, "http://node-c", &acks, 0);
-        let recorded_c = with_peer_state(&state, "http://node-c", |peer| {
+        finalize_peer_sync_round(&state, "https://node-c", &acks, 0);
+        let recorded_c = with_peer_state(&state, "https://node-c", |peer| {
             peer.budget_import_acks.get(origin).copied()
         })
         .flatten();
@@ -1122,8 +968,14 @@ mod cluster_and_reports_tests {
             commit.committed_nodes, 2,
             "self + node-c witness; the demoted node-b never contributes its fresh ack"
         );
-        assert!(commit.witness_urls.iter().any(|url| url == "http://node-c"));
-        assert!(!commit.witness_urls.iter().any(|url| url == "http://node-b"));
+        assert!(commit
+            .witness_urls
+            .iter()
+            .any(|url| url == "https://node-c"));
+        assert!(!commit
+            .witness_urls
+            .iter()
+            .any(|url| url == "https://node-b"));
     }
 
     #[test]
@@ -1134,29 +986,29 @@ mod cluster_and_reports_tests {
         // so peer_was_demoted stays false and revocations still replicate. A Protocol
         // violation demotes the peer, so revocations are skipped (fail-closed: an
         // untrusted peer is not pulled from).
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
-        assert!(!peer_was_demoted(&state, "http://node-b"));
+        let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        update_peer_reachable(&state, "https://node-b");
+        assert!(!peer_was_demoted(&state, "https://node-b"));
 
         // Transient budget error: peer stays reachable, so the revocation lane runs.
         let mut records = 0u64;
         let _ = route_pull(
             &state,
-            "http://node-b",
+            "https://node-b",
             Err(PullError::Transient(CliError::cli_other_error(
                 "budget endpoint slow",
             ))),
             &mut records,
         );
         assert!(
-            !peer_was_demoted(&state, "http://node-b"),
+            !peer_was_demoted(&state, "https://node-b"),
             "a transient budget error must not demote the peer, so revocations still replicate"
         );
 
         // Protocol violation: peer demoted, so the revocation lane is skipped.
         let _ = route_pull(
             &state,
-            "http://node-b",
+            "https://node-b",
             Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
                 expected_seq: 5,
                 found_seq: 9,
@@ -1164,7 +1016,7 @@ mod cluster_and_reports_tests {
             &mut records,
         );
         assert!(
-            peer_was_demoted(&state, "http://node-b"),
+            peer_was_demoted(&state, "https://node-b"),
             "a Protocol violation demotes the peer, so its revocations are not pulled"
         );
     }
@@ -1178,28 +1030,28 @@ mod cluster_and_reports_tests {
         // the round stalls. In a 3-node cluster (quorum 2), self + the just-cleared
         // peer is quorum.
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         // node-b advertised the quorum-making ack but is still pending its snapshot
         // (excluded); node-c never acks (simulating a slow peer in the same round).
-        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = true);
+        update_peer_state(&state, "https://node-b", |peer| peer.force_snapshot = true);
         update_peer_budget_acks(
             &state,
-            "http://node-b",
+            "https://node-b",
             &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
+                origin_id: "https://node-a".to_string(),
                 event_seq: 5,
             }],
         );
         // While node-b is force_snapshot, quorum is NOT met (only self counts).
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 5,
             budget_term: 1,
         };
@@ -1214,7 +1066,7 @@ mod cluster_and_reports_tests {
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             // The snapshot completes: force_snapshot cleared, then notify (exactly
             // what sync_peer now does after apply_cluster_snapshot).
-            update_peer_state(&loop_state, "http://node-b", |peer| {
+            update_peer_state(&loop_state, "https://node-b", |peer| {
                 peer.force_snapshot = false
             });
             notify_cluster_progress(&loop_state);
@@ -1243,16 +1095,16 @@ mod cluster_and_reports_tests {
         // well within the multi-second timeout, even though the other peer never
         // acked in this round.
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 5,
             budget_term: 1,
         };
@@ -1264,9 +1116,9 @@ mod cluster_and_reports_tests {
             // silent (simulating a slow/unreachable peer in the same round).
             update_peer_budget_acks(
                 &loop_state,
-                "http://node-b",
+                "https://node-b",
                 &[BudgetOriginAck {
-                    origin_id: "http://node-a".to_string(),
+                    origin_id: "https://node-a".to_string(),
                     event_seq: 5,
                 }],
             );
@@ -1291,13 +1143,13 @@ mod cluster_and_reports_tests {
     async fn replayed_budget_authorization_fails_closed_without_reversing_existing_hold() {
         let budget_db = unique_temp_path("chio-replayed-budget-quorum", "db");
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
+            "https://node-a",
+            &["https://node-b"],
             None,
             None,
             Some(budget_db.clone()),
         );
-        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "https://node-b");
         let authority = current_budget_event_authority(&state)
             .test_unwrap()
             .test_unwrap();
@@ -1335,7 +1187,7 @@ mod cluster_and_reports_tests {
             progress.awaited_kick().await;
             update_peer_failure(
                 &loop_state,
-                "http://node-b",
+                "https://node-b",
                 "quorum lost during replay".to_string(),
             );
             notify_cluster_progress(&loop_state);
@@ -1372,11 +1224,11 @@ mod cluster_and_reports_tests {
         // looking leader-visible write with no quorum budgetCommit (fail-open).
         // A genuinely unclustered node returns Ok(None).
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 7,
             budget_term: 1,
         };
-        let clustered = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let clustered = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
         assert!(clustered.cluster.is_some(), "peers must build a cluster");
         let response = match budget_write_progress_closed_outcome(&clustered, &write) {
             Err(response) => response,
@@ -1400,16 +1252,16 @@ mod cluster_and_reports_tests {
         // simulated background round records an ack and notifies, and the writer
         // observes the committed view without ever driving a sync itself.
         let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
+            "https://node-a",
+            &["https://node-b", "https://node-c"],
             None,
             None,
             None,
         );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
+        update_peer_reachable(&state, "https://node-b");
+        update_peer_reachable(&state, "https://node-c");
         let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 5,
             budget_term: 1,
         };
@@ -1420,9 +1272,9 @@ mod cluster_and_reports_tests {
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             update_peer_budget_acks(
                 &loop_state,
-                "http://node-b",
+                "https://node-b",
                 &[BudgetOriginAck {
-                    origin_id: "http://node-a".to_string(),
+                    origin_id: "https://node-a".to_string(),
                     event_seq: 5,
                 }],
             );
@@ -1441,37 +1293,37 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn peer_state_helpers_update_health_cursors_and_snapshot_thresholds() {
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
 
-        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "https://node-b");
         assert_eq!(
-            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            with_peer_state(&state, "https://node-b", |peer| peer.health.label()),
             Some("healthy")
         );
 
-        update_peer_sync_error(&state, "http://node-b", "lagging".to_string());
+        update_peer_sync_error(&state, "https://node-b", "lagging".to_string());
         assert_eq!(
-            with_peer_state(&state, "http://node-b", |peer| peer.last_error.clone()),
+            with_peer_state(&state, "https://node-b", |peer| peer.last_error.clone()),
             Some(Some("lagging".to_string()))
         );
 
-        update_peer_failure(&state, "http://node-b", "offline".to_string());
+        update_peer_failure(&state, "https://node-b", "offline".to_string());
         assert_eq!(
-            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            with_peer_state(&state, "https://node-b", |peer| peer.health.label()),
             Some("unhealthy")
         );
-        assert!(peer_should_force_snapshot(&state, "http://node-b"));
+        assert!(peer_should_force_snapshot(&state, "https://node-b"));
 
-        update_peer_success(&state, "http://node-b");
+        update_peer_success(&state, "https://node-b");
         assert_eq!(
-            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            with_peer_state(&state, "https://node-b", |peer| peer.health.label()),
             Some("healthy")
         );
-        assert!(!peer_should_force_snapshot(&state, "http://node-b"));
+        assert!(!peer_should_force_snapshot(&state, "https://node-b"));
 
         update_peer_revocation_cursor(
             &state,
-            "http://node-b",
+            "https://node-b",
             RevocationCursor {
                 cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
                 stream_id: Some("01991bb4-e2f7-7e21-b75d-a59be8fbc441".to_string()),
@@ -1482,7 +1334,7 @@ mod cluster_and_reports_tests {
         );
         update_peer_budget_cursor(
             &state,
-            "http://node-b",
+            "https://node-b",
             BudgetCursor {
                 seq: 8,
                 updated_at: 13,
@@ -1490,33 +1342,33 @@ mod cluster_and_reports_tests {
                 grant_index: 2,
             },
         );
-        update_peer_tool_seq(&state, "http://node-b", 3);
-        update_peer_child_seq(&state, "http://node-b", 4);
-        update_peer_lineage_seq(&state, "http://node-b", 5);
+        update_peer_tool_seq(&state, "https://node-b", 3);
+        update_peer_child_seq(&state, "https://node-b", 4);
+        update_peer_lineage_seq(&state, "https://node-b", 5);
         update_peer_delta_records(
             &state,
-            "http://node-b",
+            "https://node-b",
             CLUSTER_SNAPSHOT_RECORD_THRESHOLD - 1,
         );
-        assert_eq!(peer_tool_seq(&state, "http://node-b"), 3);
-        assert_eq!(peer_child_seq(&state, "http://node-b"), 4);
-        assert_eq!(peer_lineage_seq(&state, "http://node-b"), 5);
+        assert_eq!(peer_tool_seq(&state, "https://node-b"), 3);
+        assert_eq!(peer_child_seq(&state, "https://node-b"), 4);
+        assert_eq!(peer_lineage_seq(&state, "https://node-b"), 5);
         assert_eq!(
-            peer_revocation_cursor(&state, "http://node-b")
+            peer_revocation_cursor(&state, "https://node-b")
                 .test_unwrap()
                 .capability_id,
             "cap-1"
         );
         assert_eq!(
-            peer_budget_cursor(&state, "http://node-b")
+            peer_budget_cursor(&state, "https://node-b")
                 .test_unwrap()
                 .grant_index,
             2
         );
-        assert!(!peer_should_force_snapshot(&state, "http://node-b"));
+        assert!(!peer_should_force_snapshot(&state, "https://node-b"));
 
-        update_peer_delta_records(&state, "http://node-b", 1);
-        assert!(peer_should_force_snapshot(&state, "http://node-b"));
+        update_peer_delta_records(&state, "https://node-b", 1);
+        assert!(peer_should_force_snapshot(&state, "https://node-b"));
 
         assert!(budget_visibility_matches(true, Some(1), Some(2)));
         assert!(!budget_visibility_matches(true, None, Some(2)));
@@ -1527,6 +1379,9 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn auth_helpers_and_metered_billing_validation_cover_error_paths() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut headers = HeaderMap::new();
         let auth_error = bearer_token_from_headers(&headers).test_unwrap_err();
         assert_eq!(auth_error.status(), StatusCode::UNAUTHORIZED);
@@ -1576,6 +1431,20 @@ mod cluster_and_reports_tests {
         );
         config.tenant_read_tokens.remove("tenant-collision");
 
+        config.authority_workload_token = Some("authority-workload".to_string());
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer authority-workload"),
+        );
+        assert!(validate_authority_workload_auth(&headers, &config).is_ok());
+        assert!(validate_service_auth(&headers, &config.service_token).is_err());
+        assert_eq!(
+            resolve_control_read_principal(&headers, &config)
+                .test_unwrap_err()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_static("Bearer tenant-read-token"),
@@ -1616,11 +1485,11 @@ mod cluster_and_reports_tests {
         );
 
         let cluster_state =
-            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        let issued_at = unix_timestamp_now() as i64;
+            state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        let issued_at = clock_now as i64;
         let signature = cluster_peer_auth_signature(
             &cluster_state.config.service_token,
-            "http://node-b",
+            "https://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
             issued_at,
             None,
@@ -1629,7 +1498,7 @@ mod cluster_and_reports_tests {
         headers.clear();
         headers.insert(
             CLUSTER_NODE_ID_HEADER,
-            HeaderValue::from_static("http://node-b"),
+            HeaderValue::from_static("https://node-b"),
         );
         headers.insert(
             CLUSTER_AUTH_ISSUED_AT_HEADER,
@@ -1645,7 +1514,7 @@ mod cluster_and_reports_tests {
             INTERNAL_CLUSTER_STATUS_PATH,
         )
         .test_unwrap();
-        assert_eq!(peer.node_id, "http://node-b");
+        assert_eq!(peer.node_id, "https://node-b");
 
         headers.insert(
             CLUSTER_AUTH_SIGNATURE_HEADER,
@@ -1659,14 +1528,14 @@ mod cluster_and_reports_tests {
         .test_unwrap_err();
         assert_eq!(invalid_peer.status(), StatusCode::UNAUTHORIZED);
         clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
-            "http://node-b",
+            "https://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
         ));
 
         let expired_issued_at = issued_at - CLUSTER_AUTH_MAX_SKEW_SECS - 1;
         let expired_signature = cluster_peer_auth_signature(
             &cluster_state.config.service_token,
-            "http://node-b",
+            "https://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
             expired_issued_at,
             None,
@@ -1687,7 +1556,7 @@ mod cluster_and_reports_tests {
         )
         .test_unwrap_err();
         assert_eq!(expired_peer.status(), StatusCode::UNAUTHORIZED);
-        clear_cluster_peer_auth_failures("http://node-b");
+        clear_cluster_peer_auth_failures("https://node-b");
 
         for attempt in 0..CLUSTER_AUTH_FAILURE_BURST {
             let invalid_issued_at = issued_at + attempt as i64;
@@ -1737,12 +1606,12 @@ mod cluster_and_reports_tests {
             INTERNAL_CLUSTER_STATUS_PATH,
         )
         .test_unwrap();
-        assert_eq!(peer_after_spoofed_failures.node_id, "http://node-b");
+        assert_eq!(peer_after_spoofed_failures.node_id, "https://node-b");
         clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
-            "http://node-b",
+            "https://node-b",
             INTERNAL_CLUSTER_STATUS_PATH,
         ));
-        clear_cluster_peer_auth_failures("http://node-b");
+        clear_cluster_peer_auth_failures("https://node-b");
 
         let mut request = MeteredBillingReconciliationUpdateRequest {
             receipt_id: "receipt-1".to_string(),
@@ -1816,8 +1685,12 @@ mod cluster_and_reports_tests {
         zero_cluster_interval.advertise_url = Some("http://127.0.0.1:3200".to_string());
         zero_cluster_interval.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
         zero_cluster_interval.cluster_sync_interval = Duration::ZERO;
-        let error = build_cluster_state(&zero_cluster_interval, zero_cluster_interval.listen)
-            .test_unwrap_err();
+        let error = build_cluster_state(
+            &zero_cluster_interval,
+            zero_cluster_interval.listen,
+            chio_test_support::clock::clock(),
+        )
+        .test_unwrap_err();
         assert!(error
             .to_string()
             .contains("cluster sync interval must be non-zero"));
@@ -1833,15 +1706,15 @@ mod cluster_and_reports_tests {
         let target_budget_db = unique_temp_path("cluster-target-budgets", "sqlite3");
 
         let source_state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
+            "https://node-a",
+            &["https://node-b"],
             Some(source_receipt_db.clone()),
             Some(source_revocation_db.clone()),
             Some(source_budget_db.clone()),
         );
         let target_state = state_with_cluster(
-            "http://node-b",
-            &["http://node-a"],
+            "https://node-b",
+            &["https://node-a"],
             Some(target_receipt_db.clone()),
             Some(target_revocation_db.clone()),
             Some(target_budget_db.clone()),
@@ -1932,7 +1805,7 @@ mod cluster_and_reports_tests {
         );
 
         let generated_at = snapshot.generated_at;
-        apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+        apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
         let revocations = SqliteRevocationStore::open(&target_revocation_db)
             .test_unwrap()
@@ -1985,38 +1858,39 @@ mod cluster_and_reports_tests {
             vec!["hold-1:authorize", "hold-1:release"]
         );
 
-        assert_eq!(peer_tool_seq(&target_state, "http://node-a"), 1);
-        assert_eq!(peer_child_seq(&target_state, "http://node-a"), 1);
-        assert_eq!(peer_lineage_seq(&target_state, "http://node-a"), 1);
+        assert_eq!(peer_tool_seq(&target_state, "https://node-a"), 1);
+        assert_eq!(peer_child_seq(&target_state, "https://node-a"), 1);
+        assert_eq!(peer_lineage_seq(&target_state, "https://node-a"), 1);
         assert_eq!(
-            peer_budget_cursor(&target_state, "http://node-a")
+            peer_budget_cursor(&target_state, "https://node-a")
                 .test_unwrap()
                 .seq,
             2
         );
         assert_eq!(
-            peer_revocation_cursor(&target_state, "http://node-a")
+            peer_revocation_cursor(&target_state, "https://node-a")
                 .test_unwrap()
                 .capability_id,
             "cap-1"
         );
         let installed_revocation_cursor =
-            peer_revocation_cursor(&target_state, "http://node-a").test_unwrap();
+            peer_revocation_cursor(&target_state, "https://node-a").test_unwrap();
         assert_eq!(
             installed_revocation_cursor.cursor_version,
             Some(REVOCATION_SEQUENCE_CURSOR_VERSION)
         );
         assert_eq!(installed_revocation_cursor.seq, Some(3));
         assert_eq!(
-            with_peer_state(&target_state, "http://node-a", |peer| peer
+            with_peer_state(&target_state, "https://node-a", |peer| peer
                 .snapshot_applied_count),
             Some(1)
         );
         assert_eq!(
-            with_peer_state(&target_state, "http://node-a", |peer| peer.last_snapshot_at),
+            with_peer_state(&target_state, "https://node-a", |peer| peer
+                .last_snapshot_at),
             Some(Some(generated_at))
         );
-        assert!(!peer_should_force_snapshot(&target_state, "http://node-a"));
+        assert!(!peer_should_force_snapshot(&target_state, "https://node-a"));
     }
 
     #[test]
@@ -2025,15 +1899,15 @@ mod cluster_and_reports_tests {
         let target_budget_db = unique_temp_path("cluster-target-denied-budgets", "sqlite3");
 
         let source_state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
+            "https://node-a",
+            &["https://node-b"],
             None,
             None,
             Some(source_budget_db.clone()),
         );
         let target_state = state_with_cluster(
-            "http://node-b",
-            &["http://node-a"],
+            "https://node-b",
+            &["https://node-a"],
             None,
             None,
             Some(target_budget_db.clone()),
@@ -2086,7 +1960,7 @@ mod cluster_and_reports_tests {
         assert_eq!(snapshot.budget_mutation_events[0].allowed, Some(false));
         assert_eq!(snapshot.budget_mutation_events[0].usage_seq, None);
 
-        apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+        apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
         let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
         assert!(target_store
@@ -2107,7 +1981,7 @@ mod cluster_and_reports_tests {
         drop(target_store);
 
         assert_eq!(
-            peer_budget_cursor(&target_state, "http://node-a")
+            peer_budget_cursor(&target_state, "https://node-a")
                 .test_unwrap()
                 .seq,
             1
@@ -2129,15 +2003,15 @@ mod cluster_and_reports_tests {
         let target_budget_db = unique_temp_path("cluster-target-abandoned-storm", "sqlite3");
 
         let source_state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
+            "https://node-a",
+            &["https://node-b"],
             None,
             None,
             Some(source_budget_db.clone()),
         );
         let target_state = state_with_cluster(
-            "http://node-b",
-            &["http://node-a"],
+            "https://node-b",
+            &["https://node-a"],
             None,
             None,
             Some(target_budget_db.clone()),
@@ -2166,8 +2040,8 @@ mod cluster_and_reports_tests {
             total_cost_exposed_after: if seq == 1 { 1 } else { 2 },
             total_cost_realized_spend_after: 0,
             authority: Some(BudgetMutationAuthorityView {
-                authority_id: "http://node-a".to_string(),
-                lease_id: "http://node-a#term-1".to_string(),
+                authority_id: "https://node-a".to_string(),
+                lease_id: "https://node-a#term-1".to_string(),
                 lease_epoch: 1,
             }),
         };
@@ -2217,7 +2091,7 @@ mod cluster_and_reports_tests {
             encoded.len()
         );
 
-        apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+        apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
         // The follower learned every abandoned slot, so its contiguous ack head
         // advances across the whole run to the tail event (no stall at the hole).
@@ -2226,7 +2100,7 @@ mod cluster_and_reports_tests {
             .budget_ack_heads()
             .test_unwrap()
             .into_iter()
-            .find(|(origin, _)| origin == "http://node-a")
+            .find(|(origin, _)| origin == "https://node-a")
             .map(|(_, seq)| seq);
         assert_eq!(
             head,
@@ -2244,15 +2118,15 @@ mod cluster_and_reports_tests {
         let target_budget_db = unique_temp_path("cluster-target-budget-usage-only", "sqlite3");
 
         let source_state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
+            "https://node-a",
+            &["https://node-b"],
             None,
             None,
             Some(source_budget_db.clone()),
         );
         let target_state = state_with_cluster(
-            "http://node-b",
-            &["http://node-a"],
+            "https://node-b",
+            &["https://node-a"],
             None,
             None,
             Some(target_budget_db.clone()),
@@ -2260,7 +2134,7 @@ mod cluster_and_reports_tests {
 
         update_peer_budget_cursor(
             &target_state,
-            "http://node-a",
+            "https://node-a",
             BudgetCursor {
                 seq: 99,
                 updated_at: 1_717_171_718,
@@ -2284,7 +2158,7 @@ mod cluster_and_reports_tests {
         snapshot.budget_usage_history_anchors = vec![usage()];
 
         let _error =
-            apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap_err();
+            apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap_err();
 
         let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
         assert!(target_store
@@ -2298,7 +2172,7 @@ mod cluster_and_reports_tests {
         drop(target_store);
 
         assert_eq!(
-            peer_budget_cursor(&target_state, "http://node-a")
+            peer_budget_cursor(&target_state, "https://node-a")
                 .test_unwrap()
                 .seq,
             99,
@@ -2449,10 +2323,10 @@ mod cluster_and_reports_tests {
         // peer Healthy (honest backlog, not misbehavior), and short-circuit the
         // round. A bare Transient flags nothing, leaving the cursor pinned
         // indefinitely.
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
+        let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+        update_peer_reachable(&state, "https://node-b");
         assert!(
-            !peer_should_force_snapshot(&state, "http://node-b"),
+            !peer_should_force_snapshot(&state, "https://node-b"),
             "a freshly reachable, already-synced peer has no pending snapshot"
         );
 
@@ -2461,7 +2335,7 @@ mod cluster_and_reports_tests {
         let mut records = 0u64;
         let transient = route_pull(
             &state,
-            "http://node-b",
+            "https://node-b",
             Err(PullError::Transient(CliError::cli_other_error(
                 "oversized transient",
             ))),
@@ -2469,7 +2343,7 @@ mod cluster_and_reports_tests {
         );
         assert!(transient.is_err(), "a Transient short-circuits the round");
         assert!(
-            !peer_should_force_snapshot(&state, "http://node-b"),
+            !peer_should_force_snapshot(&state, "https://node-b"),
             "a bare Transient does NOT trigger snapshot recovery: this is the stall"
         );
 
@@ -2477,7 +2351,7 @@ mod cluster_and_reports_tests {
         let mut records = 0u64;
         let routed = route_pull(
             &state,
-            "http://node-b",
+            "https://node-b",
             Err(PullError::ForceSnapshot(CliError::cli_other_error(
                 "budget delta response contains 401 records, maximum is 400",
             ))),
@@ -2488,12 +2362,12 @@ mod cluster_and_reports_tests {
             "ForceSnapshot short-circuits the round before update_peer_success clears the flag"
         );
         assert!(
-            peer_should_force_snapshot(&state, "http://node-b"),
+            peer_should_force_snapshot(&state, "https://node-b"),
             "an oversized/unpageable page must route the peer to force-snapshot recovery"
         );
         // Not demoted to Unhealthy: an honest large window is not peer misbehavior.
         assert!(
-            with_peer_state(&state, "http://node-b", |peer| peer.health.is_reachable())
+            with_peer_state(&state, "https://node-b", |peer| peer.health.is_reachable())
                 .unwrap_or(false),
             "force-snapshot recovery keeps an honest peer Healthy"
         );
@@ -2672,130 +2546,5 @@ mod cluster_and_reports_tests {
         // Fail-closed: only the gap-free prefix 1..3 remains committed.
         assert_eq!(store.max_mutation_event_seq().test_unwrap(), 3);
     }
-
-    #[test]
-    fn cluster_replication_heads_reports_heads_without_materializing() {
-        let budget_db = unique_temp_path("cluster-heads-budget", "sqlite3");
-        let revocation_db = unique_temp_path("cluster-heads-revocation", "sqlite3");
-        {
-            let store = SqliteBudgetStore::open(&budget_db).test_unwrap();
-            store
-                .try_charge_cost("cap-heads", 0, Some(5), 3, None, None)
-                .test_unwrap();
-            let revocations = SqliteRevocationStore::open(&revocation_db).test_unwrap();
-            revocations
-                .upsert_revocation(&RevocationRecord {
-                    capability_id: "cap-heads".to_string(),
-                    revoked_at: 77,
-                })
-                .test_unwrap();
-        }
-        let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b"],
-            None,
-            Some(revocation_db.clone()),
-            Some(budget_db.clone()),
-        );
-        let heads = cluster_replication_heads(&state).test_unwrap();
-        assert_eq!(heads.budget_seq, 1);
-        assert_eq!(heads.tool_seq, 0);
-        assert_eq!(
-            heads.revocation_cursor_version,
-            Some(REVOCATION_SEQUENCE_CURSOR_VERSION)
-        );
-        let stream_id = heads.revocation_stream_id.as_deref().test_unwrap();
-        assert_eq!(
-            uuid::Uuid::parse_str(stream_id)
-                .test_unwrap()
-                .get_version_num(),
-            7
-        );
-        let cursor = heads.revocation_cursor.test_unwrap();
-        assert_eq!(cursor.stream_id.as_deref(), Some(stream_id));
-        assert_eq!(cursor.revoked_at, 77);
-        assert_eq!(cursor.capability_id, "cap-heads");
-    }
-
-    #[test]
-    fn status_advertises_contiguous_ack_heads() {
-        // Wire shape: budgetAckHeads serializes as camelCase originId/eventSeq
-        // when non-empty, and is omitted entirely when empty (additive,
-        // backward-compatible with older peers who never witness).
-        let response = ClusterStatusResponse {
-            self_url: "http://node-a".to_string(),
-            leader_url: None,
-            role: "follower".to_string(),
-            has_quorum: true,
-            quorum_size: 2,
-            reachable_nodes: 2,
-            election_term: 1,
-            authority_lease: None,
-            replication: ClusterReplicationHeadsView::default(),
-            peers: Vec::new(),
-            budget_ack_heads: vec![BudgetOriginAck {
-                origin_id: "http://origin-o".to_string(),
-                event_seq: 3,
-            }],
-        };
-        let value = serde_json::to_value(&response).test_unwrap();
-        assert_eq!(value["budgetAckHeads"][0]["originId"], "http://origin-o");
-        assert_eq!(value["budgetAckHeads"][0]["eventSeq"], 3);
-
-        // Empty ack heads are omitted from the wire (skip_serializing_if).
-        let empty = ClusterStatusResponse {
-            budget_ack_heads: Vec::new(),
-            ..response
-        };
-        let value = serde_json::to_value(&empty).test_unwrap();
-        assert!(value.get("budgetAckHeads").is_none());
-    }
-
-    #[test]
-    fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
-        let source_state =
-            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        let target_state = state_with_cluster(
-            "http://node-0",
-            &["http://node-a", "http://node-b"],
-            None,
-            None,
-            None,
-        );
-
-        for state in [&source_state, &target_state] {
-            let cluster = state.cluster.as_ref().test_unwrap();
-            let mut guard = cluster.lock().test_unwrap();
-            for peer in guard.peers.values_mut() {
-                peer.health = PeerHealth::Healthy;
-                peer.last_contact_at = Some(unix_timestamp_now());
-            }
-        }
-
-        let initial_target_consensus = cluster_consensus_view(&target_state).test_unwrap();
-        assert_eq!(
-            initial_target_consensus.leader_url.as_deref(),
-            Some("http://node-0")
-        );
-        assert_eq!(initial_target_consensus.election_term, 1);
-
-        let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
-        assert_eq!(snapshot.election_term, 1);
-        assert_eq!(
-            snapshot.authority_lease.as_ref().test_unwrap().leader_url,
-            "http://node-a"
-        );
-
-        apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
-
-        let seeded_consensus = cluster_consensus_view(&target_state).test_unwrap();
-        assert_eq!(
-            seeded_consensus.leader_url.as_deref(),
-            Some("http://node-0")
-        );
-        assert_eq!(seeded_consensus.election_term, 2);
-        let seeded_lease = cluster_authority_lease_view(&target_state).test_unwrap();
-        assert_eq!(seeded_lease.authority_id, "http://node-0");
-        assert_eq!(seeded_lease.lease_epoch, 2);
-    }
+    mod visibility_and_quorum;
 }

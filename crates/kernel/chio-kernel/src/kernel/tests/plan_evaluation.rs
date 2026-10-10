@@ -1,14 +1,7 @@
+use super::*;
 // Plan-level evaluation tests.
 //
-// Included by `src/kernel/tests.rs`. Inherits `super::*` plus the
-// helpers defined at the top of `tests/all.rs` (`make_config`,
-// `make_keypair`, `make_capability`, `make_scope`, `make_grant`,
-// `EchoServer`, etc.).
-
-use chio_core_types::capability::scope::ModelSafetyTier;
-use chio_core_types::{
-    PlanEvaluationRequest, PlanVerdict, PlannedToolCall, StepVerdictKind,
-};
+// Shared fixtures are imported from the parent test module.
 
 fn planned_call(
     request_id: &str,
@@ -226,7 +219,9 @@ fn plan_evaluation_first_step_denied_does_not_short_circuit() {
 /// step that submitted the wrong model.
 #[test]
 fn plan_evaluation_model_metadata_scoped_per_step() {
-    use chio_core::capability::{scope::{ChioScope, Constraint, ModelMetadata, Operation, ToolGrant}};
+    use chio_core::capability::scope::{
+        ChioScope, Constraint, ModelMetadata, Operation, ToolGrant,
+    };
 
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(

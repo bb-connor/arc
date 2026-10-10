@@ -1,18 +1,7 @@
+use super::*;
 // Compliance-score tests.
 //
-// Included by `src/kernel/tests.rs`, which already pulled in `super::*`
-// and helpers from `tests/all.rs`. We only need items that are not in
-// scope yet.
-//
-// Verified behaviour:
-//   * zero denies in 1000 calls -> score > 900
-//   * revoked capability        -> score < 500
-
-use crate::compliance_score::{
-    compliance_score, ComplianceScoreConfig, ComplianceScoreInputs,
-};
-use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
-use crate::operator_report::ComplianceReport;
+// Shared fixtures are imported from the parent test module.
 
 fn clean_report() -> ComplianceReport {
     ComplianceReport {

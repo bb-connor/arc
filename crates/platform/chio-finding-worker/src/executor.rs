@@ -8,7 +8,7 @@ use std::os::unix::fs::{
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use chio_core_types::{
     canonical_json_bytes, sha256_hex, PublicKey, SigningAlgorithm, SigningBackend,
@@ -129,6 +129,16 @@ impl FirecrackerWorkerConfig {
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkerExecutionError {
+    #[error("finding worker protocol failed")]
+    Input(#[source] crate::protocol::WorkerProtocolError),
+    #[error("finding worker authority clock rejected the operation")]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error("finding worker host counter read failed")]
+    CounterIo(#[source] std::io::Error),
+    #[error("finding worker host counter encoding is invalid")]
+    CounterEncoding(#[source] std::string::FromUtf8Error),
+    #[error("finding worker host counter is invalid")]
+    CounterValue(#[source] std::num::ParseIntError),
     #[error("finding worker configuration is invalid")]
     Configuration,
     #[error("finding worker host preflight failed")]
@@ -163,7 +173,12 @@ impl WorkerExecutionError {
             Self::Staging => "worker_staging",
             Self::Process => "worker_process",
             Self::Timeout => "worker_timeout",
-            Self::Protocol => "worker_protocol",
+            Self::Protocol
+            | Self::Input(_)
+            | Self::Clock(_)
+            | Self::CounterIo(_)
+            | Self::CounterEncoding(_)
+            | Self::CounterValue(_) => "worker_protocol",
             Self::GuestRejected => "worker_guest_rejected",
             Self::Capacity => "worker_capacity",
             Self::Cancelled => "worker_cancelled",
@@ -299,7 +314,7 @@ impl FirecrackerExecutor {
         now: u64,
     ) -> Result<u64, WorkerExecutionError> {
         authorized_attempt_limit(job, &self.inner.config.capability_authority, now)
-            .map_err(|_| WorkerExecutionError::Protocol)
+            .map_err(WorkerExecutionError::Input)
     }
 
     /// Verify host privilege, KVM availability, trusted parent ownership,
@@ -345,7 +360,7 @@ impl FirecrackerExecutor {
             &self.inner.config.capability_authority,
             now,
         )
-        .map_err(|_| WorkerExecutionError::Protocol)?;
+        .map_err(WorkerExecutionError::Input)?;
         let request_bytes =
             canonical_json_bytes(&request).map_err(|_| WorkerExecutionError::Protocol)?;
         validate_frame_payload(&request_bytes, self.inner.config.max_frame_bytes)?;
@@ -906,17 +921,9 @@ async fn exchange_with_guest(
         }
         transfer_inputs(&mut stream, request, &tenant_artifact_root, max_frame_bytes).await?;
         let response = read_frame(&mut stream, max_frame_bytes).await?;
-        let raw = std::str::from_utf8(&response).map_err(|_| WorkerExecutionError::Protocol)?;
-        let canonical = chio_core_types::canonical_json_bytes_from_str(raw)
-            .map_err(|_| WorkerExecutionError::Protocol)?;
-        if canonical != response {
-            return Err(WorkerExecutionError::Protocol);
-        }
-        let result: FindingWorkerResult =
-            serde_json::from_slice(&response).map_err(|_| WorkerExecutionError::Protocol)?;
-        result
-            .validate_for(request)
-            .map_err(|_| WorkerExecutionError::Protocol)?;
+        let result =
+            crate::protocol::decode_worker_result(&response, request, max_frame_bytes as usize)
+                .map_err(WorkerExecutionError::Input)?;
         receive_outputs(&mut stream, &result, &tenant_artifact_root, max_frame_bytes).await?;
         let done = read_line_bounded(&mut stream, 80).await?;
         if done != format!("DONE {}\n", request.request_sha256) {
@@ -1480,10 +1487,11 @@ fn trusted_file_metadata(metadata: &fs::Metadata, executable: bool) -> bool {
 }
 
 fn unix_time() -> Result<u64, WorkerExecutionError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|_| WorkerExecutionError::Protocol)
+    use chio_security_types::clock::Clock;
+    Ok(chio_security_types::clock::SystemClock
+        .read()?
+        .unix_millis()
+        .as_secs())
 }
 
 struct StagingGuard {
@@ -1568,8 +1576,7 @@ impl JailGuard {
         elapsed: Duration,
         guest: &FindingWorkerResult,
     ) -> Result<HostResourceUsage, WorkerExecutionError> {
-        let cpu_stat = fs::read_to_string(self.cgroup_dir.join("cpu.stat"))
-            .map_err(|_| WorkerExecutionError::Protocol)?;
+        let cpu_stat = read_cgroup_text(&self.cgroup_dir.join("cpu.stat"), 64 * 1024)?;
         let cpu_micros = cpu_stat
             .lines()
             .find_map(|line| {
@@ -1608,14 +1615,23 @@ impl JailGuard {
 }
 
 fn read_cgroup_counter(path: &Path) -> Result<u64, WorkerExecutionError> {
-    let value = fs::read_to_string(path).map_err(|_| WorkerExecutionError::Protocol)?;
-    if value.len() > 64 {
-        return Err(WorkerExecutionError::Protocol);
-    }
+    let value = read_cgroup_text(path, 64)?;
     value
         .trim_end()
         .parse::<u64>()
-        .map_err(|_| WorkerExecutionError::Protocol)
+        .map_err(WorkerExecutionError::CounterValue)
+}
+
+fn read_cgroup_text(path: &Path, bound: usize) -> Result<String, WorkerExecutionError> {
+    let file = fs::File::open(path).map_err(WorkerExecutionError::CounterIo)?;
+    let mut bytes = Vec::new();
+    file.take((bound + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(WorkerExecutionError::CounterIo)?;
+    if bytes.len() > bound {
+        return Err(WorkerExecutionError::Protocol);
+    }
+    String::from_utf8(bytes).map_err(WorkerExecutionError::CounterEncoding)
 }
 
 impl Drop for JailGuard {

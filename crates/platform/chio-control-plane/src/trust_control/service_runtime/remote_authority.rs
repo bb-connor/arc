@@ -1,3 +1,10 @@
+#[path = "remote_authority/lifecycle.rs"]
+mod lifecycle;
+
+#[cfg(test)]
+#[path = "remote_authority/clock_tests.rs"]
+mod clock_tests;
+
 use super::client::build_client;
 use super::*;
 
@@ -5,14 +12,91 @@ pub fn build_remote_capability_authority(
     control_url: &str,
     control_token: &str,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    build_remote_capability_authority_with_clock(
+        control_url,
+        control_token,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+pub fn build_remote_capability_authority_with_clock(
+    control_url: &str,
+    control_token: &str,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     let client = build_client(control_url, control_token)?;
     let status = client.authority_status()?;
     let cache = AuthorityKeyCache::from_status(&status)?;
     Ok(Box::new(RemoteCapabilityAuthority {
+        clock,
         client,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),
+        pinned_current: None,
+        pinned_trusted: Vec::new(),
     }))
+}
+
+pub fn build_pinned_remote_capability_authority(
+    control_url: &str,
+    workload_token: &str,
+    pinned_current: PublicKey,
+    pinned_trusted: Vec<PublicKey>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    build_pinned_remote_capability_authority_with_clock(
+        control_url,
+        workload_token,
+        pinned_current,
+        pinned_trusted,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+/// Build an operator-pinned authority using its owner's trusted clock.
+pub fn build_pinned_remote_capability_authority_with_clock(
+    control_url: &str,
+    workload_token: &str,
+    pinned_current: PublicKey,
+    mut pinned_trusted: Vec<PublicKey>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    if !pinned_trusted.contains(&pinned_current) {
+        pinned_trusted.push(pinned_current.clone());
+    }
+    pinned_trusted.sort_by_key(PublicKey::to_hex);
+    pinned_trusted.dedup();
+
+    let client = build_client(control_url, workload_token)?;
+    let status = client.authority_status()?;
+    let cache = AuthorityKeyCache::from_status(&status)?;
+    validate_authority_pins(&cache, &pinned_current, &pinned_trusted)?;
+    Ok(Box::new(RemoteCapabilityAuthority {
+        clock,
+        client,
+        cache: Mutex::new(cache),
+        refresh_lock: Mutex::new(()),
+        pinned_current: Some(pinned_current),
+        pinned_trusted,
+    }))
+}
+
+fn validate_authority_pins(
+    cache: &AuthorityKeyCache,
+    pinned_current: &PublicKey,
+    pinned_trusted: &[PublicKey],
+) -> Result<(), CliError> {
+    if cache.current.as_ref() != Some(pinned_current) {
+        return Err(CliError::cli_other_error(
+            "remote capability authority current key does not match the operator pin".to_string(),
+        ));
+    }
+    if cache.trusted != pinned_trusted {
+        return Err(CliError::cli_other_error(
+            "remote capability authority trusted key set does not match the operator pins"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 impl RemoteCapabilityAuthority {
@@ -24,7 +108,11 @@ impl RemoteCapabilityAuthority {
 
     fn fetch_status_cache(&self) -> Result<AuthorityKeyCache, CliError> {
         let status = self.client.authority_status()?;
-        AuthorityKeyCache::from_status(&status)
+        let cache = AuthorityKeyCache::from_status(&status)?;
+        if let Some(pinned_current) = self.pinned_current.as_ref() {
+            validate_authority_pins(&cache, pinned_current, &self.pinned_trusted)?;
+        }
+        Ok(cache)
     }
 
     fn lock_refresh(&self) -> std::sync::MutexGuard<'_, ()> {
@@ -35,6 +123,9 @@ impl RemoteCapabilityAuthority {
     }
 
     fn install_status_cache(&self, cache: AuthorityKeyCache) -> Result<(), CliError> {
+        if let Some(pinned_current) = self.pinned_current.as_ref() {
+            validate_authority_pins(&cache, pinned_current, &self.pinned_trusted)?;
+        }
         let mut guard = match self.cache.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -44,16 +135,18 @@ impl RemoteCapabilityAuthority {
         Ok(())
     }
 
-    fn refresh_status_if_stale(&self) {
+    fn refresh_status_if_stale(&self) -> Result<(), CliError> {
         let should_refresh = match self.cache.lock() {
             Ok(guard) => guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
             Err(poisoned) => poisoned.into_inner().refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
         };
         if should_refresh {
-            let _ = self.refresh_status();
+            self.refresh_status()?;
         }
+        Ok(())
     }
 
+    #[cfg(test)]
     fn trusted_keys_snapshot(&self) -> Vec<PublicKey> {
         match self.cache.lock() {
             Ok(guard) => guard.trusted.clone(),
@@ -98,6 +191,7 @@ impl RemoteCapabilityAuthority {
                 requested_scope,
                 requested_ttl_seconds,
                 &current,
+                self.clock.unix_millis()?,
             );
         }
 
@@ -134,6 +228,7 @@ impl RemoteCapabilityAuthority {
             requested_scope,
             requested_ttl_seconds,
             current,
+            self.clock.unix_millis()?,
         )?;
         self.install_status_cache(refreshed).map_err(|error| {
             chio_kernel::KernelError::CapabilityIssuanceFailed(error.to_string())
@@ -164,7 +259,7 @@ impl RemoteCapabilityAuthority {
 
 impl CapabilityAuthority for RemoteCapabilityAuthority {
     fn authority_public_key(&self) -> PublicKey {
-        self.refresh_status_if_stale();
+        let _ = self.refresh_status_if_stale();
         match self.cache.lock() {
             Ok(guard) => match &guard.current {
                 Some(public_key) => public_key.clone(),
@@ -178,8 +273,29 @@ impl CapabilityAuthority for RemoteCapabilityAuthority {
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
-        self.refresh_status_if_stale();
-        self.trusted_keys_snapshot()
+        let Ok(now) = self.clock.unix_millis() else {
+            return Vec::new();
+        };
+        if self.refresh_status_if_stale().is_err() {
+            return Vec::new();
+        }
+        let Ok(cache) = self.cache.lock() else {
+            return Vec::new();
+        };
+        // Both refresh and a fresh-cache lock wait may outlive an issuer.
+        let Ok(after_refresh) = self.clock.unix_millis() else {
+            return Vec::new();
+        };
+        cache.live_keys(now.as_secs().max(after_refresh.as_secs()))
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &PublicKey,
+        issued_at: u64,
+        now: u64,
+    ) -> Result<(), chio_kernel::KernelError> {
+        self.verify_live_issuer(issuer, issued_at, now)
     }
 
     fn issue_capability(
@@ -199,6 +315,8 @@ impl CapabilityAuthority for RemoteCapabilityAuthority {
         runtime_attestation: Option<RuntimeAttestationEvidence>,
     ) -> Result<CapabilityToken, chio_kernel::KernelError> {
         chio_kernel::ensure_capability_issuance_supported(&scope)?;
+        // Reject a failed owner clock before the remote authority can persist issuance.
+        self.clock.unix_millis()?;
         let capability = self
             .client
             .issue_capability_with_attestation(
@@ -243,11 +361,12 @@ impl AuthorityKeyCache {
             .map(|value| PublicKey::from_hex(value))
             .collect::<Result<Vec<_>, _>>()?;
         let mut trusted = trusted;
-        if let Some(current) = current.as_ref() {
-            if !trusted.iter().any(|public_key| public_key == current) {
-                trusted.push(current.clone());
-            }
+        if !current.as_ref().is_some_and(|key| trusted.contains(key)) {
+            return Err(CliError::cli_other_error(
+                "authority status omits its current key from live trust",
+            ));
         }
+        lifecycle::validate_status_lifecycle(status)?;
         trusted.sort_by_key(PublicKey::to_hex);
         trusted.dedup();
         Ok(Self {
@@ -255,6 +374,7 @@ impl AuthorityKeyCache {
             trusted,
             generation: status.generation,
             rotated_at: status.rotated_at,
+            issuer_state: status.issuer_state.clone(),
             refreshed_at: Instant::now(),
         })
     }
@@ -281,7 +401,8 @@ impl AuthorityKeyCache {
             ) if candidate_generation == current_generation
                 && (candidate_rotated_at != current_rotated_at
                     || self.current != installed.current
-                    || self.trusted != installed.trusted) =>
+                    || self.issuer_state != installed.issuer_state
+                    || self.trusted.iter().any(|key| !installed.trusted.contains(key))) =>
             {
                 Err(CliError::cli_other_error(format!(
                     "remote authority cache generation {current_generation} equivocated"
@@ -319,6 +440,71 @@ mod tests {
     use super::*;
     use chio_kernel::LocalCapabilityAuthority;
 
+    #[test]
+    fn kg2_remote_stale_cache_failure_cannot_grant_issuer_trust(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let authority = remote_with_trusted_key(Keypair::generate().public_key())?;
+        authority
+            .cache
+            .lock()
+            .map_err(|_| "cache poisoned")?
+            .refreshed_at = Instant::now() - AUTHORITY_CACHE_TTL;
+        assert_eq!(authority.trusted_public_keys(), Vec::new());
+        Ok(())
+    }
+
+    #[test]
+    fn unavailable_clock_prevents_remote_issuance_rpc() -> Result<(), Box<dyn std::error::Error>> {
+        use chio_security_types::clock::{Clock, ClockError, ClockReading};
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct UnavailableClock;
+        impl Clock for UnavailableClock {
+            fn read(&self) -> Result<ClockReading, ClockError> {
+                Err(ClockError::Unavailable)
+            }
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        listener.set_nonblocking(true)?;
+        let mut remote = remote_with_trusted_key(Keypair::generate().public_key())?;
+        remote.client = build_client(&format!("http://{}", listener.local_addr()?), "test-token")?;
+        remote.clock = Arc::new(UnavailableClock);
+        let stopped = Arc::new(AtomicBool::new(false));
+        let server_stopped = stopped.clone();
+        let server = std::thread::spawn(move || -> std::io::Result<usize> {
+            let mut requests = 0;
+            while !server_stopped.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        requests += 1;
+                        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+                        stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")?;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(requests)
+        });
+        let result =
+            remote.issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60);
+        stopped.store(true, Ordering::SeqCst);
+        let requests = server
+            .join()
+            .map_err(|_| std::io::Error::other("test server panicked"))??;
+        assert_eq!(requests, 0, "clock failure must precede any issuance RPC");
+        assert!(matches!(
+            result,
+            Err(chio_kernel::KernelError::Clock(ClockError::Unavailable))
+        ));
+        Ok(())
+    }
+
     struct IssuedTestCapability {
         capability: CapabilityToken,
         subject: PublicKey,
@@ -341,19 +527,59 @@ mod tests {
         })
     }
 
+    #[test]
+    fn kg2_remote_expiry_can_shrink_trust_without_new_generation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let current = Keypair::generate().public_key();
+        let old = Keypair::generate().public_key();
+        let mut remote = remote_with_trusted_key(current.clone())?;
+        remote
+            .cache
+            .get_mut()
+            .map_err(|_| "cache poisoned")?
+            .trusted
+            .push(old.clone());
+        let expired = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: vec![current.clone()],
+            generation: Some(1),
+            rotated_at: Some(1),
+            issuer_state: None,
+            refreshed_at: Instant::now(),
+        };
+        remote.install_status_cache(expired)?;
+        assert_eq!(remote.trusted_keys_snapshot(), vec![current.clone()]);
+        let resurrected = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: vec![current, old],
+            generation: Some(1),
+            rotated_at: Some(1),
+            issuer_state: None,
+            refreshed_at: Instant::now(),
+        };
+        assert!(
+            matches!(remote.install_status_cache(resurrected), Err(error) if error.to_string().contains("equivocated"))
+        );
+        Ok(())
+    }
+
     fn remote_with_trusted_key(
         public_key: PublicKey,
     ) -> Result<RemoteCapabilityAuthority, CliError> {
         Ok(RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(public_key.clone()),
                 trusted: vec![public_key],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         })
     }
 
@@ -387,6 +613,7 @@ mod tests {
             &issued.scope,
             issued.ttl_seconds,
             &current,
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
         assert!(matches!(
@@ -409,6 +636,7 @@ mod tests {
             &issued.scope,
             issued.ttl_seconds,
             &authority.authority_public_key(),
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
         assert!(matches!(
@@ -432,6 +660,7 @@ mod tests {
             trusted: vec![previous_key.clone(), rotated_key],
             generation: Some(2),
             rotated_at: Some(2),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -465,6 +694,7 @@ mod tests {
             trusted: vec![previous_key.clone(), rotated_key.clone()],
             generation: Some(2),
             rotated_at: Some(2),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -489,15 +719,19 @@ mod tests {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: None,
                 trusted: vec![authority.authority_public_key()],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
 
         let result = remote.verify_issuance_response(
@@ -524,6 +758,7 @@ mod tests {
                 trusted: vec![current_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(2),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
         );
@@ -567,15 +802,19 @@ mod tests {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(authority.authority_public_key()),
                 trusted: vec![authority.authority_public_key()],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now() - AUTHORITY_CACHE_TTL,
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
 
         let result = remote.verify_issuance_response(
@@ -597,21 +836,26 @@ mod tests {
         let older_key = Keypair::generate().public_key();
         let newer_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(newer_key.clone()),
                 trusted: vec![older_key.clone(), newer_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let stale = AuthorityKeyCache {
             current: Some(older_key.clone()),
             trusted: vec![older_key],
             generation: Some(1),
             rotated_at: Some(10),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -629,15 +873,19 @@ mod tests {
         let historical_key = Keypair::generate().public_key();
         let equivocated_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
                 trusted: vec![current_key.clone(), historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let _refresh_guard = remote.lock_refresh();
 
@@ -647,13 +895,19 @@ mod tests {
                 trusted: vec![equivocated_key, historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
             AuthorityKeyCache {
                 current: Some(current_key.clone()),
-                trusted: vec![current_key.clone()],
+                trusted: vec![
+                    current_key.clone(),
+                    historical_key.clone(),
+                    Keypair::generate().public_key(),
+                ],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
             AuthorityKeyCache {
@@ -661,6 +915,7 @@ mod tests {
                 trusted: vec![current_key.clone(), historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(21),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
         ] {
@@ -677,15 +932,19 @@ mod tests {
         let current_key = Keypair::generate().public_key();
         let next_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
                 trusted: vec![current_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         };
         let _refresh_guard = remote.lock_refresh();
 
@@ -694,6 +953,7 @@ mod tests {
             trusted: vec![current_key.clone(), next_key],
             generation: Some(3),
             rotated_at: Some(19),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         });
 
@@ -711,6 +971,7 @@ mod tests {
             public_key: Some(current.to_hex()),
             generation: Some(1),
             rotated_at: Some(10),
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.to_hex(), current.to_hex()],
         })?;
@@ -720,20 +981,45 @@ mod tests {
     }
 
     #[test]
+    fn pinned_authority_contract_rejects_current_or_trusted_key_drift() {
+        let current = Keypair::generate().public_key();
+        let historical = Keypair::generate().public_key();
+        let substituted = Keypair::generate().public_key();
+        let mut trusted = vec![current.clone(), historical.clone()];
+        trusted.sort_by_key(PublicKey::to_hex);
+        let cache = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: trusted.clone(),
+            generation: Some(2),
+            rotated_at: Some(20),
+            issuer_state: None,
+            refreshed_at: Instant::now(),
+        };
+
+        assert!(validate_authority_pins(&cache, &current, &trusted).is_ok());
+        assert!(validate_authority_pins(&cache, &substituted, &trusted).is_err());
+        assert!(validate_authority_pins(&cache, &current, std::slice::from_ref(&current)).is_err());
+    }
+
+    #[test]
     fn generationless_refreshes_are_serialized_in_completion_order(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let first_key = Keypair::generate().public_key();
         let second_key = Keypair::generate().public_key();
         let remote = Arc::new(RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(Keypair::generate().public_key()),
                 trusted: Vec::new(),
                 generation: None,
                 rotated_at: None,
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
+            pinned_current: None,
+            pinned_trusted: Vec::new(),
         });
         let (first_locked_tx, first_locked_rx) = std::sync::mpsc::channel();
         let (release_first_tx, release_first_rx) = std::sync::mpsc::channel();
@@ -749,6 +1035,7 @@ mod tests {
                     trusted: vec![first_key_for_thread],
                     generation: None,
                     rotated_at: None,
+                    issuer_state: None,
                     refreshed_at: Instant::now(),
                 })
                 .is_ok());
@@ -767,6 +1054,7 @@ mod tests {
                     trusted: vec![second_key_for_thread],
                     generation: None,
                     rotated_at: None,
+                    issuer_state: None,
                     refreshed_at: Instant::now(),
                 })
                 .is_ok());

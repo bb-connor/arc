@@ -22,6 +22,8 @@ use crate::ChioKernel;
 /// Maximum time a pool reservation may remain unclaimed before a durable
 /// purchase admission must take ownership of it.
 pub const FINDING_POOL_CLAIM_WINDOW_MS: u64 = 30_000;
+#[path = "finding_pool_clock.rs"]
+mod clock;
 pub const FINDING_POOL_MUTATION_SCHEMA_V1: &str = "chio.finding.pool-mutation.v1";
 pub const FINDING_POOL_DEBIT_AUTHORIZATION_SCHEMA_V1: &str =
     "chio.finding.pool-debit-authorization.v1";
@@ -141,6 +143,8 @@ pub use crate::finding_pool_error::FindingPoolLedgerError;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FindingPoolDebitError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("kernel emergency stop blocks finding pool debits")]
     EmergencyStopped,
     #[error("finding pool allocation rejected: {0}")]
@@ -726,7 +730,7 @@ impl ChioKernel {
         &self,
         request: FindingPoolDebitRequest<'_>,
     ) -> Result<FindingPoolDebitReceipt, FindingPoolDebitError> {
-        self.debit_finding_pool_purchase_at(request, crate::kernel::current_unix_timestamp_ms())
+        self.debit_finding_pool_purchase_at(request, self.read_authority_time()?.get())
     }
 
     fn debit_finding_pool_purchase_at(
@@ -903,9 +907,10 @@ impl ChioKernel {
             allocation_issued_at_unix_ms: allocation.issued_at_unix_ms,
             allocation_expires_at_unix_ms: verified.expires_at_unix_ms,
             debit_requested_at_unix_ms: trusted_now_unix_ms,
-            claim_deadline_unix_ms: trusted_now_unix_ms
-                .saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
-                .min(verified.expires_at_unix_ms),
+            claim_deadline_unix_ms: clock::claim_deadline(
+                trusted_now_unix_ms,
+                verified.expires_at_unix_ms,
+            )?,
         };
         if !allocation_is_live {
             return Err(FindingPoolLedgerError::AllocationNotLive.into());
@@ -996,7 +1001,7 @@ impl ChioKernel {
         }
         let mut drained = 0_usize;
         for _ in 0..FINDING_POOL_OUTBOX_BATCH_LIMIT {
-            let claimed_at = crate::kernel::current_unix_timestamp_ms();
+            let claimed_at = self.read_authority_time()?.get();
             let mut claimed = ledger.claim_pending_mutation_receipts(
                 &self.finding_pool_outbox_worker_id,
                 claimed_at,
@@ -1011,7 +1016,7 @@ impl ChioKernel {
             ledger.acknowledge_mutation_receipt(
                 &receipt.id,
                 &self.finding_pool_outbox_worker_id,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.read_authority_time()?.get(),
             )?;
             drained = drained.checked_add(1).ok_or_else(|| {
                 FindingPoolLedgerError::Receipt(
@@ -1234,7 +1239,7 @@ impl ChioKernel {
         }
         let decision = Self::finding_pool_terminal_decision(purchase, disposition)?;
         let occurred_at_unix_ms =
-            ledger.advance_trusted_time_floor(crate::kernel::current_unix_timestamp_ms())?;
+            ledger.advance_trusted_time_floor(self.read_authority_time()?.get())?;
         let terminal = AuthorizedFindingPoolTerminal {
             durable_admission_operation_id: durable_admission_operation_id.to_owned(),
             purchase_id: purchase.purchase_intent_id.clone(),

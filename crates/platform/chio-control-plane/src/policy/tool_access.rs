@@ -5,6 +5,33 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use super::guard_config::{GuardPolicyConfig, ToolAccessConfig, ToolAccessDefaultAction};
 use super::types::PolicyError;
 
+pub(super) fn constrain_explicit_tool_access_scope(
+    scope: &mut ChioScope,
+    config: &GuardPolicyConfig,
+) -> Result<(), PolicyError> {
+    let Some(tool_access) = config.tool_access.as_ref().filter(|config| config.enabled) else {
+        return Ok(());
+    };
+    for grant in &mut scope.grants {
+        if tool_pattern_has_wildcard(&grant.tool_name)
+            && confirmation_overlap(&grant.tool_name, &tool_access.require_confirmation)?
+            && !tool_access
+                .require_confirmation
+                .iter()
+                .any(|pattern| pattern == "*" || pattern == &grant.tool_name)
+        {
+            return Err(PolicyError::Invalid(format!(
+                "guards.tool_access.require_confirmation cannot narrow explicit wildcard capability '{}'; use an exact matching confirmation pattern or '*'",
+                grant.tool_name,
+            )));
+        }
+        grant
+            .constraints
+            .extend(compile_tool_constraints(tool_access, &grant.tool_name)?);
+    }
+    Ok(())
+}
+
 pub(super) fn synthesize_tool_access_scope(
     config: &GuardPolicyConfig,
 ) -> Result<Option<ChioScope>, PolicyError> {
@@ -195,19 +222,23 @@ fn pattern_suffixes_overlap(
     } else if right_index == right.len() {
         pattern_suffix_can_match_empty(left, left_index)
     } else {
-        match (left[left_index], right[right_index]) {
-            (b'*', _) => {
+        match (
+            left.get(left_index).copied(),
+            right.get(right_index).copied(),
+        ) {
+            (Some(b'*'), Some(_)) => {
                 pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
                     || pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
             }
-            (_, b'*') => {
+            (Some(_), Some(b'*')) => {
                 pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
                     || pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
             }
-            (left_byte, right_byte) => {
+            (Some(left_byte), Some(right_byte)) => {
                 pattern_bytes_compatible(left_byte, right_byte)
                     && pattern_suffixes_overlap(left, left_index + 1, right, right_index + 1, memo)
             }
+            _ => false,
         }
     };
     memo.insert((left_index, right_index), result);
@@ -215,7 +246,9 @@ fn pattern_suffixes_overlap(
 }
 
 fn pattern_suffix_can_match_empty(pattern: &[u8], index: usize) -> bool {
-    pattern[index..].iter().all(|byte| *byte == b'*')
+    pattern
+        .get(index..)
+        .is_some_and(|suffix| suffix.iter().all(|byte| *byte == b'*'))
 }
 
 fn pattern_bytes_compatible(left: u8, right: u8) -> bool {

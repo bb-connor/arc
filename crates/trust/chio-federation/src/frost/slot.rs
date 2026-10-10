@@ -298,7 +298,12 @@ pub fn verify_completed_frost_authorization_slot(
             "completed slot lacks rollback-independent authorization bytes",
         ),
     )?;
-    let proof: FrostAuthorizationV1 = serde_json::from_slice(authorization_blob).map_err(|_| {
+    let proof: FrostAuthorizationV1 = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        authorization_blob,
+        4 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_canonical())
+    .map_err(|_| {
         FrostAuthorizationSlotTransitionError::Invalid(
             "completed slot authorization bytes are not valid JSON",
         )

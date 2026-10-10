@@ -42,6 +42,7 @@ impl FindingOperatorClientProfile {
 /// operator signing role.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::BuyerClientProfileCustody")]
 pub struct FindingOperatorBuyerClientProfile {
     pub schema: String,
     pub endpoint: String,
@@ -57,6 +58,7 @@ pub struct FindingOperatorBuyerClientProfile {
 /// service credential are deliberately absent.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::SellerClientProfileCustody")]
 pub struct FindingOperatorSellerClientProfile {
     pub schema: String,
     pub endpoint: String,
@@ -83,6 +85,7 @@ pub struct FindingOperatorPaths {
 /// not disclose the profile's signing material.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::SecretSeedsCustody")]
 pub struct FindingOperatorSecretSeeds {
     pub venue: String,
     pub listing: String,
@@ -106,6 +109,7 @@ pub struct FindingOperatorSecretSeeds {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::BuyerProfileCustody")]
 pub struct FindingOperatorBuyerProfile {
     pub principal_id: String,
     pub bearer_token: String,
@@ -115,6 +119,7 @@ pub struct FindingOperatorBuyerProfile {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::SellerProfileCustody")]
 pub struct FindingOperatorSellerProfile {
     pub principal_id: String,
     pub bearer_token: String,
@@ -155,6 +160,7 @@ pub struct FindingOperatorChallengeKeys {
 /// admission, and the buyer clients.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(from = "custody::ProfileCustody")]
 pub struct FindingOperatorProfile {
     pub schema: String,
     pub listen: SocketAddr,
@@ -596,3 +602,6 @@ fn validate_absolute_path(value: &str, label: &str) -> Result<(), String> {
 fn string_error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
+
+#[path = "finding_operator_profile/custody.rs"]
+mod custody;

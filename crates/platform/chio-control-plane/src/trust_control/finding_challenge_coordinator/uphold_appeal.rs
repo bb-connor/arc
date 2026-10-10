@@ -30,7 +30,7 @@ impl FindingChallengeCoordinator {
     /// the collateral must still fund the evaluator-signed amount. A
     /// failure opens no liability, while the terminal fraud verdict keeps
     /// the listing's fail-closed sales block in place for reconciliation.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn uphold(
         &self,
         challenge_id: &str,
@@ -336,7 +336,7 @@ impl FindingChallengeCoordinator {
     /// envelope the store recorded for the challenge that upheld it, and
     /// the appeal window is proved closed against the durable case index
     /// rather than asserted by naming a disposition.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn resolve_appeal(
         &self,
         liability_key: &str,

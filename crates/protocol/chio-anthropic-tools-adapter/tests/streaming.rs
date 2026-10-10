@@ -1,11 +1,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+mod support;
+
 use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 
 use chio_anthropic_tools_adapter::transport::MockTransport;
-use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+use chio_anthropic_tools_adapter::AnthropicAdapter;
 use chio_tool_call_fabric::{
     DenyReason, ProviderAdapter, ProviderError, ProviderId, ProviderRequest, ReceiptId, Redaction,
     ToolResult, VerdictResult, DEFAULT_MAX_BUFFERED_RAW_FRAMES,
@@ -32,14 +34,7 @@ fn block_on<F: Future>(future: F) -> F::Output {
 }
 
 fn adapter() -> AnthropicAdapter {
-    let config = AnthropicAdapterConfig::new(
-        "anthropic-1",
-        "Anthropic Messages",
-        "0.1.0",
-        "deadbeef",
-        "wks_chio_demo",
-    );
-    AnthropicAdapter::new(config, Arc::new(MockTransport::new()))
+    support::adapter(Arc::new(MockTransport::new()))
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -164,7 +159,10 @@ fn forbidden_late_input_json_delta_fails_closed_before_forwarding() {
 #[test]
 fn non_empty_start_input_with_delta_fails_closed() {
     let adapter = adapter();
-    let stream = br#"event: content_block_start
+    let stream = br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_split_1","name":"get_weather","input":{"secret":"forbidden"}}}
 
 event: content_block_delta
@@ -189,7 +187,10 @@ data: {"type":"content_block_stop","index":0}
 #[test]
 fn malformed_json_event_fails_closed() {
     let adapter = adapter();
-    let stream = br#"event: content_block_start
+    let stream = br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":
 
 "#;
@@ -197,13 +198,19 @@ data: {"type":"content_block_start","index":0,"content_block":
         .gate_sse_stream(stream, |_invocation| Ok(allow_verdict()))
         .expect_err("invalid event JSON should fail closed");
 
-    assert!(err.to_string().contains("SSE data was not JSON"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 }
 
 #[test]
 fn input_json_delta_without_active_tool_fails_closed() {
     let adapter = adapter();
-    let stream = br#"event: content_block_delta
+    let stream = br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}
 
 "#;
@@ -217,7 +224,10 @@ data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta"
 #[test]
 fn text_content_stream_passes_without_verdict() {
     let adapter = adapter();
-    let stream = br#"event: content_block_start
+    let stream = br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
 
 event: content_block_delta
@@ -247,6 +257,7 @@ data: {"type":"message_stop"}
 fn allowed_tool_use_stream_preserves_original_crlf_frame_bytes() {
     let adapter = adapter();
     let stream = concat!(
+        "event: message_start\r\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_fixture\"}}\r\n\r\n",
         "event: content_block_start\r\n",
         "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_crlf\",\"name\":\"get_weather\",\"input\":{}}}\r\n",
         "\r\n",
@@ -347,6 +358,7 @@ fn evaluator_errors_fail_closed() {
 fn zero_length_input_json_deltas_count_toward_buffered_frame_limit() {
     let adapter = adapter();
     let mut stream = String::from(concat!(
+        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_fixture\"}}\n\n",
         "event: content_block_start\n",
         "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_many_empty\",\"name\":\"get_weather\",\"input\":{}}}\n\n",
     ));
@@ -373,6 +385,7 @@ fn zero_length_input_json_deltas_count_toward_buffered_frame_limit() {
 fn content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit() {
     let adapter = adapter();
     let mut stream = String::from(concat!(
+        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_fixture\"}}\n\n",
         "event: content_block_start\n",
         "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_limit\",\"name\":\"get_weather\",\"input\":{}}}\n\n",
     ));
@@ -407,7 +420,7 @@ fn content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit() {
 }
 
 #[test]
-fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
+fn non_append_start_frame_rejects_at_shared_frame_byte_limit() {
     let adapter = adapter();
     let padding = "x".repeat(2 * 1024 * 1024 + 2048);
     let stream = format!(
@@ -424,6 +437,34 @@ fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
         .gate_sse_stream(stream.as_bytes(), |_invocation| Ok(allow_verdict()))
         .expect_err("oversized non-append raw frame should fail closed");
 
-    assert!(matches!(err, ProviderError::Malformed(_)));
-    assert!(err.to_string().contains("raw frame bytes"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge {
+            bound: 1_048_576,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn invalid_message_tail_prevents_every_evaluator_call() {
+    let complete = String::from_utf8(tool_use_stream()).unwrap();
+    let (prefix, _) = complete.split_once("event: message_stop").unwrap();
+    let duplicate = format!(
+        "{prefix}{}event: message_stop\ndata: {{\"type\":\"message_stop\"}}\n\n",
+        prefix
+            .split_once("event: content_block_start")
+            .map(|(_, tail)| format!("event: content_block_start{tail}"))
+            .unwrap()
+    );
+    let malformed = format!("{prefix}event: content_block_stop\ndata: {{\"type\":\"content_block_stop\",\"index\":99}}\n\n");
+    for invalid in [prefix.to_owned(), duplicate, malformed] {
+        let mut calls = 0;
+        let result = adapter().gate_sse_stream(invalid.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        });
+        assert!(result.is_err());
+        assert_eq!(calls, 0);
+    }
 }

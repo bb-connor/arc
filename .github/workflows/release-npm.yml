@@ -90,6 +90,8 @@ jobs:
             "sdks/typescript/packages/elysia"
             "sdks/typescript/packages/ai-sdk"
             "sdks/typescript/packages/create-chio-app"
+            "sdks/typescript/packages/process"
+            "sdks/typescript/packages/ai-sdk-process"
           )
 
           selected=()
@@ -164,6 +166,7 @@ jobs:
       # Required for cosign keyless signing via Sigstore Fulcio.
       id-token: write
       contents: read
+      actions: read
     strategy:
       fail-fast: false
       # Keep publishes deterministic; node-http must build before
@@ -175,6 +178,18 @@ jobs:
       dry_run: ${{ needs.plan.outputs.dry_run }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact-source qualification before building or signing
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: python3 scripts/check-release-source-gates.py --sdk npm --package "$PACKAGE_DIR"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -731,7 +746,13 @@ jobs:
         with:
           cosign-release: "v2.4.1"
 
+      - name: Require canonical release signing identity
+        if: github.event_name == 'push'
+        shell: bash
+        run: python3 scripts/verify-release-identity.py check-context --channel npm
+
       - name: Sign npm tarball with cosign keyless
+        if: github.event_name == 'push'
         # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
         # the npm tarball. npm provenance (--provenance) and cosign keyless
         # are complementary; cosign is verified client-side via the recipe
@@ -804,8 +825,19 @@ jobs:
       # Required for npm provenance attestations via GitHub OIDC.
       id-token: write
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact-source main qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: python3 scripts/check-release-source-gates.py --sdk npm --package "$PACKAGE_DIR"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

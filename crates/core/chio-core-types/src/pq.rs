@@ -5,6 +5,8 @@
 //! classical-only.
 
 use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use fips204::ml_dsa_65;

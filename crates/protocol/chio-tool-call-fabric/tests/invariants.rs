@@ -75,6 +75,7 @@ fn sample_invocation() -> ToolInvocation {
             },
             received_at: SystemTime::UNIX_EPOCH + Duration::from_millis(1_745_452_800_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -148,6 +149,7 @@ fn arb_tool_invocation() -> impl Strategy<Value = ToolInvocation> {
                 tool_name,
                 arguments,
                 provenance,
+                bridge_security: None,
             },
         )
 }
@@ -186,12 +188,17 @@ fn arb_verdict_result() -> impl Strategy<Value = VerdictResult> {
 
 fn arb_provider_error() -> impl Strategy<Value = ProviderError> {
     prop_oneof![
-        any::<u64>().prop_map(|retry_after_ms| ProviderError::RateLimited { retry_after_ms }),
+        any::<u64>().prop_map(|retry_after_ms| ProviderError::RateLimited {
+            retry_after_ms,
+            source: None
+        }),
         "[ -~]{0,32}".prop_map(ProviderError::ContentPolicy),
         "[ -~]{0,32}".prop_map(ProviderError::BadToolArgs),
-        (500u16..=599u16, "[ -~]{0,32}")
-            .prop_map(|(status, body)| ProviderError::Upstream5xx { status, body }),
-        any::<u64>().prop_map(|ms| ProviderError::TransportTimeout { ms }),
+        (500u16..=599u16).prop_map(|status| ProviderError::Upstream5xx {
+            status,
+            source: None
+        }),
+        any::<u64>().prop_map(|ms| ProviderError::TransportTimeout { ms, source: None }),
         (any::<u64>(), any::<u64>()).prop_map(|(observed_ms, budget_ms)| {
             ProviderError::VerdictBudgetExceeded {
                 observed_ms,

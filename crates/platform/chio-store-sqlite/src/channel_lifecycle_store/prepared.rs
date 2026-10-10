@@ -426,12 +426,12 @@ pub(super) fn load_prepared_record(
     let Some(stored) = stored else {
         return Ok(None);
     };
-    let plan: ChannelPreparedReservationV1 =
-        serde_json::from_slice(&stored.plan_json).map_err(|error| {
-            invalid(format!(
-                "stored channel prepared plan is invalid JSON: {error}"
-            ))
-        })?;
+    let plan: ChannelPreparedReservationV1 = chio_core::canonical::UntrustedJsonText::from_wire(
+        &stored.plan_json,
+        MAX_CHANNEL_PREPARED_PLAN_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(ChannelLifecycleStoreError::from)?;
     let canonical = encode(
         &plan,
         MAX_CHANNEL_PREPARED_PLAN_BYTES,

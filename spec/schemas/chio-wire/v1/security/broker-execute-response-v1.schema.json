@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json",
+  "title": "Chio broker execute response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "headers", "body", "evidence", "receiptReference", "receipt"],
+  "properties": {
+    "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+    "headers": { "type": "array", "maxItems": 64, "items": { "$ref": "broker-execute-request-v1.schema.json#/$defs/header" } },
+    "body": { "type": "array", "maxItems": 2097152, "items": { "type": "integer", "minimum": 0, "maximum": 255 } },
+    "evidence": { "$ref": "broker-execution-evidence-v1.schema.json" },
+    "receiptReference": {
+      "type": "string",
+      "minLength": 86,
+      "maxLength": 86,
+      "pattern": "^broker-receipt-sha256-[0-9a-f]{64}$"
+    },
+    "receipt": { "$ref": "broker-execution-receipt-envelope-v1.schema.json" }
+  }
+}

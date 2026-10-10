@@ -36,7 +36,7 @@ pub struct ChioProofPackage {
 }
 
 pub fn proof_package_from_json(json: &str) -> Result<ChioProofPackage, ChioPackageError> {
-    serde_json::from_str(json).map_err(|error| ChioPackageError::Json(error.to_string()))
+    crate::input::decode(json.as_bytes()).map_err(ChioPackageError::from)
 }
 
 pub fn package_json(package: &ChioProofPackage) -> Result<String, ChioPackageError> {

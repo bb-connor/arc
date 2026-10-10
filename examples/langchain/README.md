@@ -33,6 +33,8 @@ The script defaults to the Docker quickstart endpoints:
 - `CHIO_BASE_URL=http://127.0.0.1:8931`
 - `CHIO_CONTROL_URL=http://127.0.0.1:8940`
 - `CHIO_AUTH_TOKEN=demo-token`
+- `CHIO_ADMIN_TOKEN=demo-admin-token`
+- `CHIO_CONTROL_TOKEN=demo-control-token`
 
 The example prints a JSON summary containing the hosted session ID, active
 capability ID, tool inventory, echoed payload, and receipt ID.
@@ -41,7 +43,9 @@ Optional environment variables:
 
 - `CHIO_BASE_URL`: hosted edge base URL
 - `CHIO_CONTROL_URL`: trust service base URL
-- `CHIO_AUTH_TOKEN`: bearer token accepted by both services
+- `CHIO_AUTH_TOKEN`: session bearer token the hosted edge accepts
+- `CHIO_ADMIN_TOKEN`: admin bearer token for the edge's session trust route
+- `CHIO_CONTROL_TOKEN`: control bearer token the trust service accepts for receipt queries
 - `CHIO_MESSAGE`: override the demo input message
 
 See also:

@@ -15,6 +15,7 @@ use chio_cross_protocol::orchestrator::CrossProtocolOrchestrator;
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolServerConnection, Verdict as KernelVerdict,
 };
+use chio_manifest::{BridgeSecurityMetadata, VerifiedManifestRegistry};
 use serde_json::json;
 
 const ACP_GUARD_READ_TOOL: &str = "fs/read_text_file";
@@ -22,6 +23,13 @@ const ACP_GUARD_WRITE_TOOL: &str = "fs/write_text_file";
 const ACP_GUARD_TERMINAL_TOOL: &str = "terminal/create";
 const ACP_GUARD_TERMINAL_KILL_TOOL: &str = "terminal/kill";
 const ACP_GUARD_TERMINAL_RELEASE_TOOL: &str = "terminal/release";
+const ACP_GUARD_TOOLS: [&str; 5] = [
+    ACP_GUARD_READ_TOOL,
+    ACP_GUARD_WRITE_TOOL,
+    ACP_GUARD_TERMINAL_TOOL,
+    ACP_GUARD_TERMINAL_KILL_TOOL,
+    ACP_GUARD_TERMINAL_RELEASE_TOOL,
+];
 
 struct AcpGuardCapabilityBridge;
 
@@ -39,7 +47,9 @@ impl CapabilityBridge for AcpGuardCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(
@@ -70,8 +80,9 @@ impl CapabilityBridge for AcpGuardCapabilityBridge {
         };
         chio_obj.insert(
             "capabilityRef".to_string(),
-            serde_json::to_value(cap_ref)
-                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+            serde_json::to_value(cap_ref).map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })?,
         );
         Ok(())
     }
@@ -104,13 +115,7 @@ impl ToolServerConnection for AcpAuthorityToolServer {
     }
 
     fn tool_names(&self) -> Vec<String> {
-        vec![
-            ACP_GUARD_READ_TOOL.to_string(),
-            ACP_GUARD_WRITE_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_KILL_TOOL.to_string(),
-            ACP_GUARD_TERMINAL_RELEASE_TOOL.to_string(),
-        ]
+        ACP_GUARD_TOOLS.into_iter().map(str::to_string).collect()
     }
 
     async fn invoke(
@@ -134,24 +139,47 @@ impl ToolServerConnection for AcpAuthorityToolServer {
 /// operations. Every successful check emits a signed Chio receipt.
 pub struct KernelCapabilityChecker {
     kernel: Arc<ChioKernel>,
+    manifest_registry: Arc<VerifiedManifestRegistry>,
     server_id: String,
+    bridge_security_by_tool: std::collections::BTreeMap<&'static str, BridgeSecurityMetadata>,
 }
 
 impl KernelCapabilityChecker {
     /// Create a new kernel-backed checker.
-    pub fn new(mut kernel: ChioKernel, server_id: impl Into<String>) -> Self {
+    pub fn new(
+        mut kernel: ChioKernel,
+        server_id: impl Into<String>,
+        manifest_registry: Arc<VerifiedManifestRegistry>,
+    ) -> Result<Self, CapabilityCheckError> {
         let server_id = server_id.into();
-        kernel.register_tool_server(Box::new(AcpAuthorityToolServer::new(server_id.clone())));
-        Self {
-            kernel: Arc::new(kernel),
-            server_id,
+        let mut bridge_security_by_tool = std::collections::BTreeMap::new();
+        for tool_name in ACP_GUARD_TOOLS {
+            let bridge_security = manifest_registry
+                .bridge_security(&server_id, tool_name)
+                .ok_or(CapabilityCheckError::AuthorityToolUnavailable)?;
+            manifest_registry
+                .validate_bridge_security(&server_id, tool_name, &bridge_security)
+                .map_err(CapabilityCheckError::Manifest)?;
+            if bridge_security.flow().is_some() || bridge_security.effective_egress() {
+                return Err(CapabilityCheckError::InvalidAuthorityTopology);
+            }
+            bridge_security_by_tool.insert(tool_name, bridge_security);
         }
+        kernel.register_tool_server(Box::new(AcpAuthorityToolServer::new(server_id.clone())));
+        Ok(Self {
+            kernel: Arc::new(kernel),
+            manifest_registry,
+            server_id,
+            bridge_security_by_tool,
+        })
     }
 
     fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
-        serde_json::from_str(token_json).map_err(|error| {
-            CapabilityCheckError::InvalidToken(format!("failed to parse token: {error}"))
-        })
+        Ok(chio_core::canonical::UntrustedJsonText::from_wire(
+            token_json.as_bytes(),
+            input::MAX_CAPABILITY_BYTES,
+        )?
+        .decode_signed()?)
     }
 
     fn map_request(
@@ -200,15 +228,11 @@ impl KernelCapabilityChecker {
                     "operation_payload": request.operation_payload,
                 }),
             )),
-            other => Err(CapabilityCheckError::Internal(format!(
-                "unsupported ACP operation for authoritative enforcement: {other}"
-            ))),
+            _ => Err(CapabilityCheckError::UnsupportedOperation),
         }?;
         {
             let Some(arguments) = arguments.as_object_mut() else {
-                return Err(CapabilityCheckError::Internal(
-                    "ACP authorization parameters must be a JSON object".to_string(),
-                ));
+                return Err(CapabilityCheckError::InvalidParameters);
             };
             arguments.insert("session_id".to_string(), json!(request.session_id));
             arguments.insert("tool_call_id".to_string(), json!(tool_call_id));
@@ -256,7 +280,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
         request: &AcpCapabilityRequest,
     ) -> Result<AcpVerdict, CapabilityCheckError> {
         let token_json = match &request.token {
-            Some(token) if !token.trim().is_empty() => token,
+            Some(token) => token,
             _ => {
                 return Ok(AcpVerdict {
                     allowed: false,
@@ -269,19 +293,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
             }
         };
 
-        let capability = match self.parse_token(token_json) {
-            Ok(capability) => capability,
-            Err(error) => {
-                return Ok(AcpVerdict {
-                    allowed: false,
-                    capability_id: None,
-                    receipt_id: None,
-                    receipt_request_id: None,
-                    execution_nonce: None,
-                    reason: error.to_string(),
-                });
-            }
-        };
+        let capability = self.parse_token(token_json)?;
         // ACP fs/read_text_file, fs/write_text_file, and terminal/create
         // request parameters do not carry a toolCallId. Only the operations
         // that mutate an existing tool call (terminal_kill, terminal_release)
@@ -310,19 +322,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
             }
             None => "",
         };
-        let (tool_name, arguments) = match self.map_request(request, tool_call_id) {
-            Ok(mapped) => mapped,
-            Err(error) => {
-                return Ok(AcpVerdict {
-                    allowed: false,
-                    capability_id: Some(capability.id.clone()),
-                    receipt_id: None,
-                    receipt_request_id: None,
-                    execution_nonce: None,
-                    reason: error.to_string(),
-                });
-            }
-        };
+        let (tool_name, arguments) = self.map_request(request, tool_call_id)?;
         let request_hash = chio_core::sha256_hex(
             &chio_core::canonical::canonical_json_bytes(&json!({
                 "sessionId": request.session_id,
@@ -333,38 +333,50 @@ impl CapabilityChecker for KernelCapabilityChecker {
                 "authorization_parameter_hash": request.authorization_parameter_hash,
                 "operation_payload": request.operation_payload,
             }))
-            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?,
+            .map_err(CapabilityCheckError::Canonical)?,
         );
         let kernel_request_id = format!("acp-live-guard-{request_hash}");
-        let orchestrated = CrossProtocolOrchestrator::new(self.kernel.as_ref())
-            .execute(
-                &AcpGuardCapabilityBridge,
-                CrossProtocolExecutionRequest {
-                    origin_request_id: format!("acp-guard-{}-{request_hash}", request.session_id),
-                    kernel_request_id: kernel_request_id.clone(),
-                    target_protocol: DiscoveryProtocol::Native,
-                    target_server_id: self.server_id.clone(),
-                    target_tool_name: tool_name.to_string(),
-                    agent_id: capability.subject.to_hex(),
-                    arguments: arguments.clone(),
-                    capability: capability.clone(),
-                    source_envelope: self.build_source_envelope(
-                        request,
-                        &arguments,
-                        tool_call_id,
-                        &kernel_request_id,
-                    ),
-                    dpop_proof: None,
-                    execution_nonce: request.execution_nonce.clone(),
-                    governed_intent: None,
-                    approval_token: None,
-                    approval_tokens: Vec::new(),
-                    threshold_approval_proposal: None,
-                    supplemental_authorization: None,
-                    model_metadata: None,
-                },
-            )
-            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
+        let bridge_security = self
+            .bridge_security_by_tool
+            .get(tool_name)
+            .cloned()
+            .ok_or(CapabilityCheckError::AuthorityToolUnavailable)?;
+        let orchestrated =
+            CrossProtocolOrchestrator::new(self.kernel.as_ref(), self.manifest_registry.as_ref())
+                .execute(
+                    &AcpGuardCapabilityBridge,
+                    CrossProtocolExecutionRequest {
+                        origin_request_id: format!(
+                            "acp-guard-{}-{request_hash}",
+                            request.session_id
+                        ),
+                        kernel_request_id: kernel_request_id.clone(),
+                        target_protocol: DiscoveryProtocol::Native,
+                        target_server_id: self.server_id.clone(),
+                        target_tool_name: tool_name.to_string(),
+                        bridge_security,
+                        agent_id: capability.subject.to_hex(),
+                        arguments: arguments.clone(),
+                        capability: capability.clone(),
+                        source_envelope: self.build_source_envelope(
+                            request,
+                            &arguments,
+                            tool_call_id,
+                            &kernel_request_id,
+                        ),
+                        dpop_proof: None,
+                        execution_nonce: request.execution_nonce.clone(),
+                        governed_intent: None,
+                        approval_token: None,
+                        approval_tokens: Vec::new(),
+                        threshold_approval_proposal: None,
+                        supplemental_authorization: None,
+                        model_metadata: None,
+                        authenticated_session_id: None,
+                        security_context: None,
+                    },
+                )
+                .map_err(CapabilityCheckError::Bridge)?;
 
         let response = orchestrated.response;
         let capability_id = Some(response.receipt.capability_id.clone());

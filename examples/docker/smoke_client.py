@@ -10,6 +10,8 @@ import urllib.request
 BASE_URL = os.environ.get("CHIO_BASE_URL", "http://127.0.0.1:8931")
 CONTROL_URL = os.environ.get("CHIO_CONTROL_URL", "http://127.0.0.1:8940")
 TOKEN = os.environ.get("CHIO_AUTH_TOKEN", "demo-token")
+ADMIN_TOKEN = os.environ.get("CHIO_ADMIN_TOKEN", "demo-admin-token")
+SERVICE_TOKEN = os.environ.get("CHIO_SERVICE_TOKEN", "demo-control-token")
 PROTOCOL_VERSION = "2025-11-25"
 
 
@@ -67,7 +69,7 @@ def read_sse_json(response):
 def session_capability_id(session_id):
     trust = request_json(
         f"{BASE_URL}/admin/sessions/{session_id}/trust",
-        headers={"Authorization": f"Bearer {TOKEN}"},
+        headers={"Authorization": f"Bearer {ADMIN_TOKEN}"},
     )
     capability_id = trust.get("capabilities", [{}])[0].get("capabilityId")
     if not capability_id:
@@ -79,7 +81,7 @@ def query_receipts(capability_id):
     query = urllib.parse.urlencode({"capabilityId": capability_id, "limit": 10})
     payload = request_json(
         f"{CONTROL_URL}/v1/receipts/query?{query}",
-        headers={"Authorization": f"Bearer {TOKEN}"},
+        headers={"Authorization": f"Bearer {SERVICE_TOKEN}"},
     )
     receipts = payload.get("receipts", [])
     if not receipts:
@@ -143,7 +145,7 @@ def main():
                 "tools": tools["result"]["tools"],
                 "toolResult": tool_call["result"],
                 "receiptId": receipt["id"],
-                "viewerUrl": f"{CONTROL_URL}/?token={TOKEN}",
+                "viewerUrl": f"{CONTROL_URL}/?token={SERVICE_TOKEN}",
             },
             indent=2,
         )

@@ -6,12 +6,11 @@ These mirror the wire shapes served by chio-api-protect under
 1. Inspection: ``GET /approvals/pending``, ``GET /approvals/{id}``.
 2. Resolution: ``POST /approvals/{id}/respond`` (signed
    ``GovernedApprovalToken``), ``POST /approvals/batch/respond``,
-   plus the v0.2 operator-friendly shortcuts
-   ``POST /approvals/submit`` (create) and
-   ``POST /approvals/{id}/operator-respond`` (sidecar-signed).
+3. Submission: ``POST /approvals/submit`` takes a full signed capability
+   and exact arguments. The service builds the bound intent.
 
-The signed-token shapes are not modeled here because v0.2 of the
-SDK uses the operator endpoints exclusively.
+Decision tokens are supplied as dictionaries signed by an explicitly
+configured approver. The control bearer and receipt signer cannot approve.
 """
 
 from __future__ import annotations
@@ -84,9 +83,9 @@ class ResolvedApproval(BaseModel):
 class Approval(BaseModel):
     """Response shape for ``GET /approvals/{id}``.
 
-    Either ``pending`` or ``resolution`` is populated. Both populated
-    means the resolved row exists alongside the original request (the
-    sidecar retains both for audit).
+    Either ``pending`` or ``resolution`` is populated. Current resolved rows
+    retain their original request and signed token inside ``resolution``;
+    older audit-only rows can omit those artifacts.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -105,7 +104,7 @@ class PendingApprovalList(BaseModel):
 
 
 class ApprovalResponse(BaseModel):
-    """Response shape for ``POST /approvals/{id}/operator-respond``.
+    """Response shape for ``POST /approvals/{id}/respond``.
 
     The signed-token ``/respond`` route returns the same shape via
     :class:`chio_http_core::RespondResponse`.
@@ -122,8 +121,8 @@ class SubmitApprovalResult(BaseModel):
     """Response shape for ``POST /approvals/submit``.
 
     ``trusted_approvers`` is the list of public keys (hex) authorized
-    to resolve this request. v0.2 always lists the sidecar's own signer
-    so the operator-respond shortcut succeeds without external keys.
+    to resolve this request. Signatures must come from the explicitly
+    configured approver roster. Receipt signers gain no approval authority.
     """
 
     model_config = ConfigDict(extra="allow")

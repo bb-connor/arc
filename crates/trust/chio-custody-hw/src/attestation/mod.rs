@@ -5,6 +5,7 @@ pub mod apple_root;
 pub mod errors;
 pub mod google_root;
 pub mod play_integrity;
+mod play_integrity_input;
 pub mod receipt_chain;
 
 pub use app_attest::{
@@ -16,4 +17,4 @@ pub use play_integrity::{
     verify_play_integrity, PlayIntegrityVerificationInput, VerifiedPlayIntegrity,
     MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED,
 };
-pub use receipt_chain::{verify_mobile_receipt_chain, VerifiedMobileReceiptChain};
+pub use receipt_chain::{parse_mobile_receipt_envelopes, ParsedMobileReceiptEnvelopes};

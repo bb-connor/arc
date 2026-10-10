@@ -404,6 +404,32 @@ pub const ATTEST_RECEIPT_SIGNING_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel", "chio-attest-verify"],
 };
 
+pub const ATTEST_RECEIPT_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:receipt-verification-failed",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Receipt evidence failed its integrity, signature or session binding checks.",
+    help: "Reject the evidence and restore the authentic receipt history and trusted signer before retrying.",
+    string_code: "CHIO-ATTEST-RECEIPT-VERIFICATION-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-acp-proxy", "chio-control-plane", "chio-cli"],
+};
+
+pub const ATTEST_RECEIPT_STORE_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:receipt-store-unavailable",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "The receipt store could not establish the required durable evidence outcome.",
+    help: "Restore receipt-store availability, retain the original operation identity and reconcile uncertain commits before retrying.",
+    string_code: "CHIO-ATTEST-RECEIPT-STORE-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-control-plane", "chio-cli"],
+};
+
 pub const ATTEST_QUOTE_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:attest:quote-verification-failed",
     domain: Domain::Attest,
@@ -1216,6 +1242,45 @@ pub const CUSTODY_RATE_LIMITED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-custody-hw"],
 };
 
+pub const CUSTODY_MOBILE_CHALLENGE_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-invalid",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Mobile attestation challenge state, binding, or validity is invalid.",
+    help: "Reject the attestation and obtain a fresh server-issued challenge bound to the exact application and audience.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
+pub const CUSTODY_MOBILE_CHALLENGE_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-replayed",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Mobile attestation challenge was already consumed.",
+    help: "Reject the replay and obtain a fresh server-issued challenge; consumed challenges are never reusable.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
+pub const CUSTODY_MOBILE_CHALLENGE_STORE_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:mobile-challenge-store-unavailable",
+    domain: Domain::Custody,
+    severity: Severity::Fatal,
+    summary: "Durable mobile attestation challenge or counter state is unavailable or untrusted.",
+    help: "Deny issuance until durable challenge custody and file identity are healthy; do not retry through an in-memory fallback.",
+    string_code: "CHIO-CUSTODY-MOBILE-CHALLENGE-STORE-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
 pub const CUSTODY_APP_ATTEST_INVALID_CBOR: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:custody:app-attest-invalid-cbor",
     domain: Domain::Custody,
@@ -1476,6 +1541,2129 @@ pub const WEIGHTS_INTERNAL_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-weights"],
 };
 
+pub const KERNEL_RESPONSE_CANONICAL_BODY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-canonical-body",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response canonical body.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-BODY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_CANONICAL_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-canonical-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response canonical encoding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_CANONICAL_IDENTIFIER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-canonical-identifier",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response canonical identifier.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-IDENTIFIER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_CANONICAL_RECEIPT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-canonical-receipt",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response canonical receipt.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-RECEIPT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_CANONICAL_VALUE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-canonical-value",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response canonical value.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-VALUE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_APPROVAL_REQUIREMENT_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-approval-requirement-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch approval requirement mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-APPROVAL-REQUIREMENT-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_AUTHORIZATION_OUTSIDE_WINDOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-authorization-outside-window",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch authorization outside window.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-AUTHORIZATION-OUTSIDE-WINDOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_CAPABILITY_DIGEST_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch capability digest mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-CAPABILITY-DIGEST-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_EXECUTION_BINDING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-execution-binding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch execution binding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-EXECUTION-BINDING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_EXECUTION_MODE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-execution-mode",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch execution mode.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-EXECUTION-MODE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_LEASE_OUTSIDE_WINDOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-lease-outside-window",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch lease outside window.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-LEASE-OUTSIDE-WINDOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_RESUME_REQUIRES_GOVERNED_APPROVAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-resume-requires-governed-approval",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch resume requires governed approval.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-RESUME-REQUIRES-GOVERNED-APPROVAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_SNAPSHOT_ALREADY_AUTHORIZED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-snapshot-already-authorized",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch snapshot already authorized.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-SNAPSHOT-ALREADY-AUTHORIZED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_SNAPSHOT_WITHOUT_EXECUTION_DISPATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-snapshot-without-execution-dispatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch snapshot without execution dispatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-SNAPSHOT-WITHOUT-EXECUTION-DISPATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_UNBOUND_ARTIFACT_PREPARATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-unbound-artifact-preparation",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: unbound historical preparation cannot mint fresh dispatch authority.",
+    help: "Use a verified bound preparation for fresh work or exact durable committed evidence for recovery.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-UNBOUND-ARTIFACT-PREPARATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_ZERO_ADMISSION_OPERATION_VERSION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-zero-admission-operation-version",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch zero admission operation version.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-ZERO-ADMISSION-OPERATION-VERSION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_DISPATCH_ZERO_EXECUTOR_GENERATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-dispatch-zero-executor-generation",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response dispatch zero executor generation.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-ZERO-EXECUTOR-GENERATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_BINDING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-active-evidence-binding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor active evidence binding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-BINDING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-active-evidence-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor active evidence encoding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_MUTATION_BOUND: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-active-evidence-mutation-bound",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor active evidence mutation bound.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-MUTATION-BOUND",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_APPROVAL_REQUIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-approval-required",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor approval required.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-APPROVAL-REQUIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_ATTEMPT_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-attempt-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor attempt overflow.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ATTEMPT-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_EFFECT_JOURNAL_DECODE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-effect-journal-decode",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor effect journal decode.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-JOURNAL-DECODE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_EFFECT_JOURNAL_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-effect-journal-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor effect journal encoding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-JOURNAL-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_EFFECT_OUTCOME_UNKNOWN: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-effect-outcome-unknown",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor effect outcome unknown.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-OUTCOME-UNKNOWN",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_GENERATION_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-generation-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor generation overflow.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-GENERATION-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_GENERATION_WIDTH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-generation-width",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor generation width.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-GENERATION-WIDTH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_INVALID_ACTIVE_EVIDENCE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-invalid-active-evidence",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor invalid active evidence.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-ACTIVE-EVIDENCE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_INVALID_EFFECT_JOURNAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-invalid-effect-journal",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor invalid effect journal.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-EFFECT-JOURNAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_INVALID_EFFECT_RESULT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-invalid-effect-result",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor invalid effect result.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-EFFECT-RESULT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_RECEIPT_LINEAGE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-receipt-lineage-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor receipt lineage mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-RECEIPT-LINEAGE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_STALE_LEASE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-stale-lease",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor stale lease.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-STALE-LEASE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_EXECUTOR_WORK_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-work-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor work mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-WORK-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_AFFECTED_IDS: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-affected-ids",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan affected ids.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-IDS",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_AFFECTED_SET_HASH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-affected-set-hash",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan affected set hash.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-SET-HASH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_AFFECTED_SET_HASH_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-affected-set-hash-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan affected set hash mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-SET-HASH-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_CONTRIBUTION_HASH_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-contribution-hash-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan contribution hash mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-HASH-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_CONTRIBUTION_NOT_CANONICAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-contribution-not-canonical",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan contribution not canonical.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-NOT-CANONICAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_CONTRIBUTION_NOT_JSON: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-contribution-not-json",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan contribution not json.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-NOT-JSON",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_EFFECT_BOUND: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-effect-bound",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan effect bound.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-BOUND",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_EFFECT_ID_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-effect-id-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan effect id mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-ID-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_EFFECT_ORDINAL_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-effect-ordinal-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan effect ordinal overflow.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-ORDINAL-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_EXPIRY_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-expiry-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan expiry overflow.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EXPIRY-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_FREEZE_ACQUISITION_NOT_EXACT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-freeze-acquisition-not-exact",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan freeze acquisition not exact.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-ACQUISITION-NOT-EXACT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_FREEZE_BINDING_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-freeze-binding-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan freeze binding mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-BINDING-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_FREEZE_CONTRIBUTION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-freeze-contribution",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan freeze contribution.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-CONTRIBUTION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_FREEZE_TARGET_NOT_LINEAGE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-freeze-target-not-lineage",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan freeze target not lineage.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-TARGET-NOT-LINEAGE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_NO_EFFECTS: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-no-effects",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan no effects.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-NO-EFFECTS",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_PLAN_BODY_HASH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-plan-body-hash",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan plan body hash.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-BODY-HASH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_PLAN_BODY_HASH_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-plan-body-hash-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan plan body hash encoding.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-BODY-HASH-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_PLAN_HASH_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-plan-hash-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan plan hash mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-HASH-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_TOO_MANY_EFFECTS: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-too-many-effects",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan too many effects.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-TOO-MANY-EFFECTS",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_PLAN_ZERO_TTL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-plan-zero-ttl",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response plan zero ttl.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-ZERO-TTL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_ACTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-action-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record action mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-ACTION-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_BODY_HASH_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-body-hash-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record body hash mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-BODY-HASH-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_DECODE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-decode",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record decode.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-DECODE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_DUE_AT_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-due-at-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record due at mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-DUE-AT-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_EMPTY_MUTATION_LOG: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-empty-mutation-log",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record empty mutation log.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-EMPTY-MUTATION-LOG",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_GENERATION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-generation-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record generation mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-GENERATION-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_LIFECYCLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-lifecycle",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record lifecycle.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-LIFECYCLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_MISSING_APPLYING_LEASE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-missing-applying-lease",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record missing applying lease.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-MISSING-APPLYING-LEASE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_NOT_CANONICAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-not-canonical",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record not canonical.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-NOT-CANONICAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_STATE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-state-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record state mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-STATE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_TENANT_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-tenant-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record tenant mismatch.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-TENANT-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_RECORD_ZERO_MUTATION_GENERATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-record-zero-mutation-generation",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response record zero mutation generation.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-ZERO-MUTATION-GENERATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_GENERATION_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-generation-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state generation overflow.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-GENERATION-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_INCOMPLETE_APPLICATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-incomplete-application",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state incomplete application.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INCOMPLETE-APPLICATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_INVALID_EFFECT_LIFECYCLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-invalid-effect-lifecycle",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state invalid effect lifecycle.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-EFFECT-LIFECYCLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_INVALID_FAILURE_RECORD: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-invalid-failure-record",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state invalid failure record.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-FAILURE-RECORD",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_INVALID_TIMING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-invalid-timing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state invalid timing.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-TIMING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_INVALID_TRANSITION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-invalid-transition",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state invalid transition.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-TRANSITION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_MUTATION_LIMIT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-mutation-limit",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state mutation limit.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-MUTATION-LIMIT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_NOT_DUE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-not-due",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state not due.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-NOT-DUE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_SHAPE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-shape",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state shape.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-SHAPE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_STALE_GENERATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-stale-generation",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state stale generation.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-STALE-GENERATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_UNKNOWN_EFFECT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-unknown-effect",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state unknown effect.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-UNKNOWN-EFFECT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_RESPONSE_STATE_UNRESTORED_EFFECTS: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-state-unrestored-effects",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response state unrestored effects.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-UNRESTORED-EFFECTS",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
+pub const KERNEL_CLOCK_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-unavailable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-unavailable.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_BEFORE_EPOCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-before-epoch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-before-epoch.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-BEFORE-EPOCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-overflow.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_WALL_CLOCK_REGRESSION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-wall-clock-regression",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-wall-clock-regression.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-WALL-CLOCK-REGRESSION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_MONOTONIC_REGRESSION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-monotonic-regression",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-monotonic-regression.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-MONOTONIC-REGRESSION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-expired.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-not-yet-valid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-not-yet-valid.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-NOT-YET-VALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const KERNEL_CLOCK_INVALID_WINDOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:clock-invalid-window",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Trusted time refused: clock-invalid-window.",
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline.",
+    string_code: "CHIO-KERNEL-CLOCK-INVALID-WINDOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-security-types",
+        "chio-kernel-core",
+        "chio-control-plane",
+    ],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_FRAME_BOUND: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-frame-bound",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope exceeds its byte limit.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-FRAME-BOUND",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_DECODE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-decode",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope cannot be decoded.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-DECODE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_CANONICAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-canonical",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope is not canonical JSON.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-CANONICAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-schema",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope schema is unsupported.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-SCHEMA",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_DEPLOYMENT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-deployment",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope is bound to a different deployment.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-DEPLOYMENT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_STORE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-store",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope is bound to a different store.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-STORE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_TIME_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-time-overflow",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority freshness window overflows.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-TIME-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_FRESHNESS: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-freshness",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope is outside its freshness window.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-FRESHNESS",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_CLIENT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-client",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope names a different client.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-CLIENT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_ALGORITHM: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-algorithm",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope signature algorithm differs from its key.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-ALGORITHM",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const TRANSPORT_RESPONSE_AUTHORITY_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:response-authority-signature",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The authority envelope signature is invalid.",
+    help: "Reject this request; verify the pinned authority context and original signed envelope.",
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-SIGNATURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-control-plane"],
+};
+
+pub const ATTEST_SIGNED_JSON_TOO_LARGE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-too-large",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON exceeds the owning byte bound.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-TOO-LARGE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_NOT_UTF8: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-not-utf8",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON is not UTF-8 text.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NOT-UTF8",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_INVALID_INPUT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-invalid-input",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON contains duplicate keys or lossy numeric tokens.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-INPUT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_INVALID_SHAPE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-invalid-shape",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON does not match the owning record shape.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-SHAPE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_CANONICALIZATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-canonicalization",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON cannot be canonicalized under its numeric contract.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-CANONICALIZATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_NONCANONICAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-noncanonical",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON differs from its required canonical wire encoding.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NONCANONICAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const KERNEL_RECEIPT_READ_CONTEXT_MISSING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-context-missing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read has no authenticated or local operator context.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-CONTEXT-MISSING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_TENANT_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-tenant-invalid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read tenant is empty or has surrounding whitespace.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-TENANT-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_SCOPE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-scope-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt query attempts to widen the authenticated tenant scope.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-SCOPE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_QUERY_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-query-invalid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read query has invalid cost or currency filters.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-QUERY-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_PROJECTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-projection-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt tenant projection differs from its signed body.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-PROJECTION-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-schema",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: schema.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SCHEMA",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: expired.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_BINDING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-binding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: binding.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-BINDING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-signature",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: signature.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SIGNATURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-replayed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: replayed.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: encoding.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_STORE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-store",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: store.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-STORE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: capacity.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_WINDOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-window",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: execution-nonce-window.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-WINDOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-not-yet-valid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: execution-nonce-not-yet-valid.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-NOT-YET-VALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_REVOCATION_SNAPSHOT_FUTURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:revocation-snapshot-future",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: revocation-snapshot-future.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-FUTURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_REVOCATION_SNAPSHOT_STALE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:revocation-snapshot-stale",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: revocation-snapshot-stale.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-STALE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_GOVERNED_APPROVAL_LIFETIME: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:governed-approval-lifetime",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: governed-approval-lifetime.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-GOVERNED-APPROVAL-LIFETIME",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-expired.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_IDENTITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-identity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-identity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-IDENTITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-unavailable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-unavailable.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ACCOUNTING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-accounting",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-accounting.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ACCOUNTING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ACTION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-action",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-action.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ACTION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPABILITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capability",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capability.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPABILITY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capability-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capability-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-encoding.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-expired.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_LIMIT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-limit",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-limit.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-LIMIT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-overflow.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_CONFIGURATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-configuration",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-configuration.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-CONFIGURATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_PROOF: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-proof",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-proof.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-PROOF",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_STORE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-store",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-store.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-not-yet-valid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-not-yet-valid.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-NOT-YET-VALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-replayed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-replayed.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-schema",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-schema.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SCHEMA",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SENDER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-sender",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-sender.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SENDER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SERVER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-server",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-server.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SERVER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-signature",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-signature.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SIGNATURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SIGNING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-signing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-signing.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SIGNING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_TOOL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-tool",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-tool.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-TOOL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-unavailable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-unavailable.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_WINDOW_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-window-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-window-overflow.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-WINDOW-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_FINANCIAL_BUDGET_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:financial-budget-exceeded",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: financial-budget-exceeded.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-FINANCIAL-BUDGET-EXCEEDED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_RESERVATION_OWNERSHIP: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-reservation-ownership",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "DPoP reservation ownership was not confirmed at commit.",
+    help: "Retain the marker and reconcile the original operation before retrying.",
+    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const TRANSPORT_TASK_CAPACITY_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:task-capacity-exceeded",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The bounded deferred-task registry has no available capacity.",
+    help: "Wait for pending work to complete or expire before submitting another task.",
+    string_code: "CHIO-MCP-TASK-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-edge", "chio-mcp-adapter"],
+};
+
+pub const TRANSPORT_STREAM_CAPACITY_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:stream-capacity-exceeded",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The provider stream exceeded its bounded frame count.",
+    help: "Use a bounded response or split the operation before retrying.",
+    string_code: "CHIO-PROVIDER-STREAM-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-provider-adapter-core", "chio-openai-adapter"],
+};
+
+pub const KERNEL_DPOP_INVALID_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-invalid-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "DPoP replay-store limits are invalid.",
+    help: "Configure a positive marker capacity and valid per-capability and identity-byte limits before starting the replay store.",
+    string_code: "CHIO-KERNEL-DPOP-INVALID-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MALFORMED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-malformed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The DPoP proof does not match its required wire shape.",
+    help: "Reject the malformed proof and present a newly encoded proof for the exact invocation; do not retry the unchanged input.",
+    string_code: "CHIO-KERNEL-DPOP-MALFORMED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-mcp-edge"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-invalid-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The governed-approval replay store was configured with zero marker capacity.",
+    help: "Configure a positive replay marker capacity before constructing the governed-approval replay store.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-INVALID-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_MEDIATED_DENIAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:mediated-denial",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The kernel runtime refused a tool call that `chio mcp wrap` mediated for its MCP client.",
+    help: "Read the denial reason and the signed receipt, then change the capability or policy before retrying the call.",
+    string_code: "CHIO-KERNEL-MEDIATED-DENIAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-cli"],
+};
+
+pub const TRANSPORT_UNTRUSTED_PROXY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:untrusted-proxy",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "An asserted proxy identity was not authenticated or was ambiguous.",
+    help: "Use an explicitly trusted socket peer and dedicated proxy credential, and send one bounded identity value per header.",
+    string_code: "CHIO-TRANSPORT-UNTRUSTED-PROXY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_INVALID_PROXY_HEADER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:invalid-proxy-header",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "A proxy authentication or identity header is not valid text.",
+    help: "Reject the request and correct the proxy header encoding before retrying.",
+    string_code: "CHIO-TRANSPORT-INVALID-PROXY-HEADER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -1506,6 +3694,8 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     GUARD_OUTPUT_REDACTED,
     GUARD_WASM_TRAP,
     ATTEST_RECEIPT_SIGNING_FAILED,
+    ATTEST_RECEIPT_VERIFICATION_FAILED,
+    ATTEST_RECEIPT_STORE_UNAVAILABLE,
     ATTEST_QUOTE_VERIFICATION_FAILED,
     ATTEST_PROVENANCE_MISSING,
     REPLAY_TRACE_NOT_FOUND,
@@ -1568,6 +3758,9 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     CUSTODY_USER_VERIFICATION_REQUIRED,
     CUSTODY_INTERNAL_ENCODING,
     CUSTODY_RATE_LIMITED,
+    CUSTODY_MOBILE_CHALLENGE_INVALID,
+    CUSTODY_MOBILE_CHALLENGE_REPLAYED,
+    CUSTODY_MOBILE_CHALLENGE_STORE_UNAVAILABLE,
     CUSTODY_APP_ATTEST_INVALID_CBOR,
     CUSTODY_APP_ATTEST_INVALID_ROOT,
     CUSTODY_APP_ATTEST_APP_MISMATCH,
@@ -1588,6 +3781,163 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     WEIGHTS_BUNDLE_REJECTED,
     WEIGHTS_SCHEMA_REJECTED,
     WEIGHTS_INTERNAL_ENCODING,
+    KERNEL_RESPONSE_CANONICAL_BODY,
+    KERNEL_RESPONSE_CANONICAL_ENCODING,
+    KERNEL_RESPONSE_CANONICAL_IDENTIFIER,
+    KERNEL_RESPONSE_CANONICAL_RECEIPT,
+    KERNEL_RESPONSE_CANONICAL_VALUE,
+    KERNEL_RESPONSE_DISPATCH_APPROVAL_REQUIREMENT_MISMATCH,
+    KERNEL_RESPONSE_DISPATCH_AUTHORIZATION_OUTSIDE_WINDOW,
+    KERNEL_RESPONSE_DISPATCH_CAPABILITY_DIGEST_MISMATCH,
+    KERNEL_RESPONSE_DISPATCH_EXECUTION_BINDING,
+    KERNEL_RESPONSE_DISPATCH_EXECUTION_MODE,
+    KERNEL_RESPONSE_DISPATCH_LEASE_OUTSIDE_WINDOW,
+    KERNEL_RESPONSE_DISPATCH_RESUME_REQUIRES_GOVERNED_APPROVAL,
+    KERNEL_RESPONSE_DISPATCH_SNAPSHOT_ALREADY_AUTHORIZED,
+    KERNEL_RESPONSE_DISPATCH_SNAPSHOT_WITHOUT_EXECUTION_DISPATCH,
+    KERNEL_RESPONSE_DISPATCH_UNBOUND_ARTIFACT_PREPARATION,
+    KERNEL_RESPONSE_DISPATCH_ZERO_ADMISSION_OPERATION_VERSION,
+    KERNEL_RESPONSE_DISPATCH_ZERO_EXECUTOR_GENERATION,
+    KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_BINDING,
+    KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_ENCODING,
+    KERNEL_RESPONSE_EXECUTOR_ACTIVE_EVIDENCE_MUTATION_BOUND,
+    KERNEL_RESPONSE_EXECUTOR_APPROVAL_REQUIRED,
+    KERNEL_RESPONSE_EXECUTOR_ATTEMPT_OVERFLOW,
+    KERNEL_RESPONSE_EXECUTOR_EFFECT_JOURNAL_DECODE,
+    KERNEL_RESPONSE_EXECUTOR_EFFECT_JOURNAL_ENCODING,
+    KERNEL_RESPONSE_EXECUTOR_EFFECT_OUTCOME_UNKNOWN,
+    KERNEL_RESPONSE_EXECUTOR_GENERATION_OVERFLOW,
+    KERNEL_RESPONSE_EXECUTOR_GENERATION_WIDTH,
+    KERNEL_RESPONSE_EXECUTOR_INVALID_ACTIVE_EVIDENCE,
+    KERNEL_RESPONSE_EXECUTOR_INVALID_EFFECT_JOURNAL,
+    KERNEL_RESPONSE_EXECUTOR_INVALID_EFFECT_RESULT,
+    KERNEL_RESPONSE_EXECUTOR_RECEIPT_LINEAGE_MISMATCH,
+    KERNEL_RESPONSE_EXECUTOR_STALE_LEASE,
+    KERNEL_RESPONSE_EXECUTOR_WORK_MISMATCH,
+    KERNEL_RESPONSE_PLAN_AFFECTED_IDS,
+    KERNEL_RESPONSE_PLAN_AFFECTED_SET_HASH,
+    KERNEL_RESPONSE_PLAN_AFFECTED_SET_HASH_MISMATCH,
+    KERNEL_RESPONSE_PLAN_CONTRIBUTION_HASH_MISMATCH,
+    KERNEL_RESPONSE_PLAN_CONTRIBUTION_NOT_CANONICAL,
+    KERNEL_RESPONSE_PLAN_CONTRIBUTION_NOT_JSON,
+    KERNEL_RESPONSE_PLAN_EFFECT_BOUND,
+    KERNEL_RESPONSE_PLAN_EFFECT_ID_MISMATCH,
+    KERNEL_RESPONSE_PLAN_EFFECT_ORDINAL_OVERFLOW,
+    KERNEL_RESPONSE_PLAN_EXPIRY_OVERFLOW,
+    KERNEL_RESPONSE_PLAN_FREEZE_ACQUISITION_NOT_EXACT,
+    KERNEL_RESPONSE_PLAN_FREEZE_BINDING_MISMATCH,
+    KERNEL_RESPONSE_PLAN_FREEZE_CONTRIBUTION,
+    KERNEL_RESPONSE_PLAN_FREEZE_TARGET_NOT_LINEAGE,
+    KERNEL_RESPONSE_PLAN_NO_EFFECTS,
+    KERNEL_RESPONSE_PLAN_PLAN_BODY_HASH,
+    KERNEL_RESPONSE_PLAN_PLAN_BODY_HASH_ENCODING,
+    KERNEL_RESPONSE_PLAN_PLAN_HASH_MISMATCH,
+    KERNEL_RESPONSE_PLAN_TOO_MANY_EFFECTS,
+    KERNEL_RESPONSE_PLAN_ZERO_TTL,
+    KERNEL_RESPONSE_RECORD_ACTION_MISMATCH,
+    KERNEL_RESPONSE_RECORD_BODY_HASH_MISMATCH,
+    KERNEL_RESPONSE_RECORD_DECODE,
+    KERNEL_RESPONSE_RECORD_DUE_AT_MISMATCH,
+    KERNEL_RESPONSE_RECORD_EMPTY_MUTATION_LOG,
+    KERNEL_RESPONSE_RECORD_GENERATION_MISMATCH,
+    KERNEL_RESPONSE_RECORD_LIFECYCLE,
+    KERNEL_RESPONSE_RECORD_MISSING_APPLYING_LEASE,
+    KERNEL_RESPONSE_RECORD_NOT_CANONICAL,
+    KERNEL_RESPONSE_RECORD_STATE_MISMATCH,
+    KERNEL_RESPONSE_RECORD_TENANT_MISMATCH,
+    KERNEL_RESPONSE_RECORD_ZERO_MUTATION_GENERATION,
+    KERNEL_RESPONSE_STATE_GENERATION_OVERFLOW,
+    KERNEL_RESPONSE_STATE_INCOMPLETE_APPLICATION,
+    KERNEL_RESPONSE_STATE_INVALID_EFFECT_LIFECYCLE,
+    KERNEL_RESPONSE_STATE_INVALID_FAILURE_RECORD,
+    KERNEL_RESPONSE_STATE_INVALID_TIMING,
+    KERNEL_RESPONSE_STATE_INVALID_TRANSITION,
+    KERNEL_RESPONSE_STATE_MUTATION_LIMIT,
+    KERNEL_RESPONSE_STATE_NOT_DUE,
+    KERNEL_RESPONSE_STATE_SHAPE,
+    KERNEL_RESPONSE_STATE_STALE_GENERATION,
+    KERNEL_RESPONSE_STATE_UNKNOWN_EFFECT,
+    KERNEL_RESPONSE_STATE_UNRESTORED_EFFECTS,
+    KERNEL_CLOCK_UNAVAILABLE,
+    KERNEL_CLOCK_BEFORE_EPOCH,
+    KERNEL_CLOCK_OVERFLOW,
+    KERNEL_CLOCK_WALL_CLOCK_REGRESSION,
+    KERNEL_CLOCK_MONOTONIC_REGRESSION,
+    KERNEL_CLOCK_EXPIRED,
+    KERNEL_CLOCK_NOT_YET_VALID,
+    KERNEL_CLOCK_INVALID_WINDOW,
+    TRANSPORT_RESPONSE_AUTHORITY_FRAME_BOUND,
+    TRANSPORT_RESPONSE_AUTHORITY_DECODE,
+    TRANSPORT_RESPONSE_AUTHORITY_CANONICAL,
+    TRANSPORT_RESPONSE_AUTHORITY_SCHEMA,
+    TRANSPORT_RESPONSE_AUTHORITY_DEPLOYMENT,
+    TRANSPORT_RESPONSE_AUTHORITY_STORE,
+    TRANSPORT_RESPONSE_AUTHORITY_TIME_OVERFLOW,
+    TRANSPORT_RESPONSE_AUTHORITY_FRESHNESS,
+    TRANSPORT_RESPONSE_AUTHORITY_CLIENT,
+    TRANSPORT_RESPONSE_AUTHORITY_ALGORITHM,
+    TRANSPORT_RESPONSE_AUTHORITY_SIGNATURE,
+    ATTEST_SIGNED_JSON_TOO_LARGE,
+    ATTEST_SIGNED_JSON_NOT_UTF8,
+    ATTEST_SIGNED_JSON_INVALID_INPUT,
+    ATTEST_SIGNED_JSON_INVALID_SHAPE,
+    ATTEST_SIGNED_JSON_CANONICALIZATION,
+    ATTEST_SIGNED_JSON_NONCANONICAL,
+    KERNEL_RECEIPT_READ_CONTEXT_MISSING,
+    KERNEL_RECEIPT_READ_TENANT_INVALID,
+    KERNEL_RECEIPT_READ_SCOPE_MISMATCH,
+    KERNEL_RECEIPT_READ_QUERY_INVALID,
+    KERNEL_RECEIPT_READ_PROJECTION_MISMATCH,
+    KERNEL_EXECUTION_NONCE_SCHEMA,
+    KERNEL_EXECUTION_NONCE_EXPIRED,
+    KERNEL_EXECUTION_NONCE_BINDING,
+    KERNEL_EXECUTION_NONCE_SIGNATURE,
+    KERNEL_EXECUTION_NONCE_REPLAYED,
+    KERNEL_EXECUTION_NONCE_ENCODING,
+    KERNEL_EXECUTION_NONCE_STORE,
+    KERNEL_EXECUTION_NONCE_CAPACITY,
+    KERNEL_EXECUTION_NONCE_WINDOW,
+    KERNEL_EXECUTION_NONCE_NOT_YET_VALID,
+    KERNEL_REVOCATION_SNAPSHOT_FUTURE,
+    KERNEL_REVOCATION_SNAPSHOT_STALE,
+    KERNEL_GOVERNED_APPROVAL_LIFETIME,
+    KERNEL_APPROVAL_REPLAY_CAPACITY,
+    KERNEL_APPROVAL_REPLAY_EXPIRED,
+    KERNEL_APPROVAL_REPLAY_IDENTITY,
+    KERNEL_APPROVAL_REPLAY_UNAVAILABLE,
+    KERNEL_DPOP_ACCOUNTING,
+    KERNEL_DPOP_ACTION,
+    KERNEL_DPOP_CAPABILITY,
+    KERNEL_DPOP_CAPABILITY_CAPACITY,
+    KERNEL_DPOP_CAPACITY,
+    KERNEL_DPOP_ENCODING,
+    KERNEL_DPOP_EXPIRED,
+    KERNEL_DPOP_IDENTITY_CAPACITY,
+    KERNEL_DPOP_IDENTITY_LIMIT,
+    KERNEL_DPOP_IDENTITY_OVERFLOW,
+    KERNEL_DPOP_MISSING_CONFIGURATION,
+    KERNEL_DPOP_MISSING_PROOF,
+    KERNEL_DPOP_MISSING_STORE,
+    KERNEL_DPOP_NOT_YET_VALID,
+    KERNEL_DPOP_REPLAYED,
+    KERNEL_DPOP_SCHEMA,
+    KERNEL_DPOP_SENDER,
+    KERNEL_DPOP_SERVER,
+    KERNEL_DPOP_SIGNATURE,
+    KERNEL_DPOP_SIGNING,
+    KERNEL_DPOP_TOOL,
+    KERNEL_DPOP_UNAVAILABLE,
+    KERNEL_DPOP_WINDOW_OVERFLOW,
+    KERNEL_FINANCIAL_BUDGET_EXCEEDED,
+    KERNEL_DPOP_RESERVATION_OWNERSHIP,
+    TRANSPORT_TASK_CAPACITY_EXCEEDED,
+    TRANSPORT_STREAM_CAPACITY_EXCEEDED,
+    KERNEL_DPOP_INVALID_CAPACITY,
+    KERNEL_DPOP_MALFORMED,
+    KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY,
+    KERNEL_MEDIATED_DENIAL,
+    TRANSPORT_UNTRUSTED_PROXY,
+    TRANSPORT_INVALID_PROXY_HEADER,
 ];
 
 #[must_use]

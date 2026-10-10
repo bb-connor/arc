@@ -1,46 +1,14 @@
+use super::*;
 // HITL kernel-level flow tests.
 //
-// Included by `src/kernel/tests.rs`; the test module imports from the
-// surrounding `kernel::tests` scope via `super::*`. Helpers such as
-// `make_keypair` come from `tests/all.rs`.
-//
-// Scope: these tests exercise the HITL subsystem (approval store,
-// approval guard, channels, replay protection, restart persistence)
-// directly rather than through the full kernel evaluate path. Running
-// the full pipeline would require standing up every downstream store
-// (revocation, budget, authority, receipt log) for every case; a
-// focused test against the primitives is faster and still covers every
-// approval behaviour.
-
-use std::sync::Arc as StdArc;
+// Shared fixtures are imported from the parent test module.
 
 // Note: `GovernedApprovalDecision`, `GovernedApprovalToken`,
 // `GovernedApprovalTokenBody`, and `Keypair` are already brought into
-// scope by `tests/all.rs`. Only pull in HITL-specific items. These
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
-use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision,
-    ApprovalGuard, ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, BatchApproval,
-    BatchApprovalStore, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
-};
-use crate::approval_channels::RecordingChannel;
-use crate::governed_active_response::{
-    GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
-};
-use crate::threshold_approval::ThresholdApprovalRequirementResolver;
-use chio_log_redact::redacted;
-use chio_core::capability::governance::{
-    GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
-    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
-};
-use chio_core::capability::threshold_approval::{
-    ThresholdApprovalRequirement, ThresholdApproverIdentity,
-};
 
-struct FixedThresholdRequirement(ThresholdApprovalRequirement);
+pub(super) struct FixedThresholdRequirement(pub(super) ThresholdApprovalRequirement);
 
 impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
     fn resolve_requirement(
@@ -53,7 +21,7 @@ impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
     }
 }
 
-type CoreKeypair = Keypair;
+pub(super) type CoreKeypair = Keypair;
 
 struct ActiveResponseFixture<'a> {
     kernel: &'a ChioKernel,
@@ -174,7 +142,7 @@ impl ActiveResponseFixture<'_> {
     }
 }
 
-fn hitl_make_request() -> ToolCallRequest {
+pub(super) fn hitl_make_request() -> ToolCallRequest {
     let subject_kp = CoreKeypair::generate();
     let cap_builder_kernel = make_kernel(make_config());
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -182,7 +150,7 @@ fn hitl_make_request() -> ToolCallRequest {
     make_request("hitl-req-1", &cap, "read_file", "srv-a")
 }
 
-fn hitl_sign_token(
+pub(super) fn hitl_sign_token(
     approver: &CoreKeypair,
     subject: &CoreKeypair,
     approval_id: &str,
@@ -204,8 +172,232 @@ fn hitl_sign_token(
     GovernedApprovalToken::sign(body, approver).unwrap()
 }
 
+fn bound_tool_invocation_fixture() -> (ChioKernel, ToolGrant, ToolCallRequest, u64) {
+    let config = make_config();
+    let approver = config.keypair.clone();
+    let mut kernel = make_kernel(config);
+    assert!(kernel
+        .set_governed_approval_policy("test-tenant".into(), vec![approver.public_key()])
+        .is_ok());
+    let subject = CoreKeypair::generate();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant
+        .constraints
+        .push(Constraint::RequireApprovalAbove { threshold_units: 0 });
+    let capability = make_capability(&kernel, &subject, make_scope(vec![grant.clone()]), 300);
+    let mut request = make_request_with_arguments(
+        "bound-request-1",
+        &capability,
+        "read_file",
+        "srv-a",
+        serde_json::json!({"path": "/workspace/approved.txt", "options": {"limit": 10}}),
+    );
+    let mut intent = make_governed_intent(
+        "bound-intent-1",
+        "srv-a",
+        "read_file",
+        "read the approved file",
+        0,
+        "USD",
+    );
+    intent.body = GovernedTransactionIntentBody::BoundToolInvocation {
+        capability_id: capability.id.clone(),
+        parameters_hash: chio_core::sha256(&canonical_json_bytes(&request.arguments).unwrap()),
+    };
+    assert!(crate::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &capability,
+        &request.arguments,
+        &request.request_id,
+        &kernel.config.policy_hash,
+        "test-tenant"
+    )
+    .is_ok());
+    request.approval_token = Some(make_governed_approval_token(
+        &approver,
+        &capability.subject,
+        &intent,
+        &request.request_id,
+    ));
+    request.governed_intent = Some(intent);
+    (kernel, grant, request, current_unix_timestamp())
+}
+
 #[test]
-fn threshold_approval_set_is_policy_bound_and_order_independent() {
+fn bound_tool_invocation_accepts_approved_canonical_arguments(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, grant, mut request, now) = bound_tool_invocation_fixture();
+    let bound = kernel.bind_tool_approval_intent(&request)?;
+    let serialized = serde_json::to_value(&bound)?;
+    assert_eq!(
+        serialized["context"]["chio_tool_approval"]["schema"],
+        "chio.tool-approval-context.v1"
+    );
+    // Object member order does not change the RFC 8785 parameter binding.
+    request.arguments =
+        serde_json::from_str(r#"{"options":{"limit":10},"path":"/workspace/approved.txt"}"#)
+            .unwrap();
+    let result = kernel
+        .validate_governed_transaction_pure(
+            &request,
+            &request.capability,
+            &grant,
+            GovernedValidationContext {
+                parent_context: None,
+                now,
+            },
+        )
+        .unwrap();
+    assert!(result.is_some());
+    assert!(kernel
+        .validate_governed_approval_for_dispatch_non_consuming(&request, &request.capability, now,)
+        .unwrap()
+        .is_some());
+    Ok(())
+}
+
+#[test]
+fn bound_tool_invocation_denies_parameter_mutation_with_valid_approval() {
+    let (kernel, grant, original, now) = bound_tool_invocation_fixture();
+    for arguments in [
+        serde_json::json!({"path": "/workspace/forbidden.txt", "options": {"limit": 10}}),
+        serde_json::json!({"path": "/workspace/approved.txt", "options": {"limit": 100}}),
+        serde_json::json!({"path": "/workspace/approved.txt", "options": {"limit": 10}, "write": true}),
+        serde_json::json!({"path": "/workspace/approved.txt", "options": {"limit": "10"}}),
+        serde_json::json!({"path": "/workspace/approved.txt"}),
+    ] {
+        let mut request = original.clone();
+        request.arguments = arguments;
+        let error = kernel
+            .validate_governed_transaction_pure(
+                &request,
+                &request.capability,
+                &grant,
+                GovernedValidationContext {
+                    parent_context: None,
+                    now,
+                },
+            )
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("parameter hash does not match"),
+            "{error}"
+        );
+
+        let direct_error = kernel
+            .validate_governed_approval_for_dispatch_non_consuming(
+                &request,
+                &request.capability,
+                now,
+            )
+            .unwrap_err();
+        assert!(
+            direct_error
+                .to_string()
+                .contains("parameter hash does not match"),
+            "{direct_error}"
+        );
+    }
+}
+
+#[test]
+fn bound_tool_invocation_denies_capability_transfer_for_same_subject() {
+    let (kernel, grant, mut request, now) = bound_tool_invocation_fixture();
+    let alternate = kernel
+        .issue_capability(
+            &request.capability.subject,
+            make_scope(vec![grant.clone()]),
+            300,
+        )
+        .unwrap();
+    assert_ne!(alternate.id, request.capability.id);
+    assert_eq!(alternate.subject, request.capability.subject);
+    request.capability = alternate;
+
+    let error = kernel
+        .validate_governed_transaction_pure(
+            &request,
+            &request.capability,
+            &grant,
+            GovernedValidationContext {
+                parent_context: None,
+                now,
+            },
+        )
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("capability does not match"),
+        "{error}"
+    );
+
+    let direct_error = kernel
+        .validate_governed_approval_for_dispatch_non_consuming(&request, &request.capability, now)
+        .unwrap_err();
+    assert!(
+        direct_error
+            .to_string()
+            .contains("capability does not match"),
+        "{direct_error}"
+    );
+
+    let intent_hash = request
+        .governed_intent
+        .as_ref()
+        .unwrap()
+        .binding_hash()
+        .unwrap();
+    let threshold_error = kernel
+        .validate_threshold_approval_set(&request, &request.capability, &intent_hash, now)
+        .unwrap_err();
+    assert!(
+        threshold_error
+            .to_string()
+            .contains("capability does not match"),
+        "{threshold_error}"
+    );
+}
+
+#[test]
+fn bound_tool_invocation_rejects_mutation_before_approval_checks() {
+    let (kernel, grant, mut request, now) = bound_tool_invocation_fixture();
+    request.arguments = serde_json::json!({"path": "/workspace/forbidden.txt"});
+    request.approval_token = None;
+    let error = kernel
+        .validate_governed_transaction_pure(
+            &request,
+            &request.capability,
+            &grant,
+            GovernedValidationContext {
+                parent_context: None,
+                now,
+            },
+        )
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("parameter hash does not match"),
+        "{error}"
+    );
+
+    let intent_hash = request
+        .governed_intent
+        .as_ref()
+        .unwrap()
+        .binding_hash()
+        .unwrap();
+    let threshold_error = kernel
+        .validate_threshold_approval_set(&request, &request.capability, &intent_hash, now)
+        .unwrap_err();
+    assert!(
+        threshold_error
+            .to_string()
+            .contains("parameter hash does not match"),
+        "{threshold_error}"
+    );
+}
+
+#[test]
+fn threshold_approval_set_is_policy_bound_and_order_independent(
+) -> Result<(), Box<dyn std::error::Error>> {
     let policy_hash = sha256_hex(b"threshold-policy");
     let policy_authority = CoreKeypair::generate();
     let approver_a = CoreKeypair::generate();
@@ -236,9 +428,9 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         300,
     )
     .unwrap();
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement.clone()),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement.clone(),
+    )));
 
     let subject = CoreKeypair::generate();
     let cap = make_capability(
@@ -259,7 +451,12 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         call_chain: None,
         autonomy: None,
         context: None,
-        body: Default::default(),
+        body: GovernedTransactionIntentBody::BoundToolInvocation {
+            capability_id: cap.id.clone(),
+            parameters_hash: chio_core::sha256(&canonical_json_bytes(
+                &serde_json::json!({"path": "/app/src/main.rs"}),
+            )?),
+        },
     };
     let intent_hash = intent.binding_hash().unwrap();
     let now = current_unix_timestamp();
@@ -310,12 +507,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
     };
     let token_a = make_token("token-a", &approver_a);
     let token_b = make_token("token-b", &approver_b);
-    let mut request = make_request(
-        "request-threshold-1",
-        &cap,
-        "transfer",
-        "srv-threshold",
-    );
+    let mut request = make_request("request-threshold-1", &cap, "transfer", "srv-threshold");
     request.governed_intent = Some(intent);
     request.approval_tokens = vec![token_b.clone(), token_a.clone()];
     request.threshold_approval_proposal = Some(proposal.clone());
@@ -368,10 +560,11 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         .validate_threshold_approval_set(&extended, &cap, &intent_hash, now)
         .unwrap_err();
     assert!(error.to_string().contains("active policy"));
+    Ok(())
 }
 
 #[test]
-fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch() {
+fn legacy_active_response_admission_requires_enabled_runtime() {
     let policy_hash = sha256_hex(b"active-response-policy");
     let policy_authority = CoreKeypair::generate();
     let approver_a = CoreKeypair::generate();
@@ -397,9 +590,9 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
     config.policy_hash = policy_hash;
     config.ca_public_keys.push(policy_authority.public_key());
     let mut kernel = make_kernel(config);
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement.clone()),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement.clone(),
+    )));
 
     let fence = admission_test_fence();
     let store = StdArc::new(TestAdmissionOperationStore::new(fence.clone()));
@@ -425,193 +618,13 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         executor: &executor,
         now,
     };
-    let request = fixture.request(
-        "active-response-1",
-        effects.clone(),
-        grants,
-    );
+    let request = fixture.request("active-response-1", effects.clone(), grants);
 
-    let mut mismatched = request.clone();
-    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
-        &mut mismatched.governed_intent.body
-    else {
-        panic!("active-response body");
-    };
-    plan.canonical_plan_body["actionId"] = serde_json::json!("substituted-response");
-    assert!(kernel
-        .admit_governed_active_response_at(&mismatched, now, now * 1_000)
-        .unwrap_err()
-        .to_string()
-        .contains("body hash"));
-
-    let mut mismatched_effects = fixture.request(
-        "active-response-mismatched-effects",
-        vec![GovernedResponseEffect::RestrictEgress],
-        vec![make_grant(
-            ACTIVE_RESPONSE_SERVER_ID,
-            GovernedResponseEffect::RestrictEgress.tool_name(),
-        )],
-    );
-    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
-        &mut mismatched_effects.governed_intent.body
-    else {
-        panic!("active-response body");
-    };
-    plan.canonical_plan_body["effects"] = serde_json::json!([
-        GovernedResponseEffect::RestrictEgress,
-        GovernedResponseEffect::SuspendSession
-    ]);
-    plan.plan_body_hash =
-        GovernedResponsePlanIntentBody::plan_body_hash(&plan.canonical_plan_body).unwrap();
-    assert!(kernel
-        .admit_governed_active_response_at(&mismatched_effects, now, now * 1_000)
-        .unwrap_err()
-        .to_string()
-        .contains("effects do not match"));
-
-    let mut raw_plan_hash = request.clone();
-    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
-        &raw_plan_hash.governed_intent.body
-    else {
-        panic!("active-response body");
-    };
-    let substituted_hash = plan.plan_body_hash.clone();
-    let mut substituted_proposal = raw_plan_hash.threshold_approval_proposal.body.clone();
-    substituted_proposal.governed_intent_hash = substituted_hash.clone();
-    raw_plan_hash.threshold_approval_proposal =
-        ThresholdApprovalProposal::sign(substituted_proposal, &policy_authority).unwrap();
-    let substituted_proposal_hash = raw_plan_hash
-        .threshold_approval_proposal
-        .artifact_digest()
-        .unwrap();
-    raw_plan_hash.approval_tokens = [&approver_a, &approver_b]
-        .into_iter()
-        .enumerate()
-        .map(|(index, approver)| {
-            GovernedApprovalToken::sign(
-                GovernedApprovalTokenBody {
-                    id: format!("raw-plan-token-{index}"),
-                    approver: approver.public_key(),
-                    subject: raw_plan_hash.operator_capability.subject.clone(),
-                    governed_intent_hash: substituted_hash.clone(),
-                    request_id: raw_plan_hash.request_id.clone(),
-                    threshold_proposal_hash: Some(substituted_proposal_hash.clone()),
-                    issued_at: now,
-                    expires_at: raw_plan_hash
-                        .threshold_approval_proposal
-                        .body
-                        .proposal_deadline,
-                    decision: GovernedApprovalDecision::Approved,
-                },
-                approver,
-            )
-            .unwrap()
-        })
-        .collect();
-    assert!(kernel
-        .admit_governed_active_response_at(&raw_plan_hash, now, now * 1_000)
-        .unwrap_err()
-        .to_string()
-        .contains("proposal does not match"));
-
-    let missing_grant = fixture.request(
-        "active-response-missing-grant",
-        effects,
-        vec![make_grant(
-            ACTIVE_RESPONSE_SERVER_ID,
-            GovernedResponseEffect::RestrictEgress.tool_name(),
-        )],
-    );
-    assert!(kernel
-        .admit_governed_active_response_at(&missing_grant, now, now * 1_000)
-        .unwrap_err()
-        .to_string()
-        .contains("suspend_session"));
-
-    let revoked = fixture.request(
-        "active-response-revoked",
-        vec![GovernedResponseEffect::RestrictEgress],
-        vec![make_grant(
-            ACTIVE_RESPONSE_SERVER_ID,
-            GovernedResponseEffect::RestrictEgress.tool_name(),
-        )],
-    );
-    kernel.set_revocation_store(Box::new(crate::InMemoryRevocationStore::new()));
-    kernel
-        .revoke_capability(&revoked.operator_capability.id)
-        .unwrap();
     assert!(matches!(
-        kernel.admit_governed_active_response_at(&revoked, now, now * 1_000),
-        Err(KernelError::CapabilityRevoked(id)) if id == revoked.operator_capability.id
+        kernel.admit_governed_active_response_at(&request, now, now * 1_000),
+        Err(KernelError::GovernedTransactionDenied(ref reason))
+            if reason == "governed active-response plans were not negotiated"
     ));
-
-    let admitted = kernel
-        .admit_governed_active_response_at(&request, now, now * 1_000)
-        .unwrap();
-    assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
-    assert_eq!(admitted.requirement(), &requirement);
-    assert_eq!(
-        admitted.operator_capability().capability_id,
-        request.operator_capability.id
-    );
-    assert_eq!(
-        admitted.operation().binding().kind(),
-        crate::admission_operation::AdmissionOperationKind::GovernedActiveResponse
-    );
-    assert_eq!(
-        admitted.operation().binding().participant_requirements(),
-        crate::admission_operation::AdmissionParticipantRequirements {
-            approval: true,
-            ..crate::admission_operation::AdmissionParticipantRequirements::NONE
-        }
-    );
-    assert_eq!(
-        admitted.approval_set().approval_set_hash().unwrap(),
-        admitted.approval_set_hash()
-    );
-    let operation_id = admitted.operation_id().to_owned();
-    let mut mismatched_approval_set = request.clone();
-    mismatched_approval_set.approval_tokens = mismatched_approval_set
-        .approval_tokens
-        .iter()
-        .zip([&approver_a, &approver_b])
-        .enumerate()
-        .map(|(index, (token, approver))| {
-            let mut body = token.body();
-            let replacement_token_id =
-                redacted!(format!("replacement-active-response-token-{index}")).to_string();
-            body.id = replacement_token_id;
-            GovernedApprovalToken::sign(body, approver).unwrap()
-        })
-        .collect();
-    assert!(kernel
-        .admit_governed_active_response_at(&mismatched_approval_set, now, now * 1_000)
-        .unwrap_err()
-        .to_string()
-        .contains("retained approval reservation"));
-    let mut admitted = kernel
-        .admit_governed_active_response_at(&request, now, now * 1_000)
-        .expect("mismatched replay must not compensate retained admission");
-    assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
-    assert_eq!(
-        kernel
-            .commit_governed_active_response_dispatch_at(&mut admitted, now * 1_000)
-            .unwrap(),
-        GovernedActiveResponseDispatchCommit::Committed
-    );
-    assert_eq!(admitted.state(), AdmissionOperationState::DispatchCommitted);
-
-    let mut recovered = kernel
-        .admit_governed_active_response_at(&request, now, now * 1_000)
-        .unwrap();
-    assert_eq!(recovered.operation_id(), operation_id);
-    assert_eq!(recovered.state(), AdmissionOperationState::DispatchCommitted);
-    assert_eq!(
-        kernel
-            .commit_governed_active_response_dispatch_at(&mut recovered, now * 1_000)
-            .unwrap(),
-        GovernedActiveResponseDispatchCommit::AlreadyCommitted
-    );
 }
 
 // ---------------------------------------------------------------------
@@ -638,7 +651,9 @@ fn hitl_force_approval_returns_pending() {
 
     let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
     match verdict {
-        HitlVerdict::Pending { request: approval, .. } => {
+        HitlVerdict::Pending {
+            request: approval, ..
+        } => {
             assert_eq!(approval.approval_id, "ap-force-1");
             assert_eq!(approval.subject_id, request.agent_id);
             assert_eq!(approval.tool_server, "srv-a");
@@ -716,12 +731,11 @@ fn hitl_resume_approved_executes() {
 
     // Pending record is gone; resolved record exists.
     assert!(store.get_pending("ap-approve-1").unwrap().is_none());
-    assert!(store
-        .get_resolution("ap-approve-1")
-        .unwrap()
-        .is_some());
+    assert!(store.get_resolution("ap-approve-1").unwrap().is_some());
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         1
     );
 }
@@ -784,7 +798,9 @@ fn hitl_resume_denied_records_denial() {
 
     // Approved counter stays zero.
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         0
     );
     // Resolution record is present with Denied outcome.
@@ -859,9 +875,7 @@ fn hitl_replay_of_consumed_token_rejected() {
     );
 
     // Consumed registry records the token.
-    assert!(store
-        .is_consumed(&token.id, &hash)
-        .unwrap());
+    assert!(store.is_consumed(&token.id, &hash).unwrap());
 
     // Re-storing the pending row and replaying the consumed token
     // should also fail with a replay error (the consumed registry is
@@ -982,9 +996,21 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     }
 
     let decisions = [
-        (ids[0], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
-        (ids[1], GovernedApprovalDecision::Denied, ApprovalOutcome::Denied),
-        (ids[2], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
+        (
+            ids[0],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
+        (
+            ids[1],
+            GovernedApprovalDecision::Denied,
+            ApprovalOutcome::Denied,
+        ),
+        (
+            ids[2],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
     ];
 
     let mut approved = 0usize;
@@ -1009,45 +1035,11 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     assert_eq!(approved, 2);
     assert_eq!(denied, 1);
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-batch").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-batch")
+            .unwrap(),
         2
     );
-}
-
-// ---------------------------------------------------------------------
-// Batch approval store: find_matching and record_usage.
-// ---------------------------------------------------------------------
-
-#[test]
-fn hitl_batch_store_find_and_record() {
-    let store = InMemoryBatchApprovalStore::new();
-    let approver = CoreKeypair::generate();
-    let batch = BatchApproval {
-        batch_id: "ba-1".into(),
-        approver_hex: approver.public_key().to_hex(),
-        subject_id: "agent-1".into(),
-        server_pattern: "search-*".into(),
-        tool_pattern: "*".into(),
-        max_amount_per_call: None,
-        max_total_amount: None,
-        max_calls: Some(3),
-        not_before: 100,
-        not_after: 1000,
-        used_calls: 0,
-        used_total_units: 0,
-        revoked: false,
-    };
-    store.store(&batch).unwrap();
-
-    let found = store
-        .find_matching("agent-1", "search-primary", "query", None, 500)
-        .unwrap()
-        .expect("batch should match");
-    assert_eq!(found.batch_id, "ba-1");
-
-    store.record_usage("ba-1", None).unwrap();
-    let after = store.get("ba-1").unwrap().unwrap();
-    assert_eq!(after.used_calls, 1);
 }
 
 // ---------------------------------------------------------------------
@@ -1172,5 +1164,86 @@ fn governed_approval_token_binds_every_authorization_field_and_time_window(
         "unexpected expiry result: {expired:?}"
     );
 
+    Ok(())
+}
+
+#[test]
+fn ap23_unbound_tool_approval_denies_before_dispatch() -> Result<(), Box<dyn std::error::Error>> {
+    let (mut kernel, _, mut request, _) = bound_tool_invocation_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(
+        super::dispatch_credentials::CountingDispatchServer {
+            id: request.server_id.clone(),
+            tool: request.tool_name.clone(),
+            invocations: invocations.clone(),
+        },
+    ));
+    let intent = request
+        .governed_intent
+        .as_mut()
+        .ok_or("missing fixture intent")?;
+    intent.body = GovernedTransactionIntentBody::ToolInvocation;
+    request.approval_token = Some(make_governed_approval_token(
+        &kernel.config.keypair,
+        &request.capability.subject,
+        intent,
+        &request.request_id,
+    ));
+    let result = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(result.verdict, Verdict::Deny);
+    assert!(
+        result
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("bound tool invocation is required")),
+        "{:?}",
+        result.reason
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn ap23_receipt_signer_has_no_implicit_approval_authority() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (mut kernel, _, request, _) = bound_tool_invocation_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(
+        super::dispatch_credentials::CountingDispatchServer {
+            id: request.server_id.clone(),
+            tool: request.tool_name.clone(),
+            invocations: invocations.clone(),
+        },
+    ));
+    kernel.set_governed_approval_policy("test-tenant".into(), Vec::new())?;
+    let result = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(result.verdict, Verdict::Deny);
+    assert!(
+        result
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("approval signer is not in configured roster")),
+        "{:?}",
+        result.reason
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn ap23_roster_rejects_duplicate_and_weak_principals() -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_config());
+    let key = CoreKeypair::generate().public_key();
+    let duplicate = kernel.set_governed_approval_policy("tenant".into(), vec![key.clone(), key]);
+    assert!(
+        matches!(duplicate, Err(KernelError::GovernedTransactionDenied(ref reason)) if reason == "approval roster contains duplicate principals")
+    );
+    let weak = chio_core::PublicKey::from_hex(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+    )?;
+    let invalid = kernel.set_governed_approval_policy("tenant".into(), vec![weak]);
+    assert!(
+        matches!(invalid, Err(KernelError::GovernedTransactionDenied(ref reason)) if reason == "approval roster contains a weak signing key")
+    );
     Ok(())
 }

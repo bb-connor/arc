@@ -4,6 +4,8 @@ use super::*;
 pub(crate) enum TrustCommands {
     /// Serve the shared trust-control plane over HTTP.
     Serve {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Socket address to bind the trust-control service to.
         #[arg(long, default_value = "127.0.0.1:8940")]
         listen: SocketAddr,
@@ -22,6 +24,39 @@ pub(crate) enum TrustCommands {
         #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
         tenant_read_tokens: Vec<String>,
 
+        /// Bearer token accepted only for capability-authority status and issuance.
+        ///
+        /// Keep this distinct from the administrative service token and from
+        /// every edge service or session bearer.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        authority_workload_token: Option<String>,
+
+        /// Witnessed authority-key transparency runtime configuration.
+        ///
+        /// This requires the global `--authority-seed-file`, `--receipt-db`,
+        /// `--authority-keyring-receipt-anchor-root`, and
+        /// `--authority-workload-token` options. Startup also requires all
+        /// configured witness and audit services to prove readiness.
+        #[arg(long)]
+        authority_keyring_config: Option<PathBuf>,
+
+        /// Private receipt rollback anchors on a separate filesystem device.
+        #[arg(long, requires = "authority_keyring_config")]
+        authority_keyring_receipt_anchor_root: Option<PathBuf>,
+
+        /// Maximum authenticated receipt query snapshot database bytes (minimum 1 MiB).
+        #[arg(
+            long,
+            value_name = "BYTES",
+            default_value_t = 2_147_483_648u64,
+            value_parser = clap::value_parser!(u64).range(1_048_576..)
+        )]
+        receipt_query_snapshot_quota_bytes: u64,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,
@@ -37,6 +72,10 @@ pub(crate) enum TrustCommands {
         /// Background cluster sync interval in milliseconds.
         #[arg(long, default_value_t = 500)]
         cluster_sync_interval_ms: u64,
+
+        /// Explicit future issue skew for authority replication; expiry remains strict.
+        #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u64).range(0..=60))]
+        authority_replication_max_future_skew_seconds: u64,
 
         /// Optional policy file whose reputation issuance extension is enforced by the service.
         #[arg(long)]

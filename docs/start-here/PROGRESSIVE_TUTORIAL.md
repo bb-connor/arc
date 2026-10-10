@@ -28,18 +28,22 @@ For the local demo, the trust service and hosted edge are separate processes:
 From the repo root:
 
 ```bash
-docker compose -f examples/docker/compose.yaml up --build
+docker compose -f examples/docker/compose.yaml up --build chio-trust-demo
 ```
 
-That publishes three defaults used throughout the rest of this tutorial:
+The trust service starts immediately. The hosted edge requires the explicit
+[enforcing host setup](../security/native-launch-examples.md) and either section 4
+below or the Docker `enforced-native` profile with a qualified host override.
+After configuring both services, the tutorial uses these endpoints and credentials:
 
 - hosted edge: `http://127.0.0.1:8931`
 - trust service and receipt viewer: `http://127.0.0.1:8940`
-- auth token: `demo-token`
+- auth token clients present to the edge: `demo-token`
+- admin token for the edge's admin routes: `demo-admin-token`
+- control token the edge and you present to the trust service: `demo-control-token`
 
-If you prefer to run the processes directly instead of Docker, phase `309`
-already qualified the equivalent `chio trust serve` plus
-`chio mcp serve-http --control-url ...` topology.
+The earlier phase `309` results describe the historical demo topology. They do
+not qualify the current enforced native host configuration.
 
 ## 3. Write A Policy
 
@@ -75,20 +79,63 @@ You can save this as `tutorial-policy.yaml` or reuse
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
-To put Chio in front of it without Docker:
+Configure the [enforcing host inputs](../security/native-launch-examples.md),
+including reviewed Python runtime read grants, then provision the exact command.
+Discovery itself is confined. Disabled and Shadow policies cannot authorize it.
 
 ```bash
+source scripts/lib/provision-mcp-launch.sh
+PYTHON3="$(chio_resolve_python python3)"
+chio_provision_mcp_launch "$(command -v chio)" "$PWD/tutorial-security" \
+  tutorial-echo "Tutorial Echo" 1 "$PWD" \
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
+```
+
+Then give the edge three distinct bearer credentials: the control token it
+presents to the trust service, the auth token clients present to it, and a
+dedicated admin token for its admin endpoints. Reusing one value across
+roles is refused, and so is a wrapped command that differs from the one the
+policy binds.
+
+The edge also pins the trust service's current capability authority key,
+presents a fourth credential, the workload token, which the trust service
+accepts only for capability issuance, and keeps its session state in a
+database whose resumable sessions are signed with a dedicated keyring.
+
+```bash
+python3 - <<'PY' > tutorial-resume-hmac-keyring.json
+import base64, json, os
+key = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode()
+print(json.dumps({"schema": "chio.remote-mcp.resume-hmac-keyring.v1",
+                  "current": {"keyId": "tutorial", "version": 1, "keyBase64": key},
+                  "previous": []}, indent=2))
+PY
+chmod 0600 tutorial-resume-hmac-keyring.json
+AUTHORITY_KEY="$(curl --silent --fail \
+  --header "Authorization: Bearer demo-control-token" \
+  http://127.0.0.1:8940/v1/authority \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["publicKey"])')"
 chio \
   --control-url http://127.0.0.1:8940 \
-  --control-token demo-token \
+  --control-token demo-control-token \
+  --control-authority-public-key "$AUTHORITY_KEY" \
   mcp serve-http \
   --policy tutorial-policy.yaml \
   --server-id tutorial-echo \
   --server-name "Tutorial Echo" \
+  --server-version 1 \
   --listen 127.0.0.1:8931 \
   --auth-token demo-token \
+  --admin-token demo-admin-token \
+  --remote-authority-workload-token demo-workload-token \
+  --session-db "$PWD/tutorial-sessions.sqlite3" \
+  --resume-hmac-keyring "$PWD/tutorial-resume-hmac-keyring.json" \
+  --signed-manifest "$PWD/tutorial-security/signed-manifest.json" \
+  --manifest-public-key "$(cat tutorial-security/manifest-public-key)" \
+  --cage-policy "$PWD/tutorial-security/cage-launch-policy.json" \
+  --cage-policy-signer "$(cat tutorial-security/cage-policy-signer)" \
   -- \
-  python3 examples/docker/mock_mcp_server.py
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 At this point the upstream tool is no longer called directly. Clients connect
@@ -126,14 +173,14 @@ query shape as well:
 
 ```bash
 curl \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer demo-control-token" \
   "http://127.0.0.1:8940/v1/receipts/query?capabilityId=<capability-id>&limit=10"
 ```
 
 You can also inspect the viewer directly at:
 
 ```text
-http://127.0.0.1:8940/?token=demo-token
+http://127.0.0.1:8940/?token=demo-control-token
 ```
 
 The receipt detail view shows the decision, timestamp, and delegation-chain
@@ -143,7 +190,7 @@ If you need the capability attached to a hosted session, query the hosted edge:
 
 ```bash
 curl \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer demo-admin-token" \
   "http://127.0.0.1:8931/admin/sessions/<session-id>/trust"
 ```
 

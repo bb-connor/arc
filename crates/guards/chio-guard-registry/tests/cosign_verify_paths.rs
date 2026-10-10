@@ -156,11 +156,9 @@ fn malformed_bundle_maps_to_guard_registry_error() {
     let result = guard_verifier.verify_bundle(b"hello world", b"this is not json");
 
     match result {
-        Err(GuardRegistryError::VerifyMalformedBundle { message }) => {
-            assert!(
-                message.to_ascii_lowercase().contains("bundle"),
-                "expected bundle parse context, got {message}"
-            );
+        Err(GuardRegistryError::Input(source)) => {
+            assert!(std::error::Error::source(&source).is_some());
+            assert!(!format!("{source:?} {source}").contains("this is not json"));
         }
         other => panic!("expected malformed bundle mapping, got {other:?}"),
     }

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! WASM Guard Runtime for Chio.
 //!
 //! This crate allows operators to author guards in any language that compiles
@@ -62,6 +63,10 @@ pub mod config;
 pub mod epoch;
 #[cfg(not(loom))]
 pub mod error;
+#[cfg(not(loom))]
+mod input;
+#[cfg(not(loom))]
+pub use input::ManifestYamlError;
 #[cfg(all(not(loom), feature = "wasmtime-runtime"))]
 pub mod host;
 #[cfg(not(loom))]

@@ -137,15 +137,8 @@ pub fn build_x402_payment_requirements(
     for (index, token) in accepted_tokens.iter().enumerate() {
         validate_x402_field(&format!("accepted token {index}"), token)?;
     }
-    if !accepted_tokens.iter().any(|token| {
-        token
-            .trim()
-            .eq_ignore_ascii_case(approval_binding.token_symbol.trim())
-    }) {
-        return Err(SettlementError::InvalidBinding(format!(
-            "x402 accepted tokens do not include the approval-bound token {:?}",
-            approval_binding.token_symbol
-        )));
+    for token in &accepted_tokens {
+        approval_binding.assert_token_symbol("x402", token)?;
     }
     Ok(X402PaymentRequirements {
         version: "x402".to_string(),
@@ -1046,13 +1039,14 @@ mod tests {
             &binding,
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
-            vec!["USD".to_string(), "EURC".to_string()],
+            vec!["USD".to_string()],
             X402SettlementMode::PrepaidAuthorization,
         )
         .test_unwrap();
 
         assert!(requirements.governed_authorization_required);
         assert_eq!(requirements.dispatch_id, dispatch.dispatch_id);
+        assert_eq!(requirements.accepted_tokens, vec!["USD".to_string()]);
     }
 
     #[test]

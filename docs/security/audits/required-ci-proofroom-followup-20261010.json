@@ -1,0 +1,116 @@
+{
+  "schema": "chio.security.required-ci-proofroom-followup.v1",
+  "recorded_at": "2026-10-10T23:36:27.168997+00:00",
+  "published_predecessor": "4339c98366b5b5e5276e7777db0ebb149871346e",
+  "source_repair": "4ba33a6cc48c746ae921dd2e685527f0760dbcb8",
+  "producer": "d405401f05088295cc39faa7f0383a4436c423b9",
+  "source_files": {
+    "crates/products/chio-proof-room/src/tests/support.rs": "25fcbe12199ac69a087f8647a733f72b1a55f36e4a3be3a4d082173b839381a0"
+  },
+  "original_failure": {
+    "command_or_scope": "Exact4339 proof-room library target from ongoing remaining-library sweep",
+    "result": "108passed;1failed before intended negative assertion; no whole-campaign exit claimed",
+    "artifact": "/tmp/pr1160-ci-batch-20261010/proof-room-original-4339.log",
+    "sha256": "3091dc9c3b562a6fa8536021d6a6d8f0f15288fb6d6acc5ff4e768d04ad9d56c"
+  },
+  "repairs": [
+    {
+      "id": "CI-PROOFROOM-GRAPH-FIXTURE",
+      "requirement": "Supply a valid root graph in the shared runtime regeneration fixture so rejection assertions exercise the source-family verdict while strict production graph validation remains enforced.",
+      "original": "Exact4339 owning library108PASS/1FAIL: missing-schema refusal precedes downgrade assertions.",
+      "verification": "Canonical schema constant and empty edges only; three focused passes,109owning tests, strictalltargets, composedfmt/hygiene/metadataPASS."
+    }
+  ],
+  "verification": [
+    {
+      "command_or_scope": "Exact4339 proof-room library target from ongoing remaining-library sweep",
+      "result": "108passed;1failed before intended negative assertion; no whole-campaign exit claimed",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proof-room-original-4339.log",
+      "sha256": "3091dc9c3b562a6fa8536021d6a6d8f0f15288fb6d6acc5ff4e768d04ad9d56c"
+    },
+    {
+      "command_or_scope": "cargo test --locked -p chio-proof-room --lib tests::source::merge_source_family_reports_rejects_ok_but_unverified_family_report -- --exact",
+      "result": "exit0;1passed;108filtered",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/01-named-green.log",
+      "sha256": "a8a413c8f3bbf8fa851a191450d15230f3a055778ee864d41e09c37dda337fe7"
+    },
+    {
+      "command_or_scope": "cargo test --locked -p chio-proof-room --lib tests::source::merge_source_family_reports_rejects_ok_but_unverified_family_report -- --exact",
+      "result": "exit0;1passed;108filtered",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/02-named-green.log",
+      "sha256": "e72baba14f4357209aec5134c08ae27c4708fe1eb1cb0499f0f3b3d6d0b27c12"
+    },
+    {
+      "command_or_scope": "cargo test --locked -p chio-proof-room --lib tests::source::merge_source_family_reports_rejects_ok_but_unverified_family_report -- --exact",
+      "result": "exit0;1passed;108filtered",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/03-named-green.log",
+      "sha256": "93cb53e6ee0946039b2fca94755742ffadd3535e7f6382a2692c609e74ee3c36"
+    },
+    {
+      "command_or_scope": "cargo test --locked -p chio-proof-room --lib",
+      "result": "exit0;109passed;0failed;0ignored",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/04-lib-full.log",
+      "sha256": "5fdade53b7e9a960836cb8d0c89fd6fb62b24d0bbd94b583adf8a8e2ea416a44"
+    },
+    {
+      "command_or_scope": "cargo clippy --locked -p chio-proof-room --all-targets -- -D warnings",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/06-clippy.log",
+      "sha256": "99341e0613e06bf4d8f452f926caf37402fe72cc7ee0baea540897752f1c9e75"
+    },
+    {
+      "command_or_scope": "Producer hygiene on4339+d405",
+      "result": "exit1;only known base trust_cluster3285>3272, not a fixture failure",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-handoff-v1/07-hygiene.log",
+      "sha256": "1d5bcd6e9363e3ce3fca2048859b82c709f8342807d30f1284fc816b247274fb"
+    },
+    {
+      "command_or_scope": "Composed Rust file hygiene",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-composed-hygiene.log",
+      "sha256": "6b8d2cf0c9b7bcb80c47bffac33ee569074ec146c3042bd0bd748f2806a3fd13"
+    },
+    {
+      "command_or_scope": "Composed cargo fmt --all -- --check",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-composed-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command_or_scope": "Composed generated proof-coverage metadata check; no proof execution",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/proofroom-composed-coverage.log",
+      "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+    }
+  ],
+  "preservation": {
+    "source": "4ba33a6cc48c746ae921dd2e685527f0760dbcb8",
+    "producer": "d405401f05088295cc39faa7f0383a4436c423b9",
+    "source_file": "crates/products/chio-proof-room/src/tests/support.rs",
+    "source_sha256": "25fcbe12199ac69a087f8647a733f72b1a55f36e4a3be3a4d082173b839381a0",
+    "inverse_fixture_only_byte_identical": true,
+    "negative_assertions_and_production_validator_unchanged": true,
+    "owning_dependency_sources_unchanged_since_producer_base": true
+  },
+  "independent_review": {
+    "author": "Claude",
+    "reviewer": "Root native thread",
+    "verdict": "accepted for CI successor",
+    "scope": "Exact producer bytes; inverse fixture edit; production validation and negative assertions unchanged; owning dependency sources unchanged since4339."
+  },
+  "evidence_errata": "Producer reported hygiene log replacement with a1891816. Root still observed original1d5bcd6e bytes and saved them independently before any further producer mutation. Only observed bytes are cited. Both reported outcomes are the known base cap failure; Root composed hygiene passes independently. No failure is relabeled green.",
+  "remaining_acceptance": [
+    "Four required checks green on exact successor head; every other failure classified; review threads answered.",
+    "New explicit Connor merge go-ahead after exact check report."
+  ],
+  "post_merge": [
+    "Coherent trusted source/definition rotation and genuine committed Linux evidence require protected landing.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED; encoder preparation is not a proof verdict.",
+    "Cold-state readiness remains OPEN; isolated C1 preparation is not live recovery."
+  ],
+  "native_recovery": "Native capture deadline and signing-custody election liveness reopened for isolated repair; not closed by fixture changes.",
+  "ongoing_diagnostics": "Remaining-library sweep at4339 continues with one known proof-room failure; not a whole-workspace pass.",
+  "hosted_qualified": false,
+  "merged": false,
+  "release_permitted": false
+}

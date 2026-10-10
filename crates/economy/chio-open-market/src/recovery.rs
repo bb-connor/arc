@@ -12,6 +12,7 @@
 //! expiry, and a bounded retry count.
 
 use base64::Engine as _;
+use chio_core_types::canonical::{SharedUntrustedJsonError, UntrustedJsonError, UntrustedJsonText};
 use chio_core_types::receipt::body::ChioReceipt;
 use chio_core_types::receipt::decision::Decision;
 use chio_core_types::receipt::metadata::{
@@ -33,8 +34,18 @@ use crate::crypto::{Keypair, PublicKey};
 /// Typed rejection from full recovery-carrier verification.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum RecoveryVerificationError {
+    #[error("recovery member {member} rejected: {source}")]
+    MemberInput {
+        member: &'static str,
+        #[source]
+        source: SharedUntrustedJsonError,
+    },
+    #[error("recovery context rejected")]
+    CarrierInput(#[source] chio_finding::FindingError),
     #[error("recovery carrier is not valid base64 canonical JSON")]
     Carrier,
+    #[error("recovery carrier encoding is invalid")]
+    CarrierEncoding(#[source] base64::DecodeError),
     #[error("recovery carrier member {0} failed strict parsing")]
     Member(&'static str),
     #[error("original capability signature is invalid")]
@@ -44,7 +55,7 @@ pub enum RecoveryVerificationError {
     #[error("original capability does not carry the exact purchase delivery profile")]
     CapabilityProfile,
     #[error("original purchase context was rejected")]
-    PurchaseContext,
+    PurchaseContext(#[source] Box<crate::purchase_verification::PurchaseVerificationError>),
     #[error("settled purchase record signature or body is invalid")]
     PurchaseRecord,
     #[error("settled purchase record does not bind the verified purchase")]
@@ -164,19 +175,20 @@ fn strict_member<T: serde::de::DeserializeOwned + serde::Serialize>(
     text: &str,
     name: &'static str,
 ) -> Result<T, RecoveryVerificationError> {
-    let canonical = chio_core_types::canonical_json_bytes_from_str(text)
-        .map_err(|_| RecoveryVerificationError::Member(name))?;
-    if canonical.as_slice() != text.as_bytes() {
-        return Err(RecoveryVerificationError::Member(name));
-    }
-    let value: T =
-        serde_json::from_str(text).map_err(|_| RecoveryVerificationError::Member(name))?;
-    let reserialized = chio_core_types::canonical_json_bytes(&value)
-        .map_err(|_| RecoveryVerificationError::Member(name))?;
-    if reserialized.as_slice() != text.as_bytes() {
-        return Err(RecoveryVerificationError::Member(name));
-    }
-    Ok(value)
+    let decode = || -> Result<T, UntrustedJsonError> {
+        let input = UntrustedJsonText::from_wire(
+            text.as_bytes(),
+            FINDING_RECOVERY_CONTEXT_MAX_CANONICAL_BYTES,
+        )?;
+        if input.canonicalize()?.as_slice() != text.as_bytes() {
+            return Err(UntrustedJsonError::NonCanonical);
+        }
+        input.decode_canonical()
+    };
+    decode().map_err(|error| RecoveryVerificationError::MemberInput {
+        member: name,
+        source: error.into(),
+    })
 }
 
 /// Verify the complete recovery carrier without clocks or mutable state.
@@ -196,9 +208,9 @@ pub fn verify_finding_recovery_context(
     }
     let raw = base64::engine::general_purpose::STANDARD
         .decode(inputs.context_b64.as_bytes())
-        .map_err(|_| RecoveryVerificationError::Carrier)?;
+        .map_err(RecoveryVerificationError::CarrierEncoding)?;
     let context =
-        parse_finding_recovery_context(&raw).map_err(|_| RecoveryVerificationError::Carrier)?;
+        parse_finding_recovery_context(&raw).map_err(RecoveryVerificationError::CarrierInput)?;
     let original_capability: CapabilityToken = strict_member(
         &context.original_capability_json,
         "original_capability_json",
@@ -246,7 +258,7 @@ pub fn verify_finding_recovery_context(
         },
         &authorities.purchase,
     )
-    .map_err(|_| RecoveryVerificationError::PurchaseContext)?;
+    .map_err(|error| RecoveryVerificationError::PurchaseContext(Box::new(error)))?;
 
     let purchase_record: SignedFindingPurchaseRecord = strict_member(
         &context.purchase_record_envelope_json,
@@ -284,8 +296,10 @@ pub fn verify_finding_recovery_context(
         .cloned()
         .ok_or(RecoveryVerificationError::DeliveryReceiptBinding)
         .and_then(|value| {
-            serde_json::from_value(value)
-                .map_err(|_| RecoveryVerificationError::DeliveryReceiptBinding)
+            serde_json::from_value(value).map_err(|error| RecoveryVerificationError::MemberInput {
+                member: "delivery_metadata",
+                source: UntrustedJsonError::Decode(error).into(),
+            })
         })?;
     delivery
         .validate()
@@ -529,5 +543,26 @@ mod tests {
         .err()
         .expect("buyer must not self-authorize recovery");
         assert_eq!(error, RecoveryVerificationError::RecoveryIssuer);
+    }
+}
+
+#[cfg(test)]
+mod original_input_tests {
+    use super::*;
+    #[test]
+    fn original_recovery_member_preserves_external_contract_and_cause() {
+        let valid = strict_member::<serde_json::Value>(r#"{"counter":9007199254740991}"#, "test");
+        assert!(valid.is_ok());
+        for text in [
+            r#"{"counter":18446744073709551615}"#,
+            r#"{"nested":{"private-marker":1,"private-marker":2}}"#,
+        ] {
+            let error = match strict_member::<serde_json::Value>(text, "test") {
+                Err(error) => error,
+                Ok(_) => panic!("invalid external member accepted"),
+            };
+            assert!(std::error::Error::source(&error).is_some());
+            assert!(!format!("{error:?} {error}").contains("private-marker"));
+        }
     }
 }

@@ -500,6 +500,16 @@ impl SettlementHookError {
                     SettlementFailureCode::Unsupported,
                     detail.as_str(),
                 ),
+                SettlementError::Input(source) => (
+                    SettlementFailureClass::Permanent,
+                    SettlementFailureCode::Serialization,
+                    source.code(),
+                ),
+                SettlementError::Io(_) => (
+                    SettlementFailureClass::Permanent,
+                    SettlementFailureCode::InvalidInput,
+                    "settlement-file-unavailable",
+                ),
                 SettlementError::Serialization(detail) => (
                     SettlementFailureClass::Permanent,
                     SettlementFailureCode::Serialization,

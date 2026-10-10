@@ -51,10 +51,10 @@ impl AnthropicAdapter {
         let mut gate = StreamGate::new(self);
 
         for frame in frames {
-            gate.accept(frame, &mut evaluate)?;
+            gate.accept(frame)?;
         }
 
-        gate.finish()
+        gate.finish(&mut evaluate)
     }
 }
 
@@ -65,6 +65,9 @@ struct StreamGate<'a> {
     active: Option<ActiveBlock>,
     invocations: Vec<ToolInvocation>,
     verdicts: Vec<VerdictResult>,
+    blocks: Vec<ToolUseBlock>,
+    seen_ids: std::collections::BTreeSet<String>,
+    started: bool,
 }
 
 impl<'a> StreamGate<'a> {
@@ -76,26 +79,35 @@ impl<'a> StreamGate<'a> {
             active: None,
             invocations: Vec::new(),
             verdicts: Vec::new(),
+            blocks: Vec::new(),
+            seen_ids: std::collections::BTreeSet::new(),
+            started: false,
         }
     }
 
-    fn accept<F>(&mut self, frame: SseFrame, evaluate: &mut F) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn accept(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
         let Some(event) = frame.event.as_deref() else {
             return self.forward_or_buffer(frame);
         };
 
+        if event == "message_start" {
+            if self.started || self.phase.is_closed() {
+                return Err(ProviderError::Malformed("duplicate message start".into()));
+            }
+            self.started = true;
+        } else if event != "ping" && (!self.started || self.phase.is_closed()) {
+            return Err(ProviderError::Malformed(
+                "event outside the message lifetime".into(),
+            ));
+        }
         match event {
             "content_block_start" => self.start_content_block(frame),
             "content_block_delta" => self.delta_content_block(frame),
-            "content_block_stop" => self.stop_content_block(frame, evaluate),
+            "content_block_stop" => self.stop_content_block(frame),
             "message_stop" => self.stop_message(frame),
-            "error" => Err(ProviderError::Malformed(format!(
-                "Anthropic SSE error event: {}",
-                data_text(&frame)
-            ))),
+            "error" => Err(ProviderError::Malformed(
+                "Anthropic stream reported an upstream error".into(),
+            )),
             _ => self.forward_or_buffer(frame),
         }
     }
@@ -125,6 +137,11 @@ impl<'a> StreamGate<'a> {
         }
 
         let block = tool_use_from_content_block(content_block)?;
+        if !self.seen_ids.insert(block.id.clone()) {
+            return Err(ProviderError::Malformed(
+                "stream reuses a tool call id".into(),
+            ));
+        }
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -157,19 +174,12 @@ impl<'a> StreamGate<'a> {
                 chunk: partial_json.as_bytes().to_vec(),
             },
         )?;
-        active.input_json.push_str(partial_json);
+        chio_provider_adapter_core::input::append_arguments(&mut active.input_json, partial_json)?;
         active.push_frame(frame)?;
         Ok(())
     }
 
-    fn stop_content_block<F>(
-        &mut self,
-        frame: SseFrame,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn stop_content_block(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
         let index = frame_index(&frame, "content_block_stop")?;
         let active = self.active.take().ok_or_else(|| {
             ProviderError::Malformed(
@@ -185,11 +195,12 @@ impl<'a> StreamGate<'a> {
 
         let block = active.completed_tool_use()?;
         let invocation = self.adapter.invocation_from_tool_use(&block)?;
-        let verdict = evaluate(&invocation)?;
-        ensure_streaming_allow(&block, &verdict)?;
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        if self.invocations.len() >= chio_provider_adapter_core::input::MAX_TOOL_CALLS {
+            return Err(ProviderError::StreamCapacityExceeded);
+        }
         self.invocations.push(invocation);
-        self.verdicts.push(verdict);
+        self.blocks.push(block);
         for frame in active.frames {
             self.output.extend_from_slice(&frame.raw);
         }
@@ -220,7 +231,10 @@ impl<'a> StreamGate<'a> {
         Ok(())
     }
 
-    fn finish(self) -> Result<GatedSseStream, ProviderError> {
+    fn finish(
+        mut self,
+        evaluate: &mut impl FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
+    ) -> Result<GatedSseStream, ProviderError> {
         if let Some(active) = self.active {
             return Err(ProviderError::Malformed(format!(
                 "Anthropic SSE ended before content block {} stopped",
@@ -228,6 +242,16 @@ impl<'a> StreamGate<'a> {
             )));
         }
 
+        if !self.started || !self.phase.is_closed() {
+            return Err(ProviderError::Malformed(
+                "stream ended without a complete message".into(),
+            ));
+        }
+        for (block, invocation) in self.blocks.iter().zip(&self.invocations) {
+            let verdict = evaluate(invocation)?;
+            ensure_streaming_allow(block, &verdict)?;
+            self.verdicts.push(verdict);
+        }
         Ok(GatedSseStream {
             bytes: self.output,
             invocations: self.invocations,
@@ -326,12 +350,7 @@ impl ActiveBlock {
             )));
         }
 
-        let input: Value = serde_json::from_str(&self.input_json).map_err(|error| {
-            ProviderError::BadToolArgs(format!(
-                "Anthropic tool_use `{}` completed input_json_delta was not valid JSON: {error}",
-                block.id
-            ))
-        })?;
+        let input: Value = chio_provider_adapter_core::input::arguments(&self.input_json)?;
         if !input.is_object() {
             return Err(ProviderError::BadToolArgs(format!(
                 "Anthropic tool_use `{}` completed input_json_delta was not a JSON object",
@@ -373,14 +392,6 @@ fn required_data<'a>(frame: &'a SseFrame, event: &str) -> Result<&'a Value, Prov
     frame.data.as_ref().ok_or_else(|| {
         ProviderError::Malformed(format!("Anthropic {event} SSE frame was missing data"))
     })
-}
-
-fn data_text(frame: &SseFrame) -> String {
-    frame
-        .data
-        .as_ref()
-        .map(Value::to_string)
-        .unwrap_or_else(|| "<missing data>".to_string())
 }
 
 fn frame_index(frame: &SseFrame, event: &str) -> Result<u64, ProviderError> {

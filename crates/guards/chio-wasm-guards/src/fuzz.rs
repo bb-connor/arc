@@ -463,7 +463,10 @@ fn assert_named_error(error: &crate::error::WasmGuardError) {
     use crate::error::WasmGuardError;
 
     match error {
-        WasmGuardError::ModuleLoad { .. }
+        WasmGuardError::Input(_)
+        | WasmGuardError::InputFile { .. }
+        | WasmGuardError::ManifestYaml(_)
+        | WasmGuardError::ModuleLoad { .. }
         | WasmGuardError::Compilation(_)
         | WasmGuardError::MissingExport(_)
         | WasmGuardError::InvalidSignature { .. }

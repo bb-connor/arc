@@ -7,9 +7,8 @@ use chio_core::capability::aggregate_invocation::{
 };
 use chio_core::capability::attenuation::{scope_hash, DelegationLink, DelegationLinkBody};
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::threshold_approval::{
@@ -250,10 +249,30 @@ fn threshold_fixture() -> TestResult<ThresholdFixture> {
         100,
     )
     .map_err(std::io::Error::other)?;
+    let context = chio_kernel::approval::ThresholdApprovalProposalCreationContext::new(
+        chio_kernel::approval::ThresholdApprovalProposalCreationParameters {
+            matched_request:
+                chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+                    "request-1",
+                    "server",
+                    "tool",
+                )
+                .map_err(std::io::Error::other)?,
+            requirement: requirement.clone(),
+            subject: subject.public_key(),
+            governed_intent_hash: sha256_hex(b"intent"),
+            authorization_capability_hash: sha256_hex(b"capability"),
+            authorizing_capability_expires_at: 200,
+            governed_operation_expires_at: 200,
+            submitter: None,
+            separation_of_duties: false,
+        },
+    )?;
     let collector = ThresholdApprovalCollector::new(
         Arc::new(InMemoryThresholdApprovalCollectorStore::new()),
         policy_hash,
         vec![authority.public_key()],
+        Arc::new(move |_: &str, _: u64| Ok(context.clone())),
     );
     Ok(ThresholdFixture {
         collector,
@@ -339,13 +358,7 @@ fn threshold_proposal_mutations_and_exact_quorum_fail_closed() -> TestResult {
         }
     }
 
-    fixture.collector.create_proposal(
-        proposal.clone(),
-        fixture.requirement.clone(),
-        None,
-        false,
-        100,
-    )?;
+    fixture.collector.create_proposal(proposal.clone(), 100)?;
     let one = fixture.collector.submit_token(
         "proposal-1",
         approval_token(&proposal, &fixture.alice, "token-alice")?,
@@ -376,13 +389,13 @@ fn verified_approval_set_is_order_invariant_and_domain_separated() -> TestResult
     let proposal = proposal(&fixture)?;
     let alice = approval_token(&proposal, &fixture.alice, "token-alice")?.artifact_digest()?;
     let bob = approval_token(&proposal, &fixture.bob, "token-bob")?.artifact_digest()?;
-    let first = VerifiedApprovalSetBody::new(vec![alice.clone(), bob.clone()], &proposal)?;
-    let second = VerifiedApprovalSetBody::new(vec![bob, alice], &proposal)?;
+    let first = ApprovalSetBody::new(vec![alice.clone(), bob.clone()], &proposal)?;
+    let second = ApprovalSetBody::new(vec![bob, alice], &proposal)?;
 
     assert_eq!(first, second);
     assert_eq!(first.approval_set_hash()?, second.approval_set_hash()?);
     assert_ne!(first.approval_set_hash()?, proposal.artifact_digest()?);
-    assert!(VerifiedApprovalSetBody::new(
+    assert!(ApprovalSetBody::new(
         vec![sha256_hex(b"duplicate"), sha256_hex(b"duplicate")],
         &proposal,
     )

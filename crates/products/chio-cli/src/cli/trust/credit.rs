@@ -63,7 +63,8 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_evaluate(
                     .to_string(),
             )
         })?;
-        trust_control::build_credit_loss_lifecycle_report(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::build_credit_loss_lifecycle_report(&receipt_store, &query)?
     };
 
     if json_output {
@@ -151,8 +152,13 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            authority_seed_path,
+            authority_db_path,
+        )?;
         trust_control::issue_signed_credit_loss_lifecycle(
-            receipt_db_path,
+            &receipt_store,
             authority_seed_path,
             authority_db_path,
             &request,
@@ -206,7 +212,8 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_credit_loss_lifecycle(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_credit_loss_lifecycle(&receipt_store, &query)?
     };
 
     if backend.json_output {
@@ -283,8 +290,9 @@ pub(crate) fn cmd_trust_credit_backtest_export(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_credit_backtest_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             None,
@@ -345,8 +353,9 @@ pub(crate) fn cmd_trust_provider_risk_package_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_signed_credit_provider_risk_package(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -383,7 +392,7 @@ pub(crate) fn cmd_trust_provider_risk_package_export(
 pub(crate) fn parse_credit_facility_disposition(
     value: &str,
 ) -> Result<chio_kernel::CreditFacilityDisposition, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit facility disposition `{value}`"))
     })
 }
@@ -391,7 +400,7 @@ pub(crate) fn parse_credit_facility_disposition(
 pub(crate) fn parse_credit_facility_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::CreditFacilityLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid credit facility lifecycle state `{value}`"
         ))
@@ -401,7 +410,7 @@ pub(crate) fn parse_credit_facility_lifecycle_state(
 pub(crate) fn parse_credit_bond_disposition(
     value: &str,
 ) -> Result<chio_kernel::CreditBondDisposition, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit bond disposition `{value}`"))
     })
 }
@@ -409,7 +418,7 @@ pub(crate) fn parse_credit_bond_disposition(
 pub(crate) fn parse_credit_bond_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::CreditBondLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit bond lifecycle state `{value}`"))
     })
 }
@@ -417,7 +426,7 @@ pub(crate) fn parse_credit_bond_lifecycle_state(
 pub(crate) fn parse_credit_loss_lifecycle_event_kind(
     value: &str,
 ) -> Result<chio_kernel::CreditLossLifecycleEventKind, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid credit loss lifecycle event kind `{value}`"
         ))
@@ -427,16 +436,5 @@ pub(crate) fn parse_credit_loss_lifecycle_event_kind(
 pub(crate) fn load_credit_bonded_execution_control_policy(
     path: &Path,
 ) -> Result<chio_kernel::CreditBondedExecutionControlPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(policy) = serde_json::from_str(&contents) {
-        Ok(policy)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load_document(path)
 }

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use chio_credit::obligation::{
     CreditExposureReservationRecordV1, CreditExposureReservationStateV1,
 };
@@ -299,7 +300,9 @@ pub(crate) fn reserve_credit_exposure_tx(
     }
     verify_credit_exposure_fence_tx(transaction, fence)?;
     validate_trusted_time(trusted_now_unix_ms, "credit_exposure_reserved_at_unix_ms")?;
-    if trusted_now_unix_ms / 1_000 >= reservation.authority_expires_at_unix_seconds() {
+    if chio_security_types::clock::UnixMillis::new(trusted_now_unix_ms).as_secs()
+        >= reservation.authority_expires_at_unix_seconds()
+    {
         return Err(invariant("credit exposure authority set is expired"));
     }
     if let Some(existing) =
@@ -1031,7 +1034,7 @@ pub(super) fn verify_credit_exposure_account_invariants(
             }
         }
         event_versions.sort_unstable();
-        if event_versions.windows(2).any(|pair| {
+        if event_versions.array_windows::<2>().any(|pair| {
             pair[0]
                 .checked_add(1)
                 .is_none_or(|expected| expected != pair[1])
@@ -1261,14 +1264,13 @@ fn decode_credit_exposure_record(
             "persisted credit exposure record has invalid size",
         ));
     }
-    let record: CreditExposureReservationRecordV1 = serde_json::from_slice(bytes)
-        .map_err(|error| invariant(format!("credit exposure record decoding failed: {error}")))?;
+    let record: CreditExposureReservationRecordV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_CREDIT_EXPOSURE_RECORD_BYTES)
+            .and_then(|input| input.decode_canonical())
+            .map_err(|error| {
+                invariant(format!("credit exposure record decoding failed: {error}"))
+            })?;
     record.validate().map_err(credit_error)?;
-    if encode_credit_exposure_record(&record)? != bytes {
-        return Err(invariant(
-            "persisted credit exposure record is not canonical",
-        ));
-    }
     Ok(record)
 }
 

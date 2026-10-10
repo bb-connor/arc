@@ -156,14 +156,18 @@ impl ToolServerConnection for FindingRevealServer {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_finding::finding_payload_sha256;
 
     #[tokio::test]
     async fn durable_resolver_reveals_after_store_restart() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = chio_test_support::private_tempdir().unwrap();
         let path = dir.path().join("operator.db");
         let tenant_id = TenantId::new("operator-alpha");
         let key = TenantKey::from_bytes([9; 32]);

@@ -2,6 +2,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::ReceiptStore;
 
+#[test]
+fn archive_schema_rejects_substituted_security_identity_guards(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::evidence_retention::create_archive_schema;
+
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch("ATTACH DATABASE ':memory:' AS archive")?;
+    create_archive_schema(&mut connection)?;
+    connection.execute_batch(
+        "DROP TRIGGER archive.chio_security_evidence_index_reject_update;
+         CREATE TRIGGER archive.chio_security_evidence_index_reject_update
+         BEFORE UPDATE ON chio_security_evidence_index BEGIN SELECT 1; END;",
+    )?;
+    assert!(matches!(create_archive_schema(&mut connection),
+        Err(chio_kernel::ReceiptStoreError::Conflict(message))
+            if message == "security evidence index schema differs from the canonical definition"));
+    Ok(())
+}
+
 fn unique_archive_path() -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)

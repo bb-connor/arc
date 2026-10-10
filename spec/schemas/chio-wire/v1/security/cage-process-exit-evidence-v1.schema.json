@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json",
+  "title": "Chio cage process-exit evidence v1",
+  "description": "Terminal process observation carrying exactly one normal exit code or terminating signal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["process_id", "exit_code", "signal", "exited_at_unix_ms"],
+  "properties": {
+    "process_id": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "exit_code": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0, "maximum": 255 },
+        { "type": "null" }
+      ]
+    },
+    "signal": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 64 },
+        { "type": "null" }
+      ]
+    },
+    "exited_at_unix_ms": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "signal": { "type": "null" }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "exit_code": { "type": "null" },
+        "signal": { "type": "integer", "minimum": 1, "maximum": 64 }
+      }
+    }
+  ]
+}

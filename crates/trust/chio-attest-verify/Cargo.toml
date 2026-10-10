@@ -46,13 +46,12 @@ p384 = { version = "0.13", default-features = false, features = ["ecdsa"], optio
 default = []
 pq = ["dep:fips204", "chio-core-types/pq"]
 tee-quotes = ["dep:sev", "dep:coset", "dep:p256", "dep:p384"]
-# `kani` is an opt-in feature toggle for the model-checked harness module
-# (`src/kani_public_harnesses.rs`). The module body itself is gated by
-# `#[cfg(kani)]` so production builds never compile it; this feature is
-# kept available for tooling that wants to opt in without invoking the
-# Kani toolchain (e.g. doc/clippy passes that include the module's
-# inline documentation comments). No production code path depends on it.
-kani = []
+# Kani uses the real portable SHA-256 implementation without CPU probes or
+# intrinsics. The harness module remains cfg(kani)-only. Enabling this feature
+# in an ordinary build also selects software SHA-256; defaults are unchanged.
+kani = ["sha2/force-soft", "chio-core-types/kani"]
+# Unproved noncollision obligations; never enabled by the mandatory proof gate.
+kani-research = ["kani"]
 
 [dev-dependencies]
 chio-adversarial-suite = { workspace = true }
@@ -78,10 +77,13 @@ path = "tests/migration.rs"
 required-features = ["pq"]
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 # `cfg(kani)` is set automatically by the Kani toolchain (see
 # `crates/trust/chio-attest-verify/src/kani_public_harnesses.rs`). Register
 # the cfg with check-cfg so default `cargo build` / `cargo clippy`

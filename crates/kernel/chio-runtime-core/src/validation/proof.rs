@@ -389,10 +389,11 @@ fn runtime_proof_source_records_match_steps(
 
 fn parse_runtime_json<T: serde::de::DeserializeOwned>(
     bytes: &[u8],
-    label: &str,
+    _label: &str,
 ) -> Result<T, ChioRuntimeError> {
-    serde_json::from_slice(bytes)
-        .map_err(|error| ChioRuntimeError::Json(format!("{label}: {error}")))
+    chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 fn canonical_json_value_sha256(bytes: &[u8], label: &str) -> Result<String, ChioRuntimeError> {

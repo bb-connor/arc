@@ -14,86 +14,31 @@ pub struct RosterPolicy {
     pub roster_anchor: String,
 }
 
-pub fn issue_signed_liability_provider(
-    receipt_db_path: &Path,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    report: &LiabilityProviderReport,
-    supersedes_provider_record_id: Option<&str>,
-) -> Result<SignedLiabilityProvider, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    report.validate().map_err(CliError::cli_other_error)?;
-    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
-    let artifact = build_liability_provider_artifact(
-        report.clone(),
-        issued_at,
-        supersedes_provider_record_id.map(ToOwned::to_owned),
-    )?;
-    let signed = SignedLiabilityProvider::sign(artifact, &keypair).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to sign liability provider artifact: {error}"
-        ))
-    })?;
-    receipt_store
-        .record_liability_provider(&signed)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    Ok(signed)
-}
-
 pub fn list_liability_providers(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &LiabilityProviderListQuery,
 ) -> Result<LiabilityProviderListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_liability_providers(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn resolve_liability_provider(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &LiabilityProviderResolutionQuery,
 ) -> Result<LiabilityProviderResolutionReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .resolve_liability_provider(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-fn build_liability_provider_artifact(
-    report: LiabilityProviderReport,
-    issued_at: u64,
-    supersedes_provider_record_id: Option<String>,
-) -> Result<LiabilityProviderArtifact, CliError> {
-    report.validate().map_err(CliError::cli_other_error)?;
-    let lifecycle_state = report.lifecycle_state;
-    let provider_record_id_input = canonical_json_bytes(&(
-        LIABILITY_PROVIDER_ARTIFACT_SCHEMA,
-        issued_at,
-        lifecycle_state,
-        &supersedes_provider_record_id,
-        &report,
-    ))
-    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let provider_record_id = format!("lpr-{}", sha256_hex(&provider_record_id_input));
-    Ok(LiabilityProviderArtifact {
-        schema: LIABILITY_PROVIDER_ARTIFACT_SCHEMA.to_string(),
-        provider_record_id,
-        issued_at,
-        lifecycle_state,
-        supersedes_provider_record_id,
-        report,
-    })
-}
-
 pub fn issue_signed_liability_quote_request(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityQuoteRequestIssueRequest,
 ) -> Result<SignedLiabilityQuoteRequest, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request.provider_id.clone(),
@@ -103,7 +48,7 @@ pub fn issue_signed_liability_quote_request(
         })
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_quote_request_artifact(request, &resolution, issued_at)?;
     let signed = SignedLiabilityQuoteRequest::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -117,12 +62,12 @@ pub fn issue_signed_liability_quote_request(
 }
 
 pub fn issue_signed_liability_quote_response(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityQuoteResponseIssueRequest,
 ) -> Result<SignedLiabilityQuoteResponse, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request
@@ -159,7 +104,7 @@ pub fn issue_signed_liability_quote_response(
         )));
     }
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_quote_response_artifact(request, issued_at)?;
     let signed = SignedLiabilityQuoteResponse::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -173,12 +118,12 @@ pub fn issue_signed_liability_quote_response(
 }
 
 pub fn issue_signed_liability_placement(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityPlacementIssueRequest,
 ) -> Result<SignedLiabilityPlacement, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request
@@ -241,7 +186,7 @@ pub fn issue_signed_liability_placement(
         )));
     }
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_placement_artifact(request, issued_at)?;
     let signed = SignedLiabilityPlacement::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -255,12 +200,12 @@ pub fn issue_signed_liability_placement(
 }
 
 pub fn issue_signed_liability_pricing_authority(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityPricingAuthorityIssueRequest,
 ) -> Result<SignedLiabilityPricingAuthority, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request
@@ -297,7 +242,7 @@ pub fn issue_signed_liability_pricing_authority(
         )));
     }
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_pricing_authority_artifact(request, issued_at)?;
     let signed = SignedLiabilityPricingAuthority::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -311,12 +256,12 @@ pub fn issue_signed_liability_pricing_authority(
 }
 
 pub fn issue_signed_liability_bound_coverage(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityBoundCoverageIssueRequest,
 ) -> Result<SignedLiabilityBoundCoverage, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request
@@ -393,7 +338,7 @@ pub fn issue_signed_liability_bound_coverage(
         )));
     }
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_bound_coverage_artifact(request, issued_at)?;
     let signed = SignedLiabilityBoundCoverage::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -407,12 +352,12 @@ pub fn issue_signed_liability_bound_coverage(
 }
 
 pub fn issue_signed_liability_auto_bind(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityAutoBindIssueRequest,
 ) -> Result<SignedLiabilityAutoBindDecision, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let resolution = receipt_store
         .resolve_liability_provider(&LiabilityProviderResolutionQuery {
             provider_id: request
@@ -474,7 +419,7 @@ pub fn issue_signed_liability_auto_bind(
                 .provider_record_id
         )));
     }
-    if request.authority.body.expires_at <= unix_timestamp_now() {
+    if request.authority.body.expires_at <= clock_now {
         return Err(CliError::cli_other_error(format!(
             "liability pricing authority `{}` is stale",
             request.authority.body.authority_id
@@ -490,7 +435,7 @@ pub fn issue_signed_liability_auto_bind(
                 "liability auto-bind requires a quoted quote response".to_string(),
             )
         })?;
-    if quoted_terms.expires_at <= unix_timestamp_now() {
+    if quoted_terms.expires_at <= clock_now {
         return Err(CliError::cli_other_error(format!(
             "liability quote response `{}` is stale",
             request.quote_response.body.quote_response_id
@@ -529,7 +474,7 @@ pub fn issue_signed_liability_auto_bind(
         ));
     }
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let placement_request = LiabilityPlacementIssueRequest {
         quote_response: request.quote_response.clone(),
         selected_coverage_amount: quoted_terms.quoted_coverage_amount.clone(),
@@ -602,24 +547,23 @@ pub fn issue_signed_liability_auto_bind(
 }
 
 pub fn list_liability_market_workflows(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &LiabilityMarketWorkflowQuery,
 ) -> Result<LiabilityMarketWorkflowReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_liability_market_workflows(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn issue_signed_liability_claim_package(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimPackageIssueRequest,
 ) -> Result<SignedLiabilityClaimPackage, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_package_artifact(request, issued_at)?;
     let signed = SignedLiabilityClaimPackage::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -633,14 +577,14 @@ pub fn issue_signed_liability_claim_package(
 }
 
 pub fn issue_signed_liability_claim_response(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimResponseIssueRequest,
 ) -> Result<SignedLiabilityClaimResponse, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_response_artifact(request, issued_at)?;
     let signed = SignedLiabilityClaimResponse::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -654,14 +598,14 @@ pub fn issue_signed_liability_claim_response(
 }
 
 pub fn issue_signed_liability_claim_dispute(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimDisputeIssueRequest,
 ) -> Result<SignedLiabilityClaimDispute, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_dispute_artifact(request, issued_at)?;
     let signed = SignedLiabilityClaimDispute::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -675,15 +619,15 @@ pub fn issue_signed_liability_claim_dispute(
 }
 
 pub fn issue_signed_liability_claim_adjudication(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimAdjudicationIssueRequest,
     policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimAdjudication, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_adjudication_artifact(request, issued_at, policy)?;
     let signed = SignedLiabilityClaimAdjudication::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -697,15 +641,15 @@ pub fn issue_signed_liability_claim_adjudication(
 }
 
 pub fn issue_signed_liability_claim_payout_instruction(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimPayoutInstructionIssueRequest,
     policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimPayoutInstruction, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_payout_instruction_artifact(request, issued_at, policy)?;
     let signed =
         SignedLiabilityClaimPayoutInstruction::sign(artifact, &keypair).map_err(|error| {
@@ -720,14 +664,14 @@ pub fn issue_signed_liability_claim_payout_instruction(
 }
 
 pub fn issue_signed_liability_claim_payout_receipt(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimPayoutReceiptIssueRequest,
 ) -> Result<SignedLiabilityClaimPayoutReceipt, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_payout_receipt_artifact(request, issued_at)?;
     let signed = SignedLiabilityClaimPayoutReceipt::sign(artifact, &keypair).map_err(|error| {
         CliError::cli_other_error(format!(
@@ -741,15 +685,15 @@ pub fn issue_signed_liability_claim_payout_receipt(
 }
 
 pub fn issue_signed_liability_claim_settlement_instruction(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimSettlementInstructionIssueRequest,
     policy: &RosterPolicy,
 ) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact =
         build_liability_claim_settlement_instruction_artifact(request, issued_at, policy)?;
     let signed =
@@ -765,14 +709,14 @@ pub fn issue_signed_liability_claim_settlement_instruction(
 }
 
 pub fn issue_signed_liability_claim_settlement_receipt(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimSettlementReceiptIssueRequest,
 ) -> Result<SignedLiabilityClaimSettlementReceipt, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_liability_claim_settlement_receipt_artifact(request, issued_at)?;
     let signed =
         SignedLiabilityClaimSettlementReceipt::sign(artifact, &keypair).map_err(|error| {
@@ -787,10 +731,9 @@ pub fn issue_signed_liability_claim_settlement_receipt(
 }
 
 pub fn list_liability_claim_workflows(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &LiabilityClaimWorkflowQuery,
 ) -> Result<LiabilityClaimWorkflowReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_liability_claim_workflows(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
@@ -2164,3 +2107,7 @@ mod roster_enforcement {
         );
     }
 }
+
+#[path = "liability/providers.rs"]
+mod providers;
+pub use providers::issue_signed_liability_provider;

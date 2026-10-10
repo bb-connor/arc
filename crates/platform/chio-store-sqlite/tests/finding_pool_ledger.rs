@@ -40,6 +40,23 @@ use chio_swarm_authority::finding_pool::{
 use chio_swarm_authority::{SwarmBudgetPool, CHIO_SWARM_BUDGET_POOL_SCHEMA};
 use chio_test_support::prelude::*;
 
+#[path = "finding_pool_ledger/tenant_isolation.rs"]
+mod tenant_isolation;
+
+mod tempfile {
+    pub use ::tempfile::{Builder, TempDir};
+
+    pub fn tempdir() -> std::io::Result<TempDir> {
+        let mut builder = Builder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            builder.permissions(std::fs::Permissions::from_mode(0o700));
+        }
+        builder.tempdir()
+    }
+}
+
 fn ledger_domain() -> String {
     let thread = std::thread::current();
     format!(
@@ -75,8 +92,14 @@ fn rollback_anchor_root() -> &'static std::path::Path {
 }
 
 fn rollback_anchor_tempdir(prefix: &str) -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .prefix(prefix)
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(prefix);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder
         .tempdir_in("/dev/shm")
         .test_expect("create rollback anchor directory")
 }
@@ -408,24 +431,27 @@ fn debit_at_with_policy_and_authority_and_tenant(
         reject_verification: reject_purchase_verification,
         reject_admission: reject_purchase_admission,
     };
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: kernel_key,
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-ledger-test".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: kernel_key,
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-ledger-test".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel
         .set_receipt_store_handle(fixture.receipt_store.clone())
         .test_expect("configure durable receipt store");
@@ -480,6 +506,7 @@ fn debit_at_with_policy_and_authority_and_tenant(
                         audience: Some("chio-mcp".to_owned()),
                         scopes: vec!["mcp:invoke".to_owned()],
                         federated_claims: OAuthBearerFederatedClaims {
+                            sender_public_key: None,
                             tenant_id: Some(tenant_id.to_owned()),
                             ..OAuthBearerFederatedClaims::default()
                         },
@@ -535,10 +562,7 @@ fn debit_at_with_policy_and_authority_and_tenant(
         &fixture.debit_signer,
     )
     .test_expect("sign purchaser debit authorization");
-    let _runtime = chio_kernel::scope_fixed_runtime_for_current_thread(
-        now_unix_ms / 1_000,
-        std::iter::empty::<String>(),
-    );
+    let _runtime = chio_test_support::clock::scope_unix_secs(now_unix_ms / 1_000);
     kernel.debit_finding_pool_purchase(FindingPoolDebitRequest {
         operation_context: &operation_context,
         allocation: &fixture.allocation,
@@ -598,43 +622,6 @@ impl FindingStatusProofVerifier for StaticStatusVerifier {
         self.admissions.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
-}
-
-#[test]
-fn cognition_market_debit_resolves_tenant_from_authenticated_session_context() {
-    let directory = tempfile::tempdir().test_expect("create ledger directory");
-    let database = directory.path().join("finding-pool.sqlite3");
-    let ledger = open_qualified(&database, ledger_domain()).test_expect("open qualified ledger");
-    let fixture = fixture(100, &ledger);
-    let purchase_id = "purchase:authenticated-tenant";
-
-    debit_at_with_policy_and_authority_and_tenant(
-        &ledger,
-        &fixture,
-        purchase_id,
-        10,
-        2_000,
-        None,
-        None,
-        Arc::new(AtomicU64::new(0)),
-        false,
-        Keypair::from_seed(&[99_u8; 32]),
-        fixture.authority.public_key(),
-        false,
-        Some("tenant-A"),
-        SessionState::Ready,
-    )
-    .test_expect("reserve against authenticated tenant context");
-
-    let connection = rusqlite::Connection::open(&database).test_expect("open tenant ledger");
-    let tenant_id: Option<String> = connection
-        .query_row(
-            "SELECT tenant_id FROM finding_pool_debits WHERE purchase_id = ?1",
-            [purchase_id],
-            |row| row.get(0),
-        )
-        .test_expect("load reserved tenant");
-    assert_eq!(tenant_id.as_deref(), Some("tenant-A"));
 }
 
 #[test]
@@ -1660,24 +1647,27 @@ fn cognition_market_kernel_refuses_pool_ledger_replacement() {
     .test_expect("open second qualified ledger");
     let fixture = fixture(100, &first);
     let receipt_directory = tempfile::tempdir().test_expect("create receipt directory");
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::from_seed(&[99_u8; 32]),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-ledger-pinning-test".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::from_seed(&[99_u8; 32]),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-ledger-pinning-test".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel
         .set_receipt_store(Box::new(
             SqliteReceiptStore::open_for_finding_pool(

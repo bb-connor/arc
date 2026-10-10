@@ -62,14 +62,32 @@ def verify_sig(pk_hex: str, body: dict[str, Any], sig_hex: str) -> bool:
 
 
 # -- Capability body extraction -----------------------------------------------
+#
+# Chio signs the canonical JSON of a token's schema envelope and body with
+# every empty collection and absent optional field left out, so the bytes a
+# client signs must be pruned the same way or the trust service refuses the
+# signature.
+
+CAPABILITY_SCHEMA = "chio.capability.v1"
+
+
+def _prune(value: Any) -> Any:
+    if isinstance(value, dict):
+        pruned = {k: _prune(v) for k, v in value.items()}
+        return {k: v for k, v in pruned.items() if v is not None and v != [] and v != {}}
+    if isinstance(value, list):
+        return [_prune(v) for v in value]
+    return value
+
 
 def cap_body(cap: dict[str, Any]) -> dict[str, Any]:
     b = {
+        "schema": cap.get("schema", CAPABILITY_SCHEMA),
         "id": cap["id"], "issuer": cap["issuer"], "subject": cap["subject"],
-        "scope": cap["scope"], "issued_at": cap["issued_at"], "expires_at": cap["expires_at"],
+        "scope": _prune(cap["scope"]), "issued_at": cap["issued_at"], "expires_at": cap["expires_at"],
     }
     if cap.get("delegation_chain"):
-        b["delegation_chain"] = cap["delegation_chain"]
+        b["delegation_chain"] = [_prune(link) for link in cap["delegation_chain"]]
     return b
 
 
@@ -79,7 +97,7 @@ def link_body(link: dict[str, Any]) -> dict[str, Any]:
         "delegatee": link["delegatee"], "timestamp": link["timestamp"],
     }
     if link.get("attenuations"):
-        b["attenuations"] = link["attenuations"]
+        b["attenuations"] = _prune(link["attenuations"])
     return b
 
 
@@ -105,6 +123,7 @@ def delegate(
     }
     link["signature"] = delegator.sign(link_body(link))
     cap = {
+        "schema": CAPABILITY_SCHEMA,
         "id": cap_id or f"cap-{uuid.uuid4().hex[:12]}",
         "issuer": delegator.pk,
         "subject": delegatee.pk,

@@ -93,7 +93,7 @@ fn signed_view(
 ) -> TestResult<EconomicStateAnchorViewV1> {
     heads.sort_by(|left, right| left.resource_key.cmp(&right.resource_key));
     absent_resource_keys.sort_unstable();
-    request_replays.sort_by(|left, right| left.request.key().cmp(&right.request.key()));
+    request_replays.sort_by_key(|replay| replay.request.key());
     absent_request_keys.sort_unstable();
     let mut view = EconomicStateAnchorViewV1 {
         schema: CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA.to_owned(),

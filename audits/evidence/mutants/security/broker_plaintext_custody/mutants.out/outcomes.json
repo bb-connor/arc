@@ -1,0 +1,119 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.752311889,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.752400938,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--locked",
+            "--lib",
+            "encrypted_blob_backend::tests::ordinary_or_unsealed_file_cannot_supply_startup_key",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-secret-broker",
+          "file": "crates/security/chio-secret-broker/src/encrypted_blob_backend.rs",
+          "function": {
+            "function_name": "read_sealed_32",
+            "return_type": "-> Result<Zeroizing<[u8; KEY_BYTES]>>",
+            "span": {
+              "start": {
+                "line": 111,
+                "column": 1
+              },
+              "end": {
+                "line": 157,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 129,
+              "column": 8
+            },
+            "end": {
+              "line": 129,
+              "column": 9
+            }
+          },
+          "replacement": "",
+          "genre": "UnaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-secret-broker__src__encrypted_blob_backend.rs_line_129_col_8.log",
+      "diff_path": "diff/crates__security__chio-secret-broker__src__encrypted_blob_backend.rs_line_129_col_8.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 9.267249113,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.752509857,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-secret-broker@0.1.0",
+            "--locked",
+            "--lib",
+            "encrypted_blob_backend::tests::ordinary_or_unsealed_file_cannot_supply_startup_key",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

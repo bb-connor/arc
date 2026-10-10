@@ -7,25 +7,7 @@ fn mcp_serve_progresses_wrapped_sampling_tasks_while_upstream_keeps_talking() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");

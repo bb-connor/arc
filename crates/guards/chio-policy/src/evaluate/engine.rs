@@ -59,33 +59,35 @@ pub fn evaluate_with_context(
     action: &EvaluationAction,
     context: &RuntimeContext,
     conditions: &HashMap<String, Condition>,
-) -> EvaluationResult {
+    clock: &dyn chio_security_types::clock::Clock,
+) -> Result<EvaluationResult, chio_security_types::clock::ClockError> {
+    let now = observed_time(clock)?;
     if is_panic_active() {
-        return EvaluationResult {
+        return Ok(EvaluationResult {
             decision: Decision::Deny,
             matched_rule: Some("__hushspec_panic__".to_string()),
             reason: Some("emergency panic mode is active".to_string()),
             origin_profile: None,
             posture: None,
-        };
+        });
     }
 
     let matched_profile = select_origin_profile(spec, action.origin.as_ref());
     let origin_profile_id = matched_profile.map(|profile| profile.id.clone());
     if let Some(denied) = origin_admission_denial(spec, action.origin.as_ref(), matched_profile) {
-        return denied;
+        return Ok(denied);
     }
     let posture = resolve_posture(spec, matched_profile, action.posture.as_ref());
 
     if let Some(denied) = posture_capability_guard(action, &posture, spec, &origin_profile_id) {
-        return denied;
+        return Ok(denied);
     }
 
     // Reject condition maps that reference unknown rule-block names before
     // filtering, so a misspelled key fails closed instead of silently leaving
     // its target rule active (which apply_conditions would otherwise no-op).
     if let Err(reason) = validate_condition_keys(conditions) {
-        return EvaluationResult {
+        return Ok(EvaluationResult {
             decision: Decision::Deny,
             matched_rule: None,
             reason: Some(format!(
@@ -93,12 +95,12 @@ pub fn evaluate_with_context(
             )),
             origin_profile: None,
             posture: None,
-        };
+        });
     }
 
-    let effective_spec = apply_conditions(spec, context, conditions);
+    let effective_spec = apply_conditions(spec, context, conditions, now);
 
-    match action.action_type.as_str() {
+    Ok(match action.action_type.as_str() {
         "tool_call" => evaluate_tool_call(
             &effective_spec,
             action,
@@ -156,5 +158,5 @@ pub fn evaluate_with_context(
             origin_profile: origin_profile_id,
             posture,
         },
-    }
+    })
 }

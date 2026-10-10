@@ -31,202 +31,38 @@ pub const ATTACK_CLASSES: &[AttackClass] = &[
     AttackClass::AnchorGrafted,
     AttackClass::SigstoreBundlePayloadMismatch,
     AttackClass::AuthorityBindingMutation,
+    AttackClass::BrokerDestinationRebinding,
+    AttackClass::BrokerExecutionOverspend,
+    AttackClass::BrokerOrphanHold,
+    AttackClass::BrokerParentDoubleCharge,
+    AttackClass::BrokerPlaintextCustody,
+    AttackClass::BrokerProofReplay,
+    AttackClass::BrokerRevocationRace,
+    AttackClass::BrokerSecretBoundaryCrossing,
+    AttackClass::BrokerUnboundHeaders,
+    AttackClass::CanaryEvasion,
+    AttackClass::ContainmentRollback,
+    AttackClass::KeyLogInconsistentGrowth,
+    AttackClass::KeyLogNoncontiguousSync,
+    AttackClass::KeyLogOmission,
+    AttackClass::KeyLogSplitView,
+    AttackClass::LabelDowngrade,
+    AttackClass::OldKeyBackdating,
+    AttackClass::RotationPartialCommit,
+    AttackClass::RotationUnwitnessedSigning,
+    AttackClass::SandboxFalseExecSuccess,
+    AttackClass::SandboxFdOrEnvLeak,
+    AttackClass::SandboxHelperSubstitution,
+    AttackClass::SandboxPartialEnforcement,
+    AttackClass::SandboxPathSwap,
+    AttackClass::SandboxSymlinkEscape,
+    AttackClass::SandboxSyscallEscape,
+    AttackClass::SandboxUnsignedManifest,
+    AttackClass::TemporalEvasion,
 ];
 
-/// One statically bundled adversarial case file.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BundledCase {
-    /// Repository-relative path to the case JSON.
-    pub path: &'static str,
-    /// Embedded JSON payload.
-    pub contents: &'static str,
-}
-
-/// Case files embedded into the crate for downstream test harnesses.
-pub const BUNDLED_CASES: &[BundledCase] = &[
-    BundledCase {
-        path: "cases/clock_rewound/clock-rewound-001.json",
-        contents: include_str!("../cases/clock_rewound/clock-rewound-001.json"),
-    },
-    BundledCase {
-        path: "cases/clock_rewound/clock-rewound-002.json",
-        contents: include_str!("../cases/clock_rewound/clock-rewound-002.json"),
-    },
-    BundledCase {
-        path: "cases/clock_rewound/clock-rewound-003.json",
-        contents: include_str!("../cases/clock_rewound/clock-rewound-003.json"),
-    },
-    BundledCase {
-        path: "cases/clock_rewound/clock-rewound-004.json",
-        contents: include_str!("../cases/clock_rewound/clock-rewound-004.json"),
-    },
-    BundledCase {
-        path: "cases/clock_rewound/clock-rewound-005.json",
-        contents: include_str!("../cases/clock_rewound/clock-rewound-005.json"),
-    },
-    BundledCase {
-        path: "cases/future_dated/future-dated-001.json",
-        contents: include_str!("../cases/future_dated/future-dated-001.json"),
-    },
-    BundledCase {
-        path: "cases/future_dated/future-dated-002.json",
-        contents: include_str!("../cases/future_dated/future-dated-002.json"),
-    },
-    BundledCase {
-        path: "cases/future_dated/future-dated-003.json",
-        contents: include_str!("../cases/future_dated/future-dated-003.json"),
-    },
-    BundledCase {
-        path: "cases/future_dated/future-dated-004.json",
-        contents: include_str!("../cases/future_dated/future-dated-004.json"),
-    },
-    BundledCase {
-        path: "cases/future_dated/future-dated-005.json",
-        contents: include_str!("../cases/future_dated/future-dated-005.json"),
-    },
-    BundledCase {
-        path: "cases/replayed_nonce/replayed-nonce-001.json",
-        contents: include_str!("../cases/replayed_nonce/replayed-nonce-001.json"),
-    },
-    BundledCase {
-        path: "cases/replayed_nonce/replayed-nonce-002.json",
-        contents: include_str!("../cases/replayed_nonce/replayed-nonce-002.json"),
-    },
-    BundledCase {
-        path: "cases/replayed_nonce/replayed-nonce-003.json",
-        contents: include_str!("../cases/replayed_nonce/replayed-nonce-003.json"),
-    },
-    BundledCase {
-        path: "cases/replayed_nonce/replayed-nonce-004.json",
-        contents: include_str!("../cases/replayed_nonce/replayed-nonce-004.json"),
-    },
-    BundledCase {
-        path: "cases/replayed_nonce/replayed-nonce-005.json",
-        contents: include_str!("../cases/replayed_nonce/replayed-nonce-005.json"),
-    },
-    BundledCase {
-        path: "cases/partial_signature/partial-signature-001.json",
-        contents: include_str!("../cases/partial_signature/partial-signature-001.json"),
-    },
-    BundledCase {
-        path: "cases/partial_signature/partial-signature-002.json",
-        contents: include_str!("../cases/partial_signature/partial-signature-002.json"),
-    },
-    BundledCase {
-        path: "cases/partial_signature/partial-signature-003.json",
-        contents: include_str!("../cases/partial_signature/partial-signature-003.json"),
-    },
-    BundledCase {
-        path: "cases/partial_signature/partial-signature-004.json",
-        contents: include_str!("../cases/partial_signature/partial-signature-004.json"),
-    },
-    BundledCase {
-        path: "cases/partial_signature/partial-signature-005.json",
-        contents: include_str!("../cases/partial_signature/partial-signature-005.json"),
-    },
-    BundledCase {
-        path: "cases/scope_superset/scope-superset-001.json",
-        contents: include_str!("../cases/scope_superset/scope-superset-001.json"),
-    },
-    BundledCase {
-        path: "cases/scope_superset/scope-superset-002.json",
-        contents: include_str!("../cases/scope_superset/scope-superset-002.json"),
-    },
-    BundledCase {
-        path: "cases/scope_superset/scope-superset-003.json",
-        contents: include_str!("../cases/scope_superset/scope-superset-003.json"),
-    },
-    BundledCase {
-        path: "cases/scope_superset/scope-superset-004.json",
-        contents: include_str!("../cases/scope_superset/scope-superset-004.json"),
-    },
-    BundledCase {
-        path: "cases/scope_superset/scope-superset-005.json",
-        contents: include_str!("../cases/scope_superset/scope-superset-005.json"),
-    },
-    BundledCase {
-        path: "cases/revocation_rollback/revocation-rollback-001.json",
-        contents: include_str!("../cases/revocation_rollback/revocation-rollback-001.json"),
-    },
-    BundledCase {
-        path: "cases/revocation_rollback/revocation-rollback-002.json",
-        contents: include_str!("../cases/revocation_rollback/revocation-rollback-002.json"),
-    },
-    BundledCase {
-        path: "cases/revocation_rollback/revocation-rollback-003.json",
-        contents: include_str!("../cases/revocation_rollback/revocation-rollback-003.json"),
-    },
-    BundledCase {
-        path: "cases/revocation_rollback/revocation-rollback-004.json",
-        contents: include_str!("../cases/revocation_rollback/revocation-rollback-004.json"),
-    },
-    BundledCase {
-        path: "cases/revocation_rollback/revocation-rollback-005.json",
-        contents: include_str!("../cases/revocation_rollback/revocation-rollback-005.json"),
-    },
-    BundledCase {
-        path: "cases/anchor_grafted/anchor-grafted-001.json",
-        contents: include_str!("../cases/anchor_grafted/anchor-grafted-001.json"),
-    },
-    BundledCase {
-        path: "cases/anchor_grafted/anchor-grafted-002.json",
-        contents: include_str!("../cases/anchor_grafted/anchor-grafted-002.json"),
-    },
-    BundledCase {
-        path: "cases/anchor_grafted/anchor-grafted-003.json",
-        contents: include_str!("../cases/anchor_grafted/anchor-grafted-003.json"),
-    },
-    BundledCase {
-        path: "cases/anchor_grafted/anchor-grafted-004.json",
-        contents: include_str!("../cases/anchor_grafted/anchor-grafted-004.json"),
-    },
-    BundledCase {
-        path: "cases/anchor_grafted/anchor-grafted-005.json",
-        contents: include_str!("../cases/anchor_grafted/anchor-grafted-005.json"),
-    },
-    BundledCase {
-        path: "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-001.json",
-        contents: include_str!(
-            "../cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-001.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-002.json",
-        contents: include_str!(
-            "../cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-002.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-003.json",
-        contents: include_str!(
-            "../cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-003.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-004.json",
-        contents: include_str!(
-            "../cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-004.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-005.json",
-        contents: include_str!(
-            "../cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-005.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/authority_binding_mutation/aggregate-root-binding-mutations-001.json",
-        contents: include_str!(
-            "../cases/authority_binding_mutation/aggregate-root-binding-mutations-001.json"
-        ),
-    },
-    BundledCase {
-        path: "cases/authority_binding_mutation/threshold-proposal-mutations-001.json",
-        contents: include_str!(
-            "../cases/authority_binding_mutation/threshold-proposal-mutations-001.json"
-        ),
-    },
-];
+mod bundled;
+pub use bundled::{BundledCase, BUNDLED_CASES};
 
 /// One malicious-but-well-formed case consumed by test harnesses.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -368,6 +204,34 @@ pub enum AttackClass {
     AnchorGrafted,
     SigstoreBundlePayloadMismatch,
     AuthorityBindingMutation,
+    BrokerDestinationRebinding,
+    BrokerExecutionOverspend,
+    BrokerOrphanHold,
+    BrokerParentDoubleCharge,
+    BrokerPlaintextCustody,
+    BrokerProofReplay,
+    BrokerRevocationRace,
+    BrokerSecretBoundaryCrossing,
+    BrokerUnboundHeaders,
+    CanaryEvasion,
+    ContainmentRollback,
+    KeyLogInconsistentGrowth,
+    KeyLogNoncontiguousSync,
+    KeyLogOmission,
+    KeyLogSplitView,
+    LabelDowngrade,
+    OldKeyBackdating,
+    RotationPartialCommit,
+    RotationUnwitnessedSigning,
+    SandboxFalseExecSuccess,
+    SandboxFdOrEnvLeak,
+    SandboxHelperSubstitution,
+    SandboxPartialEnforcement,
+    SandboxPathSwap,
+    SandboxSymlinkEscape,
+    SandboxSyscallEscape,
+    SandboxUnsignedManifest,
+    TemporalEvasion,
 }
 
 impl AttackClass {
@@ -383,6 +247,34 @@ impl AttackClass {
             Self::AnchorGrafted => "anchor_grafted",
             Self::SigstoreBundlePayloadMismatch => "sigstore_bundle_payload_mismatch",
             Self::AuthorityBindingMutation => "authority_binding_mutation",
+            Self::BrokerDestinationRebinding => "broker_destination_rebinding",
+            Self::BrokerExecutionOverspend => "broker_execution_overspend",
+            Self::BrokerOrphanHold => "broker_orphan_hold",
+            Self::BrokerParentDoubleCharge => "broker_parent_double_charge",
+            Self::BrokerPlaintextCustody => "broker_plaintext_custody",
+            Self::BrokerProofReplay => "broker_proof_replay",
+            Self::BrokerRevocationRace => "broker_revocation_race",
+            Self::BrokerSecretBoundaryCrossing => "broker_secret_boundary_crossing",
+            Self::BrokerUnboundHeaders => "broker_unbound_headers",
+            Self::CanaryEvasion => "canary_evasion",
+            Self::ContainmentRollback => "containment_rollback",
+            Self::KeyLogInconsistentGrowth => "key_log_inconsistent_growth",
+            Self::KeyLogNoncontiguousSync => "key_log_noncontiguous_sync",
+            Self::KeyLogOmission => "key_log_omission",
+            Self::KeyLogSplitView => "key_log_split_view",
+            Self::LabelDowngrade => "label_downgrade",
+            Self::OldKeyBackdating => "old_key_backdating",
+            Self::RotationPartialCommit => "rotation_partial_commit",
+            Self::RotationUnwitnessedSigning => "rotation_unwitnessed_signing",
+            Self::SandboxFalseExecSuccess => "sandbox_false_exec_success",
+            Self::SandboxFdOrEnvLeak => "sandbox_fd_or_env_leak",
+            Self::SandboxHelperSubstitution => "sandbox_helper_substitution",
+            Self::SandboxPartialEnforcement => "sandbox_partial_enforcement",
+            Self::SandboxPathSwap => "sandbox_path_swap",
+            Self::SandboxSymlinkEscape => "sandbox_symlink_escape",
+            Self::SandboxSyscallEscape => "sandbox_syscall_escape",
+            Self::SandboxUnsignedManifest => "sandbox_unsigned_manifest",
+            Self::TemporalEvasion => "temporal_evasion",
         }
     }
 }
@@ -470,7 +362,35 @@ mod tests {
                 "revocation_rollback",
                 "anchor_grafted",
                 "sigstore_bundle_payload_mismatch",
-                "authority_binding_mutation"
+                "authority_binding_mutation",
+                "broker_destination_rebinding",
+                "broker_execution_overspend",
+                "broker_orphan_hold",
+                "broker_parent_double_charge",
+                "broker_plaintext_custody",
+                "broker_proof_replay",
+                "broker_revocation_race",
+                "broker_secret_boundary_crossing",
+                "broker_unbound_headers",
+                "canary_evasion",
+                "containment_rollback",
+                "key_log_inconsistent_growth",
+                "key_log_noncontiguous_sync",
+                "key_log_omission",
+                "key_log_split_view",
+                "label_downgrade",
+                "old_key_backdating",
+                "rotation_partial_commit",
+                "rotation_unwitnessed_signing",
+                "sandbox_false_exec_success",
+                "sandbox_fd_or_env_leak",
+                "sandbox_helper_substitution",
+                "sandbox_partial_enforcement",
+                "sandbox_path_swap",
+                "sandbox_symlink_escape",
+                "sandbox_syscall_escape",
+                "sandbox_unsigned_manifest",
+                "temporal_evasion",
             ]
         );
     }
@@ -712,20 +632,37 @@ mod tests {
     }
 
     #[test]
-    fn bundled_cases_are_valid_and_coverage_eligible() -> Result<(), CaseError> {
+    fn bundled_cases_require_completed_evidence_for_coverage() -> Result<(), CaseError> {
         let cases = bundled_cases()?;
         assert_eq!(cases.len(), BUNDLED_CASES.len());
         for case in cases {
             assert_eq!(case.expected_verdict, ExpectedVerdict::Deny);
-            assert!(!case.pending);
             assert!(!case.expected_reason.trim().is_empty());
             assert!(!case.threat_id.trim().is_empty());
             assert!(case
                 .artifact
                 .as_object()
                 .is_some_and(|object| !object.is_empty()));
-            case.into_coverage_case()?;
+            if case.pending {
+                assert!(matches!(
+                    case.into_coverage_case(),
+                    Err(CaseError::PendingCase(_))
+                ));
+            } else {
+                case.into_coverage_case()?;
+            }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn bundled_cases_preserve_all_registered_attack_classes() -> Result<(), CaseError> {
+        let observed = bundled_cases()?
+            .into_iter()
+            .map(|case| case.class)
+            .collect::<std::collections::BTreeSet<_>>();
+        let expected = ATTACK_CLASSES.iter().copied().collect();
+        assert_eq!(observed, expected);
         Ok(())
     }
 

@@ -381,7 +381,7 @@ impl SqliteFrostStore {
         }
         stored
             .anchored_checkpoint_json
-            .map(|json| serde_json::from_slice(&json).map_err(canonical_error))
+            .map(|json| crate::frost_store::decode_record(&json))
             .transpose()
     }
 
@@ -465,10 +465,9 @@ impl SqliteFrostStore {
                 "rotation anchor has not been durably acknowledged",
             ));
         }
-        let target: FrostRosterV1 =
-            serde_json::from_slice(&stored.target_roster_json).map_err(canonical_error)?;
+        let target: FrostRosterV1 = crate::frost_store::decode_record(&stored.target_roster_json)?;
         let burn: FrostSessionBurnSummaryV1 =
-            serde_json::from_slice(&stored.burn_summary_json).map_err(canonical_error)?;
+            crate::frost_store::decode_record(&stored.burn_summary_json)?;
         verify_local_burn_summary(&transaction, &burn)?;
         let predecessor_key_epoch =
             target
@@ -997,8 +996,8 @@ fn load_active_artifacts(
     values
         .map(|(roster, checkpoint)| {
             Ok((
-                serde_json::from_slice(&roster).map_err(canonical_error)?,
-                serde_json::from_slice(&checkpoint).map_err(canonical_error)?,
+                crate::frost_store::decode_record(&roster)?,
+                crate::frost_store::decode_record(&checkpoint)?,
             ))
         })
         .transpose()

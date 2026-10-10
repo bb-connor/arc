@@ -2,7 +2,7 @@
 
 impl FindingChallengeCoordinator {
     /// Build over the durable stores while checking all configured role pins.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,
@@ -28,12 +28,12 @@ impl FindingChallengeCoordinator {
             rail,
             filings,
             failed_challenge_disposition,
-            Arc::new(SystemFindingStatusCommitClock),
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 
-    /// Build with local compatibility keys and an injected clock.
-    #[allow(clippy::too_many_arguments)]
+    /// Build with local signing keys and an injected clock.
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new_with_status_commit_clock(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,
@@ -46,7 +46,7 @@ impl FindingChallengeCoordinator {
         rail: Arc<dyn FindingRailObserver>,
         filings: Arc<dyn FindingFilingResolver>,
         failed_challenge_disposition: FindingDisputeLockDisposition,
-        status_commit_clock: Arc<dyn FindingStatusCommitClock>,
+        status_commit_clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, ChallengeCoordinatorError> {
         Self::new_with_signing_backends_and_status_commit_clock(
             challenges,
@@ -65,7 +65,7 @@ impl FindingChallengeCoordinator {
     }
 
     /// Build with custody-backed signers and the production commit clock.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new_with_signing_backends(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,
@@ -91,7 +91,7 @@ impl FindingChallengeCoordinator {
             rail,
             filings,
             failed_challenge_disposition,
-            Arc::new(SystemFindingStatusCommitClock),
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 }

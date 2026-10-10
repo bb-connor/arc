@@ -12,8 +12,9 @@
 //! All outputs are deterministic. JSON output carries the schema tag
 //! `chio.lineage.cli/v1`.
 
+#[cfg(test)]
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chio_lineage::anchor::AnchoredFrontier;
 use chio_lineage::diff::{diff as compute_diff, render_text, LineageDiff};
@@ -25,12 +26,8 @@ pub const LINEAGE_CLI_SCHEMA: &str = "chio.lineage.cli/v1";
 
 #[derive(Debug, thiserror::Error)]
 pub enum LineageCliError {
-    #[error("graph file not found: {0}")]
-    NotFound(PathBuf),
-    #[error("invalid graph JSON: {0}")]
-    InvalidGraph(String),
-    #[error("io error: {0}")]
-    Io(String),
+    #[error("lineage input rejected")]
+    Input(#[source] crate::CliError),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,8 +57,8 @@ pub struct CliRootsReport {
 }
 
 fn read_graph(path: &Path) -> Result<LineageGraph, LineageCliError> {
-    let bytes = fs::read(path).map_err(|_| LineageCliError::NotFound(path.to_path_buf()))?;
-    serde_json::from_slice(&bytes).map_err(|e| LineageCliError::InvalidGraph(e.to_string()))
+    let bytes = crate::input::read(path).map_err(|e| LineageCliError::Input(e.into()))?;
+    crate::input::json(&bytes).map_err(|e| LineageCliError::Input(e.into()))
 }
 
 pub fn cmd_query(
@@ -108,18 +105,19 @@ pub fn render_diff_text(report: &CliDiffReport) -> String {
 }
 
 pub fn cmd_roots(roots_dir: &Path) -> Result<CliRootsReport, LineageCliError> {
-    let entries = fs::read_dir(roots_dir).map_err(|e| LineageCliError::Io(e.to_string()))?;
+    let mut budget = crate::input::collection::Budget::default();
+    let paths = crate::input::collection::directory(roots_dir, &mut budget)
+        .map_err(LineageCliError::Input)?;
     let mut artifacts = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| LineageCliError::Io(e.to_string()))?;
-        let path = entry.path();
+    for path in paths {
         if path.extension().and_then(|s| s.to_str()) != Some("json") {
             continue;
         }
-        let bytes = fs::read(&path).map_err(|e| LineageCliError::Io(e.to_string()))?;
-        if let Ok(artifact) = serde_json::from_slice::<AnchoredFrontier>(&bytes) {
-            artifacts.push(artifact);
-        }
+        let bytes = budget.read(&path).map_err(LineageCliError::Input)?;
+        artifacts.push(
+            crate::input::json::<AnchoredFrontier>(&bytes)
+                .map_err(|error| LineageCliError::Input(error.into()))?,
+        );
     }
     artifacts.sort_by(|a, b| a.digest.hex.cmp(&b.digest.hex));
     Ok(CliRootsReport {

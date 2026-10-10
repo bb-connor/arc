@@ -174,10 +174,10 @@ impl EvaluationVerdictJson {
         };
         let (subject_hex, issuer_hex, capability_id, evaluated_at) = match value.verified {
             Some(verified) => (
-                Some(verified.subject_hex),
-                Some(verified.issuer_hex),
-                Some(verified.id),
-                Some(verified.evaluated_at),
+                Some(verified.subject_hex().to_string()),
+                Some(verified.issuer_hex().to_string()),
+                Some(verified.id().to_string()),
+                Some(verified.evaluated_at()),
             ),
             None => (None, None, None, None),
         };
@@ -252,7 +252,7 @@ pub struct VerifyCapabilityRequestJson {
 
 /// Wire shape for [`crate::verify_capability_pure`] outputs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerifiedCapabilityJson {
+pub struct CapabilityVerificationJson {
     pub id: String,
     pub subject_hex: String,
     pub issuer_hex: String,
@@ -262,16 +262,16 @@ pub struct VerifiedCapabilityJson {
     pub evaluated_at: u64,
 }
 
-impl From<VerifiedCapability> for VerifiedCapabilityJson {
+impl From<VerifiedCapability> for CapabilityVerificationJson {
     fn from(value: VerifiedCapability) -> Self {
         Self {
-            id: value.id,
-            subject_hex: value.subject_hex,
-            issuer_hex: value.issuer_hex,
-            scope: value.scope,
-            issued_at: value.issued_at,
-            expires_at: value.expires_at,
-            evaluated_at: value.evaluated_at,
+            id: value.id().to_string(),
+            subject_hex: value.subject_hex().to_string(),
+            issuer_hex: value.issuer_hex().to_string(),
+            scope: value.scope().clone(),
+            issued_at: value.issued_at(),
+            expires_at: value.expires_at(),
+            evaluated_at: value.evaluated_at(),
         }
     }
 }

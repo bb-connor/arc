@@ -71,11 +71,16 @@ pub struct ComplianceSourceResult {
 }
 
 /// Error shape for [`handle_compliance_score`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ComplianceScoreError {
+    /// Original JSON failed validation; native diagnostics remain local.
+    #[error("invalid compliance/score request body")]
+    Input(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     /// Malformed request body.
+    #[error("invalid compliance request: {0}")]
     BadRequest(String),
     /// The backing store was unavailable.
+    #[error("compliance store unavailable: {0}")]
     StoreUnavailable(String),
 }
 
@@ -83,7 +88,7 @@ impl ComplianceScoreError {
     #[must_use]
     pub fn status(&self) -> u16 {
         match self {
-            Self::BadRequest(_) => 400,
+            Self::Input(_) | Self::BadRequest(_) => 400,
             Self::StoreUnavailable(_) => 503,
         }
     }
@@ -91,7 +96,7 @@ impl ComplianceScoreError {
     #[must_use]
     pub fn code(&self) -> &'static str {
         match self {
-            Self::BadRequest(_) => "bad_request",
+            Self::Input(_) | Self::BadRequest(_) => "bad_request",
             Self::StoreUnavailable(_) => "store_unavailable",
         }
     }
@@ -99,6 +104,7 @@ impl ComplianceScoreError {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
+            Self::Input(_) => "invalid compliance/score request body".to_string(),
             Self::BadRequest(m) => m.clone(),
             Self::StoreUnavailable(m) => m.clone(),
         }
@@ -131,9 +137,9 @@ pub fn handle_compliance_score(
     body: &[u8],
     now: u64,
 ) -> Result<ComplianceScoreResponse, ComplianceScoreError> {
-    let parsed: ComplianceScoreRequest = serde_json::from_slice(body).map_err(|e| {
-        ComplianceScoreError::BadRequest(format!("invalid compliance/score body: {e}"))
-    })?;
+    let parsed: ComplianceScoreRequest =
+        crate::input::decode(body, crate::input::MAX_REQUEST_BYTES)
+            .map_err(ComplianceScoreError::Input)?;
     if parsed.agent_id.trim().is_empty() {
         return Err(ComplianceScoreError::BadRequest(
             "agent_id must not be empty".to_string(),

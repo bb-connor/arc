@@ -1,0 +1,33 @@
+[package]
+name = "chio-security-kernel"
+description = "Kernel adapters for Chio active-defense enforcement"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_security_kernel"
+
+[dependencies]
+chio-core = { workspace = true }
+chio-core-types = { workspace = true }
+chio-decoy = { workspace = true }
+chio-flow = { workspace = true, features = ["std"] }
+chio-kernel = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+chio-guards = { workspace = true }
+chio-store-sqlite = { workspace = true }
+chio-test-support = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

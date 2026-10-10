@@ -5,7 +5,6 @@
 //! and the cryptographically re-verified local status cache.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::governance::ProvenanceEvidenceClass;
 use chio_core::receipt::body::ChioReceipt;
@@ -13,7 +12,7 @@ use chio_core::receipt::lineage::ReceiptLineageRelationKind;
 use chio_core::receipt::metadata::{FindingDelivery, FINDING_DELIVERY_METADATA_KEY};
 use chio_core::session::SessionAnchorReference;
 use chio_guards::finding_retraction::{
-    AuthenticatedFindingStatus, FindingDeliveryLineageResolver, FindingRetractionClock,
+    AuthenticatedFindingStatus, Clock, FindingDeliveryLineageResolver,
     FindingRetractionResolveError, FindingRetractionResolver, FindingStatusCache,
     FindingStatusValue, VerifiedFindingDeliveryLineage, VerifiedFindingRetractionResolver,
 };
@@ -37,16 +36,16 @@ impl SystemFindingRetractionClock {
     }
 }
 
-impl FindingRetractionClock for SystemFindingRetractionClock {
-    fn now_unix_secs(&self) -> Result<u64, FindingRetractionResolveError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
+impl Clock for SystemFindingRetractionClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        let reading = chio_security_types::clock::SystemClock.read()?;
         self.store
-            .observe_trusted_time(&self.feed_id, now)
-            .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
-        Ok(now)
+            .observe_trusted_time(&self.feed_id, reading.unix_millis().as_secs())
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        Ok(reading)
     }
 }
 
@@ -254,14 +253,14 @@ pub struct SqliteFindingStatusCache {
     service_bond: FindingStatusServiceBond,
     max_epoch_age_secs: u64,
     store: SqliteFindingStatusStore,
-    clock: Arc<dyn FindingRetractionClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl SqliteFindingStatusCache {
     pub fn new(
         config: &FindingMarketConfig,
         store: SqliteFindingStatusStore,
-        clock: Arc<dyn FindingRetractionClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingRetractionResolveError> {
         config
             .validate()
@@ -282,7 +281,11 @@ impl FindingStatusCache for SqliteFindingStatusCache {
         &self,
         finding_id: &str,
     ) -> Result<Option<AuthenticatedFindingStatus>, FindingRetractionResolveError> {
-        let now = self.clock.now_unix_secs()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)
+            .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
         let (proof, expected_kind) = match self
             .store
             .status_for_purchase(&self.feed_id, finding_id, now, self.max_epoch_age_secs)
@@ -310,7 +313,11 @@ impl FindingStatusCache for SqliteFindingStatusCache {
                 FindingStatusProofKind::Inclusion,
             ),
         };
-        let verified_at = self.clock.now_unix_secs()?;
+        let verified_at = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)
+            .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
         verify_proof_record(
             &self.operator,
             &self.service_bond,
@@ -324,7 +331,11 @@ impl FindingStatusCache for SqliteFindingStatusCache {
                 "durable status decision and portable proof kind differ".to_owned(),
             ));
         }
-        let final_now = self.clock.now_unix_secs()?;
+        let final_now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)
+            .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
         verify_proof_record(
             &self.operator,
             &self.service_bond,
@@ -388,7 +399,7 @@ pub fn sqlite_finding_retraction_resolver(
     receipts: Arc<dyn ReceiptStore>,
     status_store: SqliteFindingStatusStore,
 ) -> Result<Arc<dyn FindingRetractionResolver>, FindingRetractionResolveError> {
-    let clock: Arc<dyn FindingRetractionClock> = Arc::new(SystemFindingRetractionClock::new(
+    let clock: Arc<dyn Clock> = Arc::new(SystemFindingRetractionClock::new(
         config.status_feed_operator_ref.clone(),
         status_store.clone(),
     ));

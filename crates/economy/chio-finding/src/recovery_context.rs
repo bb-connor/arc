@@ -84,13 +84,9 @@ pub fn parse_finding_recovery_context(raw: &[u8]) -> Result<FindingRecoveryConte
     if canonical.as_slice() != raw {
         return Err(FindingError::NonCanonicalBytes("recovery_context"));
     }
-    let context: FindingRecoveryContext =
-        serde_json::from_slice(raw).map_err(|_| FindingError::InvalidField("recovery_context"))?;
-    let reserialized = chio_core_types::canonical_json_bytes(&context)
-        .map_err(|_| FindingError::Canonicalization)?;
-    if reserialized.as_slice() != raw {
-        return Err(FindingError::NonCanonicalBytes("recovery_context"));
-    }
+    let context: FindingRecoveryContext = chio_core_types::canonical::UntrustedJsonText::new(text)
+        .decode_canonical()
+        .map_err(|_| FindingError::InvalidField("recovery_context"))?;
     context.validate()?;
     Ok(context)
 }

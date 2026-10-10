@@ -189,15 +189,17 @@ fn build_azure_content_safety_guard(
 ) -> Result<ScopedAsyncGuard<AzureContentSafetyGuard>, PolicyError> {
     validate_required_secret(
         "cloud_guardrails.azure_content_safety.api_key",
-        &config.api_key,
+        config.api_key.expose_secret(),
     )?;
     validate_https_url(
         "cloud_guardrails.azure_content_safety.endpoint",
         &config.endpoint,
     )?;
 
-    let mut guard_config =
-        AzureContentSafetyConfig::new(config.api_key.clone(), config.endpoint.clone());
+    let mut guard_config = AzureContentSafetyConfig::new(
+        config.api_key.expose_secret().to_owned(),
+        config.endpoint.clone(),
+    );
     if let Some(api_version) = &config.api_version {
         if api_version.trim().is_empty() {
             return Err(PolicyError::Invalid(
@@ -247,8 +249,11 @@ pub(super) const SAFE_BROWSING_DEFAULT_BASE_URL: &str = "https://safebrowsing.go
 fn build_safe_browsing_guard(
     config: &SafeBrowsingPolicyConfig,
 ) -> Result<ScopedAsyncGuard<SafeBrowsingGuard>, PolicyError> {
-    validate_required_secret("threat_intel.safe_browsing.api_key", &config.api_key)?;
-    let mut guard_config = SafeBrowsingConfig::new(config.api_key.clone());
+    validate_required_secret(
+        "threat_intel.safe_browsing.api_key",
+        config.api_key.expose_secret(),
+    )?;
+    let mut guard_config = SafeBrowsingConfig::new(config.api_key.expose_secret().to_owned());
     let base_url = if let Some(base_url) = config.base_url.as_deref() {
         validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
         base_url.to_string()

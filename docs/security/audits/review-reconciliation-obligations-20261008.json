@@ -1,0 +1,121 @@
+{
+  "schema": "chio.security.review-reconciliation.v1",
+  "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+  "requirements": [
+    {
+      "id": "MCP-RESERVE",
+      "priority": "P2",
+      "requirement": "Release only the exact credential call reservation after a request is definitely not enqueued.",
+      "status": "source-confirmed-original-and-repair-pending",
+      "source_path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+      "source_lines": [
+        488,
+        508
+      ],
+      "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480",
+      "acceptance": [
+        "Real restricted HTTP request with conflicting approval aliases refuses before enqueue and does not strand a credential.",
+        "Disconnected inbox rollback is exact; ambiguous delivery or a newer/rebound latch cannot be released."
+      ]
+    },
+    {
+      "id": "MCP-PROJECTION",
+      "priority": "P1",
+      "requirement": "Authenticate the complete caller-visible MCP result against its signed output before delivery or acknowledgement.",
+      "status": "source-confirmed-original-and-repair-pending",
+      "source_path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs",
+      "source_lines": [
+        746,
+        835
+      ],
+      "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480",
+      "acceptance": [
+        "Genuine signed evidence with substituted content, structuredContent or isError cannot expose the substituted result.",
+        "Invalid evidence cannot return forged output even if the reservation is fenced and no acknowledgement is minted.",
+        "Legitimate signed error results, once-only completion and replay remain valid."
+      ],
+      "reachability_limit": "Worker-result substitution is the reviewed trust boundary; an unprivileged network injection route into the private worker event channel was not established."
+    },
+    {
+      "id": "MCP-GENERATION",
+      "priority": "P2",
+      "requirement": "Bind each request-stream event to the actual actor enqueue generation while preserving session notification ownership.",
+      "status": "source-confirmed-original-and-producer-proposal-pending",
+      "source_path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+      "source_lines": [
+        501,
+        553
+      ],
+      "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6031035480",
+      "acceptance": [
+        "After an old POST body is dropped, its late method event cannot be forwarded on a new POST stream.",
+        "Pre-enqueue events and a reused JSON-RPC identifier cannot terminate or lend authority to a different generation.",
+        "Roots, nested requests, GET notifications, absolute deadlines and cancellation remain correct."
+      ]
+    },
+    {
+      "id": "FX-CLOCK",
+      "priority": "P2",
+      "requirement": "Check fetched FX evidence against fresh trusted time without changing stored settlement replay or accepting future quotes.",
+      "status": "source-hypothesis-deterministic-original-and-proposal-pending",
+      "source_path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs",
+      "source_lines": [
+        138,
+        154
+      ],
+      "review_url": null,
+      "acceptance": [
+        "An injected trusted clock advancing during oracle I/O distinguishes a valid newly fetched quote from a truly future quote.",
+        "Both ordinary and durable callers preserve future/stale refusal, global clock/fence failure and original stored-disposition replay."
+      ],
+      "reachability_limit": "A prior full suite failed with authorized fallback10 rather than converted1. The stale pre-fetch timestamp explains a possible production path but has not yet been reproduced by a deterministic Original."
+    },
+    {
+      "id": "EF-FINALITY",
+      "priority": "P2",
+      "requirement": "A fresh Apply command cannot reinstall the same effect after its committed removal; exact historical command replay remains read-only.",
+      "status": "proposed-effect-repair-regression-confirmed-original-and-producer-pending",
+      "reviewed_source": "c472f5c79e",
+      "source_path": "crates/platform/chio-store-sqlite/src/security_state",
+      "source_lines": [],
+      "review_url": null,
+      "acceptance": [
+        "Real egress, throttle, capability-set and session suspension Apply/Remove/fresh-Apply controls, preserving exact old command replay.",
+        "Atomic same tenant/action/effect journal barrier with bounded verified reads and fatal malformed or unavailable custody."
+      ],
+      "reachability_limit": "Three-kind lane probe demonstrates the regression; session suspension is analogous and still needs its own Original. These effect repairs are not yet integrated in the Root source."
+    },
+    {
+      "id": "EF-FREEZE",
+      "priority": "P2",
+      "requirement": "Concurrent plans freezing the same lineage retain each plan contribution through renewal, restart and independent lift.",
+      "status": "effect-composition-gap-confirmed-original-and-producer-proposal-pending",
+      "reviewed_source": "c472f5c79e",
+      "source_path": "crates/platform/chio-control-plane/src/security/adapters/effect_port",
+      "source_lines": [],
+      "review_url": null,
+      "acceptance": [
+        "Use the normal executor: the second plan must reach its intended suspension with its authenticated observed base.",
+        "Lifting the first plan preserves the second restriction and external issuance fence; renew/restart retain both obligations."
+      ],
+      "reachability_limit": "A probe that directly invokes suspension after freeze failure does not demonstrate normal executor continuation."
+    }
+  ],
+  "qualified": false,
+  "merged": false,
+  "review_snapshot": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/review-thread-reconciliation-20261008.json",
+    "sha256": "6ba207bbe6810b1205e8dedf1edbb2e2f04a551ceb9c6848971b86e11d7002ff",
+    "threads": 65,
+    "inline_comments": 88,
+    "unresolved_threads": 55,
+    "inline_p1_p2_mapped": 62,
+    "swarm_p0_p1_p2_preserved": 86,
+    "quota_notices_separate": 6
+  },
+  "ownership": "Codex successors on isolated branches after explicit Claude quota handoff; Root alone integrates.",
+  "remaining_acceptance": [
+    "Genuine Original failure, reviewed repair and current focused controls for each new obligation.",
+    "Combined-source owning/strict/native/cold/trusted/hosted qualification and protected landing; no quota or baseline waiver."
+  ]
+}

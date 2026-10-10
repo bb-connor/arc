@@ -1,4 +1,5 @@
-fn make_chain_bound_plain_capability(
+use super::*;
+pub(super) fn make_chain_bound_plain_capability(
     kernel: &ChioKernel,
     id: &str,
     subject: PublicKey,

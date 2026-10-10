@@ -8,44 +8,61 @@ use crate::*;
 pub fn runtime_admission_profile_from_json(
     json: &str,
 ) -> Result<RuntimeAdmissionProfile, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_admission_bundle_from_json(
     json: &str,
 ) -> Result<RuntimeAdmissionBundle, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_request_binding_from_json(
     json: &str,
 ) -> Result<RuntimeRequestBinding, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn buyer_attestation_packet_from_json(
     json: &str,
 ) -> Result<BuyerAttestationPacket, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn buyer_attestation_review_package_from_json(
     json: &str,
 ) -> Result<BuyerAttestationReviewPackage, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn signed_runtime_verifier_trust_bundle_from_json(
     json: &str,
 ) -> Result<SignedRuntimeVerifierTrustBundle, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_trusted_verifier_keys_from_json(
     json: &str,
 ) -> Result<RuntimeTrustedVerifierKeysDocument, ChioRuntimeError> {
     let document: RuntimeTrustedVerifierKeysDocument =
-        serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            (json).as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)?;
     if !is_runtime_trusted_verifiers_schema(&document.schema) {
         return Err(ChioRuntimeError::Rejected {
             code: "unsupported_trusted_verifiers_schema",
@@ -75,19 +92,23 @@ fn is_runtime_trusted_verifiers_schema(schema: &str) -> bool {
 pub fn signed_runtime_pheromone_policy_from_json(
     json: &str,
 ) -> Result<SignedRuntimePheromonePolicy, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn signed_runtime_peer_weights_from_json(
     json: &str,
 ) -> Result<SignedRuntimePeerWeights, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_admission_report_json(
     report: &RuntimeAdmissionReport,
 ) -> Result<String, ChioRuntimeError> {
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn sign_runtime_admission_report(
@@ -101,13 +122,15 @@ pub fn sign_runtime_admission_report(
 pub fn signed_runtime_admission_report_from_json(
     json: &str,
 ) -> Result<SignedRuntimeAdmissionReport, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn signed_runtime_admission_report_json(
     report: &SignedRuntimeAdmissionReport,
 ) -> Result<String, ChioRuntimeError> {
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn verify_signed_runtime_admission_report(
@@ -121,21 +144,27 @@ pub fn verify_signed_runtime_admission_report(
 pub fn runtime_pheromone_advisory_from_query_report_json(
     json: &str,
 ) -> Result<RuntimePheromoneAdvisory, ChioRuntimeError> {
-    let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let value: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        (json).as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(ChioRuntimeError::from)?;
     runtime_pheromone_advisory_from_query_report_value(&value)
 }
 
 pub fn signed_runtime_pheromone_query_report_from_json(
     json: &str,
 ) -> Result<SignedRuntimePheromoneQueryReport, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn signed_runtime_pheromone_query_report_json(
     report: &SignedRuntimePheromoneQueryReport,
 ) -> Result<String, ChioRuntimeError> {
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub(crate) fn runtime_pheromone_advisory_from_query_report_value(
@@ -189,153 +218,162 @@ pub fn runtime_workflow_run_report_json(
     report: &RuntimeWorkflowRunReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_workflow_run_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn buyer_attestation_verification_report_json(
     report: &BuyerAttestationVerificationReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_buyer_attestation_verification_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn buyer_attestation_review_report_json(
     report: &BuyerAttestationReviewReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_buyer_attestation_review_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_proof_regeneration_report_json(
     report: &RuntimeProofRegenerationReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_proof_regeneration_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_evidence_manifest_json(
     manifest: &RuntimeEvidenceManifest,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_evidence_manifest(manifest)?;
-    serde_json::to_string_pretty(manifest)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(manifest).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_proof_regeneration_input_json(
     input: &RuntimeProofRegenerationInput,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_proof_regeneration_input(input)?;
-    serde_json::to_string_pretty(input).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(input).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_proof_parity_report_json(
     report: &RuntimeProofParityReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_proof_parity_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_orchestration_profile_from_json(
     json: &str,
 ) -> Result<RuntimeOrchestrationProfile, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_run_contract_from_json(json: &str) -> Result<RuntimeRunContract, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_supervisor_profile_from_json(
     json: &str,
 ) -> Result<RuntimeSupervisorProfile, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_artifact_retention_profile_from_json(
     json: &str,
 ) -> Result<RuntimeArtifactRetentionProfile, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_provider_bindings_from_json(
     json: &str,
 ) -> Result<RuntimeProviderBindingsDocument, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub fn runtime_orchestration_plan_json(
     plan: &RuntimeOrchestrationPlan,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_orchestration_plan(plan)?;
-    serde_json::to_string_pretty(plan).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(plan).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_orchestration_run_report_json(
     report: &RuntimeOrchestrationRunReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_orchestration_run_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_orchestration_resume_plan_json(
     plan: &RuntimeOrchestrationResumePlan,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_orchestration_resume_plan(plan)?;
-    serde_json::to_string_pretty(plan).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(plan).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_orchestration_status_report_json(
     report: &RuntimeOrchestrationStatusReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_orchestration_status_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_proof_drift_report_json(
     report: &RuntimeProofDriftReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_proof_drift_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_scheduler_tick_report_json(
     report: &RuntimeSchedulerTickReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_scheduler_tick_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_evidence_sink_health_report_json(
     report: &RuntimeEvidenceSinkHealthReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_evidence_sink_health_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_recovery_drill_report_json(
     report: &RuntimeRecoveryDrillReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_recovery_drill_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_artifact_retention_plan_json(
     report: &RuntimeArtifactRetentionPlan,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_artifact_retention_plan(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_provider_health_report_json(
     report: &RuntimeProviderHealthReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_provider_health_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
 pub fn runtime_ops_status_report_json(
     report: &RuntimeOpsStatusReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_runtime_ops_status_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }

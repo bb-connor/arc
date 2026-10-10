@@ -14,6 +14,8 @@ require_copy() {
   fi
 }
 
+require_copy "crates" "./crates"
+require_copy "third_party" "./third_party"
 require_copy "contracts" "./contracts"
 require_copy "spec" "./spec"
 require_copy "fixtures" "./fixtures"
@@ -35,7 +37,7 @@ import tomllib
 
 manifest = tomllib.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 profile = manifest.get("profile", {}).get("docker-release")
-expected = {"inherits": "release", "codegen-units": 16, "lto": "thin"}
+expected = {"inherits": "release", "codegen-units": 16, "lto": "thin", "overflow-checks": True}
 if profile != expected:
     raise SystemExit(
         "Cargo.toml profile.docker-release must be the bounded-memory "

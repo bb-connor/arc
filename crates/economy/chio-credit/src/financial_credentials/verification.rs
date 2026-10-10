@@ -411,7 +411,7 @@ pub(super) fn prepare_request(
         .collect::<Vec<_>>();
     let disclosure = FinancialSourceDisclosureV1::Bundled { artifacts };
     let disclosure_digest = domain_digest(
-        SOURCE_DISCLOSURE_DIGEST_DOMAIN,
+        FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN,
         &canonical_json_bytes(&disclosure).map_err(|error| {
             FinancialCredentialProjectionError::InvalidSource(error.to_string())
         })?,

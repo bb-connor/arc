@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "schema/caller_wait.rs"]
+mod caller_wait;
+pub(super) use caller_wait::{remove_caller_wait_state, remove_empty_checkpoint_catalog};
+
 struct SqlObligationHead {
     obligation_id: String,
     atom_digest: String,
@@ -415,7 +419,10 @@ fn insert_sql_assignment_result(
 }
 
 #[test]
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "The tuple preserves the complete typed database row at this existing storage boundary."
+)]
 fn fresh_provision_creates_the_operation_schema_after_serving_lease_schema() {
     let fixture = fixture();
     let connection = fixture.store.connection().expect("connection");
@@ -571,7 +578,7 @@ fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -
         "#,
     )?;
     drop(connection);
-    let error = match SqliteAuthorityStore::open_serving(&database, &lock_root) {
+    let error = match crate::test_authority::open_serving(&database, &lock_root) {
         Ok(_) => return Err("incomplete current assignment schema was accepted".into()),
         Err(error) => error,
     };
@@ -597,6 +604,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
     drop(authority);
 
     let connection = Connection::open(&database)?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         r#"
         DROP TRIGGER threshold_approval_tokens_immutable;
@@ -629,7 +637,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let connection = store.connection()?;
     let primary_key_columns: String = connection.query_row(
@@ -653,6 +661,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
 
 #[test]
 fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
+    let _legacy = legacy_clock::LegacyClock::enter();
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -677,6 +686,8 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     drop(authority);
 
     let connection = Connection::open(&database).expect("open offline database");
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
+        .expect("remove empty post-v1 runtime migration schema");
     connection
         .execute_batch(
             r#"
@@ -703,8 +714,8 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v1 authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open migrated authority");
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
+        .expect("open migrated authority");
     let store = authority.admission_operation_store();
     assert_eq!(
         store
@@ -719,6 +730,7 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
 
 #[test]
 fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
+    let _legacy = legacy_clock::LegacyClock::enter();
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -742,7 +754,7 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     drop(authority);
 
     let replacement =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("rotate serving owner");
+        crate::test_authority::open_serving(&database, &lock_root).expect("rotate serving owner");
     drop(replacement);
 
     let connection = Connection::open(&database).expect("open offline database");
@@ -761,6 +773,8 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
         )
         .expect("closed commit epochs");
     assert!(closed_epochs > 0);
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
+        .expect("remove empty post-v2 runtime migration schema");
     connection
         .execute_batch(
             r#"
@@ -857,8 +871,8 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v2 authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open migrated authority");
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
+        .expect("open migrated authority");
     let store = authority.admission_operation_store();
     assert_eq!(
         store
@@ -891,6 +905,8 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
 
 #[test]
 fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> AnchoredTestResult {
+    let _legacy = legacy_clock::LegacyClock::enter();
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -900,7 +916,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     );
     let begun_at = now_ms();
     fixture.store.begin(&operation, &fixture.fence, begun_at)?;
-    let recovery = claim(&fixture, &operation, "v4-channel-migration", begun_at + 1);
+    let recovery = claim(&fixture, &operation, "v4-channel-migration", begun_at);
     let participant_digest = economic_digest("v4-channel-participant");
     {
         let mut connection = fixture.store.connection()?;
@@ -913,7 +929,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
             &operation,
             &recovery,
             &participant_digest,
-            begun_at + 2,
+            begun_at,
         )?;
         fixture.store.commit_write(transaction)?;
         fixture.store.sync_after_write(&connection)?;
@@ -935,6 +951,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     drop(authority);
 
     let connection = Connection::open(&database)?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         r#"
         DROP TABLE obligation_assignment_results;
@@ -1045,7 +1062,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let mut connection = store.connection()?;
@@ -1205,7 +1222,10 @@ fn persisted_operations_use_rfc_8785_bytes() {
 }
 
 #[test]
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "The tuple preserves the complete typed database row at this existing storage boundary."
+)]
 fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredTestResult {
     let fixture = fixture();
     let at = now_ms();

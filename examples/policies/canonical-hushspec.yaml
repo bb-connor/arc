@@ -63,6 +63,3 @@ rules:
   #   enabled: true
   #   require_confirmation: ["write_*", "run_command"]
   #   approve_above: 15000
-  #   approve_above_currency: "USD"
-  #   timeout_seconds: 900
-  #   on_timeout: deny

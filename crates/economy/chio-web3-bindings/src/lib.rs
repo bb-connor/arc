@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Alloy bindings and packaged artifacts for the official Chio web3 contract family.
 //!
 //! This crate is the Rust-side integration target for the Solidity package in

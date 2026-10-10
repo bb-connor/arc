@@ -224,7 +224,10 @@ fn decode_inline<T: serde::de::DeserializeOwned>(
     serde_json::from_value(value.clone()).map_err(|error| invalid(error.to_string()))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn apply_consumed_projection(
     transaction: &Transaction<'_>,
     projection: &VerifiedChannelTerminalProjectionV1,

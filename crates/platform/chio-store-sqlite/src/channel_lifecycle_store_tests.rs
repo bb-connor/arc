@@ -46,7 +46,7 @@ fn fixture() -> TestResult<Fixture> {
         std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
     }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.channel_lifecycle_store();
     let fence = authority.mutation_fence();
     Ok(Fixture {
@@ -565,7 +565,7 @@ fn prepared_operation_and_plan_rollback_together() -> TestResult {
 #[test]
 fn second_serving_owner_is_denied() -> TestResult {
     let fixture = fixture()?;
-    let second = SqliteAuthorityStore::open_serving(&fixture.database, &fixture.lock_root);
+    let second = crate::test_authority::open_serving(&fixture.database, &fixture.lock_root);
     assert!(matches!(
         second,
         Err(SqliteServingOwnerError::AlreadyServing(_))
@@ -583,3 +583,12 @@ fn secure_temp_directory(path: &std::path::Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
+
+#[path = "channel_lifecycle_store_tests/connection_recovery.rs"]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+#[cfg(unix)]
+mod connection_recovery;

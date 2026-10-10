@@ -1,5 +1,6 @@
 use alloc::collections::BTreeMap;
 
+use crate::canonical::canonical_json_bytes;
 use crate::crypto::{Keypair, PublicKey, SigningBackend};
 use crate::error::{Error, Result};
 use crate::runtime_attestation::AttestationVerifierFamily;
@@ -16,6 +17,9 @@ use super::scope::*;
 use super::token::*;
 use super::trust_policy::*;
 use super::workload_identity::*;
+
+#[path = "tests/governed_intents.rs"]
+mod governed_intents;
 
 fn make_grant(server: &str, tool: &str, ops: Vec<Operation>) -> ToolGrant {
     ToolGrant {
@@ -338,24 +342,6 @@ fn validate_attenuation_escalation_fails() {
         vec![Operation::Invoke, Operation::Delegate],
     )]);
     assert!(validate_attenuation(&parent, &child).is_err());
-}
-
-#[test]
-fn attenuation_witness_roundtrip_and_forgery_rejection() {
-    let parent = make_scope(vec![make_grant(
-        "srv",
-        "tool",
-        vec![Operation::Invoke, Operation::ReadResult],
-    )]);
-    let child = make_scope(vec![make_grant("srv", "tool", vec![Operation::Invoke])]);
-
-    let witness = compute_attenuation_witness(&parent, &child).unwrap();
-    let parent_hash = scope_hash(&parent).unwrap();
-    let child_hash = scope_hash(&child).unwrap();
-
-    verify_attenuation_witness(&parent_hash, &child_hash, &witness).unwrap();
-    let forged = "00".repeat(32);
-    assert!(verify_attenuation_witness(&forged, &child_hash, &witness).is_err());
 }
 
 #[test]
@@ -889,88 +875,6 @@ fn constraint_serde_roundtrip() {
     let json = serde_json::to_string_pretty(&constraints).unwrap();
     let restored: Vec<Constraint> = serde_json::from_str(&json).unwrap();
     assert_eq!(constraints, restored);
-}
-
-#[test]
-fn governed_transaction_intent_binding_hash_changes_with_payload() {
-    let base = GovernedTransactionIntent {
-        id: "intent-1".to_string(),
-        server_id: "srv-pay".to_string(),
-        tool_name: "charge".to_string(),
-        purpose: "pay supplier".to_string(),
-        max_amount: Some(MonetaryAmount {
-            units: 500,
-            currency: "USD".to_string(),
-        }),
-        commerce: Some(GovernedCommerceContext {
-            seller: "merchant.example".to_string(),
-            shared_payment_token_id: "spt_123".to_string(),
-            settlement_destination_ref: Some("acct:merchant-primary".to_string()),
-        }),
-        metered_billing: Some(MeteredBillingContext {
-            settlement_mode: MeteredSettlementMode::AllowThenSettle,
-            quote: MeteredBillingQuote {
-                quote_id: "quote-1".to_string(),
-                provider: "meter.chio".to_string(),
-                billing_unit: "1k_tokens".to_string(),
-                quoted_units: 12,
-                quoted_cost: MonetaryAmount {
-                    units: 300,
-                    currency: "USD".to_string(),
-                },
-                issued_at: 950,
-                expires_at: Some(1300),
-            },
-            max_billed_units: Some(20),
-            verified_outcome: None,
-        }),
-        runtime_attestation: Some(RuntimeAttestationEvidence {
-            schema: "chio.runtime-attestation.v1".to_string(),
-            verifier: "verifier.chio".to_string(),
-            tier: RuntimeAssuranceTier::Attested,
-            issued_at: 900,
-            expires_at: 1200,
-            evidence_sha256: "attestation-digest".to_string(),
-            runtime_identity: Some("spiffe://chio/runtime/123".to_string()),
-            workload_identity: None,
-            claims: None,
-        }),
-        call_chain: Some(GovernedCallChainContext {
-            chain_id: "chain-1".to_string(),
-            parent_request_id: "req-parent-1".to_string(),
-            parent_receipt_id: Some("rc-parent-1".to_string()),
-            origin_subject: "origin-subject".to_string(),
-            delegator_subject: "delegator-subject".to_string(),
-        }),
-        autonomy: Some(GovernedAutonomyContext {
-            tier: GovernedAutonomyTier::Delegated,
-            delegation_bond_id: Some("bond-1".to_string()),
-        }),
-        context: None,
-        body: GovernedTransactionIntentBody::ToolInvocation,
-    };
-    let mut changed = base.clone();
-    changed
-        .call_chain
-        .as_mut()
-        .expect("call chain present")
-        .parent_request_id = "req-parent-2".to_string();
-
-    assert_ne!(
-        base.binding_hash().unwrap(),
-        changed.binding_hash().unwrap()
-    );
-
-    let mut changed_destination = base.clone();
-    changed_destination
-        .commerce
-        .as_mut()
-        .expect("commerce present")
-        .settlement_destination_ref = Some("acct:merchant-substituted".to_string());
-    assert_ne!(
-        base.binding_hash().unwrap(),
-        changed_destination.binding_hash().unwrap()
-    );
 }
 
 #[test]
@@ -3239,3 +3143,5 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
+
+mod authority_readers;
