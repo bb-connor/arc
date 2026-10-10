@@ -1,0 +1,162 @@
+{
+  "schema": "chio.security.snapshot-preopen-repair.v1",
+  "observed_utc": "2026-10-10T03:33:24.532424+00:00",
+  "stage": "3fea1185b3052c0dd85a36003b38e2ba0dd8eb06",
+  "integration": {
+    "hook_producer": "d0f574933b69957ede48636c1d9483a480a7ec29",
+    "hook_integration": "abae247560b76e05e2200ff4361adf8d1e05d387",
+    "storage_producer": "99fe1e6a762465893e8b06f56826fc8e88170498",
+    "storage_integration": "3fea1185b3052c0dd85a36003b38e2ba0dd8eb06",
+    "startup_integration": "81bc06489993ed7cd30ae3fc7255f661d1606552",
+    "all_six_final_producer_files_exact": {
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs": "d79c00fa39005298db48f78a31fa4b2751812f063bd43ba5323193df825c558a",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/preopen.rs": "9e377b70be386ccbdb8e7b5561bf9fd7be2db1715e73cf4d47bc8846282e8bcd",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/preopen/tests.rs": "edccc50a412515ca5ec199d1058b1a29657381702eaf767a437947c88137c1b5",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs": "0509373c52b4005d1c9a740192e60c56c9023c746f69ba19971f2edea1351e13",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/preopen.rs": "1c6ddf3ab493387ccaf58c2f69cce1b335764827ca40366bb6d5d49b2caccd1b",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db/storage.rs": "88c9e3884564c95976dd9c891075014e600f28bec11562d71ad7e1b004f4aa55"
+    },
+    "startup_green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "init::tests::snapshot_recovery::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 226.69611763721332,
+      "source_before": {
+        "head": "abae247560b76e05e2200ff4361adf8d1e05d387",
+        "diff_sha256": "4a8806622b219f713aa31c26e4ab690c8125aa7b5df6f46362d742c6ae02ca31"
+      },
+      "source_after": {
+        "head": "abae247560b76e05e2200ff4361adf8d1e05d387",
+        "diff_sha256": "4a8806622b219f713aa31c26e4ab690c8125aa7b5df6f46362d742c6ae02ca31"
+      },
+      "source_stable": true,
+      "log_sha256": "c8a2e2823e175aad31bdd63d4edd1104190a5272d27c62e851bdf7353e75501f"
+    },
+    "scope": "Source integrated and two startup controls genuinely RED-to-GREEN; final combined owning and strict qualification pending."
+  },
+  "producer_manifest": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-preopen-hook/sha256sums.txt",
+    "sha256": "1317b0c4297ee675cd3d34a5cfd1c2d02911b3577ef71cf8e7dd957ff9959914",
+    "verified_artifacts": {
+      "clippy-hook.log": "382d8d0160d7485da35ca20b1d8c7a277e4f2b48731ef84b18e62d13a65514f7",
+      "clippy.log": "382d8d0160d7485da35ca20b1d8c7a277e4f2b48731ef84b18e62d13a65514f7",
+      "fmt-check.log": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "gate-check-negative-assertions-hook.log": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+      "gate-check-negative-assertions.log": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+      "gate-check-rust-file-hygiene-hook.log": "3fa4b42090db96113fc29587e4b0d8659af0cd5592ac9f78659725f1325f9a20",
+      "gate-check-rust-file-hygiene.log": "3fa4b42090db96113fc29587e4b0d8659af0cd5592ac9f78659725f1325f9a20",
+      "gate-check-security-clocks-hook.log": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+      "gate-check-security-clocks.log": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9",
+      "gate-check-trust-boundaries-hook.log": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+      "gate-check-trust-boundaries.log": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+      "green-hook.log": "538dfc91d96f79ead40ed6685cb8d457003e7db7041aafea5d4734b11de80a17",
+      "green.log": "632e8e884888c243c31ae43a8d3866a1362a8c16f1aecf080f732418a485e206",
+      "init-hunk.patch": "c1c214645ba65f0f328845d0df8cb6779c6c75764f1bbb8d1fb8480faee35fe6",
+      "preopen-hook.patch": "a903d2f6e949e5976391995d0f63742c3c0eb659d12c940d34fbb878339777cd",
+      "red-hook-tests-only.patch": "9d71077dd4fba7e22f1dfdfadd05cf4a5d67d160dd09ab20ded30c0d5e19ff25",
+      "red-hook.log": "2471786e241effffee36a72e89450399864984ec1d057d2c52deaab60e5d2dd3",
+      "red-storage-tests-only.patch": "4b68b425e7d81fa5fa30ca6d0036b132b01f076dc8ab427b8b642619e2b7daf5",
+      "red-storage.log": "9ac61342a84737a9e49a1e9a2d7412434614af144a7dcc43f67e4c75f7145422",
+      "storage-non-utf8.patch": "c352fbcc2c2d2f73981d4cdb0d48f03e16d3bd0a65336a2acf8031dab744e73b",
+      "tested-commits.txt": "0a85ccfadd29bb191df1a797af6f024af5fceddd6358a8af419e1ea8aa30023a",
+      "trust-boundary-pragma-census.log": "a559ab7039ae40690137cd13ad00ab53c2e78c8d8293be183f3694f26c18ef98"
+    }
+  },
+  "producer_patch_ids": {
+    "d0f574933b69957ede48636c1d9483a480a7ec29": "12f74830bc707ebec5f62895619f446400aed74f",
+    "99fe1e6a762465893e8b06f56826fc8e88170498": "43fb8a315a6bd4ae8bf59d3bfb275bddeea4cd20"
+  },
+  "producer_runtime": {
+    "passed": 236,
+    "failed": 0,
+    "ignored": 10,
+    "storage_original_failed_names": [
+      "receipt_query_snapshot::preopen::tests::a_store_under_a_non_utf8_directory_keeps_its_snapshot_there",
+      "receipt_query_snapshot::preopen::tests::the_walker_provisions_where_the_hook_reclaims"
+    ],
+    "both_original_names_pass": true,
+    "hook_original": "Compile-only missing API; not a runtime RED. Root actual ordinary/anchored startup ordering witnesses supply runtime RED-to-GREEN."
+  },
+  "root_startup_original": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "init::tests::snapshot_recovery::",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "seconds": 220.61534939566627,
+    "source_before": {
+      "head": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+      "diff_sha256": "64210da667ec4cf6a16d870296a17d61083a588cb575db77e2b84c7460225c81"
+    },
+    "source_after": {
+      "head": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+      "diff_sha256": "64210da667ec4cf6a16d870296a17d61083a588cb575db77e2b84c7460225c81"
+    },
+    "source_stable": true,
+    "log_sha256": "02c62a14cdc7eef729dbddfed2c39ec5ff99e7d629ee302aa889ca222ae74945"
+  },
+  "root_startup_green": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "init::tests::snapshot_recovery::",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 226.69611763721332,
+    "source_before": {
+      "head": "abae247560b76e05e2200ff4361adf8d1e05d387",
+      "diff_sha256": "4a8806622b219f713aa31c26e4ab690c8125aa7b5df6f46362d742c6ae02ca31"
+    },
+    "source_after": {
+      "head": "abae247560b76e05e2200ff4361adf8d1e05d387",
+      "diff_sha256": "4a8806622b219f713aa31c26e4ab690c8125aa7b5df6f46362d742c6ae02ca31"
+    },
+    "source_stable": true,
+    "log_sha256": "c8a2e2823e175aad31bdd63d4edd1104190a5272d27c62e851bdf7353e75501f"
+  },
+  "strict_provenance": {
+    "errata_path": "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-preopen-hook/ERRATA.md",
+    "sha256": "6db0319002b6f174563a4e4454c86fd414853e5317ac9807d5ae91b99c578805",
+    "producer_report": "Two distinct strict executions on dirty source subsequently committed unchanged; byte-identical output. Exit0 reported in producer session, not embedded in logs. The overwritten pre-amendment strict log is unavailable.",
+    "binding_acceptance": "Final combined all-target strict remains required."
+  },
+  "source_review": [
+    "Two startup callsites run bounded reclamation before either receipt-store open. Original open refusals and source bytes remain unchanged.",
+    "Walker placement reads actual main filename bytes through schema-independent, read-only pragma_database_list. Only the empty filename selects memory fallback; errors preserve their classification.",
+    "Local parser matches tested SQLite filename rules, including case-sensitive memory names, local URI authority, percent escapes, query/fragment handling and file symlinks. Unsupported forms skip pre-open cleanup.",
+    "No new Clippy allowance, limit relaxation or catalog waiver. The metadata query names no tenant table, so constructor/SQL inventory is unchanged."
+  ],
+  "limitations": [
+    "One256-dirent/16-candidate window does not guarantee sufficient free space on one restart; persistent bounded progress and operator relief remain the contract.",
+    "CoW cursor allocation, preserved legacy directories, same-uid fallback-location availability and second-uid custody controls retain prior documented limits.",
+    "The inherited receipt-store directory-creation helper does not percent-decode escaped URI parents; this addendum does not claim to repair that independent existing behavior."
+  ],
+  "remaining": [
+    "Final core and Building health coverage integration, then combined owning/default runtime and strict qualification.",
+    "Final independent candidate review, four exact protected hosted checks and normal merge."
+  ],
+  "merged": false,
+  "hosted_qualified": false
+}
