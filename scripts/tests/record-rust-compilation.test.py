@@ -304,6 +304,26 @@ class RecorderSubprocessTest(unittest.TestCase):
             except TypeError as error:
                 self.fail("ordinary host context unavailable: " + str(error))
 
+    def test_ordinary_host_retains_cargo_long_lint_arguments(self):
+        spec = importlib.util.spec_from_file_location("ordinary_host_recorder", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        host = {"target": "aarch64-apple-darwin", "features": set(),
+                "build_cfg": set(), "build_check_cfg": set(), "linker": "/public/clang"}
+        args = [str(self.source), "--crate-type", "rlib", "--emit", "dep-info,link", "-o", str(self.out)]
+        for flag in ["--allow", "--warn", "--deny", "--forbid", "--force-warn"]:
+            for selector in ["unused_qualifications", "clippy::unnecessary_semicolon", "dead-code"]:
+                for extra in [[flag, selector], [flag + "=" + selector]]:
+                    with self.subTest(extra=extra):
+                        parsed = module.parse(args + extra, self.source_root, host=host)
+                        self.assertIn({"name": flag, "value_sha256": module.digest(selector)}, parsed["flags"])
+            with self.assertRaisesRegex(module.Refusal, "unsupported_option"):
+                module.parse(args + [flag, "warnings"], self.source_root)
+            for selector in ["clippy::", "file/path", "opaque value", "warnings,unused"]:
+                with self.subTest(flag=flag, selector=selector):
+                    with self.assertRaisesRegex(module.Refusal, "unsupported_lint_selector"):
+                        module.parse(args + [flag, selector], self.source_root, host=host)
+
     def test_bounded_quota_controls_use_real_subprocess(self):
         for name, limit in [("MAX_INPUT", 4), ("MAX_CONTENT", 4), ("MAX_JSON", 100), ("MAX_RECORDS", 0)]:
             campaign = self.source_root / ("target/quota-" + name)

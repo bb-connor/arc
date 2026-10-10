@@ -992,6 +992,9 @@ def parse(arguments, cwd, native=None, host=None):
     valued = {"--crate-name", "--crate-type", "--edition", "--emit", "--out-dir", "--extern", "--cfg",
               "--check-cfg", "--target", "--sysroot", "--error-format", "--json", "--cap-lints",
               "--diagnostic-width", "--remap-path-prefix", "--print", "-o", "-C", "-L", "-l", "-A", "-D", "-W", "-F"}
+    host_lints = {"--allow", "--warn", "--deny", "--forbid", "--force-warn"}
+    if host is not None:
+        valued.update(host_lints)
     switches = {"--test", "--verbose", "-g", "-O"}
     has_print = any(arg == "--print" or arg.startswith("--print=") for arg in arguments)
     result["prints"] = []
@@ -1043,6 +1046,9 @@ def parse(arguments, cwd, native=None, host=None):
         elif key == "--check-cfg":
             require(re.fullmatch(r"cfg\([A-Za-z_][A-Za-z0-9_]*(?:,[A-Za-z_][A-Za-z0-9_]*)*(?:,values\((?:none\(\))?\))?\)", value)
                     or host_cfg_value(value, host, check=True), "opaque_cfg_value")
+        elif key in host_lints:
+            require(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*(?:::[A-Za-z_][A-Za-z0-9_-]*)*", value),
+                    "unsupported_lint_selector")
         elif key == "--extern":
             require("=" in value, "implicit_extern")
             name, path = value.split("=", 1)
