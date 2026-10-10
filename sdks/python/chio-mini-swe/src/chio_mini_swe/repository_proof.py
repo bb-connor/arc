@@ -17,6 +17,23 @@ from chio_mini_swe.repository_store import atomic_bytes, configuration_digest
 MAX_RECEIPTS = 64 * 1024 * 1024
 
 
+def verification_evidence(value, receipt_count):
+    """Project stable verifier evidence; diagnostic checks are advisory details.
+
+    The protected native verifier authenticates the captured bytes and supplied
+    key. Its schema, exact receipt count and reported key bind the producer's
+    historical report to that fresh verification without pinning diagnostics.
+    """
+    if not isinstance(value, dict) or value.get("schema") != "chio.receipt.signatures.v1":
+        raise ValueError("Invalid receipt verification schema")
+    count, key = value.get("receipts_verified"), value.get("trusted_kernel_key")
+    if type(count) is not int or count != receipt_count or not 1 <= count <= 1024:
+        raise ValueError("Not every supplied receipt was verified")
+    if not isinstance(key, str) or not key or len(key.encode("utf-8")) > 1024:
+        raise ValueError("Invalid receipt verification key")
+    return {"schema": value["schema"], "receipts_verified": count, "trusted_kernel_key": key}
+
+
 def canonical_envelope(value, depth=0):
     """RFC 8785 for the closed broker envelope's string and integer vocabulary.
 
@@ -183,8 +200,7 @@ def verified_receipts(binary, data, key):
             "--trusted-kernel-pubkey",
             private / "kernel.pub",
         )
-    if verification["receipts_verified"] != len(receipts):
-        raise ValueError("Not every supplied receipt was verified")
+    verification_evidence(verification, len(receipts))
     return receipts, verification
 
 

@@ -63,7 +63,12 @@ def bundle(tmp_path, monkeypatch, request):
             outputs[receipt["id"]] = envelope
         export(workspace, output)
         raw = b"\n".join(json.dumps(r).encode() for r in receipts) + b"\n"
-        verification = {"receipts_verified": len(receipts), "trusted_kernel_key": "fixture-key"}
+        verification = {
+            "schema": "chio.receipt.signatures.v1",
+            "receipts_verified": len(receipts),
+            "trusted_kernel_key": "fixture-key",
+            "checks": ["signature", "signer_pin", "action_parameter_hash"],
+        }
         proof = {
             "schema": "chio.repository.receipt-binding.v2",
             "server_id": "sandbox",

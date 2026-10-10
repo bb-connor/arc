@@ -7,7 +7,12 @@ import stat
 
 from chio_mini_swe.provider_config import reject_constant, unique_object
 from chio_mini_swe.repository_archive import MAX_ARCHIVE, canonical, digest, import_revision, patch
-from chio_mini_swe.repository_proof import MAX_RECEIPTS, bound_output, verified_receipts
+from chio_mini_swe.repository_proof import (
+    MAX_RECEIPTS,
+    bound_output,
+    verification_evidence,
+    verified_receipts,
+)
 from chio_mini_swe.repository_scope import SCOPED_SCHEMA, normalize_source_paths, require_scope
 from chio_mini_swe.repository_store import MAX_COMMANDS, configuration_digest
 from chio_mini_swe.repository_wire import validate_result
@@ -228,12 +233,12 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
         },
     )
     matches(
-        proof,
+        {**proof, "verification": verification_evidence(proof.get("verification"), len(receipts))},
         {
             "schema": "chio.repository.receipt-binding.v2",
             "outputs": outputs,
             "server_id": server_id,
-            "verification": verification,
+            "verification": verification_evidence(verification, len(receipts)),
             "transitions": transitions,
             "receipts_sha256": digest(data["receipts.ndjson"]),
             "kernel_key_sha256": digest(data["kernel.pub"]),
