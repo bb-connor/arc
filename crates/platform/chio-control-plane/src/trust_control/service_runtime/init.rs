@@ -78,6 +78,7 @@ async fn serve_async_inner(
         config.authority_keyring_receipt_anchor_root.as_deref(),
     ) {
         (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
+            chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(receipt_path);
             let receipt_store = Arc::new(SqliteReceiptStore::open_for_finding_pool(
                 receipt_path,
                 anchor_root,
@@ -402,6 +403,7 @@ pub(crate) fn open_service_receipt_store(
     let Some(path) = path else {
         return Ok(None);
     };
+    chio_store_sqlite::receipt_query_snapshot::reclaim_abandoned_snapshots(path);
     let store = SqliteReceiptStore::open(path).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to open trust-control receipt store: {error}"

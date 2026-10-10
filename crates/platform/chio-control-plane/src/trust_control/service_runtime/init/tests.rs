@@ -344,3 +344,107 @@ fn startup_serves_while_its_one_writer_still_verifies_a_healthy_history(
     assert!(shared.writer_joins_on_reaper());
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+mod snapshot_recovery {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    struct Fixture {
+        directory: tempfile::TempDir,
+        database: PathBuf,
+        abandoned: PathBuf,
+        original_database: Vec<u8>,
+    }
+
+    impl Fixture {
+        fn new() -> Result<Self, Box<dyn std::error::Error>> {
+            let directory = chio_test_support::private_tempdir()?;
+            let database = directory.path().join("foreign.sqlite3");
+            let connection = rusqlite::Connection::open(&database)?;
+            connection.execute_batch(
+                "CREATE TABLE unrelated(value INTEGER); INSERT INTO unrelated VALUES (42)",
+            )?;
+            drop(connection);
+            let original_database = fs::read(&database)?;
+
+            // Model the on-disk liveness state after owner death: no handle
+            // holds the child lock. Actual SIGKILL behavior is covered by the
+            // backing crate's killed-owner controls.
+            let parent = directory.path().join("chio-receipt-snapshots-v2");
+            fs::DirBuilder::new().mode(0o700).create(&parent)?;
+            let cursor = parent.join("reclaim-cursor");
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&cursor)?;
+            fs::write(cursor, 0_u64.to_le_bytes())?;
+            let abandoned = parent.join("01900000-0000-7000-8000-000000000001");
+            fs::DirBuilder::new().mode(0o700).create(&abandoned)?;
+            let snapshot = abandoned.join("snapshot.sqlite3");
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&snapshot)?;
+            fs::write(snapshot, b"abandoned private projection")?;
+            Ok(Self {
+                directory,
+                database,
+                abandoned,
+                original_database,
+            })
+        }
+
+        fn assert_reclaimed_before_open_refusal(&self) -> TestResult {
+            assert_eq!(fs::read(&self.database)?, self.original_database);
+            assert!(
+                !self.abandoned.exists(),
+                "receipt-store open refused before abandoned snapshot space was reclaimed"
+            );
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn final12_plain_startup_reclaims_before_receipt_store_open_can_refuse() -> TestResult {
+        let fixture = Fixture::new()?;
+        let error = match open_service_receipt_store(Some(&fixture.database)) {
+            Ok(_) => return Err("a foreign receipt database was admitted".into()),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("is not a Chio store"), "{error}");
+        fixture.assert_reclaimed_before_open_refusal()
+    }
+
+    #[tokio::test]
+    async fn final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse() -> TestResult
+    {
+        let fixture = Fixture::new()?;
+        let mut config = test_config(fixture.directory.path().join("unused-joint.sqlite3"));
+        config.joint_authority_db_path = None;
+        config.receipt_db_path = Some(fixture.database.clone());
+        config.authority_keyring_config_path = Some(fixture.directory.path().join("keyring.json"));
+        config.authority_seed_path = Some(fixture.directory.path().join("seed"));
+        config.authority_keyring_receipt_anchor_root =
+            Some(fixture.directory.path().join("anchors"));
+        config.authority_workload_token = Some("startup-recovery-test-workload".to_owned());
+        let error = tokio::time::timeout(
+            Duration::from_secs(30),
+            super::super::serve_async(config, None, None, None, None, None, None),
+        )
+        .await?
+        .err()
+        .ok_or("a foreign anchored receipt database was admitted")?;
+        assert!(
+            matches!(&error, crate::CliError::ReceiptStore(chio_kernel::ReceiptStoreError::Conflict(reason))
+                if reason.contains("is not a Chio store")),
+            "{error}"
+        );
+        fixture.assert_reclaimed_before_open_refusal()
+    }
+}
