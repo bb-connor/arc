@@ -331,7 +331,16 @@ fn knowledge_account_initialization_rolls_back_and_reconfiguration_preserves_cus
     )?;
     let reference = f.publish("account-owned-artifact", b"retained account bytes")?;
     let store = f.f.authority.admission_operation_store();
-    let actor = f.actor(RecoveryPermission::KnowledgeRead)?;
+    // Publication capacity observation is retained administration: it reads
+    // the closed tenant counters without supplying any collection grant.
+    assert!(store
+        .inspect_live_publication_count(
+            &f.actor(RecoveryPermission::KnowledgeRead)?,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )
+        .is_err());
+    let actor = f.actor(RecoveryPermission::KnowledgeAdmin)?;
     let fence = f.f.authority.mutation_fence();
     assert_eq!(
         store.inspect_live_publication_count(&actor, &fence, now_ms()?)?,
@@ -428,7 +437,7 @@ fn knowledge_account_joins_same_tenant_and_initializes_foreign_tenant_independen
     }
     assert_eq!(
         store.inspect_live_publication_count(
-            &f.actor(RecoveryPermission::KnowledgeRead)?,
+            &f.actor(RecoveryPermission::KnowledgeAdmin)?,
             &f.f.authority.mutation_fence(),
             now_ms()?,
         )?,

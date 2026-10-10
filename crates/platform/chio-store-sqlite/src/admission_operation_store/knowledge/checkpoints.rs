@@ -14,10 +14,10 @@ mod retirement_test_support;
 #[cfg(all(test, unix))]
 use head::checkpoint_revision_key;
 use head::{checkpoint_key, load_checkpoint, load_visible_checkpoint, retain_checkpoint_revision};
-pub(super) use reference_source::{checkpoint_reference_source, CheckpointReferenceSource};
+pub(super) use reference_source::checkpoint_reference_source;
+pub(super) use restore::restore_reference_source;
 pub(in crate::admission_operation_store) use restore::AuthenticatedCheckpointRestoreEncodingSource;
 pub use restore::NativeCheckpointRestore;
-pub(super) use restore::{restore_reference_source, RestoreReferenceSource};
 #[cfg(all(test, unix))]
 mod tests;
 
