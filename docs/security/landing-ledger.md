@@ -7,6 +7,23 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Snapshot and authority recovery checkpoint (October 10)
+
+The [recovery audit](audits/recovery-checkpoint-20261010.json) records snapshot
+cleanup integrated at `c0b0ee6090`, with 224 producer tests passing and nine
+explicitly ignored controls. Pre-open recovery remains mandatory: both ordinary
+and anchored startup tests fail because receipt-store open can refuse before
+cleanup runs. A byte-preserving placement fix for non-UTF8 paths is also assigned.
+
+Authority qualification reached 73 passing tests and three refusal-status test
+failures. The 58 cluster controls pass, including minority transport recovery
+and retained authenticated-history refusal. Precise route/backend oracle repair,
+remaining owning checks and integration are still open.
+
+The canonical ledger now preserves **1,929 requirements**, including all 1,926
+previous requirement objects. Final combined qualification, independent review,
+protected hosted checks and merge remain outstanding.
+
 ## Export attribution repair integrated (October 10)
 
 The [attribution audit](audits/export-attribution-repair-20261010.json) records
