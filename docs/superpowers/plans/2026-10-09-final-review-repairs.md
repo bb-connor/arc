@@ -195,6 +195,15 @@ remain distinct from full workspace or exact-source hosted qualification.
    preserving failures individually. Claude owns hosted failure triage and
    isolated repairs; Root owns the ordinary local workspace campaign and its
    findings. Claim paths before edits and exchange exact source/evidence pins.
+   The sweep additionally requires enrollment of the existing 48th flow test,
+   renewal of the two lockfile fingerprints after reviewing the two existing
+   runtime dev-dependency edges, bounded-token copy classification, checked
+   export byte arithmetic, and enrollment of the existing snapshot-directory
+   version in the identifier inventory. Preserve every existing assertion,
+   identifier entry, finite budget and historical evidence fingerprint.
+   Checks refused by a local Cargo adapter remain unqualified until executed
+   with the actual toolchain. Missing environment tools are separate from
+   source failures.
 4. Hold the replacement push until the known repairs and fast-check sweep are
    complete. Renew generated source metadata as needed, without changing proof
    claims or running additional proof campaigns. Preserve the original hosted
@@ -203,3 +212,13 @@ remain distinct from full workspace or exact-source hosted qualification.
    commits, and qualify the changed boundaries. Then publish one replacement
    candidate and return to Task 5's protected landing requirements. Automatic
    hosted formal results do not close KANI-PROOF-QUAL.
+
+**Scheduling ruling:** The owner delegated optional formal-job scheduling to
+Root. Cancel the obsolete, already-failed candidate's remaining workflows to
+free capacity. Keep the replacement's normal protected checks, launch no extra
+proof campaigns, and do not use optional proof completion as an additional
+landing prerequisite. Retain cancellation and upstream aggregate failures
+separately from genuine source failures. The one-hour local workspace run
+expired during compilation without reaching tests; it remains incomplete.
+Reuse its build artifacts for focused checks rather than repeating that cold
+campaign. No full-workspace pass follows from successful focused checks.
