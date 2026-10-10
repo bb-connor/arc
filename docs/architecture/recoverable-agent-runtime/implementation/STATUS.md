@@ -13,32 +13,58 @@ These changes require current-source acceptance; the historical packages remain 
 
 The 2026-10-10 cleanup removes experimental admission upgrades, old checkpoint,
 restore, publication, label and flat-pin readers, modeled semantic and quota
-switches, the unused reference-overflow rebuild representation, and unreleased
-Python recovery aliases. Command selection, HTTP job ownership and Process
-reservation data now use their shared implementations. Relative to the saved
-starting worktree, handwritten Rust is reduced by 5,679 lines including tests;
-this excludes generated code and historical evidence. No finding is closed by
-that size reduction.
+switches, the unused reference-overflow rebuild and cold-account adoption
+pipelines, and unreleased Python recovery aliases. Command selection, HTTP job
+ownership and Process reservation data use their shared implementations. The
+unreachable format-41 original-owner implementation and harnesses that expected
+formats 35, 36 or 40 to serve are removed. Same-format restart and historical
+signing custody remain required. Setup serves its current process-qualified
+selection with an explicit command binding; unsupported tenant-wide selection
+custody refuses without migration or reset.
 
-Focused cleanup verification passes: 16 Store knowledge tests, 3 schema boundary
-and crash/upgrade tests, 2 checkpoint retirement/restart tests, 2 operator-pin
-tests, 8 command-executor tests, the Process reservation test, 31 semantic
-contract/doc tests, 493 Python API/contract/transport tests, strict semantic
-contract Clippy, formatting, schema registry and recovery dependency boundaries.
+A supervised Hermes GLM 5.3 wave used four isolated worktrees from local
+checkpoint `75ccf4ec0`. Reviewed changes are integrated locally. The wave exposed
+and repaired a current multi-process defect: knowledge installation rewrote one
+runtime-wide enforcement marker using a second process scope, leaving the row
+and its authenticated event inconsistent. Installation now retains the original marker,
+including on repeated configuration. The shared protected writer also rejects
+scope or kind rebinding before mutation. Collection reuses its already verified
+reference inventory; duplicate obsolete collection expectations are removed.
+
+Current owning verification and scoped source reviews are recorded in
+`target/hermes-recovery-wave/`. The affected test binaries compile. All 37 owning
+Store regressions and 13 public knowledge tests pass, including the reproduced
+account failure, ownership-rebinding refusal, checkpoint retirement, independent
+collection and damaged-readiness refusal. These compiled tests bind code commit
+`3ebd52471`; the subsequent retention-test edit is formatting only. Local SDK
+checks pass: 398 Python client tests, 71 CrewAI/LangGraph adapter tests, 366
+node-http tests, 62 TypeScript conformance tests and the node-http type check.
+The egress contract, schema registry, recovery boundaries and regression-file
+deletion guards pass. These tests do not establish a live-provider campaign.
 The historical archive was reconstructed and compared against all 5,924 original
-files before their expanded copies were removed. Those archived results still
-do not qualify current code.
+files before their expanded copies were removed; its results remain historical.
 
-Acceptance remains incomplete. The native-custody pin test fails before the
-required unknown-effect state. Semantic framing fails while observing current
-knowledge influence; the imported influence source remains held. The semantic
-recorded-return test does not reach its crash cutpoint. The Process native-return
-source is still uninstalled. The remaining account-adoption census and
-unfinished native ownership paths require further integration; their guards,
-assertions and open qualification requirements have not been weakened. Store
-and Process still emit unused integration-code warnings, so whole-runtime strict
-Clippy and production readiness are not claimed. Raw cleanup runs are in
-`target/architecture-cleanup/`. No cleanup changes have been pushed.
+The broader Store diagnostic run recorded 1,924 passes, 41 failures and four
+ignored tests while follow-up source edits were still in progress; it is not a
+frozen-source qualification. Eleven failures passed on rerun with canonical
+`TMPDIR=/private/tmp`, preserving the production symlink rejection. Twenty-nine
+failed because their separate-filesystem rollback anchor requires `/dev/shm`,
+which is unavailable on this Mac. The remaining obsolete setup expectation was
+replaced by the current pre-mutation refusal test and passes in the owning run.
+Those reruns do not turn the earlier failed suite into a passing full suite.
+
+Acceptance remains incomplete. The ordinary unknown and delivered-denial
+original tests observed zero effects before their required native cutpoints.
+The native finishing/Process return bank remains uninstalled, and the parked
+Capture workflow-identity/cumulative-roster dependency remains excluded. C1-05
+successor ownership and setup replacement remain open. Strict Clippy still fails:
+208 Store unused-code/import diagnostics and 18 Process diagnostics, including
+unused integration code, private-interface visibility and structural lints.
+Four Store large-enum diagnostics were repaired without changing serialized
+types or proof ownership. Whole-runtime strict Clippy, Linux, live-provider,
+formal and hosted-CI qualification are not claimed. No register finding
+is closed by deletion size, source review or a refusal before its required
+cutpoint. No wave changes have been pushed.
 
 The authoritative original inventory is
 `target/recovery-safety-remediation/all-findings/ledger/findings-ledger.json`

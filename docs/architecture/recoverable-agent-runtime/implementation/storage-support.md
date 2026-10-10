@@ -60,6 +60,12 @@ current leases and object pointers against retained native ownership. Collection
 still requires exact terminal and reference custody. This is a deletion of
 unsupported state adoption, not removal of current-state integrity checks.
 
+Setup uses its process-qualified selection key and requires the explicit command
+binding field. The experimental tenant-wide selection decoder is removed. An
+unsupported tenant-wide marker is authenticated and refused, so removing its
+reader cannot silently disable setup protection. Current tenant-required
+custody and same-format setup generation checks remain enforced.
+
 Artifact releases use only actor-scoped request keys. Confinement uses the
 current scope-qualified textual index and full signed-token digest; the older
 unscoped textual-index fallback is removed. Inline and compact checkpoint

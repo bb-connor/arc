@@ -537,11 +537,10 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
         [],
         |row| row.get(0),
     )?;
-    let commits: i64 = connection.query_row(
-        "SELECT count(*) FROM authority_global_commits",
-        [],
-        |row| row.get(0),
-    )?;
+    let commits: i64 =
+        connection.query_row("SELECT count(*) FROM authority_global_commits", [], |row| {
+            row.get(0)
+        })?;
     assert!(
         f.runtime.collect(&f.f.control, &reference).is_err(),
         "missing or corrupt retained readiness cannot become zero reference custody"
@@ -556,11 +555,9 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
         "collection refusal must precede every protected retirement write"
     );
     assert_eq!(
-        connection.query_row(
-            "SELECT count(*) FROM authority_global_commits",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?,
+        connection.query_row("SELECT count(*) FROM authority_global_commits", [], |row| {
+            row.get::<_, i64>(0)
+        },)?,
         commits,
         "collection refusal must not advance the authority"
     );
