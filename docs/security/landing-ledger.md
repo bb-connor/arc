@@ -7,6 +7,18 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Authority and crash-recovery acceptance (October 10)
+
+The [follow-on audit](audits/authority-snapshot-followons-20261010.json) records
+five additional obligations and maps every signer-review observation. The signer
+source passed independent review; exact refusal tests and final composition remain.
+
+Crash-orphan snapshot reclamation is required before landing under the planner's
+explicit recovery ruling. It must preserve live and unknown-liveness legacy
+backing, make bounded progress, and use the existing data directory. Plain-seed
+startup provisioning is also being qualified. Bounded lineage-refresh performance
+and two signer improvements remain named follow-ups.
+
 ## Fee-binding composition and wallet review (October 10)
 
 The [fee and wallet audit](audits/fee-wallet-review-20261010.json) records the
@@ -52,7 +64,7 @@ consumer triage and a genuine Original before a bug claim. Both remain visible.
 
 ## Bounded readiness repairs and remaining review work (October 10)
 
-The ledger preserves **1,920 requirements**, including all 1,915 earlier objects.
+The ledger preserves **1,925 requirements**, including all 1,920 earlier objects.
 The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
 native tests, registry transaction and governance producer evidence, and the
 shared authority APIs. These are component results; the final source is not
