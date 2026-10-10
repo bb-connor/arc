@@ -1,5 +1,187 @@
 use super::*;
 
+/// An actual authenticated peer surface with a private runtime and dynamic URL.
+pub(super) struct LoopbackPeer {
+    pub(super) state: TrustServiceState,
+    pub(super) url: String,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    worker: Option<std::thread::JoinHandle<()>>,
+    finished: std::sync::mpsc::Receiver<Result<(), String>>,
+}
+
+impl LoopbackPeer {
+    pub(super) fn reserve(address: &str) -> (std::net::TcpListener, String) {
+        let listener = std::net::TcpListener::bind(address).test_unwrap();
+        let url = format!("http://{}", listener.local_addr().test_unwrap());
+        (listener, url)
+    }
+
+    pub(super) fn serve(
+        listener: std::net::TcpListener,
+        url: String,
+        state: TrustServiceState,
+    ) -> Self {
+        use axum::routing::get;
+        let router = axum::Router::new()
+            .route(AUTHORITY_PATH, get(handle_authority_status))
+            .route(
+                INTERNAL_CLUSTER_STATUS_PATH,
+                get(handle_internal_cluster_status),
+            )
+            .route(
+                INTERNAL_CLUSTER_SNAPSHOT_PATH,
+                get(handle_internal_cluster_snapshot),
+            )
+            .route(
+                INTERNAL_AUTHORITY_SNAPSHOT_PATH,
+                get(handle_internal_authority_snapshot),
+            )
+            .route(
+                INTERNAL_REVOCATIONS_DELTA_PATH,
+                get(handle_internal_revocations_delta),
+            )
+            .with_state(state.clone());
+        listener.set_nonblocking(true).test_unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel();
+        let (finished_tx, finished) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            use std::future::IntoFuture;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .test_unwrap();
+            let outcome = runtime.block_on(async move {
+                let listener = tokio::net::TcpListener::from_std(listener).test_unwrap();
+                let (stopping, stopping_rx) = tokio::sync::oneshot::channel();
+                let serving = axum::serve(listener, router)
+                    .with_graceful_shutdown(async move {
+                        let _ = stopped.await;
+                        let _ = stopping.send(());
+                    })
+                    .into_future();
+                tokio::pin!(serving);
+                tokio::select! {
+                    result = &mut serving => result.map_err(|error| error.to_string()),
+                    _ = stopping_rx => tokio::time::timeout(Duration::from_secs(30), serving)
+                        .await
+                        .map_err(|_| "loopback peer shutdown timed out".to_string())?
+                        .map_err(|error| error.to_string()),
+                }
+            });
+            runtime.shutdown_timeout(Duration::from_secs(5));
+            let _ = finished_tx.send(outcome);
+        });
+        Self {
+            state,
+            url,
+            stop: Some(stop),
+            worker: Some(worker),
+            finished,
+        }
+    }
+}
+
+impl Drop for LoopbackPeer {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        let Some(worker) = self.worker.take() else {
+            return;
+        };
+        match self.finished.recv_timeout(Duration::from_secs(40)) {
+            Ok(outcome) => {
+                let joined = worker.join();
+                if !std::thread::panicking() {
+                    joined.test_unwrap();
+                    outcome.test_unwrap();
+                }
+            }
+            Err(error) => {
+                // The deadline prevents a broken fixture from hanging the suite.
+                // A disconnected channel still propagates the worker's panic.
+                if matches!(error, std::sync::mpsc::RecvTimeoutError::Disconnected) {
+                    let joined = worker.join();
+                    if !std::thread::panicking() {
+                        joined.test_unwrap();
+                    }
+                }
+                if !std::thread::panicking() {
+                    panic!("loopback peer did not complete shutdown: {error}");
+                }
+            }
+        }
+    }
+}
+
+/// Bootstrap convergence first, then authenticate real signed peer agreement.
+pub(super) struct AdmittedReplicationPair {
+    pub(super) source: LoopbackPeer,
+    pub(super) follower: LoopbackPeer,
+}
+
+impl AdmittedReplicationPair {
+    pub(super) fn new(source_path: PathBuf, follower_path: PathBuf) -> Self {
+        let (source_listener, source_url) = LoopbackPeer::reserve("127.0.0.1:0");
+        let (follower_listener, follower_url) = LoopbackPeer::reserve("127.0.0.2:0");
+        let mut source = state_with_cluster(&source_url, &[&follower_url], None, None, None);
+        source.config.authority_db_path = Some(source_path);
+        let mut follower = state_with_cluster(&follower_url, &[&source_url], None, None, None);
+        follower.config.authority_db_path = Some(follower_path);
+        let source = LoopbackPeer::serve(source_listener, source_url, source);
+        let follower = LoopbackPeer::serve(follower_listener, follower_url, follower);
+        // The first import can converge before the elected source admits trust.
+        let initial = sync_peer(&follower.state, &source.url).test_unwrap_err();
+        assert!(
+            matches!(initial, CliError::Chio(_)),
+            "unexpected refusal: {initial}"
+        );
+        assert_eq!(
+            initial.to_string(),
+            CliError::cli_other_error(format!(
+                "trust control service request failed with 503: {}",
+                json!({"error": "cluster authority context changed during inspection"})
+            ))
+            .to_string(),
+            "first convergence import must not imply serving admission"
+        );
+        sync_peer(&source.state, &follower.url).test_unwrap();
+        let source_view = load_authority_status_for_state(&source.state).test_unwrap();
+        sync_peer(&follower.state, &source.url).test_unwrap();
+        let follower_view = load_authority_status_for_state(&follower.state).test_unwrap();
+        assert_eq!(source_view.issuer_state, follower_view.issuer_state);
+        assert_eq!(current_leader_url(&source.state), Some(source.url.clone()));
+        assert_eq!(
+            current_leader_url(&follower.state),
+            Some(source.url.clone())
+        );
+        Self { source, follower }
+    }
+
+    /// Refresh only authenticated transport contact, without importing authority.
+    pub(super) fn refresh_transport_context(&self) -> Result<(), CliError> {
+        for (local, remote) in [
+            (&self.source, &self.follower),
+            (&self.follower, &self.source),
+        ] {
+            let client = service_runtime::client::build_cluster_peer_client(
+                &remote.url,
+                &local.state.config.service_token,
+                &local.url,
+            )?;
+            let status = client.cluster_status()?;
+            assert_eq!(status.self_url, remote.url);
+            update_peer_reachable(&local.state, &remote.url);
+        }
+        for local in [&self.source, &self.follower] {
+            let view = cluster_consensus_view(&local.state).test_unwrap();
+            assert!(view.has_quorum, "fresh authenticated contact: {view:?}");
+            assert_eq!(view.leader_url.as_deref(), Some(self.source.url.as_str()));
+        }
+        Ok(())
+    }
+}
+
 #[test]
 fn unsigned_authority_full_snapshot_cannot_insert_issuer() {
     let root = chio_test_support::private_tempdir().test_unwrap();
@@ -103,16 +285,10 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
     follower.pin_replication_anchor(&anchor).test_unwrap();
     source.rotate().test_unwrap();
     let signed = source.signed_snapshot().test_unwrap();
-    let mut state = state_with_cluster(
-        "http://127.0.0.1:3300",
-        &["http://127.0.0.1:3301"],
-        None,
-        None,
-        None,
-    );
+    let pair = AdmittedReplicationPair::new(root.path().join("source.db"), follower_path.clone());
+    let state = pair.follower.state.clone();
     let template = build_cluster_state_snapshot(&state).test_unwrap();
     let template = serde_json::to_value(template).test_unwrap();
-    state.config.authority_db_path = Some(follower_path.clone());
     let attacker = Keypair::generate();
     let mut injected = signed.clone();
     injected
@@ -141,7 +317,7 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
             serde_json::from_value(template.clone()).test_unwrap();
         full.authority = Some(forged);
         assert!(
-            matches!(apply_cluster_snapshot(&state, "http://127.0.0.1:3301", full),
+            matches!(apply_cluster_snapshot(&state, &pair.source.url, full),
             Err(CliError::AuthorityStore(chio_kernel::AuthorityStoreError::Fence(message)))
                 if message == expected)
         );
@@ -156,7 +332,7 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
     source.rotate().test_unwrap();
     let mut full: ClusterStateSnapshotResponse = serde_json::from_value(template).test_unwrap();
     full.authority = Some(source.signed_snapshot().test_unwrap());
-    apply_cluster_snapshot(&state, "http://127.0.0.1:3301", full).test_unwrap();
+    apply_cluster_snapshot(&state, &pair.source.url, full).test_unwrap();
     assert_eq!(
         follower.snapshot().test_unwrap(),
         source.snapshot().test_unwrap()

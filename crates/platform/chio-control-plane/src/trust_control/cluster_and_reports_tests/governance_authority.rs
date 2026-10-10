@@ -34,6 +34,7 @@ const LISTING_ID: &str = "governance-authority-listing";
 struct StaleFormerCustodian {
     _directory: tempfile::TempDir,
     leader: ServedPeer,
+    follower: super::super::authority_replication::LoopbackPeer,
     state: TrustServiceState,
     revoked: Keypair,
     recovered: Keypair,
@@ -77,14 +78,21 @@ fn stale_former_custodian() -> StaleFormerCustodian {
     assert_eq!(recovered_status.public_key, recovered_head.public_key());
 
     let (listener, recovered_url) = ServedPeer::reserve();
-    let mut leader_state = state_with_cluster(&recovered_url, &[IMPORTER_URL], None, None, None);
+    let (follower_listener, follower_url) =
+        super::super::authority_replication::LoopbackPeer::reserve("127.0.0.2:0");
+    let mut leader_state = state_with_cluster(&recovered_url, &[&follower_url], None, None, None);
     leader_state.config.authority_db_path = Some(recovered_path);
     leader_state.finding_challenge_clock = fixed_clock(now + 1);
     let leader = ServedPeer::serve(listener, recovered_url, leader_state, None);
 
-    let mut state = state_with_cluster(IMPORTER_URL, &[&leader.url], None, None, None);
+    let mut state = state_with_cluster(&follower_url, &[&leader.url], None, None, None);
     state.config.authority_db_path = Some(custodian_path);
     state.finding_challenge_clock = fixed_clock(now);
+    let follower = super::super::authority_replication::LoopbackPeer::serve(
+        follower_listener,
+        follower_url,
+        state.clone(),
+    );
     // One second behind the leader at zero configured skew.
     let refused = sync_peer(&state, &leader.url).test_unwrap_err();
     assert!(
@@ -98,6 +106,7 @@ fn stale_former_custodian() -> StaleFormerCustodian {
     StaleFormerCustodian {
         _directory: directory,
         leader,
+        follower,
         state,
         revoked,
         recovered: recovered_head,
@@ -879,8 +888,16 @@ async fn confirmed_follower_trusts_only_the_admitted_set_and_never_signs_with_it
     node.state
         .config
         .authority_replication_max_future_skew_seconds = 1;
-    sync_peer(&node.state, &node.leader.url).test_unwrap();
     node.state.finding_challenge_clock = fixed_clock(node.now + 1);
+    // The source obtains a real authenticated prefix agreement through the
+    // follower's independent internal export before it can admit serving.
+    sync_peer(&node.leader.state, &node.follower.url).test_unwrap();
+    let source = load_authority_status_for_state(&node.leader.state).test_unwrap();
+    assert_eq!(
+        source.public_key,
+        Some(node.recovered.public_key().to_hex())
+    );
+    sync_peer(&node.state, &node.leader.url).test_unwrap();
 
     let admitted = load_authority_status_for_state(&node.state).test_unwrap();
     let current = node.recovered.public_key();

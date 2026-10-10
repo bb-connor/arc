@@ -1727,3 +1727,6 @@ mod oid4vp_issuer_fetch_tests;
 
 #[path = "passport_handlers/issuer_authority.rs"]
 mod issuer_authority;
+
+#[cfg(test)]
+pub(crate) use issuer_authority::provisional_test_observer::observe_provisional_issuer_once;

@@ -308,40 +308,10 @@ async fn unconfigured_unsigned_issuer_operations_keep_the_legacy_profile() -> Te
     Ok(())
 }
 
-/// Inspection constructors and lookups each read the authority clock. Key
-/// selection is reads 1-2, the guard pre-view 3-4, and signer pre-binding 5-6.
-/// Read 7 pauses signer post-binding after credential construction; the rotated
-/// head is observed at read 8 before the registry can persist.
-struct PausePostSignerRead {
-    inner: Arc<dyn chio_security_types::clock::Clock>,
-    reads: std::sync::atomic::AtomicUsize,
-    reached: std::sync::mpsc::Sender<()>,
-    release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
-}
-
-impl chio_security_types::clock::Clock for PausePostSignerRead {
-    fn read(
-        &self,
-    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
-    {
-        use chio_security_types::clock::ClockError;
-        let read = self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-        if read == 7 {
-            self.reached.send(()).map_err(|_| ClockError::Unavailable)?;
-            self.release
-                .lock()
-                .map_err(|_| ClockError::Unavailable)?
-                .recv_timeout(Duration::from_secs(30))
-                .map_err(|_| ClockError::Unavailable)?;
-        }
-        self.inner.read()
-    }
-}
-
 #[tokio::test]
 async fn a_rotation_after_provisional_credential_construction_refuses_without_consuming_entitlement(
 ) -> TestResult {
-    let mut fixture = IssuerFixture::new(false)?;
+    let fixture = IssuerFixture::new(false)?;
     let original = std::fs::read(&fixture.offers)?;
     let authority_path = fixture
         .state
@@ -351,24 +321,31 @@ async fn a_rotation_after_provisional_credential_construction_refuses_without_co
         .ok_or("missing authority path")?;
     let (reached, reached_rx) = std::sync::mpsc::channel();
     let (release_tx, release) = std::sync::mpsc::channel();
-    let clock = Arc::new(PausePostSignerRead {
-        inner: Arc::clone(&fixture.state.finding_challenge_clock),
-        reads: std::sync::atomic::AtomicUsize::new(0),
-        reached,
-        release: std::sync::Mutex::new(release),
-    });
-    fixture.state.finding_challenge_clock = clock.clone();
+    let _observation = crate::trust_control::passport_handlers::observe_provisional_issuer_once(
+        &fixture.offers,
+        move |selected| {
+            reached.send(selected.clone()).map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "construction observer disconnected",
+                )
+            })?;
+            release.recv_timeout(Duration::from_secs(30)).map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "construction observer timed out",
+                )
+            })?;
+            Ok(())
+        },
+    )?;
     let offers = fixture.offers.clone();
     let token = fixture.credential_token.clone();
-    let observed_clock = Arc::clone(&clock);
     let rotation = std::thread::spawn(move || {
-        let outcome = (|| -> Result<(Vec<u8>, bool, PublicKey, PublicKey, usize), String> {
-            reached_rx
+        let outcome = (|| -> Result<(Vec<u8>, bool, PublicKey, PublicKey, PublicKey), String> {
+            let constructed_signer = reached_rx
                 .recv_timeout(Duration::from_secs(30))
                 .map_err(|error| error.to_string())?;
-            let reads_at_pause = observed_clock
-                .reads
-                .load(std::sync::atomic::Ordering::SeqCst);
             let before = std::fs::read(&offers).map_err(|error| error.to_string())?;
             let registry =
                 PassportIssuanceOfferRegistry::load(&offers).map_err(|error| error.to_string())?;
@@ -389,22 +366,17 @@ async fn a_rotation_after_provisional_credential_construction_refuses_without_co
                 .rotate()
                 .map_err(|error| error.to_string())?
                 .public_key;
-            Ok((before, entitled, selected, rotated, reads_at_pause))
+            Ok((before, entitled, selected, rotated, constructed_signer))
         })();
         let _ = release_tx.send(());
         outcome
     });
     let response = tokio::time::timeout(Duration::from_secs(35), fixture.credential()).await?;
-    let (paused_bytes, entitled_at_pause, selected_at_pause, rotated, reads_at_pause) =
+    let (paused_bytes, entitled_at_pause, selected_at_pause, rotated, constructed_signer) =
         rotation.join().map_err(|_| "rotation worker panicked")??;
     assert_eq!(
-        reads_at_pause, 7,
-        "the real callback did not reach its post-construction inspection"
-    );
-    assert_eq!(
-        clock.reads.load(std::sync::atomic::Ordering::SeqCst),
-        8,
-        "the refused post-binding lookup did not complete at the documented source boundary"
+        constructed_signer, fixture.actual,
+        "real credential construction completed with a different signer"
     );
     assert_eq!(selected_at_pause, fixture.actual);
     assert_ne!(rotated, fixture.actual);

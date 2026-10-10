@@ -9,6 +9,10 @@ use crate::trust_control::report_validation::{
 const UNADMITTED_SIGNER: &str =
     "passport issuer signing key is not the admitted live authority head";
 
+#[cfg(test)]
+#[path = "issuer_authority/provisional_test_observer.rs"]
+pub(crate) mod provisional_test_observer;
+
 /// Metadata uses the already-selected key and performs no second key lookup.
 pub(super) fn metadata(
     config: &TrustServiceConfig,
@@ -69,6 +73,8 @@ pub(super) fn run<T>(
         bind_signer(state, &selected)?;
         let result =
             operation(state, Some(&selected)).map_err(RegistryOperationError::into_response)?;
+        #[cfg(test)]
+        provisional_test_observer::after_operation(state, &selected.public_key())?;
         bind_signer(state, &selected)?;
         Ok(result)
     })

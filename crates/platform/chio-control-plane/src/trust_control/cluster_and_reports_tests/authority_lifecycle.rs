@@ -64,14 +64,29 @@ fn request(capability: &CapabilityToken, id: &str) -> ToolCallRequest {
 }
 
 fn full_import(
-    state: &TrustServiceState,
+    phase: &str,
+    pair: &super::authority_replication::AdmittedReplicationPair,
+    follower: &SqliteCapabilityAuthority,
     template: &Value,
     signed: AuthoritySnapshotView,
 ) -> Result<(), CliError> {
+    let prior_authority = follower.snapshot()?;
+    pair.refresh_transport_context()?;
+    assert_eq!(
+        follower.snapshot()?,
+        prior_authority,
+        "transport contact must not pre-import the {phase} authority state"
+    );
+    let state = &pair.follower.state;
     let mut full: ClusterStateSnapshotResponse = serde_json::from_value(template.clone())?;
     full.authority = Some(signed);
-    apply_cluster_snapshot(state, "http://127.0.0.1:3301", full)?;
-    Ok(())
+    let before = cluster_consensus_and_authority_lease_view(state);
+    let outcome = apply_cluster_snapshot(state, &pair.source.url, full);
+    if let Err(error) = &outcome {
+        let after = cluster_consensus_and_authority_lease_view(state);
+        eprintln!("full import phase={phase}; before={before:?}; after={after:?}; error={error:?}");
+    }
+    outcome
 }
 
 #[test]
@@ -84,15 +99,12 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
     let anchor = source
         .initialize_replication_with_recovery("live-admission", Some(&recovery.public_key()))?;
     follower.pin_replication_anchor(&anchor)?;
-    let mut state = state_with_cluster(
-        "http://127.0.0.1:3300",
-        &["http://127.0.0.1:3301"],
-        None,
-        None,
-        None,
+    let pair = super::authority_replication::AdmittedReplicationPair::new(
+        root.path().join("source.db"),
+        follower_path.clone(),
     );
+    let state = pair.follower.state.clone();
     let template = serde_json::to_value(build_cluster_state_snapshot(&state)?)?;
-    state.config.authority_db_path = Some(follower_path.clone());
     let policy = root.path().join("kernel.yaml");
     std::fs::write(
         &policy,
@@ -132,7 +144,13 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
     assert_eq!(effects.load(Ordering::SeqCst), 2);
     let b = source.issue_capability(&subject, scope.clone(), 300)?;
     source.retire_issuer(&a.issuer)?;
-    full_import(&state, &template, source.signed_snapshot()?)?;
+    full_import(
+        "retired-issuer",
+        &pair,
+        &follower,
+        &template,
+        source.signed_snapshot()?,
+    )?;
     let denied = kernel.evaluate_tool_call_blocking(&request(&a, "retired"))?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied
@@ -151,7 +169,13 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
     super::authority_replication::pull_snapshot(&state, &source.signed_snapshot()?)?;
     for full in [false, true] {
         let result = if full {
-            full_import(&state, &template, rotation.clone())
+            full_import(
+                "replayed-rotation",
+                &pair,
+                &follower,
+                &template,
+                rotation.clone(),
+            )
         } else {
             super::authority_replication::pull_snapshot(&state, &rotation)
         };
@@ -160,7 +184,13 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
         );
     }
     source.recover_authority(&recovery)?;
-    full_import(&state, &template, source.signed_snapshot()?)?;
+    full_import(
+        "recovered-authority",
+        &pair,
+        &follower,
+        &template,
+        source.signed_snapshot()?,
+    )?;
     let denied = kernel.evaluate_tool_call_blocking(&request(&b, "revoked-by-recovery"))?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied
