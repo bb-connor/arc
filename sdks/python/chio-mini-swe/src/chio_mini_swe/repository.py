@@ -11,7 +11,16 @@ from chio_mini_swe.provider_config import reject_constant, unique_object
 from chio_mini_swe.repository_archive import contents, digest, patch
 from chio_mini_swe.repository_proof import verify
 from chio_mini_swe.repository_store import Workspace, atomic_bytes, configuration_digest, initialize
-from chio_mini_swe.repository_wire import request_id, response_frame, tool_result
+from chio_mini_swe.repository_wire import (
+    MAX_COMMAND_BYTES,
+    MAX_TOOL_CALL_ID_BYTES,
+    command_text,
+    error_frame,
+    read_request_frame,
+    request_id,
+    response_frame,
+    tool_result,
+)
 
 
 def tool(config):
@@ -33,8 +42,17 @@ def tool(config):
             "additionalProperties": False,
             "required": ["command"],
             "properties": {
-                "command": {"type": "string", "minLength": 1, "maxLength": 65536},
-                "tool_call_id": {"type": "string", "maxLength": 1024},
+                "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_COMMAND_BYTES,
+                    "description": "Non-NUL command limited to 65,536 UTF-8 bytes.",
+                },
+                "tool_call_id": {
+                    "type": "string",
+                    "maxLength": MAX_TOOL_CALL_ID_BYTES,
+                    "description": "Optional tool call ID limited to 1,024 UTF-8 bytes.",
+                },
             },
         },
         "annotations": {
@@ -50,58 +68,83 @@ def serve(workspace, incoming=None, outgoing=None):
     incoming = sys.stdin.buffer if incoming is None else incoming
     outgoing = sys.stdout if outgoing is None else outgoing
     workspace.recover()
-    while line := incoming.readline(80 * 1024 + 1):
-        if len(line) > 80 * 1024 or not line.endswith(b"\n"):
-            raise ValueError("Repository MCP frame exceeds its bound or is incomplete")
-        message = json.loads(line, object_pairs_hook=unique_object, parse_constant=reject_constant)
-        if "id" not in message:
+    while True:
+        try:
+            line = read_request_frame(incoming)
+        except ValueError:
+            print(
+                error_frame(None, -32600, "Invalid repository MCP frame"), file=outgoing, flush=True
+            )
             continue
-        identifier = request_id(message["id"])
-        method = message["method"]
-        if method == "initialize":
-            result = {
-                "protocolVersion": message["params"]["protocolVersion"],
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "chio-mini-swe-repository", "version": "1"},
-            }
-        elif method == "tools/list":
-            result = {"tools": [tool(workspace.config)]}
-        elif method == "tools/call":
-            try:
-                arguments = message["params"]["arguments"]
-                if (
-                    message["params"]["name"] != "execute"
-                    or not isinstance(arguments, dict)
-                    or not {"command"} <= set(arguments) <= {"command", "tool_call_id"}
-                ):
-                    raise ValueError("Invalid repository tool call")
-                if "tool_call_id" in arguments and (
-                    not isinstance(arguments["tool_call_id"], str)
-                    or len(arguments["tool_call_id"].encode()) > 1024
-                ):
-                    raise ValueError("Invalid repository tool call ID")
-                value = workspace.execute(arguments["command"])
-                result = tool_result(value)
-            except Exception:
+        if not line:
+            return
+        try:
+            message = json.loads(
+                line.decode("utf-8"),
+                object_pairs_hook=unique_object,
+                parse_constant=reject_constant,
+            )
+        except (ValueError, RecursionError):
+            print(
+                error_frame(None, -32700, "Invalid repository MCP JSON"), file=outgoing, flush=True
+            )
+            continue
+        identifier = None
+        try:
+            if not isinstance(message, dict):
+                raise ValueError("Invalid repository MCP request")
+            if "id" not in message:
+                continue
+            identifier = request_id(message["id"])
+            method = message["method"]
+            if method == "initialize":
                 result = {
-                    "isError": True,
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Repository execution stopped. "
-                                "Inspect the retained operator workspace before continuing."
-                            ),
-                        }
-                    ],
+                    "protocolVersion": message["params"]["protocolVersion"],
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "chio-mini-swe-repository", "version": "1"},
                 }
-        else:
-            raise ValueError("Unsupported repository MCP method")
-        print(
-            response_frame(identifier, result),
-            file=outgoing,
-            flush=True,
-        )
+            elif method == "tools/list":
+                result = {"tools": [tool(workspace.config)]}
+            elif method == "tools/call":
+                try:
+                    arguments = message["params"]["arguments"]
+                    if (
+                        message["params"]["name"] != "execute"
+                        or not isinstance(arguments, dict)
+                        or not {"command"} <= set(arguments) <= {"command", "tool_call_id"}
+                    ):
+                        raise ValueError("Invalid repository tool call")
+                    if "tool_call_id" in arguments and (
+                        not isinstance(arguments["tool_call_id"], str)
+                        or len(arguments["tool_call_id"].encode("utf-8")) > MAX_TOOL_CALL_ID_BYTES
+                    ):
+                        raise ValueError("Invalid repository tool call ID")
+                    value = workspace.execute(command_text(arguments["command"]))
+                    result = tool_result(value)
+                except Exception:
+                    result = {
+                        "isError": True,
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Repository execution stopped. "
+                                    "Inspect the retained operator workspace before continuing."
+                                ),
+                            }
+                        ],
+                    }
+            else:
+                print(
+                    error_frame(identifier, -32601, "Unsupported repository MCP method"),
+                    file=outgoing,
+                    flush=True,
+                )
+                continue
+            encoded = response_frame(identifier, result)
+        except Exception:
+            encoded = error_frame(identifier, -32600, "Invalid repository MCP request")
+        print(encoded, file=outgoing, flush=True)
 
 
 def export(workspace, output):
