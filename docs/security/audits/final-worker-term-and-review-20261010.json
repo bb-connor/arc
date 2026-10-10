@@ -1,0 +1,99 @@
+{
+  "schema": "chio.final-worker-term-and-review.v1",
+  "observed_at": "2026-10-10T05:15:04.115901+00:00",
+  "source_stage": "f3dcbe03cf7be392de466ff181a9dbd904d98dfd",
+  "forwarded_term": {
+    "finding": "FINAL-FORWARDED-TERM-AFTER-WAIT",
+    "priority": "P2",
+    "status": "source-integrated-component-qualified-and-reviewed-final-composition-open",
+    "handoff": {
+      "producer_commit": "f55b87ba3efef0d310b75eb4361fd4aa7384d03b",
+      "base": "e76adcb132d0b6834cbbd23aa4a7bbed9d8cf193",
+      "files": {
+        "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs": "a1169a9d928e0e8f1e8cf540de128867761c42682f0e1d952982934147a85ff6",
+        "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_majority_contract.rs": "fa1a36cc7e4381a8463dbffa9d0b035dc505485b1fb627c80c43c7de18c90204",
+        "crates/platform/chio-control-plane/src/trust_control/report_validation.rs": "da630445f121f4650a5fc0da611b3d6bc874dfcb0e09b7bbaee110ffc750f67b",
+        "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/forwarded_authority_term.rs": "9738006cbe195e3ff5ee7d395d51bc090a9a6c304a139e91ff57031016647ddf"
+      },
+      "original": {
+        "passed": 2,
+        "genuine_failed": 2,
+        "first_compile_failure_retained": true
+      },
+      "repaired_component_passed": 4,
+      "composed_owning_passed": 14,
+      "owning_strict_alltargets": "PASS",
+      "format": "PASS",
+      "source_stable": true,
+      "scope": "Retain authenticated forwarded context and recheck current lease term at worker entry. Existing guards/fences retained; no new database/consensus atomicity claim.",
+      "evidence": {
+        "/tmp/pr1160-forwarded-term-20261010/ORIGINAL-VERDICT.json": "ea0f9b9f04e5628ebaf0f6719caf954a3e5ac162e14f1c0a2820ed50ce7641a5",
+        "/tmp/pr1160-forwarded-term-20261010/original/summary.json": "2a3b8e4bf223e62c1a7b3666bbeba0f02d86658171d5a407046ff12c51852296",
+        "/tmp/pr1160-forwarded-term-20261010/original-v2/summary.json": "d117136d1cf74c6feb4fc3fe81d24dbee9a23d2c8808fbb54d33f55d742eda94",
+        "/tmp/pr1160-forwarded-term-20261010/repaired/summary.json": "fcf17252b20a29a15d0fc5bfb4b475ddccbecd41199230dc77a7b676ea0bd0d9",
+        "/tmp/pr1160-forwarded-term-20261010/static/summary.json": "3a415a975fcd537380c8bb7b6a18971f6a622143fd61a6371a5d4dd1f18873f2",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/summary.json": "ddf1d039af4257b9731efcd1a35c4ffe103dd37f7f95669638f9b04b69bf165d",
+        "/tmp/pr1160-forwarded-term-20261010/independent-review.md": "cf9c37e76afa1af93e18bd755b6b29135cf35549a1ad6806e3a3a615788c67e1",
+        "/tmp/pr1160-forwarded-term-20261010/original-v2/001-runtime/output.log": "0634d39b3c667db67107cf57726a18ea9cd59413ebf49fc0543576b977c25e71",
+        "/tmp/pr1160-forwarded-term-20261010/repaired/001-runtime/output.log": "77fe6dad0cf149abe41c43ca829f14cf05a334ccd11d99b40b0e0d9ea147e62d",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/002-tests-01-ignored-list/output.log": "7ca734dc24ce07bd057acd38f2d9a019cf46c88588920e30940b9bae9f75cb08",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/003-tests-01-runtime/output.log": "476f29f8d82556d838bfca9c095f56f900ee2961262815e44bbb175f1c3ab855",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/004-strict/output.log": "f8418e490201019f9fc9edcdd824e17b54ac906077239efa8cc1a655b42c375f",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/001-tests-01-list/output.log": "b1363f186870d97056c638d53c030dec8d1725f080d66b54ae608c9c9aa663ed",
+        "/tmp/pr1160-forwarded-term-20261010/owning-composed/005-format/output.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "integration": {
+      "producer": "f55b87ba3efef0d310b75eb4361fd4aa7384d03b",
+      "integrated": "f3dcbe03cf7be392de466ff181a9dbd904d98dfd",
+      "all_four_source_hashes_identical": true,
+      "manifest_sha256": "5c5a2236c1202de915313aa11d93a1b41f5df508a269490c99af4310d10cbcf7"
+    },
+    "manifest_sha256": "5c5a2236c1202de915313aa11d93a1b41f5df508a269490c99af4310d10cbcf7",
+    "atomic_database_cluster_binding_claimed": false
+  },
+  "independent_component_reviews": [
+    {
+      "path": "/tmp/pr1160-forwarded-term-20261010/independent-review.md",
+      "sha256": "cf9c37e76afa1af93e18bd755b6b29135cf35549a1ad6806e3a3a615788c67e1",
+      "scope": "Four-file forwarded-term delta accepted from source review; retained Original/repair/composed evidence verified without rerunning tests.",
+      "introduced_p0_p1_p2_found": false,
+      "runtime_rerun_by_reviewer": false
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/wallet-delta-review.md",
+      "sha256": "5ffcece1b24d9d11a6d9686949b4615a409b68ddf5a26329e6b50de3e638bdff",
+      "scope": "Seven-file wallet expiry delta accepted from source review and verified producer evidence; no final candidate qualification.",
+      "introduced_p0_p1_p2_found": false,
+      "runtime_rerun_by_reviewer": false
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/startup-delta-review.md",
+      "sha256": "1091512a62e6b158facfd69df5c34526ef73746cd60f823abc52e0018f1e8fad",
+      "scope": "Startup order delta source review found no blocking finding; six focused tests retained, final owning strict/composition still pending.",
+      "introduced_p0_p1_p2_found": false,
+      "runtime_rerun_by_reviewer": false
+    }
+  ],
+  "hosted_thread_refresh": {
+    "path": "/tmp/pr1160-final-review-20261009/hosted/review-threads-20261010T051232Z.json",
+    "sha256": "c0c12db6960e31465f7a5df46965f853fb7f758106b16b0e4a4f42c416773bb2",
+    "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+    "total": 65,
+    "unresolved": 33,
+    "new_or_changed_since_0c_intake": 0,
+    "posted_or_resolved": false
+  },
+  "ledger_requirement_count": 1931,
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "remaining": [
+    "Complete isolated behavioral signer custody repair and the four composition controls.",
+    "Renew generated proof-coverage metadata for new Rust files without running proof tools.",
+    "Freeze all integrated repairs and renew whole control-plane library, other selected owners, strict, static gates and independent final candidate review.",
+    "Four exact protected hosted checks and normal protected merge.",
+    "Keep KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 gating G5; no release or preview claim."
+  ],
+  "review_availability": "Claude final core/snapshot reviews are retained. Actual Claude session is weekly-quota unavailable; temporary explicitly assigned isolated lanes continue. Component independent reviews are not represented as planner approval."
+}
