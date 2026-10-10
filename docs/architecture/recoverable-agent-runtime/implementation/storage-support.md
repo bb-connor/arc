@@ -19,11 +19,13 @@ No installation requiring them has been identified. Unknown external development
 checkouts are not evidence of a supported migration contract. Their data is
 retained on refusal, rather than silently adopted or erased.
 
-Format 41 is reserved by an incomplete successor-ownership implementation.
-The supported format does not enable it. Original-call ownership remains at its
-existing conservative behavior until the complete native owner contract and
-its acceptance are integrated. A schema bump must never enable authority merely
-because an integer matches an unfinished branch.
+The unreachable format-41 successor-ownership implementation is removed.
+Original-call ownership uses the existing immutable origin claim: a different
+workflow cannot consume an already claimed original. Failed or cancelled
+originals gaining a safe successor remains an open requirement (C1-05); setup
+replacement that requires this ownership transfer remains unavailable. A future
+implementation must satisfy the complete current-format ownership contract and
+its acceptance rather than revive the unsupported format.
 
 Current checkpoint keys use separate length-framed latest and revision domains.
 Every checkpoint read verifies its scope, identity and revision. Current

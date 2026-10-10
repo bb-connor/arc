@@ -1,9 +1,5 @@
-//! Permanent immutable origin ownership under the supported catalog.
-//! The never-released format-41 successor-ownership prototype is deleted from
-//! the maintained path: no supported writer creates its catalog, heads,
-//! transfers or closures, a consumed origin claim stays permanent, and any
-//! retained predecessor prototype tables, rows or indexes refuse before
-//! recovery serving and pricing.
+//! Immutable origin claims bind each original operation to one workflow.
+//! Unsupported ownership records refuse before serving and pricing.
 use super::*;
 use crate::admission_operation_store::setup::VerifiedUnusedSetupGeneration;
 use crate::serving_owner::NativeSourceTransactionOrigin;

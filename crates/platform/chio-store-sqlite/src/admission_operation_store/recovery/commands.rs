@@ -432,18 +432,6 @@ fn response(
     }
 }
 
-pub(in crate::admission_operation_store) fn apply(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    actor: &AuthenticatedRecoveryActor,
-    command: &RecoveryCommandV1,
-    deployment: &RecoveryDeploymentV1,
-    now: u64,
-    original_process: Option<&dyn RecoveryProcessOriginPort>,
-) -> Result<RecoveryCommandResponseV1, RecoveryCommandPortError> {
-    apply_in_origin(tx, owner, actor, command, deployment, now, original_process)
-}
-
 /// Setup supplies its actual pre-mutation cut across Selection and creation.
 pub(in crate::admission_operation_store) fn apply_with_origin(
     tx: &Transaction<'_>,
@@ -462,10 +450,10 @@ pub(in crate::admission_operation_store) fn apply_with_origin(
     if !cut.matches_owner(owner) {
         return Err(invariant("setup creation changed its actual source owner").into());
     }
-    apply_in_origin(tx, owner, actor, command, deployment, now, original_process)
+    apply(tx, owner, actor, command, deployment, now, original_process)
 }
 
-fn apply_in_origin(
+pub(in crate::admission_operation_store) fn apply(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
     actor: &AuthenticatedRecoveryActor,

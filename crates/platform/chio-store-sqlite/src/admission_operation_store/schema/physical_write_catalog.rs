@@ -10,7 +10,7 @@ const TABLES: [&str; 4] = [
 ];
 /// Indexes of the never-released successor-ownership prototype. No supported
 /// store installs them, and their retained presence refuses pricing.
-const SUCCESSOR_PROTOTYPE_INDEXES: [&str; 4] = [
+const UNSUPPORTED_OWNERSHIP_INDEXES: [&str; 4] = [
     "admission_operation_recovery_original_owner",
     "admission_operation_recovery_original_transfer",
     "admission_operation_recovery_original_tombstone",
@@ -32,7 +32,7 @@ impl PhysicalCommandCatalogData {
 pub(in crate::admission_operation_store) fn verify_physical_command_catalog(
     connection: &Connection,
 ) -> Result<PhysicalCommandCatalogData, AdmissionOperationStoreError> {
-    refuse_successor_prototype_cohort(connection)?;
+    refuse_unsupported_ownership_indexes(connection)?;
     let actual = catalog(connection)?;
     if actual.as_slice() != expected()? {
         return Err(invariant(
@@ -46,10 +46,10 @@ pub(in crate::admission_operation_store) fn verify_physical_command_catalog(
     })
 }
 
-fn refuse_successor_prototype_cohort(
+fn refuse_unsupported_ownership_indexes(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    for name in SUCCESSOR_PROTOTYPE_INDEXES {
+    for name in UNSUPPORTED_OWNERSHIP_INDEXES {
         let found: bool = connection
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM main.sqlite_schema WHERE name=?1)",
@@ -248,11 +248,11 @@ mod tests {
     }
 
     #[test]
-    fn successor_ownership_prototype_index_cohort_refuses_pricing(
+    fn unsupported_ownership_indexes_refuse_pricing(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let connection = model()?;
         verify_physical_command_catalog(&connection)?;
-        for index in SUCCESSOR_PROTOTYPE_INDEXES {
+        for index in UNSUPPORTED_OWNERSHIP_INDEXES {
             connection.execute_batch(&format!(
                 "CREATE INDEX {index} ON admission_operation_recovery_records(record_key);"
             ))?;
