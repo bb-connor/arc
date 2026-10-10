@@ -35,6 +35,11 @@ files = ["crates/protocol/chio-provider-conformance/src/capture.rs"]
 first_seen = "e299888892"
 
 [[schema]]
+value = "chio-receipt-snapshots-v2"
+files = ["crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/reclaim.rs"]
+first_seen = "c0b0ee6090"
+
+[[schema]]
 value = "chio-replay-v1"
 files = ["crates/economy/chio-finding/src/profile.rs"]
 first_seen = "46b804906d"
