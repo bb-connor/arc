@@ -572,7 +572,22 @@ def claim_has_allowed_context(line: str, match: re.Match[str]) -> bool:
 
 
 def stop_pattern_has_allowed_context(line: str, match: re.Match[str]) -> bool:
-    return False
+    # A mandatory token-scope restriction describes Chio's approval boundary;
+    # it does not make the external protocol a source of authority. Match the
+    # complete candidate span so adjacent overclaims still fail independently.
+    # A negated premise or conditional suffix cannot borrow this restriction.
+    prefix = re.split(r'[.;!?"\n]', line[:match.start()])[-1].strip()
+    suffix = re.split(r'[.;!?"\n]', line[match.end():], maxsplit=1)[0].strip()
+    if suffix or re.fullmatch(r"(?:(?:Every|All)(?: emitted)?)?", prefix,
+                              re.IGNORECASE) is None:
+        return False
+    return re.fullmatch(
+        r"(?:x402|AP2|ACP-Commerce|web3(?: settlement)?)\s+"
+        r"(?:accepted\s+)?tokens?\s+must\s+remain\s+(?:inside|within)\s+"
+        r"(?:the\s+)?approval-bound\s+(?:token\s+)?authority",
+        match.group(0),
+        re.IGNORECASE,
+    ) is not None
 
 
 truth_doc = read_truth(TRUTH_PATH)

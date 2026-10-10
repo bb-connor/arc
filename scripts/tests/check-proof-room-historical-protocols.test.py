@@ -41,6 +41,52 @@ def scanner(root, paths, classify=None):
 
 
 class HistoricalProtocolCalibration(unittest.TestCase):
+    def copy_findings(self, text):
+        directory = tempfile.TemporaryDirectory(prefix="chio-authority-copy-")
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        path = root / "current-claim.md"
+        path.write_text(text + "\n")
+        return scanner(root, [path])
+
+    def test_required_approval_bound_token_scope_is_not_external_authority(self):
+        for text in (
+            "Every emitted x402 accepted token must remain inside the "
+            "approval-bound token authority; membership of one approved token "
+            "must not authorize additional tokens.",
+            "AP2 tokens must remain within approval-bound authority.",
+            "Web3 settlement tokens must remain within approval-bound authority.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.copy_findings(text), [])
+
+    def test_weakened_or_external_token_authority_is_refused(self):
+        for text in (
+            "x402 accepted tokens may remain inside approval-bound authority.",
+            "x402 accepted tokens must not remain inside approval-bound authority.",
+            "x402 accepted tokens must remain outside approval-bound authority.",
+            "x402 accepted tokens must remain inside ambient authority.",
+            "x402 grants token authority.",
+            "AP2 provides universal authority.",
+            "It is not required that x402 accepted tokens must remain inside "
+            "approval-bound authority.",
+            "x402 accepted tokens must remain inside approval-bound authority "
+            "only when convenient.",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(any("ambient_external_authority" in finding
+                                    for finding in self.copy_findings(text)))
+
+    def test_bound_token_scope_cannot_hide_an_adjacent_authority_claim(self):
+        bound = "x402 accepted tokens must remain inside approval-bound authority."
+        for text in (
+            bound + " x402 grants ambient authority.",
+            "AP2 provides universal authority. " + bound,
+            bound + " Chio is the universal agent protocol.",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(self.copy_findings(text))
+
     def fixture(self):
         directory = tempfile.TemporaryDirectory(prefix="chio-historical-protocol-")
         self.addCleanup(directory.cleanup)
