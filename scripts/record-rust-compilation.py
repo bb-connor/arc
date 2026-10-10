@@ -3047,66 +3047,68 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 source_item["origin"] = "campaign-produced"
         row["inputs"].append(source_item)
         identities[str(source)] = source_identity
-        for external in parsed["externs"]:
-            if native is None and host is None:
-                with HeldPath(Path(external["path"]).parent, directory=True) as directory:
-                    require(not any(Path(name).suffix in {".so", ".dylib", ".dll"}
-                                    for name in os.listdir(directory.fd)), "dynamic_search_hidden_inputs")
-                    directory.verify(content=False)
-            elif native is not None:
-                require(external["path"] in readonly_members or any(Path(external["path"]).is_relative_to(Path(path)) for path in native["write_roots"]), "native_extern_scope")
-            with HeldPath(external["path"]) as handle:
-                header = os.read(handle.fd, 8)
-                require(header.startswith(b"!<arch>\n") if external["path"].endswith(".rlib") else
-                        header[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} if external["path"].endswith(".dylib") else
-                        header.startswith(b"\x7fELF") if external["path"].endswith(".so") else header.startswith(b"rmeta"), "extern_image_format")
-                handle.verify()
-            item, observed = capture(external["path"], "extern", campaign)
-            item["extern_name"] = external["name"]
-            if host is not None:
-                require(Path(item["path"]).is_relative_to(Path(host["target_directory"])), "host_extern_scope")
-                item["producer"] = producing_unit(campaign, item)
-                item["origin"] = "recorded-producing-unit"
-                if external.get("kind") == "dynamic-image":
-                    item["extern_kind"] = "proc-macro-or-dynamic-image"
-            if native is not None:
-                if external["path"] in readonly_members:
-                    require(item["sha256"] == readonly_members[external["path"]]["sha256"], "native_extern_binding")
-                    item["origin"] = "declared-immutable-scope"
-                    item["immutable_scope"] = {"scope_id": native_reference["scope_id"], "path": external["path"],
-                                               "sha256": item["sha256"]}
-                else:
-                    public_source = next(({"path": entry["value"], "sha256": entry["source"]["sha256"]}
-                                          for entry in native.get("_public_arguments", []) if entry["kind"] == "source"), None)
-                    item["producer"] = producing_unit(campaign, item, "chio_credentials" if external["name"] == "chio_credentials" else None,
-                                                      public_source if external["name"] == "chio_credentials" else None)
-                    item["origin"] = "recorded-producing-unit"
-                if external.get("kind") == "dynamic-image":
-                    item["extern_kind"] = "proc-macro-or-dynamic-image"
-            row["inputs"].append(item)
-            identities[external["path"]] = observed
-        search_snapshots = {}
-        for search in parsed["search"]:
-            search_root = Path(search["path"])
-            if native is not None:
-                writable_search = any(search_root.is_relative_to(Path(path)) for path in native["write_roots"])
-                require(writable_search or any(search_root.is_relative_to(Path(scope["root"])) for scope in native["scopes"])
-                        and not any(search_root.is_relative_to(Path(native[key])) for key in ["records", "evidence"]), "native_search_scope")
-                files = tree_files(search_root) if writable_search else [Path(path) for path in readonly_members if Path(path).is_relative_to(search_root)]
-            else:
-                files = tree_files(search_root)
-            require(native is not None or host is not None or not any(path.suffix in {".so", ".dylib", ".dll"} for path in files), "dynamic_search_hidden_inputs")
-            search_snapshots[search["path"]] = sorted(str(p) for p in files)
-            for path in files:
-                item, observed = capture(path, "search", campaign)
-                item["search_kind"] = search["kind"]
-                item["coverage"] = "conservative-search-scope"
-                if host is not None and path.suffix in {".so", ".dylib", ".dll"}:
-                    require(path.suffix == ".dylib" and path.is_relative_to(Path(host["target_directory"])), "host_dynamic_search_scope")
+        with campaign.retention_batch() if host is not None and parsed["externs"] else contextlib.nullcontext():
+            for external in parsed["externs"]:
+                if native is None and host is None:
+                    with HeldPath(Path(external["path"]).parent, directory=True) as directory:
+                        require(not any(Path(name).suffix in {".so", ".dylib", ".dll"}
+                                        for name in os.listdir(directory.fd)), "dynamic_search_hidden_inputs")
+                        directory.verify(content=False)
+                elif native is not None:
+                    require(external["path"] in readonly_members or any(Path(external["path"]).is_relative_to(Path(path)) for path in native["write_roots"]), "native_extern_scope")
+                with HeldPath(external["path"]) as handle:
+                    header = os.read(handle.fd, 8)
+                    require(header.startswith(b"!<arch>\n") if external["path"].endswith(".rlib") else
+                            header[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} if external["path"].endswith(".dylib") else
+                            header.startswith(b"\x7fELF") if external["path"].endswith(".so") else header.startswith(b"rmeta"), "extern_image_format")
+                    handle.verify()
+                item, observed = capture(external["path"], "extern", campaign)
+                item["extern_name"] = external["name"]
+                if host is not None:
+                    require(Path(item["path"]).is_relative_to(Path(host["target_directory"])), "host_extern_scope")
                     item["producer"] = producing_unit(campaign, item)
                     item["origin"] = "recorded-producing-unit"
+                    if external.get("kind") == "dynamic-image":
+                        item["extern_kind"] = "proc-macro-or-dynamic-image"
+                if native is not None:
+                    if external["path"] in readonly_members:
+                        require(item["sha256"] == readonly_members[external["path"]]["sha256"], "native_extern_binding")
+                        item["origin"] = "declared-immutable-scope"
+                        item["immutable_scope"] = {"scope_id": native_reference["scope_id"], "path": external["path"],
+                                                   "sha256": item["sha256"]}
+                    else:
+                        public_source = next(({"path": entry["value"], "sha256": entry["source"]["sha256"]}
+                                              for entry in native.get("_public_arguments", []) if entry["kind"] == "source"), None)
+                        item["producer"] = producing_unit(campaign, item, "chio_credentials" if external["name"] == "chio_credentials" else None,
+                                                          public_source if external["name"] == "chio_credentials" else None)
+                        item["origin"] = "recorded-producing-unit"
+                    if external.get("kind") == "dynamic-image":
+                        item["extern_kind"] = "proc-macro-or-dynamic-image"
                 row["inputs"].append(item)
-                identities[str(path)] = observed
+                identities[external["path"]] = observed
+        search_snapshots = {}
+        with campaign.retention_batch() if host is not None and parsed["search"] else contextlib.nullcontext():
+            for search in parsed["search"]:
+                search_root = Path(search["path"])
+                if native is not None:
+                    writable_search = any(search_root.is_relative_to(Path(path)) for path in native["write_roots"])
+                    require(writable_search or any(search_root.is_relative_to(Path(scope["root"])) for scope in native["scopes"])
+                            and not any(search_root.is_relative_to(Path(native[key])) for key in ["records", "evidence"]), "native_search_scope")
+                    files = tree_files(search_root) if writable_search else [Path(path) for path in readonly_members if Path(path).is_relative_to(search_root)]
+                else:
+                    files = tree_files(search_root)
+                require(native is not None or host is not None or not any(path.suffix in {".so", ".dylib", ".dll"} for path in files), "dynamic_search_hidden_inputs")
+                search_snapshots[search["path"]] = sorted(str(p) for p in files)
+                for path in files:
+                    item, observed = capture(path, "search", campaign)
+                    item["search_kind"] = search["kind"]
+                    item["coverage"] = "conservative-search-scope"
+                    if host is not None and path.suffix in {".so", ".dylib", ".dll"}:
+                        require(path.suffix == ".dylib" and path.is_relative_to(Path(host["target_directory"])), "host_dynamic_search_scope")
+                        item["producer"] = producing_unit(campaign, item)
+                        item["origin"] = "recorded-producing-unit"
+                    row["inputs"].append(item)
+                    identities[str(path)] = observed
         for path, original in identities.items():
             verify_unchanged(path, original, output_directory)
         verify_host_aliases(host_aliases)
@@ -3134,7 +3136,7 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 output_lease.verify_host_search(directory, original)
             elif native is None or any(Path(directory).is_relative_to(Path(path)) for path in native["write_roots"]):
                 require(sorted(str(p) for p in tree_files(directory)) == original, "search_changed_during_compilation")
-        with HeldPath(depfile) as handle:
+        with (campaign.retention_batch() if host is not None else contextlib.nullcontext()), HeldPath(depfile) as handle:
             payload = handle.read()
             dep = parse_depfile(payload, cwd, environment, native, host)
             require(str(source) in dep["dependencies"], "source_not_in_depfile")
@@ -3176,13 +3178,14 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 mappings.append({"target": target, "output": path})
         require(set(item["output"] for item in mappings) == expected_outputs, "depfile_output_binding")
         dep["unit_targets"] = mappings
-        for path in sorted(expected_outputs):
-            item, _ = capture(path, "unit", campaign)
-            if native is not None and path.endswith(".so"):
-                item["unit_kind"] = "linux-dynamic-image"
-            if host is not None and path.endswith(".dylib"):
-                item["unit_kind"] = "darwin-dynamic-image"
-            row["outputs"].append(item)
+        with campaign.retention_batch() if host is not None else contextlib.nullcontext():
+            for path in sorted(expected_outputs):
+                item, _ = capture(path, "unit", campaign)
+                if native is not None and path.endswith(".so"):
+                    item["unit_kind"] = "linux-dynamic-image"
+                if host is not None and path.endswith(".dylib"):
+                    item["unit_kind"] = "darwin-dynamic-image"
+                row["outputs"].append(item)
         output_lease.verify(produced)
         row["status"] = "success"
         campaign.publish(row)
