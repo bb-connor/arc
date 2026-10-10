@@ -7,6 +7,18 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Wallet, export and signer component evidence (October 10)
+
+The [component audit](audits/wallet-export-signer-20261010.json) pins the export
+attribution and error-classification repairs, including 75 renewed focused tests,
+and the passport signer's 37 serial owning tests. Strict checks passed for those
+components. Independent review and final composition are still pending.
+
+The wallet worker offload retains its genuine Original and focused passes, but
+independent eight-thread review found a separate shared-lane failure. Its new
+P1 row requires service-owned admission, the same four permits, and repeated
+parallel verification. It is being repaired alongside registry admission.
+
 ## Registry admission qualification reopened (October 10)
 
 The [registry review audit](audits/registry-admission-review-20261010.json) records
@@ -22,7 +34,7 @@ consumer triage and a genuine Original before a bug claim. Both remain visible.
 
 ## Bounded readiness repairs and remaining review work (October 10)
 
-The ledger preserves **1,914 requirements**, including all 1,908 earlier objects.
+The ledger preserves **1,915 requirements**, including all 1,914 earlier objects.
 The [readiness audit](audits/readiness-followons-20261010.json) pins 80 renewed
 native tests, registry transaction and governance producer evidence, and the
 shared authority APIs. These are component results; the final source is not
