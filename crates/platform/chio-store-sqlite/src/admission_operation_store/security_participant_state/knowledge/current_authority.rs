@@ -45,7 +45,18 @@ impl<'tx, 'conn, 'owner> CurrentNativeInfluenceAuthority<'tx, 'conn, 'owner> {
     > {
         self.verify()?;
         self.require_supported_import_influence()?;
-        super::observed_influence(self.transaction, self.initialized.authority.as_str(), key)
+        // This warm read pays the same retained-history charge before any
+        // authenticated body is decoded as the capture and release readers.
+        let mut budget = chio_semantic_contracts::VerificationBudget::new(
+            chio_security_types::recovery::MAX_RECOVERY_VERIFICATION_WORK,
+        )
+        .map_err(invalid)?;
+        super::budgeted_observed_influence(
+            self.transaction,
+            self.initialized.authority.as_str(),
+            key,
+            &mut budget,
+        )
     }
 
     fn require_supported_import_influence(&self) -> Result<(), AdmissionOperationStoreError> {

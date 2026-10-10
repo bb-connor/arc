@@ -85,12 +85,13 @@ pub(super) fn materialized_influence(
     budget: &mut VerificationBudget,
 ) -> Result<(CanonicalPayloadDigest, bool, Option<ArtifactInfluenceV1>), AdmissionOperationStoreError>
 {
-    let observed = budgeted_observed_influence(
-        tx,
-        binding.security_authority_id().as_str(),
-        &recovery_flow_key(context),
-        budget,
-    )?;
+    let observed =
+        super::super::security_participant_state::knowledge::budgeted_observed_influence(
+            tx,
+            binding.security_authority_id().as_str(),
+            &recovery_flow_key(context),
+            budget,
+        )?;
     let action = &invocation.action;
     let plan: SemanticPlanV1 =
         load(tx, &plan_key(&action.scope, &action.plan)?)?.ok_or_else(|| refused("plan absent"))?;
@@ -159,21 +160,6 @@ pub(super) fn materialized_influence(
         observed,
     ))
 }
-/// Charge the retained history before its authenticated bodies are decoded.
-/// The caller holds a transaction so the counted history cannot grow meanwhile.
-fn budgeted_observed_influence(
-    tx: &Transaction<'_>,
-    authority: &str,
-    key: &chio_security_types::ports::FlowStateKey,
-    budget: &mut VerificationBudget,
-) -> Result<Option<ArtifactInfluenceV1>, AdmissionOperationStoreError> {
-    use super::super::security_participant_state::knowledge;
-    budget
-        .charge(u32::try_from(knowledge::head(tx, authority)?).map_err(refused)?)
-        .map_err(refused)?;
-    knowledge::observed_influence(tx, authority, key)
-}
-
 pub(super) fn verify_materialized_plan(
     tx: &Transaction<'_>,
     invocation: &SemanticInvocationV1,
@@ -746,7 +732,7 @@ impl SqliteAdmissionOperationStore {
 mod influence_read_budget_tests {
     use super::*;
     use crate::admission_operation_store::security_participant_state::knowledge::{
-        prefix, read_work_test_support::NativeInfluenceReadWorkFixture,
+        budgeted_observed_influence, prefix, read_work_test_support::NativeInfluenceReadWorkFixture,
     };
     use chio_security_types::ports::{
         FlowStateKey, IsolationEpochId, LineageId, SessionId, TenantId,

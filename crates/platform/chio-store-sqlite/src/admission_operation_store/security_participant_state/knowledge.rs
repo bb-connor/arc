@@ -64,10 +64,29 @@ fn record_key(authority: &str, sequence: u64) -> String {
 
 /// Influence follows every native scope that can carry confidentiality. Reading
 /// an older checkpoint never discards later artifact or model observations.
-pub(in crate::admission_operation_store) fn observed_influence(
+/// This charged entry is the only influence reader: one retained-history census
+/// both prices the caller's budget and bounds the private decode loop below.
+pub(in crate::admission_operation_store) fn budgeted_observed_influence(
     tx: &Connection,
     authority: &str,
     key: &FlowStateKey,
+    budget: &mut chio_semantic_contracts::VerificationBudget,
+) -> Result<Option<chio_security_types::knowledge::ArtifactInfluenceV1>, AdmissionOperationStoreError>
+{
+    let history = head(tx, authority)?;
+    budget
+        .charge(u32::try_from(history).map_err(invalid)?)
+        .map_err(invalid)?;
+    observed_influence_with_head(tx, authority, key, history)
+}
+
+/// Private decode loop bounded by the already-charged retained history. The
+/// caller holds a transaction, so the counted history cannot grow meanwhile.
+fn observed_influence_with_head(
+    tx: &Connection,
+    authority: &str,
+    key: &FlowStateKey,
+    history: u64,
 ) -> Result<Option<chio_security_types::knowledge::ArtifactInfluenceV1>, AdmissionOperationStoreError>
 {
     use chio_core::recovery::{knowledge_digest, RecoveryDigestDomain};
@@ -75,7 +94,7 @@ pub(in crate::admission_operation_store) fn observed_influence(
     let mut observed = Vec::new();
     let mut external = false;
     let mut unknown = false;
-    for sequence in 1..=head(tx, authority)? {
+    for sequence in 1..=history {
         let record = load(tx, authority, sequence)?;
         let other = &record.request.key;
         // Principal and session rows share principal/epoch ownership; lineage
