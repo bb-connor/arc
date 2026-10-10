@@ -59,7 +59,12 @@ import sys
 root = Path(sys.argv[1])
 assert stat.S_IMODE((root / "state").stat().st_mode) == 0o700
 for path in (root / "state").iterdir():
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600, path
+    mode = path.lstat().st_mode
+    if stat.S_ISDIR(mode):
+        assert stat.S_IMODE(mode) == 0o700, path
+    else:
+        assert stat.S_ISREG(mode), path
+        assert stat.S_IMODE(mode) == 0o600, path
 assert len(bytes.fromhex((root / "state/sidecar.seed").read_text().strip())) == 32
 for name in ("public-key", "capability.json", "capability.token"):
     assert stat.S_IMODE((root / name).stat().st_mode) == 0o600, name
@@ -72,7 +77,7 @@ PY
 chmod 0755 "${fixture_root}/state"
 response_code="$(curl -sS -o "${fixture_root}/refusal.json" -w '%{http_code}' \
   -H 'Authorization: Bearer fixture-only-token' "${control_url}/v1/authority")"
-[[ "${response_code}" == 500 ]]
+[[ "${response_code}" == 503 ]]
 python3 - "${fixture_root}/refusal.json" <<'PY'
 import json
 from pathlib import Path
