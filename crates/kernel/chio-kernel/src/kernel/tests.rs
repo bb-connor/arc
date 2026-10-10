@@ -183,6 +183,8 @@ mod settlement_routing;
 use hot_path_deadlines::HangingToolServer;
 #[path = "tests/approval_flow.rs"]
 mod approval_flow;
+#[path = "tests/approval_reservation_cleanup.rs"]
+mod approval_reservation_cleanup;
 #[path = "tests/budget.rs"]
 mod budget;
 #[path = "tests/budget_cross_currency.rs"]
