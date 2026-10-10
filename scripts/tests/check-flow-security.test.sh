@@ -114,7 +114,7 @@ expected_counts = {
     "strict manifest v2": 25,
     "security kernel adapters": 49,
     "durable flow state": 44,
-    "native flow custody": 117,
+    "native flow custody": 140,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
     "native dispatch attachment contracts": 4,
@@ -122,7 +122,7 @@ expected_counts = {
     "original security authority selection": 22,
     "original operation authority profile": 10,
     "runtime profile non-upgrade": 1,
-    "native authority admission integration": 12,
+    "native authority admission integration": 17,
     "physical dispatch hold ownership": 9,
     "kernel-owned native preparation": 11,
     "kernel-owned native egress": 11,
@@ -279,7 +279,8 @@ required_native_commands = {
         "admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_original_absent_runtime_selection",
     ],
     "native flow custody": [
-        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "cargo", "test", "-p", "chio-store-sqlite", "--features",
+        "admission-test-support", "--lib",
         "admission_operation_store::tests::security_participant_state::",
     ],
     "native compiled catalog identity": [
@@ -383,6 +384,11 @@ for label in ("Cohere canonical stream", *required_native_commands):
 
 native_filter = "admission_operation_store::tests::security_participant_state::"
 prepared_filter = "security::adapters::tests::prepared_dispatch::"
+rejects(
+    "missing native image observer feature",
+    source.replace("--features admission-test-support --lib", "--lib"),
+    "native authority target is not exact",
+)
 for replacement in (
     "security::adapters::tests::flow_dispatch_tests::",
     "security::adapters::tests::",

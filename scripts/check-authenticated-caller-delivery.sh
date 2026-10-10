@@ -55,6 +55,8 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   full_ledger_and_changed_schema_do_not_reset_retained_claims \
   independent_connections_race_one_operation_without_holding_sqlite_across_effect \
   substituted_key_epoch_or_physical_ledger_fails_closed \
+  injected_clock::clock_faults_deny_report_replay_and_preserve_durable_custody \
+  injected_clock::injected_epoch_owns_claim_report_expiry_and_restart \
   -- cargo test -p chio-store-sqlite --test caller_execution_ledger --locked
 
 ./scripts/run-exact-cargo-test-inventory.sh --label "native authenticated caller custody" --allow-filtered --expected \

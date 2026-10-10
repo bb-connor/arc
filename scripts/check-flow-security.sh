@@ -442,7 +442,30 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::egress::native_journal_checkpoint_preserves_egress_pending_then_commit \
   admission_operation_store::tests::security_participant_state::mutations::journal_capacity::native_journal_capacity_resumes_after_operator_checkpoint \
   admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::native_journal_checkpoint_preserves_nonce_preflight_and_current_label \
-  -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::security_participant_state::
+  admission_operation_store::tests::security_participant_state::egress::retention::automatic_maintenance_keeps_sustained_native_calls_within_current_row_budget \
+  admission_operation_store::tests::security_participant_state::egress::retention::compacted_join_identity_keeps_replay_refusal_and_recorded_retry \
+  admission_operation_store::tests::security_participant_state::egress::retention::expired_pending_fence_compacts_and_cannot_be_committed \
+  admission_operation_store::tests::security_participant_state::egress::retention::expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path \
+  admission_operation_store::tests::security_participant_state::egress::retention::failure_after_compaction_restores_rows_anchor_and_denying_callbacks \
+  admission_operation_store::tests::security_participant_state::egress::retention::live_pending_fences_beyond_current_row_budget_remain_refused \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::a_parked_approval_across_the_budget_completes_from_its_reservation \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::a_principal_at_its_share_is_refused_while_another_still_admits \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::every_parked_admitted_operation_finishes_after_admissions_are_refused \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::existing_identities_keep_admitting_after_new_identities_are_refused \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::identity_classes_keep_measured_current_rows \
+  admission_operation_store::tests::security_participant_state::egress::session_capacity::new_admissions_past_the_budget_refuse_typed_and_recover_after_session_churn \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::distinct_finished_sessions_stay_within_current_row_budget \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::imported_sessions_stay_current_through_maintenance \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::joined_unfinished_operation_keeps_its_context_through_maintenance \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::missing_principal_label_under_an_existing_epoch_is_refused_by_the_native_reader \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::pending_fence_keeps_its_session_until_the_fence_is_dead \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::resurrected_evicted_session_row_is_refused_at_open \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::reused_session_identifier_after_eviction_keeps_every_label \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::session_only_taint_stays_current \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::shared_lineage_taint_survives_its_first_principals_eviction \
+  admission_operation_store::tests::security_participant_state::egress::session_churn::unfinished_operations_past_their_bound_pin_every_session \
+  admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::compacted_preflight_transition_stays_refused_to_another_join_family \
+  -- cargo test -p chio-store-sqlite --features admission-test-support --lib admission_operation_store::tests::security_participant_state::
 
 run_exact_target --label "native dispatch ledger callbacks" --allow-filtered --expected \
   kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_confirms_both_reads_without_activating_dispatch \
@@ -524,6 +547,11 @@ run_exact_target --label "native authority admission integration" --expected \
   panicked_native_preparation_retains_monotone_history \
   repeated_native_preparation_cannot_reach_budget_or_runtime \
   silent_native_preparation_cannot_reach_budget_or_runtime \
+  lineage_observation::existing_principal_refreshes_a_second_lineage_through_the_kernel \
+  lineage_observation::missing_principal_label_edited_out_of_band_is_refused_by_the_serving_owner \
+  lineage_observation::missing_principal_label_under_an_existing_epoch_is_refused_by_the_legacy_reader \
+  lineage_observation::rows_without_their_isolation_epoch_are_still_refused \
+  lineage_observation::session_from_another_lineage_keeps_its_taint_under_an_existing_epoch \
   -- cargo test -p chio-store-sqlite --test native_authority_binding
 
 run_exact_target --label "physical dispatch hold ownership" --allow-filtered --expected \
