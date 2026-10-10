@@ -7,6 +7,39 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Required CI replacement (October 10)
+
+Source `bc4e214f640dc3774e34dbb25c2c20a7a54d2f5a` carries 7 bounded CI repair obligations.
+The [replacement audit](audits/required-ci-replacement-20261010.json) records
+Original failures, exact source fingerprints, focused local verification,
+independent review and the original required check statuses at capture. All **1,958**
+previous requirements, sources and current states are preserved; the ledger now
+contains **1,965 requirements**. No production authority, timeout,
+dependency budget or test inventory enforcement was relaxed.
+
+At this checkpoint, the original Build/lint/test job is still running, MSRV failed
+on the repaired fixture, and Cargo Vet and Cargo Deny passed. Publication waits
+for all four original jobs to finish so any further genuine failures join the
+same replacement push.
+
+The MSRV fixture retains the original late-leader topology and budget snapshot
+assertions. It explicitly checks HTTP 503 when the elected leader lacks signing
+custody while independent budget replication continues. The failed-profile
+artifact repair improves native recovery diagnostics; it does not itself repair
+that runtime failure. The broad local library campaign was deliberately cancelled
+to prioritize MSRV, so its partial passes are not a workspace pass.
+
+Native recovery remains a classified, unresolved capture-deadline failure.
+Deterministic local controls verify fail-closed refusal; the cause of the hosted
+delay remains unmeasured. It must be disclosed separately in the readiness report.
+
+The foundation merge bar is four required checks green on the exact replacement
+head, every other failure classified, and review threads answered. Root reports
+that state to Connor and Claude, then waits for Connor's explicit merge go-ahead.
+Stale controller/enterprise authorization, the absent committed Linux evidence
+variable, unproved Kani qualification and cold-state readiness remain documented
+post-merge obligations. Foundation landing grants no preview or release readiness.
+
 ## CI repair checkpoint (October 10)
 
 The candidate source is `53f4d394254f3179231e4639a35e774bb6fb3461`. Eight narrow CI repairs are integrated:
