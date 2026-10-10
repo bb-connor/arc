@@ -21,8 +21,8 @@ struct Selection {
     probe: RecoverySetupProbeV1,
     creation: CanonicalPayloadDigest,
     command: RecoveryCommandV1,
-    // Historical selections are decoded through their exact canonical codec.
-    // The exposed Resume identity remains bound without rewriting its preimage.
+    // A selection is only served with its explicit command binding. A
+    // payload without this member refuses instead of being repaired.
     command_bound: bool,
     operator: PublicKey,
     receipt_key: PublicKey,
@@ -127,14 +127,13 @@ fn load(
         }
         return Ok(Some(value));
     }
-    let Some(row) = authenticated_record(tx, &legacy_key(scope)?)? else {
-        return Ok(None);
-    };
-    let value = selection_codec::decode(&row.payload)?;
-    require_selection_envelope(&row, &value)?;
-    // The tenant-wide historical marker never chooses another process's
-    // self-test. It still protects that tenant through tenant_required().
-    Ok((value.probe.scope == *scope).then_some(value))
+    // An authenticated predecessor tenant-wide selection is not adopted,
+    // decoded, migrated or reset. Its presence must never silently turn
+    // an existing marker into disabled setup, so it refuses here.
+    if authenticated_record(tx, &legacy_key(scope)?)?.is_some() {
+        return Err(refused("unsupported tenant-wide setup selection"));
+    }
+    Ok(None)
 }
 fn authenticated_record(
     tx: &Connection,
@@ -301,11 +300,10 @@ mod denied_counterpart;
 mod gate;
 mod incoming_proof;
 mod inventory;
-#[cfg(test)]
-mod legacy_selection_tests;
 mod original_scope;
 mod retirement;
-mod selection_codec;
+#[cfg(test)]
+mod selection_tests;
 mod service;
 mod unused_generation;
 pub(super) use context::register_native_setup_context;

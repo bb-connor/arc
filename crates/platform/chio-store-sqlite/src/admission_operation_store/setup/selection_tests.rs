@@ -1,3 +1,4 @@
+//! Strict current setup selection custody and unsupported-marker refusal.
 use super::*;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -25,22 +26,22 @@ fn authority_fixture() -> TestResult<(tempfile::TempDir, crate::SqliteAuthorityS
 
 fn selection() -> TestResult<Selection> {
     let scope = RecoveryScopeV1 {
-        authority_domain: AuthorityDomainId::new("legacy-setup-authority")?,
-        tenant_id: RecoveryTenantId::new("legacy-setup-tenant")?,
-        process_id: ProcessId::new("legacy-setup-process")?,
+        authority_domain: AuthorityDomainId::new("setup-selection-authority")?,
+        tenant_id: RecoveryTenantId::new("setup-selection-tenant")?,
+        process_id: ProcessId::new("setup-selection-process")?,
     };
-    let workflow = WorkflowId::new("legacy-setup-workflow")?;
+    let workflow = WorkflowId::new("setup-selection-workflow")?;
     Ok(Selection {
         probe: RecoverySetupProbeV1 {
             domain_version: VersionV1,
             scope,
-            probe_id: ChallengeId::new("legacy-setup-probe")?,
+            probe_id: ChallengeId::new("setup-selection-probe")?,
             native_authority: SourceDigest::from_bytes([1; 32]),
             deployment: DeploymentDigest::from_bytes([2; 32]),
             source_profile: SourceDigest::from_bytes([3; 32]),
             required_coverage: CoverageDigest::from_bytes([4; 32]),
             benign_workflow: workflow.clone(),
-            denied_command: CommandId::new("legacy-setup-denied")?,
+            denied_command: CommandId::new("setup-selection-denied")?,
             issued_at_unix_ms: SafeInteger::new(1_000)?,
             expires_at_unix_ms: SafeInteger::new(901_000)?,
         },
@@ -48,7 +49,7 @@ fn selection() -> TestResult<Selection> {
         command: RecoveryCommandV1 {
             schema: RecoveryCommandSchema::V1,
             version: VersionV1,
-            command_id: CommandId::new("legacy-setup-benign")?,
+            command_id: CommandId::new("setup-selection-benign")?,
             command: RecoveryCommandBodyV1::ResumeWorkflow {
                 workflow_id: workflow,
                 expected_revision: SafeInteger::new(2)?,
@@ -61,14 +62,6 @@ fn selection() -> TestResult<Selection> {
         evidence: None,
         report: None,
     })
-}
-
-fn store_legacy_selection(
-    store: &SqliteAdmissionOperationStore,
-    value: &Selection,
-    legacy: &serde_json::Value,
-) -> TestResult {
-    store_selection_at_key(store, value, legacy, &legacy_key(&value.probe.scope)?)
 }
 
 fn store_selection_at_key(
@@ -93,38 +86,15 @@ fn store_selection_at_key(
     Ok(())
 }
 
-#[test]
-fn setup_legacy_selection_is_authenticated_before_explicit_canonical_decode() -> TestResult {
-    let (_directory, authority) = authority_fixture()?;
-    let store: SqliteAdmissionOperationStore = authority.admission_operation_store();
-    let value = selection()?;
-    let mut legacy = serde_json::to_value(&value)?;
-    legacy
-        .as_object_mut()
-        .ok_or("legacy selection object")?
-        .remove("command_bound");
-    store_legacy_selection(&store, &value, &legacy)?;
-    let connection = store.connection()?;
-    let decoded = load(&connection, &value.probe.scope)?.ok_or("authenticated legacy selection")?;
-    assert!(decoded.command_bound);
-    assert_eq!(decoded.command, value.command);
-    assert_eq!(decoded.probe, value.probe);
-    Ok(())
-}
-
-#[test]
-fn setup_legacy_selection_rejects_unknown_members_without_repairing_them() -> TestResult {
-    let (_directory, authority) = authority_fixture()?;
-    let store: SqliteAdmissionOperationStore = authority.admission_operation_store();
-    let value = selection()?;
-    let mut legacy = serde_json::to_value(&value)?;
-    let object = legacy.as_object_mut().ok_or("legacy selection object")?;
-    object.remove("command_bound");
-    object.insert("unrecognized_authority".into(), serde_json::json!(true));
-    store_legacy_selection(&store, &value, &legacy)?;
-    let connection = store.connection()?;
-    assert!(load(&connection, &value.probe.scope).is_err());
-    Ok(())
+fn stored_row(
+    connection: &rusqlite::Connection,
+    record_key: &str,
+) -> TestResult<(String, i64, Vec<u8>)> {
+    Ok(connection.query_row(
+        "SELECT scope_key,version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
+        [record_key],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?)
 }
 
 #[test]
@@ -152,7 +122,7 @@ fn setup_independent_process_selections_preserve_their_own_native_custody() -> T
         assert_eq!(retained.scope, protected::scope_key(&first.probe.scope)?);
         assert_eq!(retained.version, 1);
         assert_eq!(
-            selection_codec::decode(&retained.payload)?.probe,
+            protected::decode::<Selection>(&retained.payload)?.probe,
             first.probe
         );
     }
@@ -178,53 +148,89 @@ fn setup_independent_process_selections_preserve_their_own_native_custody() -> T
 }
 
 #[test]
-fn setup_legacy_cross_scope_overwrite_cannot_pass_native_event_authentication() -> TestResult {
+fn setup_selection_without_command_bound_refuses_without_rewriting() -> TestResult {
     let (_directory, authority) = authority_fixture()?;
-    let store = authority.admission_operation_store();
+    let store: SqliteAdmissionOperationStore = authority.admission_operation_store();
+    let value = selection()?;
+    let mut unbound = serde_json::to_value(&value)?;
+    unbound
+        .as_object_mut()
+        .ok_or("selection object")?
+        .remove("command_bound");
+    let record_key = key(&value.probe.scope)?;
+    store_selection_at_key(&store, &value, &unbound, &record_key)?;
+    let connection = store.connection()?;
+    assert!(
+        load(&connection, &value.probe.scope).is_err(),
+        "a selection without its explicit command binding was adopted"
+    );
+    let (scope_key, version, payload) = stored_row(&connection, &record_key)?;
+    assert_eq!(scope_key, protected::scope_key(&value.probe.scope)?);
+    assert_eq!(version, 1);
+    assert_eq!(payload, chio_core::canonical_json_bytes(&unbound)?);
+    let events: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_events WHERE record_key=?1",
+        [&record_key],
+        |row| row.get(0),
+    )?;
+    assert_eq!(events, 1);
+    Ok(())
+}
+
+#[test]
+fn setup_unsupported_tenant_wide_marker_refuses_selection_and_tenant_load() -> TestResult {
+    let (_directory, authority) = authority_fixture()?;
+    let store: SqliteAdmissionOperationStore = authority.admission_operation_store();
+    let value = selection()?;
+    store_selection_at_key(
+        &store,
+        &value,
+        &serde_json::to_value(&value)?,
+        &legacy_key(&value.probe.scope)?,
+    )?;
+    let connection = store.connection()?;
+    assert!(
+        load(&connection, &value.probe.scope).is_err(),
+        "the unsupported tenant-wide marker was adopted as a served selection"
+    );
+    assert!(
+        context::tenant_required(&connection, &value.probe.scope).is_err(),
+        "the unsupported tenant-wide marker silently controlled tenant protection"
+    );
+    Ok(())
+}
+
+#[test]
+fn setup_unsupported_tenant_wide_marker_refuses_cross_scope_replacement() -> TestResult {
+    let (_directory, authority) = authority_fixture()?;
+    let store: SqliteAdmissionOperationStore = authority.admission_operation_store();
     let first = selection()?;
     let mut second = first.clone();
     second.probe.scope.process_id = ProcessId::new("collision-second-process")?;
-    let legacy_key = format!(
-        "protected-setup:{}",
-        sha256_hex(&protected::encode(&(
-            &first.probe.scope.authority_domain,
-            &first.probe.scope.tenant_id,
-        ))?)
+    let record_key = legacy_key(&first.probe.scope)?;
+    let first_payload = chio_core::canonical_json_bytes(&serde_json::to_value(&first)?)?;
+    store_selection_at_key(&store, &first, &serde_json::to_value(&first)?, &record_key)?;
+    assert!(
+        store_selection_at_key(
+            &store,
+            &second,
+            &serde_json::to_value(&second)?,
+            &record_key,
+        )
+        .is_err(),
+        "a cross-scope replacement committed over the retained marker"
     );
-    store_selection_at_key(&store, &first, &serde_json::to_value(&first)?, &legacy_key)?;
-    store_selection_at_key(
-        &store,
-        &second,
-        &serde_json::to_value(&second)?,
-        &legacy_key,
-    )?;
     let connection = store.connection()?;
-    let (scope_key, version, payload): (String, i64, Vec<u8>) = connection.query_row(
-        "SELECT scope_key,version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
-        [&legacy_key],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    )?;
+    let (scope_key, version, payload) = stored_row(&connection, &record_key)?;
     assert_eq!(scope_key, protected::scope_key(&first.probe.scope)?);
-    assert_eq!(version, 2);
-    assert_eq!(
-        selection_codec::decode(&payload)?.probe.scope,
-        second.probe.scope
-    );
+    assert_eq!(version, 1);
+    assert_eq!(payload, first_payload);
     let events: i64 = connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_events WHERE record_key=?1",
-        [&legacy_key],
+        [&record_key],
         |row| row.get(0),
     )?;
-    let references: i64 = connection.query_row(
-        "SELECT count(*) FROM authority_global_commits WHERE projection_kind='recovery' AND projection_key=?1",
-        [&legacy_key],
-        |row| row.get(0),
-    )?;
-    assert_eq!((events, references), (2, 2));
-    assert!(matches!(
-        protected::raw(&connection, &legacy_key),
-        Err(AdmissionOperationStoreError::Invariant(ref message))
-            if message == "recovery projection lost its event"
-    ));
+    assert_eq!(events, 1);
+    assert!(protected::raw(&connection, &record_key)?.is_some());
     Ok(())
 }

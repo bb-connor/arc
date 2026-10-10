@@ -45,19 +45,14 @@ pub(super) fn tenant_required(
         }
         return Ok(true);
     }
-    // The original tenant-keyed selection remains an authenticated protection
-    // marker after scoped migration or explicit completed-self-test retirement.
-    let Some(row) = authenticated_record(tx, &legacy_key(scope)?)? else {
-        return Ok(false);
-    };
-    let value = selection_codec::decode(&row.payload)?;
-    require_selection_envelope(&row, &value)?;
-    if value.probe.scope.authority_domain != scope.authority_domain
-        || value.probe.scope.tenant_id != scope.tenant_id
-    {
-        return Err(refused("historical setup tenant changed"));
+    // An authenticated predecessor tenant-wide selection is not adopted,
+    // decoded, migrated or reset. Its presence must not silently turn the
+    // tenant's protection into disabled setup, so it refuses here and the
+    // current tenant-required marker above remains the only supported form.
+    if authenticated_record(tx, &legacy_key(scope)?)?.is_some() {
+        return Err(refused("unsupported tenant-wide setup selection"));
     }
-    Ok(true)
+    Ok(false)
 }
 
 fn required_scope(scope: &RecoveryScopeV1) -> Result<String, AdmissionOperationStoreError> {

@@ -123,12 +123,9 @@ pub(super) fn verify_unused_generation<'tx, 'conn>(
     if creation(&record)? != selected.creation {
         return Err(refused("unused setup original changed"));
     }
-    let scoped_key = key(&selected.probe.scope)?;
-    let selected_key = if authenticated_record(tx, &scoped_key)?.is_some() {
-        scoped_key
-    } else {
-        legacy_key(&selected.probe.scope)?
-    };
+    // Only the process-qualified current key serves. An unsupported
+    // tenant-wide row never becomes this generation's selected custody.
+    let selected_key = key(&selected.probe.scope)?;
     let workflow_key = protected::workflow_key(&record.scope, &record.workflow_id)?;
     let witness = VerifiedUnusedSetupGeneration {
         transaction: tx,
