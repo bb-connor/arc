@@ -150,6 +150,20 @@ where
         )
     }
 
+    fn revalidate_reserved_operation(
+        &self,
+        context: &chio_kernel::RuntimeAdmissionContext<'_>,
+        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
+    ) -> Result<chio_kernel::RuntimeAdmissionDecision, chio_kernel::KernelError> {
+        chio_kernel::RuntimeAdmissionHook::revalidate_reserved_operation(
+            &self.core_hook(),
+            context,
+            source,
+            claim,
+        )
+    }
+
     fn evaluate(
         &self,
         context: &chio_kernel::RuntimeAdmissionContext<'_>,
