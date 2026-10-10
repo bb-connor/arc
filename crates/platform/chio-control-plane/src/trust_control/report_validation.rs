@@ -383,34 +383,47 @@ pub(crate) fn validate_authority_mutation_auth(
         || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
     if has_cluster_peer_headers {
         let peer = validate_cluster_peer_auth(headers, &state.config, endpoint)?;
-        let Some(term) = peer.term else {
-            return Err(plain_http_error(
-                StatusCode::UNAUTHORIZED,
-                "cluster authority mutation is missing the forwarded term",
-            ));
-        };
-        let Some(authority_lease) = cluster_authority_lease_view(state) else {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease is unavailable for authority mutation",
-            ));
-        };
-        if !authority_lease.lease_valid {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "cluster authority lease expired before authority mutation",
-            ));
-        }
-        if term != authority_lease.term {
-            return Err(plain_http_error(
-                StatusCode::CONFLICT,
-                "cluster authority mutation term does not match the current lease",
-            ));
-        }
+        validate_authority_mutation_term(state, Some(&peer))?;
         return Ok(Some(peer));
     }
     validate_service_auth(headers, &state.config.service_token)?;
     Ok(None)
+}
+
+/// Recheck an authenticated forward against the live lease at execution time.
+/// Queueing must not transfer a request from an earlier election into a new term.
+pub(crate) fn validate_authority_mutation_term(
+    state: &TrustServiceState,
+    peer: Option<&ClusterPeerAuthContext>,
+) -> Result<(), Response> {
+    let Some(peer) = peer else {
+        return Ok(());
+    };
+    let Some(term) = peer.term else {
+        return Err(plain_http_error(
+            StatusCode::UNAUTHORIZED,
+            "cluster authority mutation is missing the forwarded term",
+        ));
+    };
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease is unavailable for authority mutation",
+        ));
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before authority mutation",
+        ));
+    }
+    if term != authority_lease.term {
+        return Err(plain_http_error(
+            StatusCode::CONFLICT,
+            "cluster authority mutation term does not match the current lease",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_authority_workload_auth(

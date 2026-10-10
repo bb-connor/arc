@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "forwarded_authority_term.rs"]
+mod forwarded_authority_term;
 use chio_kernel::authority::lifecycle::AuthorityLifecycleChange;
 use chio_kernel::authority::replication::{
     AuthorityReplicationAnchor, SignedAuthoritySnapshot, SignedAuthorityTransition,

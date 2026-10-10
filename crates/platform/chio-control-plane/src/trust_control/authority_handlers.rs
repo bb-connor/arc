@@ -11,7 +11,7 @@ use super::report_validation::{
     enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
     load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
     run_authority_commit, validate_authority_issue_auth, validate_authority_mutation_auth,
-    validate_authority_workload_auth, validate_service_auth,
+    validate_authority_mutation_term, validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
 
@@ -64,17 +64,21 @@ pub(crate) async fn handle_rotate_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
-        return response;
-    }
+    let forwarded = match validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
+        Ok(forwarded) => forwarded,
+        Err(response) => return response,
+    };
     match forward_authority_post_to_leader(&state, AUTHORITY_PATH, &json!({})).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
-    run_authority_commit(&state, |state| Ok(rotate_authority_blocking(state)))
-        .await
-        .unwrap_or_else(std::convert::identity)
+    run_authority_commit(&state, move |state| {
+        validate_authority_mutation_term(state, forwarded.as_ref())?;
+        Ok(rotate_authority_blocking(state))
+    })
+    .await
+    .unwrap_or_else(std::convert::identity)
 }
 
 fn rotate_authority_blocking(state: &TrustServiceState) -> Response {
@@ -110,15 +114,17 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    if let Err(response) = validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
-        return response;
-    }
+    let forwarded = match validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
+        Ok(forwarded) => forwarded,
+        Err(response) => return response,
+    };
     match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
     inspect_authority_state(&state, move |state| {
+        validate_authority_mutation_term(state, forwarded.as_ref())?;
         Ok(issue_capability_blocking(state, payload))
     })
     .await
