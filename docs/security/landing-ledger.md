@@ -33,7 +33,11 @@ regression found during review. Its [audit](audits/review2-tree-qualified-202610
 retains both failures and the passing final runner/helper checks. The [composed structural audit](audits/review2-composed-structural-20261011.json)
 records the passing full CI-contract mutation suite, 51 actual temporal tests
 and strict owning lint. The later one-name threshold enrollment has its own
-focused contract probes; runtime qualification is still in progress.
+focused contract probes. The [throttle audit](audits/review2-throttle-qualified-20261011.json)
+records 18 focused controls, 85 security-kernel tests, 1,668 kernel tests,
+59 actual PQ threshold tests and strict owning/downstream lint. The old
+58-name inventory refuses that output; the updated inventory accepts it.
+Temporary runner and initial test-fixture lint failures remain recorded.
 
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and

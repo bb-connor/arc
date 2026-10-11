@@ -113,9 +113,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-007: Dropping a timed-out blocking adapter leaves its queued invocation runnable
 
