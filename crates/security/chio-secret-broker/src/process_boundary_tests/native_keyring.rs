@@ -13,6 +13,8 @@ mod services;
 use services::{backend, KeyServices};
 #[path = "native_keyring_recovery.rs"]
 mod recovery;
+#[path = "native_keyring_trust.rs"]
+mod trust;
 
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -23,7 +25,7 @@ pub(super) struct KeyringDelivery {
     policy: chio_keyring::KeyLogPolicy,
     verifier_path: PathBuf,
     _services: KeyServices,
-    _receipt_anchors: tempfile::TempDir,
+    receipt_anchors: tempfile::TempDir,
     config_path: PathBuf,
     seed_path: PathBuf,
     policy_document: chio_keyring::KeyLogPolicyDocument,
@@ -293,7 +295,7 @@ impl KeyringDelivery {
             policy,
             verifier_path,
             _services: services,
-            _receipt_anchors: receipt_anchors,
+            receipt_anchors,
             config_path,
             seed_path,
             policy_document: document,
@@ -332,7 +334,7 @@ impl KeyringDelivery {
         serde_json::json!({
             "runtime_config": self.config_path,
             "authority_seed_file": self.seed_path,
-            "receipt_anchor_directory": self._receipt_anchors.path(),
+            "receipt_anchor_directory": self.receipt_anchors.path(),
             "verification_policy": self.policy_document,
         })
     }
@@ -348,7 +350,7 @@ impl KeyringDelivery {
         assert!(self.runtime.is_none(), "the host must own the selector");
         let receipts = Arc::new(SqliteReceiptStore::open_for_finding_pool(
             self.config_path.with_file_name("key-receipts.sqlite3"),
-            self._receipt_anchors.path(),
+            self.receipt_anchors.path(),
         )?);
         receipts.wait_for_writer_ready(Duration::from_secs(30))?;
         let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
