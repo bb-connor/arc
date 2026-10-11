@@ -63,6 +63,7 @@ RELEASE_NAMES = (
     "process_boundary_tests::native::keyring::recovery::confined_broker_public_keyring_startup_recovers_exact_activation_after_auditor_and_receipt_loss",
     "process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart",
     "process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority",
+    "process_boundary_tests::native::keyring::trust::keyring_trust_service_starts_and_serves_admin_receipt_reads",
 )
 RELEASE_FIXTURES = {
     label: {
@@ -77,6 +78,10 @@ RELEASE_FIXTURES = {
         (
             "governed native broker original keyring authority",
             "process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority",
+        ),
+        (
+            "witnessed keyring trust control startup",
+            "process_boundary_tests::native::keyring::trust::keyring_trust_service_starts_and_serves_admin_receipt_reads",
         ),
     )
 }

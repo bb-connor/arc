@@ -348,6 +348,12 @@ EOF
 )" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
     process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority
+  run_tests "witnessed keyring trust control startup" yes "$(cat <<'EOF'
+process_boundary_tests::native::keyring::trust::keyring_trust_service_starts_and_serves_admin_receipt_reads
+EOF
+)" \
+    cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
+    process_boundary_tests::native::keyring::trust::keyring_trust_service_starts_and_serves_admin_receipt_reads
   run_tests "privileged enforced CLI discovery" no \
     "privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup" \
     cargo test --locked -p chio-cli --features real-linux-enforcement --test enforced_discovery
