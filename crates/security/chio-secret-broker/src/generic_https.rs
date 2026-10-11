@@ -19,11 +19,20 @@ use crate::protocol::{
     MAX_HEADER_COUNT,
 };
 use crate::provider::{rejects_forbidden_caller_header, ProviderAdapter};
+use crate::service::DEFAULT_BROKER_IPC_DEADLINE_MS;
 use crate::{BrokerError, Result};
 
 const MAX_RESOLVED_ADDRESSES: usize = 16;
 const MAX_RESOLUTIONS_IN_FLIGHT: usize = 4;
 pub(super) const MAX_RESPONSE_HEAD_BYTES: usize = 16_384;
+
+/// Server-owned bound on how long preparation waits for destination
+/// resolution, measured from the start of pinning. It is the broker's default
+/// control deadline; a shorter signed request timeout tightens it and a longer
+/// one never extends it. A lookup that outlives the wait keeps its in-flight
+/// slot until its resolver thread exits.
+const PREPARATION_RESOLUTION_BUDGET: Duration =
+    Duration::from_millis(DEFAULT_BROKER_IPC_DEADLINE_MS);
 
 const fn is_redirect_status(status: u16) -> bool {
     matches!(status, 300 | 301 | 302 | 303 | 305 | 307 | 308)
@@ -462,7 +471,7 @@ impl GenericHttpsExecutor {
 
     fn pin_destination(&self, request: &BrokerRequest) -> Result<PinnedDestination> {
         let deadline = Instant::now()
-            .checked_add(Duration::from_millis(request.options.timeout_ms))
+            .checked_add(preparation_resolution_budget(request.options.timeout_ms))
             .ok_or_else(|| {
                 BrokerError::InvalidRequest("destination resolution deadline overflow".to_string())
             })?;
@@ -516,6 +525,10 @@ impl GenericHttpsExecutor {
         let received = receiver.recv_timeout(deadline.saturating_duration_since(Instant::now()));
         accept_resolution(received, Instant::now(), deadline)
     }
+}
+
+fn preparation_resolution_budget(signed_timeout_ms: u64) -> Duration {
+    Duration::from_millis(signed_timeout_ms).min(PREPARATION_RESOLUTION_BUDGET)
 }
 
 /// Accepts a resolver answer only when it was observed before `deadline`; an
@@ -1356,6 +1369,27 @@ mod tests {
             Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
         ));
         drop(release);
+    }
+
+    #[test]
+    fn preparation_resolution_waits_for_the_shorter_of_the_signed_and_server_budgets() {
+        let server_ms = u64::try_from(PREPARATION_RESOLUTION_BUDGET.as_millis())
+            .test_expect("server budget fits in u64");
+        assert_eq!(
+            preparation_resolution_budget(server_ms - 1),
+            Duration::from_millis(server_ms - 1),
+            "a shorter signed timeout wins"
+        );
+        assert_eq!(
+            preparation_resolution_budget(server_ms),
+            PREPARATION_RESOLUTION_BUDGET,
+            "a signed timeout equal to the server budget keeps it"
+        );
+        assert_eq!(
+            preparation_resolution_budget(server_ms + 1),
+            PREPARATION_RESOLUTION_BUDGET,
+            "a longer signed timeout never extends the server budget"
+        );
     }
 
     #[test]
