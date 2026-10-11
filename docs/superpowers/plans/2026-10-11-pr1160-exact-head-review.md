@@ -34,10 +34,10 @@ Files: `crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compact
 
 Files: `crates/core/chio-core-types` signing backend trait, `crates/security/chio-keyring/src/router.rs`, kernel governed authority, owning tests and `scripts/check-keyring-transparency.sh`.
 
-- [ ] Reproduce rotation then real lock poison with the independent-services fixture.
-- [ ] Add fallible `SigningBackend::current_public_key`; override router lookup; use it for governed trust and issuance. Errors produce an empty trust set or typed issuance refusal.
-- [ ] Pin public composition trust/issuance failure and document remaining compatibility identity accessors with their consumer scope.
-- [ ] Run owner tests and strict lint, update exact inventory, and independently review the composed change.
+- [x] Reproduce rotation then real lock poison with the independent-services fixture.
+- [x] Add fallible `SigningBackend::current_public_key`; override router lookup; use it for governed trust and issuance. Errors produce an empty trust set or typed issuance refusal.
+- [x] Pin public composition trust/issuance failure and document remaining compatibility identity accessors with their consumer scope.
+- [x] Run owner tests and strict lint, update exact inventory, and independently review the composed change.
 
 ## Task 3: Authenticated delta checkpoints (Claude, shared pins Root)
 
@@ -75,3 +75,14 @@ and three rejected mutations; run `python3 scripts/check-apalache-formal-slice.p
 in final local prepublication gates. See the source-scoped
 [repair audit](../../security/audits/compaction-static-repairs-20261011.json).
 Keyring, checkpoint, prepaid control and final composition remain pending.
+
+### Keyring source qualification
+
+Source `b4af756f20` has 73 passing composed owner tests, a passing exact-panic
+renewal and strict all-target lint for core types, keyring, kernel and control
+plane. The [audit](../../security/audits/keyring-current-selector-20261011.json)
+retains the genuine Original and initial static failures. Claude approved the
+exact source and final panic assertion. Checkpoint and prepaid acceptance stay
+open. The prepaid control will call periodic recovery after the initial tool
+call, because that call already completes the startup latch; this exercises the
+shared recovery page without resetting private runtime state.

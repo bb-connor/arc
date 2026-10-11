@@ -8,6 +8,30 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Current signing identity qualified privately (October 11 UTC)
+
+The [keyring audit](audits/keyring-current-selector-20261011.json) records
+source **`b4af756f20`**, the genuine rotation/poison Original, **73 passing
+composed owner tests**, the final panic-assertion renewal and strict all-target
+lint across the four owning crates. Current key selection fails closed;
+governed trust and issuance, forwarding wrappers and reputation receipt trust
+use that boundary. Compatibility identity accessors remain explicit.
+
+Compaction, keyring and the static CI repair are source-qualified privately.
+Checkpoint reconstruction/storage controls and the corrected **periodic**
+legacy-prepaid recovery control remain in progress. The first prepaid test
+reused an already-reconciled startup runtime; its failure is retained as a
+fixture defect. No unknown original debit may be replaced with budget exposure.
+All **2,020** requirements and historical observations are preserved.
+
+Published **`9e9cf98942`** still awaits Build and MSRV; Vet and Deny pass.
+Eight unsuccessful jobs are classified, including repeated weights proof
+exit124 in **114471420943** and **114471511741**. That additional proof residual
+remains distinct from the accepted attestation-only item. The reviewed early
+static formal guard **`69c192e131`** catches the repaired comment-contract drift
+before compilation. No replacement push, merge readiness or merge authorization
+is claimed by this local checkpoint.
+
 ## Compaction and static CI repairs qualified privately (October 11 UTC)
 
 The [repair audit](audits/compaction-static-repairs-20261011.json) records
