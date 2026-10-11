@@ -86,7 +86,7 @@ use serde::{Deserialize, Serialize};
 
 use chio_core_types::capability::{
     attenuation::ScopeHash, crypto_floor::CapabilityCryptoFloor, features::CapabilityNegotiation,
-    token::CapabilityToken,
+    scope::ToolGrant, token::CapabilityToken,
 };
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
@@ -343,6 +343,21 @@ fn decode_trusted_issuers(values: &[String]) -> Result<Vec<PublicKey>, ChioMobil
         .collect()
 }
 
+const MEDIATED_AUTHORIZATION_REQUIRED: &str =
+    "grant requires mediated authorization (DPoP/usage accounting) unavailable to the offline mobile gate";
+
+/// Whether the matched grant carries authority the offline gate cannot
+/// enforce: DPoP proof of possession or invocation and spend accounting. A
+/// missing matched grant is never enforceable.
+fn requires_mediated_authorization(matched_grant: Option<&ToolGrant>) -> bool {
+    matched_grant.is_none_or(|grant| {
+        grant.dpop_required == Some(true)
+            || grant.max_invocations.is_some()
+            || grant.max_cost_per_invocation.is_some()
+            || grant.max_total_cost.is_some()
+    })
+}
+
 /// Evaluate a tool-call request against a capability token.
 ///
 /// Input: a JSON object matching [`EvaluateRequest`]. Output: a JSON
@@ -435,7 +450,17 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         &mut budgets,
     );
 
+    let matched_grant = verdict
+        .verified
+        .as_ref()
+        .zip(verdict.matched_grant_index)
+        .and_then(|(verified, index)| verified.scope().grants.get(index));
     let response = match verdict.verdict {
+        Verdict::Allow if requires_mediated_authorization(matched_grant) => EvaluateResponse {
+            verdict: "deny",
+            reason: Some(MEDIATED_AUTHORIZATION_REQUIRED.to_string()),
+            matched_grant_index: verdict.matched_grant_index,
+        },
         Verdict::Allow => EvaluateResponse {
             verdict: "allow",
             reason: None,

@@ -15,7 +15,7 @@
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
-    scope::{ChioScope, Operation, ToolGrant},
+    scope::{ChioScope, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core_types::crypto::Keypair;
@@ -37,18 +37,30 @@ const ISSUED_AT: u64 = 1_700_000_000;
 const EXPIRES_AT: u64 = 1_700_100_000;
 const EVAL_TIME: u64 = 1_700_000_100;
 
+fn echo_grant() -> ToolGrant {
+    ToolGrant {
+        server_id: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    }
+}
+
 fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    make_capability_with_grant(subject, issuer, echo_grant())
+}
+
+fn make_capability_with_grant(
+    subject: &Keypair,
+    issuer: &Keypair,
+    grant: ToolGrant,
+) -> CapabilityToken {
     let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "srv-a".to_string(),
-            tool_name: "echo".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![],
-            max_invocations: None,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
+        grants: vec![grant],
         resource_grants: vec![],
         prompt_grants: vec![],
     };
@@ -166,6 +178,60 @@ fn evaluate_allow_roundtrip() {
     assert_eq!(response["verdict"], "allow");
     assert_eq!(response["matched_grant_index"], 0);
     assert!(response.get("reason").is_none());
+}
+
+#[test]
+fn evaluate_denies_grant_requiring_mediated_authorization() {
+    let usd = |units| MonetaryAmount {
+        units,
+        currency: "USD".to_string(),
+    };
+    let grants = [
+        ToolGrant {
+            dpop_required: Some(true),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_invocations: Some(3),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_cost_per_invocation: Some(usd(5)),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_total_cost: Some(usd(50)),
+            ..echo_grant()
+        },
+    ];
+
+    for grant in grants {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_capability_with_grant(&subject, &issuer, grant);
+        let request_json = serde_json::json!({
+            "capability": capability,
+            "trusted_issuers": [issuer.public_key().to_hex()],
+            "request": {
+                "request_id": "req-mediated",
+                "tool_name": "echo",
+                "server_id": "srv-a",
+                "agent_id": subject.public_key().to_hex(),
+                "arguments": {"msg": "hello"},
+            },
+            "now_secs": EVAL_TIME as i64,
+        })
+        .to_string();
+
+        let response_json = evaluate(request_json).expect("evaluate mediated deny");
+        let response: serde_json::Value = serde_json::from_str(&response_json).unwrap();
+        assert_eq!(response["verdict"], "deny");
+        assert_eq!(
+            response["reason"],
+            "grant requires mediated authorization (DPoP/usage accounting) unavailable to the offline mobile gate"
+        );
+        assert_eq!(response["matched_grant_index"], 0);
+    }
 }
 
 #[test]

@@ -41,7 +41,7 @@ with a matching UDL declaration.
 
 | Function | Purpose |
 |----------|---------|
-| `evaluate(request_json)` | Evaluate a tool-call request against a capability; a kernel-core deny (including `PendingApproval`) is returned as JSON, not thrown. |
+| `evaluate(request_json)` | Evaluate a tool-call request against a capability; a kernel-core deny (including `PendingApproval`) is returned as JSON, not thrown. A grant that needs a mediated kernel (DPoP, invocation or spend limits, cumulative approval, or an aggregate invocation budget) is denied. Revocation is not checked. |
 | `sign_receipt(body_json, canonical_content_hex, signing_seed_hex)` | WYSIWYS signer: recomputes `content_hash` over the caller-supplied canonical preimage, refusing to sign on mismatch. |
 | `sign_receipt_relaying_trusted_body(body_json, signing_seed_hex)` | Relay-sign a body an upstream trusted producer already minted, without recomputing `content_hash`. |
 | `verify_capability(token_json, authority_pub_hex)` | Verify a capability against one trusted authority key, using the device clock. |
