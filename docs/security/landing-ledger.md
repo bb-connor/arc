@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Required CI terminal results and repair batch (October 11 UTC)
+
+All four required checks on published `974f22914b` have reported. Cargo Vet and
+Cargo Deny passed. MSRV and Build/lint/test failed on the same stale command
+expectation, already repaired privately at `5955d1cc6a`. Build completed 114
+structural gates with 113 passing and only that expectation failing. It did not
+reach workspace compilation or tests. The [terminal CI record](audits/required-ci-terminal-20261011.json)
+preserves the job IDs and downloaded log hash.
+
+The replacement now includes locally qualified directory-scan/open, temporal
+correlation, blocking adapter, Go preflight and relay repairs. The relay's final
+composed package passed 299 tests and Ruff; four live-sidecar cases remain
+unavailable. The [component audit](audits/review2-local-components-20261011.json)
+and [Cage audit](audits/review2-cage-qualified-20261011.json) distinguish genuine
+Original failures, repaired results and native limitations. Descriptor custody
+repairs are composed and undergoing platform qualification. Other confirmed
+review items remain in assigned repair lanes. The canonical count stays **1,997**;
+only the named current states advance, preserving all historical requirements.
+
+Publication is held for the remaining confirmed repairs and local composition
+gates. Exact-head hosted qualification, documented readiness residuals and
+Connor's explicit merge go-ahead remain outstanding.
+
 ## Second review repair intake (October 11 UTC)
 
 The canonical ledger now records **1,997 requirements**. All 1,969 earlier
