@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     canonical_json_bytes, params, sha256, CanonicalBody, Connection, Digest32, InformationLabel,
     OptionalExtension, PortError, PortResult, RecordId,
