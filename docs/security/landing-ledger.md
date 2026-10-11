@@ -33,6 +33,25 @@ Linux x86 enforcing-host cases; five live conformance targets refused missing
 enforcing-host material. These require hosted evidence. The audit records local
 tool/platform differences and the interrupted supplemental run separately.
 
+All 17 failed or cancelled jobs observed on `36d77fe276` are classified. The
+non-required results remain distinct from passes:
+
+- Controller `114427666485`, adversarial `114429188337` and real Linux
+  `114429188368` stop at the stale `d0496c14d824` authorization boundary.
+- Active defense `114429188392` stops at the Temporal runner checksum: executed
+  trusted definition `8e689abfa757` expects `f91b0a9a91fc`, while the candidate
+  runner and current workflow pins use `f46d39d0265e`. Earlier gates pass; this
+  failed job does not qualify Temporal execution. Required Build used the current
+  pin and passed its Temporal step before the separate model metadata failure.
+- Both mandatory weights jobs, `114427953778` and `114427679001`, time out as
+  described below. Neither establishes a proof or a counterexample.
+- Fuzz sampling `114428079323` is cancelled at the 75-minute job limit after
+  compilation consumes 70 minutes 20 seconds. Completed targets find no crashes;
+  the full sampling obligation is incomplete. No budget increase is made.
+- Nine redundant C++/Swift jobs are cancelled. Equivalent retained push runs
+  `38125082335` and `38125082345` pass; their source trees and job commands match.
+  The cancelled jobs themselves remain cancelled.
+
 The mandatory weights SHA-256 determinism/shape proof timed out in both automatic
 jobs at its unchanged budget. It remains **unproved and not owner-accepted**;
 the earlier attestation-only amendment does not cover it. The next ordinary
