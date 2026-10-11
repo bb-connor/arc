@@ -526,6 +526,11 @@ pub(super) fn publish_live_lifecycle_tx(
         MAX_CHANNEL_ARTIFACT_BYTES,
         "live channel escrow reservation",
     )?;
+    // `channel_lifecycle_records_versioned` refuses any UPDATE that does not
+    // advance record_version, state_version and lifecycle_fence by exactly one
+    // each, and `channel_lifecycle_records_no_delete` refuses removal, so the
+    // exact prior state_version and lifecycle_fence pin the record version
+    // this plan observed.
     let changed = transaction
         .execute(
             r#"
@@ -545,7 +550,6 @@ pub(super) fn publish_live_lifecycle_tx(
               AND live_reservation_id IS NULL AND operation_id IS NULL
               AND channel_head_digest = ?22 AND escrow_head_digest = ?23
               AND checkpoint_sequence = ?24 AND checkpoint_digest = ?25
-              AND record_version = 1
             "#,
             params![
                 lifecycle_json,
