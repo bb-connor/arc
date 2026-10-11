@@ -46,6 +46,7 @@ SLICES: tuple[ReviewSlice, ...] = (
         "core protocol types, canonical bytes, HTTP/session contracts, manifests",
         (
             "crates/core/chio-bounded/**",
+            "crates/core/chio-file-custody/**",
             "crates/core/chio-core-types/**",
             "crates/core/chio-core/**",
             "crates/core/chio-response-model/**",

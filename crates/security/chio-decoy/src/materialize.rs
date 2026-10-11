@@ -773,6 +773,12 @@ mod unix {
             {
                 return Err(MaterializeError::MetadataMismatch);
             }
+            #[cfg(target_vendor = "apple")]
+            if chio_file_custody::darwin_descriptor_grants_extended_acl_authority(directory)
+                .map_err(|error| io_error("inspect materialization directory ACL", error))?
+            {
+                return Err(MaterializeError::MetadataMismatch);
+            }
             Ok(())
         }
 

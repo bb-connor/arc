@@ -2744,6 +2744,7 @@ dependencies = [
  "chio-federation",
  "chio-federation-authority",
  "chio-federation-transport-iroh",
+ "chio-file-custody",
  "chio-finding",
  "chio-finding-verifier",
  "chio-flow",
@@ -2780,7 +2781,6 @@ dependencies = [
  "chio-selective-disclosure",
  "chio-settle",
  "chio-spec-validate",
- "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",
  "chio-tee-frame",
@@ -3176,6 +3176,7 @@ dependencies = [
  "base64ct",
  "chio-core-types",
  "chio-custody-hw",
+ "chio-file-custody",
  "chio-revocation-oracle",
  "chio-sqlite-file-identity",
  "chrono",
@@ -3233,6 +3234,7 @@ dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "chio-core-types",
+ "chio-file-custody",
  "chio-security-types",
  "chio-test-support",
  "hex",
@@ -3406,6 +3408,13 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "chio-file-custody"
+version = "0.1.0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -3826,9 +3835,9 @@ name = "chio-keyring"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-file-custody",
  "chio-secure-ipc",
  "chio-security-types",
- "chio-sqlite-file-identity",
  "chio-test-support",
  "rusqlite",
  "rustix",
@@ -3975,6 +3984,7 @@ dependencies = [
  "chio-core-types",
  "chio-egress-contract",
  "chio-errors",
+ "chio-file-custody",
  "chio-http-serve",
  "chio-kernel",
  "chio-manifest",
@@ -3983,7 +3993,6 @@ dependencies = [
  "chio-secure-ipc",
  "chio-security-types",
  "chio-siem",
- "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-test-support",
  "hmac 0.12.1",
@@ -4465,6 +4474,7 @@ dependencies = [
  "chio-cage",
  "chio-control-plane",
  "chio-core-types",
+ "chio-file-custody",
  "chio-flow",
  "chio-kernel",
  "chio-keyring",
@@ -4473,7 +4483,6 @@ dependencies = [
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
- "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-test-support",
  "hex",

@@ -1816,6 +1816,7 @@ dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "chio-core-types",
+ "chio-file-custody",
  "chio-security-types",
  "hex",
  "hmac 0.12.1",
@@ -1959,6 +1960,13 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "zeroize",
+]
+
+[[package]]
+name = "chio-file-custody"
+version = "0.1.0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -2308,6 +2316,7 @@ name = "chio-keyring"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-file-custody",
  "chio-secure-ipc",
  "chio-security-types",
  "rusqlite",

@@ -2379,6 +2379,7 @@ dependencies = [
  "base64ct",
  "chio-core-types",
  "chio-custody-hw",
+ "chio-file-custody",
  "chio-revocation-oracle",
  "chio-sqlite-file-identity",
  "chrono",
@@ -2503,6 +2504,13 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "zeroize",
+]
+
+[[package]]
+name = "chio-file-custody"
+version = "0.1.0"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
