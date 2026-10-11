@@ -1552,6 +1552,7 @@ pub(super) fn advancing_authority_fixture(mode: &'static str) -> Fixture {
     service.revocations = authority;
     fixture
 }
+#[cfg(target_os = "linux")]
 pub(super) use endpoint_test_handler_method;
 mod authority_time;
 mod dispatch_claim_cases;

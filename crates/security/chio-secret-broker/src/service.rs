@@ -252,10 +252,12 @@ pub(crate) use wire::{reset_sensitive_drop_observer, sensitive_drop_observation}
 mod tests;
 
 pub(crate) use failure::failure_receipt_id_for_canonical_request_digest;
+#[cfg(all(test, target_os = "linux"))]
+use ipc::validate_broker_peer_uid;
 #[cfg(all(test, unix))]
 use ipc::{
     classify_broker_ipc_handler_result, classify_broker_ipc_write_error,
     is_well_formed_broker_ipc_error_code, validate_broker_ipc_response_envelope,
-    validate_broker_peer_uid, validate_broker_socket_identity, BrokerIpcServeFailure,
-    BrokerIpcWriteFailureClass, ProvisionalBrokerSocketCleanup,
+    validate_broker_socket_identity, BrokerIpcServeFailure, BrokerIpcWriteFailureClass,
+    ProvisionalBrokerSocketCleanup,
 };
