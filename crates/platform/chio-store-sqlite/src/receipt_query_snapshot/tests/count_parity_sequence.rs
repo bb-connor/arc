@@ -189,8 +189,8 @@ struct Generations {
     /// Generations compared, per lineage.
     seen: BTreeMap<String, BTreeSet<u64>>,
     held_states: u64,
-    /// Lineages whose owned rows the campaign edits on purpose before a read
-    /// drops them; their counts are not compared again.
+    /// Lineages whose rows or backing custody the campaign damages on purpose
+    /// before a read drops them; their counts are not compared again.
     tampered: BTreeSet<String>,
     /// The first state whose maintained counts differed from `GROUP BY`.
     mismatch: Option<String>,
@@ -775,6 +775,13 @@ impl<'p> Campaign<'p> {
             self.fail("a Linux snapshot has no private backing file");
         };
         let epoch = self.lease();
+        // The observer cannot compare counts after this deliberate custody fault.
+        // Exclude only this lineage; every rebuilt lineage is compared normally.
+        self.generations
+            .lock()
+            .unwrap()
+            .tampered
+            .insert(self.served.clone());
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
         let read = self.service().query_receipts(&admin(5)).map(drop);
         // The dropped lineage may already have removed its file.
