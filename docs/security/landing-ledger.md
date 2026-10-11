@@ -82,6 +82,14 @@ verifies a matching source overlay with 70 passing executions, five additional
 full reruns and strict lint. Linux owning, strict and deception-boundary renewal
 of those new bytes remains pending.
 
+The [native checkpoint composition](audits/native-checkpoint-cadence-composition-20261011.json)
+changes the maintenance trigger from twenty events to five. Independent review
+approves the source and its corrected sequential-bound wording. It does not
+bound later concurrent appends or snapshot/archive size. Exact producer renewal,
+composed owning tests and actual native 10-second acceptance remain open; no
+policy fence was extended. The older lifetime-scan and size-aware cadence work
+remains preserved for separate reconciliation.
+
 The [native cold-map preparation audit](audits/native-cold-map-preparation-20261011.json)
 records 26 passing controls, six runtime-killed mutants, strict lint and
 independent review of the authenticated copy-on-write map. It is registered only

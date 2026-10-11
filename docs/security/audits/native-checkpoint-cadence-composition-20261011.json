@@ -1,0 +1,64 @@
+{
+  "schema": "chio.security.native-checkpoint-cadence-composition.v1",
+  "observed_utc": "2026-10-11T03:59:57.936466+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY"
+  ],
+  "source_checkpoint": "2a771bba409274e683e7a9262b43eea00d6e2889",
+  "source_repair": {
+    "producer": "c63163a322ee6d2547c03ef4f13cf4d62fa96bf1",
+    "commits": [
+      "0ca1e3fb3177d6e404b670d3f42294b9c238c133",
+      "2a771bba409274e683e7a9262b43eea00d6e2889"
+    ],
+    "files": [
+      "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs",
+      "docs/security/native-security-journal-checkpoints.md"
+    ],
+    "file_sha256": {
+      "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs": "0c069e7a5cc45c8582c2084e9d5c69b19283f0dcff4e8bdf1f67cb191e7d6325",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs": "22be18e77a57015bb95563207461d87351bc06cf3e86ff12e25841996da00350",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs": "6c4974a9d910f8d523ccfe37f7a7b464cc6d8024f9a7b0efa2f13b9802833315",
+      "docs/security/native-security-journal-checkpoints.md": "26d265d9afff154d80b4c9212e579d1e3204d24c0cd7b431ed904e8fb3273b3b"
+    }
+  },
+  "contract": [
+    "Maintenance trigger changes from twenty to five authenticated family events. Maintenance still precedes the invocation fence.",
+    "In sequential use, fewer than five earlier events remain at the maintenance observation before the current call appends its events. This excludes later concurrent appends and does not bound current snapshot or archive size.",
+    "Checkpoint transaction, per-event authentication, compaction, anchor commit, policy expiry, retries and kernel revalidation remain unchanged. The prose successor changes no runtime or assertion tokens."
+  ],
+  "independent_reviews": [
+    {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/native-checkpoint-cadence-independent-review.md",
+      "sha256": "89aeeb54bf61cb61e2fc44cfd76401ddf8228b1ae6e0a49808705a4c9407a29b",
+      "scope": "Independent bounded source approval; no runtime execution by reviewer."
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/native-checkpoint-cadence-prose-followup-review.md",
+      "sha256": "1f7390b6e44fc01ce57e4af4b8e446e733d7a31822a9c4df091a402d4bed8b83",
+      "scope": "Independent bounded source approval; no runtime execution by reviewer."
+    }
+  ],
+  "producer_runtime_boundary": "The producer reported a failing old-threshold control, one sixteen-call green control and 140 passing store controls. Their initial logs omit exact source/environment identities. Pinned Original/GREEN renewal is requested; these historical logs are not promoted to exact-source qualification.",
+  "preserved_followups": [
+    "903189f99f57ec1aa0bebe012059d22cee851942",
+    "e0176870ba165bac41feddd66e5b899cc9dbeff4",
+    "ed3f1a120ec0c35df76f9ea998cd192e4bce6bfe"
+  ],
+  "followup_disposition": "Preserve the older lifetime-scan optimization for independent review. The size-aware cadence and its test must be reconciled with this fixed-trigger contract and cold-state work before any composition; no equivalence or supersession claimed.",
+  "remaining_acceptance": [
+    "Retain explicitly pinned Original/GREEN evidence and pass final composed control-plane/store owning and strict gates.",
+    "Complete actual enforcing native trajectory on the current image with unchanged10000ms fence, authenticated costs and custody.",
+    "Qualify archive/open-time and cold-state capacity separately.",
+    "Pass four required checks on the exact published successor; classify other failures, answer reviews and obtain Connor merge go-ahead."
+  ],
+  "source_reviewed": true,
+  "source_integrated": true,
+  "runtime_qualified": false,
+  "native_qualified": false,
+  "hosted_qualified": false,
+  "merged": false
+}
