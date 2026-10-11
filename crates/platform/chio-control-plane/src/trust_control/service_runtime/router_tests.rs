@@ -1,3 +1,14 @@
+#[path = "router_tests/compacted_replay_tests.rs"]
+mod compacted_replay_tests;
+
+#[cfg(target_os = "linux")]
+#[path = "router_tests/recovery_rpc_tests.rs"]
+mod recovery_rpc_tests;
+
+#[cfg(target_os = "linux")]
+#[path = "router_tests/public_authority_reads.rs"]
+mod public_authority_reads;
+
 use super::super::super::*;
 use super::super::budget::build_remote_budget_store;
 use super::handle_trust_control_metrics;
@@ -6,15 +17,36 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[path = "ingress_tests.rs"]
+mod ingress_tests;
+
+#[path = "router_tests/queued_wallet_expiry.rs"]
+mod queued_wallet_expiry;
+
+#[path = "router_tests/receipt_store_ownership_tests.rs"]
+mod receipt_store_ownership_tests;
+
+#[path = "attestation_authentication_tests.rs"]
+mod attestation_authentication_tests;
+
+#[cfg(target_os = "linux")]
+#[path = "router_tests/behavioral_signing_custody.rs"]
+mod behavioral_signing_custody;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
+        transport: Default::default(),
         listen: "127.0.0.1:0".parse().test_unwrap(),
         service_token: service_token.to_string(),
         tenant_read_tokens: BTreeMap::new(),
+        authority_workload_token: None,
         receipt_db_path: None,
+        receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
         authority_seed_path: None,
         authority_db_path: None,
+        authority_keyring_config_path: None,
+        authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
@@ -34,16 +66,24 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         certification_public_metadata_ttl_seconds: 300,
         peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(25),
+        authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: None,
     };
     TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
+        authority_keyring: None,
+        authority_keyring_seed_path: None,
         joint_authority_store: None,
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        receipt_store: None,
+        receipt_query_snapshots: None,
+        receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
+        evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry: None,
         verifier_policy_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(
@@ -51,6 +91,15 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         )),
         cluster: None,
         cluster_progress: None,
+        leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
+        authority_inspection_lane: Arc::new(tokio::sync::Semaphore::new(8)),
+        operator_registry_write_lane: BlockingLane::new("operator_registry_write", 2),
+        public_passport_issuance_lane: BlockingLane::new("public_passport_issuance", 2),
+        wallet_entitlement_lane: crate::trust_control::ingress_lanes::wallet_entitlement_lane(),
+        public_passport_challenge_lane: Arc::new(tokio::sync::Semaphore::new(
+            crate::trust_control::report_rendering::PUBLIC_PASSPORT_CHALLENGE_PERMITS,
+        )),
         finding_rail: None,
         finding_purchase_executor: None,
         finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -63,6 +112,99 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn admission_authority_authenticates_before_reading_the_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use tower::ServiceExt;
+    let request = axum::http::Request::builder()
+        .method("POST")
+        .uri(INTERNAL_ADMISSION_AUTHORITY_PATH)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from_stream(
+            futures_util::stream::pending::<Result<axum::body::Bytes, std::convert::Infallible>>(),
+        ))?;
+    let response = tokio::time::timeout(
+        Duration::from_secs(1),
+        super::build_router(metrics_state("service-secret")).oneshot(request),
+    )
+    .await??;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn retained_hold_route_requires_service_auth_and_the_current_owner(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use super::super::admission_authority::handle_admission_authority;
+    use chio_store_sqlite::SqliteAuthorityStore;
+
+    let temp = crate::durable_admission::private_tempdir()?;
+    let database = temp.path().join("authority.sqlite3");
+    let locks = temp.path().join("locks");
+    std::fs::create_dir(&locks)?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700))?;
+    SqliteAuthorityStore::provision(&database, &locks)?;
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?);
+    let fence = authority.mutation_fence();
+    let mut state = metrics_state("service-secret");
+    state.joint_authority_store = Some(authority);
+    let request = AdmissionAuthorityRequest::new(
+        Some(fence.clone()),
+        AdmissionAuthorityAction::LoadBudgetHold,
+        &RetainedBudgetHoldRequest {
+            hold_id: "absent-hold".to_owned(),
+        },
+    )?;
+    let unauthorized = handle_admission_authority(
+        State(state.clone()),
+        axum::http::Request::builder()
+            .body(axum::body::Body::from("invalid JSON must not be parsed"))?,
+    )
+    .await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+    for current in [false, true] {
+        let mut request = request.clone();
+        if !current {
+            request
+                .expected_fence
+                .as_mut()
+                .ok_or("missing fence")?
+                .owner_epoch += 1;
+        }
+        let response = handle_admission_authority(
+            State(state.clone()),
+            axum::http::Request::builder()
+                .header(AUTHORIZATION, "Bearer service-secret")
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(serde_json::to_vec(&request)?))?,
+        )
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+        let response: AdmissionAuthorityResponse = serde_json::from_slice(&body)?;
+        if current {
+            assert!(response.error.is_none());
+            assert_eq!(
+                response.result.ok_or("missing authoritative result")?.value,
+                serde_json::Value::Null
+            );
+        } else {
+            assert!(response.result.is_none());
+            assert_eq!(
+                response.error.ok_or("missing fence rejection")?.code,
+                AdmissionAuthorityErrorCode::Fenced
+            );
+        }
+    }
+    Ok(())
+}
+
 /// The /metrics route shares the trust-control listener and must fail closed.
 /// An unauthenticated scrape is rejected with 401 rather than exposing
 /// operational counters and guard labels.
@@ -71,6 +213,28 @@ async fn trust_control_metrics_rejects_unauthenticated_request() {
     let state = metrics_state("service-secret");
     let response = handle_trust_control_metrics(State(state), HeaderMap::new()).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn authority_key_log_sync_requires_service_auth_and_a_keyring() {
+    let state = metrics_state("service-secret");
+    let request = AuthorityKeyLogSyncRequest { base: None };
+    let unauthorized = super::handle_authority_key_log_sync(
+        State(state.clone()),
+        HeaderMap::new(),
+        Json(request.clone()),
+    )
+    .await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer service-secret"),
+    );
+    let unavailable =
+        super::handle_authority_key_log_sync(State(state), headers, Json(request)).await;
+    assert_eq!(unavailable.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
 
 #[tokio::test]
@@ -133,12 +297,34 @@ fn fiscal_marketplace_credit_limit_rejects_client_trust_claims() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use chio_security_types::clock::{
+        Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
+    };
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct LegacyBudgetClock(AtomicU64);
+    impl Clock for LegacyBudgetClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            let seconds = self.0.load(Ordering::SeqCst);
+            Ok(ClockReading::new(
+                UnixMillis::from_secs(seconds)?,
+                MonotonicInstant::from_nanos(
+                    seconds
+                        .checked_mul(1_000_000_000)
+                        .ok_or(ClockError::Overflow)?,
+                ),
+            ))
+        }
+    }
+
     let temp = crate::durable_admission::private_tempdir()?;
-    let sqlite = Arc::new(SqliteBudgetStore::open(
+    let clock = Arc::new(LegacyBudgetClock(AtomicU64::new(1_000)));
+    let sqlite = Arc::new(SqliteBudgetStore::open_with_clock(
         temp.path().join("legacy-budget.sqlite3"),
+        clock.clone(),
     )?);
     let mut state = metrics_state("service-secret");
-    state.budget_store = Some(sqlite);
+    state.budget_store = Some(sqlite.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let url = format!("http://{}", listener.local_addr()?);
     let server =
@@ -171,7 +357,11 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         let authorization_usage = store
             .get_usage("legacy-rich", 0)?
             .ok_or_else(|| std::io::Error::other("authorization usage was not cached"))?;
-        std::thread::sleep(Duration::from_millis(1_100));
+        let authorization_projection = sqlite
+            .usage_projection_for_event_id("legacy-capture:authorize")?
+            .ok_or_else(|| std::io::Error::other("authorization projection was not durable"))?;
+        assert_eq!(authorization_projection.updated_at, 1_000);
+        clock.0.store(1_002, Ordering::SeqCst);
         let capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "legacy-rich".to_string(),
             grant_index: 0,
@@ -179,6 +369,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             event_id: format!("{capture_hold}:capture-invocation"),
             trusted_time: None,
             authority: None,
+        }).inspect_err(|error| {
+            eprintln!("capture failed: {error}; cached authorization={authorization_usage:?}; durable authorization={authorization_projection:?}");
         })?;
         let capture = match capture {
             BudgetInvocationCaptureDecision::Captured(mutation) => mutation,
@@ -202,6 +394,14 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert_eq!(capture_usage.seq, authorization_usage.seq);
         assert_eq!(capture_usage.updated_at, authorization_usage.updated_at);
         assert!(capture_usage.seq < capture_commit);
+        assert_eq!(authorization_usage, authorization_projection);
+        assert_eq!(capture_usage, authorization_projection);
+        let capture_event = sqlite
+            .mutation_event_for_event_id("legacy-capture:capture-invocation")?
+            .ok_or_else(|| std::io::Error::other("capture event was not durable"))?;
+        assert_eq!(capture_event.recorded_at, 1_002);
+        assert_eq!(capture_event.event_seq, capture_commit);
+        assert_eq!(capture_event.usage_seq, Some(authorization_projection.seq));
 
         let release_hold = "legacy-release";
         assert!(matches!(
@@ -296,8 +496,11 @@ async fn versioned_rich_lifecycle_does_not_mutate_legacy_cluster_follower(
     state.budget_store = Some(sqlite.clone());
     state.config.advertise_url = Some("http://127.0.0.1:3200".to_string());
     state.config.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
-    state.cluster =
-        crate::trust_control::cluster::build_cluster_state(&state.config, state.config.listen)?;
+    state.cluster = crate::trust_control::cluster::build_cluster_state(
+        &state.config,
+        state.config.listen,
+        state.finding_challenge_clock.clone(),
+    )?;
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -331,7 +534,11 @@ async fn live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(joint.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -445,7 +652,11 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let legacy = Arc::new(SqliteBudgetStore::open(
         temp.path().join("legacy-budget.sqlite3"),
     )?);
@@ -568,7 +779,11 @@ async fn v1_lifecycle_uses_current_joint_epoch_after_restart(
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let first = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let first = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let first_fence = first.mutation_fence();
     let capability_id = "restart-capability";
     let hold_id = "restart-hold";
@@ -611,7 +826,11 @@ async fn v1_lifecycle_uses_current_joint_epoch_after_restart(
     drop(first_budget);
     drop(first);
 
-    let restarted = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let restarted = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let restarted_fence = restarted.mutation_fence();
     assert_eq!(restarted_fence.store_uuid, first_fence.store_uuid);
     assert!(restarted_fence.owner_epoch > first_fence.owner_epoch);
@@ -719,12 +938,18 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
         request_timeout: None,
         ..ServeHygieneConfig::default()
     };
-    let build = || apply_server_hygiene(super::build_router(metrics_state("secret")), &hygiene);
+    let state = || {
+        let mut state = metrics_state("secret");
+        state.config.authority_workload_token = Some("workload-secret".into());
+        state
+    };
+    let build = || apply_server_hygiene(super::build_router(state()), &hygiene);
 
     // Over the 1 MiB service cap but well under the receipt cap. The bytes are
     // not a valid receipt, so the handler's own decode still rejects them, but
     // NOT with 413: the point is the larger route limit lets the request reach
-    // the handler at all.
+    // the handler at all. Each request carries its route's credential, because
+    // authentication runs before any body byte is read.
     let oversized = vec![b'x'; 2 * 1024 * 1024];
 
     for path in [TOOL_RECEIPTS_PATH, CHILD_RECEIPTS_PATH] {
@@ -732,6 +957,7 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
             .method("POST")
             .uri(path)
             .header("content-type", "application/json")
+            .header(AUTHORIZATION, "Bearer secret")
             .body(Body::from(oversized.clone()))
             .test_unwrap();
         let response = build().oneshot(request).await.test_unwrap();
@@ -740,12 +966,18 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
             StatusCode::PAYLOAD_TOO_LARGE,
             "{path} must accept a receipt body above the 1 MiB service cap"
         );
+        assert_ne!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{path} must reach its handler with the service credential"
+        );
     }
 
     let request = Request::builder()
         .method("POST")
         .uri(ISSUE_CAPABILITY_PATH)
         .header("content-type", "application/json")
+        .header(AUTHORIZATION, "Bearer workload-secret")
         .body(Body::from(oversized))
         .test_unwrap();
     let response = build().oneshot(request).await.test_unwrap();
@@ -755,3 +987,12 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
         "a route without the receipt-append override must still cap at 1 MiB"
     );
 }
+
+#[path = "router_tests/receipt_query_snapshot_tests.rs"]
+mod receipt_query_snapshot_tests;
+
+#[path = "router_tests/evidence_snapshot_export_tests.rs"]
+mod evidence_snapshot_export_tests;
+
+#[path = "router_tests/registry_revocation_capacity.rs"]
+mod registry_revocation_capacity;

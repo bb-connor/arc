@@ -1,0 +1,138 @@
+{
+  "schema": "chio.pr1160.artifact-siem-integration-checkpoint.v1",
+  "captured_utc": "2026-10-07T23:35:28.967360+00:00",
+  "source_repair": "aaa62b32e1884b9f942f57a0713222f7fb87a4bf",
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "candidate_qualified": false,
+  "foundation_merged": false,
+  "requirement": {
+    "id": "AR-TERM-EVIDENCE",
+    "priority": "P2",
+    "text": "Completed signed executor evidence must bind the exact original artifact, schema and canonical dispatch identifier before terminal outbox publication or recovery.",
+    "original_result": {
+      "passed": 2,
+      "failed": 3,
+      "fixture_setup0of5_retained": true
+    },
+    "source_files": [
+      "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc",
+      "crates/kernel/chio-kernel/src/kernel/active_response_executor.rs",
+      "crates/kernel/chio-kernel/src/kernel/active_response_executor/dispatch_identity.rs"
+    ],
+    "source_limits": "Signatures remain mandatory. Private signed consistency controls do not claim public execution, effects or persisted-outbox qualification."
+  },
+  "source_integrated_items": [
+    "AR-OUT",
+    "AR-CAS",
+    "AR-TERM",
+    "AR-PROOF",
+    "AR-LATE",
+    "AR-EXPIRY",
+    "AR-VIEW",
+    "AR-BIND",
+    "AR-SCHEMA",
+    "AR-TERM-EVIDENCE",
+    "SIEM-BE",
+    "SIEM-SCHEMA"
+  ],
+  "local_evidence": {
+    "artifact_terminal_focus": {
+      "passed": 66,
+      "failed": 0
+    },
+    "distinct_affected_integration_and_modules": {
+      "passed": 167,
+      "failed": 0,
+      "historical_failed_owning_attempt_retained": true
+    },
+    "siem_full_target": {
+      "passed": 24,
+      "failed": 0
+    },
+    "conformance_rollback": {
+      "passed": 1,
+      "failed": 0
+    },
+    "quarantine_proof": {
+      "passed": 1,
+      "failed": 0
+    },
+    "signer_global_fault_controls": {
+      "passed": 4,
+      "failed": 0
+    },
+    "strict_owning_alltargets": {
+      "crates": [
+        "chio-kernel",
+        "chio-control-plane",
+        "chio-store-sqlite",
+        "chio-security-types",
+        "chio-quarantine"
+      ],
+      "exit": 0
+    },
+    "format_exit": 0,
+    "hygiene_exit": 0,
+    "negative_assertions": 1248,
+    "debt_removed": "exact one retired SIEM ack-loss assertion; no additions or waiver",
+    "umask": "0002"
+  },
+  "independent_review": {
+    "scope": "finite artifact and terminal consistency amendment only; explicit unread/full-candidate/native limits",
+    "verdict": "no remaining confirmed blocker in that amendment",
+    "path": "terminal-binding-final-independent/REVIEW.md",
+    "sha256": "a03ed71eda2697b4497a9f7e45e6c19eec5a61991cd844cc1e18fd7da7c730a2"
+  },
+  "remaining_acceptance": [
+    "Record and verify the new automatic-preparation table and exact moved/shared reader inventory; current source gate failed until this classification is complete.",
+    "Integrate current MCP/native/fuzz/monetary/TTL/effect/F016/ingress handoffs with genuine Originals, source review and owning checks.",
+    "Finish full default/PQ, independent full-candidate slices, native/cold/trusted evidence, terminal exact-SHA hosted checks and protected landing before claiming readiness."
+  ],
+  "logs": [
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/terminal-and-artifact-composed-green.log",
+      "sha256": "a14346d2367fe9e087b55288297de72fa3119453b7800e05cb0c51a00d3b3336",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/terminal-binding-current-original.log",
+      "sha256": "cbbd63fa9d1ce33716e8e0a3869f177ccca5fbe6fa63cb35aa467ed06129a6fb",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/terminal-binding-corrected-original.log",
+      "sha256": "a65cd656f70ab15c7bba4ee4055a105d21790460d5f8d0c32a8531eeb9591a92",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/artifact-terminal-five-owner-integration.log",
+      "sha256": "feca995113c2781a9b13b9038ec10b03876c1b5a3978c81d235511b2f56c3860",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/artifact-owner-lifecycle-corrected.log",
+      "sha256": "c26a5eca9d298c4955d9a62d3c9683e16247de1da7ded2404b434016d7676ab7",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/artifact-final-owner-strict-and-format.log",
+      "sha256": "8642ad70c02dbb76a55422d1263d49fdfa878bfdc33da80d4e46e8352c7b197b",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/siem-source-and-schema-current-green.log",
+      "sha256": "a0043935ea9a8eeeb0de03f4c2d5f0c56f523c0e344bba7fd7e638507f7046a3",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/artifact-conformance-and-proof-controls.log",
+      "sha256": "b68a7838498f2fde15f7b4fa164bc50618e26140228d6a9da20f1113cfebf50f",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/artifact-trust-boundaries-current.log",
+      "sha256": "7e012e4f2948d0e84c72c2bbbaffc246c0f5217a002cb2641b849dd425d17864",
+      "result": "failed/unrun classifications retained in owning receipts; no aggregate false Green"
+    }
+  ]
+}

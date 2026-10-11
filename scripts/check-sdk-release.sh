@@ -34,9 +34,20 @@ esac
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-sdk-release.XXXXXX")"
+qualification_complete=0
 
 cleanup() {
-  rm -rf "${work_dir}"
+  local status=$?
+  if ! rm -rf "${work_dir}"; then
+    status=1
+  fi
+  # Bash 3.2 can report status zero to EXIT after a nounset failure. Success
+  # requires reaching the end of the complete qualification driver.
+  if [[ "${status}" == "0" && "${qualification_complete}" != "1" ]]; then
+    status=1
+  fi
+  trap - EXIT
+  exit "${status}"
 }
 trap cleanup EXIT
 
@@ -265,6 +276,7 @@ PY
     . "${builder_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip build twine
     python -m build sdks/python/chio-py --sdist --wheel --outdir "${dist_dir}"
+    python -m build sdks/python/chio-process --sdist --wheel --outdir "${dist_dir}"
     python -m twine check "${dist_dir}"/*
     python - "${dist_dir}" <<'PY'
 from pathlib import Path
@@ -301,12 +313,15 @@ PY
     python3 -m venv "${wheel_venv}"
     . "${wheel_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.whl
+    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.whl "${dist_dir}"/chio_process-*.whl
     python - <<'PY'
 import importlib.metadata
 import chio
+from chio_process import ProcessClient
 
 assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert importlib.metadata.version("chio-process")
+assert ProcessClient is not None
 assert chio.ChioClient is not None
 assert chio.ChioSession is not None
 assert chio.ReceiptQueryClient is not None
@@ -317,12 +332,15 @@ PY
     python3 -m venv "${sdist_venv}"
     . "${sdist_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.tar.gz
+    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.tar.gz "${dist_dir}"/chio_process-*.tar.gz
     python - <<'PY'
 import importlib.metadata
 import chio
+from chio_process import ProcessClient
 
 assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert importlib.metadata.version("chio-process")
+assert ProcessClient is not None
 assert chio.ChioClient is not None
 assert chio.ChioSession is not None
 assert chio.ReceiptQueryClient is not None
@@ -713,11 +731,13 @@ NODE
       local dep_name
       local -a requested_dep_names=()
 
-      for existing_name in "${install_arg_names[@]}"; do
-        if [[ "${existing_name}" == "${requested_name}" ]]; then
-          return 0
-        fi
-      done
+      if [[ "${#install_arg_names[@]}" -gt 0 ]]; then
+        for existing_name in "${install_arg_names[@]}"; do
+          if [[ "${existing_name}" == "${requested_name}" ]]; then
+            return 0
+          fi
+        done
+      fi
 
       if ! requested_index="$(packed_package_index_for "${requested_name}")"; then
         echo "TypeScript release smoke is missing packed local dependency ${requested_name}" >&2
@@ -910,3 +930,5 @@ NODE
     exit 2
     ;;
 esac
+
+qualification_complete=1

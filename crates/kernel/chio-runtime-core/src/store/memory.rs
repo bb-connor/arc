@@ -3,6 +3,7 @@ use crate::validation::{validate_non_empty, validate_state_label};
 use crate::*;
 use chio_swarm_authority::SwarmAuthorityBundle;
 
+/// Process-local state shared by clones, with mutex-linearized trust-floor transitions.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryRuntimeAdmissionStore {
     bundles: Arc<Mutex<BTreeMap<String, RuntimeAdmissionBundle>>>,
@@ -43,8 +44,7 @@ impl InMemoryRuntimeAdmissionStore {
         validate_state_label(evidence_kind, "runtime_treaty_artifact_invalid_kind")?;
         validate_non_empty(evidence_id, "runtime_treaty_artifact_empty_id")?;
         let artifact_sha256 = canonical_sha256(artifact)?;
-        let raw_json = serde_json::to_value(artifact)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw_json = serde_json::to_value(artifact).map_err(ChioRuntimeError::Json)?;
         let mut treaty_artifacts = self.treaty_artifacts.lock().map_err(|_| {
             ChioRuntimeError::Store("runtime treaty artifact store is poisoned".to_string())
         })?;
@@ -244,6 +244,24 @@ impl RuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
             trust_floor_identity(&entry.verifier_id, &entry.key_id),
             entry,
         );
+        Ok(())
+    }
+
+    fn validate_and_record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+        previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
+        let mut floors = self.trust_floors.lock().map_err(|_| {
+            ChioRuntimeError::Store("runtime admission trust floor store is poisoned".to_string())
+        })?;
+        let identity = trust_floor_identity(&entry.verifier_id, &entry.key_id);
+        validate_runtime_trust_floor_transition(
+            floors.get(&identity).cloned(),
+            &entry,
+            previous_hash_sha256,
+        )?;
+        floors.insert(identity, entry);
         Ok(())
     }
 }

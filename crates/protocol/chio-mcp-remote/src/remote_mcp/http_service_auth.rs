@@ -5,6 +5,7 @@ fn should_emit_post_stream_event(
 ) -> bool {
     match event.kind {
         RemoteSessionEventKind::Notification => !notification_stream_attached,
+        RemoteSessionEventKind::StandaloneRequest => false,
         RemoteSessionEventKind::RequestCorrelated => {
             request_id.is_none_or(|request_id| {
                 is_terminal_response_for_request(&event.message, request_id)
@@ -61,9 +62,10 @@ fn plain_session_id_from_headers(
         McpSessionIdHeader::Missing => {
             Err(plain_http_error(StatusCode::BAD_REQUEST, missing_message))
         }
-        McpSessionIdHeader::Invalid => {
-            Err(plain_http_error(StatusCode::BAD_REQUEST, "invalid MCP-Session-Id"))
-        }
+        McpSessionIdHeader::Invalid => Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "invalid MCP-Session-Id",
+        )),
     }
 }
 
@@ -71,7 +73,10 @@ async fn resolve_session_entry(
     state: &RemoteAppState,
     session_id: &str,
 ) -> Option<RemoteSessionEntry> {
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        warn!(%error, "MCP lookup denied while lifecycle custody is retained");
+        return None;
+    }
     state.sessions.lookup(session_id).await
 }
 
@@ -91,7 +96,9 @@ async fn session_reaper_loop(
             _ = tokio::time::sleep(interval) => {}
             _ = shutdown.changed() => return,
         }
-        state.sessions.cleanup_due_sessions().await;
+        if let Err(error) = state.sessions.cleanup_due_sessions().await {
+            warn!(%error, "MCP reaper retained custody");
+        }
     }
 }
 
@@ -108,18 +115,29 @@ fn build_remote_auth_state(
         enterprise_provider_registry.clone(),
     )?;
 
-    let admin_token = if let Some(token) = config.admin_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--admin-token")?)
-    } else if let Some(token) = config.auth_token.as_deref() {
-        Some(validated_static_bearer_token(token, "--auth-token")?)
-    } else {
+    let admin_token = admin_bearer_token(config)?;
+
+    Ok((auth_mode, Some(admin_token)))
+}
+
+/// The admin routes run on their own credential. The session credential is
+/// never promoted to the admin role, so a bearer-authenticated edge refuses to
+/// launch without a dedicated admin token or with one that repeats the session
+/// token.
+fn admin_bearer_token(config: &RemoteServeHttpConfig) -> Result<Arc<str>, CliError> {
+    let Some(admin_token) = config.admin_token.as_deref() else {
         return Err(CliError::cli_other_error(
-            "bearer-authenticated remote MCP edge requires --admin-token for admin APIs"
+            "bearer-authenticated remote MCP edge requires --admin-token; the admin routes never run on the session credential"
                 .to_string(),
         ));
     };
-
-    Ok((auth_mode, admin_token))
+    let admin_token = validated_static_bearer_token(admin_token, "--admin-token")?;
+    if config.auth_token.as_deref() == Some(&*admin_token) {
+        return Err(CliError::cli_other_error(
+            "--auth-token and --admin-token must be distinct bearer credentials".to_string(),
+        ));
+    }
+    Ok(admin_token)
 }
 
 fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {
@@ -147,12 +165,8 @@ fn validate_chio_oauth_authorization_profile_metadata(
     source: &str,
 ) -> Result<(), CliError> {
     let expected_profile = ChioOAuthAuthorizationProfile::default();
-    let profile: ChioOAuthAuthorizationProfile =
-        serde_json::from_value(value.clone()).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{source} contains invalid Chio authorization profile metadata: {error}"
-            ))
-        })?;
+    let profile: ChioOAuthAuthorizationProfile = serde_json::from_value(value.clone())
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
     if profile.schema != CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA {
         return Err(CliError::cli_other_error(format!(
             "{source} must advertise Chio authorization profile schema `{CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA}`"
@@ -309,8 +323,9 @@ fn build_authorization_server_metadata(
     }
 
     if let Some(issuer) = resolve_local_auth_issuer(config, local_addr)? {
-        let issuer = Url::parse(&issuer)
-            .map_err(|error| CliError::cli_other_error(format!("invalid local auth issuer: {error}")))?;
+        let issuer = Url::parse(&issuer).map_err(|error| {
+            CliError::cli_other_error(format!("invalid local auth issuer: {error}"))
+        })?;
         let metadata_path = metadata_path_for_issuer(&issuer);
         let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
         let chio_authorization_profile = build_chio_oauth_authorization_profile_metadata()?;
@@ -438,7 +453,7 @@ fn build_remote_auth_mode(
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime();
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
 
     if config.auth_token.is_some()
         && (config.auth_jwt_public_key.is_some()
@@ -481,6 +496,7 @@ fn build_remote_auth_mode(
     if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
         return Ok(RemoteAuthMode::JwtBearer {
             verifier: Arc::new(JwtBearerVerifier {
+                clock: config.clock.clone(),
                 key_source: JwtVerificationKeySource::Static(
                     load_or_create_authority_keypair(seed_path)?.public_key(),
                 ),
@@ -526,6 +542,7 @@ fn build_remote_auth_mode(
             })?;
         return Ok(RemoteAuthMode::IntrospectionBearer {
             verifier: Arc::new(IntrospectionBearerVerifier {
+                clock: config.clock.clone(),
                 client: client_builder_with_contract(&egress_contract)
                     .timeout(Duration::from_secs(TOKEN_INTROSPECTION_TIMEOUT_SECS))
                     .build()
@@ -582,6 +599,7 @@ fn build_remote_auth_mode(
 
     Ok(RemoteAuthMode::JwtBearer {
         verifier: Arc::new(JwtBearerVerifier {
+            clock: config.clock.clone(),
             key_source,
             issuer: config
                 .auth_jwt_issuer
@@ -607,13 +625,21 @@ fn build_remote_auth_mode(
     })
 }
 
-fn build_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
+fn build_sender_dpop_runtime(
+    clock: &RemoteClock,
+) -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
     let config = DpopConfig::default();
-    let store = Arc::new(DpopNonceStore::new(
-        config.nonce_store_capacity,
-        Duration::from_secs(config.proof_ttl_secs),
-    ));
-    (store, config)
+    let store = Arc::new(
+        DpopNonceStore::with_clock(
+            config.nonce_store_capacity,
+            config.nonce_store_capacity,
+            chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+            Duration::from_secs(config.proof_ttl_secs),
+            Arc::new(clock.clone()),
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+    );
+    Ok((store, config))
 }
 
 fn resolve_local_auth_issuer(
@@ -638,12 +664,14 @@ fn build_local_auth_server(
         return Ok(None);
     };
     let signing_key = load_or_create_authority_keypair(seed_path)?;
-    let issuer = resolve_local_auth_issuer(config, local_addr)?
-        .ok_or_else(|| CliError::cli_other_error("failed to resolve local auth issuer".to_string()))?;
+    let issuer = resolve_local_auth_issuer(config, local_addr)?.ok_or_else(|| {
+        CliError::cli_other_error("failed to resolve local auth issuer".to_string())
+    })?;
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     let default_audience = effective_resource_indicator(config, &base_url);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime();
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
     Ok(Some(LocalAuthorizationServer {
+        clock: config.clock.clone(),
         signing_key,
         issuer,
         default_audience,
@@ -699,13 +727,14 @@ fn parse_request_time_authorization_details_from_value(
 ) -> Result<Vec<GovernedAuthorizationDetail>, Response> {
     let details: Vec<GovernedAuthorizationDetail> =
         serde_json::from_value(value).map_err(|error| {
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                "invalid_request",
-                &format!(
-                    "{} must be a JSON array of Chio governed authorization details: {error}",
-                    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
+            let error = chio_core::canonical::UntrustedJsonError::Decode(error);
+            input::with_source(
+                oauth_token_error(
+                    StatusCode::BAD_REQUEST,
+                    OAuthError::InvalidRequest,
+                    error.code(),
                 ),
+                error,
             )
         })?;
     validate_request_time_authorization_details(&details)?;
@@ -718,54 +747,57 @@ fn parse_request_time_authorization_details(
     let Some(raw) = raw else {
         return Ok(None);
     };
-    let value: Value = serde_json::from_str(raw).map_err(|error| {
-        oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            "invalid_request",
-            &format!(
-                "{} must be valid JSON: {error}",
-                CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
+    let value: Value = decode_json(raw.as_bytes(), MAX_AUTH_JSON_BYTES).map_err(|error| {
+        input::with_source(
+            oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidRequest,
+                error.code(),
             ),
+            error,
         )
     })?;
     parse_request_time_authorization_details_from_value(value).map(Some)
 }
 
 fn parse_request_time_transaction_context_from_value(
+    clock: &RemoteClock,
     value: Value,
 ) -> Result<GovernedAuthorizationTransactionContext, Response> {
     let context: GovernedAuthorizationTransactionContext =
         serde_json::from_value(value).map_err(|error| {
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                "invalid_request",
-                &format!(
-                    "{} must be a JSON object matching Chio transaction context: {error}",
-                    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER
+            let error = chio_core::canonical::UntrustedJsonError::Decode(error);
+            input::with_source(
+                oauth_token_error(
+                    StatusCode::BAD_REQUEST,
+                    OAuthError::InvalidRequest,
+                    error.code(),
                 ),
+                error,
             )
         })?;
-    validate_request_time_transaction_context(&context)?;
+    validate_request_time_transaction_context(clock, &context)?;
     Ok(context)
 }
 
 fn parse_request_time_transaction_context(
+    clock: &RemoteClock,
     raw: Option<&str>,
 ) -> Result<Option<GovernedAuthorizationTransactionContext>, Response> {
     let Some(raw) = raw else {
         return Ok(None);
     };
-    let value: Value = serde_json::from_str(raw).map_err(|error| {
-        oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            "invalid_request",
-            &format!(
-                "{} must be valid JSON: {error}",
-                CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER
+    let value: Value = decode_json(raw.as_bytes(), MAX_AUTH_JSON_BYTES).map_err(|error| {
+        input::with_source(
+            oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidRequest,
+                error.code(),
             ),
+            error,
         )
     })?;
-    parse_request_time_transaction_context_from_value(value).map(Some)
+    parse_request_time_transaction_context_from_value(clock, value).map(Some)
 }
 
 fn validate_request_time_authorization_details(
@@ -774,7 +806,7 @@ fn validate_request_time_authorization_details(
     if details.is_empty() {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "authorization_details must include at least one Chio governed detail",
         ));
     }
@@ -786,7 +818,7 @@ fn validate_request_time_authorization_details(
                 if detail.locations.is_empty() || detail.actions.is_empty() {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_tool authorization detail requires non-empty locations and actions",
                     ));
                 }
@@ -795,14 +827,14 @@ fn validate_request_time_authorization_details(
                 {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_tool authorization detail locations and actions must not be empty",
                     ));
                 }
                 if detail.commerce.is_some() || detail.metered_billing.is_some() {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_tool authorization detail must not include commerce or meteredBilling sidecars",
                     ));
                 }
@@ -812,7 +844,7 @@ fn validate_request_time_authorization_details(
                 let Some(commerce) = detail.commerce.as_ref() else {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_commerce authorization detail requires commerce fields",
                     ));
                 };
@@ -821,14 +853,14 @@ fn validate_request_time_authorization_details(
                 {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_commerce seller and sharedPaymentTokenId must not be empty",
                     ));
                 }
                 if detail.metered_billing.is_some() {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_commerce authorization detail must not include meteredBilling detail",
                     ));
                 }
@@ -837,7 +869,7 @@ fn validate_request_time_authorization_details(
                 let Some(metered) = detail.metered_billing.as_ref() else {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_metered_billing authorization detail requires meteredBilling fields",
                     ));
                 };
@@ -847,14 +879,14 @@ fn validate_request_time_authorization_details(
                 {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_metered_billing provider, quoteId, and billingUnit must not be empty",
                     ));
                 }
                 if detail.commerce.is_some() {
                     return Err(oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_request",
+                        OAuthError::InvalidRequest,
                         "chio_governed_metered_billing authorization detail must not include commerce detail",
                     ));
                 }
@@ -862,7 +894,7 @@ fn validate_request_time_authorization_details(
             unsupported => {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
-                    "invalid_request",
+                    OAuthError::InvalidRequest,
                     &format!("unsupported authorization_details.type `{unsupported}`"),
                 ));
             }
@@ -872,7 +904,7 @@ fn validate_request_time_authorization_details(
     if !saw_tool_detail {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "authorization_details must include one chio_governed_tool detail",
         ));
     }
@@ -880,19 +912,20 @@ fn validate_request_time_authorization_details(
 }
 
 fn validate_request_time_transaction_context(
+    clock: &RemoteClock,
     context: &GovernedAuthorizationTransactionContext,
 ) -> Result<(), Response> {
     if context.intent_id.trim().is_empty() {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "chio_transaction_context.intentId must not be empty",
         ));
     }
     if context.intent_hash.trim().is_empty() {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "chio_transaction_context.intentHash must not be empty",
         ));
     }
@@ -900,28 +933,28 @@ fn validate_request_time_transaction_context(
         if token_id.trim().is_empty() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.approvalTokenId must not be empty",
             ));
         }
         let Some(approver_key) = context.approver_key.as_deref() else {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.approvalTokenId requires approverKey",
             ));
         };
         if approver_key.trim().is_empty() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.approverKey must not be empty",
             ));
         }
         if context.approval_approved.is_none() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.approvalTokenId requires approvalApproved",
             ));
         }
@@ -930,28 +963,28 @@ fn validate_request_time_transaction_context(
         let Some(verifier) = context.runtime_assurance_verifier.as_deref() else {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.runtimeAssuranceTier requires runtimeAssuranceVerifier",
             ));
         };
         if verifier.trim().is_empty() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.runtimeAssuranceVerifier must not be empty",
             ));
         }
         let Some(evidence_sha) = context.runtime_assurance_evidence_sha256.as_deref() else {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.runtimeAssuranceTier requires runtimeAssuranceEvidenceSha256",
             ));
         };
         if evidence_sha.trim().is_empty() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.runtimeAssuranceEvidenceSha256 must not be empty",
             ));
         }
@@ -964,7 +997,7 @@ fn validate_request_time_transaction_context(
         {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_transaction_context.callChain requires non-empty chainId, parentRequestId, originSubject, and delegatorSubject",
             ));
         }
@@ -972,7 +1005,7 @@ fn validate_request_time_transaction_context(
             if parent_receipt_id.trim().is_empty() {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
-                    "invalid_request",
+                    OAuthError::InvalidRequest,
                     "chio_transaction_context.callChain.parentReceiptId must not be empty when present",
                 ));
             }
@@ -980,9 +1013,13 @@ fn validate_request_time_transaction_context(
     }
     if let Some(identity_assertion) = context.identity_assertion.as_ref() {
         identity_assertion
-            .validate_at(unix_now())
+            .validate_at(clock.seconds().map_err(clock::rejection)?)
             .map_err(|message| {
-                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", &message)
+                oauth_token_error(
+                    StatusCode::BAD_REQUEST,
+                    OAuthError::InvalidRequest,
+                    &message,
+                )
             })?;
     }
     Ok(())
@@ -996,7 +1033,7 @@ fn validate_identity_assertion_binding(
     if identity_assertion.verifier_id != expected_verifier_id {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "chio_transaction_context.identityAssertion.verifierId must match client_id",
         ));
     }
@@ -1006,14 +1043,14 @@ fn validate_identity_assertion_binding(
             Some(_) => {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
-                    "invalid_request",
+                    OAuthError::InvalidRequest,
                     "chio_transaction_context.identityAssertion.boundRequestId must match the enclosing request",
                 ))
             }
             None => {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
-                    "invalid_request",
+                    OAuthError::InvalidRequest,
                     "chio_transaction_context.identityAssertion requires boundRequestId for request-bound continuity",
                 ))
             }
@@ -1045,7 +1082,7 @@ fn normalize_optional_sender_value(
     match value {
         Some(raw) if raw.trim().is_empty() => Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             &format!("{field} must not be empty"),
         )),
         Some(raw) => Ok(Some(raw.trim().to_string())),
@@ -1062,13 +1099,14 @@ fn build_request_sender_constraint(
     let chio_sender_key =
         normalize_optional_sender_value(dpop_public_key, CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER)?;
     if let Some(sender_key) = chio_sender_key.as_deref() {
-        PublicKey::from_hex(sender_key).map_err(|error| {
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                "invalid_request",
-                &format!(
-                    "{CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER} must be an Ed25519 public key hex string: {error}"
+        sender_constraint::decode_sender_key(sender_key).map_err(|error| {
+            input::with_source(
+                oauth_token_error(
+                    StatusCode::BAD_REQUEST,
+                    OAuthError::InvalidRequest,
+                    "sender public key decoding failed",
                 ),
+                error,
             )
         })?;
     }
@@ -1082,21 +1120,21 @@ fn build_request_sender_constraint(
         let Some(context) = transaction_context else {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "attestation-bound sender semantics require chio_transaction_context runtime assurance fields",
             ));
         };
         if context.runtime_assurance_evidence_sha256.as_deref() != Some(attestation_sha256) {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "chio_sender_attestation_sha256 must match chio_transaction_context.runtimeAssuranceEvidenceSha256",
             ));
         }
         if chio_sender_key.is_none() && mtls_thumbprint_sha256.is_none() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "attestation-bound sender semantics require either chio_sender_dpop_public_key or chio_sender_mtls_thumbprint_sha256",
             ));
         }
@@ -1111,119 +1149,4 @@ fn build_request_sender_constraint(
     } else {
         Ok(Some(claims))
     }
-}
-
-fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, String> {
-    let encoded = raw.trim();
-    let bytes = URL_SAFE_NO_PAD
-        .decode(encoded)
-        .map_err(|error| format!("DPoP proof header is not valid base64url: {error}"))?;
-    serde_json::from_slice::<DpopProof>(&bytes)
-        .map_err(|error| format!("DPoP proof header is not valid JSON: {error}"))
-}
-
-fn verify_sender_dpop_proof(
-    proof: &DpopProof,
-    expected_binding_id: &str,
-    expected_target: &str,
-    expected_method: &str,
-    expected_agent_key: &PublicKey,
-    nonce_store: &DpopNonceStore,
-    config: &DpopConfig,
-) -> Result<(), String> {
-    if !is_supported_dpop_schema(&proof.body.schema) {
-        return Err(format!("unsupported DPoP schema `{}`", proof.body.schema));
-    }
-    if proof.body.agent_key != *expected_agent_key {
-        return Err("DPoP proof agent_key did not match the bound sender key".to_string());
-    }
-    let expected_action_hash = sha256_hex(HTTP_DPOP_ACTION_HASH_EMPTY);
-    if proof.body.capability_id != expected_binding_id
-        || proof.body.tool_server != expected_target
-        || proof.body.tool_name != expected_method
-        || proof.body.action_hash != expected_action_hash
-    {
-        return Err(
-            "DPoP proof did not match the expected binding id, target, method, or action hash"
-                .to_string(),
-        );
-    }
-    if proof.body.nonce.trim().is_empty() {
-        return Err("DPoP proof nonce must not be empty".to_string());
-    }
-
-    let now = unix_now();
-    if proof.body.issued_at > now.saturating_add(config.max_clock_skew_secs) {
-        return Err("DPoP proof is too far in the future".to_string());
-    }
-    if now > proof.body.issued_at.saturating_add(config.proof_ttl_secs) {
-        return Err("DPoP proof is stale".to_string());
-    }
-
-    let message = canonical_json_bytes(&proof.body)
-        .map_err(|error| format!("failed to canonicalize DPoP proof body: {error}"))?;
-    if !proof.body.agent_key.verify(&message, &proof.signature) {
-        return Err("DPoP proof signature is invalid".to_string());
-    }
-    match nonce_store.check_and_insert(&proof.body.nonce, expected_binding_id) {
-        Ok(true) => Ok(()),
-        Ok(false) => Err("DPoP proof nonce was already used".to_string()),
-        Err(error) => Err(format!("DPoP nonce verification failed: {error}")),
-    }
-}
-
-fn validate_sender_constraint_runtime(
-    sender_constraint: Option<&ChioSenderConstraintClaims>,
-    headers: &HeaderMap,
-    expected_binding_id: Option<&str>,
-    expected_target: &str,
-    expected_method: &str,
-    nonce_store: &DpopNonceStore,
-    config: &DpopConfig,
-) -> Result<(), String> {
-    let Some(sender_constraint) = sender_constraint else {
-        return Ok(());
-    };
-    if let Some(sender_key) = sender_constraint.chio_sender_key.as_deref() {
-        let binding_id = expected_binding_id.ok_or_else(|| {
-            "sender-constrained token is missing the binding identifier".to_string()
-        })?;
-        let proof = headers
-            .get(DPOP_HEADER)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "missing DPoP proof header".to_string())
-            .and_then(decode_sender_dpop_proof)?;
-        let sender_key = PublicKey::from_hex(sender_key)
-            .map_err(|error| format!("token cnf.chioSenderKey is invalid: {error}"))?;
-        verify_sender_dpop_proof(
-            &proof,
-            binding_id,
-            expected_target,
-            expected_method,
-            &sender_key,
-            nonce_store,
-            config,
-        )?;
-    }
-    if let Some(expected_thumbprint) = sender_constraint.mtls_thumbprint_sha256.as_deref() {
-        let actual_thumbprint = headers
-            .get(CHIO_MTLS_THUMBPRINT_HEADER)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "missing mTLS thumbprint header".to_string())?;
-        if actual_thumbprint != expected_thumbprint {
-            return Err("mTLS thumbprint did not match the sender-bound token".to_string());
-        }
-    }
-    if let Some(expected_attestation) = sender_constraint.chio_attestation_sha256.as_deref() {
-        let actual_attestation = headers
-            .get(CHIO_RUNTIME_ATTESTATION_HEADER)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "missing runtime attestation binding header".to_string())?;
-        if actual_attestation != expected_attestation {
-            return Err(
-                "runtime attestation binding did not match the sender-bound token".to_string(),
-            );
-        }
-    }
-    Ok(())
 }

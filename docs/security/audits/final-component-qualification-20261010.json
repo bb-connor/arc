@@ -1,0 +1,1081 @@
+{
+  "schema": "chio.final-component-qualification.v1",
+  "observed_at": "2026-10-10T05:57:32.308119+00:00",
+  "source_stage": "52470c85160d96c8906824fc94d0657569744b7c",
+  "components": {
+    "behavioral_custody": {
+      "packet": {
+        "path": "/tmp/pr1160-behavioral-custody-20261010/source-and-evidence-manifest.json",
+        "sha256": "625e41411246cbeaa3683209cc3fe5bc8ddb8c67242338a9e0cdb80b3911ac60"
+      },
+      "integration": {
+        "path": "/tmp/pr1160-behavioral-custody-20261010/integration.json",
+        "sha256": "aa28b4a9e59bb0e8dcd572bdfed4123e2c6cbdc182e04c755f0508121cc31401"
+      },
+      "integration_commit": "b1093829bf0e9a198e6b457a483bd725bd0df850",
+      "scope": "3 PASS, 6 genuine Original failures; preservation 10 PASS; repaired 19 PASS; strict all-target Clippy and static gates PASS. Eight exact files and one additive router enrollment composition.",
+      "final_candidate_qualified": false
+    },
+    "authority_composition": {
+      "packet": {
+        "path": "/tmp/pr1160-composition-controls-20261010/qualification.json",
+        "sha256": "91e38d3415dd0ce4ef602a7a4a28b8f7cd3c2d8c1c466cae8199b1b3bfb20405"
+      },
+      "integration": {
+        "path": "/tmp/pr1160-composition-controls-20261010/integration.json",
+        "sha256": "1f7e81cbb8dbf75a70092b868c525f4a45d9a40a823911b2a550b67a70864988"
+      },
+      "integration_commit": "eac80ffde3e1bcfe0fd9703cff6cef80f12bca0a",
+      "scope": "All 40 owning controls PASS at eight threads; strict all-target Clippy and static gates PASS. All seven files exact. Earlier failed campaigns remain failed.",
+      "final_candidate_qualified": false
+    },
+    "detached_lock_parity": {
+      "packet": {
+        "path": "/tmp/pr1160-detached-locks-20261010/immutable-handoff.json",
+        "sha256": "5466b36eb92ed98add7e72411fd89696fe16489bce15168d2a70403629564b22"
+      },
+      "integration": {
+        "path": "/tmp/pr1160-detached-locks-20261010/integration.json",
+        "sha256": "5fb1fe718f545c010fc93ca29dfcbb6e2c1df3215b479931678b5a163600c93e"
+      },
+      "integration_commit": "a0b57da046394e8121b52edd6d3a083655873c66",
+      "scope": "Five genuine locked-resolution failures repaired with 23 added lines across five active locks. All existing versions, sources and checksums preserved. Full fork checker PASS on six active graphs and authenticated source reconstruction. Three inactive example locks unchanged.",
+      "final_candidate_qualified": false
+    }
+  },
+  "independent_component_reviews": [
+    {
+      "path": "/tmp/pr1160-behavioral-custody-20261010/independent-review.md",
+      "sha256": "2a928e1032bc7426ca47519b8636430d6c2aba98db96d904b31dcdaa30a64921"
+    },
+    {
+      "path": "/tmp/pr1160-composition-controls-20261010/independent-review-v4-addendum.md",
+      "sha256": "9a1918a732bd62220c8adaf3591215fc839fab182f29ab1d8011f24b15156f83"
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/formal-anchor-source-review.md",
+      "sha256": "1bdaab08e22462dcffbb4d39435e849939b3dbf9c740e4cf41c03729a69fbc10"
+    }
+  ],
+  "preflight_records": {
+    "supply-preflight-f762e30f44": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-preflight-f762e30f44/summary.json",
+        "sha256": "831f971764d8347f5c3a9275e959f7ebfc85da99e77ffc47681f6f5fca64c495"
+      },
+      "result": {
+        "commands": [
+          {
+            "argv": [
+              "cargo",
+              "vet",
+              "--locked"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-preflight-f762e30f44/001-vet",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "vet",
+            "log_sha256": "d982dd4856191fc841563773161909836622aa495d51bb05baf7730483e8283c",
+            "seconds": 4.045577947050333,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:16:19.278599+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 600,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "vet",
+              "--locked"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "deny",
+              "check",
+              "advisories",
+              "licenses",
+              "sources",
+              "bans"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-preflight-f762e30f44/002-deny",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "deny",
+            "log_sha256": "f1a0fca39d4280363937aabd77783990ea6480bd9ca257816de3b68fc8efa845",
+            "seconds": 5.487919944804162,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:16:24.257953+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 600,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "deny",
+              "check",
+              "advisories",
+              "licenses",
+              "sources",
+              "bans"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/check-external-wildcard-deps.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-preflight-f762e30f44/003-wildcards",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "wildcards",
+            "log_sha256": "33fc6408caec5ce150f8bf3327dc9518a979461f99b6c8a290f84531f312ce65",
+            "seconds": 2.3303470690734684,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:16:30.675160+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 600,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/check-external-wildcard-deps.py"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/check-cargo-deny-duplicate-baseline.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-preflight-f762e30f44/004-duplicates",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "duplicates",
+            "log_sha256": "6535fb4fc6213d4dd4320f798dd7b219c458a43a13235c6b6196344df396f491",
+            "seconds": 2.227476474829018,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:16:33.910887+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 600,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/check-cargo-deny-duplicate-baseline.py"
+            ]
+          }
+        ],
+        "errors": [],
+        "scope": "Cargo Vet graph, all four Cargo Deny checks and lockfile structural checks; separate fork-source test workflow not renewed here.",
+        "source_stable": true
+      }
+    },
+    "feature-preflight-f762e30f44": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/feature-preflight-f762e30f44/summary.json",
+        "sha256": "3384532a8b25ba93fdfd19a5e98c7b863555d5d829138eeb6e8b0d32475df6d8"
+      },
+      "result": {
+        "commands": [
+          {
+            "argv": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/feature-preflight-f762e30f44/001-kernel-no-market-strict",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "kernel-no-market-strict",
+            "log_sha256": "a76591026d62f3608e12c8945083b9264553ea835974be1f93356af5c72337f2",
+            "seconds": 101.86687570530921,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:19:05.225166+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "--",
+              "-D",
+              "warnings"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-cli",
+              "--features",
+              "iroh",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/feature-preflight-f762e30f44/002-cli-iroh-strict",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "cli-iroh-strict",
+            "log_sha256": "61aafc0fa110008ea965b42924ef25e3b523ad9ff691fa65bc31d4cef5999749",
+            "seconds": 273.38384417723864,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:20:47.955555+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-cli",
+              "--features",
+              "iroh",
+              "--",
+              "-D",
+              "warnings"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "xtask",
+              "check",
+              "formal-mirrors"
+            ],
+            "command_ok": false,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/feature-preflight-f762e30f44/003-formal-mirrors-metadata",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 1,
+            "inputs_stable": true,
+            "label": "formal-mirrors-metadata",
+            "log_sha256": "32acf9a6dcae8a2df7f0506c2c96f385e506af4cd09de0077a1ca534ddead6be",
+            "seconds": 6.64530539419502,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:25:22.192042+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "check",
+              "formal-mirrors"
+            ]
+          }
+        ],
+        "errors": [
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-feature-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 221, in command\n    raise ValueError('command failed or source changed: ' + label)\nValueError: command failed or source changed: formal-mirrors-metadata\n",
+            "gate": "formal-mirrors-metadata"
+          }
+        ],
+        "scope": "Two distinct hosted feature compilation/lint modes and formal source-mirror metadata check. No proof tool execution; not feature runtime or native-host acceptance.",
+        "source_stable": true
+      }
+    },
+    "supply-fork-preflight-f762e30f44": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/summary.json",
+        "sha256": "0e452062876cce7ffccb1484b40781d60c1f8b94b4090c4d69adcec6e0a98973"
+      },
+      "result": {
+        "commands": [
+          {
+            "argv": [
+              "python3",
+              "scripts/check-aws-lc-fork.py"
+            ],
+            "command_ok": false,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/001-check-aws-lc-fork",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 1,
+            "inputs_stable": true,
+            "label": "check-aws-lc-fork",
+            "log_sha256": "1c99ed6bdd8e8467d805b49b8855608246d516f011648fbc0c8f198ead885fbc",
+            "seconds": 4.65040726121515,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:31:50.698349+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/check-aws-lc-fork.py"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/check-aws-lc-lints.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/002-check-aws-lc-lints",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "check-aws-lc-lints",
+            "log_sha256": "f7cbf6ab0a53283ef237de377efb602e095ddb6b5f6757dedffab6874ed65d43",
+            "seconds": 98.99459234857932,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:31:56.250466+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/check-aws-lc-lints.py"
+            ]
+          }
+        ],
+        "errors": [
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-supply-fork-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 166, in command\n    folder.mkdir(exist_ok=False)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py\", line 722, in mkdir\n    os.mkdir(self, mode)\n    ~~~~~~~~^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/001-tests/check-supply-chain-workflows.test'\n",
+            "gate": "tests/check-supply-chain-workflows.test"
+          },
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-supply-fork-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 166, in command\n    folder.mkdir(exist_ok=False)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py\", line 722, in mkdir\n    os.mkdir(self, mode)\n    ~~~~~~~~^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/001-tests/render-vcpkg-release.test'\n",
+            "gate": "tests/render-vcpkg-release.test"
+          },
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-supply-fork-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 166, in command\n    folder.mkdir(exist_ok=False)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py\", line 722, in mkdir\n    os.mkdir(self, mode)\n    ~~~~~~~~^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/001-tests/check-aws-lc-fork.test'\n",
+            "gate": "tests/check-aws-lc-fork.test"
+          },
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-supply-fork-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 166, in command\n    folder.mkdir(exist_ok=False)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py\", line 722, in mkdir\n    os.mkdir(self, mode)\n    ~~~~~~~~^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-fork-preflight-f762e30f44/001-tests/check-aws-lc-lints.test'\n",
+            "gate": "tests/check-aws-lc-lints.test"
+          },
+          {
+            "exception": "Traceback (most recent call last):\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run-supply-fork-preflight.py\", line 9, in <module>\n    try:c.command(label,cmd)\n        ~~~~~~~~~^^^^^^^^^^^\n  File \"/tmp/pr1160-final-review-20261009/final-candidate-v2/run.py\", line 221, in command\n    raise ValueError('command failed or source changed: ' + label)\nValueError: command failed or source changed: check-aws-lc-fork\n",
+            "gate": "check-aws-lc-fork"
+          }
+        ],
+        "scope": "Supply-chain workflow regressions, authenticated upstream/fork source reconstruction, deployment resolution and lint policy. Does not renew Rust DES/AES/FIPS runtime parity tests or hosted qualification.",
+        "source_stable": true
+      }
+    },
+    "supply-regressions-parity-f762e30f44": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/summary.json",
+        "sha256": "f0aac98cbfb07b95fae5e98ac1e024b6c6254c0186a088379efa9f1edfd788dd"
+      },
+      "result": {
+        "commands": [
+          {
+            "argv": [
+              "python3",
+              "scripts/tests/check-supply-chain-workflows.test.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/001-check-supply-chain-workflows.test",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "check-supply-chain-workflows.test",
+            "log_sha256": "4a160235c0add54f7a5997815d0e01a072210439de4899c702c94dd3cd814662",
+            "seconds": 2.179748137947172,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:02.806186+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/tests/check-supply-chain-workflows.test.py"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/tests/render-vcpkg-release.test.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/002-render-vcpkg-release.test",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "render-vcpkg-release.test",
+            "log_sha256": "edb4e2159c923ea45a32656078835cdf531c3d7b414c670dd786978875cb0678",
+            "seconds": 2.145888054743409,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:05.903438+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/tests/render-vcpkg-release.test.py"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/tests/check-aws-lc-fork.test.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/003-check-aws-lc-fork.test",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "check-aws-lc-fork.test",
+            "log_sha256": "e09602f41bae662f0e3525a5ca6a07413dfe382970b81594d08d02d25b3db3b4",
+            "seconds": 2.3729051938280463,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:08.964528+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/tests/check-aws-lc-fork.test.py"
+            ]
+          },
+          {
+            "argv": [
+              "python3",
+              "scripts/tests/check-aws-lc-lints.test.py"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/004-check-aws-lc-lints.test",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "check-aws-lc-lints.test",
+            "log_sha256": "37c3071c284c6a6754fb0854930a00193a763dd131d53c46a1c1bea318a07c6a",
+            "seconds": 3.55677352193743,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:12.345101+00:00",
+            "test_summaries": [],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "python3",
+              "scripts/tests/check-aws-lc-lints.test.py"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--features",
+              "legacy-des",
+              "--test",
+              "des_parity_regression"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/005-des-parity",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "des-parity",
+            "log_sha256": "bf67c4d7b4322e8e19aaf8a987e1fa4d17098088f4f88bc95d5b78f8dc520b28",
+            "seconds": 10.52178170485422,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:16.807608+00:00",
+            "test_summaries": [
+              "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+            ],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--features",
+              "legacy-des",
+              "--test",
+              "des_parity_regression"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--lib",
+              "cipher::key::tests::aes_schedules_initialize_unused_words",
+              "--",
+              "--exact"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/006-aes-schedules",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "aes-schedules",
+            "log_sha256": "36266f0b4132d6e860a7e6bd20e290e36f4ba89137beb240942de2848db868da",
+            "seconds": 37.05074918922037,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:34:28.243708+00:00",
+            "test_summaries": [
+              "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.00s"
+            ],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--lib",
+              "cipher::key::tests::aes_schedules_initialize_unused_words",
+              "--",
+              "--exact"
+            ]
+          },
+          {
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--lib",
+              "--no-default-features",
+              "--features",
+              "alloc,fips,ring-io,ring-sig-verify",
+              "rsa::key::fips_validation_tests::non_rsa_key_is_rejected_without_panicking",
+              "--",
+              "--exact"
+            ],
+            "command_ok": true,
+            "cwd": "/home/connor/lanes/pr1160-landing-final",
+            "directory": "/tmp/pr1160-final-review-20261009/final-candidate-v2/supply-regressions-parity-f762e30f44/007-fips-rejection",
+            "environment": {
+              "CARGO_BUILD_JOBS": "2",
+              "CARGO_INCREMENTAL": "0",
+              "CARGO_PROFILE_DEV_DEBUG": "0",
+              "CARGO_PROFILE_TEST_DEBUG": "0",
+              "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+              "CARGO_TERM_COLOR": "never",
+              "CHIO_CAPACITY_DIVISOR": "1",
+              "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-landing-final",
+              "RUST_TEST_THREADS": "8"
+            },
+            "exit": 0,
+            "inputs_stable": true,
+            "label": "fips-rejection",
+            "log_sha256": "06f7cd0eae662d574ef59dc5efb18daa32eb08fb5adea35d8c758856502d356d",
+            "seconds": 49.26519200997427,
+            "source_stable": true,
+            "started_at": "2026-10-10T05:35:06.210385+00:00",
+            "test_summaries": [
+              "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 491 filtered out; finished in 0.04s"
+            ],
+            "timed_out": false,
+            "timeout_seconds": 1200,
+            "wrapped_argv": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "test",
+              "--locked",
+              "--manifest-path",
+              "third_party/aws-lc-rs-chio/Cargo.toml",
+              "--lib",
+              "--no-default-features",
+              "--features",
+              "alloc,fips,ring-io,ring-sig-verify",
+              "rsa::key::fips_validation_tests::non_rsa_key_is_rejected_without_panicking",
+              "--",
+              "--exact"
+            ]
+          }
+        ],
+        "errors": [],
+        "scope": "Four supply-chain checker fixture regressions and three AWS-LC fork runtime parity controls. Prior harness path errors and stale fuzz lock failure retained separately. No proof execution or hosted qualification.",
+        "source_stable": true
+      }
+    },
+    "formal-anchor-renewal-f762e30f44": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/formal-anchor-renewal-f762e30f44/summary.json",
+        "sha256": "1185e70620aa147f5fb5c96bcf1ca4aab1cbe9a4a90dc234e3a9a4ee6e9d911a"
+      },
+      "result": {
+        "status": "terminal_pass",
+        "source_parent": "f762e30f44600156d40f7ef651b31840c50741d6",
+        "review": {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/formal-anchor-source-review.md",
+          "sha256": "1bdaab08e22462dcffbb4d39435e849939b3dbf9c740e4cf41c03729a69fbc10"
+        },
+        "changes": {
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs": {
+            "symbols": [
+              {
+                "symbol": "SqliteAdmissionOperationStore::join_native_command",
+                "before": "5491fb3efb282dd410646b6b1d908b0c4d41bc50012c3d44ac657613f96a713d",
+                "after": "9aebc3b120fa4b4482cad45ca9e8799181c2ed8a87f296e842874820af045aaf"
+              }
+            ],
+            "normalized_before": "436949083135ddc4cce020ba7ebd58e2816cb5058da7f0987dfddfb73962864c",
+            "normalized_after": "f0cf1775239ab261a66c276cef02aca8bf005863eacce233be1e6da5f74f7576"
+          },
+          "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs": {
+            "symbols": [
+              {
+                "symbol": "load_scoped_flow_snapshot",
+                "before": "ef17d29d00a058ae7739989aea104dfbefe6dc17467a4aa1d33ce2d10d830269",
+                "after": "1c1601faf83673f2c73726f4ac5577b694a7187259515d8df32595bafe970a98"
+              }
+            ],
+            "normalized_before": "a6d0ce43833e55da82b1fd764c0f1497ec38de56028365d663b7348525ffe3cf",
+            "normalized_after": "dc2c290e5b5a449d011451f7608d9481e1ddd83c5a468da76042d5ac1d607fd3"
+          },
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs": {
+            "symbols": [
+              {
+                "symbol": "SqliteAdmissionOperationStore::join_security_participant_nonce_preflight",
+                "before": "d7e36ceaed38d3f57d531923cb5c8627058647fa9b371fb2c9429a9564d09778",
+                "after": "b7152f68358dea99543d147f10a33be3fe8b9f2294c9fd8821b405d818713bbe"
+              }
+            ],
+            "normalized_before": "9dff4f514efd359b580a07786322adc0734b49c66bed4af7c5fb95a5db4b72ff",
+            "normalized_after": "ff2c8e708cc0958954575e074e37df1acf168885a31a19d2f4d5d8f61cbeb780"
+          },
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": {
+            "symbols": [
+              {
+                "symbol": "plan",
+                "before": "44c5a7d974a5326b95bf8caa9649ab368f7afb22c6e57c3c144ffb44f42b914e",
+                "after": "cca31589b6f60513b66dcef957e9573a9856ef8137ed71e464399d38fd5dcb3e"
+              }
+            ],
+            "normalized_before": "c35502a26a5813d8ee8bed80af293e3dab98862c3cc0ce0610fa0285edab9d29",
+            "normalized_after": "fd9ce2a4086316926b4ba31ad74051f3394c3a9eb8e1a0206cff9754ea5c50e9"
+          },
+          "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": {
+            "symbols": [
+              {
+                "symbol": "validate_dead",
+                "before": "5c87ecbd3045d1ff8bbb74d22f3dfd5bf333c317d0cdba5dd18b24dc48c26900",
+                "after": "88442428bc37842a46f0a1b2508cad2006d12aa06d0d0581ccd5c7af38a87e14"
+              },
+              {
+                "symbol": "compact_native_rows",
+                "before": "1001432ac89349c0f1c47803e6db6a2a5910e102e03b3ffe03e53268bd400442",
+                "after": "997f43b100beab0efeb6f4be6aff7976e7612fba9d0c460912ba0a55709646c1"
+              }
+            ],
+            "normalized_before": "137b61f345f9af50a0a25fedbc245a88e019aef1764ae4735ae92d42b6e83ca7",
+            "normalized_after": "32f7e6d14ec655798b053925646415f4740db40d3684f208ad2cedef2345b0a7"
+          }
+        },
+        "source_files": {
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs": "636dcda489720f36f1009c07e0b784d3729a8c30ce517dd0466b73e81fdb393a",
+          "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs": "726b03d3ec2487213f952a862e53b21340fd4b5a8dfbe7f2bd740ec50f619314",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs": "1efd89cb2300bafaa7fc06bc77f0799789ba63a37ebc143c5a6ab4595262c0d8",
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": "a691e5f20b00d7b4e23acbeb81590bac9db989aa22697014dadc2a9c5e1d1d1c",
+          "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": "2c881d2bb54c7c37b45621c75297ac51a3ab6127f316442e830730053dbf9412"
+        },
+        "model_sha256": "ea1db22689fa87e6681e882a245e5ab9f963f48e39ec74ca18ed1012660f7a28",
+        "manifest_before_sha256": "3fa6731fb3a45b82b87742a8940956271238a34b596e26ce39f903253eea9d1b",
+        "manifest_after_sha256": "63f5cfaca61a85f1562215aac553bd136dd12b9020cd184f4e2fa9018e69fa50",
+        "commands": [
+          {
+            "command": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "check",
+              "formal-mirrors",
+              "--bless"
+            ],
+            "exit_code": 0,
+            "seconds": 4.583307161927223,
+            "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/formal-anchor-renewal-f762e30f44/reviewed-renewal.log",
+            "sha256": "a99ff6b8ab3bc3e0acaf97a684e7b5d0b4008e68e2d5da537e354e8ec53448e7"
+          },
+          {
+            "command": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "check",
+              "formal-mirrors"
+            ],
+            "exit_code": 0,
+            "seconds": 4.449486234225333,
+            "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/formal-anchor-renewal-f762e30f44/reviewed-check.log",
+            "sha256": "32660d7b426aecb3cd830bd98d4f3eb570d68858978cc7f4fd58ec84b2e70211"
+          }
+        ],
+        "proof_execution": false,
+        "scope": "Reviewed abstraction-anchor fingerprints only. No refinement proof, solver acceptance, changed model or cold-state acceptance."
+      }
+    },
+    "coverage-metadata-b1093829bf": {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/coverage-metadata-b1093829bf/summary.json",
+        "sha256": "34940f74406571a086ff62f4c32b95fce490c6085e8f9064c0ae6d161e1b22cf"
+      },
+      "result": {
+        "source_head": "b1093829bf0e9a198e6b457a483bd725bd0df850",
+        "status": "terminal_pass",
+        "commands": [
+          {
+            "command": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "gen",
+              "proof-coverage",
+              "--check"
+            ],
+            "exit": 1,
+            "seconds": 4.811698020901531,
+            "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/coverage-metadata-b1093829bf/original-check.log",
+            "sha256": "42fc898d984c1ebb673d7e75da7e9707d9bb0c36f4e379b650c8083b70f8540d"
+          },
+          {
+            "command": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "gen",
+              "proof-coverage"
+            ],
+            "exit": 0,
+            "seconds": 4.757517955265939,
+            "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/coverage-metadata-b1093829bf/generate.log",
+            "sha256": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+          },
+          {
+            "command": [
+              "swarm",
+              "build",
+              "--class",
+              "integrator",
+              "--",
+              "cargo",
+              "xtask",
+              "gen",
+              "proof-coverage",
+              "--check"
+            ],
+            "exit": 0,
+            "seconds": 4.718612044118345,
+            "log": "/tmp/pr1160-final-review-20261009/final-candidate-v2/coverage-metadata-b1093829bf/repaired-check.log",
+            "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+          }
+        ],
+        "changed_tracked_paths": [
+          "docs/formal/COVERAGE.md"
+        ],
+        "before_sha256": "80d604782152b41f3845d7fb2f92ec7f12f39e7910c27a83db3407ff3afdc52c",
+        "after_sha256": "5fd22cd0917ae819afb816adcc4c614488eadb0d72bcd76b5e36b874c9bc55f4",
+        "coverage_json_sha256": "cf66fb04a8bac276970195f98bbf4a38467d957b8c720491cddcac33acc0276d",
+        "proof_execution": false,
+        "scope": "Generated source-trace inventory and metadata parity only; existing proof and cold-state residuals remain open."
+      }
+    }
+  },
+  "formal_boundary": "Only six reviewed symbol hashes and five rollups changed at 4cdc1bd033. All 255 mirror entries match. Coverage renewal changes only eight SHA256 values and passes 65 rows/179 artifacts. No model, assumption, solver execution or proof qualification changed.",
+  "clock_boundary": "One existing native factory moves from historical debt into the existing source-pinned composition contract. Immutable census and allowance 474 unchanged; observed 453 = 412 debt + 41 composition. Eleven checker tests pass; changed-provider and extra-observation controls refuse. Earlier rejected relocation remains failed.",
+  "preserved_failures": [
+    "Original custody failures and earlier rejected clock registration",
+    "Original 0c composed campaign and intermediate v2/v3 composition failures",
+    "Five Original locked-resolution failures and intermediate Docker checker failure",
+    "Preflight harness label errors are unrun commands, not product RED",
+    "Stale formal and coverage metadata checks remain failed historical evidence"
+  ],
+  "requirement_count": 1931,
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "remaining": [
+    "Freeze the candidate and execute whole control-plane library, selected store/kernel/CLI controls, strict four-owner lint and static gates.",
+    "Independent final delta review, accurate PR thread dispositions, four protected exact-SHA hosted checks and normal protected merge.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED; SEC-1160-COLDSTATE remains OPEN P1 gating G5. No proof campaign or preview/release claim.",
+    "Inherited OID4VP custody, refresh cost and trusted/native/product evidence retain their existing follow-up boundaries."
+  ]
+}

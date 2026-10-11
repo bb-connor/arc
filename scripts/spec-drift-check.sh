@@ -8,12 +8,14 @@ cd "$(dirname "$0")/.."
 
 git diff --exit-code \
   crates/core/chio-core-types/src/_generated \
+  crates/core/chio-errors/src/_generated \
   sdks/python/chio-sdk-python/src/chio_sdk/_generated \
   sdks/typescript/packages/conformance/src/_generated \
   sdks/go/chio-go-http/types.go
 
 untracked=$(git ls-files --others --exclude-standard -- \
   crates/core/chio-core-types/src/_generated \
+  crates/core/chio-errors/src/_generated \
   sdks/python/chio-sdk-python/src/chio_sdk/_generated \
   sdks/typescript/packages/conformance/src/_generated \
   sdks/go/chio-go-http)

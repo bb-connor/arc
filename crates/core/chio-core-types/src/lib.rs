@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 //! Core Chio protocol types: capabilities, receipts, crypto primitives, and
 //! canonical JSON. This crate is `no_std + alloc` compatible; heavier domain
 //! crates (`chio-core`, `chio-appraisal`, etc.) re-export these types with
@@ -25,6 +40,7 @@ extern crate alloc;
 pub mod canonical;
 pub mod capability;
 pub mod crypto;
+pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
 pub mod error;
@@ -44,11 +60,15 @@ pub mod pq;
 pub mod provider_attempt;
 pub mod receipt;
 pub mod runtime_attestation;
+pub mod runtime_replay;
+pub mod runtime_schema;
 mod schema_binding;
+pub mod security_event;
 pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
+mod wire_text;
 
 #[cfg(test)]
 #[path = "economic_continuity_anchor_tests.rs"]
@@ -63,25 +83,28 @@ pub use canonical::{
 };
 pub use crypto::{
     sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    SigningOutcome,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
+pub use declassification::{SignedDeclassificationGrant, DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 pub use economic_continuity::{
     CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 pub use error::{Error, Result};
-pub use hashing::{sha256, Hash};
+pub use hashing::{sha256, Hash, Sha256State};
 pub use loaded_weights::{
     loaded_weights_hash_of, loaded_weights_hash_of_chunks, LoadedWeights, LoadedWeightsUnavailable,
 };
 pub use manifest::{
-    PricingModel, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody, ToolPricing,
+    DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
 };
-pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
+pub use merkle::{leaf_hash, node_hash, MerkleConsistencyProof, MerkleProof, MerkleTree};
 pub use merkle_steps::{inclusion_step, InclusionStep};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
 pub use oracle::{OracleConversionEvidence, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
@@ -102,6 +125,7 @@ pub use runtime_attestation::{
     ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
     GOOGLE_CONFIDENTIAL_VM_VERIFIER_ADAPTER,
 };
+pub use security_event::{SignedSecurityEvent, SECURITY_EVENT_SIGNATURE_DOMAIN};
 pub use session::{
     ChioIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,
     CompletionResult, CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,

@@ -73,11 +73,9 @@ fn configured_generic_namespace_ownership(
 
 pub(crate) fn build_signed_generic_namespace(
     config: &TrustServiceConfig,
+    clock: &Arc<dyn Clock>,
 ) -> Result<SignedGenericNamespace, CliError> {
-    let signer_keypair = load_behavioral_feed_signing_keypair(
-        config.authority_seed_path.as_deref(),
-        config.authority_db_path.as_deref(),
-    )?;
+    let signer_keypair = resolve_public_registry_signing_key(config, clock)?;
     let registered_at = now_unix_secs()?;
     let ownership =
         configured_generic_namespace_ownership(config, signer_keypair.public_key(), registered_at)?;
@@ -341,12 +339,11 @@ fn build_signed_generic_listing_from_liability_provider(
 
 pub(crate) fn build_public_generic_listing_report(
     config: &TrustServiceConfig,
+    receipt_store: Option<&SqliteReceiptStore>,
     query: &GenericListingQuery,
+    clock: &Arc<dyn Clock>,
 ) -> Result<GenericListingReport, CliError> {
-    let signer_keypair = load_behavioral_feed_signing_keypair(
-        config.authority_seed_path.as_deref(),
-        config.authority_db_path.as_deref(),
-    )?;
+    let signer_keypair = resolve_public_registry_signing_key(config, clock)?;
     let generated_at = now_unix_secs()?;
     let namespace =
         configured_generic_namespace_ownership(config, signer_keypair.public_key(), generated_at)?;
@@ -361,7 +358,7 @@ pub(crate) fn build_public_generic_listing_report(
             &metadata.publisher,
             metadata.expires_at,
             &crate::certify::CertificationPublicSearchQuery::default(),
-        );
+        )?;
         for result in public.results {
             listings.push(build_signed_generic_listing_from_certification_entry(
                 &result.entry,
@@ -373,19 +370,19 @@ pub(crate) fn build_public_generic_listing_report(
     }
 
     listings.push(build_signed_generic_listing_from_public_issuer(
-        &build_public_issuer_discovery(config)?,
+        &build_public_issuer_discovery(config, clock)?,
         &namespace,
         &signer_keypair,
     )?);
     listings.push(build_signed_generic_listing_from_public_verifier(
-        &build_public_verifier_discovery(config)?,
+        &build_public_verifier_discovery(config, clock)?,
         &namespace,
         &signer_keypair,
     )?);
 
-    if let Some(receipt_db_path) = config.receipt_db_path.as_deref() {
+    if let Some(receipt_store) = receipt_store {
         let provider_report =
-            list_liability_providers(receipt_db_path, &LiabilityProviderListQuery::default())?;
+            list_liability_providers(receipt_store, &LiabilityProviderListQuery::default())?;
         for row in &provider_report.providers {
             listings.push(build_signed_generic_listing_from_liability_provider(
                 row,
@@ -437,28 +434,40 @@ pub(crate) fn build_public_generic_listing_report(
         .collect::<Vec<_>>();
 
     let summary = GenericListingSummary {
-        matching_listings: filtered.len() as u64,
-        returned_listings: filtered.len().min(normalized_query.limit_or_default()) as u64,
-        active_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Active)
-            .count() as u64,
-        suspended_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Suspended)
-            .count() as u64,
-        superseded_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Superseded)
-            .count() as u64,
-        revoked_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Revoked)
-            .count() as u64,
-        retired_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Retired)
-            .count() as u64,
+        matching_listings: crate::integer::count(filtered.len()),
+        returned_listings: crate::integer::count(
+            filtered.len().min(normalized_query.limit_or_default()),
+        ),
+        active_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Active)
+                .count(),
+        ),
+        suspended_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Suspended)
+                .count(),
+        ),
+        superseded_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Superseded)
+                .count(),
+        ),
+        revoked_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Revoked)
+                .count(),
+        ),
+        retired_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Retired)
+                .count(),
+        ),
     };
 
     Ok(GenericListingReport {

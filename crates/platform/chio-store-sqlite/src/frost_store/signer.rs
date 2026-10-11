@@ -140,6 +140,7 @@ impl SqliteFrostStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<FrostSignerSessionRecord, FrostStoreError> {
+        self.verify_live_ceremony(request.ceremony_id, fence)?;
         validate_time(trusted_now_unix_ms)?;
         let validated = validate_request(request)?;
         if let Some(mut stored) = self.load_signer_by_slot(
@@ -269,6 +270,7 @@ impl SqliteFrostStore {
                 "another signer session claimed the authorization slot",
             ));
         }
+        super::ceremony::require_completed_ceremony(&transaction, &stored.ceremony_id)?;
         insert_signer(&transaction, &stored)?;
         append_signer_commit(&transaction, self, &stored, "frost.signer.prepare", fence)?;
         self.commit_write(transaction)?;
@@ -501,6 +503,7 @@ impl SqliteFrostStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<StoredSigner, FrostStoreError> {
+        self.verify_live_ceremony(request.ceremony_id, fence)?;
         validate_time(trusted_now_unix_ms)?;
         let validated = validate_request(request)?;
         let mut stored = self
@@ -563,8 +566,7 @@ impl SqliteFrostStore {
             }
             FrostAuthorizationSlotState::Burned => {
                 let bound: FrostAuthorizationSlotCheckpointV1 =
-                    serde_json::from_slice(&stored.bound_checkpoint_json)
-                        .map_err(|error| invalid(error.to_string()))?;
+                    crate::frost_store::decode_record(&stored.bound_checkpoint_json)?;
                 verify_burned_frost_authorization_slot(
                     &bound,
                     &anchored,
@@ -644,6 +646,17 @@ impl SqliteFrostStore {
         self.load_completed_key_package(request.ceremony_id, custody, fence)
     }
 
+    fn verify_live_ceremony(
+        &self,
+        id: &str,
+        fence: &StoreMutationFence,
+    ) -> Result<(), FrostStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection, Some(fence))?;
+        super::ceremony::require_completed_ceremony(&transaction, id)?;
+        transaction.commit().map_err(super::sqlite_error)
+    }
+
     fn load_signer_by_slot(
         &self,
         slot_id: &str,
@@ -667,6 +680,12 @@ impl SqliteFrostStore {
     ) -> Result<(), FrostStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, fence)?;
+        if matches!(
+            stored.state,
+            FrostSignerSessionState::CommitmentPublished | FrostSignerSessionState::ShareReady
+        ) {
+            super::ceremony::require_completed_ceremony(&transaction, &stored.ceremony_id)?;
+        }
         update_signer(&transaction, stored, previous_state, previous_version)?;
         append_signer_commit(&transaction, self, stored, mutation_kind, fence)?;
         self.commit_write(transaction)?;
@@ -691,8 +710,7 @@ impl SqliteFrostStore {
             ));
         }
         let bound: FrostAuthorizationSlotCheckpointV1 =
-            serde_json::from_slice(&stored.bound_checkpoint_json)
-                .map_err(|error| invalid(error.to_string()))?;
+            crate::frost_store::decode_record(&stored.bound_checkpoint_json)?;
         let burn = verify_frost_authorization_slot_burn(
             &bound,
             request.artifact_trust,

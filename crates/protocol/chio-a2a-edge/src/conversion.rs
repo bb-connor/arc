@@ -1,5 +1,5 @@
 // Message/argument conversion helpers and Chio metadata envelope builders
-// shared across the kernel and compatibility surfaces.
+// for kernel-mediated requests.
 
 /// Extract validated tool arguments from A2A message parts.
 fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdgeError> {
@@ -30,13 +30,12 @@ fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdge
         }
     }
 
-    if let Some(data) = data_part {
-        Ok(data)
-    } else {
-        Ok(json!({
-            "message": text_parts.join("\n"),
-        }))
-    }
+    let arguments = data_part.unwrap_or_else(|| json!({"message": text_parts.join("\n")}));
+    let encoded =
+        serde_json::to_vec(&arguments).map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
+    chio_core::canonical::UntrustedJsonText::from_wire(&encoded, MAX_A2A_REQUEST_BYTES)?
+        .canonicalize()?;
+    Ok(arguments)
 }
 
 /// Convert a tool result to A2A message parts.
@@ -97,7 +96,22 @@ fn task_response_from_orchestrated(
             message: None,
             metadata: receipt_metadata,
         },
-        KernelVerdict::Deny | KernelVerdict::PendingApproval => TaskResponse {
+        KernelVerdict::PendingApproval => TaskResponse {
+            id: task_id,
+            status: TaskStatus::Working,
+            status_message: response.reason,
+            message: chio_cross_protocol::execution::pending_approval_result(
+                response.verdict,
+                response.output.as_ref(),
+            )
+            .map(|pending| A2aMessage {
+                role: "agent".to_string(),
+                parts: vec![A2aPart::Data { data: pending }],
+                metadata: None,
+            }),
+            metadata: receipt_metadata,
+        },
+        KernelVerdict::Deny => TaskResponse {
             id: task_id,
             status: TaskStatus::Failed,
             status_message: response.reason,
@@ -124,7 +138,6 @@ fn pending_task_metadata(authority_path: &str, message_stream: &str) -> Value {
             "capabilityId": Value::Null,
             "authorityPath": authority_path,
             "authoritative": true,
-            "compatibilityOnly": false,
             "claimEligible": true,
             "receiptBearing": false,
             "receiptPending": true,
@@ -148,7 +161,6 @@ fn cancelled_task_metadata(authority_path: &str, message_stream: &str) -> Value 
             "capabilityId": Value::Null,
             "authorityPath": authority_path,
             "authoritative": true,
-            "compatibilityOnly": false,
             "claimEligible": true,
             "receiptBearing": false,
             "runtimeLifecycle": runtime_lifecycle_metadata(RuntimeLifecycleSurface::A2aAuthoritative),
@@ -172,29 +184,6 @@ fn kernel_output_to_parts(output: Option<&ToolCallOutput>) -> Vec<A2aPart> {
             .collect(),
         None => vec![],
     }
-}
-
-#[cfg(any(test, feature = "compatibility-surface"))]
-fn passthrough_metadata(reason: Option<&str>) -> Value {
-    json!({
-        "chio": {
-            "receiptId": Value::Null,
-            "receipt": Value::Null,
-            "decision": "passthrough",
-            "capabilityId": Value::Null,
-            "authorityPath": "passthrough_compatibility",
-            "authoritative": false,
-            "compatibilityOnly": true,
-            "claimEligible": false,
-            "receiptBearing": false,
-            "runtimeLifecycle": runtime_lifecycle_metadata(RuntimeLifecycleSurface::A2aCompatibility),
-            "lifecycle": {
-                "messageSend": "blocking_terminal_task",
-                "messageStream": "unsupported"
-            },
-            "reason": reason,
-        }
-    })
 }
 
 fn annotate_authoritative_a2a_metadata(metadata: &mut Value, output: Option<&ToolCallOutput>) {

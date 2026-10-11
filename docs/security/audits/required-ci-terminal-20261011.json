@@ -1,0 +1,53 @@
+{
+  "job": 114341282958,
+  "head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "log": "/tmp/pr1160-ci-batch-20261010/974f-build-hosted.log",
+  "log_sha256": "a6b622b639e10915a317d76fc096f9233114780a201964837337d88a8e473f3f",
+  "structural_gates": 114,
+  "structural_passes": 113,
+  "structural_failures": [
+    [
+      1,
+      "python3 scripts/tests/msrv-cache-target.test.py "
+    ]
+  ],
+  "workspace_tests_executed": false,
+  "observed_utc": "2026-10-11T01:12:32.239252+00:00",
+  "schema": "chio.security.required-ci-terminal.v1",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:CI-MSRV-COMMAND-PIN"
+  ],
+  "required_checks": {
+    "Build, lint, test": {
+      "job": 114341282958,
+      "conclusion": "failure",
+      "reason": "Only stale MSRV command expectation among 114 structural gates"
+    },
+    "MSRV build and test": {
+      "job": 114341282995,
+      "conclusion": "failure",
+      "reason": "Same stale --no-fail-fast command expectation before compilation"
+    },
+    "cargo-vet": {
+      "job": 114341282952,
+      "conclusion": "success"
+    },
+    "cargo-deny": {
+      "job": 114341283025,
+      "conclusion": "success"
+    }
+  },
+  "private_repair": "5955d1cc6ac041bff00eaa34369659dbdc0ee80c",
+  "local_repair_evidence": {
+    "path": "docs/security/audits/required-ci-msrv-command-pin-20261011.json",
+    "sha256": "2fb8c344ca5112f07dd461f694ec862e652766c9f233a9ed2661d1c67e7b1c35"
+  },
+  "remaining_acceptance": [
+    "Finish and qualify all confirmed review repairs in the replacement batch.",
+    "Publish one replacement and obtain four required green checks on its exact head.",
+    "Classify remaining workflow results, answer reviews and obtain explicit merge go-ahead."
+  ],
+  "hosted_repaired": false,
+  "merged": false
+}

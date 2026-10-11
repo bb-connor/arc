@@ -35,12 +35,14 @@ pub use chio_core_types::runtime_attestation::AttestationVerifierFamily;
 
 mod appraisal;
 mod artifact_inventory;
+mod attestation_verification;
 mod descriptor;
 mod types;
 mod validate;
 
 pub use appraisal::*;
 pub use artifact_inventory::*;
+pub use attestation_verification::*;
 pub use descriptor::*;
 pub use types::*;
 

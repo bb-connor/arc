@@ -1,6 +1,4 @@
-use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::PublicKey;
 use chio_credentials::{
@@ -23,11 +21,9 @@ use serde::{Deserialize, Serialize};
 use crate::issuance::{self, LocalReputationInspection, ReputationScoringSource};
 use crate::{load_or_create_authority_keypair, policy::load_policy, trust_control, CliError};
 
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 /// Load the local authority public key from a seed file and return it as the
@@ -64,7 +60,12 @@ pub struct ReputationLocalCommand<'a> {
     pub authority_seed_file: Option<&'a Path>,
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let ReputationLocalCommand {
         subject_public_key,
         since,
@@ -111,11 +112,11 @@ pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), C
     if control_url.is_none() {
         let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
         inspection.imported_trust = Some(build_imported_trust_report(
-            receipt_db_path,
+            &SqliteReceiptStore::open(receipt_db_path)?,
             &inspection.subject_key,
             inspection.since,
             inspection.until,
-            unix_now(),
+            clock_now,
             &inspection.scoring,
         )?);
     }
@@ -203,7 +204,12 @@ pub struct ReputationCompareCommand<'a> {
     pub authority_seed_file: Option<&'a Path>,
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let ReputationCompareCommand {
         subject_public_key,
         passport_path,
@@ -219,7 +225,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         authority_seed_file,
     } = command;
 
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(passport_path)?)?;
+    let passport: AgentPassport = crate::signed_input::read(passport_path)?;
     let verifier_policy = verifier_policy_path
         .map(load_passport_verifier_policy)
         .transpose()?;
@@ -261,11 +267,11 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         let imported_trust = {
             let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
             build_imported_trust_report(
-                receipt_db_path,
+                &SqliteReceiptStore::open(receipt_db_path)?,
                 &local.subject_key,
                 local.since,
                 local.until,
-                unix_now(),
+                clock_now,
                 &local.scoring,
             )?
         };
@@ -284,7 +290,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
             local,
             &passport,
             verifier_policy.as_ref(),
-            unix_now(),
+            clock_now,
             shared_evidence,
             Some(imported_trust),
         )?
@@ -309,19 +315,33 @@ fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<&Path, CliE
 }
 
 fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
+    let bytes = crate::signed_input::read_bounded(path)?;
+    let input = chio_core::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        crate::signed_input::MAX_SIGNED_FILE_BYTES,
+    )?;
     let policy = if path
         .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext, "yaml" | "yml"))
     {
-        serde_yml::from_str(&contents)?
-    } else if let Ok(document) = serde_json::from_str::<SignedPassportVerifierPolicy>(&contents) {
-        verify_signed_passport_verifier_policy(&document)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        document.body.policy
+        // Explicit operator configuration format, never a signed-document fallback.
+        serde_yml::from_slice(&bytes)?
     } else {
-        serde_json::from_str(&contents).or_else(|_| serde_yml::from_str(&contents))?
+        let value: serde_json::Value = input.decode_signed()?;
+        let signed = value.as_object().is_some_and(|object| {
+            object.contains_key("body")
+                || object.contains_key("signature")
+                || object.contains_key("signerKey")
+        });
+        if signed {
+            let document: SignedPassportVerifierPolicy = serde_json::from_value(value)?;
+            verify_signed_passport_verifier_policy(&document)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            document.body.policy
+        } else {
+            serde_json::from_value(value)?
+        }
     };
     Ok(policy)
 }
@@ -366,7 +386,7 @@ pub(crate) fn build_reputation_comparison(
 }
 
 pub(crate) fn build_imported_trust_report(
-    receipt_db_path: &Path,
+    store: &SqliteReceiptStore,
     subject_key: &str,
     since: Option<u64>,
     until: Option<u64>,
@@ -374,7 +394,6 @@ pub(crate) fn build_imported_trust_report(
     scoring: &chio_reputation::ReputationConfig,
 ) -> Result<issuance::ImportedTrustReport, CliError> {
     let policy = ImportedTrustPolicy::default();
-    let store = SqliteReceiptStore::open(receipt_db_path)?;
     let signals = store
         .list_federated_share_subject_corpora(subject_key, since, until)?
         .into_iter()
@@ -419,7 +438,7 @@ pub(crate) fn build_imported_trust_report(
 }
 
 pub(crate) fn build_behavioral_feed_reputation_summary(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     subject_key: &str,
     since: Option<u64>,
@@ -427,17 +446,18 @@ pub(crate) fn build_behavioral_feed_reputation_summary(
     now: u64,
     trusted_kernel_keys: &[String],
 ) -> Result<BehavioralFeedReputationSummary, CliError> {
-    let inspection = issuance::inspect_local_reputation(
+    let inspection = issuance::inspect_local_reputation_with_store(
         subject_key,
-        Some(receipt_db_path),
+        receipt_store,
         budget_db_path,
         since,
         until,
         None,
         trusted_kernel_keys,
+        &chio_kernel::ReceiptReadContext::local_operator_admin_all(),
     )?;
     let imported_trust = build_imported_trust_report(
-        receipt_db_path,
+        receipt_store,
         &inspection.subject_key,
         inspection.since,
         inspection.until,
@@ -547,6 +567,10 @@ fn compare_metric_values(portable: MetricValue, local: MetricValue) -> Reputatio
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn print_local_reputation(inspection: &LocalReputationInspection) {
     println!("subject_key:             {}", inspection.subject_key);
     println!("window:                  {}", describe_window(inspection));
@@ -620,6 +644,10 @@ fn print_local_reputation(inspection: &LocalReputationInspection) {
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn print_reputation_comparison(comparison: &PortableReputationComparison) {
     println!("subject_key:             {}", comparison.subject_key);
     println!("passport_subject:        {}", comparison.passport_subject);

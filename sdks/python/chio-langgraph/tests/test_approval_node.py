@@ -18,9 +18,6 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 import pytest
-from chio_sdk.models import ChioScope, Operation, ToolGrant
-from chio_sdk.testing import allow_all, deny_all
-
 from chio_langgraph import (
     ApprovalRequestPayload,
     ApprovalResolution,
@@ -28,6 +25,9 @@ from chio_langgraph import (
     ChioLangGraphError,
     chio_approval_node,
 )
+from chio_langgraph.approval import _approval_id_from_receipt
+from chio_sdk.models import ChioScope, Operation, ToolGrant
+from chio_sdk.testing import allow_all, deny_all
 
 
 class State(TypedDict, total=False):
@@ -35,6 +35,16 @@ class State(TypedDict, total=False):
 
 
 SERVER_ID = "demo-srv"
+
+
+@pytest.mark.parametrize("evidence", [None, []])
+async def test_absent_optional_evidence_does_not_invent_approval_authority(evidence):
+    client = allow_all()
+    receipt = await client.evaluate_tool_call(
+        capability_id="fixture", tool_server="langgraph", tool_name="review", parameters={}
+    )
+    receipt.evidence = evidence
+    assert _approval_id_from_receipt(receipt) is None
 
 
 def _scope(*tools: str) -> ChioScope:
@@ -86,9 +96,7 @@ class TestApprovedFlow:
         )
         await cfg.provision()
 
-        interrupt_fn = FakeInterrupt(
-            resume_value={"outcome": "approved", "approver": "ops@acme"}
-        )
+        interrupt_fn = FakeInterrupt(resume_value={"outcome": "approved", "approver": "ops@acme"})
         wrapped = chio_approval_node(
             dangerous_body,
             scope=_scope("danger"),
@@ -114,9 +122,7 @@ class TestApprovedFlow:
             return {"value": "done"}
 
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
         interrupt_fn = FakeInterrupt(resume_value=True)
@@ -134,9 +140,7 @@ class TestApprovedFlow:
             return {"value": "done"}
 
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
         resume = ApprovalResolution(outcome="approved", approver="alice")
@@ -197,9 +201,7 @@ class TestDeniedFlow:
             return {}
 
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
         interrupt_fn = FakeInterrupt(resume_value="rejected")
@@ -227,9 +229,7 @@ class TestPolicySkip:
             return {"value": "done"}
 
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
         interrupt_fn = FakeInterrupt(resume_value={"outcome": "denied"})
@@ -261,9 +261,7 @@ class TestDispatcherHook:
             return {"value": "done"}
 
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
         sent: list[ApprovalRequestPayload] = []
@@ -271,9 +269,7 @@ class TestDispatcherHook:
         async def dispatch(payload: ApprovalRequestPayload) -> None:
             sent.append(payload)
 
-        interrupt_fn = FakeInterrupt(
-            resume_value={"outcome": "approved"}
-        )
+        interrupt_fn = FakeInterrupt(resume_value={"outcome": "approved"})
         wrapped = chio_approval_node(
             body,
             scope=_scope("t"),
@@ -303,14 +299,10 @@ class TestSidecarDeny:
             return {}
 
         chio = deny_all(reason="scope mismatch", guard="ScopeGuard")
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
         await cfg.provision()
 
-        interrupt_fn = FakeInterrupt(
-            resume_value={"outcome": "approved"}
-        )
+        interrupt_fn = FakeInterrupt(resume_value={"outcome": "approved"})
         wrapped = chio_approval_node(
             body,
             scope=_scope("t"),
@@ -338,9 +330,7 @@ class TestMissingCapability:
 
         chio = allow_all()
         # No provision() -> no tokens minted.
-        cfg = ChioGraphConfig(
-            chio_client=chio, node_scopes={"t": _scope("t")}
-        )
+        cfg = ChioGraphConfig(chio_client=chio, node_scopes={"t": _scope("t")})
 
         interrupt_fn = FakeInterrupt(resume_value={"outcome": "approved"})
         wrapped = chio_approval_node(

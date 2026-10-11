@@ -124,7 +124,9 @@ pub(super) fn parse_review_json<T: serde::de::DeserializeOwned>(
             code: "chio_buyer_review_missing_artifact_role",
             detail: format!("buyer review package is missing artifact role {role}"),
         })?;
-    serde_json::from_slice(bytes).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 pub(super) fn buyer_review_check(

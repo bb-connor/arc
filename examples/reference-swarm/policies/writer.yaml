@@ -1,0 +1,26 @@
+# The writer edge: one artifact, with the secret-leak guard inspecting every
+# write before the tool receives it.
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 2
+guards:
+  forbidden_path:
+    enabled: true
+  secret_patterns:
+    enabled: true
+capabilities:
+  default:
+    tools:
+      - server: "reference-writer"
+        tool: "write_file"
+        operations: [invoke]
+        ttl: 900
+      - server: "reference-writer"
+        tool: "read_file"
+        operations: [invoke]
+        ttl: 900
+      - server: "reference-writer"
+        tool: "stat"
+        operations: [invoke]
+        ttl: 900
+        max_invocations: 6

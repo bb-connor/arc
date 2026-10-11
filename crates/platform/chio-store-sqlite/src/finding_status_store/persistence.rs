@@ -195,7 +195,7 @@ fn require_unique_leaf_inputs(
         .map(|leaf| leaf.finding_id)
         .collect::<Vec<_>>();
     ids.sort_unstable();
-    if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+    if ids.array_windows::<2>().any(|pair| pair[0] == pair[1]) {
         return Err(invariant("epoch advance contains duplicate leaf updates"));
     }
     Ok(())
@@ -209,7 +209,7 @@ fn require_unique_proof_inputs(
         .map(|proof| proof.finding_id)
         .collect::<Vec<_>>();
     ids.sort_unstable();
-    if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+    if ids.array_windows::<2>().any(|pair| pair[0] == pair[1]) {
         return Err(invariant("epoch advance contains duplicate proof inputs"));
     }
     Ok(())

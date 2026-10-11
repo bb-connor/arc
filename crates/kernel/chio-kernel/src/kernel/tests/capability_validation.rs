@@ -1,3 +1,41 @@
+use super::*;
+
+#[test]
+fn kg2_receipt_key_cannot_issue_after_distinct_authority_configuration(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_config());
+    let effects = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        effects.clone(),
+    )));
+    let subject = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &subject,
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+        300,
+    );
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(make_keypair())));
+    let response = kernel.evaluate_tool_call_blocking(&make_request(
+        "receipt-key-is-not-issuer",
+        &capability,
+        "read_file",
+        "srv-a",
+    ))?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.output.is_none());
+    assert_eq!(effects.load(Ordering::SeqCst), 0);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("not found among trusted")
+            || reason.contains("not a trusted CA")));
+    assert!(response.receipt.verify_signature()?);
+    Ok(())
+}
+
 #[test]
 fn kernel_rejects_classical_capability_under_pq_required_floor() {
     let keypair = make_keypair();
@@ -281,7 +319,10 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let valid_response = valid_kernel.evaluate_tool_call_blocking(&valid_request)?;
     assert_eq!(valid_response.verdict, Verdict::Deny);
     let valid_reason = valid_response.reason.as_deref().unwrap_or_default();
-    assert!(valid_reason.contains("qualified admission"), "{valid_reason}");
+    assert!(
+        valid_reason.contains("qualified admission"),
+        "{valid_reason}"
+    );
 
     let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
     let mut missing_kernel = make_hosted_kernel();
@@ -594,12 +635,117 @@ fn kernel_rejects_historical_issuance_key() {
     assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
 }
 
+struct FixedCapabilityIssuanceAdmission {
+    deny: bool,
+}
+
+impl CapabilityIssuanceAdmissionAuthority for FixedCapabilityIssuanceAdmission {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()> {
+        Ok(())
+    }
+
+    fn authorize(
+        &self,
+        _: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()> {
+        if self.deny {
+            Err(chio_security_types::ports::PortError::conflict())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn issuance_security_context(subject: &PublicKey) -> SecurityInvocationContext {
+    SecurityInvocationContext::V1(SecurityInvocationContextV1::new(
+        chio_security_types::ports::TenantId::new("tenant-issuance")
+            .unwrap_or_else(|error| panic!("tenant: {error}")),
+        chio_security_types::ports::SessionId::new("session-issuance")
+            .unwrap_or_else(|error| panic!("session: {error}")),
+        chio_security_types::PrincipalId::new(subject.to_hex())
+            .unwrap_or_else(|error| panic!("principal: {error}")),
+        chio_security_types::ports::IsolationEpochId::new("epoch-issuance")
+            .unwrap_or_else(|error| panic!("epoch: {error}")),
+        chio_security_types::ports::LineageId::new("lineage-issuance")
+            .unwrap_or_else(|error| panic!("lineage: {error}")),
+        1,
+    ))
+}
+
+#[test]
+fn installed_issuance_admission_requires_context_and_allows_exact_subject() {
+    let mut kernel = make_kernel(make_config());
+    kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let subject = Keypair::generate().public_key();
+
+    assert!(matches!(
+        kernel.issue_capability(&subject, ChioScope::default(), 60),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+    assert!(matches!(
+        kernel.issue_aggregate_family_root(&subject, ChioScope::default(), 60, 2),
+        Err(KernelError::CapabilityIssuanceDenied(reason))
+            if reason.contains("tenant and lineage context")
+    ));
+    let capability = kernel
+        .issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        )
+        .unwrap_or_else(|error| panic!("security-bound issuance: {error}"));
+    assert_eq!(capability.subject, subject);
+}
+
+#[test]
+fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
+    let subject = Keypair::generate().public_key();
+    let mut frozen_kernel = make_kernel(make_config());
+    frozen_kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: true,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    assert!(matches!(
+        frozen_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+
+    let mut open_kernel = make_kernel(make_config());
+    open_kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let substituted = Keypair::generate().public_key();
+    assert!(matches!(
+        open_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&substituted),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+}
+
 #[test]
 fn kernel_accepts_capabilities_from_configured_authority() {
     let authority_keypair = make_keypair();
     let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
         authority_keypair.clone(),
+        chio_test_support::clock::clock(),
     )));
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -623,12 +769,13 @@ fn kernel_reports_capability_issuer_trust() {
     let authority_keypair = make_keypair();
     let untrusted_keypair = make_keypair();
     let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
         authority_keypair.clone(),
+        chio_test_support::clock::clock(),
     )));
 
     assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
-    assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
+    assert!(!kernel.capability_issuer_is_trusted(&kernel.public_key()));
     assert!(!kernel.capability_issuer_is_trusted(&untrusted_keypair.public_key()));
 }
 
@@ -693,8 +840,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
 
     let cap = {
         let mut kernel = make_kernel(make_config());
-        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
             authority_keypair.clone(),
+            chio_test_support::clock::clock(),
         )));
         kernel.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
         kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -705,7 +853,10 @@ fn sqlite_revocation_store_survives_kernel_restart() {
     };
 
     let mut restarted = make_kernel(make_config());
-    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new(authority_keypair)));
+    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
+        authority_keypair,
+        chio_test_support::clock::clock(),
+    )));
     restarted.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
     restarted.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -916,6 +1067,7 @@ fn untrusted_issuer_denied() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -958,6 +1110,7 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         ),
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel
@@ -965,10 +1118,9 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         .expect("unsupported extension must produce a signed denial");
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("supplemental authorization requires an installed verifier")));
+    assert!(response.reason.as_deref().is_some_and(
+        |reason| reason.contains("supplemental authorization requires an installed verifier")
+    ));
 }
 
 #[test]
@@ -1528,7 +1680,10 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
-    assert!(reason.contains("root evidence is not a direct token"), "{reason}");
+    assert!(
+        reason.contains("root evidence is not a direct token"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -1587,6 +1742,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1621,6 +1777,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1670,6 +1827,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1729,4 +1887,94 @@ fn kernel_error_report_includes_request_cancel_context() {
     assert_eq!(report.context["request_id"], "req-123");
     assert_eq!(report.context["reason"], "operator cancelled");
     assert!(report.suggested_fix.contains("cancelled request ID"));
+}
+struct AdmissionTestClock(std::sync::atomic::AtomicU64);
+
+impl chio_security_types::clock::Clock for AdmissionTestClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, UnixMillis};
+        let milliseconds = self.0.load(Ordering::SeqCst);
+        if milliseconds == 0 {
+            return Err(ClockError::Unavailable);
+        }
+        Ok(ClockReading::new(
+            UnixMillis::new(milliseconds),
+            MonotonicInstant::from_nanos(milliseconds * 1_000_000),
+        ))
+    }
+}
+
+fn admission_clock_fixture(
+    clock: Arc<AdmissionTestClock>,
+) -> Result<(ChioKernel, CapabilityToken), Box<dyn std::error::Error>> {
+    let config = make_config();
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "pre-admit-owned-clock".into(),
+            issuer: config.keypair.public_key(),
+            subject: make_keypair().public_key(),
+            scope: ChioScope::default(),
+            issued_at: 100,
+            expires_at: 110,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &config.keypair,
+    )?;
+    Ok((ChioKernel::new_with_clock(config, clock), token))
+}
+
+#[test]
+fn pre_admit_clock_accepts_before_exact_expiry() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(109_999))))?;
+    kernel.verify_capability_full_pre_admit(&token, None, 109)?;
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_rejects_fresh_exact_expiry() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(110_000))))?;
+    let result = kernel.verify_capability_full_pre_admit(&token, None, 109);
+    assert!(matches!(result, Err(reason) if reason.contains("expired")));
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_retains_later_caller_floor() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(109_000))))?;
+    let result = kernel.verify_capability_full_pre_admit(&token, None, 110);
+    assert!(matches!(result, Err(reason) if reason.contains("expired")));
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_preserves_unavailable_cause() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) = admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(0))))?;
+    assert_eq!(
+        kernel.verify_capability_full_pre_admit(&token, None, 109),
+        Err(KernelError::Clock(chio_security_types::clock::ClockError::Unavailable).to_string()),
+    );
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_preserves_regression_cause() -> Result<(), Box<dyn std::error::Error>> {
+    let clock = Arc::new(AdmissionTestClock(AtomicU64::new(109_000)));
+    let (kernel, token) = admission_clock_fixture(clock.clone())?;
+    assert_eq!(kernel.read_authority_time()?.get(), 109_000);
+    clock.0.store(108_000, Ordering::SeqCst);
+    assert_eq!(
+        kernel.verify_capability_full_pre_admit(&token, None, 109),
+        Err(
+            KernelError::Clock(chio_security_types::clock::ClockError::WallClockRegression)
+                .to_string()
+        ),
+    );
+    Ok(())
 }

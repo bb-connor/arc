@@ -25,6 +25,7 @@ class RuntimeHandle:
 
     chio_client: Any | None = None
     capability_id: str | None = None
+    signed_capability: dict[str, Any] | None = field(default=None, repr=False)
     code_agent: Any | None = None
     receipts: Any | None = None
     policy: Any | None = None
@@ -127,6 +128,19 @@ def build_runtime_handle() -> RuntimeHandle:
             "CHIO_CAPABILITY_ID is unset; run `hermes chio issue` to mint one"
         )
         return handle
+
+    # The operator CLI retains minted tokens in its private profile cache.
+    # Old ID-only entries remain usable for legacy evaluation, but cannot
+    # submit approvals. The service verifies the full token at submission.
+    from chio_hermes.cli import _load_cache
+
+    for entry in reversed(_load_cache()):
+        if entry.get("capability_id") != capability_id:
+            continue
+        token = entry.get("signed_capability")
+        if not entry.get("revoked") and isinstance(token, dict) and token.get("id") == capability_id:
+            handle.signed_capability = token
+        break
 
     try:
         from chio_code_agent.agent import CodeAgent

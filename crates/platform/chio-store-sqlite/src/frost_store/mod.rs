@@ -1,15 +1,19 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use chio_federation_authority::SealedFrostRound2Package;
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::StoreMutationFence;
-use chio_federation_authority::{FrostAuthenticatedDkgPackage, FrostCeremonySecret};
+use chio_federation_authority::{FrostCeremonySecret, FrostRound1Package};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
 use crate::admission_operation_store::verify_active_owner;
 use crate::encrypted_blob::TenantKey;
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 mod ceremony;
+mod input;
+use input::decode_record;
 mod commit;
 mod coordinator;
 mod rotation;
@@ -29,8 +33,14 @@ const FROST_STORE_SCHEMA_ANCHORS: &[&str] = &[
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrostStoreError {
+    #[error(transparent)]
+    SignedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("sqlite FROST store is fenced")]
     Fenced,
+    #[error("FROST ceremony failed after a conflicting authenticated round-two delivery")]
+    CeremonyFailed,
+    #[error("round-two input has not been durably accepted")]
+    Round2NotAccepted,
     #[error("sqlite FROST store conflict: {0}")]
     Conflict(&'static str),
     #[error("sqlite FROST store state is invalid: {0}")]
@@ -95,6 +105,7 @@ pub enum FrostCeremonyState {
     Round1Ready,
     Round2Ready,
     Completed,
+    Failed,
 }
 
 impl FrostCeremonyState {
@@ -103,6 +114,7 @@ impl FrostCeremonyState {
             Self::Round1Ready => "round1_ready",
             Self::Round2Ready => "round2_ready",
             Self::Completed => "completed",
+            Self::Failed => "failed",
         }
     }
 
@@ -111,6 +123,7 @@ impl FrostCeremonyState {
             "round1_ready" => Ok(Self::Round1Ready),
             "round2_ready" => Ok(Self::Round2Ready),
             "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
             _ => Err(FrostStoreError::InvalidState(
                 "unknown ceremony state".to_string(),
             )),
@@ -135,7 +148,7 @@ pub struct FrostCeremonyRound1Record {
     pub ceremony_id: String,
     pub state: FrostCeremonyState,
     pub state_version: u64,
-    pub package: FrostAuthenticatedDkgPackage,
+    pub package: FrostRound1Package,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,7 +156,7 @@ pub struct FrostCeremonyRound2Record {
     pub ceremony_id: String,
     pub state: FrostCeremonyState,
     pub state_version: u64,
-    pub packages: Vec<FrostAuthenticatedDkgPackage>,
+    pub packages: Vec<SealedFrostRound2Package>,
     pub round1_transcript_digest: String,
 }
 
@@ -402,13 +415,13 @@ impl StagedFrostRotation {
 
 #[derive(Clone)]
 pub struct SqliteFrostStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFrostStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -418,9 +431,9 @@ impl SqliteFrostStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FrostStoreError> {
-        self.connection.lock().map_err(|_| {
-            FrostStoreError::Unavailable("sqlite FROST store lock is poisoned".to_string())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FrostStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -553,11 +566,9 @@ fn owner_error(
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "state", content = "output", rename_all = "snake_case")]
 enum StoredCeremonyOutput {
-    Round1(Box<FrostAuthenticatedDkgPackage>),
-    Round2(Vec<FrostAuthenticatedDkgPackage>),
+    Round1(Box<FrostRound1Package>),
+    Round2(Vec<SealedFrostRound2Package>),
 }
 
 pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
@@ -567,3 +578,11 @@ pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
         chio_federation_authority::FrostCeremonySecretKind::KeyPackage => "key_package",
     }
 }
+
+#[cfg(all(test, unix))]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+mod connection_recovery;

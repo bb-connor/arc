@@ -540,13 +540,13 @@ fn derive_ledger_store_binding(
 
     let mut binding = Sha256::new();
     binding.update(b"chio.finding-pool.store-binding.v1");
-    binding.update((ledger_domain.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(ledger_domain.len()).to_be_bytes());
     binding.update(ledger_domain.as_bytes());
-    binding.update((identity_material.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(identity_material.len()).to_be_bytes());
     binding.update(&identity_material);
-    binding.update((public_key_bytes.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(public_key_bytes.len()).to_be_bytes());
     binding.update(public_key_bytes);
-    binding.update((anchor_instance_id.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(anchor_instance_id.len()).to_be_bytes());
     binding.update(anchor_instance_id.as_bytes());
     Ok(hex::encode(binding.finalize()))
 }
@@ -572,7 +572,7 @@ fn database_identity_material(
 }
 
 fn append_binding_part(target: &mut Vec<u8>, value: &[u8]) {
-    target.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    target.extend_from_slice(&crate::integer::count(value.len()).to_be_bytes());
     target.extend_from_slice(value);
 }
 
@@ -593,8 +593,12 @@ fn verify_legacy_outbox_authority(
         let receipt_json = row
             .get::<_, String>(0)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-        let receipt = serde_json::from_str::<ChioReceipt>(&receipt_json)
-            .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
+        let receipt = chio_core::canonical::UntrustedJsonText::from_wire(
+            receipt_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed::<ChioReceipt>())
+        .map_err(FindingPoolLedgerError::from)?;
         if canonical_receipt_authority_json(&receipt.kernel_key)? != authority_json {
             return Err(FindingPoolLedgerError::ReceiptAuthorityMismatch);
         }

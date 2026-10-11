@@ -7,7 +7,7 @@ use crate::finding_challenge_store::{
 fn finding_challenge_projection_rejects_offline_state_tampering() {
     let (_temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    let authority = crate::test_authority::open_serving(&database, &lock_root).expect("open");
     let challenge_envelope = br#"{"challenge":"tamper"}"#;
     authority
         .finding_challenge_store()
@@ -37,7 +37,11 @@ fn finding_challenge_projection_rejects_offline_state_tampering() {
     );
     drop(connection);
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
 }
@@ -46,7 +50,7 @@ fn finding_challenge_projection_rejects_offline_state_tampering() {
 fn finding_challenge_projection_rejects_retained_submission_tampering() {
     let (_temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    let authority = crate::test_authority::open_serving(&database, &lock_root).expect("open");
     let challenge_envelope = br#"{"challenge":"retained"}"#;
     authority
         .finding_challenge_store()
@@ -83,7 +87,11 @@ fn finding_challenge_projection_rejects_retained_submission_tampering() {
     );
     drop(connection);
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
 }

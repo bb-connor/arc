@@ -1,0 +1,245 @@
+//! Revalidate operation-owned approval evidence at the nonce capture boundary.
+
+use super::*;
+use chio_core::capability::governance::{
+    ApprovalSetBody, GovernedApprovalToken, ThresholdApprovalProposal,
+};
+use chio_kernel::ThresholdApprovalReplayReservationV1;
+
+/// The exact original reserved threshold approval, physically qualified in the
+/// native capture write transaction before any budget or admission mutation.
+/// It holds no store handle, so its later use performs no database, parsing or
+/// signature work, only comparisons against its already verified signed times.
+pub(in crate::admission_operation_store) struct ReservedThresholdApproval {
+    operation_id: AdmissionOperationId,
+    operation_version: u64,
+    nonce_id: Option<AdmissionIdentifier>,
+    fence: StoreMutationFence,
+    proposal_hash: String,
+    approval_set_hash: String,
+    reservation: ThresholdApprovalReplayReservationV1,
+}
+
+impl ReservedThresholdApproval {
+    /// Whether this witness was qualified for exactly this operation version,
+    /// physical nonce, approval artifacts and serving fence.
+    pub(in crate::admission_operation_store) fn binds(
+        &self,
+        operation: &AdmissionOperationV1,
+        owner: &SqliteServingOwner,
+    ) -> bool {
+        operation.binding().operation_id() == &self.operation_id
+            && operation.version() == self.operation_version
+            && operation.execution_nonce_id() == self.nonce_id.as_ref()
+            && operation
+                .threshold_proposal_hash()
+                .map(AdmissionDigest::as_str)
+                == Some(self.proposal_hash.as_str())
+            && operation.approval_set_hash().map(AdmissionDigest::as_str)
+                == Some(self.approval_set_hash.as_str())
+            && owner.fence == self.fence
+    }
+
+    /// Bounded comparison of the original signed proposal and token windows.
+    pub(in crate::admission_operation_store) fn validate_at(
+        &self,
+        now_unix_ms: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        qualification::verify_window(&self.reservation, now_unix_ms)
+    }
+}
+
+pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    now: u64,
+    owner: &SqliteServingOwner,
+) -> Result<(), AdmissionOperationStoreError> {
+    reserved_nonce_capture_approval(transaction, operation, now, owner, None).map(|_| ())
+}
+
+/// Qualify the operation's approval exactly as nonce capture does. A threshold
+/// operation returns its strict reserved witness bound to `nonce_id`; a single
+/// owned approval or an operation without approval returns no witness.
+pub(in crate::admission_operation_store) fn reserved_nonce_capture_approval(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    now: u64,
+    owner: &SqliteServingOwner,
+    nonce_id: Option<&AdmissionIdentifier>,
+) -> Result<Option<ReservedThresholdApproval>, AdmissionOperationStoreError> {
+    if !operation.binding().participant_requirements().approval {
+        return Ok(None);
+    }
+    let Some(proposal) = load_retained_proposal(transaction, operation)? else {
+        if operation.governed_approval_ledger_digest().is_some()
+            && operation.threshold_proposal_hash().is_none()
+            && operation.approval_set_hash().is_none()
+        {
+            // A single configured approval has a different participant from a
+            // threshold set. Require its physical live claim and fresh source
+            // authority; a ledger with released or expired history is not enough.
+            return super::super::governed_approval_claim::verify_fresh_approval_tx(
+                transaction,
+                operation,
+                now,
+                owner,
+            )
+            .map(|()| None);
+        }
+        return Err(invariant(
+            "nonce capture requires bounded durable threshold approval evidence",
+        ));
+    };
+    let maximum = chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
+    let mut statement = transaction
+        .prepare(
+            "SELECT CASE WHEN length(token_json) BETWEEN 1 AND 262144 THEN token_json END
+         FROM threshold_approval_tokens WHERE proposal_id = ?1
+         ORDER BY canonical_token_digest LIMIT ?2",
+        )
+        .map_err(sqlite_error)?;
+    let mut rows = statement
+        .query(params![
+            proposal.body.proposal_id,
+            i64::try_from(maximum + 1).map_err(|_| invariant("threshold token bound overflow"))?
+        ])
+        .map_err(sqlite_error)?;
+    let mut tokens = Vec::new();
+    while let Some(row) = rows.next().map_err(sqlite_error)? {
+        if tokens.len() == maximum {
+            return Err(invariant(
+                "nonce capture approval token inventory exceeds its bound",
+            ));
+        }
+        let bytes: Option<Vec<u8>> = row.get(0).map_err(sqlite_error)?;
+        let bytes = bytes
+            .ok_or_else(|| invariant("nonce capture approval token exceeds its storage bound"))?;
+        let token: GovernedApprovalToken = chio_core::canonical::UntrustedJsonText::from_wire(
+            &bytes,
+            MAX_PERSISTED_OPERATION_BYTES,
+        )
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| invariant(error.to_string()))?;
+        tokens.push(token);
+    }
+    let token_digests = tokens
+        .iter()
+        .map(GovernedApprovalToken::artifact_digest)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| invariant(error.to_string()))?;
+    let set = ApprovalSetBody::new(token_digests, &proposal)
+        .map_err(|error| invariant(error.to_string()))?;
+    let reservation = ThresholdApprovalReplayReservationV1::new(proposal, tokens, set)?;
+    let proposal_hash = reservation
+        .proposal()
+        .artifact_digest()
+        .map_err(|error| invariant(error.to_string()))?;
+    let set_hash = reservation
+        .verified_set()
+        .approval_set_hash()
+        .map_err(|error| invariant(error.to_string()))?;
+    if operation
+        .threshold_proposal_hash()
+        .map(AdmissionDigest::as_str)
+        != Some(proposal_hash.as_str())
+        || operation.approval_set_hash().map(AdmissionDigest::as_str) != Some(set_hash.as_str())
+        || operation.binding().request_id().as_str() != reservation.proposal().body.request_id
+        || operation
+            .to_persisted()
+            .binding
+            .authorization_capability_hash
+            .as_str()
+            != reservation.proposal().body.authorizing_capability_digest
+        || operation.binding().policy_hash().as_str() != reservation.proposal().body.policy_hash
+    {
+        return Err(invariant(
+            "nonce capture approval changed its operation binding",
+        ));
+    }
+    qualification::verify_window(&reservation, now)?;
+    qualification::verify_exact_replay(
+        transaction,
+        operation,
+        &reservation,
+        &proposal_hash,
+        &set_hash,
+        now,
+    )?;
+    Ok(Some(ReservedThresholdApproval {
+        operation_id: operation.binding().operation_id().clone(),
+        operation_version: operation.version(),
+        nonce_id: nonce_id.cloned(),
+        fence: owner.fence.clone(),
+        proposal_hash,
+        approval_set_hash: set_hash,
+        reservation,
+    }))
+}
+
+/// The bounded, canonical threshold proposal retained for an operation.
+fn load_retained_proposal(
+    connection: &rusqlite::Connection,
+    operation: &AdmissionOperationV1,
+) -> Result<Option<ThresholdApprovalProposal>, AdmissionOperationStoreError> {
+    let proposal_bytes: Option<Option<Vec<u8>>> = connection
+        .query_row(
+            "SELECT CASE WHEN length(proposal_json) BETWEEN 1 AND 262144 THEN proposal_json END
+         FROM threshold_approval_proposals WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let Some(proposal_bytes) = proposal_bytes else {
+        return Ok(None);
+    };
+    let proposal_bytes = proposal_bytes
+        .ok_or_else(|| invariant("retained threshold proposal exceeds its storage bound"))?;
+    let proposal: ThresholdApprovalProposal = chio_core::canonical::UntrustedJsonText::from_wire(
+        &proposal_bytes,
+        MAX_PERSISTED_OPERATION_BYTES,
+    )
+    .and_then(|input| input.decode_canonical())
+    .map_err(|error| invariant(error.to_string()))?;
+    Ok(Some(proposal))
+}
+
+/// The time at which an operation-bound nonce is verified for liveness. An
+/// operation that parked for cumulative approval bound its nonce when the
+/// kernel minted the retained proposal, so its nonce is verified at that
+/// creation time rather than at the later reservation, capture or replay;
+/// every other operation, and an issuance recorded before any proposal
+/// exists, verifies at the recorded time.
+pub(in crate::admission_operation_store) fn nonce_verification_time_unix_ms(
+    connection: &rusqlite::Connection,
+    operation: &AdmissionOperationV1,
+    recorded_at_unix_ms: u64,
+) -> Result<u64, AdmissionOperationStoreError> {
+    if !operation.binding().participant_requirements().approval {
+        return Ok(recorded_at_unix_ms);
+    }
+    let Some(proposal) = load_retained_proposal(connection, operation)? else {
+        return Ok(recorded_at_unix_ms);
+    };
+    if proposal.body.request_id != operation.binding().request_id().as_str() {
+        return Err(invariant(
+            "retained approval proposal does not bind this operation",
+        ));
+    }
+    let created_at_unix_ms = proposal
+        .body
+        .proposal_created_at
+        .checked_mul(1_000)
+        .ok_or_else(|| invariant("approval proposal creation time overflows"))?;
+    if created_at_unix_ms > recorded_at_unix_ms {
+        return Err(invariant(
+            "approval proposal was created after its nonce was recorded",
+        ));
+    }
+    Ok(created_at_unix_ms)
+}
+
+#[cfg(test)]
+#[path = "nonce_capture/witness_tests.rs"]
+mod witness_tests;

@@ -14,6 +14,9 @@ use std::collections::BTreeMap;
 
 use chio_test_support::prelude::*;
 
+#[path = "tests/authentication.rs"]
+mod authentication;
+
 fn sample_evidence() -> RuntimeAttestationEvidence {
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
@@ -228,10 +231,16 @@ fn verified_runtime_attestation_record_requires_local_trust_boundary_for_tier_pr
 }
 
 #[test]
-fn verified_runtime_attestation_record_promotes_tier_only_after_local_policy_verification() {
-    let verified =
-        verify_runtime_attestation_record(&sample_evidence(), Some(&sample_trust_policy()), 150)
-            .test_expect("trusted record");
+fn signed_attestation_promotes_tier_only_with_pinned_authority_and_policy() {
+    let authority = crate::crypto::Keypair::generate();
+    let signed = SignedExportEnvelope::sign(sample_evidence(), &authority).test_unwrap();
+    let verified = verify_signed_runtime_attestation_record(
+        &signed,
+        &authority.public_key(),
+        Some(&sample_trust_policy()),
+        150,
+    )
+    .test_expect("pinned authority-signed record");
 
     assert!(verified.policy_outcome.trust_policy_configured);
     assert!(verified.policy_outcome.accepted);
@@ -253,11 +262,17 @@ fn verified_runtime_attestation_record_promotes_tier_only_after_local_policy_ver
 }
 
 #[test]
-fn verified_runtime_attestation_record_accepts_nitro_evidence_across_trust_boundary() {
+fn signed_attestation_accepts_nitro_evidence_from_pinned_authority() {
     let evidence = sample_nitro_evidence();
-    let verified =
-        verify_runtime_attestation_record(&evidence, Some(&sample_nitro_trust_policy()), 150)
-            .test_expect("nitro record should verify across the trust boundary");
+    let authority = crate::crypto::Keypair::generate();
+    let signed = SignedExportEnvelope::sign(evidence.clone(), &authority).test_unwrap();
+    let verified = verify_signed_runtime_attestation_record(
+        &signed,
+        &authority.public_key(),
+        Some(&sample_nitro_trust_policy()),
+        150,
+    )
+    .test_expect("nitro record signed by the pinned authority");
 
     assert!(verified.is_locally_accepted());
     assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);

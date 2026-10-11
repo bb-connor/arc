@@ -1,0 +1,39 @@
+//! Live tool discovery runs only with the provisioned cage's enforced authority.
+
+use super::{CliError, ProvisionInputs};
+
+#[cfg(unix)]
+#[path = "discovery/launch.rs"]
+mod launch;
+#[cfg(unix)]
+#[path = "discovery/transport.rs"]
+mod transport;
+
+pub(super) fn discover_tool_surface(
+    inputs: &ProvisionInputs,
+) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, CliError> {
+    #[cfg(unix)]
+    {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let (child, stdin, stdout, stderr) = launch::start(inputs, deadline)?;
+        let outcome = transport::exchange_until(stdin, stdout, stderr, deadline);
+        // The cage denies clone/fork and owns termination through a pidfd.
+        // Bounded nonblocking I/O never waits for EOF.
+        drop(child);
+        let tools = outcome.map_err(|reason| {
+            CliError::cli_other_error(format!("native MCP tool discovery failed: {reason}"))
+        })?;
+        serde_json::from_value(tools).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "the native MCP target advertised an invalid tools/list result: {error}"
+            ))
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = inputs;
+        Err(CliError::cli_other_error(
+            "live native discovery requires Unix; supply a reviewed --tools-fixture",
+        ))
+    }
+}

@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod input;
+
 pub mod fee_schedule;
 mod fiscal;
 mod lifecycle;

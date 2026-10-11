@@ -189,6 +189,21 @@ fn retained_lookup_queries_the_archive_connection_that_was_authenticated(
         &store,
         &archived_receipt.id,
         || {
+            let writer = rusqlite::Connection::open(&archive)?;
+            writer.busy_timeout(std::time::Duration::ZERO)?;
+            let error = writer
+                .execute("DELETE FROM chio_tool_receipts", [])
+                .err()
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "authenticated snapshot allowed archive replacement in place".into(),
+                    )
+                })?;
+            assert_eq!(
+                error.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::DatabaseBusy)
+            );
+            drop(writer);
             std::fs::rename(&archive, &displaced)?;
             std::fs::rename(&replacement, &archive)?;
             Ok(())
@@ -745,7 +760,7 @@ fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::E
     // Force the size branch: threshold just under the current live size.
     let before = store.live_db_size_bytes()?;
     let config = RetentionConfig {
-        retention_days: u64::MAX, // disable the time branch
+        retention_days: 36_500, // a century keeps these fixtures outside the time cutoff
         max_size_bytes: before.saturating_sub(1),
         archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
         ..RetentionConfig::default()
@@ -798,7 +813,7 @@ fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dy
 
     let before = store.live_db_size_bytes()?;
     let config = RetentionConfig {
-        retention_days: u64::MAX, // disable the time branch
+        retention_days: 36_500, // a century keeps these fixtures outside the time cutoff
         max_size_bytes: before.saturating_sub(1),
         archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
         ..RetentionConfig::default()
@@ -1699,13 +1714,13 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
                      INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
                        SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
                      DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
-                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
-                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
-                       BEFORE DELETE ON chio_tool_receipts \
-                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2;",
                 )?;
                 copy_checkpoint_prefix_to_attached_archive(connection, 2)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
+                // Inject only set drift. Operator repair still requires the
+                // canonical immutability guards.
+                super::support::restore_transparency_projection_guards(connection)?;
                 Ok(())
             }
         })?;
@@ -2285,111 +2300,8 @@ fn repair_refuses_incomplete_prefix_archive() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-/// A botched rotation can record a watermark and then fail before removing the
-/// orphaned claim-log rows it left behind. Re-running repair rounds to the same
-/// boundary the watermark already covers; an unconditional re-insert would hit
-/// the ledger's monotonic-insert trigger and roll the whole repair back, so the
-/// store could never be cleaned up. Repair must skip the redundant watermark
-/// insert and still remove the orphans.
-#[test]
-fn repair_is_idempotent_when_watermark_already_covers_boundary(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-idempotent-watermark");
-    let archive = unique_db_path("repair-idempotent-watermark-archive");
-    let archive_path = archive.to_str().ok_or("archive path invalid")?;
-    let keypair = super::support::receipt_test_keypair();
-
-    {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-        for i in 0..4u64 {
-            let r = super::support::sample_receipt_with_keypair_and_timestamp(
-                &format!("iw-{i}"),
-                i + 1,
-                100,
-                &keypair,
-            );
-            store.append_chio_receipt_returning_seq(&r)?;
-        }
-        store.flush_receipt_writes()?;
-        assert!(store.load_checkpoint_by_seq(1)?.is_some());
-        // Simulate the partial-failure state in one write: co-archive the
-        // claim-log for [1,2], delete ONLY their source rows (leaving the
-        // orphaned claim-log rows), and record the watermark the botched rotation
-        // stamped at boundary 2 before it crashed.
-        store.writer_handle().run_write({
-            let archive_path = archive_path.to_string();
-            move |connection| {
-                let escaped = archive_path.replace('\'', "''");
-                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
-                connection.execute_batch(
-                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
-                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
-                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
-                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
-                        tool_name TEXT, raw_json TEXT NOT NULL); \
-                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
-                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
-                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
-                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
-                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
-                       BEFORE DELETE ON chio_tool_receipts \
-                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
-                )?;
-                copy_checkpoint_prefix_to_attached_archive(connection, 2)?;
-                super::support::restore_transparency_projection_guards(connection)?;
-                connection.execute_batch("DETACH DATABASE archive")?;
-                // The ledger must name the real archive the botched rotation
-                // co-archived [1,2] into, so the reopen's watermark check finds
-                // the backing evidence.
-                let canonical_archive_path = std::fs::canonicalize(&archive_path)?;
-                let canonical_archive_path = canonical_archive_path.to_str().ok_or_else(|| {
-                    ReceiptStoreError::Conflict(
-                        "canonical retention archive path is not valid UTF-8".to_string(),
-                    )
-                })?;
-                crate::receipt_store::support::insert_receipt_retention_watermark(
-                    connection,
-                    2,
-                    100,
-                    canonical_archive_path,
-                    None,
-                    1,
-                )?;
-                Ok(())
-            }
-        })?;
-    }
-
-    let store = SqliteReceiptStore::open_existing(&path)?;
-    let removed = store.retention_repair(archive_path)?;
-    assert_eq!(removed, 2, "repair removes the orphaned claim-log rows");
-
-    // The orphans are gone and the watermark still sits at the covered boundary.
-    let live = store.reader_connection_for_test()?;
-    let orphans: i64 = live.query_row(
-        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(orphans, 0, "orphaned claim-log rows must be removed");
-    let watermark: Option<i64> = live.query_row(
-        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
-        [],
-        |row| row.get::<_, Option<i64>>(0),
-    )?;
-    assert_eq!(watermark, Some(2), "the covering watermark is preserved");
-    drop(live);
-    drop(store);
-
-    // The repaired store reopens healthy.
-    let reopened = SqliteReceiptStore::open(&path)?;
-    assert!(reopened.receipt_store_health()?.healthy);
-
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(&archive);
-    Ok(())
-}
+#[path = "retention/repair_idempotence.rs"]
+mod repair_idempotence;
 
 /// A store whose entire checkpointed history was archived has legitimately empty
 /// source tables AND an empty projection. The next writable `open()` must NOT
@@ -2421,6 +2333,7 @@ fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Err
 
     // Reopen writable: the empty expected + empty existing case must be accepted.
     let reopened = SqliteReceiptStore::open(&path)?;
+    reopened.wait_for_writer_ready(Duration::from_secs(10))?;
     assert!(reopened.receipt_store_health()?.healthy);
     // And the store is still appendable after the full-prefix rotation.
     let fresh =
@@ -4241,348 +4154,11 @@ fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std:
 // would glob-import itself and collide with that re-export (E0659 ambiguous
 // name).
 #[cfg(test)]
-mod state_machine {
-    use std::collections::BTreeSet;
+#[path = "retention/state_machine.rs"]
+mod state_machine;
 
-    use super::*;
-    use proptest::prelude::*;
-
-    #[derive(Clone, Debug)]
-    enum Op {
-        AppendTool(u8),
-        AppendChild(u8),
-        Rotate,
-    }
-
-    fn op_strategy() -> impl Strategy<Value = Op> {
-        prop_oneof![
-            (0u8..8).prop_map(Op::AppendTool),
-            (0u8..8).prop_map(Op::AppendChild),
-            Just(Op::Rotate),
-        ]
-    }
-
-    /// Every receipt_id currently in `chio_tool_receipts` union
-    /// `chio_child_receipts` on `store` (live or archive database alike).
-    fn receipt_id_set(store: &SqliteReceiptStore) -> Result<BTreeSet<String>, ReceiptStoreError> {
-        let connection = store.reader_connection_for_test()?;
-        let mut ids = BTreeSet::new();
-        let mut tool_statement = connection.prepare("SELECT receipt_id FROM chio_tool_receipts")?;
-        let tool_rows = tool_statement.query_map([], |row| row.get::<_, String>(0))?;
-        for id in tool_rows {
-            ids.insert(id?);
-        }
-        let mut child_statement =
-            connection.prepare("SELECT receipt_id FROM chio_child_receipts")?;
-        let child_rows = child_statement.query_map([], |row| row.get::<_, String>(0))?;
-        for id in child_rows {
-            ids.insert(id?);
-        }
-        Ok(ids)
-    }
-
-    proptest! {
-        // 24 cases, health folded at rotation boundaries: each health call
-        // re-verifies the whole chain over a synchronous=FULL file-backed
-        // store, so a per-op fold at 48 cases is hours of fsync-bound work on
-        // a loaded runner (the lane wedges to the 6h job ceiling). Rotation is
-        // the transition this invariant guards; per-append head divergence is
-        // covered by head_property's full-audit equality.
-        #![proptest_config(ProptestConfig::with_cases(24))]
-        // Quarantined from the hot CI lanes: on GitHub runners this test
-        // enters and never completes (2.5h+ before the job timeout), wedging
-        // Build-lint-test and MSRV, while finishing in ~34s locally. The
-        // suspected livelock is the background checkpoint signer racing
-        // archival rotation under runner-grade fsync latency; issue #1045
-        // tracks reproducing it and restoring the lane. Run explicitly with
-        // `cargo test -p chio-store-sqlite --lib -- --ignored retention`.
-        #[test]
-        #[ignore = "wedges CI runners; see issue #1045"]
-        fn prop_retention_preserves_append_invariant(ops in prop::collection::vec(op_strategy(), 1..40)) {
-            let path = unique_db_path("prop-retention");
-            let archive = unique_db_path("prop-archive");
-            let keypair = super::super::support::receipt_test_keypair();
-            let archive_path = archive.to_str().ok_or_else(|| TestCaseError::fail("archive path"))?;
-
-            let mut seq = 0u64;
-            // The full history of every receipt id ever appended, independent
-            // of where it ends up (live or archived): the ground truth that
-            // invariant (4) below partitions against.
-            let mut appended_ids: BTreeSet<String> = BTreeSet::new();
-            {
-                let store = SqliteReceiptStore::open(&path).map_err(map_err)?;
-                store
-                    .enable_background_checkpoints(super::super::support::signer(&keypair, 2))
-                    .map_err(map_err)?;
-                for (i, op) in ops.iter().enumerate() {
-                    // Non-monotonic timestamps within an aged band to exercise
-                    // the MAX(timestamp)-over-prefix watermark rule.
-                    let ts = 100 + ((i as u64 * 7) % 13);
-                    match op {
-                        Op::AppendTool(n) => {
-                            seq += 1;
-                            let r = super::super::support::sample_receipt_with_keypair_and_timestamp(
-                                &format!("pt-{seq}-{n}"), seq, ts, &keypair);
-                            appended_ids.insert(r.id.clone());
-                            store.append_chio_receipt_returning_seq(&r).map_err(map_err)?;
-                        }
-                        Op::AppendChild(n) => {
-                            seq += 1;
-                            let r = super::super::support::sample_child_receipt_with_keypair_seq_and_timestamp(
-                                &format!("pc-{seq}-{n}"), seq, ts, &keypair);
-                            appended_ids.insert(r.id.clone());
-                            store.append_child_receipt_record(&r).map_err(map_err)?;
-                        }
-                        Op::Rotate => {
-                            store.flush_receipt_writes().map_err(map_err)?;
-                            // Cutoff above BOTH the aged op band (100..=112) and
-                            // the probe band (2_000), so every timestamp is
-                            // below the cutoff and any fully checkpointed prefix
-                            // is eligible for archival. The archival watermark
-                            // W = MAX(batch_end_seq) is a PREFIX rule: a
-                            // checkpoint qualifies only if no entry in [1, W]
-                            // has timestamp >= cutoff. A cutoff below the probe
-                            // band would let the low-seq probes poison every
-                            // prefix and make the co-archive-and-delete path a
-                            // permanent no-op (W = 0), so the archived/live
-                            // partition below would never actually be exercised.
-                            store.archive_receipts_before(3_000, archive_path).map_err(map_err)?;
-                            // Invariant (3): health stays healthy across the
-                            // rotation (folds set-equality and chain
-                            // integrity). Asserted at rotation boundaries and
-                            // after the final op rather than per append: the
-                            // fold re-verifies the whole chain, and rotation is
-                            // the transition this invariant guards.
-                            store.flush_receipt_writes().map_err(map_err)?;
-                            prop_assert!(store.receipt_store_health().map_err(map_err)?.healthy);
-                        }
-                    }
-                    // Invariant (1): the next append still succeeds.
-                    seq += 1;
-                    let probe = super::super::support::sample_receipt_with_keypair_and_timestamp(
-                        &format!("probe-{seq}"), seq, 2_000, &keypair);
-                    appended_ids.insert(probe.id.clone());
-                    store.append_chio_receipt_returning_seq(&probe).map_err(map_err)?;
-                }
-                // Invariant (3) at the end of the run: the final interleaving
-                // (including trailing un-rotated appends) leaves a healthy
-                // store.
-                store.flush_receipt_writes().map_err(map_err)?;
-                prop_assert!(store.receipt_store_health().map_err(map_err)?.healthy);
-            }
-            // Invariant (2): reopen succeeds (open-time seed re-verifies).
-            // The verified-head seed runs on the commit-writer thread, so flush
-            // to drain it before sampling health; until the seed completes the
-            // head reads poisoned and the writer serves closed.
-            let reopened = SqliteReceiptStore::open(&path).map_err(map_err)?;
-            reopened.flush_receipt_writes().map_err(map_err)?;
-            prop_assert!(reopened.receipt_store_health().map_err(map_err)?.healthy);
-
-            // Invariant (4): the archived and live receipt-id sets partition
-            // the full appended history. No id is lost (union covers
-            // everything ever appended) and none is double-counted (the two
-            // sets are disjoint). A run with no eligible rotation leaves the
-            // archive set empty and everything live, which still satisfies
-            // the partition.
-            let live_ids = receipt_id_set(&reopened).map_err(map_err)?;
-            let archive_store = SqliteReceiptStore::open(&archive).map_err(map_err)?;
-            let archived_ids = receipt_id_set(&archive_store).map_err(map_err)?;
-            let overlap: Vec<&String> = live_ids.intersection(&archived_ids).collect();
-            prop_assert!(
-                overlap.is_empty(),
-                "receipt ids double-counted in both live and archive: {overlap:?}"
-            );
-            let union: BTreeSet<String> = live_ids.union(&archived_ids).cloned().collect();
-            prop_assert_eq!(
-                union,
-                appended_ids,
-                "archived and live receipt-id sets must partition the full appended history"
-            );
-
-            let _ = std::fs::remove_file(&path);
-            let _ = std::fs::remove_file(&archive);
-        }
-    }
-
-    fn map_err(error: ReceiptStoreError) -> TestCaseError {
-        TestCaseError::fail(error.to_string())
-    }
-}
-
-/// A dependent row that a second store handle commits into the archived prefix
-/// AFTER the co-archival copy but BEFORE the delete transaction takes its write
-/// lock must never be deleted un-archived. The delete re-checks co-archival
-/// completeness under the BEGIN IMMEDIATE lock and fails closed, so the prefix
-/// and the newly inserted row survive for a later rotation to re-copy.
-#[test]
-fn delete_fails_closed_when_a_dependent_row_escapes_the_copy(
-) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::receipt_store::evidence_retention::{
-        copy_archived_prefix, create_archive_schema, delete_archived_prefix_in_tx,
-    };
-    let path = unique_db_path("toctou-delete");
-    let archive = unique_db_path("toctou-archive");
-    let archive_path = archive.to_str().ok_or("archive path invalid")?;
-    let keypair = super::support::receipt_test_keypair();
-
-    let store = SqliteReceiptStore::open(&path)?;
-    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-    for i in 0..2u64 {
-        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
-            &format!("toctou-{i}"),
-            i + 1,
-            100,
-            &keypair,
-        );
-        store.append_chio_receipt_returning_seq(&receipt)?;
-    }
-    store.flush_receipt_writes()?;
-    let receipt_id = super::support::first_tool_receipt_id(&store)?;
-
-    // Co-archive the aged [1,2] prefix, then simulate a concurrent handle
-    // committing a settlement reconciliation for a receipt in that prefix after
-    // the copy has run, and only then attempt the delete.
-    let fail_closed = store.writer_handle().run_write({
-        let archive_path = archive_path.to_string();
-        let receipt_id = receipt_id.clone();
-        move |connection| {
-            let escaped = archive_path.replace('\'', "''");
-            connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
-            create_archive_schema(connection)?;
-            copy_archived_prefix(connection, 2)?;
-            // The archive now faithfully holds [1,2]. A second writer commits a
-            // dependent row into the archived prefix, unseen by the copy above.
-            connection.execute(
-                "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, note, updated_at) \
-                 VALUES (?1, 'settled', NULL, 1)",
-                rusqlite::params![receipt_id],
-            )?;
-            let result = delete_archived_prefix_in_tx(connection, 2, 150, &archive_path, None);
-            connection.execute_batch("DETACH DATABASE archive")?;
-            Ok(result.is_err())
-        }
-    })?;
-    assert!(
-        fail_closed,
-        "the delete must fail closed when a dependent row is not in the archive"
-    );
-
-    // Fail-closed: the prefix and the un-archived reconciliation both survive.
-    let live = store.reader_connection_for_test()?;
-    let live_receipts: i64 = live.query_row(
-        "SELECT COUNT(*) FROM chio_tool_receipts WHERE seq <= 2",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        live_receipts, 2,
-        "the archived prefix must survive the refusal"
-    );
-    let live_settlement: i64 = live.query_row(
-        "SELECT COUNT(*) FROM settlement_reconciliations",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        live_settlement, 1,
-        "the un-archived reconciliation must survive the refusal"
-    );
-
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(&archive);
-    Ok(())
-}
-
-/// The archive-path pin is checked before the delete transaction takes the write
-/// lock, so two store handles rotating concurrently to DIFFERENT archives can
-/// split the prefix: one commits `[1, W1]` to archive A after the outer check,
-/// then the other copies only the surviving suffix to archive B and records a
-/// higher watermark naming B, leaving the ledger pointing at a file that lacks
-/// the earlier prefix. The delete must re-read and re-enforce the ledger archive
-/// path AFTER acquiring the write lock and fail closed, so the split is caught
-/// and the surviving suffix is preserved for a later rotation.
-#[test]
-fn delete_rechecks_archive_path_under_the_write_lock() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::receipt_store::evidence_retention::{
-        copy_archived_prefix, create_archive_schema, delete_archived_prefix_in_tx,
-    };
-    let path = unique_db_path("toctou-path-split");
-    let archive_a = unique_db_path("toctou-path-split-a");
-    let archive_b = unique_db_path("toctou-path-split-b");
-    let archive_a_path = archive_a.to_str().ok_or("archive path invalid")?;
-    let archive_b_path = archive_b.to_str().ok_or("archive path invalid")?;
-    let keypair = super::support::receipt_test_keypair();
-
-    let store = SqliteReceiptStore::open(&path)?;
-    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-    // Two aged batches: [1,2] at timestamp 100, [3,4] at timestamp 200.
-    for i in 0..2u64 {
-        let r = super::support::sample_receipt_with_keypair_and_timestamp(
-            &format!("a-{i}"),
-            i + 1,
-            100,
-            &keypair,
-        );
-        store.append_chio_receipt_returning_seq(&r)?;
-    }
-    for i in 2..4u64 {
-        let r = super::support::sample_receipt_with_keypair_and_timestamp(
-            &format!("b-{i}"),
-            i + 1,
-            200,
-            &keypair,
-        );
-        store.append_chio_receipt_returning_seq(&r)?;
-    }
-    store.flush_receipt_writes()?;
-    assert!(store.load_checkpoint_by_seq(2)?.is_some());
-
-    // A concurrent rotation commits [1,2] to archive A: the ledger now pins the
-    // archive path to A and the live prefix [1,2] is gone.
-    let first = store.archive_receipts_before(150, archive_a_path)?;
-    assert_eq!(first, 2, "the aged [1,2] batch archives to A");
-
-    // This rotation, in flight against a DIFFERENT archive B, has already copied
-    // the surviving suffix [3,4] into B and now reaches its locked delete for
-    // W=4. Under the write lock the ledger names A, so the delete must refuse the
-    // path split rather than strand [1,2] in A behind a ledger pointing at B.
-    let refusal = store.writer_handle().run_write({
-        let archive_b_path = archive_b_path.to_string();
-        move |connection| {
-            let escaped = archive_b_path.replace('\'', "''");
-            connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
-            create_archive_schema(connection)?;
-            copy_archived_prefix(connection, 4)?;
-            let result = delete_archived_prefix_in_tx(connection, 4, 250, &archive_b_path, None);
-            connection.execute_batch("DETACH DATABASE archive")?;
-            Ok(result.err().map(|error| error.to_string()))
-        }
-    })?;
-    let message = refusal
-        .ok_or("the delete must fail closed when a concurrent rotation split the archive path")?;
-    assert!(
-        message.contains("differs from the archive"),
-        "expected the archive-path pin to fire under the write lock, got: {message}"
-    );
-
-    // Fail-closed: the surviving [3,4] suffix is intact for a later rotation.
-    let live = store.reader_connection_for_test()?;
-    let live_log: i64 = live.query_row(
-        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq > 2",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        live_log, 2,
-        "no [3,4] rows may be deleted when the locked path re-check rejects the split"
-    );
-
-    drop(live);
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(&archive_a);
-    let _ = std::fs::remove_file(&archive_b);
-    Ok(())
-}
+#[path = "retention/delete_races.rs"]
+mod delete_races;
 
 /// A governed receipt's lineage statement must travel into the archive with the
 /// receipt. The delete leaves the live lineage row in place (like capability

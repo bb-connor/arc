@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 mod error;
 pub mod finding_pool;
 mod types;
@@ -19,7 +34,8 @@ pub use types::{
     CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA, CLAIM_SWARM_ATTENUATION_WITNESS_CHAIN_BOUND,
     CLAIM_SWARM_BUDGET_POOL_BOUND, CLAIM_SWARM_CONTINUATION_FRESH, CLAIM_SWARM_JOIN_RECEIPT_BOUND,
     CLAIM_SWARM_REVOCATION_EPOCH_BOUND, CLAIM_SWARM_ROUTE_PLAN_BOUND, CLAIM_SWARM_TASK_GRAPH_BOUND,
-    CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND,
+    CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND, MAX_SWARM_GRAPH_EDGES, MAX_SWARM_GRAPH_JOINS,
+    MAX_SWARM_GRAPH_TASKS,
 };
 pub use verifier::{
     mint_swarm_continuation_token, mint_swarm_join_receipt, release_swarm_budget_fanin,
@@ -27,4 +43,5 @@ pub use verifier::{
     sign_swarm_join_receipt, sign_swarm_revocation_epoch, sign_swarm_route_plan_receipt,
     sign_swarm_task_graph, sign_swarm_terminal_graph_receipt,
     validate_swarm_budget_pool_accounting, verify_swarm_authority_bundle,
+    verify_swarm_authority_for_admission,
 };

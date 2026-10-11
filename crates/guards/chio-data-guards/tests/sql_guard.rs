@@ -54,6 +54,7 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (kp, scope, agent_id, server_id, request)
@@ -61,13 +62,11 @@ fn make_request(
 
 fn evaluate(guard: &SqlQueryGuard, tool: &str, args: serde_json::Value) -> Verdict {
     let (_kp, scope, agent_id, server_id, request) = make_request(tool, args);
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     guard
         .evaluate(&ctx)

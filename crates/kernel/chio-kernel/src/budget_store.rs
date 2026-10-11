@@ -1,9 +1,16 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use chio_core::capability::scope::MonetaryAmount;
+pub use chio_kernel_core::accounting::{
+    AccountingError, ExposureBalance, ExposureUnits, InvocationCount,
+};
 
 use crate::supplemental_quota::CanonicalRevocationSet;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
@@ -26,6 +33,25 @@ pub enum BudgetStoreError {
 
     #[error("budget mutation durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+}
+
+impl From<AccountingError> for BudgetStoreError {
+    fn from(error: AccountingError) -> Self {
+        match error {
+            AccountingError::ExposureOverflow => {
+                Self::Overflow("exposure units overflowed u64".into())
+            }
+            AccountingError::ExposureUnderflow => {
+                Self::Invariant("insufficient exposure units".into())
+            }
+            AccountingError::InvocationOverflow => {
+                Self::Overflow("invocation count overflowed u32".into())
+            }
+            AccountingError::InvocationUnderflow => {
+                Self::Invariant("insufficient invocation count".into())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,7 +155,7 @@ impl BudgetAuthorizeHoldRequest {
         }
         if self
             .invocation_quotas
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].key >= pair[1].key)
         {
             return Err(BudgetStoreError::Invariant(
@@ -492,8 +518,11 @@ pub struct BudgetCaptureHoldRequest {
     pub authority: Option<BudgetEventAuthority>,
 }
 
+/// A decision record returned by the composition-installed budget store.
+/// Only the kernel-owned authorize-hold call admits this result; caller-built
+/// records are not an entry point to reserve, consume, or dispatch budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AuthorizedBudgetHold {
+pub struct BudgetHoldAuthorizationRecord {
     pub hold_id: Option<String>,
     pub admission_binding: Option<BudgetAdmissionBinding>,
     pub authorized_exposure_units: u64,
@@ -536,7 +565,7 @@ pub struct DeniedBudgetHold {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BudgetAuthorizeHoldDecision {
-    Authorized(AuthorizedBudgetHold),
+    Authorized(BudgetHoldAuthorizationRecord),
     ApprovalRequired(ApprovalRequiredBudgetHold),
     Denied(DeniedBudgetHold),
     AlreadyCaptured(BudgetHoldMutationDecision),
@@ -649,7 +678,10 @@ pub trait BudgetStore: Send + Sync {
         max_total_cost_units: Option<u64>,
     ) -> Result<bool, BudgetStoreError>;
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids(
         &self,
         capability_id: &str,
@@ -680,7 +712,10 @@ pub trait BudgetStore: Send + Sync {
     /// authority fence. Implementations must preserve all three values or
     /// return an explicit unsupported error. This method is required so a
     /// backend upgrade cannot compile successfully and fail only on live calls.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -805,7 +840,10 @@ pub trait BudgetStore: Send + Sync {
 
     /// Reconcile exposure and spend under the exact durable identity and
     /// authority fence.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -950,7 +988,7 @@ pub trait BudgetStore: Send + Sync {
 
         if allowed {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
-                AuthorizedBudgetHold {
+                BudgetHoldAuthorizationRecord {
                     hold_id: request.hold_id,
                     admission_binding: request.admission_binding,
                     authorized_exposure_units: request.requested_exposure_units,
@@ -1045,12 +1083,16 @@ pub trait BudgetStore: Send + Sync {
         Ok(None)
     }
 
+    /// Authoritative recovery lookup. `None` means the store established that
+    /// the hold is absent; unsupported or unavailable reads must return an error.
     fn get_budget_hold(
         &self,
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
         let _ = hold_id;
-        Ok(None)
+        Err(BudgetStoreError::Invariant(
+            "budget store does not support authoritative hold lookup".to_owned(),
+        ))
     }
 
     fn mark_hold_reserved(
@@ -1089,13 +1131,11 @@ fn checked_committed_cost_units(
     total_cost_exposed: u64,
     total_cost_realized_spend: u64,
 ) -> Result<u64, BudgetStoreError> {
-    total_cost_exposed
-        .checked_add(total_cost_realized_spend)
-        .ok_or_else(|| {
-            BudgetStoreError::Overflow(
-                "total_cost_exposed + total_cost_realized_spend overflowed u64".to_string(),
-            )
-        })
+    Ok(
+        ExposureBalance::new(total_cost_exposed, total_cost_realized_spend)?
+            .committed()?
+            .get(),
+    )
 }
 
 mod in_memory;

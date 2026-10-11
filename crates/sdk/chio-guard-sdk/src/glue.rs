@@ -50,7 +50,9 @@ pub unsafe fn read_request(ptr: i32, len: i32) -> Result<GuardRequest, String> {
     if len == 0 {
         return serde_json::from_slice(&[]).map_err(|e| e.to_string());
     }
-    let slice = core::slice::from_raw_parts(ptr as *const u8, len as usize);
+    // SAFETY: the caller guarantees a live readable guest region; invalid signed
+    // pointer/length inputs were rejected above. The slice never outlives this call.
+    let slice = unsafe { core::slice::from_raw_parts(ptr as *const u8, len as usize) };
     serde_json::from_slice(slice).map_err(|e| e.to_string())
 }
 
@@ -277,6 +279,7 @@ mod tests {
         // Defense-in-depth: a hostile or buggy host that supplies a negative
         // `len` must not dereference the resulting slice. The function is
         // documented unsafe but should still reject this without UB.
+        // SAFETY: invalid pointer/length cases return before memory is accessed.
         let result = unsafe { super::read_request(0x1000, -1) };
         assert!(
             result.is_err(),
@@ -286,11 +289,13 @@ mod tests {
 
     #[test]
     fn read_request_rejects_zero_or_negative_pointer() {
+        // SAFETY: invalid pointer/length cases return before memory is accessed.
         let result = unsafe { super::read_request(0, 4) };
         assert!(
             result.is_err(),
             "zero pointer should fail-closed without dereferencing"
         );
+        // SAFETY: invalid pointer/length cases return before memory is accessed.
         let result = unsafe { super::read_request(-1, 4) };
         assert!(
             result.is_err(),

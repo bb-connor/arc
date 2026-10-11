@@ -1,0 +1,675 @@
+{
+  "schema": "chio.security.terminal-owner-renewal.v1",
+  "observed_utc": "2026-10-11T07:29:35.655311+00:00",
+  "source_stage_head": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+  "public_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "scope": "Terminal component and focused evidence. Earlier failed campaigns remain failed. Current clock owner renewal is active; no hosted, merge, release or operational readiness claim.",
+  "root_campaigns": {
+    "focused-residual-final": {
+      "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/summary.json",
+      "sha256": "ea2e00934e0962f2721ab9a281e9bb7a8cb03751b43a7272a3f25cd4bfb2350b",
+      "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+      "accepted": false,
+      "source_stable": true,
+      "commands": [
+        {
+          "label": "kernel-expiry-ownership",
+          "exit": 0,
+          "seconds": 189.4879090259783,
+          "source_stable": true,
+          "log_sha256": "f0e6ab047475986f6970199c720da03f0549da90c67694a0de9c96472fdcf932",
+          "test_summaries": [
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1668 filtered out; finished in 0.07s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "issuer-pool-and-receipt-deadlines",
+          "exit": 0,
+          "seconds": 302.49459472391754,
+          "source_stable": true,
+          "log_sha256": "287657a9a2245e2514a2f120f0a8bc332978de108bf65ad31a4538a880662a29",
+          "test_summaries": [
+            "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1765 filtered out; finished in 6.53s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "authority-replication-and-custody",
+          "exit": 0,
+          "seconds": 41.826008420903236,
+          "source_stable": true,
+          "log_sha256": "86b73872978aead78293d4b1f04f5bd1339fd3b6e35f21c903fb09c77a980141",
+          "test_summaries": [
+            "test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 1707 filtered out; finished in 39.92s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "channel-reservation-family",
+          "exit": 0,
+          "seconds": 15.632021756377071,
+          "source_stable": true,
+          "log_sha256": "ffffb87400c0b4f7d1151597cf682a88f3c718878a36a15ebea47f830f768979",
+          "test_summaries": [
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 2413 filtered out; finished in 14.28s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "receipt-snapshot-family",
+          "exit": 0,
+          "seconds": 61.96433908911422,
+          "source_stable": true,
+          "log_sha256": "afe2f6aea5564a8577ff3992e826640073ad809a4567238a5004bfe793dc63c1",
+          "test_summaries": [
+            "test result: ok. 151 passed; 0 failed; 7 ignored; 0 measured; 2261 filtered out; finished in 60.71s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "cli-export-and-proof-fixtures",
+          "exit": 0,
+          "seconds": 629.279228663072,
+          "source_stable": true,
+          "log_sha256": "cabdf866b16d46d51c625b3f532d432a551c2f105b7119dd86343a4809af74e8",
+          "test_summaries": [
+            "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.31s",
+            "test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 178.08s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "keyring-helper-binaries",
+          "exit": 0,
+          "seconds": 20.678830134682357,
+          "source_stable": true,
+          "log_sha256": "f2362223898ac33a195041d276ee0d9c5a306911304619fccfa4663a39ee13c1",
+          "test_summaries": [],
+          "accepted": true
+        },
+        {
+          "label": "actual-broker-portable",
+          "exit": 0,
+          "seconds": 896.5146414679475,
+          "source_stable": true,
+          "log_sha256": "542c6fc55cf1b316733ad754acc82f88bfd460752ee0a4ced9fd219fc1c94e3d",
+          "test_summaries": [
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 257 filtered out; finished in 0.08s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 134 filtered out; finished in 0.00s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 243 filtered out; finished in 0.19s",
+            "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 253 filtered out; finished in 0.75s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 259 filtered out; finished in 0.00s",
+            "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 259 filtered out; finished in 0.16s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 259 filtered out; finished in 0.01s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 257 filtered out; finished in 0.57s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 296 filtered out; finished in 0.05s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 256 filtered out; finished in 1.13s",
+            "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 287 filtered out; finished in 237.45s",
+            "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 253 filtered out; finished in 0.03s",
+            "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 277 filtered out; finished in 105.61s",
+            "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1790 filtered out; finished in 86.05s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "native-parallel-confirmation",
+          "exit": 101,
+          "seconds": 60.73808576632291,
+          "source_stable": true,
+          "log_sha256": "12606be6095210c5a4717b57f85a7d70811638dfaad02b5fc118b6933c6424eb",
+          "test_summaries": [
+            "test result: FAILED. 8 passed; 5 failed; 0 ignored; 0 measured; 287 filtered out; finished in 59.63s"
+          ],
+          "accepted": false
+        },
+        {
+          "label": "strict-changed-owners",
+          "exit": 0,
+          "seconds": 295.53751221718267,
+          "source_stable": true,
+          "log_sha256": "ced11752954eef91a4a0cdb2e9fdec96a30c405a8690ad6078cbf3fdd6f045be",
+          "test_summaries": [],
+          "accepted": true
+        },
+        {
+          "label": "strict-broker-all-features",
+          "exit": 0,
+          "seconds": 136.28563618985936,
+          "source_stable": true,
+          "log_sha256": "d290dba04053665dbafe30789c14d96e480b3cc4e9cdf5b77fcfda0fabb543ca",
+          "test_summaries": [],
+          "accepted": true
+        }
+      ]
+    },
+    "mobile-owning-919": {
+      "path": "/tmp/pr1160-ci-batch-20261010/mobile-owning-919/summary.json",
+      "sha256": "e2ef5b843284cef5618f7239b953174c280ad9b504a624541788628f55dd5455",
+      "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+      "accepted": true,
+      "source_stable": true,
+      "commands": [
+        {
+          "label": "mobile-owning",
+          "exit": 0,
+          "seconds": 172.7912982921116,
+          "source_stable": true,
+          "log_sha256": "4f0f4beb3fa755c33f6cc2311af388ed5b90f72c8613b689c328097371165a92",
+          "test_summaries": [
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s",
+            "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ],
+          "accepted": true
+        },
+        {
+          "label": "mobile-strict",
+          "exit": 0,
+          "seconds": 96.32841212488711,
+          "source_stable": true,
+          "log_sha256": "05df914d78f7d5e080d1dbe838f9a033692accf4341c6779f8ba6318b89f47d4",
+          "test_summaries": [],
+          "accepted": true
+        }
+      ]
+    }
+  },
+  "c1_c5": {
+    "verified_manifest_path": "/tmp/pr1160-ci-batch-20261010/c1-c5-terminal-evidence-verified.json",
+    "verified_manifest_sha256": "9f9f67999ccdbbcfda060240e66db832c6f6fd9e21d26f04acbd6f282fd1573b",
+    "evidence": {
+      "artifacts": {
+        "r2-c1-small/r2017c-green.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2017c-green.log",
+          "sha256": "ad02ae359805e542cca090f96ef8c04eab4e2040cda8a48d7ce5a9ad13305134",
+          "test_summaries": [
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s"
+          ]
+        },
+        "r2-c1-small/r2017-red-reason.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2017-red-reason.log",
+          "sha256": "d2a92ad75d728dbfe473c5818b2f47e42242a2146b9633dace688f2d6bc21470",
+          "test_summaries": [
+            "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s"
+          ]
+        },
+        "r2-c1-small/r2017-red-blobs.txt": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2017-red-blobs.txt",
+          "sha256": "d2381df3e4b0db3f2d13b60539b0ddea7d77e1f3f717f312cabd275ed3921f24",
+          "test_summaries": []
+        },
+        "r2-c1-small/r2018-a-old-oracle-mutant.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-a-old-oracle-mutant.log",
+          "sha256": "b7bd706e6bb6bdbc5551527fb6e604b6551f359e78275ad612deb114c1c34c0c",
+          "test_summaries": [
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        "r2-c1-small/r2018-b-repaired-oracle-mutant.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-b-repaired-oracle-mutant.log",
+          "sha256": "1238b56f129a6a45192cbf193cfe68a5fed6927c39736736f4c958896f252a77",
+          "test_summaries": [
+            "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        "r2-c1-small/r2018-c-green.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-c-green.log",
+          "sha256": "75dba2a1bb947ad107c6b77f0e498bc14bf49e9b380ac60584c3940894404159",
+          "test_summaries": [
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        "r2-c1-small/r2018-mutation.patch": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-mutation.patch",
+          "sha256": "6da02fb6a46ad55b96b2f614df15ab2c35e2de3748ed3239fa3c203875451f0b",
+          "test_summaries": []
+        },
+        "r2-c1-small/r2018-mutation-rc.txt": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-mutation-rc.txt",
+          "sha256": "99933e706b6d15ce28d5af79159d506ee736f21a1cb317abccda7d525d61b0cf",
+          "test_summaries": []
+        },
+        "r2-c1-small/r2018-sha-before.txt": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-sha-before.txt",
+          "sha256": "2d28f6a0573275b5e1f4f9cc41697b1943336aeb7ea63efaaf47fd195d563a8c",
+          "test_summaries": []
+        },
+        "r2-c1-small/r2018-sha-after.txt": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c1-small/r2018-sha-after.txt",
+          "sha256": "2d28f6a0573275b5e1f4f9cc41697b1943336aeb7ea63efaaf47fd195d563a8c",
+          "test_summaries": []
+        },
+        "r2-c5-sim-anthropic/r2-014-original.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/r2-014-original.log",
+          "sha256": "5756dae920a3227077d53d2b2d1a3ddbbd711fd7dc2b4361a79274002fc6a123",
+          "test_summaries": [
+            "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s"
+          ]
+        },
+        "r2-c5-sim-anthropic/r2-014-green.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/r2-014-green.log",
+          "sha256": "f774a71f9a44648d0c0517016dbcd12684c37b05e1342db0eb2bf05fe377f480",
+          "test_summaries": [
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.02s"
+          ]
+        },
+        "r2-c5-sim-anthropic/r2-016-original.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/r2-016-original.log",
+          "sha256": "d56d543b32c6c193ced42172f0b73dcab01f6008c6afc31cc5e95b8feaf64d6f",
+          "test_summaries": [
+            "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.04s"
+          ]
+        },
+        "r2-c5-sim-anthropic/r2-016-green.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/r2-016-green.log",
+          "sha256": "d79a58d5a0ad9998184d840f693fc69d6cada80f40ec7cfaa61f8cc30eaea4ad",
+          "test_summaries": [
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.05s"
+          ]
+        },
+        "r2-c5-sim-anthropic/check-all-targets.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/check-all-targets.log",
+          "sha256": "92f36b4f4191550d6a2b79fa71184ceb27662b97a700f5b951bbef597a00319c",
+          "test_summaries": []
+        },
+        "r2-c5-sim-anthropic/clippy-strict.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/clippy-strict.log",
+          "sha256": "fbf2ef1909ce914f17c4acf0a076f4cd6aaba9c0b8a557689d24d6727e747d96",
+          "test_summaries": []
+        },
+        "r2-c5-sim-anthropic/fmt-check.log": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/fmt-check.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "test_summaries": []
+        },
+        "r2-c5-sim-anthropic/c5-gates.out": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/c5-gates.out",
+          "sha256": "36661f638781cde426989c195623eb70c579cb339054dd6876836db77d06f734",
+          "test_summaries": []
+        },
+        "r2-c5-sim-anthropic/gates-tree-status.txt": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c5-sim-anthropic/gates-tree-status.txt",
+          "sha256": "6c2294044bdafcd1667a33873cb12b5044db19ec255e651d106f55a3cffa955a",
+          "test_summaries": []
+        }
+      },
+      "r2_018_restoration_byte_identical": true,
+      "r2_016_composed_source_equivalent": {
+        "crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs": "5c7ca84bc3c5a17c882449a64ba11cf81eb4d637cc3634a367e3346babda9507",
+        "crates/protocol/chio-anthropic-tools-adapter/tests/streaming.rs": "48952a968cc85c2b3d89f0d9181997da0e3df686951ee4f6d572c2335d06c05d"
+      },
+      "main_ref_live_verified": "2b1d467e17dbb172bbd3080188ff6476192c59f8",
+      "main_semantics": "The bug is present: message_start follows the default forwarding arm. The repair is not already on main.",
+      "scope": "Producer focused Original/GREEN and gate evidence, not full candidate or hosted qualification."
+    }
+  },
+  "c3": {
+    "original_production_verified_byte_equal_to_public_parent": true,
+    "original_production_file": "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs",
+    "original_production_sha256": "c039fdd481ba2e4b84e3d62ed6120ebe36fdba07dd2affd36fe43b74ce1e81eb",
+    "evidence": {
+      "manifest.txt": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/manifest.txt",
+        "sha256": "65e8a6ffc8acc8ab5e6ee668d6164dfe17ded0861fe0148d11fabbea9bd6bfa6",
+        "test_summaries": []
+      },
+      "c7-original.sh": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c7-original.sh",
+        "sha256": "abf5d80e9bd4b5fa2fcccb8652ae3331bb2818c3b5f9d58757557ac59da96088",
+        "test_summaries": []
+      },
+      "c7-original-tests.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c7-original-tests.log",
+        "sha256": "f195ac1f900f630b42c80a2a84d4fcdf542776cf73bf2c3e35ff9a8ab2caa95d",
+        "test_summaries": [
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1775 filtered out; finished in 11.19s"
+        ]
+      },
+      "c6-green-tests.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c6-green-tests.log",
+        "sha256": "49c53997a379c139f1b1d64842262eb0331e43dc84d18f226503c0f3095e0cf1",
+        "test_summaries": [
+          "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1757 filtered out; finished in 3.51s"
+        ]
+      },
+      "c6-repeat-tests.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c6-repeat-tests.log",
+        "sha256": "a1c448c18e99f3ced4ffe696d1efb43437c32a487a69bddec397a7d4821be6fb",
+        "test_summaries": [
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1784 filtered out; finished in 2.26s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1784 filtered out; finished in 2.26s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1784 filtered out; finished in 2.25s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1784 filtered out; finished in 2.26s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1784 filtered out; finished in 2.25s"
+        ]
+      },
+      "c6-security-clocks.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c6-security-clocks.log",
+        "sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b",
+        "test_summaries": []
+      }
+    },
+    "scope": "Genuine unchanged parent DNS timeout failure plus final producer30 and Root30/strict. Earlier reconstructed Original remains a mutant, not genuine old code."
+  },
+  "native_debug_concurrency": {
+    "result": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--features",
+        "native-mcp",
+        "--lib",
+        "process_boundary_tests::native",
+        "--",
+        "--test-threads=8",
+        "--nocapture"
+      ],
+      "exit": 101,
+      "log_sha256": "b66d56005e5887ede8b2ad457ada3e84a09f8d1e0b77ef11b97e07ab1afd614e",
+      "overlay_stable": true,
+      "probe_sha256": "7437e7724057e791437a4132003aeda4a03c8b64f64df340deb4a026983ffe62",
+      "scope": "Diagnostic only; no correctness or latency qualification regardless of exit.",
+      "seconds": 284.5606528627686,
+      "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+      "started_utc": "2026-10-11T07:03:36.127973+00:00",
+      "test_summaries": [
+        "test result: FAILED. 8 passed; 5 failed; 0 ignored; 0 measured; 287 filtered out; finished in 61.35s"
+      ],
+      "timeout_seconds": 1800,
+      "umask": "022"
+    },
+    "restoration": {
+      "files": {
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs": "e669f8848dd824a6ef27fa0a93eff1f6fb2308200f4716beeb2b7724a68c9e96",
+        "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs": "594a83a227dd8bdb50b13944ec5bbe01ebcb3326462cbfe76c34a0905c80a6f3",
+        "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs": "af1dbf5c9c81c61b94272830a49a1634a610edca1df0a7a3a3f01967413aad57",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs": "6ed25bcd6f69abc6740e83f84940f41dee86aabc884fd58fd340908db0a6ed61"
+      },
+      "source_stable": true
+    },
+    "result_sha256": "7b921584264d1ee40e7cdef807d42815f467ba0fa63fb80551af1c34c72ccc99",
+    "restoration_sha256": "5279dbda697e674e2a5035c3d61384b6a31c5d72f39446d5d8770177fce663f4",
+    "classification": "Five fail-closed native capture conflicts after fence budget in unoptimized eight-thread test load on 12 CPUs with concurrent C7 jobs5. Fence expiry is source-supported inference, not a logged distinct predicate. Required serial native13 passes; concurrency and latency acceptance stays open.",
+    "named_follow_up": "NATIVE-FENCE-EXPIRY-PROVENANCE",
+    "follow_up_scope": "P3 precise expiry-versus-other-conflict diagnostic in existing security follow-up track; no timeout/cap increase or production behavior change."
+  },
+  "clock_repair": {
+    "producer": "f7ab1df334a4d7f14b5762477fbc1429fe2f83a8",
+    "integration": "877d468e43",
+    "root_followups": "66d4568ab7",
+    "independent_review": "Claude APPROVE 2026-10-11T07:26:32Z in coordination to-codex.md",
+    "scope": "Injected authority monotonic clock, signed deny and unknown output on faults, retained original invocation hold/capture and replay refusal. Invocation-only tests do not establish monetary custody.",
+    "producer_evidence": {
+      "original.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/original.log",
+        "sha256": "1da5d8ffaafa63d59757c28f07fc1cfb3c062738bcf1eaff6c34cbe2c9126979",
+        "test_summaries": [
+          "test result: FAILED. 2 passed; 8 failed; 0 ignored; 0 measured; 1671 filtered out; finished in 0.28s"
+        ]
+      },
+      "green.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/green.log",
+        "sha256": "16ee880b5bba7c6a01d76c924af7682204b4f6bf70c5c2f56b1047e284b1d5a3",
+        "test_summaries": [
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1671 filtered out; finished in 0.29s"
+        ]
+      },
+      "green2.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/green2.log",
+        "sha256": "29730edea5a8c7101065f0fe0296528350a11067d1801e207de11778eae4db26",
+        "test_summaries": []
+      },
+      "green2.sh": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/green2.sh",
+        "sha256": "a96e3a2f89ee7ce636f8429e38b7bc70afafcecd6ef65b19d15327c48d2bfea4",
+        "test_summaries": []
+      },
+      "clippy.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/clippy.log",
+        "sha256": "a1b48ea45d6b9d74fe330220fe8c912ea1ce9d63e5646b2605903ccd63d5d3d4",
+        "test_summaries": []
+      },
+      "proof-parity.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-tool-elapsed/proof-parity.log",
+        "sha256": "bc22a4f81139a0d57ec806ec285a9414645dd124d16d023da7194164bac05b0d",
+        "test_summaries": [
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 146 filtered out; finished in 5.77s"
+        ]
+      }
+    },
+    "concurrent_evidence": {
+      "path": "/tmp/pr1160-ci-batch-20261010/c7-green-independent-verification.json",
+      "sha256": "3fd92089e183d7cc3f908c3b475a8fba541bcdb6ebf342a6136a2559a85a627f",
+      "result": {
+        "source": "f7ab1df334a4d7f14b5762477fbc1429fe2f83a8",
+        "binary_sha256": "b72ffb4d0c48a787e32d75c521d7931d296a7abf6fddd0ad3ed5c12f5ea0ef99",
+        "exit_log_sha256": "78633e472ae08b7e11a831366d74e2fcd9eb785d734344767bf7598655e8ba10",
+        "baseline_sha256": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3",
+        "tree_results": {
+          "r1-1": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-10": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-11": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-12": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-13": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-14": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-15": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-16": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-2": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-3": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-4": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-5": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-6": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-7": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-8": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r1-9": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-1": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-10": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-11": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-12": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-13": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-14": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-15": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-16": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-2": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-3": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-4": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-5": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-6": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-7": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-8": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r2-9": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-1": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-10": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-11": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-12": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-13": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-14": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-15": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-16": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-2": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-3": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-4": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-5": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-6": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-7": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-8": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          },
+          "r3-9": {
+            "files": 215,
+            "digest": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3"
+          }
+        },
+        "generated": 48,
+        "failed": 0,
+        "distinct_trees": 1,
+        "actual_umask": "002",
+        "scope": "Retained 3x16 concurrent generated fixture trees independently byte-hashed; source-family timing repair evidence, not full candidate/hosted proof."
+      }
+    },
+    "current_qualification": "Focused10 and full affected owner/strict campaign active on frozen66d. Producer focused10, strict, parity control and48 concurrent full artifact trees pass. Producer umask002 is retained; Root renewal uses022."
+  },
+  "remaining_acceptance": [
+    "Complete current clock fault/full-owner/strict renewal.",
+    "Obtain genuine C2 budget-split and C6 channel-reservation Original evidence; classify actual writer startup health error.",
+    "Publish one replacement, pass four required exact-head checks, classify remaining failures and answer review threads.",
+    "Report landing readiness and obtain explicit merge go-ahead. Known trusted authorization/evidence, proofs, cold activation and native latency acceptance remain separate."
+  ]
+}

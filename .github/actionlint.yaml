@@ -5,3 +5,4 @@ self-hosted-runner:
     - network
     - ephemeral
     - attested
+    - chio-enterprise-security

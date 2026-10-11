@@ -170,6 +170,10 @@ enum ProofCommands {
         #[arg(long)]
         input: PathBuf,
 
+        /// Independently trusted kernel public key for the input evidence package.
+        #[arg(long, required = true)]
+        trusted_kernel_pubkey: Vec<String>,
+
         /// Output JSON file for the MERCURY proof package.
         #[arg(long)]
         output: PathBuf,
@@ -550,7 +554,14 @@ fn run(cli: Cli) -> Result<(), chio_control_plane::CliError> {
                 input,
                 output,
                 bundle_manifest,
-            } => commands::cmd_mercury_proof_export(&input, &output, &bundle_manifest, cli.json),
+                trusted_kernel_pubkey,
+            } => commands::cmd_mercury_proof_export(
+                &input,
+                &output,
+                &bundle_manifest,
+                &trusted_kernel_pubkey,
+                cli.json,
+            ),
         },
         Commands::Inquiry { command } => match command {
             InquiryCommands::Export {

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 type MarkerRow = (
@@ -299,14 +300,12 @@ fn load_quota_projection(
             key: quota_key(&row.0, row.1, row.2)?,
             max_invocations: maximum,
         };
-        let counts = [row.4, row.5, row.6, row.7]
-            .map(|value| {
-                u32::try_from(value).map_err(|_| {
-                    BudgetStoreError::Invariant("invalid quota projection count".to_string())
-                })
+        let [c0, c1, c2, c3] = [row.4, row.5, row.6, row.7].map(|value| {
+            u32::try_from(value).map_err(|_| {
+                BudgetStoreError::Invariant("invalid quota projection count".to_string())
             })
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+        });
+        let counts = [c0?, c1?, c2?, c3?];
         if (!allow_zero_maximum && maximum == 0)
             || counts[0]
                 .checked_add(counts[1])
@@ -374,14 +373,12 @@ fn load_cumulative_projection(
     )?;
     let state_before = row.0.as_deref().map(cumulative_state).transpose()?;
     let state_after = cumulative_state(&row.1)?;
-    let values = [row.2, row.3, row.4, row.5, row.6, row.7]
-        .map(|value| {
-            u64::try_from(value).map_err(|_| {
-                BudgetStoreError::Invariant("negative cumulative approval projection".to_string())
-            })
+    let [v0, v1, v2, v3, v4, v5] = [row.2, row.3, row.4, row.5, row.6, row.7].map(|value| {
+        u64::try_from(value).map_err(|_| {
+            BudgetStoreError::Invariant("negative cumulative approval projection".to_string())
         })
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+    });
+    let values = [v0?, v1?, v2?, v3?, v4?, v5?];
     let currency = request.account_key.currency.clone();
     let account_key = request.account_key.clone();
     let amount = |units| MonetaryAmount {

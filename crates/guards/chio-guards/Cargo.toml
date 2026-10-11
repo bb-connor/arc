@@ -16,11 +16,13 @@ public_entrypoint = true
 name = "chio_guards"
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 chio-kernel = { workspace = true }
 chio-core = { workspace = true }
 chio-http-session = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+libc = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

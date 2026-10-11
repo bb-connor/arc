@@ -1,6 +1,6 @@
+use chio_security_types::clock::ClockError;
 use chio_swarm_authority::SwarmAuthorityBundle;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{sqlite_error, SqliteRuntimeOrchestrationStore};
 use crate::hash::canonical_sha256;
@@ -16,9 +16,10 @@ impl SqliteRuntimeOrchestrationStore {
             &bundle.task_graph.graph_id,
             "runtime_swarm_authority_empty_graph_id",
         )?;
+        let created_at =
+            i64::try_from(self.clock.unix_millis()?.get()).map_err(|_| ClockError::Overflow)?;
         let bundle_sha256 = canonical_sha256(&bundle)?;
-        let raw_json = serde_json::to_string(&bundle)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw_json = serde_json::to_string(&bundle).map_err(ChioRuntimeError::Json)?;
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -54,7 +55,7 @@ impl SqliteRuntimeOrchestrationStore {
                 bundle.task_graph.graph_id,
                 bundle_sha256,
                 raw_json,
-                current_unix_ms()?
+                created_at
             ],
         )
         .map_err(sqlite_error)?;
@@ -67,28 +68,31 @@ impl SqliteRuntimeOrchestrationStore {
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         validate_non_empty(task_graph_id, "runtime_swarm_authority_empty_graph_id")?;
         let connection = self.lock_connection()?;
-        let raw_json: Option<String> = connection
+        let row: Option<(String, String)> = connection
             .query_row(
-                "SELECT raw_json FROM runtime_swarm_authority_bundles WHERE task_graph_id = ?1",
+                "SELECT bundle_sha256, raw_json FROM runtime_swarm_authority_bundles WHERE task_graph_id = ?1",
                 params![task_graph_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()
             .map_err(sqlite_error)?;
-        raw_json
-            .map(|json| {
-                serde_json::from_str(&json)
-                    .map_err(|error| ChioRuntimeError::Json(error.to_string()))
-            })
-            .transpose()
+        row.map(|(stored_hash, json)| {
+            let bundle: SwarmAuthorityBundle =
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    json.as_bytes(),
+                    64 * 1024 * 1024,
+                )?
+                .decode_signed()?;
+            if bundle.task_graph.graph_id != task_graph_id
+                || canonical_sha256(&bundle)? != stored_hash
+            {
+                return Err(ChioRuntimeError::Rejected {
+                    code: "runtime_stored_bundle_binding_mismatch",
+                    detail: "stored bundle does not match its index and digest".to_owned(),
+                });
+            }
+            Ok(bundle)
+        })
+        .transpose()
     }
-}
-
-fn current_unix_ms() -> Result<i64, ChioRuntimeError> {
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| ChioRuntimeError::Store(format!("system clock before epoch: {error}")))?;
-    i64::try_from(duration.as_millis()).map_err(|_| {
-        ChioRuntimeError::Store("system clock timestamp exceeds sqlite range".to_string())
-    })
 }

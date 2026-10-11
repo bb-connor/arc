@@ -1,0 +1,402 @@
+{
+  "schema": "chio.receipt-snapshot-integrity-qualification.v1",
+  "observed_utc": "2026-10-09T14:13:04.505474+00:00",
+  "stage_head": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "stage_promoted_to_source": false,
+  "candidate_qualified": false,
+  "merged": false,
+  "repairs": {
+    "V25-CHECKPOINT-PUBLICATION": {
+      "pairs": [
+        {
+          "producer": "df64ff46911b1f28cea23a18aea26947ac8a7f88",
+          "integrated": "9a6a828c7e17d6089d16f1c6a5e31c2f6c686b5f"
+        },
+        {
+          "producer": "0c6ce34250f4a5d13562c1e64e1c566a8c24191c",
+          "integrated": "93050e5496b358268ef659ea192e0614589df14a"
+        }
+      ],
+      "contract": "Stage leaves without publishing rows/counts, authenticate covering root, reread/authenticate/source-check and require the verified leaves before bounded publication. Preserve prior published prefix and retry cleanup.",
+      "source_repair": {
+        "commits": [
+          "9a6a828c7e17d6089d16f1c6a5e31c2f6c686b5f",
+          "93050e5496b358268ef659ea192e0614589df14a"
+        ],
+        "producer_commits": [
+          "df64ff46911b1f28cea23a18aea26947ac8a7f88",
+          "0c6ce34250f4a5d13562c1e64e1c566a8c24191c"
+        ],
+        "observed_source_head": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "observed_source_tree": "cb639853805c9e2918f9d09ec12d3e7125218e9f",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/publication.rs"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-handoff/JOINED-LOCAL-RESULT.json",
+          "sha256": "1360e9c3023a22a967b29bc6c88097a44a13c3448b2b37c25df11ea3d05fb4a0",
+          "scope": "Exact disjoint90+27 snapshot/backing and61 public controls; strict three-owner all-target Clippy."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-local-residual/source.json",
+          "sha256": "1b7820d584dc094a5e938f2d63f80ca8a68950caf77df03316996f25517f0242",
+          "scope": "Frozen composed source manifest at6a1c7c5a9f."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/static-checkpoint/JOINED-RESULT.json",
+          "sha256": "71d09b185d39a84ec9de2d1ac9a10e9fcef637ba8b58295c6084538cbdb050aa",
+          "scope": "Six actual static gates pass. Two initial mistyped HTTP command paths are preserved as setup refusals, not gate failures or passes."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-publication/red.log",
+          "sha256": "c9ba659afd670d1155552665dbb5f55677bf184cc1e21ef6f5351dae80fea4b8",
+          "scope": "Actual Original2FAIL: covered rows became visible before covering-root verification."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-publication/green.log",
+          "sha256": "f6f6ef788d819427fda3494889d56002f59f9817b4eac26910657a0fdf1d4f19",
+          "scope": "Producer109PASS before lineage and target selection follow-ups."
+        }
+      ]
+    },
+    "V25-LINEAGE-REFRESH": {
+      "pairs": [
+        {
+          "producer": "e2c103dfb696b287481c798773585a55db923b8d",
+          "integrated": "c8af0afddd2dae67574697d27bfe5cd908a3f011"
+        },
+        {
+          "producer": "722e1c08b56538e37c8435807c3962ff21f9c918",
+          "integrated": "6ad6b364871aea085ffa040de35b5cb3a38d75f8"
+        }
+      ],
+      "contract": "Measure variable fields before canonical snapshot_from_row validation. Conservatively invalidate a refused lineage row for a represented capability; ignore unrepresented rows without attribution until canonical validation is needed.",
+      "source_repair": {
+        "commits": [
+          "c8af0afddd2dae67574697d27bfe5cd908a3f011",
+          "6ad6b364871aea085ffa040de35b5cb3a38d75f8"
+        ],
+        "producer_commits": [
+          "e2c103dfb696b287481c798773585a55db923b8d",
+          "722e1c08b56538e37c8435807c3962ff21f9c918"
+        ],
+        "observed_source_head": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "observed_source_tree": "cb639853805c9e2918f9d09ec12d3e7125218e9f",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/lineage.rs"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-handoff/JOINED-LOCAL-RESULT.json",
+          "sha256": "1360e9c3023a22a967b29bc6c88097a44a13c3448b2b37c25df11ea3d05fb4a0",
+          "scope": "Exact disjoint90+27 snapshot/backing and61 public controls; strict three-owner all-target Clippy."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-local-residual/source.json",
+          "sha256": "1b7820d584dc094a5e938f2d63f80ca8a68950caf77df03316996f25517f0242",
+          "scope": "Frozen composed source manifest at6a1c7c5a9f."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/static-checkpoint/JOINED-RESULT.json",
+          "sha256": "71d09b185d39a84ec9de2d1ac9a10e9fcef637ba8b58295c6084538cbdb050aa",
+          "scope": "Six actual static gates pass. Two initial mistyped HTTP command paths are preserved as setup refusals, not gate failures or passes."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/lineage-refresh/red.log",
+          "sha256": "7134c28cc6fb46cac34ed855ab812d185c24b1ce13da77c628168de0d653691c",
+          "scope": "Actual Original3FAIL/2positive controls: refused lineage rows supplied query attribution."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/lineage-refresh/green.log",
+          "sha256": "8d077ae7599e7cd7c08e88db1413d6f98d13b05449fd25b9cea07be0b752571e",
+          "scope": "Producer114PASS; valid signed and legacy controls preserved."
+        }
+      ]
+    },
+    "V25-CHECKPOINT-TARGET-SHADOW": {
+      "pairs": [
+        {
+          "producer": "63b12b2aab9247519966d3e0a82665f413928c11",
+          "integrated": "b31f137818b2b864f19c2faf4839a6b5b8e8aa24"
+        },
+        {
+          "producer": "fa45e6df73d0df3ca0c8afc6d7dc454c368db36f",
+          "integrated": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3"
+        }
+      ],
+      "contract": "Observe unfiltered checkpoint MAX in the coherent read, authenticate target and require signed batch end within observed head before classifying covered rows.",
+      "source_repair": {
+        "commits": [
+          "b31f137818b2b864f19c2faf4839a6b5b8e8aa24",
+          "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3"
+        ],
+        "producer_commits": [
+          "63b12b2aab9247519966d3e0a82665f413928c11",
+          "fa45e6df73d0df3ca0c8afc6d7dc454c368db36f"
+        ],
+        "observed_source_head": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "observed_source_tree": "cb639853805c9e2918f9d09ec12d3e7125218e9f",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/pass.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/publication.rs"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-handoff/JOINED-LOCAL-RESULT.json",
+          "sha256": "1360e9c3023a22a967b29bc6c88097a44a13c3448b2b37c25df11ea3d05fb4a0",
+          "scope": "Exact disjoint90+27 snapshot/backing and61 public controls; strict three-owner all-target Clippy."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/checkpoint-local-residual/source.json",
+          "sha256": "1b7820d584dc094a5e938f2d63f80ca8a68950caf77df03316996f25517f0242",
+          "scope": "Frozen composed source manifest at6a1c7c5a9f."
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/static-checkpoint/JOINED-RESULT.json",
+          "sha256": "71d09b185d39a84ec9de2d1ac9a10e9fcef637ba8b58295c6084538cbdb050aa",
+          "scope": "Six actual static gates pass. Two initial mistyped HTTP command paths are preserved as setup refusals, not gate failures or passes."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-target-shadow/red.log",
+          "sha256": "869fda4f44322015633279cfb765d21850de9dcf90627c59f4cb5d456d71a763",
+          "scope": "Actual Original3FAIL in extension, build and recertification with unsigned checkpoint-end shadowing."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-target-shadow/green.log",
+          "sha256": "a837da6770e6138bdeaf6a7379ac8c617679195eb11c5a897a4d30bc33a3c75e",
+          "scope": "Producer117PASS/5explicit ignores at63b; finalfa45 changes only an Observation comment."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-target-shadow/clippy-final.log",
+          "sha256": "ee0335c2576bd0e4c8657af388759aa632f931eaa4fe9e7e477aa7725063ba18",
+          "scope": "Strict owning all-target Clippy passes atfa45."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-target-shadow/initial-build-equivalence-final.txt",
+          "sha256": "3e3b564f201d5eff02eb0c54ce6760025f5a4cf042948352c2754ff77a2f830b",
+          "scope": "Nineteen initial-build/per-receipt function bodies unchanged; observe query and per-checkpoint signed-end bound change."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/checkpoint-target-shadow/observe-query-plan.txt",
+          "sha256": "227b3d5444ab290bda920a33401ab476b8eb119ad3f9b79cc86469923a3e370d",
+          "scope": "Two-thousand-checkpoint query-plan comparison; filtered2022 versus unfiltered15 VMsteps, not full capacity qualification."
+        }
+      ]
+    }
+  },
+  "local_qualification": {
+    "source": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+    "snapshot_passed": 117,
+    "public_passed": 61,
+    "explicit_snapshot_ignores": 5,
+    "strict_owners": [
+      "chio-store-sqlite",
+      "chio-control-plane",
+      "chio-cli"
+    ],
+    "strict_all_targets": true,
+    "earlier_selection_refusal_retained": true,
+    "results": [
+      {
+        "name": "snapshot",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "receipt_query_snapshot_backing::"
+        ],
+        "source": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "started_at": "2026-10-09T14:05:08.446943+00:00",
+        "terminal_at": "2026-10-09T14:05:09.671634+00:00",
+        "seconds": 1.2247128910385072,
+        "exit_code": 0,
+        "passed_test_names": [
+          "receipt_query_snapshot_backing::tests::altered_memory_temp_store_is_refused_on_next_borrow",
+          "receipt_query_snapshot_backing::tests::cleanup_preserves_replaced_file",
+          "receipt_query_snapshot_backing::tests::cleanup_preserves_replaced_private_parent",
+          "receipt_query_snapshot_backing::tests::cleanup_preserves_symlink_and_its_target",
+          "receipt_query_snapshot_backing::tests::creates_real_sqlite_backing_with_checked_borrows",
+          "receipt_query_snapshot_backing::tests::drop_preserves_substituted_parent",
+          "receipt_query_snapshot_backing::tests::drop_removes_healthy_custody_with_an_open_transaction",
+          "receipt_query_snapshot_backing::tests::foreign_sqlite_descriptor_is_refused",
+          "receipt_query_snapshot_backing::tests::hardlinked_backing_file_refuses_checked_connection",
+          "receipt_query_snapshot_backing::tests::leaf_symlink_refuses_checked_connection",
+          "receipt_query_snapshot_backing::tests::memory_sqlite_descriptor_is_refused",
+          "receipt_query_snapshot_backing::tests::private_named_file_uses_memory_journal_and_memory_temp_store",
+          "receipt_query_snapshot_backing::tests::provision::directory_open_fd_exhaustion_cleans_exclusively_created_entries",
+          "receipt_query_snapshot_backing::tests::provision::directory_substituted_after_stage_capture_cannot_replace_the_created_inode",
+          "receipt_query_snapshot_backing::tests::provision::misspelled_probe_selector_cannot_satisfy_the_emfile_control",
+          "receipt_query_snapshot_backing::tests::provision::staged_cleanup_preserves_substituted_directory",
+          "receipt_query_snapshot_backing::tests::provision::staged_cleanup_preserves_substituted_symlink",
+          "receipt_query_snapshot_backing::tests::relative_and_uri_parents_are_refused_without_provisioning",
+          "receipt_query_snapshot_backing::tests::relaxed_directory_permissions_refuse_checked_connection",
+          "receipt_query_snapshot_backing::tests::relaxed_file_permissions_refuse_checked_connection",
+          "receipt_query_snapshot_backing::tests::replaced_file_path_refuses_checked_connection",
+          "receipt_query_snapshot_backing::tests::replaced_private_parent_refuses_checked_connection",
+          "receipt_query_snapshot_backing::tests::symlink_parent_is_refused_during_provisioning",
+          "receipt_query_snapshot_backing::tests::transient_leaf_swap_after_validation_refuses_actual_sqlite_descriptor",
+          "receipt_query_snapshot_backing::tests::transient_parent_swap_after_validation_refuses_actual_sqlite_descriptor",
+          "receipt_query_snapshot_backing::tests::unexpected_sidecar_refuses_borrow_and_cleanup",
+          "receipt_query_snapshot_backing::tests::writable_nonsticky_parent_is_refused_during_provisioning"
+        ],
+        "test_summaries": [
+          [
+            27,
+            0,
+            1
+          ]
+        ],
+        "missing_expected_tests": [],
+        "log_sha256": "0ad5cd4b41488c07c5951bd40c829620e70338eb38cc89ccca4aab81d4cf936a",
+        "accepted": true
+      },
+      {
+        "name": "public",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "receipt_query_snapshot_tests",
+          "leader_forward_admission",
+          "oid4vp_issuer_fetch_tests",
+          "portable_issuer_fetch::tests",
+          "public_passport_challenge_admission",
+          "search_admission",
+          "public_authority_reads",
+          "config_and_public_tests"
+        ],
+        "source": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "started_at": "2026-10-09T14:05:09.904178+00:00",
+        "terminal_at": "2026-10-09T14:08:51.723453+00:00",
+        "seconds": 221.81929644662887,
+        "exit_code": 0,
+        "passed_test_names": [
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::cancelled_finalized_leader_forwards_keep_their_permit_until_the_response_is_built",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::cancelled_leader_forward_keeps_its_permit_until_the_transport_ends",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::finalized_leader_forwards_return_the_built_response_under_their_permit",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::leader_forward_leaves_the_async_worker_free_while_the_leader_withholds_its_response",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::leader_forward_retry_readmits_under_one_permit_after_a_failed_attempt",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::local_leader_and_standalone_writes_never_take_a_forward_permit",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::next_leader_forward_is_refused_at_once_while_paused_forwards_hold_every_permit",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::paused_forward_response_build_keeps_its_permit_and_refuses_the_next_forward",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::leader_forward_admission::paused_forward_response_build_leaves_the_async_worker_free",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::cancelled_public_challenge_verification_keeps_its_permit_until_the_verification_ends",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::next_public_challenge_verification_is_refused_at_once_while_a_paused_one_holds_the_permit",
+          "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::public_challenge_verification_leaves_the_async_worker_free_while_its_status_read_is_paused",
+          "trust_control::config_and_public::config_and_public_tests::configured_public_certification_metadata_validates_advertise_url_and_builds_paths",
+          "trust_control::config_and_public::config_and_public_tests::oid4vp_url_helpers_encode_request_values",
+          "trust_control::config_and_public::config_and_public_tests::public_discovery_uses_local_db_signer_after_replica_snapshot",
+          "trust_control::config_and_public::config_and_public_tests::public_generic_registry_publisher_requires_and_normalizes_advertise_url",
+          "trust_control::config_and_public::config_and_public_tests::trusted_public_keys_require_configuration_and_add_current_key_once",
+          "trust_control::config_and_public::config_and_public_tests::verifier_metadata_and_jwks_can_be_built_from_seed_authority",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::aborted_fetch_response_does_not_reflect_panic_payload",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::allowlisted_https_issuer_plans_a_strict_remote_fetch",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::allowlisted_remote_issuer_verifies_end_to_end",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::cancellation_keeps_admission_until_the_blocking_fetch_finishes",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::dns_resolution_is_pinned_to_the_checked_addresses_once",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::empty_allowlist_refuses_remote_issuer_without_network",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::fetch_bounds_an_oversized_body",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::fetch_error_status_does_not_reflect_the_response_body",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::fetch_returns_only_the_pinned_loopback_keys",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::http_allowlisted_issuer_is_refused_before_any_fetch",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::lifecycle_without_status_reference_resolves_locally",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::non_allowlisted_issuer_is_untrusted",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::offload_leaves_the_async_worker_free_while_the_remote_stalls",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::offload_refuses_when_no_permit_is_free",
+          "trust_control::config_and_public::portable_issuer_fetch::tests::pin_checked_addrs_refuses_private_resolution",
+          "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_accepts_locally_issued_credential_without_fetch",
+          "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_reads_the_local_authority_database_without_writing",
+          "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_acceptance_past_request_expiry",
+          "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_credential_expired_during_the_wait",
+          "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_untrusted_issuer_before_any_fetch",
+          "trust_control::service_runtime::router::finding_market_exit_tests::search_admission::cancelled_finding_search_keeps_its_permit_until_the_search_ends",
+          "trust_control::service_runtime::router::finding_market_exit_tests::search_admission::finding_search_leaves_the_async_worker_free_while_its_authority_status_is_paused",
+          "trust_control::service_runtime::router::finding_market_exit_tests::search_admission::next_finding_search_is_refused_at_once_while_a_paused_one_holds_the_permit",
+          "trust_control::service_runtime::router::tests::public_authority_reads::health_reports_an_initialized_authority_as_the_status_owner_does",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_authority_routes_answer_while_an_authority_writer_holds_the_write_lock",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_authority_routes_commit_no_authority_data_writes",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_authority_routes_publish_rotation_and_lifecycle",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_authority_routes_refuse_a_regressed_clock_and_unsafe_custody",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_authority_routes_refuse_absent_storage_without_creating_it",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_issuer_metadata_is_identical_to_the_owner_view",
+          "trust_control::service_runtime::router::tests::public_authority_reads::public_routes_refuse_absent_authority_with_a_typed_message",
+          "trust_control::service_runtime::router::tests::public_authority_reads::token_redemption_redeems_an_issued_code_without_authority_writes",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_export_keeps_its_permit_until_blocking_work_stops",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_page_materialization_keeps_read_admission",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_point_materialization_keeps_read_admission",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::cancelled_response_finalization_keeps_the_export_lane_occupied",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::every_receipt_read_route_reports_an_authenticated_watermark",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::export_lane_refuses_a_second_export_without_borrowing_read_capacity",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::health_reports_snapshot_readiness_and_resource_usage",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::http_pages_use_the_pinned_projection_and_refuse_a_changed_returned_leaf",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::receipt_admission_is_nonqueued_and_authentication_precedes_it",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::receipt_response_materialization_runs_off_the_async_worker",
+          "trust_control::service_runtime::router::tests::receipt_query_snapshot_tests::snapshot_errors_preserve_codes_status_and_retry_contracts"
+        ],
+        "test_summaries": [
+          [
+            61,
+            0,
+            0
+          ]
+        ],
+        "missing_expected_tests": [],
+        "log_sha256": "debfb679163134cbef03e1985fdd9d119e1b6595cedaf77bef3ac906066f1fdf",
+        "accepted": true
+      },
+      {
+        "name": "strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "-p",
+          "chio-control-plane",
+          "-p",
+          "chio-cli",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "source": "6a1c7c5a9fd4870d7d110126b1b894a49d7fe5a3",
+        "started_at": "2026-10-09T14:08:51.958314+00:00",
+        "terminal_at": "2026-10-09T14:12:39.061092+00:00",
+        "seconds": 227.10279738530517,
+        "exit_code": 0,
+        "passed_test_names": [],
+        "test_summaries": [],
+        "missing_expected_tests": [],
+        "log_sha256": "e6991ed214f529479633287880bcc50df7a86b8f1a07889b2b5edf5f81cd9137",
+        "accepted": true
+      }
+    ],
+    "selection_union_exact": true
+  },
+  "capacity_status": "pending_same_host_pair_on_restored_builder",
+  "remaining_acceptance": [
+    "Complete the full150k same-host Original/final capacity comparison and C20 sequence handoff; earlier1M/10M evidence remains at its predecessor source.",
+    "Complete mandatory original-domain real-SHA proof, then promote stage to Source, independent final review and accurate threads, four exact protected checks and protected merge."
+  ]
+}

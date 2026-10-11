@@ -12,6 +12,7 @@ publish = false
 name = "chio_credentials"
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 chio-core = { workspace = true }
 chio-credit = { workspace = true }
 chio-did = { workspace = true }

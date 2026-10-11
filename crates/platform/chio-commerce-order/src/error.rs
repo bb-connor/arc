@@ -2,6 +2,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CommerceOrderError {
+    #[error("commerce input rejected: {0}")]
+    Input(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("commerce evidence exceeds the verification budget")]
+    EvidenceLimit,
     #[error("unsupported commerce schema for {field}: {schema}")]
     UnsupportedSchema { field: &'static str, schema: String },
     #[error("invalid commerce artifact {field}: {message}")]

@@ -1,0 +1,70 @@
+{
+  "schema": "chio.pr1160.native-diagnostic-checkpoint.v1",
+  "source": "f41e8928d9baf5e722801146fef7e20b2921ed10",
+  "source_tree": "0dce0d64e8723758b6483f29cd68f415b2bb5c07",
+  "purpose": "Diagnostic counterexample only; not current candidate qualification",
+  "qualified": false,
+  "merged": false,
+  "manifest_sha256": "600faa0da0a4ee249b38691bd43377aa5e2f418e1570244450e820b07c1c4c05",
+  "verified_files": 908,
+  "root_cause_report_sha256": "ffef7ab7312bfe96e337ef44b548bdca60e8cb2e909f162845b2126f0cf9c6ab",
+  "root_cause": "The attach child is spawned with PR_SET_PDEATHSIG by a Tokio worker thread. That thread can retire while the runner lives; the native trace records thread exit followed by SIGKILL to its child 125.5 microseconds later.",
+  "attempts": [
+    {
+      "name": "a-r1",
+      "result": "416 Python tests and earlier qualification steps passed; native baseline exit_1 three times; operator stage not reached"
+    },
+    {
+      "name": "a-r2",
+      "result": "unperturbed operator attachment loss, one attempt"
+    },
+    {
+      "name": "a-r3",
+      "result": "operator attachment loss with read-only kernel trace"
+    },
+    {
+      "name": "a-r4",
+      "result": "operator exit_1 twice; no attachment loss"
+    },
+    {
+      "name": "a-n2",
+      "result": "native baseline attachment loss"
+    },
+    {
+      "name": "a-n3",
+      "result": "native baseline exit_1 three times"
+    }
+  ],
+  "published_source_comparison": "89d79ac6ab prepared but not run; source-vs-host attribution of the separate capture denial remains open",
+  "private_evidence": "Private payloads remain in the restricted local evidence directory; no payload copied to this report.",
+  "worker_disposition": "Batch-created resources removed after verified transfer; starting footprint restored; worker stopped.",
+  "requirements": [
+    {
+      "id": "MINISW-PDEATH",
+      "priority": "P1",
+      "requirement": "Keep the child spawning thread alive for the exact supervised process while preserving parent-death termination, cancellation, at-most-once reaping and concurrency bounds.",
+      "status": "confirmed-native-counterexample-original-first-repair-assigned",
+      "owner": "claude"
+    },
+    {
+      "id": "MINISW-NATIVE-DENY",
+      "priority": "P1",
+      "requirement": "Identify and repair the native dispatch capture or lifecycle-handoff denial reached on the third sandbox execution without weakening custody, trusted-time or recovery-required behavior.",
+      "status": "native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending",
+      "owner": "claude"
+    },
+    {
+      "id": "BROKER-SELECT",
+      "priority": "P2",
+      "requirement": "Select the broker execution original through authenticated operation custody despite another operation sharing the request identifier.",
+      "status": "source-suspected-liveness-defect-original-and-selector-proposal-pending",
+      "owner": "claude"
+    }
+  ],
+  "remaining_acceptance": [
+    "Actual Original-first repair and focused controls for the process lifetime defect.",
+    "Bounded non-secret diagnostics and causal Original for the separate native capture denial.",
+    "Broker collision runtime reproduction before accepting a producer change.",
+    "Exact final source native/cold/trusted/hosted qualification and protected landing."
+  ]
+}

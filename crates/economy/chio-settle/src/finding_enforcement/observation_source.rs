@@ -7,7 +7,7 @@ use std::net::{IpAddr, ToSocketAddrs as _};
 use std::sync::Arc;
 use std::time::Duration;
 
-use chio_core::{canonical::canonical_json_bytes_from_str, canonical_json_bytes, sha256_hex};
+use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_egress_contract::HttpEgressContract;
 use chio_finding::FindingObservedFinality;
 use serde::{Deserialize, Serialize};
@@ -444,27 +444,8 @@ fn decode_response(
     request_sha256: &str,
     bytes: &[u8],
 ) -> Result<FindingBondObservationRecheck, SettlementError> {
-    if bytes.is_empty() || bytes.len() > MAX_OBSERVATION_RESPONSE_BYTES {
-        return Err(SettlementError::Verification(
-            "remote bond observation response exceeds its bound".to_owned(),
-        ));
-    }
-    let raw = std::str::from_utf8(bytes).map_err(|_| {
-        SettlementError::Verification("remote bond observation response is not UTF-8".to_owned())
-    })?;
-    let canonical = canonical_json_bytes_from_str(raw).map_err(|_| {
-        SettlementError::Verification(
-            "remote bond observation response is not strict canonical JSON".to_owned(),
-        )
-    })?;
-    if canonical != bytes {
-        return Err(SettlementError::Verification(
-            "remote bond observation response is not canonical".to_owned(),
-        ));
-    }
-    let response: FindingBondObservationResponse = serde_json::from_slice(bytes).map_err(|_| {
-        SettlementError::Verification("remote bond observation response is invalid".to_owned())
-    })?;
+    let response: FindingBondObservationResponse =
+        crate::input::external_canonical(bytes, MAX_OBSERVATION_RESPONSE_BYTES)?;
     if response.schema != FINDING_BOND_OBSERVATION_RESPONSE_SCHEMA
         || response.request_sha256 != request_sha256
         || !valid_observation(&response.observation)
@@ -614,5 +595,22 @@ mod tests {
         let schema = chio_spec_validate::load_json(&path).map_err(|error| error.to_string())?;
         chio_spec_validate::validate_value(&path, &schema, &path, value)
             .map_err(|error| error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod original_input_tests {
+    use super::*;
+    #[test]
+    fn original_observation_failure_preserves_native_source() {
+        let error = match decode_response(
+            &"a".repeat(64),
+            br#"{"private-marker":1,"private-marker":2}"#,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("ambiguous observation accepted"),
+        };
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
     }
 }

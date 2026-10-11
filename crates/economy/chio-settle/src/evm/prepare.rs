@@ -1,5 +1,7 @@
 //! EVM settlement call preparation and on-chain read/submit helpers.
 
+use secrecy::ExposeSecret;
+
 use super::*;
 
 pub fn scale_chio_amount_to_token_minor_units(
@@ -266,7 +268,13 @@ fn settlement_operator_key_hash(
             binding.certificate.chio_public_key.algorithm()
         )));
     }
-    Ok(keccak256(binding.certificate.chio_public_key.as_bytes()))
+    Ok(keccak256(
+        binding
+            .certificate
+            .chio_public_key
+            .ed25519_bytes()
+            .map_err(|_| SettlementError::InvalidBinding("Ed25519 public key required".into()))?,
+    ))
 }
 
 pub fn prepare_merkle_release(
@@ -1172,7 +1180,8 @@ pub async fn prepare_dual_sign_release(
                 .to_string(),
         ));
     }
-    let signer_address = signer_address_from_private_key(&input.operator_private_key_hex)?;
+    let signer_address =
+        signer_address_from_private_key(input.operator_private_key_hex.expose_secret())?;
     if settlement_key != signer_address {
         return Err(SettlementError::InvalidInput(
             "operator signing key does not match identity registry settlement key".to_string(),
@@ -1193,7 +1202,7 @@ pub async fn prepare_dual_sign_release(
         amount_minor_units,
         registry_evidence.operator_epoch,
     )?;
-    let signature = sign_digest(&input.operator_private_key_hex, &digest)?;
+    let signature = sign_digest(input.operator_private_key_hex.expose_secret(), &digest)?;
 
     let call = IChioEscrow::releaseWithSignatureCall {
         escrowId: escrow_id,

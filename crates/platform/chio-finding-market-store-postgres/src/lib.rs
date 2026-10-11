@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! PostgreSQL durability for the hosted cognition-market control loop.
 //!
 //! Every tenant-scoped operation sets `chio.tenant_id` transaction-locally
@@ -146,6 +147,10 @@ const MAX_I_JSON_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, thiserror::Error)]
 pub enum HostedMarketStoreError {
+    #[error("hosted market input JSON is invalid")]
+    InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted market durable JSON is invalid")]
+    CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("hosted market PostgreSQL configuration is invalid")]
     Configuration,
     #[error("hosted market tenant identity is invalid")]
@@ -692,7 +697,7 @@ impl PostgresFindingMarketStore {
     ) -> Result<Option<HostedMarketJob>, HostedMarketStoreError> {
         validate_identifier(job_id, MAX_JOB_ID_BYTES)
             .map_err(|_| HostedMarketStoreError::Invalid("job_id"))?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_tenant_snapshot(tenant).await?;
         let row = sqlx::query(JOB_SELECT)
             .bind(tenant.as_str())
             .bind(job_id)
@@ -737,13 +742,13 @@ impl PostgresFindingMarketStore {
         stored_u64(count)
     }
 
-    /// Prove that the runtime role can enter one configured tenant boundary
+    /// Prove that the connected role can read one enabled tenant boundary
     /// before a worker advertises readiness or claims a lease.
     pub async fn probe_tenant(
         &self,
         tenant: &HostedTenantId,
     ) -> Result<(), HostedMarketStoreError> {
-        let transaction = self.begin_tenant(tenant).await?;
+        let transaction = self.begin_tenant_snapshot(tenant).await?;
         transaction.commit().await.map_err(unavailable)
     }
 

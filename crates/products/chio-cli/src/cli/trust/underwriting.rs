@@ -71,8 +71,9 @@ pub(crate) fn cmd_trust_underwriting_input_export(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_signed_underwriting_policy_input(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -141,8 +142,9 @@ pub(crate) fn cmd_trust_underwriting_decision_evaluate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_underwriting_decision_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             &query,
@@ -198,8 +200,9 @@ pub(crate) fn cmd_trust_underwriting_decision_simulate(
             )
         })?;
         let trusted_kernel_keys = trusted_kernel_keys_from_authority(backend.authority_seed_path)?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         trust_control::build_underwriting_simulation_report(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.certification_registry_file,
             &request,
@@ -245,7 +248,7 @@ pub(crate) fn cmd_trust_underwriting_decision_simulate(
 pub(crate) fn parse_underwriting_decision_outcome(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingDecisionOutcome, CliError> {
-    serde_json::from_str(&format!("\"{value}\""))
+    crate::input::literal(value)
         .map_err(|_| CliError::cli_other_error(format!("invalid underwriting outcome `{value}`")))
 }
 
@@ -274,7 +277,7 @@ mod trust_command_error_classification_tests {
 pub(crate) fn parse_underwriting_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingDecisionLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid underwriting lifecycle state `{value}`"))
     })
 }
@@ -282,7 +285,7 @@ pub(crate) fn parse_underwriting_lifecycle_state(
 pub(crate) fn parse_underwriting_appeal_status(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingAppealStatus, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid underwriting appeal status `{value}`"))
     })
 }
@@ -290,7 +293,7 @@ pub(crate) fn parse_underwriting_appeal_status(
 pub(crate) fn parse_underwriting_appeal_resolution(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingAppealResolution, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid underwriting appeal resolution `{value}`"
         ))
@@ -300,18 +303,7 @@ pub(crate) fn parse_underwriting_appeal_resolution(
 pub(crate) fn load_underwriting_decision_policy(
     path: &Path,
 ) -> Result<chio_kernel::UnderwritingDecisionPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(policy) = serde_json::from_str(&contents) {
-        Ok(policy)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load_document(path)
 }
 
 pub(crate) fn cmd_trust_underwriting_decision_issue(
@@ -334,8 +326,13 @@ pub(crate) fn cmd_trust_underwriting_decision_issue(
                     .to_string(),
             )
         })?;
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        crate::trust_commands_cli::provision_local_issuance_authority(
+            backend.authority_seed_path,
+            backend.authority_db_path,
+        )?;
         trust_control::issue_signed_underwriting_decision(
-            receipt_db_path,
+            &receipt_store,
             backend.budget_db_path,
             backend.authority_seed_path,
             backend.authority_db_path,
@@ -400,7 +397,8 @@ pub(crate) fn cmd_trust_underwriting_decision_list(
                     .to_string(),
             )
         })?;
-        trust_control::list_underwriting_decisions(receipt_db_path, &query)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::list_underwriting_decisions(&receipt_store, &query)?
     };
 
     if backend.json_output {
@@ -456,7 +454,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_create(
                     .to_string(),
             )
         })?;
-        trust_control::create_underwriting_appeal(receipt_db_path, &request)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::create_underwriting_appeal(&receipt_store, &request)?
     };
 
     if json_output {
@@ -492,7 +491,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_resolve(
                     .to_string(),
             )
         })?;
-        trust_control::resolve_underwriting_appeal(receipt_db_path, &request)?
+        let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
+        trust_control::resolve_underwriting_appeal(&receipt_store, &request)?
     };
 
     if backend.json_output {

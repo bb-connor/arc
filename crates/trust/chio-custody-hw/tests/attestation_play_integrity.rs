@@ -6,7 +6,7 @@ use chio_custody_hw::attestation::google_root::{
     GOOGLE_PLAY_INTEGRITY_ISSUER, GOOGLE_PLAY_INTEGRITY_ROOT_KID,
 };
 use chio_custody_hw::{
-    verify_mobile_receipt_chain, verify_play_integrity, AttestationError,
+    parse_mobile_receipt_envelopes, verify_play_integrity, AttestationError,
     PlayIntegrityVerificationInput, MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED,
 };
 use jsonwebtoken::{decode_header, encode, Algorithm, EncodingKey, Header};
@@ -111,7 +111,7 @@ fn play_integrity_verifier_rejects_unrecognized_app() -> Result<(), Box<dyn Erro
 
 #[test]
 fn receipt_chain_accepts_play_integrity_evidence_shape() -> Result<(), Box<dyn Error>> {
-    let verified = verify_mobile_receipt_chain(
+    let verified = parse_mobile_receipt_envelopes(
         r#"{"schema":"chio.mobile.receipt.v1"}"#,
         r#"{"schema":"chio.mobile.attestation-evidence.v1","platform":"play_integrity"}"#,
     )?;
@@ -143,8 +143,8 @@ fn play_integrity_pins_jwks_and_ignores_caller_supplied_keys() -> Result<(), Box
     .ok_or("expected pinned-root rejection of caller-supplied kid")?;
     match error {
         AttestationError::PlayIntegrityInvalidToken(message) => assert!(
-            message.contains(ATTACKER_KID),
-            "rejection should reference the missing attacker kid, got {message:?}"
+            message == "JWKS has no matching key id" && !message.contains(ATTACKER_KID),
+            "rejection must identify the rule without echoing the attacker key id"
         ),
         other => panic!("expected invalid-token rejection, got {other:?}"),
     }
@@ -297,6 +297,7 @@ fn play_integrity_verifier_rejects_expired_token_fail_closed() -> Result<(), Box
     assert!(matches!(
         error,
         AttestationError::PlayIntegrityInvalidToken(_)
+            | AttestationError::PlayIntegrityVerification(_)
     ));
     assert_eq!(
         error.urn(),
@@ -321,6 +322,7 @@ fn play_integrity_verifier_rejects_wrong_issuer() -> Result<(), Box<dyn Error>> 
     assert!(matches!(
         error,
         AttestationError::PlayIntegrityInvalidToken(_)
+            | AttestationError::PlayIntegrityVerification(_)
     ));
     Ok(())
 }
@@ -364,6 +366,7 @@ fn play_integrity_verifier_rejects_wrong_audience() -> Result<(), Box<dyn Error>
     assert!(matches!(
         error,
         AttestationError::PlayIntegrityInvalidToken(_)
+            | AttestationError::PlayIntegrityVerification(_)
     ));
     Ok(())
 }
@@ -443,6 +446,7 @@ fn play_integrity_verifier_rejects_symmetric_alg_downgrade() -> Result<(), Box<d
     assert!(matches!(
         error,
         AttestationError::PlayIntegrityInvalidToken(_)
+            | AttestationError::PlayIntegrityVerification(_)
     ));
     Ok(())
 }
@@ -478,6 +482,7 @@ fn play_integrity_verifier_rejects_symmetric_jwks_fail_closed() -> Result<(), Bo
     assert!(matches!(
         error,
         AttestationError::PlayIntegrityInvalidToken(_)
+            | AttestationError::PlayIntegrityVerification(_)
     ));
     Ok(())
 }
@@ -595,7 +600,7 @@ fn receipt_chain_rejects_empty_evidence_schema_fail_closed() -> Result<(), Box<d
     // an empty evidence schema string is meaningless and must be rejected
     // rather than passed through to a downstream consumer that might
     // treat the absence of a schema marker as "schema-agnostic".
-    let res = verify_mobile_receipt_chain(
+    let res = parse_mobile_receipt_envelopes(
         r#"{"schema":"chio.mobile.receipt.v1"}"#,
         r#"{"schema":"","platform":"play_integrity"}"#,
     );
@@ -608,7 +613,7 @@ fn receipt_chain_rejects_empty_evidence_schema_fail_closed() -> Result<(), Box<d
 fn receipt_chain_rejects_unknown_platform_fail_closed() -> Result<(), Box<dyn Error>> {
     // Only `app_attest` and `play_integrity` are accepted; an attacker
     // cannot label evidence with a made-up platform and pass the shell.
-    let res = verify_mobile_receipt_chain(
+    let res = parse_mobile_receipt_envelopes(
         r#"{"schema":"chio.mobile.receipt.v1"}"#,
         r#"{"schema":"chio.mobile.attestation-evidence.v1","platform":"hand-rolled"}"#,
     );

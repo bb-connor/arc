@@ -1,10 +1,8 @@
 package chio
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,9 +17,47 @@ type protocolPrimitiveFixtureCase struct {
 	Instance   json.RawMessage `json:"instance"`
 }
 
+// protocolPrimitiveRawFixtureCase keeps the exact wire bytes in a string,
+// because duplicate keys do not survive any JSON parse of the corpus itself.
+type protocolPrimitiveRawFixtureCase struct {
+	Name         string `json:"name"`
+	SchemaFile   string `json:"schema_file"`
+	Valid        bool   `json:"valid"`
+	InstanceText string `json:"instance_text"`
+}
+
+type protocolPrimitiveCorpus struct {
+	Cases    []protocolPrimitiveFixtureCase    `json:"cases"`
+	RawCases []protocolPrimitiveRawFixtureCase `json:"raw_cases"`
+}
+
+func loadProtocolPrimitiveCorpus(t *testing.T) protocolPrimitiveCorpus {
+	t.Helper()
+	corpusBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "protocol-primitives-v1.json"))
+	if err != nil {
+		t.Fatalf("read protocol-primitives fixture corpus: %v", err)
+	}
+	var corpus protocolPrimitiveCorpus
+	if err := json.Unmarshal(corpusBytes, &corpus); err != nil {
+		t.Fatalf("parse protocol-primitives fixture corpus: %v", err)
+	}
+	if len(corpus.Cases) == 0 || len(corpus.RawCases) == 0 {
+		t.Fatal("protocol-primitives fixture corpus is missing cases or raw_cases")
+	}
+	return corpus
+}
+
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "receipt/record.schema.json":
+		target = &ReceiptRecord{}
+	case "kernel/caller_dispatch_authorization.schema.json":
+		target = &KernelCallerDispatchAuthorization{}
+	case "kernel/caller_delivery_report.schema.json":
+		target = &KernelCallerDeliveryReport{}
+	case "kernel/execution_nonce.schema.json":
+		target = &KernelExecutionNonce{}
 	case "capability/token.schema.json":
 		target = &CapabilityToken{}
 	case "capability/aggregate-invocation-budget.schema.json":
@@ -41,6 +77,8 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		}
 	case "capability/threshold-approval-proposal.schema.json":
 		target = &CapabilityThresholdApprovalProposal{}
+	case "result/pending_approval.schema.json":
+		target = &ResultPendingApproval{}
 	case "capability/governed-approval-token.schema.json":
 		target = &CapabilityGovernedApprovalToken{}
 	case "agent/active-response-governed-intent.schema.json":
@@ -53,29 +91,15 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		return nil, fmt.Errorf("unmapped protocol-primitives fixture schema %q", schemaFile)
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
+	// Exercise the ordinary public parser, not a stricter test-only decoder.
+	if err := json.Unmarshal(payload, target); err != nil {
 		return nil, err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, fmt.Errorf("trailing JSON after protocol primitive: %w", err)
 	}
 	return target, nil
 }
 
 func TestGeneratedProtocolPrimitivesConsumeSharedFixtures(t *testing.T) {
-	corpusPath := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "protocol-primitives-v1.json")
-	corpusBytes, err := os.ReadFile(corpusPath)
-	if err != nil {
-		t.Fatalf("read protocol-primitives fixture corpus: %v", err)
-	}
-	var corpus struct {
-		Cases []protocolPrimitiveFixtureCase `json:"cases"`
-	}
-	if err := json.Unmarshal(corpusBytes, &corpus); err != nil {
-		t.Fatalf("parse protocol-primitives fixture corpus: %v", err)
-	}
+	corpus := loadProtocolPrimitiveCorpus(t)
 
 	for _, fixture := range corpus.Cases {
 		fixture := fixture
@@ -100,6 +124,31 @@ func TestGeneratedProtocolPrimitivesConsumeSharedFixtures(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("generated Go round trip changed fixture\nwant: %#v\ngot:  %#v", want, got)
+			}
+		})
+	}
+
+	for _, fixture := range corpus.RawCases {
+		fixture := fixture
+		t.Run(fixture.Name, func(t *testing.T) {
+			if fixture.Valid {
+				t.Fatal("raw fixtures are rejection cases")
+			}
+			decoder := json.NewDecoder(strings.NewReader(fixture.InstanceText))
+			decoder.UseNumber()
+			var collapsed any
+			if err := decoder.Decode(&collapsed); err != nil {
+				t.Fatalf("raw fixture text is not JSON: %v", err)
+			}
+			lastWins, err := json.Marshal(collapsed)
+			if err != nil {
+				t.Fatalf("marshal collapsed raw fixture: %v", err)
+			}
+			if _, err := decodeProtocolPrimitive(fixture.SchemaFile, lastWins); err != nil {
+				t.Fatalf("raw fixture must be valid once duplicate keys collapse last-wins: %v", err)
+			}
+			if _, err := decodeProtocolPrimitive(fixture.SchemaFile, []byte(fixture.InstanceText)); err == nil {
+				t.Fatal("generated Go decoder accepted duplicate keys")
 			}
 		})
 	}

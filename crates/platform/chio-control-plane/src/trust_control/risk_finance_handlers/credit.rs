@@ -12,18 +12,14 @@ pub(crate) async fn handle_credit_scorecard_report(
             Err(response) => return response,
         };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "credit scorecard export requires --receipt-db on the trust-control service",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
     let keypair = match load_behavioral_feed_signing_keypair(
         state.config.authority_seed_path.as_deref(),
@@ -37,8 +33,7 @@ pub(crate) async fn handle_credit_scorecard_report(
 
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     match build_credit_scorecard_report_with_context(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.issuance_policy.as_ref(),
         &query,
@@ -64,18 +59,14 @@ pub(crate) async fn handle_credit_facility_report(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "credit facility evaluation requires --receipt-db on the trust-control service",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
 
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -90,8 +81,7 @@ pub(crate) async fn handle_credit_facility_report(
         }
     };
     match build_credit_facility_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         state.config.issuance_policy.as_ref(),
@@ -112,8 +102,8 @@ pub(crate) async fn handle_issue_credit_facility(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -123,7 +113,7 @@ pub(crate) async fn handle_issue_credit_facility(
     };
 
     match issue_signed_credit_facility_detailed(CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path: state.config.budget_db_path.as_deref(),
         authority_seed_path: state.config.authority_seed_path.as_deref(),
         authority_db_path: state.config.authority_db_path.as_deref(),
@@ -148,7 +138,7 @@ pub(crate) async fn handle_query_credit_facilities(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -170,18 +160,14 @@ pub(crate) async fn handle_credit_bond_report(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "credit bond evaluation requires --receipt-db on the trust-control service",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
 
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -196,8 +182,7 @@ pub(crate) async fn handle_credit_bond_report(
         }
     };
     match build_credit_bond_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         state.config.issuance_policy.as_ref(),
@@ -218,8 +203,8 @@ pub(crate) async fn handle_issue_credit_bond(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -229,7 +214,7 @@ pub(crate) async fn handle_issue_credit_bond(
     };
 
     match issue_signed_credit_bond_detailed(CreditIssuanceArgs {
-        receipt_db_path,
+        receipt_store,
         budget_db_path: state.config.budget_db_path.as_deref(),
         authority_seed_path: state.config.authority_seed_path.as_deref(),
         authority_db_path: state.config.authority_db_path.as_deref(),
@@ -254,7 +239,7 @@ pub(crate) async fn handle_query_credit_bonds(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -278,7 +263,7 @@ pub(crate) async fn handle_credit_bonded_execution_simulation_report(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -300,7 +285,7 @@ pub(crate) async fn handle_credit_loss_lifecycle_report(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -320,8 +305,8 @@ pub(crate) async fn handle_issue_credit_loss_lifecycle(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -331,7 +316,7 @@ pub(crate) async fn handle_issue_credit_loss_lifecycle(
     };
 
     match issue_signed_credit_loss_lifecycle_detailed(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -352,7 +337,7 @@ pub(crate) async fn handle_query_credit_loss_lifecycle(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -374,18 +359,14 @@ pub(crate) async fn handle_credit_backtest_report(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "credit backtests require --receipt-db on the trust-control service",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
 
     let trusted_kernel_keys = match trusted_kernel_keys_from_service_config(&state.config) {
@@ -400,8 +381,7 @@ pub(crate) async fn handle_credit_backtest_report(
         }
     };
     match build_credit_backtest_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         state.config.issuance_policy.as_ref(),
@@ -427,18 +407,14 @@ pub(crate) async fn handle_credit_provider_risk_package_report(
         Err(response) => return response,
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "provider risk package export requires --receipt-db on the trust-control service",
             );
         }
-    };
-    let receipt_store = match open_receipt_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
     };
     let keypair = match load_behavioral_feed_signing_keypair(
         state.config.authority_seed_path.as_deref(),
@@ -451,8 +427,7 @@ pub(crate) async fn handle_credit_provider_risk_package_report(
     };
 
     match build_credit_provider_risk_package_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         state.config.issuance_policy.as_ref(),

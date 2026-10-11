@@ -36,21 +36,30 @@ pub mod capability;
 pub mod error;
 pub mod issuer;
 pub mod mint;
+pub mod mobile_challenge;
 pub mod nonce_store;
 pub mod rate_limit;
 pub mod revocation;
 pub mod verifier;
 
 pub use attestation::{
-    verify_app_attest, verify_mobile_receipt_chain, verify_play_integrity,
-    AppAttestVerificationInput, AttestationError, PlayIntegrityVerificationInput,
-    VerifiedAppAttest, VerifiedMobileReceiptChain, VerifiedPlayIntegrity, APP_ATTEST_FORMAT,
+    parse_mobile_receipt_envelopes, verify_app_attest, verify_play_integrity,
+    AppAttestVerificationInput, AttestationError, ParsedMobileReceiptEnvelopes,
+    PlayIntegrityVerificationInput, VerifiedAppAttest, VerifiedPlayIntegrity, APP_ATTEST_FORMAT,
     MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED,
 };
 pub use capability::{PasskeyCapability, ScopeSet};
 pub use error::CustodyError;
 pub use issuer::{IssuerService, MintRequest, MintResponse};
 pub use mint::{sign_capability, signing_message};
+#[cfg(feature = "sqlite-store")]
+pub use mobile_challenge::SqliteMobileChallengeStore;
+pub use mobile_challenge::{
+    InMemoryMobileChallengeStore, IssuedMobileChallenge, MobileAttestationBinding,
+    MobileChallengeAuthority, MobileChallengeError, MobileChallengeSnapshot, MobileChallengeStore,
+    VerifiedMobileAttestation, VerifiedMobileAttestationEvidence,
+    DEFAULT_MOBILE_CHALLENGE_LIFETIME_SECONDS,
+};
 #[cfg(feature = "sqlite-store")]
 pub use nonce_store::SqlitePasskeyNonceStore;
 pub use nonce_store::{

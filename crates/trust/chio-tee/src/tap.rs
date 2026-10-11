@@ -177,6 +177,7 @@ mod tests {
 
     fn fake_request(kp: &Keypair, id: &str) -> AgentMessage {
         AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: id.to_string(),
             capability_token: Box::new(fake_capability(kp, id)),
             server_id: "srv-1".to_string(),

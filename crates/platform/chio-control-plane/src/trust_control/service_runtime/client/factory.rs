@@ -1,4 +1,4 @@
-use super::super::super::report_validation::normalize_cluster_url;
+use super::super::super::report_validation::{normalize_cluster_config_url, normalize_cluster_url};
 use super::super::*;
 use super::validation::{normalize_control_endpoint, validate_control_token};
 
@@ -23,6 +23,9 @@ pub(crate) fn build_cluster_peer_client(
     control_token: &str,
     node_id: &str,
 ) -> Result<TrustControlClient, CliError> {
+    for endpoint in control_url.split(',') {
+        normalize_cluster_config_url(endpoint, true)?;
+    }
     build_client_with_cluster_peer(
         control_url,
         control_token,
@@ -59,8 +62,10 @@ fn build_client_with_cluster_peer(
             "control URL must not be empty".to_string(),
         ));
     }
+    // Credential-bearing and public clients use the same fixed authority boundary.
     let http = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
+        .redirects(0)
         .build();
     Ok(TrustControlClient {
         endpoints: Arc::new(endpoints),

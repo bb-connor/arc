@@ -88,7 +88,7 @@ code silently.
 | ------------------- | --------------------------- | ------ | ------------------------ |
 | `ProviderError::RateLimited` | `{"status":429,"headers":{"retry-after-ms":"1000"},"body":{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached","code":"rate_limit_exceeded","param":null},"request_id":"req_openai_rate"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Preserve the retry hint as `retry_after_ms` when the OpenAI response carries one. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::ContentPolicy` | `{"status":400,"body":{"error":{"type":"invalid_request_error","message":"Request rejected by content policy","code":"content_policy_violation","param":null},"request_id":"req_openai_policy"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Surface provider refusal or policy rejection as content-policy denial rather than a tool execution error. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::BadToolArgs` | `{"type":"function_call","call_id":"call_bad_args","name":"get_weather","arguments":"{not json"}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Fail closed when OpenAI emits function-call arguments that cannot become canonical JSON arguments. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
+| `ProviderError::UntrustedInput` | `{"type":"function_call","call_id":"call_bad_args","name":"get_weather","arguments":"{not json"}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Fail closed when OpenAI emits function-call arguments that cannot become canonical JSON arguments. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::Upstream5xx` | `{"status":500,"body":{"error":{"type":"server_error","message":"Internal server error","code":"server_error","param":null},"request_id":"req_openai_500"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Keep upstream 5xx bodies visible for retry and audit policy. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.openai.com/v1/responses","elapsed_ms":30000}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Classify local transport timeout separately from OpenAI 5xx envelopes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::VerdictBudgetExceeded` | `{"provider":"openai","event":"response.output_item.done","observed_ms":300,"budget_ms":250}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Preserve the fabric verdict-budget error when the evaluator misses the 250ms gate. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
@@ -96,8 +96,7 @@ code silently.
 <!-- error-taxonomy:end -->
 
 `ProviderError::Other` is intentionally absent: a native OpenAI envelope must
-map to a concrete class above, or fail closed as `Malformed` when the shape
-cannot be trusted.
+map to a concrete class above, or fail closed as `UntrustedInput` for invalid original JSON and `Malformed` for a protocol shape violation.
 
 ## Testing
 
@@ -123,3 +122,11 @@ SSE gate's p99 latency exceeds a 250ms budget over 128 iterations.
 - `chio-cross-protocol` - plans the authoritative route before each
   default-surface dispatch.
 - `chio-provider-conformance` - replays fixtures against this adapter.
+
+Peer JSON is limited to 16 MiB, individual SSE frames to 1 MiB, and complete
+streams to 16,384 frames. Tool arguments must be I-JSON objects of at most
+1 MiB. Duplicate keys and unsafe integers reject before canonicalization.
+`UntrustedInput` retains a local parser source and exposes only a registered
+rejection code. `Clock` refuses unavailable or regressing trusted time;
+`StreamCapacityExceeded` reports the whole-stream frame quota. Per-tool stream
+buffer and verdict-latency limits also apply.

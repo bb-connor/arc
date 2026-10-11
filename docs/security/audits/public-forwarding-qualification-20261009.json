@@ -1,0 +1,125 @@
+{
+  "schema": "chio.security.component-qualification.v1",
+  "observed_utc": "2026-10-09T21:35:06.593952+00:00",
+  "finding": "FINAL-F10",
+  "scope": "Public passport forwarding admission; component-local evidence only.",
+  "baseline_source": "8f3dfac6b66b79ae04b745475a1a410000dbe06a",
+  "producer_commit": "b55090e5201ee8dadf2b7e130b617c8f81722500",
+  "integration_commit": "bd9bd6a20183c6e29a17a076a4be556e41effed4",
+  "source_pins": {
+    "f10-original-source.sha256": [
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/report_rendering.rs",
+        "sha256": "ab8c403fb5cd690a257721a057db8ed2d2dea3185ae51bf6eeb481b98bfe5f4b",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+        "sha256": "6f66085466b33f091ff12582e59651007e031e92f172850c41f30bda28ba1bbd",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs",
+        "sha256": "ce0b30544faf59d1fc388cf44b1f5658a232609b97c1b9ef2c939f20e4efb0cc",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+        "sha256": "ed8923219e552d5ce841811e9b886a22165339870da93ce09d2d32ac2039e92f",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/leader_forward_admission.rs",
+        "sha256": "8c22a279e43beb4555dbca4a24ce0394c11c68756697e896bad7d15eb6ba307f",
+        "test_overlay": true
+      }
+    ],
+    "f10-final-source.sha256": [
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/report_rendering.rs",
+        "sha256": "b1b6f862387f74088c390dd7c6ed4a2ed2a707b57e09112a4f5cec708c2c8f35",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+        "sha256": "f89253ff78856ffbe88198fb625b466a61d0497429c6f22ab80ad68d0e371916",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs",
+        "sha256": "49eca26b6b2f34c2fb471d5db69ca96480d58dc05830b6158a8dfb93eb003359",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+        "sha256": "bd9237a8b1ef016a022db7f81fd3966b78ce1a7a635ba362a49a83e5ff304b25",
+        "test_overlay": false
+      },
+      {
+        "path": "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/leader_forward_admission.rs",
+        "sha256": "d3c96b992e088891076194273637d8a877939000535d0f6511af70ca9b700f6b",
+        "test_overlay": false
+      }
+    ]
+  },
+  "evidence_root": "pr1160-cluster-acceptance-20261009",
+  "evidence": {
+    "f10-baseline.log": {
+      "evidence_path": "f10-baseline.log",
+      "sha256": "91993672a7d054216fadc07e890e1d9d87fa3dd51148125de02ac2d0b377dcbe"
+    },
+    "original-f10-f11.log": {
+      "evidence_path": "original-f10-f11.log",
+      "sha256": "fe00c86b030f761ff420d29ac8a90c199ad196b36ac78fc125b7711674570417"
+    },
+    "f10-green-forwarding.log": {
+      "evidence_path": "f10-green-forwarding.log",
+      "sha256": "4752af1554cc62dea8340997747e5db00f70c72b63b9682c26c1cf7e3f4c73a9"
+    },
+    "f10-green-public-local.log": {
+      "evidence_path": "f10-green-public-local.log",
+      "sha256": "9857ec9f0027b11751b5d1b41cc575dd0d31524767c73815193a6cb28e849ee6"
+    },
+    "f10-clippy.log": {
+      "evidence_path": "f10-clippy.log",
+      "sha256": "ed9aa6cd28cf4d58a2506944fd427989a1c3543880b3657c64fea042ba0736ce"
+    }
+  },
+  "original": {
+    "initial_attempt": "f10-baseline.log failed to compile because the F11 test fixture referenced the wrong health module. This is not runtime RED.",
+    "actual_attempt": "original-f10-f11.log",
+    "full_campaign": {
+      "passed": 0,
+      "failed": 5
+    },
+    "finding_subtests": {
+      "passed": 0,
+      "failed": 2
+    },
+    "failures": [
+      "A held public forward consumed the single authenticated permit, so concurrent revocation and budget writes returned503 instead of200.",
+      "The seventeenth public submission was admitted or queued instead of immediately returning503."
+    ],
+    "other_failed_subtests": "Three separately tracked F11 authority freshness controls; they remain failed in this historical campaign."
+  },
+  "repaired": {
+    "forwarding_tests": 11,
+    "public_local_tests": 3,
+    "failed": 0,
+    "strict_control_plane_all_targets": "pass"
+  },
+  "composed_evidence": {
+    "audit": "docs/security/audits/receipt-recovery-health-qualification-20261009.json",
+    "scope": "26 composed HTTP component tests include11 forwarding and3 public-local controls, plus12 receipt tests; strict owning lint passed. Later candidate qualification is separate."
+  },
+  "review_disposition": {
+    "source": "claude read-only review 2026-10-09T21:31:25Z",
+    "original_evidence_gap": "Actual Original exists and source hashes were independently verified; this audit makes it discoverable in the repository.",
+    "test_limit": "The post-completion64-permit assertion alone does not establish isolation. The concurrent authenticated writes under a held public forward and single authenticated permit provide the actual separation control. Direct in-flight counts are optional extra coverage, not a substitute for that control."
+  },
+  "remaining_acceptance": [
+    "Integrate remaining runtime repairs, then obtain final independent candidate review and exact protected hosted checks."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

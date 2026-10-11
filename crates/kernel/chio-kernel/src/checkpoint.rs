@@ -7,10 +7,9 @@
 //! Issuance schema: "chio.checkpoint_statement.v2"
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core::crypto::{Keypair, PublicKey, Signature};
 use chio_core::hashing::sha256_hex;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, verify_consistency_proof, MerkleProof, MerkleTree};
@@ -75,6 +74,8 @@ where
 /// Error type for checkpoint operations.
 #[derive(Debug, thiserror::Error)]
 pub enum CheckpointError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("merkle error: {0}")]
     Merkle(#[from] chio_core::Error),
     #[error("serialization error: {0}")]
@@ -330,11 +331,9 @@ pub struct CheckpointTransparencySummary {
 
 #[must_use]
 pub fn checkpoint_log_id(checkpoint: &KernelCheckpoint) -> String {
-    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.algorithm() {
-        SigningAlgorithm::Ed25519 => checkpoint.body.kernel_key.as_bytes().to_vec(),
-        SigningAlgorithm::P256 | SigningAlgorithm::P384 | SigningAlgorithm::Hybrid => {
-            checkpoint.body.kernel_key.to_hex().into_bytes()
-        }
+    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.ed25519_bytes() {
+        Ok(bytes) => bytes.to_vec(),
+        Err(_) => checkpoint.body.kernel_key.to_hex().into_bytes(),
     };
     format!("local-log-{}", sha256_hex(&log_key_bytes))
 }
@@ -448,9 +447,8 @@ impl CheckpointChainFrontier {
     pub fn append(&mut self, chain_leaf_hash: Hash) {
         self.last_leaf = Some(chain_leaf_hash);
         self.subtrees.push((chain_leaf_hash, 1));
-        while self.subtrees.len() >= 2 {
-            let (right, right_span) = self.subtrees[self.subtrees.len() - 1];
-            let (left, left_span) = self.subtrees[self.subtrees.len() - 2];
+        while let [.., (left, left_span), (right, right_span)] = self.subtrees.as_slice() {
+            let (left, left_span, right, right_span) = (*left, *left_span, *right, *right_span);
             if left_span != right_span {
                 break;
             }
@@ -474,15 +472,10 @@ impl CheckpointChainFrontier {
     /// definition produces for a tree whose right edge is incomplete.
     #[must_use]
     pub fn root(&self) -> Option<Hash> {
-        let (last, _) = *self.subtrees.last()?;
-        Some(
-            self.subtrees[..self.subtrees.len() - 1]
-                .iter()
-                .rev()
-                .fold(last, |acc, (subtree, _)| {
-                    chio_core::merkle::node_hash(subtree, &acc)
-                }),
-        )
+        let (&(last, _), prefix) = self.subtrees.split_last()?;
+        Some(prefix.iter().rev().fold(last, |acc, (subtree, _)| {
+            chio_core::merkle::node_hash(subtree, &acc)
+        }))
     }
 }
 
@@ -611,6 +604,10 @@ fn chain_tree_size(checkpoint: &KernelCheckpoint) -> Result<usize, CheckpointErr
 
 /// Ensure the two pair endpoints appear at their own positions in the
 /// supplied chain leaves, then hand back the parsed sizes.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both nonzero tree sizes are checked against the supplied leaf count before indexing."
+)]
 fn validate_chain_leaves_for_pair(
     previous: &KernelCheckpoint,
     current: &KernelCheckpoint,
@@ -946,7 +943,10 @@ pub fn verify_checkpoint_consistency_proof_with_anchor(
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn ordered_equivocation(
     kind: CheckpointEquivocationKind,
     log_id: Option<String>,
@@ -1212,6 +1212,10 @@ struct DerivedCheckpointTransparency<'a> {
     checkpoints: Vec<ValidatedCheckpoint<'a>>,
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "All positions are created by enumerating this immutable checkpoint slice in this function."
+)]
 fn derive_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
 ) -> Result<DerivedCheckpointTransparency<'_>, CheckpointError> {
@@ -1418,6 +1422,10 @@ pub fn build_checkpoint_transparency(
 /// A caller that wants to trust a later boundary without the full prefix must
 /// use a separate API that accepts an explicitly pinned boundary. This
 /// verifier has no such input, so an unresolved predecessor fails closed.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The digest index stores positions from enumerating the same unchanged checkpoint vector."
+)]
 pub fn validate_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
 ) -> Result<CheckpointTransparencySummary, CheckpointError> {
@@ -1579,170 +1587,12 @@ pub fn verify_checkpoint_continuity(
     }
 }
 
-/// Return the current Unix timestamp in seconds.
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
-/// Build a signed kernel checkpoint from a batch of canonical receipt bytes.
-///
-/// `receipt_canonical_bytes_batch` must not be empty. The first checkpoint of
-/// a chain (`checkpoint_seq == 1`) commits a single-leaf chain; a detached
-/// checkpoint at a later sequence is issued without a chain commitment.
-pub fn build_checkpoint(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-) -> Result<KernelCheckpoint, CheckpointError> {
-    build_checkpoint_with_previous(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        receipt_canonical_bytes_batch,
-        keypair,
-        None,
-        &[],
-    )
-}
-
-/// Build a signed kernel checkpoint that explicitly links to the previous
-/// checkpoint when provided.
-///
-/// `prior_chain_leaf_hashes` must hold the chain leaf of every prior
-/// checkpoint in sequence order (see [`checkpoint_chain_leaf_hash`]); the new
-/// body then carries a `chain_root` extending them, and the leaves are
-/// cross-checked against the predecessor's own commitment when it has one. An
-/// empty slice is valid only with no previous checkpoint.
-pub fn build_checkpoint_with_previous(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
-    prior_chain_leaf_hashes: &[Hash],
-) -> Result<KernelCheckpoint, CheckpointError> {
-    build_checkpoint_with_chain_frontier(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        receipt_canonical_bytes_batch,
-        keypair,
-        previous_checkpoint,
-        &CheckpointChainFrontier::from_leaves(prior_chain_leaf_hashes),
-    )
-}
-
-/// Build a signed kernel checkpoint from the chain frontier rather than from
-/// every prior leaf.
-///
-/// This is the hot path: a long-lived writer keeps the frontier and extends
-/// it, so issuing a checkpoint costs O(log n) hashes instead of rehashing the
-/// whole chain. The predecessor's signed `chain_root` is still checked, at the
-/// same O(log n) cost, so the integrity guarantee is unchanged.
-#[allow(clippy::too_many_arguments)]
-pub fn build_checkpoint_with_chain_frontier(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
-    prior_chain: &CheckpointChainFrontier,
-) -> Result<KernelCheckpoint, CheckpointError> {
-    let tree = MerkleTree::from_leaves(receipt_canonical_bytes_batch)?;
-    let merkle_root = tree.root();
-    let covered_entries = batch_end_seq
-        .checked_sub(batch_start_seq)
-        .and_then(|count| count.checked_add(1))
-        .ok_or_else(|| {
-            CheckpointError::Invalid(format!(
-                "invalid checkpoint entry range {batch_start_seq}-{batch_end_seq}"
-            ))
-        })?;
-    if usize::try_from(covered_entries).ok() != Some(tree.leaf_count()) {
-        return Err(CheckpointError::Invalid(format!(
-            "receipt batch length {} does not match covered entry count {} for range {}-{}",
-            tree.leaf_count(),
-            covered_entries,
-            batch_start_seq,
-            batch_end_seq
-        )));
-    }
-
-    let own_chain_leaf = checkpoint_chain_leaf_hash_from_parts(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        merkle_root,
-    )?;
-    let chain_root = match previous_checkpoint {
-        None => {
-            if prior_chain.leaf_count() != 0 {
-                return Err(CheckpointError::Invalid(
-                    "prior chain leaves supplied without a previous checkpoint".to_string(),
-                ));
-            }
-            (checkpoint_seq == 1)
-                .then(|| checkpoint_chain_root(&[own_chain_leaf]))
-                .transpose()?
-        }
-        Some(previous) => {
-            validate_checkpoint(previous)?;
-            validate_checkpoint_successor_position(previous, checkpoint_seq, batch_start_seq)?;
-            if prior_chain.leaf_count() != previous.body.checkpoint_seq {
-                return Err(CheckpointError::Continuity(format!(
-                    "prior chain covers {} leaves but predecessor is checkpoint {}",
-                    prior_chain.leaf_count(),
-                    previous.body.checkpoint_seq
-                )));
-            }
-            // When the predecessor committed a chain, the frontier must
-            // reproduce exactly that commitment: this is what stops a stale or
-            // foreign frontier from being extended into a signed root.
-            if let Some(previous_chain_root) = previous.body.chain_root {
-                if prior_chain.root() != Some(previous_chain_root) {
-                    return Err(CheckpointError::Continuity(format!(
-                        "predecessor {} chain_root does not match the supplied chain",
-                        previous.body.checkpoint_seq
-                    )));
-                }
-            } else if prior_chain.last_leaf != Some(checkpoint_chain_leaf_hash(&previous.body)?) {
-                return Err(CheckpointError::Continuity(format!(
-                    "legacy predecessor {} is not the final supplied chain leaf",
-                    previous.body.checkpoint_seq
-                )));
-            }
-            let mut chain = prior_chain.clone();
-            chain.append(own_chain_leaf);
-            chain.root()
-        }
-    };
-
-    let body = KernelCheckpointBody {
-        schema: CHECKPOINT_SCHEMA.to_string(),
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        tree_size: tree.leaf_count(),
-        merkle_root,
-        issued_at: unix_now(),
-        kernel_key: keypair.public_key(),
-        previous_checkpoint_sha256: previous_checkpoint
-            .map(|checkpoint| checkpoint_body_sha256(&checkpoint.body))
-            .transpose()?,
-        chain_root,
-    };
-    let body_bytes =
-        canonical_json_bytes(&body).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
-    let signature = keypair.sign(&body_bytes);
-    Ok(KernelCheckpoint { body, signature })
-}
+mod builders;
+pub use builders::{
+    build_checkpoint, build_checkpoint_with_chain_frontier,
+    build_checkpoint_with_chain_frontier_at, build_checkpoint_with_previous,
+    build_checkpoint_with_previous_at, CheckpointSigningContext,
+};
 
 /// Build an inclusion proof for a leaf in an already-built MerkleTree.
 pub fn build_inclusion_proof(
@@ -1774,7 +1624,7 @@ pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool
     Ok(checkpoint
         .body
         .kernel_key
-        .verify(&body_bytes, &checkpoint.signature))
+        .verify_strict(&body_bytes, &checkpoint.signature))
 }
 
 #[cfg(test)]

@@ -142,6 +142,7 @@ fn session_operation_roundtrip_preserves_tool_call_payload() {
         })
         .collect::<Vec<_>>();
     let op = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: make_token(&kp),
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -580,6 +581,7 @@ fn oauth_session_auth_context_roundtrips_with_federated_claims() {
             audience: Some("chio-mcp".to_string()),
             scopes: vec!["mcp:invoke".to_string()],
             federated_claims: OAuthBearerFederatedClaims {
+                sender_public_key: None,
                 client_id: Some("client-abc".to_string()),
                 object_id: Some("object-123".to_string()),
                 tenant_id: Some("tenant-123".to_string()),

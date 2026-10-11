@@ -14,6 +14,8 @@ mod http;
 mod invoke;
 #[path = "record/openai.rs"]
 mod openai;
+#[path = "record/process.rs"]
+mod process;
 #[path = "record/record.rs"]
 mod record;
 #[path = "record/util.rs"]
@@ -29,6 +31,20 @@ fn main() {
 
 #[derive(Debug, Error)]
 pub(crate) enum RecordError {
+    #[error("{0}")]
+    Provider(#[from] chio_tool_call_fabric::ProviderError),
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("capture I/O failed")]
+    CaptureIo(#[from] std::io::Error),
+    #[error("{0}")]
+    Transport(#[from] chio_provider_adapter_core::http::HttpTransportError),
+    #[error("capture process exceeded its deadline")]
+    ProcessTimeout,
+    #[error("capture process output exceeded its byte limit")]
+    ProcessOutputLimit,
+    #[error("capture process failed with exit status {code:?}")]
+    ProcessFailed { code: Option<i32> },
     #[error("invalid scenario id `{0}`: use the fixture id without path separators")]
     InvalidScenario(String),
     #[error("scenario fixture does not exist: {path}")]
@@ -62,7 +78,7 @@ pub(crate) enum RecordError {
         path: PathBuf,
         line: usize,
         #[source]
-        source: serde_json::Error,
+        source: chio_core::canonical::UntrustedJsonError,
     },
     #[error("invalid fixture {path}: {message}")]
     InvalidFixture { path: PathBuf, message: String },
@@ -70,11 +86,6 @@ pub(crate) enum RecordError {
     MissingEnv {
         provider: &'static str,
         vars: &'static str,
-    },
-    #[error("{provider} curl request failed: {message}")]
-    Curl {
-        provider: &'static str,
-        message: String,
     },
     #[error("{provider} captured payload did not contain expected tool invocations: {message}")]
     CaptureShape {

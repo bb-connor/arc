@@ -1,0 +1,773 @@
+mod support;
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use chio_core_types::crypto::Keypair;
+use chio_kernel::{
+    ChioKernel, KernelError, NestedFlowBridge, ToolCallOutput, ToolServerConnection, Verdict,
+};
+use chio_process::{ProcessError, ProcessRuntime, ProcessState};
+use serde_json::{json, Value};
+use support::{child, kernel, parent_key, root, scope, Result};
+
+struct Server {
+    calls: Arc<AtomicUsize>,
+    entered: Option<Arc<tokio::sync::Notify>>,
+    release: Option<Arc<tokio::sync::Notify>>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for Server {
+    fn server_id(&self) -> &str {
+        "tools"
+    }
+    fn tool_names(&self) -> Vec<String> {
+        vec!["append".into(), "read".into()]
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        arguments: Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> std::result::Result<Value, KernelError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(entered) = &self.entered {
+            entered.notify_one();
+        }
+        if let Some(release) = &self.release {
+            release.notified().await;
+        }
+        Ok(arguments)
+    }
+}
+
+fn server(calls: &Arc<AtomicUsize>) -> Box<Server> {
+    Box::new(Server {
+        calls: calls.clone(),
+        entered: None,
+        release: None,
+    })
+}
+
+#[tokio::test]
+async fn host_flow_identity_is_bound_to_the_original_process_operation() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?;
+    let profile = chio_process::ProcessSecurityProfile {
+        tenant_id: "tenant-a".into(),
+        isolation_epoch_id: "epoch-a".into(),
+        generation: 1,
+    };
+    let secured = runtime.clone().with_security_profile(profile.clone())?;
+    let capability = root(&secured, &kernel, 2)?;
+    let request = secured.tool_request("root", "bound-call", "tools", "read", json!({}))?;
+    let _response = secured.invoke("root", "bound-call", &request).await?;
+    assert!(matches!(
+        runtime.invoke("root", "bound-call", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    let changed = runtime.with_security_profile(chio_process::ProcessSecurityProfile {
+        tenant_id: "tenant-b".into(),
+        ..profile
+    })?;
+    assert!(matches!(
+        changed.invoke("root", "bound-call", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    assert_eq!(request.capability.id, capability.id);
+    Ok(())
+}
+
+#[test]
+fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?
+        .with_supplemental_authorization_routes([
+            ("tools".into(), "append".into()),
+            ("model".into(), "infer".into()),
+        ])?;
+    let capability = root(&runtime, &kernel, 2)?;
+    runtime
+        .registry()
+        .provision_signers(&[("root".into(), &parent_key())])?;
+    let signed = runtime
+        .registry()
+        .with_process_signer("root", |parent, signer| {
+            assert_eq!(parent.id, capability.id);
+            signer.sign_canonical(&json!({"request": "original"}))
+        })??;
+    assert!(capability
+        .subject
+        .verify_canonical(&json!({"request": "original"}), &signed.0)?);
+    let original = json!({"b": 2, "a": 1});
+    let request = runtime.tool_request("root", "broker", "tools", "append", original.clone())?;
+    let extension = request
+        .supplemental_authorization
+        .ok_or("missing original authorization")?;
+    assert_eq!(
+        serde_json::to_value(extension)?["signed_extension"],
+        "{\"a\":1,\"b\":2}"
+    );
+    assert!(runtime
+        .tool_request("root", "second-route", "model", "infer", original.clone())?
+        .supplemental_authorization
+        .is_some());
+    assert!(runtime
+        .tool_request("root", "cross-route", "model", "append", original.clone())?
+        .supplemental_authorization
+        .is_none());
+    assert!(matches!(
+        runtime.clone().with_supplemental_authorization_routes([
+            ("tools".into(), "append".into()),
+            ("tools".into(), "read".into())
+        ]),
+        Err(ProcessError::Invalid(
+            "supplemental routes are duplicated or oversized"
+        ))
+    ));
+    assert!(runtime
+        .tool_request("root", "ordinary", "tools", "read", original)?
+        .supplemental_authorization
+        .is_none());
+    assert!(runtime
+        .registry()
+        .with_process_signer("other", |_, _| ())
+        .is_err());
+    Ok(())
+}
+
+#[test]
+fn incompatible_journal_versions_cannot_gain_preparation_authority() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let path = directory.path().join("process.db");
+    drop(ProcessRuntime::open(&path, kernel.clone())?);
+    let database = rusqlite::Connection::open(&path)?;
+    assert_eq!(
+        database.query_row("SELECT version FROM process_runtime", [], |row| row
+            .get::<_, u32>(0))?,
+        2
+    );
+    database.execute("UPDATE process_runtime SET version = 1", [])?;
+    drop(database);
+    assert!(matches!(
+        ProcessRuntime::open(&path, kernel),
+        Err(ProcessError::Configuration(
+            "process journal belongs to a different durable authority, kernel key or version"
+        ))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn prepared_invocations_survive_reopen_without_reissuing_and_share_storage_limits() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let path = directory.path().join("process.db");
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    let capability =
+        kernel.issue_capability(&parent_key().public_key(), scope(&["append", "read"]), 3600)?;
+    let mut limits = support::limits(2);
+    limits.state.max_blobs = 2;
+    runtime.create_root("root", &capability, limits)?;
+    runtime
+        .registry()
+        .provision_signers(&[("root".into(), &parent_key())])?;
+    let registry = runtime.registry();
+    let binding = "a".repeat(64);
+    let original =
+        registry.prepare_invocation("root", "prepared", &binding, |parent, signer| {
+            assert_eq!(parent.subject, signer.public_key());
+            Ok(json!({"original_nonce":"once", "expiry":123}))
+        })?;
+    let before = runtime.storage("root")?;
+    assert_eq!(before.tree_blobs, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    drop(registry);
+    drop(runtime);
+    let reopened = ProcessRuntime::open(path, kernel)?;
+    let recovered =
+        reopened
+            .registry()
+            .prepare_invocation("root", "prepared", &binding, |_, _| {
+                Err(ProcessError::Invalid("must not reissue"))
+            })?;
+    assert_eq!(original, recovered);
+    assert_eq!(reopened.storage("root")?.tree_bytes, before.tree_bytes);
+    assert!(matches!(
+        reopened
+            .registry()
+            .prepare_invocation("root", "prepared", &"b".repeat(64), |_, _| Ok(json!({}))),
+        Err(ProcessError::Conflict)
+    ));
+    let limits = before.limits;
+    for index in 1..limits.max_blobs {
+        // Filling the existing immutable-state owner must also fence signing.
+        let bytes = format!("blob-{index}").into_bytes();
+        reopened.put_blob("root", &bytes)?;
+    }
+    assert!(matches!(
+        reopened
+            .registry()
+            .prepare_invocation("root", "second", &binding, |_, _| Ok(json!({"new":true}))),
+        Err(ProcessError::Limit("immutable process state"))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_process_lineage_produces_attributed_signed_denials_without_dispatch() -> Result {
+    for refusal in [
+        "expired",
+        "revoked_leaf",
+        "revoked_parent",
+        "untrusted_leaf",
+    ] {
+        let dir = tempfile::tempdir()?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let kernel = kernel(dir.path(), server(&calls))?;
+        let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+        let mut capability = kernel.issue_capability(
+            &parent_key().public_key(),
+            scope(&["append", "read"]),
+            3600,
+        )?;
+        if refusal == "untrusted_leaf" {
+            let other = Keypair::generate();
+            capability.issuer = other.public_key();
+            capability.signature = other.sign_canonical(&capability.signing_body())?.0;
+        }
+        runtime.create_root("root", &capability, support::limits(2))?;
+        let process_id = if refusal == "revoked_parent" {
+            let delegated = child(
+                &capability,
+                &parent_key(),
+                "child",
+                &Keypair::generate(),
+                scope(&["read"]),
+            )?;
+            runtime.spawn("root", "child", &delegated)?;
+            "child"
+        } else {
+            "root"
+        };
+        if refusal.starts_with("revoked") {
+            kernel.revoke_capability(&capability.id)?;
+        }
+        let request = runtime.tool_request(process_id, "read", "tools", "read", json!({}))?;
+        let _clock = (refusal == "expired")
+            .then(|| chio_test_support::clock::scope_unix_secs(capability.expires_at + 1));
+        let response = runtime.invoke(process_id, "read", &request).await?;
+        assert_eq!(response.verdict, Verdict::Deny, "{refusal}");
+        assert!(response.output.is_none());
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(
+            response.receipt.metadata.as_ref().ok_or("metadata")?["chio_process"]["process_id"],
+            process_id
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(kernel
+            .receipt_log()
+            .receipts()
+            .iter()
+            .any(|receipt| receipt.id == response.receipt.id
+                && receipt.signature == response.receipt.signature));
+        let mut wrong_identity = request.clone();
+        wrong_identity.agent_id = "another-agent".into();
+        let receipts_before = kernel.receipt_log().receipts().len();
+        assert!(matches!(
+            runtime.invoke(process_id, "read", &wrong_identity).await,
+            Err(ProcessError::Conflict)
+        ));
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts_before);
+        let mut wrong_request = request.clone();
+        wrong_request.request_id = "process:substituted-request".into();
+        assert!(matches!(
+            runtime.invoke(process_id, "read", &wrong_request).await,
+            Err(ProcessError::Invalid(_))
+        ));
+        assert!(runtime
+            .invoke("unregistered-process", "read", &request)
+            .await
+            .is_err());
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts_before);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn logical_call_replays_original_signed_receipt_after_kernel_restart() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (request, first_receipt) = {
+        let kernel = kernel(dir.path(), server(&calls))?;
+        let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+        root(&runtime, &kernel, 1)?;
+        let request = runtime.tool_request(
+            "root",
+            "publish",
+            "tools",
+            "append",
+            json!({"text": "hello"}),
+        )?;
+        let first = runtime.invoke("root", "publish", &request).await?;
+        assert_eq!(first.verdict, Verdict::Allow, "{:?}", first.reason);
+        assert!(first.receipt.verify_signature()?);
+        runtime.checkpoint("root", 0, json!({"phase": "published"}))?;
+        (request, serde_json::to_value(first.receipt)?)
+    };
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel)?;
+    let recovered = runtime.invoke("root", "publish", &request).await?;
+    assert_eq!(recovered.verdict, Verdict::Allow, "{:?}", recovered.reason);
+    assert_eq!(serde_json::to_value(recovered.receipt)?, first_receipt);
+    assert_eq!(
+        recovered.output,
+        Some(ToolCallOutput::Value(json!({"text": "hello"})))
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        runtime.process("root")?.checkpoint.value,
+        json!({"phase": "published"})
+    );
+    assert_eq!(runtime.process("root")?.tree_calls, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn children_share_a_durable_tree_ceiling_and_cannot_widen_scope() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let parent = root(&runtime, &kernel, 2)?;
+    for id in ["worker-a", "worker-b"] {
+        let cap = child(
+            &parent,
+            &parent_key(),
+            id,
+            &Keypair::generate(),
+            scope(&["read"]),
+        )?;
+        runtime.spawn("root", id, &cap)?;
+        let request =
+            runtime.tool_request(id, "research", "tools", "read", json!({"worker": id}))?;
+        let response = runtime.invoke(id, "research", &request).await?;
+        assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+        assert!(response.receipt.verify_signature()?);
+    }
+    let request = runtime.tool_request("root", "third", "tools", "append", json!({}))?;
+    assert!(matches!(
+        runtime.invoke("root", "third", &request).await,
+        Err(ProcessError::Limit(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(runtime.process("worker-a")?.tree_calls, 2);
+    // A correctly signed token for a different process is still not a child.
+    assert!(runtime.spawn("root", "forged", &parent).is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn narrowed_child_is_denied_by_the_real_kernel() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let parent = root(&runtime, &kernel, 3)?;
+    let cap = child(
+        &parent,
+        &parent_key(),
+        "reader",
+        &Keypair::generate(),
+        scope(&["read"]),
+    )?;
+    runtime.spawn("root", "reader", &cap)?;
+    let request = runtime.tool_request("reader", "write", "tools", "append", json!({}))?;
+    let response = runtime.invoke("reader", "write", &request).await?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn conflicting_replay_and_capability_substitution_never_dispatch() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    root(&runtime, &kernel, 3)?;
+    let mut request = runtime.tool_request("root", "write", "tools", "append", json!({"v": 1}))?;
+    assert_eq!(
+        runtime.invoke("root", "write", &request).await?.verdict,
+        Verdict::Allow
+    );
+    request.arguments = json!({"v": 2});
+    assert!(matches!(
+        runtime.invoke("root", "write", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    request = runtime.tool_request("root", "other", "tools", "append", json!({}))?;
+    request.capability =
+        kernel.issue_capability(&Keypair::generate().public_key(), scope(&["append"]), 300)?;
+    request.agent_id = request.capability.subject.to_hex();
+    assert!(matches!(
+        runtime.invoke("root", "other", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(runtime.process("root")?.tree_calls, 1);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn concurrent_opens_cannot_overspend_the_last_call() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let a = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let b = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    root(&a, &kernel, 1)?;
+    let req_a = a.tool_request("root", "a", "tools", "append", json!({}))?;
+    let req_b = b.tool_request("root", "b", "tools", "append", json!({}))?;
+    let barrier = Arc::new(tokio::sync::Barrier::new(2));
+    let other_barrier = barrier.clone();
+    let left = tokio::spawn(async move {
+        barrier.wait().await;
+        a.invoke("root", "a", &req_a).await
+    });
+    let right = tokio::spawn(async move {
+        other_barrier.wait().await;
+        b.invoke("root", "b", &req_b).await
+    });
+    let (left, right) = (left.await?, right.await?);
+    assert_eq!(usize::from(left.is_ok()) + usize::from(right.is_ok()), 1);
+    assert!(
+        matches!(left, Err(ProcessError::Limit(_))) || matches!(right, Err(ProcessError::Limit(_)))
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn checkpoints_use_compare_and_swap_and_cancel_covers_descendants() -> Result {
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), server(&Arc::new(AtomicUsize::new(0))))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let parent = root(&runtime, &kernel, 10)?;
+    let child_key = Keypair::generate();
+    let cap = child(
+        &parent,
+        &parent_key(),
+        "child",
+        &child_key,
+        scope(&["read"]),
+    )?;
+    runtime.spawn("root", "child", &cap)?;
+    let grandchild = child(
+        &cap,
+        &child_key,
+        "grandchild",
+        &Keypair::generate(),
+        scope(&["read"]),
+    )?;
+    runtime.spawn("child", "grandchild", &grandchild)?;
+    let other = ProcessRuntime::open(dir.path().join("process.db"), kernel)?;
+    assert_eq!(
+        runtime.checkpoint("child", 0, json!({"step": 1}))?.revision,
+        1
+    );
+    assert!(matches!(
+        other.checkpoint("child", 0, json!({"step": 2})),
+        Err(ProcessError::CheckpointConflict)
+    ));
+    assert_eq!(runtime.cancel("child")?, 2);
+    assert_eq!(runtime.cancel("child")?, 0);
+    assert_eq!(other.process("root")?.state, ProcessState::Running);
+    assert_eq!(other.process("grandchild")?.state, ProcessState::Cancelled);
+    assert!(matches!(
+        other.checkpoint("child", 1, json!({})),
+        Err(ProcessError::Cancelled(_))
+    ));
+    assert!(matches!(
+        runtime.spawn("child", "later", &grandchild),
+        Err(ProcessError::Cancelled(_))
+    ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn cancellation_withholds_inflight_output_and_prevents_further_calls() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let kernel = kernel(
+        dir.path(),
+        Box::new(Server {
+            calls: calls.clone(),
+            entered: Some(entered.clone()),
+            release: Some(release.clone()),
+        }),
+    )?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    root(&runtime, &kernel, 10)?;
+    let worker = runtime.clone();
+    let request = runtime.tool_request("root", "publish", "tools", "append", json!({}))?;
+    let task = tokio::spawn(async move { worker.invoke("root", "publish", &request).await });
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
+    runtime.cancel("root")?;
+    release.notify_one();
+    assert!(matches!(task.await?, Err(ProcessError::Cancelled(_))));
+    let another = runtime.tool_request("root", "next", "tools", "append", json!({}))?;
+    assert!(matches!(
+        runtime.invoke("root", "next", &another).await,
+        Err(ProcessError::Cancelled(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn opening_against_a_fresh_authority_or_ephemeral_kernel_is_rejected() -> Result {
+    let a = tempfile::tempdir()?;
+    let b = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let first = kernel(a.path(), server(&calls))?;
+    ProcessRuntime::open(a.path().join("process.db"), first)?;
+    let fresh = kernel(b.path(), server(&calls))?;
+    assert!(matches!(
+        ProcessRuntime::open(a.path().join("process.db"), fresh),
+        Err(ProcessError::Configuration(_))
+    ));
+    let ephemeral = Arc::new(ChioKernel::new_with_clock(
+        support::config(),
+        chio_test_support::clock::clock(),
+    ));
+    assert!(matches!(
+        ProcessRuntime::open(a.path().join("process.db"), ephemeral),
+        Err(ProcessError::Configuration(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn unversioned_journals_cannot_gain_dispatch_authority() -> Result {
+    for schema in [
+        "CREATE TABLE process_calls (process_id TEXT NOT NULL, operation_key TEXT NOT NULL, request_hash TEXT NOT NULL, PRIMARY KEY(process_id, operation_key))",
+        "CREATE TABLE process_runtime (singleton INTEGER PRIMARY KEY, version INTEGER NOT NULL, namespace TEXT NOT NULL, authority TEXT NOT NULL, kernel_key TEXT NOT NULL)",
+    ] {
+        let directory = tempfile::tempdir()?;
+        let journal = directory.path().join("process.db");
+        rusqlite::Connection::open(&journal)?.execute_batch(schema)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let before = std::fs::read(&journal)?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let kernel = kernel(directory.path(), server(&calls))?;
+        assert!(matches!(
+            ProcessRuntime::open(&journal, kernel),
+            Err(ProcessError::Configuration(_))
+        ));
+        assert_eq!(std::fs::read(&journal)?, before);
+        assert!(!directory.path().join("process.db-wal").exists());
+        assert!(!directory.path().join("process.db-shm").exists());
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn first_dispatch_attempt_preserves_request_identity_and_exact_replay() -> Result {
+    let dir = tempfile::tempdir()?;
+    let journal = dir.path().join("process.db");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(&journal, kernel.clone())?;
+    root(&runtime, &kernel, 1)?;
+    let request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+    assert_eq!(request.request_id, runtime.request_id("root", "peek")?);
+    let response = runtime.invoke("root", "peek", &request).await?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(response.request_id, request.request_id);
+    let replay = runtime.invoke("root", "peek", &request).await?;
+    assert_eq!(
+        serde_json::to_value(&replay.receipt)?,
+        serde_json::to_value(&response.receipt)?
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let attempts: u32 = rusqlite::Connection::open(&journal)?.query_row(
+        "SELECT attempts FROM process_calls WHERE process_id = 'root' AND operation_key = 'peek'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(attempts, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn never_invoked_ancestors_are_restored_before_a_grandchild_runs() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    {
+        let kernel = kernel(dir.path(), server(&calls))?;
+        let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+        let parent = root(&runtime, &kernel, 3)?;
+        let key = Keypair::generate();
+        let cap = child(&parent, &parent_key(), "child", &key, scope(&["read"]))?;
+        runtime.spawn("root", "child", &cap)?;
+        let grandchild = child(
+            &cap,
+            &key,
+            "grandchild",
+            &Keypair::generate(),
+            scope(&["read"]),
+        )?;
+        runtime.spawn("child", "grandchild", &grandchild)?;
+    }
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel)?;
+    let request =
+        runtime.tool_request("grandchild", "read", "tools", "read", json!({"depth": 2}))?;
+    let response = runtime.invoke("grandchild", "read", &request).await?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(runtime.process("root")?.tree_calls, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_duplicate_while_dispatch_is_live_does_not_create_a_second_effect() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let kernel = kernel(
+        dir.path(),
+        Box::new(Server {
+            calls: calls.clone(),
+            entered: Some(entered.clone()),
+            release: Some(release.clone()),
+        }),
+    )?;
+    let a = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let b = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    root(&a, &kernel, 1)?;
+    let request = a.tool_request("root", "publish", "tools", "append", json!({}))?;
+    let concurrent_request = request.clone();
+    let first = tokio::spawn(async move { a.invoke("root", "publish", &concurrent_request).await });
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
+    let duplicate = b.invoke("root", "publish", &request).await?;
+    assert_eq!(duplicate.verdict, Verdict::Deny);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    release.notify_one();
+    let original = first.await??;
+    assert_eq!(original.verdict, Verdict::Allow);
+    let replay = b.invoke("root", "publish", &request).await?;
+    assert_eq!(
+        serde_json::to_value(replay.receipt)?,
+        serde_json::to_value(original.receipt)?
+    );
+    assert_eq!(b.process("root")?.tree_calls, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn process_count_depth_and_identity_reuse_are_bounded() -> Result {
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), server(&Arc::new(AtomicUsize::new(0))))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let cap =
+        kernel.issue_capability(&parent_key().public_key(), scope(&["append", "read"]), 300)?;
+    let limits = chio_process::ProcessLimits {
+        max_processes: 2,
+        max_depth: 1,
+        max_calls: 1,
+        state: Default::default(),
+    };
+    runtime.create_root("root", &cap, limits)?;
+    runtime.create_root("root", &cap, limits)?;
+    assert!(matches!(
+        runtime.create_root("root", &cap, support::limits(20)),
+        Err(ProcessError::Conflict)
+    ));
+    let key = Keypair::generate();
+    let narrow = child(&cap, &parent_key(), "child", &key, scope(&["read"]))?;
+    runtime.spawn("root", "child", &narrow)?;
+    let grandchild = child(
+        &narrow,
+        &key,
+        "grandchild",
+        &Keypair::generate(),
+        scope(&["read"]),
+    )?;
+    assert!(matches!(
+        runtime.spawn("child", "grandchild", &grandchild),
+        Err(ProcessError::Limit("depth"))
+    ));
+    runtime.cancel("child")?;
+    assert!(matches!(
+        runtime.spawn("root", "sibling", &narrow),
+        Err(ProcessError::Limit("process count"))
+    ));
+    assert!(matches!(
+        runtime.spawn("root", "child", &narrow),
+        Err(ProcessError::Cancelled(_))
+    ));
+    assert_ne!(
+        runtime.request_id("a:b", "c")?,
+        runtime.request_id("a", "b:c")?
+    );
+    assert!(runtime.request_id("root", "").is_err());
+    assert!(runtime.checkpoint("root", u64::MAX, json!({})).is_err());
+    Ok(())
+}
+
+#[test]
+fn dormant_parents_cannot_overallocate_sibling_shares_and_cancellation_does_not_reset_them(
+) -> Result {
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), server(&Arc::new(AtomicUsize::new(0))))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let parent = root(&runtime, &kernel, 100)?;
+    for index in 0..10 {
+        let id = format!("child-{index}");
+        let cap = child(
+            &parent,
+            &parent_key(),
+            &id,
+            &Keypair::generate(),
+            scope(&["read"]),
+        )?;
+        runtime.spawn("root", &id, &cap)?;
+    }
+    assert_eq!(runtime.process("root")?.tree_calls, 0);
+    runtime.cancel("child-0")?;
+    let other = ProcessRuntime::open(dir.path().join("process.db"), kernel)?;
+    let extra = child(
+        &parent,
+        &parent_key(),
+        "extra",
+        &Keypair::generate(),
+        scope(&["read"]),
+    )?;
+    assert!(matches!(
+        other.spawn("root", "extra", &extra),
+        Err(ProcessError::Limit("sibling budget shares"))
+    ));
+    Ok(())
+}

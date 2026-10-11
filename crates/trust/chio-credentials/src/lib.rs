@@ -65,6 +65,9 @@ fn is_supported_passport_presentation_response_schema(schema: &str) -> bool {
     schema == PASSPORT_PRESENTATION_RESPONSE_SCHEMA
 }
 
+mod jwt_decode;
+use jwt_decode::decode_compact_jwt_without_signature;
+
 pub mod trust_tier;
 pub use trust_tier::{
     synthesize_trust_tier, TrustTier, TRUST_TIER_ATTESTED_MIN, TRUST_TIER_PREMIER_MIN,
@@ -90,4 +93,5 @@ include!("oid4vci.rs");
 include!("oid4vp.rs");
 include!("discovery.rs");
 include!("portable_reputation.rs");
-include!("tests.rs");
+#[cfg(test)]
+mod tests;

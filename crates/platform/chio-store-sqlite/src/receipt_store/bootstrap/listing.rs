@@ -60,7 +60,7 @@ impl SqliteReceiptStore {
                 tool_server,
                 tool_name,
                 decision_kind,
-                limit as i64,
+                crate::integer::checked::<_, i64>(limit)?,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -70,7 +70,7 @@ impl SqliteReceiptStore {
             decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )
         })
         .collect()
@@ -116,7 +116,7 @@ impl SqliteReceiptStore {
             decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )
         })
         .collect()
@@ -146,12 +146,16 @@ impl SqliteReceiptStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![after_seq as i64, limit as i64], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })?;
+        let rows = statement.query_map(
+            params![
+                crate::integer::checked::<_, i64>(after_seq)?,
+                crate::integer::checked::<_, i64>(limit)?
+            ],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )?;
         rows.map(|row| {
             let (seq, raw_json) = row?;
-            let seq = seq.max(0) as u64;
+            let seq = u64::try_from(seq.max(0)).unwrap_or_default();
             Ok(StoredToolReceipt {
                 seq,
                 receipt: decode_verified_chio_receipt(
@@ -204,7 +208,7 @@ impl SqliteReceiptStore {
                 request_id,
                 operation_kind,
                 terminal_state,
-                limit as i64,
+                crate::integer::checked::<_, i64>(limit)?,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -214,7 +218,7 @@ impl SqliteReceiptStore {
             decode_verified_child_receipt(
                 &raw_json,
                 "persisted child receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )
         })
         .collect()
@@ -222,7 +226,10 @@ impl SqliteReceiptStore {
 
     // Six optional SQL filter columns plus the admin read context; the
     // positional list mirrors list_child_receipts by design.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn list_child_receipts_with_context(
         &self,
         read_context: &ReceiptReadContext,
@@ -259,12 +266,16 @@ impl SqliteReceiptStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![after_seq as i64, limit as i64], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })?;
+        let rows = statement.query_map(
+            params![
+                crate::integer::checked::<_, i64>(after_seq)?,
+                crate::integer::checked::<_, i64>(limit)?
+            ],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )?;
         rows.map(|row| {
             let (seq, raw_json) = row?;
-            let seq = seq.max(0) as u64;
+            let seq = u64::try_from(seq.max(0)).unwrap_or_default();
             Ok(StoredChildReceipt {
                 seq,
                 receipt: decode_verified_child_receipt(

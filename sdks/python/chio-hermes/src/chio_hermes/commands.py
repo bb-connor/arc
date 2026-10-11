@@ -2,7 +2,8 @@
 
 `make_slash_handler(handle)` returns the async closure Hermes registers
 via `ctx.register_command(...)`. Subcommands: `status`, `receipts [N]`,
-`policy`, `approvals`, `approve <id>`, `deny <id>`.
+`policy`, `approvals`, `approve <id> <signed-token-json>`, and
+`deny <id> <signed-token-json>`.
 """
 
 from __future__ import annotations
@@ -105,7 +106,7 @@ async def _format_approvals_list(handle: RuntimeHandle) -> str:
             f"  - {approval_id} {tool_server}/{tool_name} "
             f"expires={expires_at} summary={summary!r}"
         )
-    lines.append("respond with `/chio approve <id> [reason]` or `/chio deny <id> [reason]`.")
+    lines.append("respond with `/chio approve <id> '<signed-token-json>' [reason]` or the deny equivalent.")
     return "\n".join(lines)
 
 
@@ -115,15 +116,18 @@ async def _respond_approval(
     verdict: str,
     args: list[str],
 ) -> str:
-    if not args:
-        return f"usage: /chio {verdict} <approval_id> [reason]"
+    if len(args) < 2:
+        return f"usage: /chio {verdict} <approval_id> '<signed-token-json>' [reason]; an externally signed decision is required"
     approval_id = args[0]
-    reason = " ".join(args[1:]).strip() or None
+    reason = " ".join(args[2:]).strip() or None
     client = handle.chio_client
     if client is None:
         return "chio approvals unavailable (chio client not initialised)"
     try:
-        result = await client.respond_approval(approval_id, verdict, reason)
+        from chio_hermes.approval_inputs import parse_signed_token
+
+        token = parse_signed_token(args[1])
+        result = await client.respond_approval(approval_id, verdict, reason, signed_token=token)
     except Exception as exc:  # noqa: BLE001
         return f"failed to {verdict} {approval_id}: {exc}"
     outcome = getattr(result, "outcome", verdict)
@@ -131,11 +135,11 @@ async def _respond_approval(
     if reason:
         return (
             f"chio approval {approval_id} -> {outcome_str} (reason: {reason}). "
-            "Retry the original tool call to proceed (auto-resume is v0.3 work)."
+            "Hermes execution resume is unavailable; use the configured durable caller protocol."
         )
     return (
         f"chio approval {approval_id} -> {outcome_str}. "
-        "Retry the original tool call to proceed (auto-resume is v0.3 work)."
+        "Hermes execution resume is unavailable; use the configured durable caller protocol."
     )
 
 

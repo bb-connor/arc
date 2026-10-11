@@ -1,0 +1,794 @@
+{
+  "schema": "chio.security.component-composition.v1",
+  "observed_utc": "2026-10-09T23:47:03.353717+00:00",
+  "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+  "scope": "Local registry, receipt export and operator recovery composition only; not new F11 authority repair, native capacity correction, exact candidate or hosted qualification.",
+  "findings": {
+    "FINAL-F02": {
+      "state": "local-component-qualified-candidate-pending",
+      "source_repair": {
+        "commits": [
+          "685a6acba83bbbded170a345fcb3fbb89f8632e7",
+          "aa7cd4d3b007ec198740f3c699e0c8024eb6704e",
+          "6db15e29380788194569f0978b79ea33528eb61f"
+        ],
+        "observed_source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "observed_source_tree": "4a841b9bfbe43911649622eee376918f6fa7e280",
+        "files": [
+          "crates/platform/chio-control-plane/src/certify/mod.rs",
+          "crates/platform/chio-control-plane/src/certify/registry.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/fixtures.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/older_registry_files.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/revocation_capacity.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/fixtures.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/older_registry_files.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/revocation_capacity.rs",
+          "crates/platform/chio-control-plane/src/signed_input.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/registry_revocation_capacity.rs"
+        ],
+        "source_file_sha256": {
+          "crates/platform/chio-control-plane/src/certify/mod.rs": "13a7253356ea46f6c2fb800a8b4e1d5f2ddc3806d92b6fb7a043ad83b46df499",
+          "crates/platform/chio-control-plane/src/certify/registry.rs": "b3f4391eb390c5aedad82a8029ddfaa7daba9c069eea7bd3471ee879f6d6acda",
+          "crates/platform/chio-control-plane/src/certify/registry/fixtures.rs": "90ddcd72689bf2b752b02a27335ff5e3307be5d17620573eb1d81a33dcf2000c",
+          "crates/platform/chio-control-plane/src/certify/registry/older_registry_files.rs": "faffb48239ea46c17b66c89170790afd7de7225ebe2e1e6680af77817f0a370c",
+          "crates/platform/chio-control-plane/src/certify/registry/revocation_capacity.rs": "715100c5e4d09340fe87d11b9901429192ff5618ddb843bb0fbc3017f8141693",
+          "crates/platform/chio-control-plane/src/passport_verifier.rs": "626f2ec5d1a0799f413f53f5835ed64ade08ac2c91d369b229037a7c696a2296",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/fixtures.rs": "e1a88f444e9e8f00c0f22e0f5bcb81167cd98649966d701c0977dab2571b80f1",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/older_registry_files.rs": "367e91dbfbdc1057aabb5f408ba717af4f051e48b7cbce50c311cc8fd246c1e5",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/revocation_capacity.rs": "1e0c776c942fa3a236b7aedc882660ddbd2aeb540ca52be5e3186b291496f818",
+          "crates/platform/chio-control-plane/src/signed_input.rs": "61abc6341f21f508e90886622d403956af06408efc741787916dc80ac409b397",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs": "a81bdb1f5fab5d6f1b6e6641c6b56e2c589b6b17615bf7f8f184406e6aa72b8a",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/registry_revocation_capacity.rs": "b0268e513b1b3ecec012a7d651ab550c8bcc302437485dd4efdbcba3c34aba1e"
+        }
+      },
+      "contract": "Per-record worst-case encoded terminal headroom under the unchanged 16 MiB cap; F13 transaction supplies atomic fresh capacity accounting.",
+      "original": "Original 2 passed / 13 failed; superseding-record Original 7 passed / 2 failed retained separately.",
+      "producer_verification": {
+        "evidence_path": "pr1160-final-review-20261009/F02-PRODUCER-VERIFICATION.json",
+        "sha256": "741d8076ad553e02985e296d5459e52740b506169517efbf2450ca9425e5c68f"
+      },
+      "boundary": "Owner-accepted old-format exact-cap files may refuse a growing revocation and retain the unchanged active record; operator archival remains required. No unconditional legacy revocation claim.",
+      "remaining_acceptance": [
+        "Close the new F03 re-review: typed HTTP export refusal and builder-independent readiness controls; retain all four lower-priority observations.",
+        "Complete native capacity fixture correction, composed authority/governance repairs and adjacent offer/policy registry transaction obligations.",
+        "Complete the exact-source independent candidate review.",
+        "Publish one candidate and obtain the four exact-SHA protected checks, then normal protected merge.",
+        "KANI-PROOF-QUAL remains OPEN/UNPROVED. SEC-1160-COLDSTATE remains OPEN P1 and gates G5 preview."
+      ]
+    },
+    "FINAL-F13": {
+      "state": "local-component-qualified-candidate-pending",
+      "source_repair": {
+        "commits": [
+          "f83f1fef0b4f24e6e7349f1318452adf5c14cf28",
+          "b5f521a2e84efec15a5dab56902a8ae2438f403f"
+        ],
+        "observed_source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "observed_source_tree": "4a841b9bfbe43911649622eee376918f6fa7e280",
+        "files": [
+          "crates/platform/chio-control-plane/src/certify/commands.rs",
+          "crates/platform/chio-control-plane/src/certify/registry.rs",
+          "crates/platform/chio-control-plane/src/certify/registry/registry_writer_lock.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier.rs",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/registry_writer_lock.rs",
+          "crates/platform/chio-control-plane/src/signed_input.rs",
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs",
+          "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+          "crates/platform/chio-control-plane/src/trust_control/registry_write_lane.rs",
+          "crates/platform/chio-control-plane/src/trust_control/registry_write_lane/tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/registry_revocation_capacity.rs",
+          "crates/products/chio-cli/src/passport/verifier.rs"
+        ],
+        "source_file_sha256": {
+          "crates/platform/chio-control-plane/src/certify/commands.rs": "f89e0b60babadbb558965a83e36687b5c21a831ea7fff0bd4a8eba6d456b746d",
+          "crates/platform/chio-control-plane/src/certify/registry.rs": "b3f4391eb390c5aedad82a8029ddfaa7daba9c069eea7bd3471ee879f6d6acda",
+          "crates/platform/chio-control-plane/src/certify/registry/registry_writer_lock.rs": "02686297bb12be936cc4cdb1c2a54a9ac40cdfb65acaab102459e16867363b3a",
+          "crates/platform/chio-control-plane/src/passport_verifier.rs": "626f2ec5d1a0799f413f53f5835ed64ade08ac2c91d369b229037a7c696a2296",
+          "crates/platform/chio-control-plane/src/passport_verifier/tests/registry_writer_lock.rs": "423f2600a2346b8ffc1541b536074bb59b08895d955464edb5f5b48de5d45dfa",
+          "crates/platform/chio-control-plane/src/signed_input.rs": "61abc6341f21f508e90886622d403956af06408efc741787916dc80ac409b397",
+          "crates/platform/chio-control-plane/src/trust_control.rs": "c66b95d4d4b5794c45ae566aa211e9c50b21fe1994555208c7e7d70dd9b13e41",
+          "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs": "da04e64d44a51e36e61c428a8ac424a34e9ec92350a4b3ceac83ad966d618c49",
+          "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs": "22c2e4b67018fe7950bee89f5d73f811e89695ddf2e2739eb8a63c1bec67e2de",
+          "crates/platform/chio-control-plane/src/trust_control/registry_write_lane.rs": "5bbf1b47ba307a18bde860ee6ec3f1be25476bc31ba891380065d5307aac7d34",
+          "crates/platform/chio-control-plane/src/trust_control/registry_write_lane/tests.rs": "8871c9ea5d044b523a007158743b0fc627d8dc46f825a4750b6dca1571f13042",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/registry_revocation_capacity.rs": "b0268e513b1b3ecec012a7d651ab550c8bcc302437485dd4efdbcba3c34aba1e",
+          "crates/products/chio-cli/src/passport/verifier.rs": "ae147e05a1e3a6bf5087295eb3c3ce93948e0a644ae4737bba2d279a451a2736"
+        }
+      },
+      "contract": "All ten shipped passport-status/certification mutation paths load and mutate fresh state under the stable same-entry writer lock; two bounded HTTP permits remain owned through cancellation and durable replacement.",
+      "original": "Expected-safe original 0 passed / 2 failed, before repair.",
+      "producer_verification": {
+        "evidence_path": "pr1160-final-review-20261009/F13-PRODUCER-VERIFICATION.json",
+        "sha256": "7fb033cf54eccac1ec6ca9dab6ed3a0aad1cba9db0786742bc1bc9b257a64ab5"
+      },
+      "documentation_verification": {
+        "evidence_path": "pr1160-final-review-20261009/F13-DOC-PRODUCER-VERIFICATION.json",
+        "sha256": "1045e98a4a552e79253d00454d91aa897465807ab455721dbfde849aeecf1ad5"
+      },
+      "mutation_controls": "Five genuine runtime kills: m13, m15, m16, m17, m18. There is no m14; earlier range wording was corrected.",
+      "boundary": "Cooperating single-host writers at the same canonical registry entry; mutation closure is trusted Rust application code. Multi-host shared storage and adjacent offer/policy registries are not covered.",
+      "remaining_acceptance": [
+        "Close the new F03 re-review: typed HTTP export refusal and builder-independent readiness controls; retain all four lower-priority observations.",
+        "Complete native capacity fixture correction, composed authority/governance repairs and adjacent offer/policy registry transaction obligations.",
+        "Complete the exact-source independent candidate review.",
+        "Publish one candidate and obtain the four exact-SHA protected checks, then normal protected merge.",
+        "KANI-PROOF-QUAL remains OPEN/UNPROVED. SEC-1160-COLDSTATE remains OPEN P1 and gates G5 preview."
+      ]
+    },
+    "FINAL-F03": {
+      "state": "shared-snapshot-repaired-http-contract-and-qualification-reopened",
+      "source_repair": {
+        "commits": [
+          "e7d5a7d0e3bc21da866ddb6063eb5dc2c11582eb",
+          "7d1a89e354be8372cee9f62b72692ba1ee19e437"
+        ],
+        "observed_source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "observed_source_tree": "4a841b9bfbe43911649622eee376918f6fa7e280",
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/http_budget.rs",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/query.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity/linux_file.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+          "docs/security/receipt-http-evidence-export.md"
+        ],
+        "source_file_sha256": {
+          "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs": "bcc88578f96e4af28780c276bdcecad0bf78f63499cb0f12128fcbccf3bcac0b",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs": "a81bdb1f5fab5d6f1b6e6641c6b56e2c589b6b17615bf7f8f184406e6aa72b8a",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs": "4d6487f2fb6de2316a281d5f62e77ef80780dc8726d604140079120c673b0aae",
+          "crates/platform/chio-store-sqlite/src/evidence_export.rs": "125fb077f09f058e25327d4578ad8ada60b5a310e17e995d321fac081e9833f2",
+          "crates/platform/chio-store-sqlite/src/evidence_export/http_budget.rs": "4201dc3b6589d7d87a2ed1f800f8d6642e84c64a03e834a197f3beb96ed052a2",
+          "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs": "613fd45b793697a6fe82085415ac0a9a0bec0b83688b8b2e30e4fac5fb19c9a8",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs": "82b58fd0254028652a36b87b6dc0b33d2086e779f26cda96b51550cf776e4fc6",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs": "8a4edf91ed07c6824bc9fdd36f5e0037e708f6d1c3d3afd2763c63006b75db9a",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs": "1f2672bfc9cf93c2e2e6aff6941260d8da93a62786030344689022d7b7ba2474",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": "7828d6e82cf80cdafe7072ffacad2ca3fb5e194f6c9c28b4c08c72f18502d27a",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/proofs.rs": "aa7b1fcf3d6ddca6c87e8695654e276fcd640c413f233bbdacb1140ae00e754e",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs": "f2293f2be0f841b84d72d896937dfcdbeb1bef0fc7efd0a34c5b5c2f42901109",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs": "781c8e710e4d674bf5853114def4fbf26b62d8a21bcf442daba8a50bf9dce657",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/query.rs": "836fc751f44c235c057df0cbcb5987d30fa7fd80f0eb9c83f20e5fab99699cbc",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "cb84c310e5d2440dba8dc14ca00f1a4f8848ba7212e1d4c2c9f1853acd767bb7",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity/linux_file.rs": "88589c410a3e5101c0699c82971878942963a6c940b0559bb1a60d79d632bf4d",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs": "f4d2a8929f62522fc471294f112c3fc81cf7108b2a26b0150a9c57e27186582b",
+          "docs/security/receipt-http-evidence-export.md": "69883f851d14c7d9ffe56705a379ddd663615c6ea34c7e92ecb6aee9e368619f"
+        }
+      },
+      "contract": "Bounded authenticated tenant export; unsupported mutable metadata refuses only this request, while corruption of owned authenticated projection invalidates shared state.",
+      "original": "New expected-safe Original 0 passed / 6 failed is distinct from the reviewer bad-behavior demonstration that exited zero.",
+      "producer_verification": {
+        "evidence_path": "pr1160-final-review-20261009/F03-REFUSAL-PRODUCER-VERIFIED.json",
+        "sha256": "c34f2a0c92661a960a62b35bcccb548e3af393b007189ecff8aac4c81e1bfa62"
+      },
+      "producer_records": [
+        {
+          "label": "lineage-and-projection-original",
+          "exit": 101,
+          "source_stable": true,
+          "test_summaries": [
+            "test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 2297 filtered out; finished in 0.82s"
+          ],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/lineage-and-projection-original.log",
+            "sha256": "f8cc0e8b46dc80e7ae5a7ecfacf18074b441ab6f2d133b306bab588e498174e1"
+          }
+        },
+        {
+          "label": "lineage-and-projection-green",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [
+            "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 2292 filtered out; finished in 1.13s"
+          ],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/lineage-and-projection-green.log",
+            "sha256": "7a2939fcbe3e6aadce166e202f2e637c08797dd7e5433a4744009826c89103ae"
+          }
+        },
+        {
+          "label": "owning-export-snapshot-http",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [
+            "test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 1526 filtered out; finished in 38.34s",
+            "test result: ok. 187 passed; 0 failed; 7 ignored; 0 measured; 2113 filtered out; finished in 64.49s"
+          ],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/owning-export-snapshot-http.log",
+            "sha256": "ddf552bb70255ce6d7e8325220bff5c22e3a9be01b44dfc71144e5ab812473b9"
+          }
+        },
+        {
+          "label": "clock-gate",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/clock-gate.log",
+            "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9"
+          }
+        },
+        {
+          "label": "negative-gate",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/negative-gate.log",
+            "sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+          }
+        },
+        {
+          "label": "hygiene-gate",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/hygiene-gate.log",
+            "sha256": "8b592be8e262f9f867fcc1d1d9171ac3feb5d7e3a5a78f887d58778665ec9ea9"
+          }
+        },
+        {
+          "label": "trust-gate",
+          "exit": 1,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/trust-gate.log",
+            "sha256": "96a51536c5977548b9572e235597d8e0f8b3d43ad7d75026ff2f0048b492852e"
+          }
+        },
+        {
+          "label": "strict-owning",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/strict-owning.log",
+            "sha256": "9418c52ef9af2a1f238c1366a4172a8389ff67e4a311fe285f00c5f0d409bc6f"
+          }
+        },
+        {
+          "label": "final-format",
+          "exit": 0,
+          "source_stable": true,
+          "test_summaries": [],
+          "log": {
+            "evidence_path": "pr1160-export-refusals-20261009/final-format.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "triage": {
+        "P1_A": "Repaired: mutable legacy/live lineage transport/cycle/depth/missing-parent refuses current export with typed Conflict, preserving shared Ready and other tenant reads. Known captured unsigned subject mismatch/deletion remain Invalid.",
+        "P2_A": "Repaired by safe-behavior controls and actual4097-receipt HTTP422/code/no-bundle/Ready control.",
+        "P3_A": "Refuted as a legitimate rotation interleaving for current supported source ordering: archive copy committed before atomic delete+watermark; child read pins live watermark and lookup in one transaction. Deterministic after-capture child rotation preserves export/Ready. No retry/Original RED invented.",
+        "P3_B": "RegradedP2 and repaired: missing owned checkpoint prefix/proof construction corruption invalidates; mutable publication metadata and digest-matching whole-bundle representation failure refuse only the request. Walker shares validate_checkpoint/predecessor and additionally chain_root; no new historical protocol support.",
+        "P3_C_D_E": "Explicit deferred minor checkpoint-advancement/time-wait/filter control debt; no polish expansion."
+      },
+      "boundary": "4096 selected receipts, 32 MiB payload/metadata, 4096 checkpoint prefix entries, 131072 proof leaves. Explicit complete local export remains available. No repeat of historical 100k test claimed.",
+      "remaining_acceptance": [
+        "Close the new F03 re-review: typed HTTP export refusal and builder-independent readiness controls; retain all four lower-priority observations.",
+        "Complete native capacity fixture correction, composed authority/governance repairs and adjacent offer/policy registry transaction obligations.",
+        "Complete the exact-source independent candidate review.",
+        "Publish one candidate and obtain the four exact-SHA protected checks, then normal protected merge.",
+        "KANI-PROOF-QUAL remains OPEN/UNPROVED. SEC-1160-COLDSTATE remains OPEN P1 and gates G5 preview."
+      ]
+    },
+    "FINAL-F04-OPERATOR": {
+      "state": "local-component-qualified-candidate-pending",
+      "source_repair": {
+        "commits": [
+          "13ec138d238fb546ca09dfff67a35dcf63c9506e",
+          "b15c7383f5430eb3942e5fbed110b0570b9adf5c",
+          "9472d40c951993f4de4af1b2800454ad5fe8401f"
+        ],
+        "observed_source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "observed_source_tree": "4a841b9bfbe43911649622eee376918f6fa7e280",
+        "files": [
+          "crates/platform/chio-control-plane/src/trust_control.rs",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs"
+        ],
+        "source_file_sha256": {
+          "crates/platform/chio-control-plane/src/trust_control.rs": "c66b95d4d4b5794c45ae566aa211e9c50b21fe1994555208c7e7d70dd9b13e41",
+          "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs": "a7074078c408b8081e1ad3cfa8ada29bbfa44598179e1c69fdeaae27c45cd223",
+          "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs": "09e17e6701cf75065e40ba1c29df46bdd372ee9a275e87593b2029a1f26d55b2",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs": "91b8568a2d222c57b6487cb3a8da9c945de75276ea9741a43ed77ae30bafce95",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs": "ed6b50b5b6addb834c6e89d38528ac1b368c43608e67e3e3fb85318950790d52",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot.rs": "82b58fd0254028652a36b87b6dc0b33d2086e779f26cda96b51550cf776e4fc6",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "cb84c310e5d2440dba8dc14ca00f1a4f8848ba7212e1d4c2c9f1853acd767bb7",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs": "3f2e925d8447d4095d16c3380a36440d7e6c1cfc9591792953279c2bad421363",
+          "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/recovery.rs": "8f40c5fd0462ea32bd5e338db709e9f38bbf4dfeaa674e820354eb7bc17a0288"
+        }
+      },
+      "contract": "Admin-authenticated node-local bounded recovery route accepts monotonic runtime quota growth and immediate resource retry; acknowledges scheduling and does not bypass authentication of rebuilt state.",
+      "producer_verification": {
+        "evidence_path": "pr1160-final-review-20261009/OPERATOR-PRODUCER-VERIFICATION.json",
+        "sha256": "00e00a1decba485728a3c8c2ddf3034b6b10a1b734ad3f0346779cf7ad689aa0"
+      },
+      "source_review": {
+        "evidence_path": "pr1160-final-review-20261009/OPERATOR-PRE-HANDOFF-REVIEW.json",
+        "sha256": "b45db18cf86d38c6efd1ea4ee520c90621a5707e19931a1b78f707100f73d3c9"
+      },
+      "boundary": "Quota changes are runtime-only; persisted deployment configuration remains explicit. Healthy service is not forcibly rebuilt, and request traffic cannot raise quota.",
+      "remaining_acceptance": [
+        "Close the new F03 re-review: typed HTTP export refusal and builder-independent readiness controls; retain all four lower-priority observations.",
+        "Complete native capacity fixture correction, composed authority/governance repairs and adjacent offer/policy registry transaction obligations.",
+        "Complete the exact-source independent candidate review.",
+        "Publish one candidate and obtain the four exact-SHA protected checks, then normal protected merge.",
+        "KANI-PROOF-QUAL remains OPEN/UNPROVED. SEC-1160-COLDSTATE remains OPEN P1 and gates G5 preview."
+      ]
+    }
+  },
+  "composed_checks": {
+    "store-snapshots": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "--",
+        "receipt_query_snapshot",
+        "evidence_export",
+        "--show-output"
+      ],
+      "observed_at": "2026-10-09T23:18:00.029830+00:00",
+      "elapsed_seconds": 267.18740947172046,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 191 passed; 0 failed; 7 ignored; 0 measured; 2129 filtered out; finished in 117.25s"
+      ],
+      "required_named_controls": [],
+      "named_controls_pass": true,
+      "accepted": true,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/store-snapshots.json",
+        "sha256": "5b4682cf48468bf257d03b1c116b7245a8fd8ee881db1a8cbb3f60740dd58453"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/store-snapshots.log",
+        "sha256": "94d8b3e8a5f525cd7ea1c4ecfa1af634c0593291c0504f53a8c2069f40b10c67"
+      }
+    },
+    "control-plane": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "passport_verifier",
+        "certify::",
+        "signed_input",
+        "receipt_query_snapshot_tests",
+        "receipt_snapshot_recovery",
+        "evidence_snapshot_export_tests",
+        "teardown_overlay_wait",
+        "registry_write_lane",
+        "registry_revocation_capacity",
+        "--show-output"
+      ],
+      "observed_at": "2026-10-09T23:22:27.323976+00:00",
+      "elapsed_seconds": 682.4750488940626,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 1560 filtered out; finished in 411.00s"
+      ],
+      "required_named_controls": [
+        "another_process_holding_the_lock_makes_updates_busy",
+        "a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends",
+        "passport_status_revocations_persist_at_a_full_registry",
+        "certification_revocations_persist_at_a_full_registry",
+        "a_revocation_while_another_writer_holds_the_registry_is_busy_and_changes_nothing",
+        "oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalidation",
+        "operator_recovery_route_exists_while_reads_are_unavailable_at_quota",
+        "http_reads_recover_after_quota_growth_and_still_verify_selected_payloads",
+        "operator_retry_wakes_an_unchanged_quota_backoff_by_request_not_by_its_deadline"
+      ],
+      "named_controls_pass": true,
+      "accepted": false,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/control-plane.json",
+        "sha256": "263b6c992aef6abf954b49858e31c3e879854e8ed764b93a412ed40d89409edd"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/control-plane.log",
+        "sha256": "d1a2dec95265a87dfb4f0c2eb281db5a35209d7b235be25bb2775bb40ebdbafb"
+      }
+    },
+    "control-plane-supplement": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "enterprise_federation::tests::certification_discovery_network_local_failures_preserve_typed_domains",
+        "enterprise_federation::tests::certification_discovery_network_normalizes_registry_urls",
+        "enterprise_federation::tests::certification_discovery_network_round_trips_validation_state",
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::cancelled_public_challenge_verification_keeps_its_permit_until_the_verification_ends",
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::next_public_challenge_verification_is_refused_at_once_while_a_paused_one_holds_the_permit",
+        "trust_control::cluster_and_reports::cluster_and_reports_tests::public_passport_challenge_admission::public_challenge_verification_leaves_the_async_worker_free_while_its_status_read_is_paused",
+        "trust_control::config_and_public::config_and_public_tests::configured_public_certification_metadata_validates_advertise_url_and_builds_paths",
+        "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_accepts_locally_issued_credential_without_fetch",
+        "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_reads_the_local_authority_database_without_writing",
+        "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_acceptance_past_request_expiry",
+        "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_credential_expired_during_the_wait",
+        "trust_control::passport_handlers::oid4vp_issuer_fetch_tests::public_direct_post_refuses_untrusted_issuer_before_any_fetch",
+        "trust_control::service_runtime::router::tests::ingress_tests::ingress_certification_rejects_duplicate_original_keys_without_store_changes",
+        "trust_control::service_runtime::router::tests::ingress_tests::ingress_nested_signed_certification_is_checked_before_network_dispatch",
+        "trust_control::service_runtime::tests::client::path_helpers_encode_segments_and_certification_paths",
+        "trust_control::service_types::config::service_config_tests::trust_service_config_rejects_zero_public_certification_metadata_ttl",
+        "--exact",
+        "--show-output"
+      ],
+      "observed_at": "2026-10-09T23:33:53.573194+00:00",
+      "elapsed_seconds": 2.2243837960995734,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1627 filtered out; finished in 0.33s"
+      ],
+      "required_named_controls": [],
+      "named_controls_pass": true,
+      "accepted": true,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/control-plane-supplement.json",
+        "sha256": "f94e5bddbefd0440827ee008efde6532434ebdcf9f8dfcae7aab6bd39e79fb1c"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/control-plane-supplement.log",
+        "sha256": "673cd67e8d0cf6dda1f4a74bd6de37c12f71aa6f1c9ee56884d093ccbc97633b"
+      }
+    },
+    "cli-registries": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "passport",
+        "--test",
+        "certify",
+        "--",
+        "--show-output"
+      ],
+      "observed_at": "2026-10-09T23:33:55.903009+00:00",
+      "elapsed_seconds": 404.7458646008745,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [
+        "test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.81s",
+        "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.00s"
+      ],
+      "required_named_controls": [],
+      "named_controls_pass": true,
+      "accepted": true,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/cli-registries.json",
+        "sha256": "ac1a55c6ead9947628424e91626ae43a43f23acddedcf0e176ef35b66abff226"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/cli-registries.log",
+        "sha256": "c0402078ee259343d1db88998a2ec9dc2b7919d5e45c35fe7330dfa9d670c60e"
+      }
+    },
+    "strict": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-cli",
+        "--all-targets",
+        "--features",
+        "chio-store-sqlite/admission-test-support",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "observed_at": "2026-10-09T23:40:40.743125+00:00",
+      "elapsed_seconds": 313.2317656627856,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [],
+      "required_named_controls": [],
+      "named_controls_pass": true,
+      "accepted": true,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/strict.json",
+        "sha256": "902686544092f4a64328a6ad997c18f2ea3207d9a29bc59e16241ba5239e5dd5"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/strict.log",
+        "sha256": "3f154ce80c4c97c690aad12a324f50e461ee761f13348563e884a16a1af033ac"
+      }
+    },
+    "fmt": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "observed_at": "2026-10-09T23:45:54.077153+00:00",
+      "elapsed_seconds": 28.79251693142578,
+      "exit": 0,
+      "source_before": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_after": {
+        "head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994",
+        "dirty_files": {
+          "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+        }
+      },
+      "source_stable": true,
+      "test_summaries": [],
+      "required_named_controls": [],
+      "named_controls_pass": true,
+      "accepted": true,
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/fmt.json",
+        "sha256": "ce62fb8e1ffe096b12932cd6b4dc0c8a984dddcc3a77de95c224475dff5c59fb"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-supplement/fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "control-plane-scope-reconciliation": {
+      "unique_passing_cases": 99,
+      "original_inventory": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/control-plane-inventory.json",
+        "sha256": "f291146bda3291e5cae5bd7d619aafdafed3efd5099732d35ce2707996fabef9"
+      },
+      "additional_inventory": {
+        "evidence_path": "pr1160-final-review-20261009/runtime-composed/control-plane-supplement-inventory.json",
+        "sha256": "4a19b3fc3d3d6e9c04a79a44eb2cb4c16a1aae2fc2a7f134546e85bf1fccad50"
+      },
+      "state": "99 unique owning component cases passed across two source-identical runs",
+      "original_harness_result": "The first run passed its selected83 tests and all9 named controls, but failed an incorrectly guessed90-test minimum. That failed acceptance record is preserved.16 additional producer owning interface tests were then run; no missing case is silently waived."
+    }
+  },
+  "composed_static_checks": {
+    "check-trust-boundaries.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-trust-boundaries.py.json",
+        "sha256": "3748d7bf7aa0eb1759d4ab870eecfad94b49c1950e9aff4e4f960928a699ff97"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-trust-boundaries.py.log",
+        "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-negative-assertions.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-negative-assertions.py.json",
+        "sha256": "2e21d46b551e60ec1a152e6668d572ebb18d2ebc2e34771d58fb541f2718e281"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-negative-assertions.py.log",
+        "sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-rust-file-hygiene.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-rust-file-hygiene.py.json",
+        "sha256": "31dabc2c0fbaf572c9c1dba05eb9d6166ef1b39696c9fe3bf327cfc5e57addc9"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-rust-file-hygiene.py.log",
+        "sha256": "b8fce2b784a76aca52119242277fa84a6362148ff573bcdcbd2880ac5a8e7991"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-security-clocks.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-security-clocks.py.json",
+        "sha256": "e56845cd2eba8b6171fbd2b2611e18b6e4401fa01c529d9e1eca9edfb5c0d4b3"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-security-clocks.py.log",
+        "sha256": "bd324fbc2aec503258f82917613ce9aeff2296a2cce36fc0e6f3285bcf158bd9"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-receipt-query-http.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-receipt-query-http.py.json",
+        "sha256": "535b5ce695ad20817968e2abc819338a4f5f47591b30ea5ff27e8662db331a68"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-receipt-query-http.py.log",
+        "sha256": "23144522615b2f7e75819cc338f99ccfe8b361c3e8d3886832aab3a8ef714481"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-rust-public-surface.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-rust-public-surface.py.json",
+        "sha256": "47ade16bc3a2b9d46ca41dcc95bf923aa920b069bc717d77f2afd1f3be686261"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-rust-public-surface.py.log",
+        "sha256": "2df1650320f3ee91715a5b67e0e4e7d18cecb3308d6769546ef5f97cc8423181"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    },
+    "check-security-landing-ledger.py": {
+      "record": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-security-landing-ledger.py.json",
+        "sha256": "5d0a30d140ebb328d06283c780b56907ac46fbcc34825ef09380e7d9439c254d"
+      },
+      "log": {
+        "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-security-landing-ledger.py.log",
+        "sha256": "4e0f4b17bc9fb33693747e24ed6ef97ce425081b04f23df035a0e55ef6a3ddd2"
+      },
+      "exit": 0,
+      "source_stable": true,
+      "source_head": "15df68dd3a5f38f2b2dd0cca7e7cd6119cfd9994"
+    }
+  },
+  "retained_harness_failure": {
+    "evidence_path": "pr1160-final-review-20261009/composed-reviewed-gates/check-public-surface.py.json",
+    "sha256": "b9dc736356d0f57445f8f77b1ba2a87d1bf789403aa2fe205dca8e918ca154eb"
+  },
+  "harness_failure_disposition": "Exit2 because the command omitted rust from the checker filename. Corrected invocation passed, failure remains retained; no source or policy change.",
+  "composition_review": {
+    "evidence_path": "pr1160-final-review-20261009/READY-REPAIRS-COMPOSITION.json",
+    "sha256": "a47e2c028587424defa8eb0732b0fb9e312d0e6d4555e0740596de4081509296"
+  },
+  "reviewed_catalog_application": {
+    "evidence_path": "pr1160-final-review-20261009/FINAL-CATALOG-APPLICATION.json",
+    "sha256": "730bd89392b5d3ccc1fc628be628079a0f8c8ec3362c2645f9db89352d872d00"
+  },
+  "proof_campaigns_run": false,
+  "hosted_qualified": false,
+  "merged": false
+}

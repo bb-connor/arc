@@ -10,17 +10,12 @@ static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
 const MAX_DEFERRED_A2A_TASKS: usize = 1024;
 const DEFERRED_A2A_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
 
-fn unix_now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_millis() as u64)
-}
-
 #[derive(Debug, Clone)]
 struct SkillBinding {
     target_protocol: DiscoveryProtocol,
     server_id: String,
     tool_name: String,
+    security: BridgeSecurityMetadata,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +43,9 @@ impl CapabilityBridge for A2aCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(
@@ -99,7 +96,7 @@ fn evaluate_bridge_fidelity(
         };
     }
     let mut caveats = Vec::new();
-    if tool.has_side_effects {
+    if !tool.annotations.read_only {
         caveats.push(
             "A2A publication cannot project protocol-native permission prompts; callers must rely on Chio capability enforcement".to_string(),
         );
@@ -137,6 +134,7 @@ fn build_skill_candidate(
     manifest: &ToolManifest,
     tool: &ToolDefinition,
     requires_qualification: bool,
+    security: BridgeSecurityMetadata,
 ) -> Result<SkillCandidate, A2aEdgeError> {
     let target_protocol =
         target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
@@ -176,6 +174,7 @@ fn build_skill_candidate(
             target_protocol,
             server_id: manifest.server_id.clone(),
             tool_name: tool.name.clone(),
+            security,
         }),
         published_id,
         lookup_alias,
@@ -187,7 +186,9 @@ fn build_skill_candidate(
 }
 
 fn execute_orchestrated_a2a_request(
+    peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
+    manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
 ) -> Result<OrchestratedToolCall, A2aEdgeError> {
     let registry = authoritative_target_registry();
@@ -198,7 +199,8 @@ fn execute_orchestrated_a2a_request(
         )));
     }
 
-    match CrossProtocolOrchestrator::new(kernel)
+    match CrossProtocolOrchestrator::new(kernel, manifest_registry)
+        .with_peer_capabilities(peer)?
         .with_registry(registry)
         .execute(&A2aCapabilityBridge, request)
     {

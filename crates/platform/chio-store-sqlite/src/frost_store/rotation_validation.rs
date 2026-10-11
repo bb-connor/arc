@@ -7,9 +7,7 @@ use chio_federation::frost::{
 };
 use rusqlite::{params, Connection};
 
-use super::rotation::{
-    canonical_error, invalid, load_active_record, sqlite_u64, trust_error, StoredRotation,
-};
+use super::rotation::{invalid, load_active_record, sqlite_u64, trust_error, StoredRotation};
 use super::FrostStoreError;
 
 pub(super) fn verify_checkpoint_roster(
@@ -82,8 +80,7 @@ pub(super) fn verify_stored_successor(
     artifact_trust
         .verify_epoch_checkpoint(checkpoint)
         .map_err(trust_error)?;
-    let target: FrostRosterV1 =
-        serde_json::from_slice(&stored.target_roster_json).map_err(canonical_error)?;
+    let target: FrostRosterV1 = crate::frost_store::decode_record(&stored.target_roster_json)?;
     let group_key = hex::decode(&target.group_public_key)
         .map_err(|_| invalid("target roster group key is not hexadecimal"))?;
     if checkpoint.scope_id != stored.scope_id
@@ -174,8 +171,7 @@ pub(super) fn verify_completed_ceremony(
         ));
     }
     for (group_key, transcript, shares_json) in rows {
-        let shares: BTreeMap<String, String> =
-            serde_json::from_slice(&shares_json).map_err(canonical_error)?;
+        let shares: BTreeMap<String, String> = crate::frost_store::decode_record(&shares_json)?;
         if group_key != target.group_public_key
             || transcript != target.ceremony_transcript_digest
             || shares != expected_shares

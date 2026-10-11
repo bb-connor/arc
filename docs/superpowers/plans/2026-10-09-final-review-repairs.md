@@ -1,0 +1,249 @@
+# Final foundation review repairs
+
+**Objective:** Repair FINAL-F01 through FINAL-F13 from the independent review of
+candidate `63ae9a4f5c`, preserving receipt and authority integrity. Publish only
+after the repaired candidate has local acceptance and independent delta review.
+
+**Execution:** Root remains the only integration writer. Existing authorization
+covers implementation, integration, qualification and protected landing. Claude
+delivers source-bound commits through the mailbox. Earlier helper work is
+integrated; all further Root execution is in the native thread, without
+subagents. The coordination board records path ownership and handoffs.
+No additional proof campaigns are authorized;
+KANI-PROOF-QUAL remains OPEN/UNPROVED under the recorded owner amendment.
+
+## Contracts and ownership
+
+| Findings | Owner | Required behavior |
+| --- | --- | --- |
+| F01 | Claude | Distinct native sessions cannot exhaust current-state rows permanently. Preserve taint, membership, replay protection, pending fences and authenticated recovery. Never silently reset a reused session ID. |
+| F02 | Claude | Every admitted passport and certification record retains enough capacity for terminal revocation and exact read-after-reopen. A shared fixed reserve is insufficient. |
+| F03 | Export helper | Tenant evidence export uses authenticated, bounded request work independent of unrelated history. Preserve complete selected evidence, attribution, proofs and tenant boundaries. Full local operator exports remain explicit offline work. |
+| F04 | Root | Transient backing exhaustion is recoverable and distinct from the configured quota. Actual quota exhaustion retains finite limits and an explicit recovery contract; no permanent silent latch or automatic unbounded allocation. |
+| F05-F08 | Root | Reconcile current acceptance with the owner proof amendment and completed capacity evidence, explicitly distinguish encoding noncollision from SHA assumptions, account for duplicate review IDs, and remove internal host aliases. Preserve historical source/evidence hashes and prior states. |
+| F09 | Root | Public health uses nonblocking, process-owned telemetry. It never takes receipt admission or the snapshot database lock, and exposes only configured/state. Detailed observations remain in the trusted owner API. Authenticated reads keep their original integrity checks. |
+| F10 | Cluster helper | Public forwarding has an independent bounded lane; cancellation retains its permit until work terminates. Authenticated forwarding retains its own capacity. |
+| F13 | Claude | Registry transactions cannot lose terminal revocations or use stale capacity accounting under concurrent writers. Inventory handler and CLI mutation entry points before implementation. |
+| F12 | Claude | A principal can refresh a new lineage before its first join; inconsistent materialized state still refuses. Deliver independently of capacity work. |
+| F11 | Cluster helper | Explicit bounded issue-time tolerance does not weaken expiry, signatures, epochs or replay. A stale replicated authority refuses trust reads and reports degraded health until verified synchronization recovers. |
+
+## Task 1: Complete report and fixture acceptance
+
+1. Verify producer hashes, review and integrate `0c82063475` report repair.
+2. Run the three owning script suites using their inert proof-tool fixtures.
+   Expected: all pass, open residual named last, decision inputs source-bound,
+   and ordinary crate names cannot be confused with internal record tags.
+3. Integrate the related Creusot contract fixture dependency repair after its
+   unchanged-source failure and passing repaired fixture are retained.
+4. Record terminal CLI tests and strict lint; keep hosted acceptance separate.
+
+## Task 2: Repair receipt health and snapshot recovery
+
+**Files:** `receipt_query_snapshot/service.rs`, a focused service health module,
+`receipt_query_snapshot/db.rs`, owning snapshot tests, control-plane
+`receipt_query_service.rs` and `receipt_query_snapshot_tests.rs`.
+
+1. Reproduce public health's dependency on an exhausted receipt read lane.
+   Expected Original: health reports busy instead of ready.
+2. Add walker-maintained resource telemetry and a nonblocking health read;
+   retain the existing inspecting status API for operators and integrity tests.
+3. Test held snapshot locks, exhausted admission, invalid/stopped phases, and
+   coherent sampled watermarks without timing-based success claims. Public HTTP
+   exposes only configured/state; detailed watermarks, counts, paths and raw
+   diagnostics stay in the trusted owner status API.
+4. Reproduce SQLite FULL misclassification without filling the host filesystem,
+   and reproduce failure to resume after a one-shot capacity fault clears.
+5. Implement explicit bounded resource retry/recovery. Test transient recovery,
+   actual quota refusal, cancellation during backoff, and unchanged tamper refusal.
+   Exercise HTTP refusal then successful reads after owner quota growth, followed
+   by rejection of altered selected receipt data on the recovered service.
+   SQLite FULL is ambiguous even when post-rollback usage is below the quota;
+   report both possible resource causes instead of asserting quota exhaustion.
+   Capacity/per-row-limit backoff starts at the configured retry interval capped
+   at 30 seconds and grows to one hour across repeated failed builds. Other
+   resource refusals retain the existing fixed retry interval capped at 30 seconds. An explicit owner-only quota
+   increase wakes recovery and is applied by the walker; request traffic cannot
+   raise it. The existing CLI startup setting remains the persisted deployment budget.
+   FINAL-F04-OPERATOR adds an admin-authenticated node-local HTTP recovery entry
+   point: explicit runtime quota increase and immediate resource retry without
+   restart, bounded before work begins, no forced healthy rebuild. Its response
+   acknowledges scheduling rather than completed readiness. Deterministic wake
+   and cancellation controls supplement the original component evidence.
+6. Run focused snapshot and HTTP tests, owning strict Clippy, format and boundary
+   scanners. Retain all failures; do not amend baselines to waive them.
+
+## Task 3: Integrate independent runtime repairs
+
+1. Obtain F01/F02/F03/F10/F11 source contracts and Original RED witnesses.
+2. Review each commit and evidence, check released paths, and cherry-pick in
+   dependency order. Resolve conflicts explicitly with the owning lane.
+3. Run composition tests at the touched boundaries and strict owning lint.
+   Expected: session churn, terminal revocation, bounded tenant export, separated
+   forwarding and skew/stale-authority controls pass without weakening refusals.
+
+**F03 bounded-format ruling:** The existing unpaginated export verifier requires
+a complete checkpoint prefix from genesis. HTTP bundles therefore have explicit
+total ceilings: 4096 selected receipts, 32 MiB of payload/metadata, 4096 checkpoint
+prefix entries, and 131072 proof leaves. A prefix ceiling cannot be fixed by
+narrowing the time range; its error must direct the operator to the complete
+local export. An anchored/paginated format is a separate protocol follow-up.
+Receipt GET queries do not inherit these export ceilings. Optional live database
+retention diagnostics are unavailable in a snapshot-bound HTTP export; the
+existing complete local export still computes them. No source-index lookup may
+pretend to authenticate the minimum of a tamperable live table.
+
+**F01 preservation ruling:** Dominated session labels may be compacted only if
+no egress fence or nonterminal operation retains their context. Non-dominated
+session taint and cross-principal lineage remain authoritative. New context
+admission must not cross the global authenticated bound or prevent already
+admitted operations from completing. A residual store-wide permanent denial is
+not accepted merely because another churn pattern reaches it. Per-principal sharing and
+reserved completion must cover parked approvals. Lineage, principal, epoch and
+declassification authority cannot be forgotten to reclaim capacity. Any cold
+state must authenticate current versions and absence, preserve cross-tier
+transition uniqueness, prevent stale resurrection and avoid full-history work
+on startup or admission. Owner decision0020 moves authenticated cold state to SEC-1160-COLDSTATE, an
+OPEN P1 that blocks G5 outside-team preview. The bounded repair set remains
+required before foundation landing. Preserve the65,536 current-row ceiling,
+count declassification state, and document measured thresholds and exact refusal
+from the final source. No unbounded-capacity claim follows from landing.
+
+**F02 legacy-file boundary:** New per-record terminal headroom does not establish
+guaranteed revocation for an older file already at the read cap. Retain genuine
+old-format controls and qualify any no-regression fallback separately. A full
+legacy file needs a reviewed migration or explicit acceptance disposition; do
+not enlarge the cap or delete signed records to make a write pass.
+
+## Task 4: Reconcile the authoritative record
+
+1. Archive the seven stale current states before updating acceptance. Preserve
+   their historical requirement objects and existing evidence.
+2. State encoding noncollision as UNPROVED independently of ASSUME-SHA256.
+3. Record V13-V15 as consolidated duplicates of V10-V12, citing the planner's
+   disposition. Keep the 28 distinct original findings unchanged.
+4. Replace internal host aliases with generic execution-host descriptions;
+   record old/new document hashes so existing historical bindings remain clear.
+5. Add every new finding, repair, test evidence and remaining acceptance to the
+   canonical ledger; renew generated coverage only after source changes settle.
+
+## Task 5: Qualify the exact landing candidate
+
+1. Refresh mailbox, PR threads and main; preserve new relevant review obligations.
+2. Verify clean candidate, source-bound local evidence and no baseline waivers.
+3. Request planner review of `63ae9a4f5c..candidate` and address confirmed blockers.
+4. Publish the single integration candidate, verify the four protected checks at
+   that exact SHA, and use the normal protected merge path.
+5. Keep unproved Kani work and native/trusted/release follow-ups explicitly open.
+   No release readiness claim follows from this foundation landing.
+
+## Review focus
+
+Check cancellation ownership, cross-tenant effects, snapshot publication and
+freshness, recovery without resource-limit removal, registry worst-case terminal
+growth, session-ID reuse, and future-issued versus expired authority envelopes.
+Review ledger transitions as evidence changes, not as a rewrite of history.
+
+
+## Task 6: Repair the final hosted review findings
+
+The exact-source review of `fd82f2f247` added six obligations in
+[the intake audit](../../security/audits/github-final-review-intake-20261010.json).
+That head is withdrawn despite its 967 distinct bounded local passes. Preserve
+those results and all earlier failures; the new findings require their own
+Original evidence. Root remains the only integration writer.
+
+1. Reject x402 requirement lists containing a token outside ApprovalBinding.
+   Preserve approved symbol case handling and prove mixed-token refusal.
+2. Restore reserved-operation revalidation forwarding through the public runtime
+   facade and preserve invalid binding and stale reservation refusal.
+3. Preserve the next request when an oversized reference-tool line already ended
+   at the bounded read boundary. Test exact boundary, fragmented input and EOF.
+4. Reconcile repository command schema and finite frame limits for escaped UTF-8
+   commands. Drain rejected frames without consuming a following valid request.
+5. Reverify receipt signatures with the independently supplied key, while comparing
+   only documented stable verifier evidence. Diagnostic order and additions are
+   compatible; schema, receipt count, key and integrity contradictions refuse.
+6. Scan nested argument strings and keys for exact registered decoy candidates,
+   including supported header, cookie, URL and word contexts. Bound traversal,
+   candidate count and bytes; refuse exhaustion. Preserve tenant/lifecycle checks,
+   event/receipt evidence and refusal on detector failure. No plaintext-registry
+   enumeration or arbitrary encoded-substring detection claim.
+7. Integrate reviewed commits, retain all six ledger obligations, renew generated
+   source metadata, then run final changed-boundary qualification and independent
+   review before one replacement publication. Hosted protections remain mandatory.
+
+These are repairs to existing contracts under the standing execution authorization.
+They add no roadmap features, real proof campaigns, external interception experiments,
+new lint allowances or acceptance waivers.
+
+
+## Task 7: Repair hosted qualification failures before another publication
+
+Candidate `b9a43b2995` retains the six review repairs and passing composed local
+qualification (385 Rust tests, 469 Python tests, strict owning lint and static
+checks). Its hosted Build job failed before reaching Rust checks. These results
+remain distinct from full workspace or exact-source hosted qualification.
+
+1. Integrate the comment-only budget provenance clarification after reproducing
+   the stub-surface scanner failure. Run the actual scanner and its regression
+   suite; change no scanner allowance or production behavior.
+2. Move the approval-reservation cleanup test out of the threshold crypto-floor
+   module. Preserve its assertions and execution, and restore the unchanged
+   20-name crypto-floor inventory. Require the exact inventory, moved control
+   and owning strict lint to pass before integration.
+3. Inventory the actual remaining CI steps and run their fast local checks,
+   preserving failures individually. Claude owns hosted failure triage and
+   isolated repairs; Root owns the ordinary local workspace campaign and its
+   findings. Claim paths before edits and exchange exact source/evidence pins.
+   The sweep additionally requires enrollment of the existing 48th flow test,
+   renewal of the two lockfile fingerprints after reviewing the two existing
+   runtime dev-dependency edges, bounded-token copy classification, checked
+   export byte arithmetic, and enrollment of the existing snapshot-directory
+   version in the identifier inventory. Preserve every existing assertion,
+   identifier entry, finite budget and historical evidence fingerprint.
+   Checks refused by a local Cargo adapter remain unqualified until executed
+   with the actual toolchain. Missing environment tools are separate from
+   source failures.
+4. Hold the replacement push until the known repairs and fast-check sweep are
+   complete. Renew generated source metadata as needed, without changing proof
+   claims or running additional proof campaigns. Preserve the original hosted
+   failures and any incomplete local campaigns.
+5. Review the complete repair delta in the native thread, compose released
+   commits, and qualify the changed boundaries. Then publish one replacement
+   candidate and return to Task 5's protected landing requirements. Automatic
+   hosted formal results do not close KANI-PROOF-QUAL.
+
+**Scheduling ruling:** The owner delegated optional formal-job scheduling to
+Root. Cancel the obsolete, already-failed candidate's remaining workflows to
+free capacity. Keep the replacement's normal protected checks, launch no extra
+proof campaigns, and do not use optional proof completion as an additional
+landing prerequisite. Retain cancellation and upstream aggregate failures
+separately from genuine source failures. The one-hour local workspace run
+expired during compilation without reaching tests; it remains incomplete.
+Reuse its build artifacts for focused checks rather than repeating that cold
+campaign. No full-workspace pass follows from successful focused checks.
+
+
+### Dependency-budget repair discovered by the real Cargo preflight
+
+The actual graph check found 73 packages against the helper ceiling of 72 and
+482 against the broker ceiling of 481. Both graphs gained only `ascii 1.1.0`
+through `chio-core-types` in `b830fb0f89`. Preserve both ceilings and the gate's
+existing 12 controls. Remove that dependency by using checked byte buffers and
+safe UTF-8 conversion in the shared encoder; retain the 135-byte P-256 stack
+path, exact wire rendering, non-ASCII compatibility fallback and proof refusal
+branches. No alternate proof implementation or unsafe conversion is permitted.
+
+Original wire and exhaustive-prefix controls pass before the refactor and serve
+as preservation evidence. The dependency gate supplies genuine Original RED.
+Require whole owning tests, strict all-target lint, `no_std` compilation,
+downstream attestation and real FIPS-family wire controls. Regenerate only the
+active deployment locks and current fingerprints, preserving all versions,
+checksums and historical audit inputs.
+
+The native reviewer identified a possible symbolic cost from UTF-8 validation
+on allocating rendering paths. Keep the safe allocation transfer instead of
+adding another allocation for unmeasured proof convenience. The fixed P-256
+prehash path consumes stack bytes directly. Record the possible proof cost as
+unverified; no earlier proof pass qualifies the changed source. Kani remains
+OPEN/UNPROVED, and no additional proof campaign is run.

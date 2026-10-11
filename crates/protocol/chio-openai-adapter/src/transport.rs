@@ -190,11 +190,7 @@ impl OpenAiTransport {
             .await
             .map_err(map_openai_transport_error)?;
         classify_openai_http_status(&response)?;
-        let value: Value = serde_json::from_slice(&response.body).map_err(|error| {
-            ProviderError::Malformed(format!(
-                "OpenAI chat.completions response was not JSON: {error}"
-            ))
-        })?;
+        let value = crate::input::read_json(&response.body)?;
 
         let tool_calls = extract_chat_completion_tool_calls(&value)?;
         let invocations = if tool_calls.is_empty() {
@@ -294,7 +290,7 @@ fn transport_build_error(error: HttpTransportError) -> ProviderError {
 }
 
 fn classify_openai_http_status(response: &HttpResponse) -> Result<(), ProviderError> {
-    if let Some(error) = map_http_status("OpenAI", response.status, &response.body) {
+    if let Some(error) = map_http_status("OpenAI", response.status) {
         return Err(error);
     }
     Ok(())

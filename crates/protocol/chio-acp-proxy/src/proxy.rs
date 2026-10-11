@@ -39,6 +39,7 @@ impl AcpProxy {
         signer: Option<Box<dyn ReceiptSigner>>,
         checker: Option<Box<dyn CapabilityChecker>>,
         attestation_mode: AcpAttestationMode,
+        clock: AcpClock,
     ) -> Result<Self, AcpProxyError> {
         let transport = AcpTransport::spawn(
             config.agent_command(),
@@ -50,6 +51,7 @@ impl AcpProxy {
             signer,
             checker,
             attestation_mode,
+            clock,
         );
         Ok(Self {
             config,
@@ -64,7 +66,7 @@ impl AcpProxy {
     /// block, or augment the message.
     pub fn process_client_message(
         &self,
-        message: &serde_json::Value,
+        message: &AcpMessage,
     ) -> Result<InterceptResult, AcpProxyError> {
         self.interceptor
             .intercept(Direction::ClientToAgent, message)
@@ -76,14 +78,14 @@ impl AcpProxy {
     /// block, or augment the message.
     pub fn process_agent_message(
         &self,
-        message: &serde_json::Value,
+        message: &AcpMessage,
     ) -> Result<InterceptResult, AcpProxyError> {
         self.interceptor
             .intercept(Direction::AgentToClient, message)
     }
 
     /// Read the next message from the agent subprocess.
-    pub fn recv_from_agent(&mut self) -> Result<Option<serde_json::Value>, AcpProxyError> {
+    pub fn recv_from_agent(&mut self) -> Result<Option<AcpMessage>, AcpProxyError> {
         self.transport.recv()
     }
 

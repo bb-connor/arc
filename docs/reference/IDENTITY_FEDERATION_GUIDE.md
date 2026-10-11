@@ -38,6 +38,23 @@ same Chio subject and therefore the same receipt attribution path.
 
 ## CLI
 
+Every launch below wraps the repository's mock MCP server and passes the
+signed manifest and native-launch policy provisioned for that exact command.
+Configure the [enforcing host inputs](../security/native-launch-examples.md),
+including reviewed Python runtime read grants, then provision and export them:
+
+```bash
+source scripts/lib/provision-mcp-launch.sh
+PYTHON3="$(chio_resolve_python python3)"
+chio_provision_mcp_launch "$(command -v chio)" "$PWD/federation-security" \
+  wrapped-http-mock "Wrapped HTTP Mock" 1 "$PWD" \
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
+export CHIO_SIGNED_MANIFEST="$PWD/federation-security/signed-manifest.json"
+export CHIO_MANIFEST_PUBLIC_KEY="$(cat federation-security/manifest-public-key)"
+export CHIO_CAGE_POLICY="$PWD/federation-security/cage-launch-policy.json"
+export CHIO_CAGE_POLICY_SIGNER="$(cat federation-security/cage-policy-signer)"
+```
+
 Use `chio mcp serve-http` with explicit JWT admission:
 
 ```bash
@@ -51,7 +68,11 @@ chio mcp serve-http \
   --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
-  -- python3 ./mock_server.py
+  --signed-manifest "$CHIO_SIGNED_MANIFEST" \
+  --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+  --cage-policy "$CHIO_CAGE_POLICY" \
+  --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+  -- "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 Or use OIDC discovery plus provider-aware mapping:
@@ -67,7 +88,11 @@ chio mcp serve-http \
   --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
-  -- python3 ./mock_server.py
+  --signed-manifest "$CHIO_SIGNED_MANIFEST" \
+  --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+  --cage-policy "$CHIO_CAGE_POLICY" \
+  --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+  -- "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 Or use OAuth2 token introspection for opaque bearer tokens:
@@ -85,7 +110,11 @@ chio mcp serve-http \
   --auth-jwt-audience chio-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
-  -- python3 ./mock_server.py
+  --signed-manifest "$CHIO_SIGNED_MANIFEST" \
+  --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+  --cage-policy "$CHIO_CAGE_POLICY" \
+  --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+  -- "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 To share an explicit provider-admin registry with the edge and trust-control:
@@ -99,7 +128,11 @@ chio mcp serve-http \
   --identity-federation-seed-file ./identity-federation.seed \
   --enterprise-providers-file ./enterprise-providers.json \
   --admin-token <admin-token> \
-  -- python3 ./mock_server.py
+  --signed-manifest "$CHIO_SIGNED_MANIFEST" \
+  --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+  --cage-policy "$CHIO_CAGE_POLICY" \
+  --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+  -- "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 
 chio trust serve \
   --listen 127.0.0.1:8940 \

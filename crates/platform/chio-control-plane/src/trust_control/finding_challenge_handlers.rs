@@ -277,6 +277,7 @@ pub(crate) async fn handle_submit_finding_challenge(
             Ok(collected) => collected,
             Err(response) => return response,
         };
+    let clock = Arc::clone(&state.finding_challenge_clock);
     let executor = Arc::clone(executor);
     let purchase_executor = state.finding_purchase_executor.clone();
     let service_token = state.config.service_token.clone();
@@ -399,12 +400,13 @@ pub(crate) async fn handle_submit_finding_challenge(
             );
         }
 
-        match executor.submit(
-            &request,
-            raw_challenge_envelope,
-            &raw_finding,
-            unix_timestamp_now(),
-        ) {
+        // Body I/O and blocking-pool queueing cannot extend signed filing authority.
+        let clock_now = match clock.unix_millis() {
+            Ok(now) => now.as_secs(),
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
+
+        match executor.submit(&request, raw_challenge_envelope, &raw_finding, clock_now) {
             Ok(outcome) => Json(FindingChallengeSubmissionResponse::from(outcome)).into_response(),
             Err(error) if coordinator_unavailable(&error) => {
                 plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
@@ -554,7 +556,12 @@ fn checked_outcome_json(outcome: &FindingChallengeOutcomeRecord) -> Result<serde
     {
         return Err(());
     }
-    serde_json::from_slice(&outcome.outcome_envelope_json).map_err(|_| ())
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        &outcome.outcome_envelope_json,
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| ())
 }
 
 const fn challenge_authorization_name(branch: FindingChallengeAuthorizationBranch) -> &'static str {

@@ -15,7 +15,7 @@ class ChioModule : Module() {
             throw ChioBindingUnavailable("evaluate")
         }
 
-        AsyncFunction("signReceipt") { bodyJson: String, signingSeedHex: String ->
+        AsyncFunction("signReceipt") { bodyJson: String, canonicalContentHex: String, signingSeedHex: String ->
             throw ChioBindingUnavailable("signReceipt")
         }
 
@@ -35,8 +35,8 @@ class ChioModule : Module() {
             throw ChioBindingUnavailable("attestPlayIntegrity")
         }
 
-        AsyncFunction("verifyMobileReceipt") { receiptJson: String, evidenceJson: String ->
-            throw ChioBindingUnavailable("verifyMobileReceipt")
+        AsyncFunction("inspectMobileReceiptEnvelopes") { receiptJson: String, evidenceJson: String ->
+            throw ChioBindingUnavailable("inspectMobileReceiptEnvelopes")
         }
     }
 }

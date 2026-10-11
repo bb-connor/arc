@@ -1,3 +1,4 @@
+use super::json_file::{read_json_store, write_json_store};
 use super::traits::RuntimeTrustFloorStore;
 use crate::*;
 
@@ -10,19 +11,7 @@ impl JsonRuntimeTrustFloorStateStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
         let path = path.as_ref().to_path_buf();
         let mut state = if path.exists() {
-            let json = fs::read_to_string(&path).map_err(|error| {
-                ChioRuntimeError::Io(format!(
-                    "failed to read runtime trust-floor state {}: {error}",
-                    path.display()
-                ))
-            })?;
-            let state: RuntimeTrustFloorState = serde_json::from_str(&json).map_err(|error| {
-                ChioRuntimeError::Json(format!(
-                    "failed to parse runtime trust-floor state {}: {error}",
-                    path.display()
-                ))
-            })?;
-            state
+            read_json_store(&path)?
         } else {
             RuntimeTrustFloorState {
                 schema: CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string(),
@@ -103,25 +92,16 @@ impl JsonRuntimeTrustFloorStateStore {
         })
     }
 
-    fn persist_state(&self, state: &RuntimeTrustFloorState) -> Result<(), ChioRuntimeError> {
-        if let Some(parent) = self.path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    ChioRuntimeError::Io(format!(
-                        "failed to create runtime trust-floor state directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
-            }
-        }
-        let json = serde_json::to_string_pretty(state)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
-        fs::write(&self.path, format!("{json}\n")).map_err(|error| {
-            ChioRuntimeError::Io(format!(
-                "failed to write runtime trust-floor state {}: {error}",
-                self.path.display()
-            ))
-        })
+    /// Live state changes only after `candidate` is validated and persisted.
+    fn commit(
+        &self,
+        live: &mut RuntimeTrustFloorState,
+        candidate: RuntimeTrustFloorState,
+    ) -> Result<(), ChioRuntimeError> {
+        Self::validate_state(&candidate)?;
+        write_json_store(&self.path, &candidate)?;
+        *live = candidate;
+        Ok(())
     }
 }
 
@@ -144,16 +124,16 @@ impl RuntimeTrustFloorStore for JsonRuntimeTrustFloorStateStore {
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        state.schema = CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string();
-        if let Some(existing) = state.entries.iter_mut().find(|existing| {
+        let mut candidate = state.clone();
+        candidate.schema = CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string();
+        if let Some(existing) = candidate.entries.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {
             *existing = entry;
         } else {
-            state.entries.push(entry);
+            candidate.entries.push(entry);
         }
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn validate_and_record_runtime_trust_floor(
@@ -162,7 +142,6 @@ impl RuntimeTrustFloorStore for JsonRuntimeTrustFloorStateStore {
         previous_hash_sha256: Option<&str>,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        state.schema = CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string();
         let existing = state
             .entries
             .iter()
@@ -171,14 +150,15 @@ impl RuntimeTrustFloorStore for JsonRuntimeTrustFloorStateStore {
             })
             .cloned();
         validate_runtime_trust_floor_transition(existing, &entry, previous_hash_sha256)?;
-        if let Some(existing) = state.entries.iter_mut().find(|existing| {
+        let mut candidate = state.clone();
+        candidate.schema = CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string();
+        if let Some(existing) = candidate.entries.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {
             *existing = entry;
         } else {
-            state.entries.push(entry);
+            candidate.entries.push(entry);
         }
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 }

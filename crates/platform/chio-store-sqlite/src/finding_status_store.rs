@@ -26,7 +26,7 @@ use chio_finding::{
     FindingStatusVerdict,
 };
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::FindingStatusProofInput;
@@ -44,6 +44,7 @@ use crate::finding_challenge_store::{
     begin_finalizing_under_sanction_tx, FindingFinalizingAuthorizationInput, FindingLiabilityState,
 };
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 const FINDING_STATUS_SCHEMA_KEY: &str = "finding_status";
 pub(crate) const FINDING_STATUS_SUPPORTED_SCHEMA_VERSION: i32 = 5;
@@ -73,6 +74,8 @@ pub const MAX_FINDING_STATUS_VALUE_BYTES: usize = 4 * 1024;
 /// Fail-closed errors from durable finding-status persistence.
 #[derive(Debug, Error)]
 pub enum FindingStatusStoreError {
+    #[error("finding status clock rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding status store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding status store fence rejected the caller")]
@@ -341,13 +344,13 @@ pub enum FindingStatusDecision {
 
 #[derive(Clone)]
 pub struct SqliteFindingStatusStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingStatusStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -362,11 +365,9 @@ impl SqliteFindingStatusStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingStatusStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingStatusStoreError::Unavailable(
-                "sqlite finding status store lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingStatusStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -421,53 +422,13 @@ impl SqliteFindingStatusStore {
             .map_err(|error| FindingStatusStoreError::Unavailable(error.to_string()))
     }
 
-    /// Advance the rollback-protected trusted-time floor for one status feed.
-    ///
-    /// The feed floor is already covered by the authenticated finding-status
-    /// projection, so reusing its monotonic timestamp keeps clock continuity
-    /// across verifier clones and process restarts without creating an
-    /// unanchored side table. Equal observations are exact replays. A wall
-    /// clock below the retained floor fails closed.
-    pub fn observe_trusted_time(
-        &self,
-        feed_id: &str,
-        trusted_now: u64,
-    ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
-        self.observe_trusted_time_with_clock(feed_id, || trusted_now)
-            .map(|(outcome, _)| outcome)
-    }
-
-    /// Sample and advance trusted time only after acquiring the durable write
-    /// transaction. This closes expiry races for callers that must perform a
-    /// final freshness check after a potentially blocking feed read.
-    pub fn observe_trusted_time_with_clock(
-        &self,
-        feed_id: &str,
-        read_now: impl FnOnce() -> u64,
-    ) -> Result<(FindingStatusWriteOutcome, u64), FindingStatusStoreError> {
-        require_identifier(feed_id, "feed_id")?;
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection)?;
-        ensure_feed_registered_tx(&transaction, feed_id)?;
-        let trusted_now = read_now();
-        require_positive(trusted_now, "trusted_now")?;
-        let outcome = advance_trusted_time_floor_tx(&transaction, feed_id, trusted_now)?;
-        if outcome == FindingStatusWriteOutcome::ExactReplay {
-            transaction.commit().map_err(sqlite_error)?;
-        } else {
-            self.commit_write(transaction)?;
-            self.sync_after_write(&connection)?;
-        }
-        Ok((outcome, trusted_now))
-    }
-
     /// Atomically persist a local retraction intent and the sticky pending row.
     /// Exact replay is a no-op; a second intent for the same finding conflicts.
     pub fn issue_retraction_intent(
         &self,
         input: &FindingRetractionIntentInput<'_>,
     ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
-        self.issue_retraction_intent_inner(input, None, || input.created_at)
+        self.issue_retraction_intent_inner(input, None, || Ok(input.created_at))
     }
 
     /// Persist a new intent only if its admission-pinned operator and bond are
@@ -479,7 +440,7 @@ impl SqliteFindingStatusStore {
         &self,
         input: &FindingRetractionIntentInput<'_>,
         liveness: FindingRetractionIntentCommitLiveness,
-        read_now: impl FnOnce() -> u64,
+        read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
     ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
         self.issue_retraction_intent_inner(input, Some(liveness), read_now)
     }
@@ -488,7 +449,7 @@ impl SqliteFindingStatusStore {
         &self,
         input: &FindingRetractionIntentInput<'_>,
         liveness: Option<FindingRetractionIntentCommitLiveness>,
-        read_now: impl FnOnce() -> u64,
+        read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
     ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
         validate_intent_input(input)?;
         let intent_sha256 = sha256_hex(input.intent_bytes);
@@ -514,7 +475,7 @@ impl SqliteFindingStatusStore {
         if let Some(liveness) = liveness {
             validate_intent_commit_liveness(input, liveness)?;
         }
-        let created_at = read_now();
+        let created_at = read_now()?;
         if let Some(liveness) = liveness {
             if created_at < liveness.valid_from
                 || created_at >= liveness.valid_until
@@ -612,7 +573,7 @@ impl SqliteFindingStatusStore {
         authorization: &FindingFinalizingAuthorizationInput<'_>,
         input: &FindingRetractionIntentInput<'_>,
         liveness: FindingRetractionIntentCommitLiveness,
-        read_now: impl FnOnce() -> u64,
+        read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
     ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
         require_hex64(liability_key, "liability_key")?;
         require_identifier(sanction_case_id, "sanction_case_id")?;
@@ -634,7 +595,7 @@ impl SqliteFindingStatusStore {
             existing.created_at
         } else {
             validate_intent_commit_liveness(input, liveness)?;
-            let observed = read_now();
+            let observed = read_now()?;
             require_positive(observed, "commit_now")?;
             if observed < liveness.valid_from
                 || observed >= liveness.valid_until
@@ -758,7 +719,7 @@ impl SqliteFindingStatusStore {
         finality_evidence_bytes: &[u8],
         inclusion_sla_secs: u64,
         liveness: FindingRetractionIntentCommitLiveness,
-        read_now: impl FnOnce() -> u64,
+        read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
     ) -> Result<FindingStatusWriteOutcome, FindingStatusStoreError> {
         require_hex64(intent_id, "intent_id")?;
         require_bytes(
@@ -784,7 +745,7 @@ impl SqliteFindingStatusStore {
         })?;
         match existing.state {
             FindingRetractionIntentState::WaitingFinality => {
-                let authorized_at = read_now();
+                let authorized_at = read_now()?;
                 require_positive(authorized_at, "authorized_at")?;
                 let floor = load_floor_tx(&transaction, &existing.feed_id)?;
                 if let Some(floor) = floor.as_ref() {
@@ -1277,7 +1238,7 @@ impl SqliteFindingStatusStore {
             .map_err(sqlite_error)?;
         let rows = statement
             .query_map(
-                params![feed_id, sqlite_i64(limit as u64, "limit")?],
+                params![feed_id, sqlite_i64(crate::integer::count(limit), "limit")?],
                 raw_intent_from_row,
             )
             .map_err(sqlite_error)?
@@ -1335,7 +1296,7 @@ impl SqliteFindingStatusStore {
             .map_err(sqlite_error)?;
         let rows = statement
             .query_map(
-                params![feed_id, sqlite_i64(limit as u64, "limit")?,],
+                params![feed_id, sqlite_i64(crate::integer::count(limit), "limit")?,],
                 raw_intent_from_row,
             )
             .map_err(sqlite_error)?
@@ -1428,7 +1389,7 @@ impl SqliteFindingStatusStore {
                     operator_authorization_sha256,
                     sqlite_i64(trusted_now, "trusted_now")?,
                     sqlite_i64(max_epoch_age_secs, "max_epoch_age_secs")?,
-                    sqlite_i64(limit as u64, "limit")?,
+                    sqlite_i64(crate::integer::count(limit), "limit")?,
                 ],
                 raw_proof_from_row,
             )
@@ -1496,7 +1457,7 @@ impl SqliteFindingStatusStore {
                 params![
                     feed_id,
                     sqlite_i64(trusted_now, "trusted_now")?,
-                    sqlite_i64(limit as u64, "limit")?,
+                    sqlite_i64(crate::integer::count(limit), "limit")?,
                 ],
                 |row| row.get(0),
             )
@@ -1859,5 +1820,11 @@ include!("finding_status_store/persistence.rs");
 
 #[cfg(test)]
 #[path = "finding_status_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
+
+mod trusted_time;

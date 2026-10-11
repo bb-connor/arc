@@ -2,7 +2,11 @@ use super::*;
 use chio_kernel::ReceiptReadContext;
 use subtle::ConstantTimeEq;
 
+#[path = "admin/revocation_batch.rs"]
+mod revocation_batch;
+
 pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<RemoteAppState> {
+    let router = remote_mcp_session_credentials::install_routes(router);
     router
         .route(ADMIN_HEALTH_PATH, get(handle_admin_health))
         .route(
@@ -21,6 +25,18 @@ pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<Rem
             get(handle_admin_session_trust).post(handle_admin_revoke_session_trust),
         )
         .route(ADMIN_SESSIONS_PATH, get(handle_admin_sessions))
+        .route(
+            "/admin/approvals",
+            post(super::remote_mcp_approvals::submit),
+        )
+        .route(
+            "/admin/approvals/{id}",
+            get(super::remote_mcp_approvals::get_record),
+        )
+        .route(
+            "/admin/approvals/{id}/decision",
+            post(super::remote_mcp_approvals::decide),
+        )
         .route("/admin/metrics", get(handle_admin_metrics))
         .route(ADMIN_SESSION_DRAIN_PATH, post(handle_admin_session_drain))
         .route(
@@ -45,7 +61,15 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         return response;
     }
 
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        return input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MCP lifecycle cleanup unavailable",
+            ),
+            error,
+        );
+    }
     let (active, terminal) = state.sessions.snapshot().await;
     let authority = match load_authority_status(&state) {
         Ok(status) => status,
@@ -113,6 +137,9 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
             "proxied": state.factory.config.control_url.is_some(),
             "controlUrl": &state.factory.config.control_url,
             "controlTokenConfigured": state.factory.config.control_token.is_some(),
+            "workloadTokenConfigured": state.factory.config.remote_authority_workload_token.is_some(),
+            "authorityCurrentKeyPinned": state.factory.config.control_authority_public_key.is_some(),
+            "authorityAdditionalTrustedKeyCount": state.factory.config.control_authority_trusted_public_keys.len(),
         },
         "stores": {
             "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),
@@ -475,7 +502,7 @@ async fn handle_admin_revocations(
 async fn handle_admin_revoke_capability(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
-    Json(payload): Json<AdminRevokeCapabilityRequest>,
+    BoundedJson(payload): BoundedJson<AdminRevokeCapabilityRequest>,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
@@ -566,43 +593,7 @@ async fn handle_admin_revoke_session_trust(
         RemoteSessionEntry::Terminal(record) => (*record).clone(),
     };
 
-    let mut newly_revoked_count = 0usize;
-    for capability in &record.capabilities {
-        let newly_revoked = if let Some(client) = match control_client(&state) {
-            Ok(client) => client,
-            Err(response) => return response,
-        } {
-            client
-                .revoke_capability(&capability.id)
-                .map(|response| response.newly_revoked)
-                .unwrap_or(false)
-        } else {
-            let store = match open_revocation_store(&state) {
-                Ok(store) => store,
-                Err(response) => return response,
-            };
-            store.revoke(&capability.id).unwrap_or(false)
-        };
-        if newly_revoked {
-            newly_revoked_count += 1;
-        }
-    }
-
-    let statuses = match load_session_revocation_status(&state, &record.capabilities) {
-        Ok(statuses) => statuses,
-        Err(response) => return response,
-    };
-
-    Json(json!({
-        "sessionId": session_id,
-        "revoked": true,
-        "newlyRevokedCount": newly_revoked_count,
-        "authContext": record.auth_context,
-        "lifecycle": serialize_session_lifecycle(&record.lifecycle, record.protocol_version.clone()),
-        "ownership": record.ownership,
-        "capabilities": statuses,
-    }))
-    .into_response()
+    revocation_batch::revoke(state, record).await
 }
 
 async fn handle_admin_sessions(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -610,7 +601,15 @@ async fn handle_admin_sessions(State(state): State<RemoteAppState>, request: Req
         return response;
     }
 
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        return input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MCP lifecycle cleanup unavailable",
+            ),
+            error,
+        );
+    }
     let (active, terminal) = state.sessions.snapshot().await;
     Json(json!({
         "configured": true,
@@ -729,7 +728,10 @@ async fn handle_admin_metrics(State(state): State<RemoteAppState>, request: Requ
         .into_response()
 }
 
-fn validate_admin_request(headers: &HeaderMap, admin_token: Option<&str>) -> Result<(), Response> {
+pub(super) fn validate_admin_request(
+    headers: &HeaderMap,
+    admin_token: Option<&str>,
+) -> Result<(), Response> {
     validate_origin(headers)?;
     validate_admin_auth(headers, admin_token)
 }
@@ -772,7 +774,15 @@ fn control_client(
     };
     trust_control::service_runtime::client::build_client(url, token)
         .map(Some)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+        .map_err(|error| {
+            input::with_source(
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "trust admin backend unavailable",
+                ),
+                error,
+            )
+        })
 }
 
 fn open_receipt_store(
@@ -784,8 +794,15 @@ fn open_receipt_store(
             "remote receipt admin requires --receipt-db",
         ));
     };
-    chio_store_sqlite::SqliteReceiptStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+    chio_store_sqlite::SqliteReceiptStore::open(path).map_err(|error| {
+        input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "trust admin backend unavailable",
+            ),
+            error,
+        )
+    })
 }
 
 fn open_revocation_store(
@@ -802,8 +819,15 @@ fn open_revocation_store(
             "remote trust admin requires durable revocation state",
         ));
     };
-    chio_store_sqlite::SqliteRevocationStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+    chio_store_sqlite::SqliteRevocationStore::open(path).map_err(|error| {
+        input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "trust admin backend unavailable",
+            ),
+            error,
+        )
+    })
 }
 
 fn open_budget_store(

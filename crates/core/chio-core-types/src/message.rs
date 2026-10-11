@@ -138,6 +138,9 @@ pub enum AgentMessage {
         /// Kernel-issued nonce from a strict execution preflight for this request.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         execution_nonce: Option<Box<SignedExecutionNonce>>,
+        /// Subject-signed invocation proof, verified by the kernel before dispatch.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dpop_proof: Option<Box<serde_json::Value>>,
     },
     /// Request a listing of the agent's current capabilities.
     ListCapabilities,
@@ -162,17 +165,29 @@ impl AgentMessage {
         else {
             return None;
         };
-        if approval_token.is_some() && !approval_tokens.is_empty() {
-            return Some("approval_token and approval_tokens are mutually exclusive");
-        }
-        if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
-            return Some("threshold_approval_proposal requires at least one approval token");
-        }
-        if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
-            return Some("approval_tokens require a threshold_approval_proposal");
-        }
-        None
+        authorization_conflict(
+            approval_token.as_deref(),
+            approval_tokens,
+            threshold_approval_proposal.as_deref(),
+        )
     }
+}
+
+pub(crate) fn authorization_conflict(
+    approval_token: Option<&GovernedApprovalToken>,
+    approval_tokens: &[GovernedApprovalToken],
+    threshold_approval_proposal: Option<&ThresholdApprovalProposal>,
+) -> Option<&'static str> {
+    if approval_token.is_some() && !approval_tokens.is_empty() {
+        return Some("approval_token and approval_tokens are mutually exclusive");
+    }
+    if threshold_approval_proposal.is_some() && approval_tokens.is_empty() {
+        return Some("threshold_approval_proposal requires at least one approval token");
+    }
+    if !approval_tokens.is_empty() && threshold_approval_proposal.is_none() {
+        return Some("approval_tokens require a threshold_approval_proposal");
+    }
+    None
 }
 
 /// Messages sent from the Kernel to the Agent.
@@ -188,7 +203,7 @@ pub enum KernelMessage {
         /// Chunk payload forwarded to the agent.
         data: serde_json::Value,
     },
-    /// Response to a tool call request (success or policy-denied).
+    /// Tool execution result, non-terminal approval wait, or failure.
     ToolCallResponse {
         /// Correlation ID matching the request.
         id: String,
@@ -214,9 +229,9 @@ pub enum KernelMessage {
     Heartbeat,
 }
 
-/// The outcome of a tool call: either a successful result value or an error.
+/// A tool execution result, non-terminal approval wait, or failure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ToolCallResult {
     /// The tool call succeeded.
     Ok {
@@ -227,6 +242,15 @@ pub enum ToolCallResult {
     StreamComplete {
         /// Number of chunks that were emitted before completion.
         total_chunks: u64,
+    },
+    /// Execution is waiting for approvals of this exact signed proposal.
+    ///
+    /// This is neither execution authority nor a terminal denial. Retry the
+    /// original request with this proposal and its collected approval tokens.
+    /// Parsing this field does not verify its signature or current authority.
+    PendingApproval {
+        /// The unchanged policy-authority artifact committed by the receipt.
+        proposal: Box<ThresholdApprovalProposal>,
     },
     /// The tool call was explicitly cancelled.
     Cancelled {
@@ -273,7 +297,11 @@ pub enum ToolCallError {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use crate::capability::{
@@ -372,6 +400,7 @@ mod tests {
         threshold_approval_proposal: Option<Box<ThresholdApprovalProposal>>,
     ) -> AgentMessage {
         AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: "req-001".to_string(),
             capability_token: Box::new(make_token(kp)),
             server_id: "srv".to_string(),
@@ -446,6 +475,7 @@ mod tests {
     fn agent_message_tool_call_serde_roundtrip() {
         let kp = Keypair::generate();
         let msg = AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: "req-001".to_string(),
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),

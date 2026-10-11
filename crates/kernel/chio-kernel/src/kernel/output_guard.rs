@@ -10,14 +10,8 @@ impl ChioKernel {
         output: &ToolServerOutput,
         post_invocation_applied: bool,
     ) -> Result<(), KernelError> {
-        let context = GuardContext {
-            request,
-            scope: &request.capability.scope,
-            agent_id: &request.agent_id,
-            server_id: &request.server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: Some(matched_grant_index),
-        };
+        let context = GuardContext::new(request, &request.capability.scope)
+            .with_matched_grant_index(Some(matched_grant_index));
         for guard in self.guards.iter() {
             if !post_invocation_applied
                 && !self.post_invocation_pipeline.is_empty()

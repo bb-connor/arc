@@ -6,8 +6,6 @@
 //! the FIPS-capable signing path available on every adapter.
 
 use alloc::string::ToString;
-#[cfg(kani)]
-use alloc::vec::Vec;
 
 use chio_core_types::crypto::SigningBackend;
 use chio_core_types::receipt::signing::ReceiptSigningHandle;
@@ -138,7 +136,13 @@ pub fn sign_receipt_relaying_trusted_body(
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, ReceiptSigningError> {
     let backend_key = backend.public_key();
-    if body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key {
+    let key_mismatch =
+        body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key;
+    // The proof models authorization and signing, not heap reclamation. Keep
+    // the actual comparison but omit recursive key drop on either branch.
+    #[cfg(kani)]
+    core::mem::forget(backend_key);
+    if key_mismatch {
         #[cfg(kani)]
         core::mem::forget(body);
 
@@ -150,7 +154,9 @@ pub fn sign_receipt_relaying_trusted_body(
         // Kani cannot practically symbolically execute the serde/RFC 8785
         // canonicalization stack. This model still exercises the successful
         // public branch: matching kernel key, backend signing, and field
-        // preservation into the returned receipt.
+        // preservation into the returned receipt. Move every body field, as
+        // production does, so this model neither resets metadata nor retains
+        // discarded fields whose destructors inflate the proof state.
         let signature = backend
             .sign_bytes(b"kani-receipt-signing-model")
             .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
@@ -162,19 +168,19 @@ pub fn sign_receipt_relaying_trusted_body(
             tool_name: body.tool_name,
             action: body.action,
             decision: body.decision,
-            receipt_kind: Default::default(),
-            boundary_class: Default::default(),
-            observation_outcome: None,
-            tool_origin: Default::default(),
-            redaction_mode: Default::default(),
-            actor_chain: Vec::new(),
+            receipt_kind: body.receipt_kind,
+            boundary_class: body.boundary_class,
+            observation_outcome: body.observation_outcome,
+            tool_origin: body.tool_origin,
+            redaction_mode: body.redaction_mode,
+            actor_chain: body.actor_chain,
             content_hash: body.content_hash,
             policy_hash: body.policy_hash,
             evidence: body.evidence,
             metadata: body.metadata,
             trust_level: body.trust_level,
             tenant_id: body.tenant_id,
-            bbs_projection_version: None,
+            bbs_projection_version: body.bbs_projection_version,
             kernel_key: body.kernel_key,
             bbs_signature: None,
             algorithm: Some(backend.algorithm()),

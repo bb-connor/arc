@@ -1,3 +1,4 @@
+use super::tests::new_test_edge;
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::CapabilityTokenBody,
@@ -65,7 +66,7 @@ fn test_kernel_config() -> KernelConfig {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test Server".to_string(),
         description: Some("Test".to_string()),
@@ -76,8 +77,14 @@ fn test_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -140,20 +147,29 @@ fn generated_request_id_rejects_threshold_approvals() {
         supplemental_authorization: None,
         model_metadata: None,
     };
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![shared_manifest()])
-        .test_expect("ACP edge should construct");
+    let edge = new_test_edge(
+        AcpEdgeConfig {
+            peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+            ..AcpEdgeConfig::default()
+        },
+        vec![shared_manifest()],
+    )
+    .test_expect("ACP edge should construct");
     let kernel = ChioKernel::new(shared_kernel_config());
 
     let error = edge
         .invoke("run", serde_json::json!({}), &kernel, &execution)
         .test_expect_err("generated request IDs must reject threshold approvals");
 
-    assert!(error.to_string().contains("invoke_with_request_id"));
+    assert!(matches!(
+        error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
 }
 
 #[test]
 fn strict_nonce_retries_require_and_accept_stable_request_ids() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -220,16 +236,26 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
     let generated_error = edge
         .invoke("read_file", arguments.clone(), &kernel, &retry_execution)
         .test_expect_err("generated invoke IDs must reject execution nonces");
-    assert!(generated_error
-        .to_string()
-        .contains("invoke_with_request_id"));
+    assert!(matches!(
+        generated_error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
     let mcp_error = edge
         .invoke_with_mcp_target("read_file", arguments.clone(), &kernel, &retry_execution)
         .test_expect_err("generated MCP-target IDs must reject execution nonces");
-    assert!(mcp_error.to_string().contains("invoke_with_request_id"));
+    assert!(matches!(
+        mcp_error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
 
-    edge.start_stream_with_request_id(request_id, "read_file", arguments.clone(), &retry_execution)
-        .test_expect("stable stream IDs should accept execution nonces");
+    edge.start_stream_with_request_id(
+        request_id,
+        "read_file",
+        arguments.clone(),
+        &retry_execution,
+        &kernel,
+    )
+    .test_expect("stable stream IDs should accept execution nonces");
     let retry = edge
         .invoke_with_request_id(
             request_id,

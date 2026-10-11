@@ -1,3 +1,5 @@
+// tenant-read-contract: chio_finding_payloads; class=tenant-predicate; principal=finding-delivery
+// Contracts: docs/security/trust-boundary-inventory.json
 //! Encrypted durable storage for sealed cognition-market payloads.
 //!
 //! The public Finding commits to a payload digest while the payload itself
@@ -7,9 +9,10 @@
 //! plaintext digest again and fail closed on missing, altered, or cross-tenant
 //! records.
 
+use chio_security_types::clock::{Clock, SystemClock};
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use chio_finding::finding_payload_sha256;
 use r2d2::Pool;
@@ -54,6 +57,8 @@ pub enum FindingPayloadPutOutcome {
 /// Fail-closed errors returned by sealed Finding payload persistence.
 #[derive(Debug, Error)]
 pub enum FindingPayloadStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding payload store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding payload record not found")]
@@ -96,28 +101,49 @@ impl From<BlobStoreError> for FindingPayloadStoreError {
 
 /// SQLite-backed encrypted sealed-payload store.
 pub struct SqliteFindingPayloadStore {
+    clock: crate::store_clock::StoreClock,
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteFindingPayloadStore {
     /// Open a durable store, creating its parent directory when needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FindingPayloadStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingPayloadStoreError> {
         let path = path.as_ref();
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(parent)?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
         let pool = Pool::builder().max_size(8).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     /// Open an isolated in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, FindingPayloadStoreError> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingPayloadStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
         let pool = Pool::builder().max_size(1).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -171,6 +197,7 @@ impl SqliteFindingPayloadStore {
         payload_sha256: &str,
         payload: &[u8],
     ) -> Result<FindingPayloadPutOutcome, FindingPayloadStoreError> {
+        let now = self.now_secs()?;
         validate_input(tenant_id, finding_id, media_type, payload_sha256, payload)?;
         if finding_payload_sha256(media_type, payload)
             .map_err(|_| FindingPayloadStoreError::AuthenticationFailed)?
@@ -218,7 +245,7 @@ impl SqliteFindingPayloadStore {
                 payload_sha256,
                 encrypted.nonce.as_slice(),
                 encrypted.ciphertext,
-                now_secs(),
+                now,
             ],
         )?;
         tx.commit()?;
@@ -348,15 +375,18 @@ fn payload_aad(
     .into_bytes()
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
+impl SqliteFindingPayloadStore {
+    fn now_secs(&self) -> Result<i64, FindingPayloadStoreError> {
+        Ok(self.clock.now_secs()?)
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 
@@ -366,6 +396,40 @@ mod tests {
 
     fn key(byte: u8) -> TenantKey {
         TenantKey::from_bytes([byte; 32])
+    }
+
+    #[test]
+    fn exact_finding_id_is_tenant_bound_before_and_after_restart() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("tenant-finding.sqlite");
+        let digest = finding_payload_sha256("text/plain", b"private").unwrap();
+        let store = SqliteFindingPayloadStore::open(&path).unwrap();
+        store
+            .put(
+                &tenant(),
+                &key(7),
+                "exact-finding",
+                "text/plain",
+                &digest,
+                b"private",
+            )
+            .unwrap();
+        let check = |store: &SqliteFindingPayloadStore| {
+            assert_eq!(
+                store
+                    .get(&tenant(), &key(7), "exact-finding")
+                    .unwrap()
+                    .payload,
+                b"private"
+            );
+            assert!(matches!(
+                store.get(&TenantId::new("foreign"), &key(7), "exact-finding"),
+                Err(FindingPayloadStoreError::NotFound)
+            ));
+        };
+        check(&store);
+        drop(store);
+        check(&SqliteFindingPayloadStore::open(&path).unwrap());
     }
 
     #[test]

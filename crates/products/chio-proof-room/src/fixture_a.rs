@@ -86,7 +86,7 @@ pub(crate) fn proof_room_fixture_claim_requirements(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!(
                 "proof-room.fixture.policy-invalid: {fixture_id}: {}",
-                proof_room_fixture_policy_error_message(&error)
+                proof_room_fixture_policy_error_message(&error.to_string())
             ),
         )
     })
@@ -286,7 +286,7 @@ pub(crate) fn insert_transaction_fixture_assets(
         return Ok(());
     };
     let Ok(passport) =
-        serde_json::from_slice::<chio_transaction_passport::TransactionPassport>(&passport_bytes)
+        crate::input::decode::<chio_transaction_passport::TransactionPassport>(&passport_bytes)
     else {
         return Ok(());
     };
@@ -318,7 +318,7 @@ pub(crate) fn insert_proof_room_fixture_bundle_assets(
         return Ok(());
     };
     let manifest: ProofRoomBundleManifest =
-        serde_json::from_slice(&manifest_bytes).map_err(|error| {
+        crate::input::decode(&manifest_bytes).map_err(|error| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!("proof-room.fixture.manifest-invalid: {fixture_id}: {error}"),
@@ -386,7 +386,7 @@ pub(crate) fn insert_proof_room_negative_case_asset_refs(
     let passport_asset_path = format!("{bundle_root}/{negative_case_path}");
     let passport_bytes = source.file(&passport_asset_path, fixture_id)?;
     let passport: chio_transaction_passport::TransactionPassport =
-        serde_json::from_slice(&passport_bytes).map_err(|error| {
+        crate::input::decode(&passport_bytes).map_err(|error| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!(
@@ -610,7 +610,7 @@ pub(crate) fn installed_fixture_file(
             format!("proof-room.fixture.asset-not-found: {fixture_id}/{asset_path}"),
         ));
     }
-    fs::read(&path).map_err(|error| {
+    crate::input::read(&path).map_err(|error| {
         (
             StatusCode::NOT_FOUND,
             format!("proof-room.fixture.asset-not-found: {fixture_id}/{asset_path}: {error}"),
@@ -654,6 +654,7 @@ pub(crate) fn installed_fixture_artifact_map(
         &fixture_dir,
         fixture_id,
         &mut artifacts,
+        &mut crate::input::ArtifactBudget::default(),
     )?;
     Ok(artifacts)
 }
@@ -664,23 +665,31 @@ pub(crate) fn collect_installed_fixture_artifacts(
     directory: &Path,
     fixture_id: &str,
     artifacts: &mut BTreeMap<String, Vec<u8>>,
+    budget: &mut crate::input::ArtifactBudget,
 ) -> Result<(), (StatusCode, String)> {
-    let mut entries = fs::read_dir(directory)
-        .map_err(|error| {
+    let depth = directory
+        .strip_prefix(fixture_dir)
+        .map_err(|_| {
             (
-                StatusCode::NOT_FOUND,
-                format!("proof-room.fixture.root-unreadable: {fixture_id}: {error}"),
+                StatusCode::BAD_REQUEST,
+                "proof-room.fixture.asset-path-escape".to_owned(),
             )
         })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| {
-            (
-                StatusCode::NOT_FOUND,
-                format!("proof-room.fixture.root-unreadable: {fixture_id}: {error}"),
-            )
-        })?;
-    entries.sort_by_key(|entry| entry.file_name());
-    for entry in entries {
+        .components()
+        .count();
+    if depth > crate::input::MAX_BUNDLE_DEPTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "proof-room.bundle.depth-limit".to_owned(),
+        ));
+    }
+    for entry in
+        fs::read_dir(directory).map_err(|error| (StatusCode::NOT_FOUND, error.to_string()))?
+    {
+        budget
+            .entry(depth)
+            .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+        let entry = entry.map_err(|error| (StatusCode::NOT_FOUND, error.to_string()))?;
         let path = entry.path();
         let metadata = fs::symlink_metadata(&path).map_err(|error| {
             (
@@ -715,11 +724,12 @@ pub(crate) fn collect_installed_fixture_artifacts(
                 &canonical_path,
                 fixture_id,
                 artifacts,
+                budget,
             )?;
         } else if metadata.is_file() {
             let relative_path =
                 installed_fixture_relative_path(fixture_dir, &canonical_path, fixture_id)?;
-            let contents = fs::read(&canonical_path).map_err(|error| {
+            let contents = budget.read(&canonical_path).map_err(|error| {
                 (
                     StatusCode::NOT_FOUND,
                     format!(
@@ -760,7 +770,7 @@ pub(crate) fn proof_room_fixture_verifier_report(
 ) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
     let passport_bytes = source.file("transaction-passport.json", fixture_id)?;
     let passport: chio_transaction_passport::TransactionPassport =
-        serde_json::from_slice(&passport_bytes).map_err(|error| {
+        crate::input::decode(&passport_bytes).map_err(|error| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!("proof-room.fixture.passport-invalid: {fixture_id}: {error}"),
@@ -1191,7 +1201,7 @@ pub(crate) fn proof_room_workflow_preflight_report(
     source: &ProofRoomFixtureSource,
 ) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
     let plan_bytes = source.file("preflight-plan.json", fixture_id)?;
-    let plan: chio_workflow_preflight::WorkflowPreflightPlan = serde_json::from_slice(&plan_bytes)
+    let plan: chio_workflow_preflight::WorkflowPreflightPlan = crate::input::decode(&plan_bytes)
         .map_err(|error| {
             (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -1231,7 +1241,7 @@ pub(crate) fn parse_embedded_evidence_graph(
     evidence_graph_bytes: &[u8],
     error_prefix: &str,
 ) -> Result<ProofRoomEmbeddedEvidenceGraph, String> {
-    serde_json::from_slice(evidence_graph_bytes)
+    crate::input::decode(evidence_graph_bytes)
         .map_err(|error| format!("{error_prefix} is not valid JSON: {error}"))
 }
 

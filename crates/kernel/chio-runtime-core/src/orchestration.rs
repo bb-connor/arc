@@ -434,12 +434,7 @@ fn load_runtime_json_artifact_hashes(
 ) -> Result<RuntimeJsonArtifactHashes, ChioRuntimeError> {
     validate_relative_evidence_path(&entry.path, "runtime_evidence_manifest_invalid_path")?;
     let path = evidence_dir.join(&entry.path);
-    let bytes = fs::read(&path).map_err(|error| {
-        ChioRuntimeError::Io(format!(
-            "failed to read Chio runtime {role} artifact {}: {error}",
-            path.display()
-        ))
-    })?;
+    let bytes = fs::read(&path).map_err(ChioRuntimeError::Io)?;
     let byte_count = u64::try_from(bytes.len()).map_err(|error| {
         ChioRuntimeError::Store(format!("Chio runtime {role} artifact byte count: {error}"))
     })?;
@@ -450,9 +445,10 @@ fn load_runtime_json_artifact_hashes(
         });
     }
     let file_sha256 = sha256_hex(&bytes);
-    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
-        ChioRuntimeError::Json(format!("Chio runtime {role} artifact JSON: {error}"))
-    })?;
+    let value: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChioRuntimeError::from)?;
     let canonical_sha256 = canonical_sha256(&value)?;
     Ok(RuntimeJsonArtifactHashes {
         manifest_sha256: entry.sha256.clone(),
@@ -491,20 +487,17 @@ fn proof_package_missing_failure() -> RuntimeOrchestrationEvidenceFailure {
     )
 }
 
-fn read_utf8_json_file(path: &Path, label: &str) -> Result<String, ChioRuntimeError> {
-    fs::read_to_string(path).map_err(|error| {
-        ChioRuntimeError::Io(format!(
-            "failed to read {label} {}: {error}",
-            path.display()
-        ))
-    })
+fn read_utf8_json_file(path: &Path, _label: &str) -> Result<String, ChioRuntimeError> {
+    fs::read_to_string(path).map_err(ChioRuntimeError::Io)
 }
 
 fn parse_json<T: serde::de::DeserializeOwned>(
     json: &str,
-    label: &str,
+    _label: &str,
 ) -> Result<T, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(format!("{label}: {error}")))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 
 fn canonical_sha256<T: Serialize>(value: &T) -> Result<String, ChioRuntimeError> {

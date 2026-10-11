@@ -1,3 +1,5 @@
+use super::*;
+
 #[tokio::test]
 async fn adapter_discovers_jsonrpc_and_invokes_skill() {
     let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
@@ -73,7 +75,9 @@ async fn adapter_rejects_json_tool_body_on_cross_origin_redirect() {
     let Some(target_listener) = bind_fake_a2a_listener("redirect target A2A listener") else {
         return;
     };
-    let target_address = target_listener.local_addr().expect("target listener address");
+    let target_address = target_listener
+        .local_addr()
+        .expect("target listener address");
     let target_base_url = format!("http://{target_address}");
 
     let Some(initial_listener) = bind_fake_a2a_listener("redirect initial A2A listener") else {
@@ -174,11 +178,12 @@ async fn adapter_rejects_http_json_tool_body_on_cross_origin_redirect() {
     else {
         return;
     };
-    let target_address = target_listener.local_addr().expect("target listener address");
+    let target_address = target_listener
+        .local_addr()
+        .expect("target listener address");
     let target_base_url = format!("http://{target_address}");
 
-    let Some(initial_listener) =
-        bind_fake_a2a_listener("api key redirect initial A2A listener")
+    let Some(initial_listener) = bind_fake_a2a_listener("api key redirect initial A2A listener")
     else {
         return;
     };
@@ -197,8 +202,10 @@ async fn adapter_rejects_http_json_tool_body_on_cross_origin_redirect() {
             let request = read_http_request(&mut stream);
             let first_line = request.lines().next().unwrap_or_default();
             if first_line.starts_with("GET /.well-known/agent-card.json") {
-                let (security_schemes, security_requirements) =
-                    agent_card_security_metadata(TestScenario::ApiKeyRequired, &initial_base_url_for_thread);
+                let (security_schemes, security_requirements) = agent_card_security_metadata(
+                    TestScenario::ApiKeyRequired,
+                    &initial_base_url_for_thread,
+                );
                 write_http_json_response(
                     &mut stream,
                     200,
@@ -276,13 +283,11 @@ async fn adapter_rejects_http_json_tool_body_on_cross_origin_redirect() {
 
 #[tokio::test]
 async fn adapter_rejects_json_tool_body_before_cross_origin_redirect_chain() {
-    let Some(initial_listener) =
-        bind_fake_a2a_listener("multi-hop redirect initial A2A listener")
+    let Some(initial_listener) = bind_fake_a2a_listener("multi-hop redirect initial A2A listener")
     else {
         return;
     };
-    let Some(middle_listener) =
-        bind_fake_a2a_listener("multi-hop redirect middle A2A listener")
+    let Some(middle_listener) = bind_fake_a2a_listener("multi-hop redirect middle A2A listener")
     else {
         return;
     };
@@ -373,9 +378,7 @@ async fn adapter_rejects_json_tool_body_before_cross_origin_redirect_chain() {
         .await
         .expect_err("JSON tool body must not enter cross-origin redirect chain");
 
-    initial_handle
-        .join()
-        .expect("join initial redirect server");
+    initial_handle.join().expect("join initial redirect server");
     let message = error.to_string();
     assert!(
         message.contains("body-bearing request rejected cross-origin redirect"),
@@ -532,8 +535,8 @@ async fn adapter_rejects_malformed_request_auth_material_before_discovery() {
     ];
 
     for (label, config, expected) in cases {
-        let error = A2aAdapter::discover(config.with_timeout(Duration::from_millis(10)))
-            .expect_err(label);
+        let error =
+            A2aAdapter::discover(config.with_timeout(Duration::from_millis(10))).expect_err(label);
         let message = error.to_string();
         assert!(
             message.contains(expected),
@@ -577,12 +580,8 @@ async fn partner_policy_rejects_required_skill_filtered_by_input_modes() {
     adapter.agent_card.skills[0].input_modes = Some(vec!["image/png".to_string()]);
     let policy = A2aPartnerPolicy::new("partner-alpha").require_skill("research");
 
-    let error = validate_partner_policy(
-        &policy,
-        &adapter.agent_card,
-        &adapter.selected_interface,
-    )
-    .expect_err("required non-projectable skill should fail partner admission");
+    let error = validate_partner_policy(&policy, &adapter.agent_card, &adapter.selected_interface)
+        .expect_err("required non-projectable skill should fail partner admission");
 
     assert!(error
         .to_string()
@@ -630,6 +629,7 @@ async fn task_registry_allows_follow_up_after_restart_and_rejects_unknown_tasks(
         oauth_token_endpoint_override: adapter.oauth_token_endpoint_override.clone(),
         transport_config: adapter.transport_config.clone(),
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: adapter.timeout,
         request_counter: AtomicU64::new(0),
         partner_policy: adapter.partner_policy.clone(),
@@ -711,6 +711,7 @@ async fn task_registry_rejects_follow_up_from_different_partner() {
         oauth_token_endpoint_override: adapter.oauth_token_endpoint_override.clone(),
         transport_config: adapter.transport_config.clone(),
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: adapter.timeout,
         request_counter: AtomicU64::new(0),
         partner_policy: Some(A2aPartnerPolicy::new("partner-beta")),
@@ -730,7 +731,9 @@ async fn task_registry_rejects_follow_up_from_different_partner() {
         .expect_err("partner mismatch must fail closed before remote follow-up");
 
     let agent_card_url = format!("{}/.well-known/agent-card.json", server.base_url());
-    let _ = ureq::get(&agent_card_url).call().expect("unblock fake server");
+    let _ = ureq::get(&agent_card_url)
+        .call()
+        .expect("unblock fake server");
     assert!(
         error.to_string().contains("partner `partner-alpha`"),
         "unexpected partner-mismatch error: {error}"
@@ -872,10 +875,7 @@ fn task_registry_persists_valid_batch_records_before_rebind_conflict() {
         .get("task-new")
         .expect("non-conflicting task from same batch should persist");
     assert_eq!(new_record.tool_name, "research");
-    assert_eq!(
-        new_record.last_state.as_deref(),
-        Some("TASK_STATE_WORKING")
-    );
+    assert_eq!(new_record.last_state.as_deref(), Some("TASK_STATE_WORKING"));
     let conflict_record = reloaded
         .tasks
         .get("task-conflict")

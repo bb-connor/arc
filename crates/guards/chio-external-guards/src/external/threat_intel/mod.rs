@@ -31,4 +31,4 @@ pub mod virustotal;
 
 pub use safe_browsing::{SafeBrowsingConfig, SafeBrowsingGuard};
 pub use snyk::{SnykConfig, SnykGuard, SnykSeverity};
-pub use virustotal::{VirusTotalConfig, VirusTotalGuard};
+pub use virustotal::{VirusTotalConfig, VirusTotalGuard, VirusTotalUnseenPolicy};

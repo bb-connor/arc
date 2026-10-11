@@ -1,8 +1,7 @@
+use super::*;
 // Constraint-variant tests.
 //
-// Included by `src/kernel/tests.rs`, so this file inherits the outer
-// `use super::*;` environment along with the helpers defined at the
-// top of `tests/all.rs` (make_config, make_capability, EchoServer, etc.).
+// Shared fixtures are imported from the parent test module.
 
 /// A grant with `MemoryStoreAllowlist` should deny a request whose
 /// arguments carry a `store` value outside the allowlist, and allow
@@ -108,53 +107,161 @@ fn kernel_allows_action_when_unaffected_by_new_constraint() {
     );
 }
 
-/// Document that `TableAllowlist` is accepted at the request-matching
-/// stage and enforcement is deferred to `chio-data-guards`. A request
-/// that ships SQL text is admitted regardless of the SQL's tables
-/// because the kernel delegates parsing.
+// These domain constraints remain part of the protocol vocabulary, but the
+// kernel cannot establish their grant-specific enforcement. A global guard
+// configuration cannot discharge a narrower capability requirement.
+fn unsupported_domain_constraints() -> [Constraint; 7] {
+    use chio_core::capability::scope::{ContentReviewTier, SqlOperationClass};
+    [
+        Constraint::TableAllowlist(vec!["orders".to_string()]),
+        Constraint::ColumnDenylist(vec!["users.ssn".to_string()]),
+        Constraint::MaxRowsReturned(1),
+        Constraint::OperationClass(SqlOperationClass::ReadOnly),
+        Constraint::ContentReviewTier(ContentReviewTier::Strict),
+        Constraint::MaxTransactionAmountUsd("1.00".to_string()),
+        Constraint::RequireDualApproval(true),
+    ]
+}
+
+fn externally_signed_domain_capability(
+    issuer: &Keypair,
+    subject: &PublicKey,
+    grants: Vec<ToolGrant>,
+) -> CapabilityToken {
+    let now = current_unix_timestamp();
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: uuid::Uuid::new_v4().to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.clone(),
+            scope: make_scope(grants),
+            issued_at: now.saturating_sub(60),
+            expires_at: now.saturating_add(300),
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        issuer,
+    )
+    .unwrap()
+}
+
 #[test]
-fn kernel_records_constraint_and_defers_to_data_guard() {
-    let mut kernel = make_kernel(make_config());
-    kernel.register_tool_server(Box::new(EchoServer::new("db", vec!["sql_query"])));
+fn kg4_issuance_rejects_each_unenforced_domain_constraint() {
+    let kernel = make_kernel(make_config());
+    let subject = make_keypair().public_key();
+    let mut accepted = Vec::new();
+    for constraint in unsupported_domain_constraints() {
+        let mut grant = make_grant("db", "sql_query");
+        grant.constraints.push(constraint.clone());
+        let result = kernel.issue_capability(&subject, make_scope(vec![grant]), 300);
+        if !matches!(result, Err(KernelError::InvalidConstraint(_))) {
+            accepted.push((constraint, result.err().map(|error| error.to_string())));
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "unsupported issuance results: {accepted:?}"
+    );
+}
 
-    let agent_kp = make_keypair();
-    let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "db".to_string(),
-            tool_name: "sql_query".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![Constraint::TableAllowlist(vec![
-                "users".to_string(),
-                "orders".to_string(),
-            ])],
-            max_invocations: None,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
-        ..ChioScope::default()
-    };
-    let cap = make_capability(&kernel, &agent_kp, scope, 300);
-
-    // SQL text references a forbidden table. The kernel does not yet
-    // parse SQL at this layer, so the request is admitted and a
-    // downstream data guard enforces the TableAllowlist. This test
-    // documents the v1 deferral behavior.
-    let request = make_request_with_arguments(
-        "req-sql",
-        &cap,
-        "sql_query",
+#[test]
+fn kg4_external_tokens_deny_before_sibling_fallback_without_tool_effects() {
+    let issuer = make_keypair();
+    let subject = make_keypair().public_key();
+    let mut config = make_config();
+    config.ca_public_keys.push(issuer.public_key());
+    let mut kernel = make_kernel(config);
+    let invocations = Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
         "db",
-        serde_json::json!({"query": "SELECT * FROM payroll WHERE id = 1"}),
+        vec!["sql_query"],
+        Arc::clone(&invocations),
+    )));
+    let mut unexpected = Vec::new();
+    for constraint in unsupported_domain_constraints() {
+        // Cover the lone grant, a matching sibling, and an unrelated grant.
+        // Even the unrelated grant must not conceal unsupported authority.
+        for sibling_kind in 0..3 {
+            let mut constrained = make_grant("db", "sql_query");
+            constrained.constraints.push(constraint.clone());
+            let mut grants = Vec::new();
+            if sibling_kind > 0 {
+                grants.push(make_grant("db", "sql_query"));
+            }
+            if sibling_kind == 2 {
+                constrained.server_id = "other-db".to_string();
+            }
+            grants.push(constrained);
+            let cap = externally_signed_domain_capability(&issuer, &subject, grants);
+            let request = make_request_with_arguments(
+                &cap.id,
+                &cap,
+                "sql_query",
+                "db",
+                serde_json::json!({"query": "SELECT * FROM users", "amount_usd": "2.00"}),
+            );
+            let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+            if response.verdict != Verdict::Deny
+                || !response
+                    .reason
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("unsupported capability constraint")
+            {
+                unexpected.push((
+                    constraint.clone(),
+                    sibling_kind,
+                    response.verdict,
+                    response.reason,
+                ));
+            }
+        }
+    }
+    assert!(
+        unexpected.is_empty(),
+        "unsupported admission results: {unexpected:?}"
     );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
 
-    assert_eq!(
-        kernel
-            .evaluate_tool_call_blocking(&request)
-            .unwrap()
-            .verdict,
-        Verdict::Allow,
-    );
+#[test]
+fn kg4_request_matching_rejects_unsupported_grants_before_route_filtering() {
+    let issuer = make_keypair();
+    for constraint in unsupported_domain_constraints() {
+        let mut unsupported = make_grant("other-db", "other-tool");
+        unsupported.constraints.push(constraint.clone());
+        let cap = externally_signed_domain_capability(
+            &issuer,
+            &issuer.public_key(),
+            vec![make_grant("db", "sql_query"), unsupported],
+        );
+        assert!(
+            matches!(
+                crate::capability_matches_request(&cap, "sql_query", "db", &serde_json::json!({})),
+                Err(KernelError::InvalidConstraint(_))
+            ),
+            "matching silently skipped {constraint:?}"
+        );
+    }
+}
+
+#[test]
+fn kg4_non_tool_admission_rejects_external_unsupported_scope() {
+    let issuer = make_keypair();
+    let mut config = make_config();
+    config.ca_public_keys.push(issuer.public_key());
+    let kernel = make_kernel(config);
+    let mut grant = make_grant("db", "sql_query");
+    grant
+        .constraints
+        .push(Constraint::TableAllowlist(vec!["orders".to_string()]));
+    let cap = externally_signed_domain_capability(&issuer, &issuer.public_key(), vec![grant]);
+    let error = kernel
+        .validate_non_tool_capability(&cap, &cap.subject.to_hex())
+        .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("unsupported capability constraint"));
 }
 
 // ---- ModelConstraint evaluation -----------------------------------------
@@ -172,10 +279,7 @@ fn kernel_allows_tool_call_when_model_is_in_allowlist() {
             tool_name: "invoke".to_string(),
             operations: vec![Operation::Invoke],
             constraints: vec![Constraint::ModelConstraint {
-                allowed_model_ids: vec![
-                    "claude-opus-4".to_string(),
-                    "gpt-5".to_string(),
-                ],
+                allowed_model_ids: vec!["claude-opus-4".to_string(), "gpt-5".to_string()],
                 min_safety_tier: None,
             }],
             max_invocations: None,

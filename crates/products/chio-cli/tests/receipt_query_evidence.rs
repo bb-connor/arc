@@ -85,7 +85,7 @@ fn test_shared_evidence_reporting_surfaces() {
     );
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .import_federated_evidence_share(&FederatedEvidenceShareImport {
                 share_id: "share-cross-org".to_string(),
@@ -538,9 +538,22 @@ fn test_behavioral_feed_export_surfaces() {
 
 #[test]
 fn test_runtime_attestation_appraisal_export_surfaces() {
+    use chio_core::appraisal::{
+        RuntimeAttestationAppraisalVerdict, RuntimeAttestationNormalizedClaimConfidence,
+    };
+
     skip_when_loopback_denied!(test_runtime_attestation_appraisal_export_surfaces);
     let dir = unique_dir("chio-runtime-appraisal");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let mut directory = std::fs::DirBuilder::new();
+    directory.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        directory.mode(0o700);
+    }
+    directory
+        .create(&dir)
+        .expect("create private test directory");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -622,6 +635,7 @@ extensions:
     assert!(report
         .verify_signature()
         .expect("verify signed runtime appraisal"));
+    assert_eq!(report.signer_key, test_kernel_keypair().public_key());
     assert_eq!(
         report.body.schema,
         "chio.runtime-attestation.appraisal-report.v1"
@@ -660,25 +674,53 @@ extensions:
                 == chio_core::appraisal::RuntimeAttestationClaimProvenance::VendorClaims
             && claim.value == serde_json::json!("enabled")
     }));
+    assert_eq!(artifact.policy.effective_tier, RuntimeAssuranceTier::None);
     assert_eq!(
-        artifact.policy.effective_tier,
-        RuntimeAssuranceTier::Attested
+        artifact.policy.verdict,
+        RuntimeAttestationAppraisalVerdict::Rejected
     );
+    assert!(artifact
+        .claims
+        .normalized_claims
+        .iter()
+        .all(|claim| { claim.confidence == RuntimeAttestationNormalizedClaimConfidence::Derived }));
     assert_eq!(
         artifact.policy.reasons,
         vec![
             chio_core::appraisal::RuntimeAttestationAppraisalReason::from_code(
-                chio_core::appraisal::RuntimeAttestationAppraisalReasonCode::EvidenceVerified
+                chio_core::appraisal::RuntimeAttestationAppraisalReasonCode::PolicyRejected
             )
         ]
     );
+    assert_eq!(
+        report.body.appraisal.verdict,
+        RuntimeAttestationAppraisalVerdict::Rejected
+    );
+    assert_eq!(
+        report.body.appraisal.effective_tier,
+        RuntimeAssuranceTier::None
+    );
+    assert!(report
+        .body
+        .appraisal
+        .normalized_claims
+        .iter()
+        .all(|claim| { claim.confidence == RuntimeAttestationNormalizedClaimConfidence::Derived }));
     assert!(!report.body.policy_outcome.trust_policy_configured);
-    assert!(report.body.policy_outcome.accepted);
+    assert!(!report.body.policy_outcome.accepted);
+    assert!(report.body.policy_outcome.reason.is_some());
     assert_eq!(
         report.body.policy_outcome.effective_tier,
-        RuntimeAssuranceTier::Attested
+        RuntimeAssuranceTier::None
     );
 
+    // The HTTP helper uses its fixed seed; this CLI invocation explicitly
+    // selects a separate SQLite authority. Pin each configured source.
+    let cli_signer = chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("initialize private CLI authority")
+        .local_keypair()
+        .expect("load configured CLI signing key")
+        .public_key();
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
@@ -707,20 +749,41 @@ extensions:
         .verify_signature()
         .expect("verify runtime appraisal CLI signature"));
     assert!(cli_report.body.policy_outcome.trust_policy_configured);
-    assert!(cli_report.body.policy_outcome.accepted);
+    assert!(!cli_report.body.policy_outcome.accepted);
+    assert!(cli_report
+        .body
+        .policy_outcome
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("authenticated")));
     assert_eq!(
         cli_report.body.policy_outcome.effective_tier,
-        RuntimeAssuranceTier::Verified
+        RuntimeAssuranceTier::None
     );
+    assert_eq!(cli_report.signer_key, cli_signer);
+    assert_eq!(cli_report.body.appraisal, report.body.appraisal);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
 fn test_runtime_attestation_appraisal_result_import_export_surfaces() {
+    use chio_core::appraisal::{
+        RuntimeAttestationAppraisalVerdict, RuntimeAttestationNormalizedClaimConfidence,
+    };
+
     skip_when_loopback_denied!(test_runtime_attestation_appraisal_result_import_export_surfaces);
     let dir = unique_dir("chio-runtime-appraisal-result");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let mut directory = std::fs::DirBuilder::new();
+    directory.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        directory.mode(0o700);
+    }
+    directory
+        .create(&dir)
+        .expect("create private test directory");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -815,6 +878,21 @@ extensions:
         exported.body.subject.runtime_identity.as_deref(),
         Some("spiffe://chio.example/workloads/google")
     );
+    assert!(!exported.body.exporter_policy_outcome.accepted);
+    assert!(
+        !exported
+            .body
+            .exporter_policy_outcome
+            .trust_policy_configured
+    );
+    assert_eq!(
+        exported.body.exporter_policy_outcome.effective_tier,
+        RuntimeAssuranceTier::None
+    );
+    assert_eq!(
+        exported.body.appraisal.policy.verdict,
+        RuntimeAttestationAppraisalVerdict::Rejected
+    );
     std::fs::write(
         &signed_result_path,
         serde_json::to_vec_pretty(&exported).expect("serialize signed result"),
@@ -861,16 +939,19 @@ extensions:
         import_response.json().expect("parse import report");
     assert_eq!(
         import_report.local_policy_outcome.disposition,
-        RuntimeAttestationImportDisposition::Attenuate
+        RuntimeAttestationImportDisposition::Reject
     );
     assert_eq!(
         import_report.local_policy_outcome.effective_tier,
-        RuntimeAssuranceTier::Basic
+        RuntimeAssuranceTier::None
     );
     assert_eq!(
         import_report.local_policy_outcome.reason_codes,
-        vec![RuntimeAttestationImportReasonCode::TierAttenuated]
+        vec![RuntimeAttestationImportReasonCode::ExporterPolicyRejected]
     );
+
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
 
     let cli_export_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -908,10 +989,26 @@ extensions:
             .exporter_policy_outcome
             .trust_policy_configured
     );
+    assert!(!cli_result.body.exporter_policy_outcome.accepted);
     assert_eq!(
         cli_result.body.exporter_policy_outcome.effective_tier,
-        RuntimeAssuranceTier::Verified
+        RuntimeAssuranceTier::None
     );
+    assert_eq!(
+        cli_result.body.appraisal.policy.verdict,
+        RuntimeAttestationAppraisalVerdict::Rejected
+    );
+    assert_eq!(
+        cli_result.body.appraisal.policy.effective_tier,
+        RuntimeAssuranceTier::None
+    );
+    assert!(cli_result
+        .body
+        .appraisal
+        .claims
+        .normalized_claims
+        .iter()
+        .all(|claim| { claim.confidence == RuntimeAttestationNormalizedClaimConfidence::Derived }));
 
     let rejecting_policy = RuntimeAttestationImportedAppraisalPolicy {
         trusted_issuers: vec!["did:chio:test:remote-exporter".to_string()],
@@ -973,6 +1070,10 @@ extensions:
 #[test]
 fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports(
 ) {
+    use chio_core::appraisal::{
+        RuntimeAttestationAppraisalVerdict, RuntimeAttestationNormalizedClaimConfidence,
+    };
+
     skip_when_loopback_denied!(test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports);
     struct ProviderCase {
         name: &'static str,
@@ -982,7 +1083,16 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
     }
 
     let dir = unique_dir("chio-runtime-appraisal-mixed-provider");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let mut directory = std::fs::DirBuilder::new();
+    directory.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        directory.mode(0o700);
+    }
+    directory
+        .create(&dir)
+        .expect("create private test directory");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
@@ -1068,6 +1178,25 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
             exported.body.appraisal.verifier.verifier_family,
             provider.expected_family
         );
+        assert!(!exported.body.exporter_policy_outcome.accepted);
+        assert!(
+            !exported
+                .body
+                .exporter_policy_outcome
+                .trust_policy_configured
+        );
+        assert_eq!(
+            exported.body.exporter_policy_outcome.effective_tier,
+            RuntimeAssuranceTier::None
+        );
+        assert_eq!(
+            exported.body.appraisal.policy.verdict,
+            RuntimeAttestationAppraisalVerdict::Rejected
+        );
+        assert_eq!(
+            exported.body.appraisal.policy.effective_tier,
+            RuntimeAssuranceTier::None
+        );
         assert!(
             exported
                 .body
@@ -1075,10 +1204,22 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
                 .claims
                 .normalized_claims
                 .iter()
-                .any(|claim| claim.code == provider.required_claim.0),
+                .any(|claim| {
+                    claim.code == provider.required_claim.0
+                        && claim.value == serde_json::json!(provider.required_claim.1)
+                }),
             "provider {} should project required normalized claim",
             provider.name
         );
+        assert!(exported
+            .body
+            .appraisal
+            .claims
+            .normalized_claims
+            .iter()
+            .all(|claim| {
+                claim.confidence == RuntimeAttestationNormalizedClaimConfidence::Derived
+            }));
 
         let import_policy = RuntimeAttestationImportedAppraisalPolicy {
             trusted_issuers: vec![exported.body.issuer.clone()],
@@ -1111,13 +1252,17 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
             import_response.json().expect("parse import report");
         assert_eq!(
             import_report.local_policy_outcome.disposition,
-            RuntimeAttestationImportDisposition::Allow,
-            "provider {} should import cleanly",
+            RuntimeAttestationImportDisposition::Reject,
+            "provider {} raw observations must not restore authority on import",
             provider.name
         );
         assert_eq!(
             import_report.local_policy_outcome.effective_tier,
-            RuntimeAssuranceTier::Attested
+            RuntimeAssuranceTier::None
+        );
+        assert_eq!(
+            import_report.local_policy_outcome.reason_codes,
+            vec![RuntimeAttestationImportReasonCode::ExporterPolicyRejected]
         );
     }
 
@@ -1258,32 +1403,38 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         .reason_codes
         .contains(&RuntimeAttestationImportReasonCode::EvidenceStale));
 
+    // This fixture is an explicit assertion by a separately pinned exporter.
+    // It is not produced by the raw evidence export endpoint. Keep real
+    // signed import acceptance and attenuation coverage before testing replay.
     let replay_attestation = sample_google_runtime_attestation();
     let replay_appraisal = derive_runtime_attestation_appraisal(&replay_attestation)
-        .expect("derive appraisal for stale replay test");
-    let stale_replay_report = RuntimeAttestationAppraisalReport {
+        .expect("derive appraisal for trusted exporter fixture");
+    let mut replay_report = RuntimeAttestationAppraisalReport {
         schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
-        generated_at: unix_now_secs().saturating_sub(600),
+        generated_at: unix_now_secs(),
         appraisal: replay_appraisal,
         policy_outcome: RuntimeAttestationPolicyOutcome {
-            trust_policy_configured: false,
+            trust_policy_configured: true,
             accepted: true,
             effective_tier: RuntimeAssuranceTier::Attested,
             reason: None,
         },
     };
-    let stale_replay_result = RuntimeAttestationAppraisalResult::from_report(
+    let fresh_result = RuntimeAttestationAppraisalResult::from_report(
         "did:chio:test:stale-replay-exporter",
-        &stale_replay_report,
+        &replay_report,
     )
-    .expect("build stale replay result");
-    let stale_replay_signer = Keypair::generate();
-    let signed_stale_replay =
-        SignedRuntimeAttestationAppraisalResult::sign(stale_replay_result, &stale_replay_signer)
-            .expect("sign stale replay result");
-    let stale_replay_policy = RuntimeAttestationImportedAppraisalPolicy {
+    .expect("build fresh trusted-exporter result");
+    let replay_signer = Keypair::generate();
+    let signed_fresh_result =
+        SignedRuntimeAttestationAppraisalResult::sign(fresh_result, &replay_signer)
+            .expect("sign fresh trusted-exporter result");
+    assert!(signed_fresh_result
+        .verify_signature()
+        .expect("verify trusted exporter fixture"));
+    let replay_policy = RuntimeAttestationImportedAppraisalPolicy {
         trusted_issuers: vec!["did:chio:test:stale-replay-exporter".to_string()],
-        trusted_signer_keys: vec![stale_replay_signer.public_key().to_hex()],
+        trusted_signer_keys: vec![replay_signer.public_key().to_hex()],
         allowed_verifier_families: vec![
             chio_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
         ],
@@ -1292,6 +1443,53 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         maximum_effective_tier: None,
         required_claims: BTreeMap::new(),
     };
+    for (maximum, disposition, tier, reasons) in [
+        (
+            None,
+            RuntimeAttestationImportDisposition::Allow,
+            RuntimeAssuranceTier::Attested,
+            Vec::new(),
+        ),
+        (
+            Some(RuntimeAssuranceTier::Basic),
+            RuntimeAttestationImportDisposition::Attenuate,
+            RuntimeAssuranceTier::Basic,
+            vec![RuntimeAttestationImportReasonCode::TierAttenuated],
+        ),
+    ] {
+        let mut local_policy = replay_policy.clone();
+        local_policy.maximum_effective_tier = maximum;
+        let response = client
+            .post(format!(
+                "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+            ))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {service_token}"),
+            )
+            .json(&serde_json::json!({
+                "signedResult": signed_fresh_result,
+                "localPolicy": local_policy,
+            }))
+            .send()
+            .expect("import fresh trusted-exporter result");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let report: RuntimeAttestationAppraisalImportReport =
+            response.json().expect("parse fresh import");
+        assert_eq!(report.local_policy_outcome.disposition, disposition);
+        assert_eq!(report.local_policy_outcome.effective_tier, tier);
+        assert_eq!(report.local_policy_outcome.reason_codes, reasons);
+    }
+
+    replay_report.generated_at = unix_now_secs().saturating_sub(600);
+    let stale_replay_result = RuntimeAttestationAppraisalResult::from_report(
+        "did:chio:test:stale-replay-exporter",
+        &replay_report,
+    )
+    .expect("build stale replay result");
+    let signed_stale_replay =
+        SignedRuntimeAttestationAppraisalResult::sign(stale_replay_result, &replay_signer)
+            .expect("sign stale replay result");
     let stale_replay_response = client
         .post(format!(
             "{base_url}/v1/reports/runtime-attestation-appraisal/import"
@@ -1302,7 +1500,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         )
         .json(&serde_json::json!({
             "signedResult": signed_stale_replay,
-            "localPolicy": stale_replay_policy,
+            "localPolicy": replay_policy,
         }))
         .send()
         .expect("import stale replay result");

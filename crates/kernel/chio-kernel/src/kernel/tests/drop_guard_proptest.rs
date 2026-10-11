@@ -1,3 +1,4 @@
+use super::*;
 // Post-admission drop-guard disposition-table property test. For every combination of
 // {monetary, non-monetary} x {pre-dispatch, post-dispatch} x {lease
 // present, absent}, a directly constructed PostAdmissionDropGuard must
@@ -7,8 +8,6 @@
 //     iff a chio_runtime admission block was present;
 //   - pre-dispatch drop: no receipt; reservations released iff a
 //     chio_runtime admission block was present.
-
-use proptest::prelude::*;
 
 struct CountingReleaseRuntimeAdmissionHook {
     releases: std::sync::Arc<AtomicU64>,
@@ -64,10 +63,7 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
         let cap = make_capability(
             &kernel,
             &agent_kp,
-            make_scope(vec![make_grant(
-                "srv-chio-runtime",
-                "destructive_update",
-            )]),
+            make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
             300,
         );
         let request = make_request_with_arguments(

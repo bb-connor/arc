@@ -12,11 +12,11 @@ History discovery compares the workflow-specific and repository-wide inventories
 
 ## Ordered activation
 
-1. Qualify and land these definitions on `main`, retaining the exact merge commit as `D`. Keep the current ordinary CI checks enabled.
-2. Update the foundation caller to that landed definition. Freeze and locally qualify the reviewed source `S`, including the definition regression suite, composed publication/revocation/audit controls and the source contract tests.
+1. Qualify and land these definitions on `main`. `D` is the immutable reviewed definition commit, which must be reachable from freshly fetched `main` and have matching trusted workflow blobs before authorization. Keep the current ordinary CI checks enabled.
+2. The foundation may compose and pin the reviewed prerequisite before it lands to overlap ordinary CI, but neither foundation merge nor definition authorization may precede the ancestry and blob checks above. Freeze and locally qualify the reviewed source `S`, including the definition regression suite, composed publication/revocation/audit controls and the source contract tests.
 3. Freeze the committed-evidence authorization at its documented all-zero value and drain existing publication attempts before rotating the authorized source and trusted definition. Preserve and inspect those attempts; the old merge-keyed and new evidence-keyed concurrency groups do not share a lock. Publish a durable ref for the reviewed source before authorizing it. Reconcile the committed evidence head through the existing protected configuration and capture procedure, preserving source and evidence commit distinctions.
 4. Obtain actual native execution and the protected capture/finalizer results for the final tuple. Before the first qualifying CI event for `E`, make its authorization and evidence policy coherent. A failed candidate needs its legitimate repair and a new evidence commit; no namespace deletion or status rewriting restores it.
-5. Require terminal checks, independent review, verified evidence and the final exact-source protected landing procedure for PR #1160. Retain all failed, incomplete, unavailable and skipped results separately.
+5. Follow the current [landing ledger](landing-ledger.md) for merge versus release boundaries. The October 8 operator decision makes the four required checks, local qualification and review-thread dispositions the #1160 merge bar. Trusted capture and App enforcement remain post-merge, pre-release gates. Retain all failed, incomplete, unavailable and skipped results separately.
 
 This definition update does not establish per-pull-request enforcement for pull requests sharing one head. The retained landing auditor, duplicate-head checks and actual App/protection acceptance remain distinct requirements. It also does not provision the external App used by isolated platform experiments.
 

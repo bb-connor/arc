@@ -1,0 +1,134 @@
+{
+  "schema": "chio.security.snapshot-authority-recovery-checkpoint.v1",
+  "observed_utc": "2026-10-10T03:03:24.083618+00:00",
+  "stage": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+  "snapshot_component": {
+    "producer": "45622b968d6d7335a4bcae16097d57e277e6cefa",
+    "verified_artifacts": {
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/clippy.log": "2a62382d176e40b600e548c3b7e86cf49643ff22d50f537e88eafecdfa8293f6",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/final12-snapshot-reclaim.patch": "ad9a8419f8353e03221e9f974f1ee2879a8227089df50a677c99dbabc36c6f42",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/fmt-check.log": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/gate-check-negative-assertions.log": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/gate-check-rust-file-hygiene.log": "305ab4e88c5af44d18535b40196313c15ad21795cdd3ba2e917bac2a2080eb3e",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/gate-check-security-clocks.log": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/gate-check-trust-boundaries.log": "ec26c21f287a8946260a3c242fcb26b5aa28c48b0a5953a4da175bae872f07ff",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/green-attempt1-setgid-and-owner-precondition.log": "0a31bfa1ace2544484b04f852c0602a90034df9fa9bfbd553cb5b626498c35c7",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/green-attempt2-clock-step-harness.log": "d3e896b5dc1d522dd91d75da637e6ccf6489c859028f9e0611150d7c9349e6bd",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/green.log": "b809a386a8a7aa257b66c30fa557ae685c98d19feeb8af771a019ca8dcc7cca7",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/original-amended-tests-only.patch": "2752b7b097dda8436d65bf92a016cfa8121a3fc0cb737d4a71a599e92818b435",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/original-tests-only.patch": "348ad9feee3b1b7b6b972e7d8920dc5ddec8ce07a8448bdd6a9c7613c6c09a99",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/placement-attempt3.log": "02624f5ab900f40573137aef85d5cac75fbb6c685c9162e3abf68461bcb03098",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/red-original-amended.log": "0558adda6e8f6e14971895f1a517cab0c12e192053b48a9650acb1f449a2199a",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/red-original-run1.log": "1a4c527417700c6753d9cd5f94289ca47c507e557cb5221082552fb0fe4ba037",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/red-original.log": "3cc90d97ca102bb88627cf63ba868703686db3f0876568538893a9ea57e8f584",
+      "/home/connor/lanes/claude-pr1160-evidence/vfix/final12-snapshot-reclaim/tested-commit.txt": "68c54109f2ef009f0d839e19b90c97824df17c7bbc4e04ac5845f2328c56eb8d"
+    },
+    "verified_source_files": {
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs": "d1ff48188550d4aec4d28b2c3c2452b89c2c037937acce40794e813c5a835abf",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db/storage.rs": "f6ca78078a1f3f80c1d353e81820149e94e0323af949b639f3ead8d31061ec36",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/pass.rs": "51c5de54ab220b94d7fb2500f04e87e061bc2afaa5e969e928dba920d308668a",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "5d54c43387bb4361bb5b93f98210648915fa3375d810855177e44b57b97d0c47",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/seed_wait.rs": "287acf26483a9028eb111d53500383253d6615d7c4507ff3d4d11c620f2fb66c",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs": "ae84fb68fccb6c2114e077085f85103566663e35eb8dd0cc73c132fb10d047dc",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity/linux_file.rs": "b21b22f0766b91da0ea36f04256debd5d18d64c01fa8f955efb6e43ede138a3e",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/placement.rs": "e571d68962e246e422024655d6174dad0f19fe100e4d10519e335efb738bde69",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing.rs": "c2019d6999f7bd64177d691bbec18123430793bfc4d9618609ec84c20931eb0e",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/custody.rs": "b2afc3bb2693e73b0d36cc66ff40e427264b41aa4002ae98dcd24eb3d67c131a",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/directory.rs": "bc7c0691ed7771f0a0c5648e23e0b0ed8b6a693c12638cb507bb7679852403f7",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/reclaim.rs": "4db0e46b933e2b1bb2e947cee98a6d5ee8684158ecadfc458580b00fd89197e7",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests.rs": "70070867b6ee460e617b5ad08e5c00187fdb0d22a06912399517e765067c0ae7",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests/cursor.rs": "4341ac5dc9e47cfe75348bf579faf4d575eab11f2486a68ec5bdfa338dd40d9e",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests/location.rs": "61667381038e26aa4622c4ab01db4a4c911699dc520ab310641cd2eee196c3cf",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests/provision.rs": "3d5395f4574c94fec01b8d12fed647a35f93666a497eaa0aab8157619b3b4185",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests/reclaim.rs": "b4dc2c03c15c21ea0f05187e7373a00d2e6aafb39a84066ef821458cc9fcf7ea",
+      "docs/reference/RECEIPT_QUERY_API.md": "fd2afdad56b3aa69c1273fee8c6cb6d7ca40db568efefecede60d7e7ea730ac5",
+      "docs/superpowers/specs/2026-10-09-authenticated-receipt-query-snapshots-design.md": "8ca6e8932bf3d2e73d5db30b40df73c70540abf5a6a60aece5af2c19f23e4afc"
+    },
+    "amended_original_failed_names": [
+      "receipt_query_snapshot_backing::tests::reclaim::the_next_provisioning_reclaims_snapshots_of_killed_owners",
+      "receipt_query_snapshot::tests::placement::snapshots_of_killed_owners_are_reclaimed_while_the_writer_seed_is_unavailable",
+      "receipt_query_snapshot::tests::placement::the_snapshot_database_lives_under_the_receipt_store_data_directory",
+      "receipt_query_snapshot::tests::placement::startup_reclaims_snapshots_of_killed_owners_in_the_data_directory"
+    ],
+    "original_patch_paths": [
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot_backing/tests/reclaim.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/placement.rs"
+    ],
+    "ruling": "Amended owner fixtures remain alive simultaneously before SIGKILL; unchanged production still fails the same four expected-safe assertions. Both originals and wrong-reason attempts retained.",
+    "status": "Component verified; pre-open full-disk recovery and final composed candidate acceptance remain OPEN.",
+    "integration": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+    "composition_difference": [
+      "docs/reference/RECEIPT_QUERY_API.md"
+    ],
+    "exact_source_files": 18
+  },
+  "preopen_original": {
+    "result": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "init::tests::snapshot_recovery::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 220.61534939566627,
+      "source_before": {
+        "head": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+        "diff_sha256": "64210da667ec4cf6a16d870296a17d61083a588cb575db77e2b84c7460225c81"
+      },
+      "source_after": {
+        "head": "c0b0ee6090b372aa4c4cee2bff1b533402adb205",
+        "diff_sha256": "64210da667ec4cf6a16d870296a17d61083a588cb575db77e2b84c7460225c81"
+      },
+      "source_stable": true,
+      "log_sha256": "02c62a14cdc7eef729dbddfed2c39ec5ff99e7d629ee302aa889ca222ae74945"
+    },
+    "failed_names": [
+      "trust_control::service_runtime::init::tests::snapshot_recovery::final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse",
+      "trust_control::service_runtime::init::tests::snapshot_recovery::final12_plain_startup_reclaims_before_receipt_store_open_can_refuse"
+    ],
+    "contract": "Both ordinary and anchored service startup must reclaim one bounded window before receipt-store open can refuse. Foreign-database refusal stays unchanged; no host disk exhaustion was attempted."
+  },
+  "authority_partial": {
+    "source_pin_sha256": "308320216a3465aa93fa3fa4f73ac6ed4c8ea9bff431e7d2803bf96e2405e263",
+    "passed": 73,
+    "failed": 3,
+    "status": "Not qualified. Cluster58, startup3 and discovery6 passed; public6 passed/3 failed due refusal-status oracle mismatch. Precise backend/route contract repair remains in progress. All later runtime and strict steps did not run."
+  },
+  "artifacts": {
+    "/tmp/pr1160-final-review-20261009/FINAL12-INTEGRATED.json": "84131a615898545c6787615557b81842b07669752b709e3cd2c7794a022b36f0",
+    "/tmp/pr1160-final-review-20261009/final12-startup-original/result.json": "55629a9c1205de3647ec93176df914186e830a5373e42bbb1a6157faeeca84a3",
+    "/tmp/pr1160-final-review-20261009/final12-startup-original/runtime.log": "02c62a14cdc7eef729dbddfed2c39ec5ff99e7d629ee302aa889ca222ae74945",
+    "/tmp/pr1160-final-review-20261009/final12-startup-original/tests-only.patch": "7be409c079ff2873e06516c23dc43a6959a8b7e8a85c5bca2a3ef2849331d184",
+    "/tmp/pr1160-final-review-20261009/MAJORITY-ORIGINAL-VERIFIED.json": "a3d2dbb8fd93f06c316e2a872053884d4f52389701246cae9c0b901494e7c47a",
+    "/tmp/pr1160-authority-evidence-repair-20261009/majority-corrected-original-root-runtime.json": "056af23f20590b121cbfed1a59f97962ba81292e10cb535a38697f9803e21f15",
+    "/tmp/pr1160-authority-evidence-repair-20261009/majority-corrected-original-root-runtime.log": "d85f459ff6192efb0014b08ba898c80b9c8b543f490d98e5eef855bfd7eeae2c",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-source.json": "308320216a3465aa93fa3fa4f73ac6ed4c8ea9bff431e7d2803bf96e2405e263",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-runtime-and-strict.json": "fdca12d081f1b57aa2b0f42491df1bf4bd3f087c7ac73be0df3c42b3e6b0f346",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-f11.log": "bb46f856697a0327459d4e761090f1016b52438e2db2dce365bcaaab52b56399",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-startup.log": "c82eb4b21558d293c96dee393ff80fc81f5aaee6e5f50cb3b3ce08a8f96bd368",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-config-public.log": "a52968400313cc60bfe0bcd7af740f09bfb964080a7bf9198eb6d54862fb96be",
+    "/tmp/pr1160-authority-evidence-repair-20261009/core-corrected-v2-public-reads.log": "bd16157d5de0fc356d4bb37192585499470b48ed44a1f670b098fe1d8b583756"
+  },
+  "rulings": [
+    "Accept amended crash Original: concurrently live owners avoid encoding the old leak as a fixture precondition; unchanged source still fails the same four assertions.",
+    "Pre-open cleanup is mandatory. It retains existing256-entry/16-candidate windows, nonblocking parent lock and persistent progress across restarts; it does not promise one-restart or universal full-filesystem recovery.",
+    "Plain paths preserve literal fragments and non-UTF8 bytes. URI resolution must match SQLite for supported forms; unsupported forms do not trigger cleanup.",
+    "Keep precise public refusal contracts per route/backend. Configured SQLite admitted documents use503; inherited plain-seed and generic-document404/409 behavior stays."
+  ],
+  "remaining": [
+    "Finish and integrate core authority repair with complete owning qualification.",
+    "Finish snapshot pre-open cleanup and byte-preserving data-directory derivation; compose both startup callsites.",
+    "Run combined owning tests, 100k functional capacity control, strict lint and static gates on the exact candidate.",
+    "Final independent review, exact protected hosted checks and normal merge."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

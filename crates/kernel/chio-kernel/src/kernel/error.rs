@@ -111,6 +111,8 @@ impl std::fmt::Display for ReplayClockDirection {
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("unknown session: {0}")]
     UnknownSession(SessionId),
 
@@ -165,6 +167,13 @@ pub enum KernelError {
     #[error("delegation chain revoked at ancestor {0}")]
     DelegationChainRevoked(CapabilityId),
 
+    #[error("revocation view snapshot is issued in the future")]
+    RevocationSnapshotFuture,
+    #[error("revocation view snapshot is stale")]
+    RevocationSnapshotStale,
+    #[error("governed approval token lifetime exceeds the maximum")]
+    GovernedApprovalLifetimeExceeded,
+
     #[error("delegation admission failed: {0}")]
     DelegationInvalid(String),
 
@@ -174,6 +183,12 @@ pub enum KernelError {
     #[error("governed transaction denied: {0}")]
     GovernedTransactionDenied(String),
 
+    #[error("active-response dispatch was rejected: {0}")]
+    ResponseDispatchRejected(#[source] chio_security_types::DispatchRejection),
+
+    #[error("active-response dispatch was never committed: {0}")]
+    ActiveResponseNeverCommitted(String),
+
     #[error("guard denied the request: {0}")]
     GuardDenied(String),
 
@@ -182,6 +197,14 @@ pub enum KernelError {
 
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
+
+    #[error("invalid receipt metadata: {0}")]
+    InvalidReceiptMetadata(String),
+
+    #[error(
+        "admitted manifest flow policy or topology requires an installed active defense runtime"
+    )]
+    FlowRuntimeUnavailable,
 
     #[error("tool not registered: {0}")]
     ToolNotRegistered(String),
@@ -243,6 +266,9 @@ pub enum KernelError {
     #[error("receipt signing failed: {0}")]
     ReceiptSigningFailed(String),
 
+    #[error("receipt verification failed")]
+    ReceiptVerificationFailed(#[source] chio_core::receipt::crypto_floor::ReceiptFloorVerifyError),
+
     #[error("receipt persistence failed: {0}")]
     ReceiptPersistence(#[from] ReceiptStoreError),
 
@@ -254,6 +280,21 @@ pub enum KernelError {
 
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
+
+    /// Recovery preserves the deciding typed source. Global authority and
+    /// integrity faults cannot be reclassified from diagnostic prose.
+    #[error("durable admission failed: {0}")]
+    AdmissionRecovery(#[source] Box<crate::admission_operation::AdmissionRecoveryError>),
+
+    /// A replay observed a retained unknown outcome. Box the full historical
+    /// projection so refusal does not widen every kernel error. This metadata
+    /// neither claims a new terminal transition nor grants recovery authority.
+    #[error("durable admission failed: request replay is retained in state {:?}", .0.projected_state)]
+    DurableAdmissionRetained(Box<crate::admission_operation::AdmissionReceiptMetadataV1>),
+    /// A consumed security mutation could not persist its terminal dispatch
+    /// outcome, so callers must reconcile before any retry.
+    #[error("security dispatch outcome requires reconciliation: {0}")]
+    SecurityDispatchOutcomeRecoveryRequired(String),
 
     /// A finding purchase, status, or recovery gate denied, carrying the
     /// family the deciding seam chose. Reads identically to
@@ -276,8 +317,33 @@ pub enum KernelError {
     #[error("settlement runtime configuration failed: {0}")]
     SettlementConfiguration(#[from] SettlementRuntimeConfigError),
 
+    #[error("execution nonce verification failed: {0}")]
+    ExecutionNonce(#[source] crate::execution_nonce::ExecutionNonceError),
+
+    #[error("execution nonce store capacity exhausted")]
+    ExecutionNonceCapacity,
+
+    #[error("dispatch credential reservation failed: {cause}; {cleanup}")]
+    CredentialReservationCleanup {
+        #[source]
+        cause: Box<KernelError>,
+        cleanup: Box<KernelError>,
+    },
+
+    #[error("trusted time rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
+
+    #[error("financial receipt accounting exceeds grant ceiling: committed {committed}, ceiling {total}")]
+    FinancialBudgetExceeded { total: u64, committed: u64 },
+
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("{0}")]
+    ApprovalReplay(#[from] crate::governed_approval_replay::ApprovalReplayError),
+
+    #[error("{0}")]
+    Dpop(#[from] crate::dpop::DpopError),
 
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
@@ -456,6 +522,18 @@ impl KernelError {
                 serde_json::json!({ "capability_id": capability_id }),
                 "Inspect the capability lineage and reissue the chain from a non-revoked ancestor.",
             ),
+            Self::RevocationSnapshotFuture => self.report_with_context(
+                "urn:chio:error:kernel:revocation-snapshot-future", serde_json::json!({}),
+                "Restore trusted time and obtain a current revocation snapshot.",
+            ),
+            Self::RevocationSnapshotStale => self.report_with_context(
+                "urn:chio:error:kernel:revocation-snapshot-stale", serde_json::json!({}),
+                "Refresh the revocation snapshot before admitting delegation.",
+            ),
+            Self::GovernedApprovalLifetimeExceeded => self.report_with_context(
+                "urn:chio:error:kernel:governed-approval-lifetime", serde_json::json!({}),
+                "Issue an approval whose signed lifetime is within the configured maximum.",
+            ),
             Self::DelegationInvalid(reason) => self.report_with_context(
                 "CHIO-KERNEL-DELEGATION-INVALID",
                 serde_json::json!({ "reason": reason }),
@@ -471,6 +549,20 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
             ),
+            Self::ResponseDispatchRejected(rejection) => self.report_with_context(
+                rejection.code(),
+                serde_json::json!({ "reason": rejection.to_string() }),
+                "Correct the dispatch binding through the response's admission or recovery path.",
+            ),
+            Self::ActiveResponseNeverCommitted(reason) => self.report_with_context(
+                "active_response.never_committed",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                }),
+                "Close the expired prepared response without dispatch. The exact executor probe proved that no commit occurred.",
+            ),
             Self::GuardDenied(reason) => self.report_with_context(
                 "CHIO-KERNEL-GUARD-DENIED",
                 serde_json::json!({ "reason": reason }),
@@ -485,6 +577,16 @@ impl KernelError {
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
                 serde_json::json!({ "reason": reason }),
                 "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::InvalidReceiptMetadata(reason) => self.report_with_context(
+                "CHIO-KERNEL-INVALID-RECEIPT-METADATA",
+                serde_json::json!({ "reason": reason }),
+                "Remove reserved kernel metadata fields; kernel entrypoints derive them from verified registry or admission state.",
+            ),
+            Self::FlowRuntimeUnavailable => self.report_with_context(
+                "CHIO-KERNEL-FLOW-RUNTIME-UNAVAILABLE",
+                serde_json::json!({}),
+                "Install the governed active-defense runtime before dispatching a flow-required manifest.",
             ),
             Self::ToolNotRegistered(tool) => self.report_with_context(
                 "CHIO-KERNEL-TOOL-NOT-REGISTERED",
@@ -582,6 +684,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Inspect the kernel signing key configuration and signing payload integrity, then retry receipt generation.",
             ),
+            Self::ReceiptVerificationFailed(_) => self.report_with_context(
+                "urn:chio:error:attest:receipt-verification-failed",
+                serde_json::json!({"rejection":"receipt_verification_failed"}),
+                "Restore the authentic receipt evidence and independently selected signer before replaying.",
+            ),
             Self::ReceiptPersistence(error) => self.report_with_context(
                 "CHIO-KERNEL-RECEIPT-PERSISTENCE",
                 serde_json::json!({ "source": error.to_string() }),
@@ -607,6 +714,26 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
+            Self::AdmissionRecovery(failure) => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "reason": failure.to_string() }),
+                "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
+            Self::DurableAdmissionRetained(projection) => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "admission_operation": projection }),
+                "Inspect the retained operation. A fresh attempt requires the kernel's conservative eligibility classification, not merely read-only tool metadata.",
+            ),
+            Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
+                "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
+                serde_json::json!({
+                    "reason": reason,
+                    "retryable": false,
+                    "redispatch_allowed": false,
+                    "required_action": "reconcile",
+                }),
+                "Do not retry or redispatch this request. Reconcile the authoritative security outcome, dispatch phase, and admission operation before deciding any next action.",
+            ),
             Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
                 "CHIO-KERNEL-NO-CROSS-CURRENCY-ORACLE",
                 serde_json::json!({ "base": base, "quote": quote }),
@@ -627,10 +754,22 @@ impl KernelError {
                 serde_json::json!({ "kind": error.as_str() }),
                 "Install a receipt store and outcome store backed by the same atomic settlement writer, then correct the retry policy or backend capability before startup.",
             ),
+            Self::FinancialBudgetExceeded { total, committed } => self.report_with_context(
+                "urn:chio:error:kernel:financial-budget-exceeded", serde_json::json!({"total": total, "committed": committed}),
+                "Reconcile the grant accounting invariant before signing financial evidence.",
+            ),
             Self::Internal(reason) => self.report_with_context(
                 "CHIO-KERNEL-INTERNAL",
                 serde_json::json!({ "reason": reason }),
                 "Capture the error report and kernel logs, then treat this as a reproducible kernel bug if it persists.",
+            ),
+            Self::ApprovalReplay(error) => self.report_with_context(
+                error.code(), serde_json::json!({"rejection": error.code()}),
+                "Restore approval custody and present an approval within its original signed window.",
+            ),
+            Self::Dpop(error) => self.report_with_context(
+                error.code(), serde_json::json!({ "rejection": error.code() }),
+                "Present a fresh proof for the exact invocation and restore replay custody before retrying.",
             ),
             Self::DpopVerificationFailed(reason) => self.report_with_context(
                 "CHIO-KERNEL-DPOP-VERIFICATION-FAILED",
@@ -641,6 +780,36 @@ impl KernelError {
                 "CHIO-KERNEL-RUNTIME-ADMISSION-READINESS-TIMEOUT",
                 serde_json::json!({ "timeout_ms": timeout_ms }),
                 "Restore the runtime admission dependency or increase the bounded readiness timeout before retrying.",
+            ),
+            Self::ExecutionNonce(error) => self.report_with_context(
+                error.code().as_ref(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Present a fresh signed nonce bound to the exact authorized request.",
+            ),
+            Self::ExecutionNonceCapacity => self.report_with_context(
+                "urn:chio:error:kernel:execution-nonce-capacity",
+                serde_json::json!({}),
+                "Wait for signed nonce windows to expire or increase replay custody capacity.",
+            ),
+            Self::CredentialReservationCleanup { cause, .. } => {
+                let mut report = cause.report();
+                if let Some(context) = report.context.as_object_mut() {
+                    context.insert("cleanup_failed".into(), serde_json::json!(true));
+                } else {
+                    report.context = serde_json::json!({ "cause": report.context, "cleanup_failed": true });
+                }
+                report.message = self.to_string();
+                report
+            }
+            Self::UntrustedInput(error) => self.report_with_context(
+                error.code(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Supply valid bounded JSON matching the admitted input contract.",
+            ),
+            Self::Clock(error) => self.report_with_context(
+                error.code(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Restore a valid trusted clock or authority window before retrying.",
             ),
             Self::ReplayClockAnomaly {
                 store,
@@ -704,6 +873,14 @@ impl KernelError {
             Self::FindingDenied(denial) => {
                 crate::finding_denial::record_finding_denial(metadata.clone(), denial.code())
             }
+            Self::DurableAdmissionRetained(projection) => {
+                crate::receipt_support::merge_metadata_objects(
+                    metadata.clone(),
+                    Some(serde_json::json!({
+                        "admission_operation": projection
+                    })),
+                )
+            }
             _ => metadata.clone(),
         }
     }
@@ -715,9 +892,24 @@ impl From<crate::admission_operation::AdmissionOperationError> for KernelError {
     }
 }
 
+impl From<crate::security_admission_operation::AdmissionOperationError> for KernelError {
+    fn from(error: crate::security_admission_operation::AdmissionOperationError) -> Self {
+        match error {
+            crate::security_admission_operation::AdmissionOperationError::Conflict(reason) => {
+                Self::Internal(format!("security admission operation conflicted: {reason}"))
+            }
+            error => Self::Internal(format!("security admission operation failed: {error}")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod overload_tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )]
     use super::*;
 
     #[test]

@@ -108,6 +108,15 @@ struct StreamGate<'a> {
     invocations: Vec<ToolInvocation>,
     verdicts: Vec<VerdictResult>,
     buffered_blocks: Vec<BufferedBlock>,
+    evaluated_calls: Vec<EvaluatedCall>,
+}
+
+/// The exact call a verdict was issued for, kept to reconcile the copy of the
+/// output that `response.completed` repeats.
+struct EvaluatedCall {
+    call_id: String,
+    name: String,
+    arguments: String,
 }
 
 impl<'a> StreamGate<'a> {
@@ -120,6 +129,7 @@ impl<'a> StreamGate<'a> {
             invocations: Vec::new(),
             verdicts: Vec::new(),
             buffered_blocks: Vec::new(),
+            evaluated_calls: Vec::new(),
         }
     }
 
@@ -131,6 +141,11 @@ impl<'a> StreamGate<'a> {
             self.close_stream(frame)?;
             return Ok(());
         }
+        if self.phase.is_closed() && (frame.event.is_some() || frame.data.is_some()) {
+            return Err(ProviderError::Malformed(
+                "OpenAI SSE event arrived after terminal completion".to_string(),
+            ));
+        }
 
         let Some(event) = frame.event.as_deref() else {
             return self.forward_or_buffer(frame);
@@ -141,12 +156,17 @@ impl<'a> StreamGate<'a> {
             "response.function_call_arguments.delta" => self.argument_delta(frame),
             "response.function_call_arguments.done" => self.argument_done(frame),
             "response.output_item.done" => self.finish_output_item(frame, evaluate),
-            "response.completed" => self.close_stream(frame),
-            "error" | "response.error" => Err(ProviderError::Malformed(format!(
-                "OpenAI SSE error event: {}",
-                data_text(&frame)
+            "response.completed" | "response.incomplete" => self.complete_response(frame),
+            "response.created" | "response.in_progress" | "response.queued" => {
+                self.forward_lifecycle_response(frame)
+            }
+            "error" | "response.error" | "response.failed" => Err(ProviderError::Malformed(
+                format!("OpenAI SSE error event: {}", data_text(&frame)),
+            )),
+            other if is_passthrough_event(other) => self.forward_or_buffer(frame),
+            other => Err(ProviderError::Malformed(format!(
+                "OpenAI SSE event {other} is not supported by the gate"
             ))),
-            _ => self.forward_or_buffer(frame),
         }
     }
 
@@ -163,12 +183,21 @@ impl<'a> StreamGate<'a> {
             ProviderError::Malformed("OpenAI output_item.added was missing item".to_string())
         })?;
 
-        if !is_tool_call_item(item) {
+        if classify_output_item(item)? == OutputItemKind::ProviderExecuted {
             self.output.extend_from_slice(&frame.raw);
             return Ok(());
         }
 
         let call = response_tool_call_start_from_item(item)?;
+        if self
+            .evaluated_calls
+            .iter()
+            .any(|evaluated| evaluated.call_id == call.call_id)
+        {
+            return Err(ProviderError::Malformed(
+                "OpenAI streamed tool call reused an evaluated call_id".to_string(),
+            ));
+        }
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -236,7 +265,8 @@ impl<'a> StreamGate<'a> {
         let item = data.get("item");
 
         let Some(active) = self.active.take() else {
-            if item.is_some_and(is_tool_call_item) {
+            let kind = item.map(classify_output_item).transpose()?;
+            if kind == Some(OutputItemKind::Evaluated) {
                 return Err(ProviderError::Malformed(
                     "OpenAI output_item.done tool call arrived without an active tool call"
                         .to_string(),
@@ -251,7 +281,7 @@ impl<'a> StreamGate<'a> {
                 "OpenAI output_item.done for active tool call was missing item".to_string(),
             )
         })?;
-        if !is_tool_call_item(item) {
+        if classify_output_item(item)? != OutputItemKind::Evaluated {
             return Err(ProviderError::Malformed(format!(
                 "OpenAI output_item.done for active tool call {} was not a tool item",
                 active.call_id
@@ -277,6 +307,11 @@ impl<'a> StreamGate<'a> {
         }
 
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        self.evaluated_calls.push(EvaluatedCall {
+            call_id: call.call_id.clone(),
+            name: call.name.clone(),
+            arguments: call.arguments.clone(),
+        });
         self.invocations.push(invocation);
         self.verdicts.push(verdict);
         self.buffered_blocks.push(buffered);
@@ -285,6 +320,54 @@ impl<'a> StreamGate<'a> {
         }
         self.output.extend_from_slice(&frame.raw);
         Ok(())
+    }
+
+    /// `response.completed` and `response.incomplete` repeat every output item
+    /// in `response.output`, and clients may execute calls from that copy. Each
+    /// tool item there must be a call that was evaluated, byte for byte.
+    fn complete_response(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+        let output = frame
+            .data
+            .as_ref()
+            .and_then(|data| data.get("response"))
+            .and_then(|response| response.get("output"));
+        if let Some(output) = output {
+            let items = output.as_array().ok_or_else(|| {
+                ProviderError::Malformed("OpenAI completed response output was not an array".into())
+            })?;
+            let mut reconciled = std::collections::BTreeSet::new();
+            for item in items {
+                if classify_output_item(item)? == OutputItemKind::ProviderExecuted {
+                    continue;
+                }
+                let call = response_tool_call_from_item(item)?;
+                let evaluated = self
+                    .evaluated_calls
+                    .iter()
+                    .find(|evaluated| evaluated.call_id == call.call_id)
+                    .ok_or_else(|| {
+                        ProviderError::Malformed(format!(
+                            "OpenAI completed output carries unevaluated tool call {}",
+                            call.call_id
+                        ))
+                    })?;
+                if evaluated.name != call.name
+                    || evaluated.arguments != call.arguments
+                    || !reconciled.insert(call.call_id.clone())
+                {
+                    return Err(ProviderError::Malformed(format!(
+                        "OpenAI completed output for tool call {} differs from the evaluated call",
+                        call.call_id
+                    )));
+                }
+            }
+            if reconciled.len() != self.evaluated_calls.len() {
+                return Err(ProviderError::Malformed(
+                    "OpenAI completed output omitted an evaluated tool call".to_string(),
+                ));
+            }
+        }
+        self.close_stream(frame)
     }
 
     fn close_stream(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
@@ -301,6 +384,27 @@ impl<'a> StreamGate<'a> {
         self.phase = transition(&self.phase, StreamEvent::Close)?;
         self.output.extend_from_slice(&frame.raw);
         Ok(())
+    }
+
+    fn forward_lifecycle_response(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+        let output = frame
+            .data
+            .as_ref()
+            .and_then(|data| data.get("response"))
+            .and_then(|response| response.get("output"));
+        if let Some(output) = output {
+            let items = output.as_array().ok_or_else(|| {
+                ProviderError::Malformed("OpenAI lifecycle response output was not an array".into())
+            })?;
+            for item in items {
+                if classify_output_item(item)? == OutputItemKind::Evaluated {
+                    return Err(ProviderError::Malformed(
+                        "OpenAI lifecycle response carried a client-executed tool call".into(),
+                    ));
+                }
+            }
+        }
+        self.forward_or_buffer(frame)
     }
 
     fn forward_or_buffer(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
@@ -627,11 +731,7 @@ fn tool_call_name(item: &Value) -> Option<String> {
 fn arguments_string(value: &Value) -> Result<String, ProviderError> {
     match value {
         Value::String(text) => {
-            serde_json::from_str::<Value>(text).map_err(|error| {
-                ProviderError::BadToolArgs(format!(
-                    "OpenAI SSE tool-call arguments were not valid JSON: {error}"
-                ))
-            })?;
+            crate::input::arguments(text)?;
             Ok(text.to_string())
         }
         Value::Object(_) => serde_json::to_string(value).map_err(|error| {
@@ -652,10 +752,74 @@ fn start_arguments_string(value: &Value) -> Result<String, ProviderError> {
     arguments_string(value)
 }
 
-fn is_tool_call_item(item: &Value) -> bool {
-    item.get("type")
-        .and_then(Value::as_str)
-        .is_some_and(|kind| kind == "function_call" || kind == "tool_call")
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OutputItemKind {
+    /// A client-executed call the kernel evaluates before release.
+    Evaluated,
+    /// An item the provider executes or renders; it asks the client to run nothing.
+    ProviderExecuted,
+}
+
+/// Classify a Responses output item. Client-executed item types the gate does
+/// not lift (`custom_tool_call`, `local_shell_call`, `computer_call`,
+/// `shell_call`, `apply_patch_call`, hosted MCP items) and unknown types are
+/// rejected rather than forwarded unevaluated.
+fn classify_output_item(item: &Value) -> Result<OutputItemKind, ProviderError> {
+    let kind = item.get("type").and_then(Value::as_str).ok_or_else(|| {
+        ProviderError::Malformed("OpenAI output item was missing its type".to_string())
+    })?;
+    match kind {
+        "function_call" | "tool_call" => Ok(OutputItemKind::Evaluated),
+        provider if crate::PROVIDER_EXECUTED_ITEM_TYPES.contains(&provider) => {
+            Ok(OutputItemKind::ProviderExecuted)
+        }
+        other => Err(ProviderError::Malformed(format!(
+            "OpenAI output item type {other} is not supported by the gate"
+        ))),
+    }
+}
+
+/// Exact documented members of the existing passthrough event families.
+/// Unknown suffixes require explicit support rather than prefix admission.
+fn is_passthrough_event(event: &str) -> bool {
+    const EXACT: &[&str] = &[
+        "response.created",
+        "response.in_progress",
+        "response.queued",
+        "response.content_part.added",
+        "response.content_part.done",
+        "response.output_text.delta",
+        "response.output_text.done",
+        "response.output_text.annotation.added",
+        "response.refusal.delta",
+        "response.refusal.done",
+        "response.reasoning_summary_part.added",
+        "response.reasoning_summary_part.done",
+        "response.reasoning_summary_text.delta",
+        "response.reasoning_summary_text.done",
+        "response.reasoning_text.delta",
+        "response.reasoning_text.done",
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed",
+        "response.file_search_call.in_progress",
+        "response.file_search_call.searching",
+        "response.file_search_call.completed",
+        "response.code_interpreter_call.in_progress",
+        "response.code_interpreter_call.interpreting",
+        "response.code_interpreter_call.completed",
+        "response.code_interpreter_call_code.delta",
+        "response.code_interpreter_call_code.done",
+        "response.image_generation_call.in_progress",
+        "response.image_generation_call.generating",
+        "response.image_generation_call.partial_image",
+        "response.image_generation_call.completed",
+        "response.audio.delta",
+        "response.audio.done",
+        "response.audio.transcript.delta",
+        "response.audio.transcript.done",
+    ];
+    EXACT.contains(&event)
 }
 
 fn frame_output_index(data: &Value) -> Option<u64> {
@@ -731,8 +895,8 @@ fn ensure_streaming_allow(call_id: &str, verdict: &VerdictResult) -> Result<(), 
     )
 }
 
+// Preserve provider identity bytes for matching and ordinary native validation.
 fn non_empty(value: &str) -> Option<String> {
-    let value = value.trim();
     if value.is_empty() {
         None
     } else {

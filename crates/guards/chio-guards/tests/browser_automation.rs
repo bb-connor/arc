@@ -55,19 +55,18 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (req, scope, agent_id, server_id)
 }
 
 fn eval<G: Guard>(guard: &G, tool: &str, args: serde_json::Value) -> Verdict {
     let (request, scope, agent_id, server_id) = make_request(tool, args);
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

@@ -1,0 +1,225 @@
+{
+  "schema": "chio.landing-ci-fixtures.v1",
+  "observed_utc": "2026-10-09T19:54:28.379762+00:00",
+  "requirement": "LANDING-STORE-FIXTURES",
+  "baseline": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+  "scope": "Two store integration targets required by Build/lint/test and MSRV; test-only repairs.",
+  "original": {
+    "source": {
+      "head": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+      "files": {
+        "crates/platform/chio-store-sqlite/tests/integration_smoke.rs": "5e1f07e4f8baa68fbdaa43bad65dc731f8ccf4686fe4faadf220fa1bd2f41fbc",
+        "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs": "1b2c81a7c7af81fc07535eeb02d363f92180f0549b8d9e72dd055a72d03b3035"
+      }
+    },
+    "result": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "integration_smoke",
+        "--test",
+        "governed_approval_kernel_replay",
+        "--no-fail-fast",
+        "--",
+        "--show-output"
+      ],
+      "exit": 101,
+      "seconds": 168.53227162361145,
+      "log_sha256": "b63f7b80abeb7e69e43be64e4f19037c424d6315ef5efb2a9a7eca257d179bce",
+      "source_stable": true
+    },
+    "counts": {
+      "passed": 3,
+      "failed": 3,
+      "ignored": 0
+    }
+  },
+  "repair": {
+    "baseline": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+    "id": "LANDING-STORE-FIXTURES",
+    "severity": "P2",
+    "scope": "Required CI test fixtures, no runtime contract changes",
+    "failures": [
+      {
+        "test": "governed_dispatch_replay_is_denied_after_store_reopen",
+        "observed": "Expected initial Allow; got Deny because bound tool invocation is required for approval.",
+        "repair": "Install explicit tenant/approver roster in both kernels. Bind the actual request via public kernel API before signing its intent hash.",
+        "oracles_preserved": [
+          "Missing server denies before token consumption.",
+          "First registered-server invocation allows.",
+          "Same approval after durable-store reopen denies as already consumed."
+        ]
+      },
+      {
+        "tests": [
+          "sqlite_capability_authority_rotates_and_applies_newer_snapshot",
+          "sqlite_capability_authority_rejects_snapshot_with_invalid_public_key"
+        ],
+        "observed": "Authority open denies database directly in shared temporary directory; parent must be owned by effective user with mode0700.",
+        "repair": "Use existing private_tempdir helper and retain the guards past authority lifetime.",
+        "producer_commit": "cd8e3395de32dffafe3dc6e484c488eb723c9ca9",
+        "integration_commit": "85903d8486"
+      }
+    ],
+    "out_of_scope": [
+      "Do not import postmerge production sidecar a7b0f372c1.",
+      "No global umask change.",
+      "No approval or custody validation relaxation."
+    ]
+  },
+  "final_file_sha256": {
+    "crates/platform/chio-store-sqlite/tests/integration_smoke.rs": "0bb6d41968a167a344c406accd71c808736b0cd1a53fbb4990e32a04da36a1ac",
+    "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs": "2212624fecac70e720b3517bd44f61b2d38c1dccb606cbdc2b2940d155b1a541"
+  },
+  "final_focused": {
+    "result": {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "integration_smoke",
+        "--test",
+        "governed_approval_kernel_replay",
+        "--no-fail-fast",
+        "--",
+        "--show-output"
+      ],
+      "exit": 0,
+      "seconds": 11.944895505905151,
+      "log_sha256": "0664323731e152db211e65e306c39c95ac616498fd8468083d05a693c57e9f6a",
+      "source_stable": true
+    },
+    "counts": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "final_strict": {
+    "command": [
+      "swarm",
+      "build",
+      "--class",
+      "integrator",
+      "--",
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-store-sqlite",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 1.709974765777588,
+    "log_sha256": "3d8b73fd7ff0f98343c1dba1726149c68f6bed3fe29605d121ed358895984f78",
+    "source_stable": true
+  },
+  "static": {
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "exit": 0,
+        "summary": "1248 assertions at baseline; no ratchet increase."
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "summary": "414 remaining debt observations, 40 pinned native compositions; no additions."
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "summary": "Rust file hygiene check passed; no baseline modifications."
+      }
+    ],
+    "formatting_observation": "Initial cargo fmt --all -- --check returned1 for one binding_hash expression wrapping. Applied rustfmt to only the modified replay fixture; final check recorded separately."
+  },
+  "evidence_directory": "/tmp/pr1160-landing-store-fixtures-20261009",
+  "retained_pre_format_passes": {
+    "tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "integration_smoke",
+        "--test",
+        "governed_approval_kernel_replay",
+        "--no-fail-fast",
+        "--",
+        "--show-output"
+      ],
+      "exit": 0,
+      "seconds": 12.224374294281006,
+      "log_sha256": "9388f338c7d5e6b0986b24300b97688232329534db2e08da814773db7e0f5adf",
+      "source_stable": true
+    },
+    "strict": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 197.4620020389557,
+      "log_sha256": "94a0f5f9565b9d2610025ec192f208a1f713e5c3c211b5fc194e261cc15ae14e",
+      "source_stable": true
+    }
+  },
+  "acceptance_boundary": {
+    "whole_workspace_qualified": false,
+    "hosted_qualified": false,
+    "merged": false,
+    "production_custody_changed": false,
+    "production_approval_changed": false,
+    "remaining": [
+      "Complete CLI custody fixture handoff and final candidate review.",
+      "Exact protected hosted checks and normal protected merge."
+    ]
+  },
+  "formatting": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 27.764861345291138,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_stable": true
+  }
+}

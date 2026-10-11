@@ -6,12 +6,13 @@ fn apply_conditions(
     spec: &HushSpec,
     context: &RuntimeContext,
     conditions: &HashMap<String, Condition>,
+    now: chrono::DateTime<chrono::Utc>,
 ) -> HushSpec {
     let mut effective = spec.clone();
 
     if let Some(rules) = &mut effective.rules {
         for (block_name, condition) in conditions {
-            if !evaluate_condition(condition, context) && !rules.clear_block(block_name) {
+            if !evaluate_condition_at(condition, context, now) && !rules.clear_block(block_name) {
                 debug_assert!(
                     false,
                     "unknown condition block name `{block_name}`; \
@@ -46,6 +47,19 @@ fn evaluate_tool_call(
 
     if base_rule.is_none() && profile_rule.is_none() {
         return allow_result(None, None, origin_profile_id, posture);
+    }
+
+    if [base_rule, profile_rule]
+        .into_iter()
+        .flatten()
+        .any(|rule| rule.dpop_required == Some(true))
+    {
+        return deny_result(
+            Some("rules.tool_access.dpop_required".to_string()),
+            Some("sender proof requires kernel verification".to_string()),
+            origin_profile_id,
+            posture,
+        );
     }
 
     let target = action.target.as_deref().unwrap_or_default();
@@ -397,9 +411,7 @@ fn workload_identity_matches(
     expected: &crate::models::WorkloadIdentityMatch,
     actual: &chio_core::capability::workload_identity::WorkloadIdentity,
 ) -> bool {
-    expected
-        .scheme
-        .is_none_or(|scheme| scheme == actual.scheme)
+    expected.scheme.is_none_or(|scheme| scheme == actual.scheme)
         && expected
             .trust_domain
             .as_deref()

@@ -1,0 +1,11 @@
+{
+  "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
+  "qualifier_source": "8e7b53347e4e8050d8f96de1babc2740e8efe76b",
+  "observer_source": "5d71ef11e26aaaca21363d4bcb85cdb182dc44ec",
+  "runtime_id": "714d3643-e7f7-42f9-95b5-6a3a0d734ce8",
+  "scenario": "linux-x86-release-budget-cb5a34e72-retry1",
+  "worker": "carol",
+  "observation_sha256": "506a95f8941c02798b42e2bc1b75f40e84a1c88801183aada156e002f23b1d42",
+  "contains_private_keys": false,
+  "m5_acceptance_complete": false
+}

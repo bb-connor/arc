@@ -38,7 +38,7 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
     let mut sse: Vec<u8> = Vec::with_capacity(body.len() + 8);
     sse.extend_from_slice(b"data: ");
     sse.extend_from_slice(&body);
-    sse.extend_from_slice(b"\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
     Ok(sse)
 }
 

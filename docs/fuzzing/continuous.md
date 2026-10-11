@@ -116,6 +116,25 @@ for them.
 
 ## ClusterFuzzLite bridge
 
+### Observed selector limitation (October 11, 2026)
+
+`FUZZ-SELECTOR-TRANSPORT` is an open P3 efficiency follow-up in the
+[landing ledger](../security/landing-ledger.md). On PR #1160 head `36d77fe276`,
+job `114428079323` supplies `CHIO_CFLITE_TARGETS` to the outer action, but the
+nested builder container receives neither selector variable. It builds the full
+33-target inventory. This PR requests all 33, so the transport defect does not
+omit coverage or explain a difference between its requested and actual workload.
+Other subset requests can unnecessarily build the full inventory.
+
+Repair acceptance is an actual container-boundary control for a subset, full
+selection, unknown names and conflicting selectors, preserving each target's
+features, sanitizer, seed handling and sampling budget. No repair or new fuzz
+campaign is claimed here. The current job's 75-minute cancellation still leaves
+sampling incomplete after its 70-minute-20-second build. Complete earlier runs
+are source-specific evidence, not qualification of the cancelled job.
+
+The descriptions below state the intended selection behavior.
+
 Two GitHub-Actions workflows pair libFuzzer's PR-time and nightly-cron
 coverage into the bridge that carries Chio through the OSS-Fuzz acceptance
 window and remains the documented permanent fallback after acceptance lands:

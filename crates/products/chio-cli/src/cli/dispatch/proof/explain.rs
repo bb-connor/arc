@@ -60,6 +60,9 @@ pub(super) fn explain_proof_claim(
         Some(archive_root) => archive_root.path(),
         None => bundle,
     };
+    let original_passport_path = resolve_proof_passport_path(input_path)?;
+    let (_snapshot, captured_input) = room::capture_input(input_path)?;
+    let input_path = captured_input.as_path();
     verify_proof_room_bundle_if_present(input_path)?;
     let passport_path = resolve_proof_passport_path(input_path)?;
     let manifest_claim = load_manifest_claim(input_path, claim_id)?;
@@ -97,12 +100,14 @@ pub(super) fn explain_proof_claim(
                 )
             }
         };
+    let evidence_paths =
+        present_evidence_paths(evidence_paths, &passport_path, &original_passport_path);
     let explain_report = ProofExplainReport {
         schema: "chio.proof.explain-report.v1",
         claim_id: claim_id.to_string(),
         status,
         bundle: bundle.to_string_lossy().into_owned(),
-        passport_path: passport_path.to_string_lossy().into_owned(),
+        passport_path: original_passport_path.to_string_lossy().into_owned(),
         verifier_report_id,
         verifier_error,
         failure_code,
@@ -291,8 +296,8 @@ fn load_explain_receipt_coverage(
     let Some(manifest_path) = proof_room_manifest_path(bundle) else {
         return Ok(Vec::new());
     };
-    let manifest_bytes = fs::read(manifest_path)?;
-    let manifest: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+    let manifest_bytes = crate::input::read(manifest_path)?;
+    let manifest: serde_json::Value = crate::input::json(&manifest_bytes)?;
     Ok(manifest
         .get("receipt_coverage")
         .and_then(serde_json::Value::as_array)
@@ -487,8 +492,8 @@ fn load_bound_risk_comptroller_report(
 ) -> Result<Option<serde_json::Value>, CliError> {
     let passport = read_transaction_passport(passport_path)?;
     let evidence_graph_path = bundle_relative_path(passport_path, &passport.evidence_graph_path)?;
-    let evidence_graph_bytes = fs::read(evidence_graph_path)?;
-    let evidence_graph: serde_json::Value = serde_json::from_slice(&evidence_graph_bytes)?;
+    let evidence_graph_bytes = crate::input::read(evidence_graph_path)?;
+    let evidence_graph: serde_json::Value = crate::input::json(&evidence_graph_bytes)?;
     let Some(nodes) = evidence_graph
         .get("nodes")
         .and_then(serde_json::Value::as_array)
@@ -496,7 +501,10 @@ fn load_bound_risk_comptroller_report(
         return Ok(None);
     };
 
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
     for node in nodes {
+        budget.enter(0)?;
         if !is_risk_comptroller_node(node) {
             continue;
         }
@@ -504,11 +512,11 @@ fn load_bound_risk_comptroller_report(
             continue;
         };
         let artifact_path = bundle_relative_path(passport_path, path)?;
-        let artifact_bytes = fs::read(artifact_path)?;
+        let artifact_bytes = budget.read(&artifact_path)?;
         if !node_digest_matches(node, &artifact_bytes) {
             continue;
         }
-        let artifact: serde_json::Value = serde_json::from_slice(&artifact_bytes)?;
+        let artifact: serde_json::Value = crate::input::json(&artifact_bytes)?;
         if artifact.get("id").and_then(serde_json::Value::as_str) == Some(risk_ref) {
             return Ok(Some(artifact));
         }
@@ -520,8 +528,8 @@ fn load_bound_risk_comptroller_report(
 fn read_transaction_passport(
     passport_path: &Path,
 ) -> Result<chio_control_plane::transaction_passport::TransactionPassport, CliError> {
-    let bytes = fs::read(passport_path)?;
-    Ok(serde_json::from_slice(&bytes)?)
+    let bytes = crate::input::read(passport_path)?;
+    Ok(crate::input::json(&bytes)?)
 }
 
 fn bundle_relative_path(passport_path: &Path, relative: &str) -> Result<PathBuf, CliError> {
@@ -662,8 +670,8 @@ fn claim_results_mention_claim(report: &serde_json::Value, claim_id: &str) -> bo
 }
 
 fn push_passport_support_evidence_paths(passport_path: &Path, paths: &mut Vec<String>) {
-    if let Ok(passport_bytes) = fs::read(passport_path) {
-        if let Ok(passport) = serde_json::from_slice::<
+    if let Ok(passport_bytes) = crate::input::read(passport_path) {
+        if let Ok(passport) = crate::input::json::<
             chio_control_plane::transaction_passport::TransactionPassport,
         >(&passport_bytes)
         {
@@ -710,4 +718,57 @@ fn proof_claim_verified(
         return claim.result == "verified";
     }
     claim_id == "claim.transaction.passport_root_verified"
+}
+
+// Path presentation never reopens the mutable source after capture.
+fn present_evidence_paths(paths: Vec<String>, captured: &Path, original: &Path) -> Vec<String> {
+    let Some(captured_parent) = captured.parent() else {
+        return paths;
+    };
+    let Some(original_parent) = original.parent() else {
+        return paths;
+    };
+    paths
+        .into_iter()
+        .map(|path| {
+            Path::new(&path)
+                .strip_prefix(captured_parent)
+                .map(|relative| {
+                    original_parent
+                        .join(relative)
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .unwrap_or(path)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod capture_tests {
+    use super::*;
+    #[test]
+    fn presentation_uses_original_paths_without_rereading_original_documents() {
+        let source = tempfile::tempdir().unwrap();
+        let original = source.path().join("transaction-passport.json");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../fixtures/proof-room/minimal-passport/valid/transaction-passport.json");
+        std::fs::write(&original, std::fs::read(fixture).unwrap()).unwrap();
+        let snapshot = crate::input::snapshot::Snapshot::capture(source.path()).unwrap();
+        let captured = snapshot.path().join("transaction-passport.json");
+        std::fs::write(&original, b"substituted invalid document").unwrap();
+        let paths = proof_claim_failure_evidence_paths(&captured, None);
+        let presented = present_evidence_paths(paths, &captured, &original);
+        assert!(presented.len() >= 3);
+        assert!(presented
+            .iter()
+            .any(|path| path.ends_with("evidence-graph.json")));
+        assert!(presented
+            .iter()
+            .all(|path| !Path::new(path).starts_with(snapshot.path())));
+        assert!(presented
+            .iter()
+            .all(|path| Path::new(path).starts_with(source.path())));
+    }
 }

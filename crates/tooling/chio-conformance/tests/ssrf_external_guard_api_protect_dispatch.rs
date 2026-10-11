@@ -197,8 +197,12 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
+        approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: true,
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
@@ -207,6 +211,8 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,
@@ -259,8 +265,12 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
+        approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: true,
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
@@ -269,6 +279,8 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,
@@ -325,8 +337,12 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
+        approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: true,
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
@@ -335,6 +351,8 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,

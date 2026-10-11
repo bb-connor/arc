@@ -565,7 +565,10 @@ class MockChioClient:
         approval_id: str,
         verdict: Any,
         reason: str | None = None,
+        *,
+        signed_token: dict[str, Any] | None = None,
     ) -> Any:
+        from chio_sdk.approval_contract import require_decision
         from chio_sdk.errors import ChioError
         from chio_sdk.models_approvals import (
             ApprovalResponse,
@@ -574,9 +577,15 @@ class MockChioClient:
         )
 
         normalised = ApprovalVerdict.from_action(verdict) if isinstance(verdict, str) else verdict
+        token = require_decision(signed_token, approval_id, normalised.value)
         approvals = getattr(self, "_pending_approvals", {})
         if approval_id not in approvals:
             raise ChioError(f"approval {approval_id} not found", code="HTTP_404")
+        pending = approvals[approval_id]
+        if token.get("subject") != pending["subject_id"] or token.get("governed_intent_hash") != pending["parameter_hash"]:
+            from chio_sdk.errors import ChioValidationError
+
+            raise ChioValidationError("signed token does not match the pending approval")
         resolved = getattr(self, "_resolved_approvals", {})
         if not hasattr(self, "_resolved_approvals"):
             self._resolved_approvals = resolved
@@ -586,8 +595,8 @@ class MockChioClient:
             approval_id=approval_id,
             outcome=normalised,
             resolved_at=now,
-            approver_hex="mock-approver",
-            token_id=f"mock-tok-{approval_id}",
+            approver_hex=token["approver"],
+            token_id=token["id"],
         )
         self.calls.append(
             RecordedCall(
@@ -596,6 +605,7 @@ class MockChioClient:
                     "approval_id": approval_id,
                     "verdict": normalised.value,
                     "reason": reason,
+                    "signed_token": token,
                 },
             )
         )
@@ -608,26 +618,38 @@ class MockChioClient:
     async def submit_for_approval(
         self,
         *,
-        capability_id: str,
         tool_name: str,
         tool_args: dict[str, Any],
+        capability: Any = None,
+        capability_id: str | None = None,
         tool_server: str | None = None,
         requested_by: str | None = None,
         ttl_seconds: int = 3600,
         summary: str | None = None,
         triggered_by: list[str] | None = None,
     ) -> str:
+        # Contract mock only. No signature, current authority or durable
+        # execution verification is simulated by this in-process queue.
+        from chio_sdk.approval_contract import require_capability
+        from chio_sdk.errors import ChioValidationError
+
+        value = capability.model_dump(mode="json") if hasattr(capability, "model_dump") else capability
+        token = require_capability(value, capability_id, requested_by)
+        if not tool_name:
+            raise ChioValidationError("tool_name is required to submit an approval")
         approvals: dict[str, Any] = getattr(self, "_pending_approvals", {})
         if not hasattr(self, "_pending_approvals"):
             self._pending_approvals = approvals
         approval_id = f"mock-ap-{uuid.uuid4().hex[:8]}"
-        param_hash = _sha256_hex(_canonical_json(tool_args))
+        # Deliberately not a production intent hash. A real approval must be
+        # signed over the server-built pending intent, never this mock value.
+        param_hash = "mock-intent-" + uuid.uuid4().hex
         now = int(time.time())
         approvals[approval_id] = {
             "approval_id": approval_id,
             "policy_id": "policy-mock",
-            "subject_id": requested_by or "mock-subject",
-            "capability_id": capability_id,
+            "subject_id": requested_by,
+            "capability_id": token["id"],
             "tool_server": tool_server or "shell",
             "tool_name": tool_name,
             "action": "invoke",
@@ -641,7 +663,10 @@ class MockChioClient:
             RecordedCall(
                 method="submit_for_approval",
                 context={
-                    "capability_id": capability_id,
+                    "capability_id": token["id"],
+                    "capability": token,
+                    "requested_by": requested_by,
+                    "parameters": tool_args,
                     "tool_name": tool_name,
                     "tool_server": tool_server,
                     "summary": summary,

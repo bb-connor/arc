@@ -182,5 +182,5 @@ fn attenuated_token_with_honest_trust_root_parent_scope_hash_verifies() {
     )
     .expect("honest attenuated token must verify under the trust-root binding");
 
-    assert_eq!(verified.id, "cap-attenuated-honest");
+    assert_eq!(verified.id(), "cap-attenuated-honest");
 }

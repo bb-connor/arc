@@ -395,6 +395,7 @@ fn sqlite_budget_store_v1_existing_capture_column_quarantines_open_hold(
         "#,
         [],
     )?;
+    install_empty_legacy_payment_journal(&connection)?;
     crate::stamp_schema_version(&connection, "budget", 1)?;
     drop(connection);
 

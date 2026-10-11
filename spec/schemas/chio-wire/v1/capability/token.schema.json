@@ -347,7 +347,8 @@
             "bind_session",
             "restrict_audience",
             "restrict_geo",
-            "restrict_time_window"
+            "restrict_time_window",
+            "bind_security_context"
           ]
         },
         "predicate": {

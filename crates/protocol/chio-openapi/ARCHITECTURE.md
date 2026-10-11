@@ -52,14 +52,18 @@ tools over MCP, and dispatching HTTP calls are out of scope and live in
   (URLs, other files) are rejected as `UnresolvedRef`.
 - Path parameters default to required when the document omits `required`;
   other locations default to not required.
-- `sensitivity` and `budget_limit` are parsed onto `ChioExtensions` and are
-  publicly readable, but `ManifestGenerator` does not consume them; only
-  `publish`, `side_effects`, and `approval_required` affect the generated
-  `ToolDefinition`.
+- Present Chio security extensions require their declared types and recognized
+  enum values. Sensitive and Restricted operations require the generated approval
+  annotation and a deny-by-default policy; an explicit false approval hint cannot
+  weaken that default. Admission still requires the owning capability and policy
+  checks.
+- `publish`, `side_effects`, and approval annotations affect generated tools.
+  `budget_limit` is rejected until budget semantics are implemented; it never
+  supplies currency enforcement or a price.
 - `GeneratorConfig.server_id` is stored but not read by `generate_tools`; it
   has no effect on this crate's output.
 - `ToolDefinition.pricing` is always `None`; this crate does not compute
-  pricing from `budget_limit` or elsewhere.
+  pricing from security extensions or elsewhere.
 
 ## Dependencies
 
@@ -68,3 +72,14 @@ this crate produces. `chio-http-core` supplies `HttpMethod`, parsed from the
 OpenAPI method string and consulted by `DefaultPolicy`. `serde`/`serde_json`
 back the JSON model; `serde_yaml` backs YAML parsing; `thiserror` derives
 `OpenApiError`. No dependency aliasing.
+
+## Verification focus
+
+The parser tests cover JSON and YAML input, local reference resolution, required
+path parameters, unsupported parameter locations and external-reference rejection.
+Extension tests reject unknown sensitivity values and retain strict Chio flow
+declarations. Generator tests cover deterministic tool construction, merged
+parameters, request and response schemas, publish exclusion, approval annotations
+and flow preservation. Run `cargo test --locked -p chio-openapi --lib` to check
+these owning boundaries. The crate does not establish runtime admission or
+transport enforcement; those remain the kernel and protocol-edge owners' tests.

@@ -10,7 +10,6 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::capability::{
     attenuation::ScopeHash, crypto_floor::CapabilityCryptoFloor, features::CapabilityNegotiation,
@@ -78,10 +77,9 @@ impl ChioKernelFfiBuffer {
         if bytes.is_empty() {
             return Self::empty();
         }
-        let mut boxed = bytes.into_boxed_slice();
-        let ptr = boxed.as_mut_ptr();
+        let boxed = bytes.into_boxed_slice();
         let len = boxed.len();
-        std::mem::forget(boxed);
+        let ptr = Box::into_raw(boxed).cast::<u8>();
         Self { ptr, len }
     }
 }
@@ -135,17 +133,7 @@ impl KernelFfiError {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct SystemClock;
-
-impl Clock for SystemClock {
-    fn now_unix_secs(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0)
-    }
-}
+use chio_kernel_core::clock::SystemClock;
 
 #[derive(Debug, Deserialize)]
 struct EvaluateRequestEnvelope {
@@ -500,11 +488,12 @@ fn map_signing_error(error: ReceiptSigningError) -> KernelFfiError {
         // over the caller-supplied canonical content preimage inside the trust
         // boundary and produces this variant on a render-A / sign-B mismatch.
         // Surfaced as a distinct, fail-closed signing failure.
-        ReceiptSigningError::ContentHashMismatch { recomputed, claimed } => {
-            KernelFfiError::SigningFailed(format!(
-                "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-            ))
-        }
+        ReceiptSigningError::ContentHashMismatch {
+            recomputed,
+            claimed,
+        } => KernelFfiError::SigningFailed(format!(
+            "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+        )),
         ReceiptSigningError::SigningFailed(message) => KernelFfiError::SigningFailed(message),
     }
 }
@@ -672,17 +661,17 @@ fn verify_capability_with_parts(
         }
     })?;
 
-    let scope_json = serde_json::to_string(&verified.scope)
+    let scope_json = serde_json::to_string(verified.scope())
         .map_err(|error| KernelFfiError::internal("serialize capability scope", error))?;
 
     serialize(&VerifiedCapabilityResponse {
-        id: verified.id,
-        subject_hex: verified.subject_hex,
-        issuer_hex: verified.issuer_hex,
+        id: verified.id().to_owned(),
+        subject_hex: verified.subject_hex().to_owned(),
+        issuer_hex: verified.issuer_hex().to_owned(),
         scope_json,
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
     })
 }
 
@@ -733,12 +722,12 @@ fn verify_passport_json_str(
         })?;
 
     serialize(&PortablePassportResponse {
-        subject: verified.subject,
-        issuer_hex: verified.issuer.to_hex(),
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
-        payload_canonical_hex: hex::encode(&verified.payload_canonical_bytes),
+        subject: verified.subject().to_owned(),
+        issuer_hex: verified.issuer().to_hex(),
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
+        payload_canonical_hex: hex::encode(verified.payload_canonical_bytes()),
     })
 }
 
@@ -773,10 +762,12 @@ pub extern "C" fn chio_kernel_buffer_free(buffer: ChioKernelFfiBuffer) {
     if buffer.ptr.is_null() || buffer.len == 0 {
         return;
     }
-    // SAFETY: all non-empty buffers returned by this crate come from
-    // `Vec::into_boxed_slice` with exactly this pointer and length.
+    // SAFETY: callers return a live buffer from this crate exactly once. Its
+    // pointer and length reconstruct the slice transferred by `Box::into_raw`.
     unsafe {
-        drop(Vec::from_raw_parts(buffer.ptr, buffer.len, buffer.len));
+        drop(Box::from_raw(ptr::slice_from_raw_parts_mut(
+            buffer.ptr, buffer.len,
+        )));
     }
 }
 

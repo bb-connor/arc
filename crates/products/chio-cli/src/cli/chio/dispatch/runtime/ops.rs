@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::CliError;
 
-use super::super::{read_utf8_json_file, unix_now_ms, write_pretty_json};
+use super::super::{read_utf8_json_file, write_pretty_json};
 use super::io::{ensure_runtime_evidence_dir, sorted_child_dirs};
 
 pub(crate) fn cmd_chio_runtime_ops_tick(
@@ -38,7 +38,7 @@ pub(crate) fn cmd_chio_runtime_ops_status(
     let profile = load_runtime_supervisor_profile(supervisor_profile)?;
     let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(store)
         .map_err(|error| CliError::cli_other_error(format!("Chio runtime ops store: {error}")))?;
-    let generated_at = now_unix_ms.unwrap_or_else(unix_now_ms);
+    let generated_at = now_unix_ms.map_or_else(crate::input::time::millis, Ok)?;
     let provider_healthy = provider_bindings
         .map(|path| {
             let bindings = load_runtime_provider_bindings(path)?;
@@ -104,7 +104,7 @@ pub(crate) fn runtime_ops_status_evidence_sink_healthy(
             Err(_) => return Ok(false),
         };
         let manifest: chio_runtime::RuntimeEvidenceManifest =
-            match serde_json::from_str(&manifest_json) {
+            match crate::input::text(&manifest_json) {
                 Ok(manifest) => manifest,
                 Err(_) => return Ok(false),
             };
@@ -174,10 +174,7 @@ pub(crate) fn cmd_chio_runtime_ops_evidence_health(
         &evidence_dir.join("runtime-evidence-manifest.json"),
         "Chio runtime evidence manifest",
     )?;
-    let manifest: chio_runtime::RuntimeEvidenceManifest = serde_json::from_str(&manifest_json)
-        .map_err(|error| {
-            CliError::cli_other_error(format!("Chio runtime evidence manifest: {error}"))
-        })?;
+    let manifest: chio_runtime::RuntimeEvidenceManifest = crate::input::text(&manifest_json)?;
     let health = chio_runtime::generate_runtime_evidence_sink_health_report(
         run_id,
         &evidence_dir,

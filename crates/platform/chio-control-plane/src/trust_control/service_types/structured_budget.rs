@@ -990,7 +990,7 @@ impl StructuredBudgetMutationResponse {
 }
 
 fn projection_from_authorized(
-    value: AuthorizedBudgetHold,
+    value: BudgetHoldAuthorizationRecord,
 ) -> Result<StructuredBudgetProjectionView, String> {
     StructuredBudgetProjectionView::from_parts(
         value.hold_id,

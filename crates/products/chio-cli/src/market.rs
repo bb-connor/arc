@@ -32,7 +32,7 @@ use chio_appraisal::{
 };
 use chio_control_plane::trust_control::TrustControlClient;
 use chio_guard_registry::{GuardPrice, MARKETPLACE_BLOCK_KEY};
-use chio_reputation::{ReputationTier, satisfies_floor};
+use chio_reputation::{satisfies_floor, ReputationTier};
 use chio_underwriting::{
     MarketplaceCreditLimitDecision, MarketplaceCreditLimitRequest, MarketplaceLimitTier,
 };
@@ -115,14 +115,10 @@ pub struct MarketInstallRecord {
 /// Errors raised by the market subcommands.
 #[derive(Debug, thiserror::Error)]
 pub enum MarketError {
-    #[error("market catalog read failed: {0}")]
-    CatalogIo(String),
-    #[error("market catalog parse failed: {0}")]
-    CatalogParse(String),
+    #[error("market input rejected")]
+    Input(#[source] crate::CliError),
     #[error("install record write failed: {0}")]
     InstallIo(String),
-    #[error("install record parse failed: {0}")]
-    InstallRecordParse(String),
     #[error("install record serialize failed: {0}")]
     InstallSerialize(String),
     #[error("guard reference not present in catalog: {0}")]
@@ -168,9 +164,23 @@ impl FiscalMarketplaceRuntime for TrustControlClient {
 }
 
 fn read_catalog(path: &Path) -> Result<Vec<MarketCatalogEntry>, MarketError> {
-    let bytes = fs::read(path).map_err(|err| MarketError::CatalogIo(err.to_string()))?;
+    let bytes = crate::input::read(path).map_err(|err| MarketError::Input(err.into()))?;
     let entries: Vec<MarketCatalogEntry> =
-        serde_json::from_slice(&bytes).map_err(|err| MarketError::CatalogParse(err.to_string()))?;
+        crate::input::json(&bytes).map_err(|err| MarketError::Input(err.into()))?;
+    if entries.len() > crate::input::collection::MAX_ENTRIES {
+        return Err(MarketError::InstallDenied(
+            "market catalog entry limit exceeded".to_owned(),
+        ));
+    }
+    let mut references = std::collections::BTreeSet::new();
+    if entries
+        .iter()
+        .any(|entry| !references.insert(&entry.reference))
+    {
+        return Err(MarketError::InstallDenied(
+            "market catalog contains duplicate references".to_owned(),
+        ));
+    }
     Ok(entries)
 }
 
@@ -426,6 +436,14 @@ fn market_install_with_fiscal(
         .map_err(|err| MarketError::InstallIo(err.to_string()))?
     {
         let mut existing = read_install_record(&install_path)?;
+        if existing.schema != MARKET_INSTALL_REPORT_SCHEMA
+            || existing.tenant_id != tenant.tenant_id
+            || existing.reference != reference
+        {
+            return Err(MarketError::InstallDenied(
+                "retained install record binds a different schema, tenant or guard".to_owned(),
+            ));
+        }
         existing.idempotent_replay = true;
         return Ok(existing);
     }
@@ -434,8 +452,8 @@ fn market_install_with_fiscal(
 }
 
 fn read_install_record(path: &Path) -> Result<MarketInstallRecord, MarketError> {
-    let bytes = fs::read(path).map_err(|err| MarketError::InstallIo(err.to_string()))?;
-    serde_json::from_slice(&bytes).map_err(|err| MarketError::InstallRecordParse(err.to_string()))
+    let bytes = crate::input::read(path).map_err(|err| MarketError::InstallIo(err.to_string()))?;
+    crate::input::json(&bytes).map_err(|err| MarketError::Input(err.into()))
 }
 
 /// Build a non-lossy, traversal-safe filename for an install record.
@@ -667,15 +685,59 @@ mod tests {
     }
 
     #[test]
+    fn retained_install_must_bind_requested_tenant_reference_and_schema() {
+        let dir = tempdir().unwrap();
+        let catalog = write_catalog(dir.path(), &fixture_entries());
+        let bundle = dir.path().join("bundle");
+        let tenant = tenant_ctx(ReputationTier::Tier1);
+        let reference = &fixture_entries()[0].reference;
+        let record = market_install_with_fiscal(
+            &catalog,
+            &bundle,
+            &tenant,
+            reference,
+            false,
+            &BootstrapFiscal,
+        )
+        .unwrap();
+        let path = install_record_path(&bundle, &tenant.tenant_id, reference);
+        for field in ["tenant_id", "reference", "schema"] {
+            let mut value = serde_json::to_value(&record).unwrap();
+            value[field] = serde_json::json!("different");
+            let bytes = serde_json::to_vec(&value).unwrap();
+            fs::write(&path, &bytes).unwrap();
+            let error = market_install_with_fiscal(
+                &catalog,
+                &bundle,
+                &tenant,
+                reference,
+                false,
+                &BootstrapFiscal,
+            )
+            .unwrap_err();
+            assert!(matches!(error, MarketError::InstallDenied(_)), "{error}");
+            assert_eq!(fs::read(&path).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn duplicate_catalog_references_are_rejected() {
+        let dir = tempdir().unwrap();
+        let entry = fixture_entries().remove(0);
+        let catalog = write_catalog(dir.path(), &[entry.clone(), entry]);
+        assert!(matches!(
+            read_catalog(&catalog),
+            Err(MarketError::InstallDenied(_))
+        ));
+    }
+
+    #[test]
     fn list_filters_by_reputation_tier() {
         let dir = tempdir().expect("tmpdir");
         let path = write_catalog(dir.path(), &fixture_entries());
-        let report = market_list_with_fiscal(
-            &path,
-            &tenant_ctx(ReputationTier::Tier0),
-            &BootstrapFiscal,
-        )
-        .expect("list runs");
+        let report =
+            market_list_with_fiscal(&path, &tenant_ctx(ReputationTier::Tier0), &BootstrapFiscal)
+                .expect("list runs");
         assert_eq!(report.entries.len(), 1);
         assert_eq!(report.entries[0].name, "pii-mask");
     }
@@ -684,12 +746,9 @@ mod tests {
     fn list_includes_higher_floor_for_higher_tier() {
         let dir = tempdir().expect("tmpdir");
         let path = write_catalog(dir.path(), &fixture_entries());
-        let report = market_list_with_fiscal(
-            &path,
-            &tenant_ctx(ReputationTier::Tier3),
-            &BootstrapFiscal,
-        )
-        .expect("list runs");
+        let report =
+            market_list_with_fiscal(&path, &tenant_ctx(ReputationTier::Tier3), &BootstrapFiscal)
+                .expect("list runs");
         assert_eq!(report.entries.len(), 2);
         // Sorted lexically by reference.
         assert!(report.entries[0].reference < report.entries[1].reference);
@@ -808,7 +867,7 @@ mod tests {
         .expect("install runs");
         assert!(!first.idempotent_replay);
         let path = install_record_path(&bundle, &tenant.tenant_id, reference);
-        let original_bytes = fs::read(&path).expect("read install record");
+        let original_bytes = crate::input::read(&path).expect("read install record");
 
         let second = market_install_with_fiscal(
             &catalog,
@@ -820,7 +879,7 @@ mod tests {
         )
         .expect("re-install runs");
         assert!(second.idempotent_replay);
-        let replay_bytes = fs::read(&path).expect("read replayed install record");
+        let replay_bytes = crate::input::read(&path).expect("read replayed install record");
         assert_eq!(
             original_bytes, replay_bytes,
             "idempotent replay must not rewrite the existing install record"

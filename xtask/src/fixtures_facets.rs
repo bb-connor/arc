@@ -17,7 +17,15 @@ impl ScratchDir {
             scratch_counter()
         );
         path.push(unique);
-        fs::create_dir_all(&path).map_err(|err| XtaskError::Io(display(&path), err))?;
+        let mut builder = fs::DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder
+            .create(&path)
+            .map_err(|err| XtaskError::Io(display(&path), err))?;
         Ok(Self { path })
     }
 
@@ -1487,7 +1495,34 @@ fn write_signing_key(path: &Path) -> Result<(), XtaskError> {
         "kernelId": "did:chio:dataco",
         "seedHex": "01".repeat(32),
     });
-    write_json(path, &key)
+    let mut bytes =
+        serde_json::to_vec_pretty(&key).map_err(|err| XtaskError::Json(display(path), err))?;
+    bytes.push(b'\n');
+    write_private_fixture(path, &bytes)
+}
+
+// Seed fixtures are public test data, but their custody must exercise the same
+// owner-only, regular, single-link file contract as the production reader.
+fn write_private_fixture(path: &Path, bytes: &[u8]) -> Result<(), XtaskError> {
+    use std::io::Write;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|err| XtaskError::Io(display(path), err))?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|err| XtaskError::Io(display(path), err))
+}
+
+fn stage_signing_fixture(source: &Path, destination: &Path) -> Result<(), XtaskError> {
+    let bytes = fs::read(source).map_err(|err| XtaskError::Io(display(source), err))?;
+    write_private_fixture(destination, &bytes)
 }
 
 fn cmp_files(left: &Path, right: &Path) -> Result<(), XtaskError> {

@@ -302,7 +302,7 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
             return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string());
         }
     };
-    let Some(receipt_db_path) = state.config.receipt_db_path.as_deref() else {
+    let Some(receipt_store) = state.receipt_store.as_deref() else {
         return plain_http_error(
             StatusCode::CONFLICT,
             "trust control service requires --receipt-db for marketplace credit limits",
@@ -314,9 +314,9 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
-    let inspection = match issuance::inspect_local_reputation_with_read_context(
+    let inspection = match issuance::inspect_local_reputation_with_store(
         &request.tenant_id,
-        Some(receipt_db_path),
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         None,
         None,
@@ -372,7 +372,8 @@ fn fiscal_operation_error(error: TrustFiscalOperationError) -> Response {
     let status = match &error {
         TrustFiscalOperationError::InvalidArtifact(_) => StatusCode::UNPROCESSABLE_ENTITY,
         TrustFiscalOperationError::Store(FiscalStoreError::Conflict) => StatusCode::CONFLICT,
-        TrustFiscalOperationError::Startup(_)
+        TrustFiscalOperationError::Clock(_)
+        | TrustFiscalOperationError::Startup(_)
         | TrustFiscalOperationError::Store(_)
         | TrustFiscalOperationError::Commit(_) => StatusCode::SERVICE_UNAVAILABLE,
     };

@@ -1,0 +1,196 @@
+{
+  "schema": "chio.final-repair-review-intake.v1",
+  "observed_at": "2026-10-10T07:42:54.986323+00:00",
+  "source_stage": "af0901caaeed06a11a572c6fc8dfefa114a5b97f",
+  "published_candidate": "633cf1d2f6b4a35008beb4b165c357fc42046251",
+  "published_status": "withdrawn",
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "review_findings": [
+    {
+      "id": "FINAL-BUDGET-LIST-SEQUENCE",
+      "priority": "P1",
+      "classification": "introduced-in-unpublished-repair",
+      "contract": "The real budget list endpoint must return its persisted sequence in the existing optional field so an incomplete versioned client projection can hydrate through the actual public endpoint.",
+      "state": "repair-in-progress",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/independent-review-v1.md",
+          "sha256": "37759de5a52d3db661f370cdbe836a7f78e8402018cec6d6bdfbdd8aa3067286"
+        },
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/frozen-v2-source.json",
+          "sha256": "b8b444c5eb9e0b816d70f1ac2439313b1b1ab80b14807299106fd6a8213d7a54"
+        },
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/hydration-router-red-v2.json",
+          "sha256": "6029d56e4bf8c69a5da44130907431d79c347e54c7b3ccb25cf06ca14ec91985"
+        }
+      ]
+    },
+    {
+      "id": "FINAL-BUDGET-REPLAY-REFUSAL-CACHE",
+      "priority": "P2",
+      "classification": "inherited-production-refusal-side-effect",
+      "contract": "Capture and cancellation responses with ambiguous replay decisions must refuse before any cache mutation, on both fresh and complete existing caches.",
+      "state": "repair-in-progress",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/independent-review-v1.md",
+          "sha256": "37759de5a52d3db661f370cdbe836a7f78e8402018cec6d6bdfbdd8aa3067286"
+        },
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/frozen-v3-decision-original-source.json",
+          "sha256": "f0cb239918dd208e9b6a71b6a1d3972b46fa01f93679d86cf9d16053193c2785"
+        },
+        {
+          "path": "/tmp/pr1160-legacy-hold-projection-20261010/decision-original-v3.json",
+          "sha256": "406232bad786cf7326addbf989461811a6990c39899b64d97d3d516086b9d365"
+        }
+      ]
+    },
+    {
+      "id": "FINAL-CLI-SEED-PUBLICATION",
+      "priority": "P2",
+      "classification": "introduced-in-unpublished-repair",
+      "contract": "Concurrent explicit local issuers must publish a fresh seed without replacing an existing winner. A losing publisher must strictly validate existing custody; reads and remote calls remain existing-only.",
+      "state": "repair-in-progress",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-source-frozen-v1.json",
+          "sha256": "88b0a5ec87999de7e8f3473055430655d2e6e710b14a8f4d9c41d3a50f213999"
+        },
+        {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/original-real-owner-race-v1/result.json",
+          "sha256": "74fec58560a825ffdcbe436b92aac8fe69cc9a35c639b3480fb391afbc3d48cf"
+        },
+        {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/race-validity-control.result.json",
+          "sha256": "6b9a1827651597658dcaadf0bdbe6f671b9f2c3abec836b581191fef5c6d3726"
+        }
+      ]
+    },
+    {
+      "id": "FINAL-CLI-SIGNED-READ-FIXTURES",
+      "priority": "P2",
+      "classification": "confirmed-required-ci-fixture",
+      "contract": "Five signed-read fixtures selecting their own authority database must explicitly provision it as owner before reading, while retaining existing backend and output assertions and production missing-custody refusal.",
+      "state": "repair-in-progress",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/signed-read-fixture-inventory.json",
+          "sha256": "5768dbb1e44aaaa5abfd89e0f82473ed47405008f2f7bf3eba7a0b170e071d20"
+        },
+        {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/originals-signed-reads-v1.result.json",
+          "sha256": "ea818b453d8a9b78ef318b3d4f6bf8c1e9d69e1ce070170bea3be804feedccee"
+        }
+      ]
+    }
+  ],
+  "cli_wrong_reason_run": {
+    "record": {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-focused-v1.result.json",
+      "sha256": "98c0dd96bff232faa3282e0fc346f5e9c5d14a8d1dca8d510bfa4a4e652ec2d9"
+    },
+    "classification": "failed; existing certify13PASS1ignored, new custody0PASS9FAIL because fixture omitted required provenance.sourceRef; the nine failures are not valid custody regression witnesses",
+    "remaining": "Correct only input fixture, preserve strict parsing and reexecute intended controls."
+  },
+  "fixture_integration": {
+    "handoff": {
+      "path": "/tmp/pr1160-replication-envelope-fixture-20261010/immutable-handoff.json",
+      "sha256": "630241ba6abfd9dcee0f7d998b10cf3bfeb8d98be3f9c7c4fc021d618dfccc1d"
+    },
+    "integration": {
+      "path": "/tmp/pr1160-replication-envelope-fixture-20261010/integration.json",
+      "sha256": "f4e207764baac3e623afdb7a9c56ac9e828ecb2f62aa6748a41163875b537ed9"
+    },
+    "verified_artifacts": 73,
+    "source_objects": {
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_replication.rs": {
+        "git_blob": "992c9f68d951933c688f9d7a79dd8f25817af500",
+        "sha256": "9bc2fbefaa2ff2096da551a20ec123bd0a7d685d77710eaa4d250ba188958884"
+      },
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/attestation_authentication_tests.rs": {
+        "git_blob": "6b2dd4cdedf6daec53813566b430d0093cc5b1d4",
+        "sha256": "b2e30f3c8000c56e821ebd38b1f70af869074c7cdd5e03bcfcc840c784496339"
+      }
+    },
+    "acceptance": {
+      "unique_focused_controls": 8,
+      "families": "replication5,lifecycle1,attestation1,existing seed-loss request refusal1",
+      "repeat_iterations": 20,
+      "replication_controls_per_iteration": 5,
+      "repeat_threads": 8,
+      "repeat_counts_overlap_unique_controls": true,
+      "all_28_commands_exit_zero_and_source_stable": true,
+      "strict": "chio-control-plane --all-targets -- -D warnings PASS",
+      "static": "negative assertions, Rust file hygiene, security clocks, fmt and diff checks PASS",
+      "independent_source_review": "Root accepted both test-only diffs during frozen qualification; separate from producer verification"
+    },
+    "remaining": "Final combined candidate review, composition and protected hosted checks."
+  },
+  "archived_current_states": {
+    "incoming-pr1160-final-qualification-20261010:FINAL-REPLICATION-ENVELOPE-FIXTURE": {
+      "requirement_id": "incoming-pr1160-final-qualification-20261010:FINAL-REPLICATION-ENVELOPE-FIXTURE",
+      "label": "FINAL-REPLICATION-ENVELOPE-FIXTURE",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-candidate-withdrawal-20261010.json",
+          "sha256": "d5b23a834627116e44efcca2bfb3fdea5efa110a43c11b3fe75ead50027a42c9",
+          "source_commit": "372639e706b2a37f4ab13f365c638395e5c9d336",
+          "scope": "Withdrawn633cf failures retained; five obligations tracked. Only smoke component repaired, no candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete four open repairs with genuine Original witnesses, owning runtime and strict lint.",
+        "Independently review new production CLI and budget-cache repairs; compose all source changes and renew metadata.",
+        "Preserve failed, partial, cancelled and ignored evidence separately. Prior independent report does not clear subsequent runtime failures.",
+        "Publish a replacement only after local boundary qualification; require all four protected exact-source hosted checks and normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 preview gate. No proof campaign or release-readiness claim."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "5cb7ec5ee4791d56ab2407b31178d8145f25f830"
+    },
+    "incoming-pr1160-final-qualification-20261010:FINAL-ATTESTATION-ISSUANCE-FIXTURE": {
+      "requirement_id": "incoming-pr1160-final-qualification-20261010:FINAL-ATTESTATION-ISSUANCE-FIXTURE",
+      "label": "FINAL-ATTESTATION-ISSUANCE-FIXTURE",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-candidate-withdrawal-20261010.json",
+          "sha256": "d5b23a834627116e44efcca2bfb3fdea5efa110a43c11b3fe75ead50027a42c9",
+          "source_commit": "372639e706b2a37f4ab13f365c638395e5c9d336",
+          "scope": "Withdrawn633cf failures retained; five obligations tracked. Only smoke component repaired, no candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete four open repairs with genuine Original witnesses, owning runtime and strict lint.",
+        "Independently review new production CLI and budget-cache repairs; compose all source changes and renew metadata.",
+        "Preserve failed, partial, cancelled and ignored evidence separately. Prior independent report does not clear subsequent runtime failures.",
+        "Publish a replacement only after local boundary qualification; require all four protected exact-source hosted checks and normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 preview gate. No proof campaign or release-readiness claim."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "5cb7ec5ee4791d56ab2407b31178d8145f25f830"
+    }
+  },
+  "rulings": [
+    "CLI authority configuration refusal creates no authority custody; existing receipt preflight can create its receipt DB. Later semantic refusal may retain explicitly initialized custody, never signed output.",
+    "Budget P1 populates existing optional sequence from persisted usage; no schema or wire-type change. P2 validates endpoint-specific decision before cache commit.",
+    "CLI concurrency evidence uses two owned local children and real publication calls with an external timing-only fixture. No test interceptor is shipped.",
+    "Failed, ignored, partial and cancelled evidence remains distinct. KANI-PROOF-QUAL stays OPEN/UNPROVED; SEC-1160-COLDSTATE stays OPEN P1 before G5. No proof execution or release claim."
+  ]
+}

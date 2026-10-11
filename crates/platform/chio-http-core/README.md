@@ -8,6 +8,15 @@ verdict and a signed receipt. The crate ships no HTTP server; substrate
 adapters (`chio-tower`, `chio-api-protect`, hosted sidecars, framework
 middleware) wire these types and handlers into their own routing layer.
 
+`HttpAuthority` rejects signed capabilities carrying `BindSecurityContext`.
+Its HTTP projection mints an internal capability and has no authenticated
+bridge for the original workload, tenant, session, or context generation.
+Caller/session labels, including matching values, do not satisfy that contract.
+The token is denied even on a `SessionAllow` route. Ordinary unbound capabilities
+retain their existing validation. Context-bound access requires a native kernel
+dispatch path that preserves and authenticates the context; HTTP support remains
+unavailable.
+
 ## Responsibilities
 
 - Define the shared wire types every substrate adapter needs: `ChioHttpRequest`,

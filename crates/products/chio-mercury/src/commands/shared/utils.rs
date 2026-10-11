@@ -19,10 +19,14 @@ pub(crate) fn unique_temp_dir(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{stamp}-{}", std::process::id()))
 }
 
-pub(crate) fn read_json_file<T: for<'de> serde::Deserialize<'de>>(
-    path: &Path,
-) -> Result<T, CliError> {
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+/// Decodes with the signed-wire contract: a duplicate object key at any depth
+/// rejects before typed projection, so embedded receipts are checked against
+/// the bytes that were read.
+pub(crate) fn read_json_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
+    let bytes = fs::read(path)?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|error| CliError::Other(format!("{} is not UTF-8: {error}", path.display())))?;
+    Ok(chio_core::canonical::UntrustedJsonText::new(text).decode_signed()?)
 }
 
 pub(crate) fn write_json_file<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {

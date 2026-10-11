@@ -5,16 +5,16 @@ use std::thread;
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::budget_store::{
-    ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAdmissionBinding,
-    BudgetAuthorizeCumulativeApprovalRequest, BudgetAuthorizeHoldDecision,
-    BudgetAuthorizeHoldRequest, BudgetCancelCapturedBeforeDispatchRequest,
-    BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
-    BudgetCapturedBeforeDispatchCancellationDecision, BudgetCumulativeApprovalAccountKey,
-    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
-    BudgetCumulativeApprovalState, BudgetEventAuthority, BudgetGuaranteeLevel,
-    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
-    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
-    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    ApprovalRequiredBudgetHold, BudgetAdmissionBinding, BudgetAuthorizeCumulativeApprovalRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
+    BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAuthorizationDecision,
+    BudgetCumulativeApprovalRequest, BudgetCumulativeApprovalState, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldAuthorizationRecord, BudgetHoldMutationDecision,
+    BudgetInvocationCaptureDecision, BudgetInvocationQuota, BudgetInvocationQuotaUsage,
+    BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetQuotaKey,
+    BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
     BudgetReverseHoldRequest, DeniedBudgetHold, RevocationCommitMetadata,
     MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
@@ -194,7 +194,7 @@ fn cumulative_request(
     request
 }
 
-fn expect_authorized(decision: BudgetAuthorizeHoldDecision) -> AuthorizedBudgetHold {
+fn expect_authorized(decision: BudgetAuthorizeHoldDecision) -> BudgetHoldAuthorizationRecord {
     match decision {
         BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
         other => panic!("expected authorized hold, got {other:?}"),

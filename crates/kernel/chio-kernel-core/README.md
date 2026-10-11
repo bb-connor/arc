@@ -14,6 +14,14 @@ directly when you need enforcement logic on a constrained or non-native
 target; the portable-kernel contract is documented in
 `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`.
 
+Portable `evaluate` entry points reject signed capabilities carrying
+`BindSecurityContext` before guards or budget admission because `EvaluateInput`
+has no authoritative security invocation context. Pure `verify_capability`
+entry points remain cryptographic verification only and are used by the native
+kernel, which retains the original token and separately enforces its context.
+A `VerifiedCapability` alone does not authorize context-bound dispatch. This
+containment does not add a portable context bridge or alter other caveat checks.
+
 ## Responsibilities
 
 - Evaluate a `(capability, request, guards)` tuple to an Allow/Deny verdict:
@@ -43,7 +51,7 @@ target; the portable-kernel contract is documented in
 | `capability_verify` | `verify_capability`, `verify_capability_with_floor`, `verify_capability_with_floor_and_trust_root`, `verify_capability_with_floor_and_resolver`, `verify_capability_full`, `VerifiedCapability`, `CapabilityError`, `TrustRootResolver` |
 | `guard` | `Guard`, `GuardContext`, `PortableToolCallRequest` |
 | `scope` | `resolve_matching_grants`, `resolve_capability_grants`, `MatchedGrant`, `ScopeMatchError` |
-| `budget_split` | `BudgetRegistry`, `BudgetSplit`, `InMemoryBudgetRegistry`, `NoopBudgetRegistry`, `MAX_BUDGET_SHARE_BPS`, `BudgetSplitError` |
+| `budget_split` | `BudgetRegistry`, `BudgetSplit`, `InMemoryBudgetRegistry`, `NoopBudgetRegistry`, `MAX_BUDGET_SHARE_BPS`, `MAX_CHILDREN_PER_PARENT`, `MAX_RETAINED_CHILD_ID_BYTES`, `MAX_BUDGET_PARENTS`, `MAX_REGISTRY_CHILD_EDGES`, `MAX_REGISTRY_RETAINED_ID_BYTES`, `BudgetSplitError` |
 | `receipts` | `sign_receipt`, `sign_receipt_with_handle`, `sign_receipt_relaying_trusted_body`, `ReceiptSigningError` |
 | `passport_verify` | `verify_passport`, `verify_parsed_passport`, `PortablePassportEnvelope`, `VerifiedPassport`, `VerifyError`, `PORTABLE_PASSPORT_SCHEMA` |
 | `normalized` | `NormalizedEvaluationVerdict`, `NormalizedVerifiedCapability`, `NormalizedScope`, `NormalizedCapability`, `NormalizationError` |
@@ -52,6 +60,14 @@ target; the portable-kernel contract is documented in
 
 `Verdict` (`Allow` / `Deny` / `PendingApproval`) lives at the crate root; the
 core itself only ever produces the first two.
+
+`verify_capability_full_with_evidence` accepts a `CapabilityEvidenceContext`
+containing original signed ancestors for narrowed recursive chains. It checks
+each ancestor and scope transition before admitting a budget. The matching
+`evaluate_with_full_floor_and_evidence` entry point also evaluates subject,
+scope and guards. Existing entry points continue to reject narrowed multi-hop
+chains without this evidence. See `tests/signed_lineage.rs`; these behavioral
+tests do not extend the bounded formal-proof claims to the new lineage code.
 
 ## Feature flags
 

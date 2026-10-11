@@ -2,6 +2,46 @@ use super::*;
 use std::os::unix::fs::symlink;
 
 #[test]
+fn private_initialization_replay_requires_existing_private_custody() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("private.json");
+    let bytes = b"private fixture";
+    write_secret_exact_or_new(&path, bytes).unwrap();
+    write_secret_exact_or_new(&path, bytes).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+    let error = write_secret_exact_or_new(&path, bytes).unwrap_err();
+    assert_eq!(
+        error.report().message,
+        "authority seed must be singly linked with mode 0600 or stricter"
+    );
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o644
+    );
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+#[test]
+fn public_initialization_replay_keeps_public_mode_and_binds_content() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("public.json");
+    write_public_exact_or_new(&path, b"public fixture").unwrap();
+    write_public_exact_or_new(&path, b"public fixture").unwrap();
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o644
+    );
+    let error = write_public_exact_or_new(&path, b"changed fixture").unwrap_err();
+    assert!(error
+        .report()
+        .message
+        .contains("different initialization data"));
+    assert_eq!(fs::read(&path).unwrap(), b"public fixture");
+}
+
+#[test]
 fn seller_repository_is_confined_to_the_configured_root() {
     let temporary = tempfile::tempdir().unwrap();
     let approved_root = temporary.path().join("approved");

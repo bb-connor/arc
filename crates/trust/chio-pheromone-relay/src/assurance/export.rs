@@ -497,5 +497,5 @@ pub(crate) fn export_artifact_from_json<T: DeserializeOwned>(
         .ok_or_else(|| {
             PheromoneRelayError::BodyHashMismatch(format!("artifact {role} file is missing"))
         })?;
-    Ok(serde_json::from_slice(&file.bytes)?)
+    Ok(crate::input::decode(&file.bytes)?)
 }

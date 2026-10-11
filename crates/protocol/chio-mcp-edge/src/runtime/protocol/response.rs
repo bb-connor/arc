@@ -105,6 +105,7 @@ pub(in crate::runtime) fn write_jsonrpc_line(
     Ok(())
 }
 
+#[cfg(test)]
 pub(in crate::runtime) fn read_jsonrpc_line(
     reader: &mut impl BufRead,
 ) -> Result<Value, AdapterError> {

@@ -14,7 +14,8 @@ pub(crate) fn settlement_reconciliation_state_text(
 pub(crate) fn parse_settlement_reconciliation_state(
     value: &str,
 ) -> Result<SettlementReconciliationState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn metered_billing_reconciliation_state_text(
@@ -31,7 +32,8 @@ pub(crate) fn metered_billing_reconciliation_state_text(
 pub(crate) fn parse_metered_billing_reconciliation_state(
     value: &str,
 ) -> Result<MeteredBillingReconciliationState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn underwriting_decision_outcome_label(
@@ -149,25 +151,29 @@ pub(crate) fn credit_loss_lifecycle_event_kind_label(
 pub(crate) fn parse_underwriting_lifecycle_state(
     value: &str,
 ) -> Result<UnderwritingDecisionLifecycleState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn parse_credit_facility_lifecycle_state(
     value: &str,
 ) -> Result<CreditFacilityLifecycleState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn parse_credit_bond_lifecycle_state(
     value: &str,
 ) -> Result<CreditBondLifecycleState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn parse_liability_provider_lifecycle_state(
     value: &str,
 ) -> Result<LiabilityProviderLifecycleState, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn liability_quote_disposition_label(

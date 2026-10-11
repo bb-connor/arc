@@ -65,3 +65,9 @@ isolation, structured JSON-RPC error responses, and receipt export into
   server; does not host.
 - `chio-mcp-edge` - hosts a Chio-native tool server over MCP transports; not
   the remote HTTP path.
+
+HTTP/auth/session/receipt integration scenarios live under
+`chio-mcp-remote/src/remote_mcp/hosted_tests`, where test-only transports can
+exercise the implementation without creating native launch authority. This
+facade retains a reexport contract test. Production native launches require
+`CageRequiredLaunch`; inactive provisioning stages cannot launch processes.

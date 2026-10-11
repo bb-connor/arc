@@ -1,7 +1,7 @@
 //! `extensions.chio` tests.
 //!
 //! The `chio` slot on `Extensions` carries chio-specific semantics (market
-//! hours, signing, k8s namespaces, rollback, expression-based approval) that
+//! hours, signing, k8s namespaces, rollback and threshold approval) that
 //! the Chio kernel does not interpret directly. The kernel accepts the block
 //! as passthrough; chio-bridge interprets it.
 
@@ -107,8 +107,6 @@ hushspec: "0.1.0"
 extensions:
   chio:
     human_in_loop:
-      approve_when:
-        - "tool == 'ticket.refund' and amount > 10000"
       approvers:
         n: 2
         of: ["alice", "bob", "carol"]
@@ -117,7 +115,7 @@ extensions:
     );
     let chio = spec.extensions.and_then(|e| e.chio).expect("chio");
     let hil = chio.human_in_loop.expect("chio hil");
-    assert_eq!(hil.approve_when.len(), 1);
+    assert!(hil.approve_when.is_empty());
     let approvers = hil.approvers.expect("approvers");
     assert_eq!(approvers.n, 2);
     assert_eq!(approvers.of.len(), 3);

@@ -6,7 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-expected_version="0.67.0"
+expected_version="0.68.0"
 if [[ -n "${CHIO_KANI_VERSION:-}" && "${CHIO_KANI_VERSION}" != "${expected_version}" ]]; then
   echo "kani-mutant-killer: CHIO_KANI_VERSION must remain ${expected_version}" >&2
   exit 2

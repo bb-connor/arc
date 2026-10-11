@@ -80,6 +80,9 @@ expected_top_level = {
     "crate",
     "script",
     "unwinding_checks",
+    "cover_required",
+    "memcmp_unwind",
+    "public_key_eq_unwind",
     "harness_groups",
     "covered_symbols",
     "lanes",
@@ -109,6 +112,28 @@ if not isinstance(unwinding_checks, list) or not all(
 if len(set(unwinding_checks)) != len(unwinding_checks):
     raise SystemExit("check-kani-public-core.sh: duplicate unwinding_checks entry")
 
+cover_required = data.get("cover_required", [])
+if not isinstance(cover_required, list) or not all(
+    isinstance(name, str) and name for name in cover_required
+):
+    raise SystemExit("check-kani-public-core.sh: cover_required must be a string list")
+if len(set(cover_required)) != len(cover_required):
+    raise SystemExit("check-kani-public-core.sh: duplicate cover_required entry")
+if not set(cover_required) <= set(unwinding_checks):
+    raise SystemExit("check-kani-public-core.sh: required covers need unwinding checks")
+memcmp_unwind = data.get("memcmp_unwind")
+if not isinstance(memcmp_unwind, dict) or any(
+    name not in cover_required or type(bound) is not int or not 1 <= bound <= 2**32 - 1
+    for name, bound in memcmp_unwind.items()
+):
+    raise SystemExit("check-kani-public-core.sh: invalid checked memcmp bounds")
+public_key_eq_unwind = data.get("public_key_eq_unwind")
+if not isinstance(public_key_eq_unwind, dict) or any(
+    name not in cover_required or name in memcmp_unwind
+    or type(bound) is not int or not 1 <= bound <= 2**32 - 1
+    for name, bound in public_key_eq_unwind.items()
+):
+    raise SystemExit("check-kani-public-core.sh: invalid checked key recursion bounds")
 all_harnesses = []
 lane_harnesses_by_name = {}
 seen = set()
@@ -190,6 +215,8 @@ if unknown_checks:
 
 print("\n".join(
     f"{name}\t{'true' if name in unwinding_checks else 'false'}"
+    f"\t{'true' if name in cover_required else 'false'}\t{memcmp_unwind.get(name, '-')}"
+    f"\t{public_key_eq_unwind.get(name, '-')}"
     for name in harnesses
 ))
 PY
@@ -210,17 +237,31 @@ if ! cargo kani --version >/dev/null 2>&1; then
 fi
 
 COUNT=0
-while IFS=$'\t' read -r harness unwinding_checks; do
+while IFS=$'\t' read -r harness unwinding_checks require_cover memcmp_unwind public_key_eq_unwind; do
   [[ -n "$harness" ]] || continue
   echo "::group::cargo kani --harness ${harness}"
   args=(
-    -p chio-kernel-core --lib --harness "$harness"
-    --default-unwind 8
+    -p chio-kernel-core --features kani --lib --harness "kani_public_harnesses::${harness}" --exact
   )
+  if [[ "$memcmp_unwind" == "-" && "$public_key_eq_unwind" == "-" ]]; then
+    args+=(--default-unwind 8)
+  fi
   if [[ "$unwinding_checks" != "true" ]]; then
     args+=(--no-unwinding-checks)
   fi
-  cargo kani "${args[@]}"
+  if [[ "$memcmp_unwind" != "-" ]]; then
+    args+=(-Z unstable-options --cbmc-args --unwindset "memcmp.0:${memcmp_unwind}")
+  fi
+  if [[ "$require_cover" == "true" ]]; then
+    cover_args=()
+    if [[ "$public_key_eq_unwind" != "-" ]]; then
+      cover_args+=(--public-key-eq-unwind "$public_key_eq_unwind")
+    fi
+    if [[ "${#cover_args[@]}" -gt 0 ]]; then cover_args+=(--); fi
+    bash scripts/run-kani-with-cover.sh "kani_public_harnesses::${harness}" "${cover_args[@]}" cargo kani "${args[@]}"
+  else
+    cargo kani "${args[@]}"
+  fi
   echo "::endgroup::"
   COUNT=$((COUNT + 1))
 done <<< "$HARNESSES"

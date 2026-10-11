@@ -93,6 +93,12 @@ pub(super) fn verify_treaty_dsse_evidence(
             "bilateral DSSE governance refs do not match the verifier-owned admission bundle",
         );
     }
+    let [signer_a, signer_b] = treaty.signer_kernel_ids.as_slice() else {
+        return rejected(
+            "chio_treaty_dsse_binding_mismatch",
+            "bilateral DSSE evidence requires exactly two signers",
+        );
+    };
     let participants: BTreeSet<_> = review.treaty_scope.participant_kernel_ids.iter().collect();
     let signers: BTreeSet<_> = treaty.signer_kernel_ids.iter().collect();
     if review.treaty_scope.participant_kernel_ids.len() != 2 || treaty.signer_kernel_ids.len() != 2
@@ -108,10 +114,8 @@ pub(super) fn verify_treaty_dsse_evidence(
             "bilateral DSSE signer set does not match treaty participants",
         );
     }
-    let signer_a_public_key =
-        treaty_participant_public_key(review.treaty_scope, &treaty.signer_kernel_ids[0])?;
-    let signer_b_public_key =
-        treaty_participant_public_key(review.treaty_scope, &treaty.signer_kernel_ids[1])?;
+    let signer_a_public_key = treaty_participant_public_key(review.treaty_scope, signer_a)?;
+    let signer_b_public_key = treaty_participant_public_key(review.treaty_scope, signer_b)?;
     if signer_a_public_key == signer_b_public_key {
         return rejected(
             "chio_treaty_unverified_required_evidence",

@@ -1149,10 +1149,10 @@ fn terminal_advance_fixture_with_charge(
                     grant_index: 0,
                     cost_charged: actual_charge.units,
                     currency: actual_charge.currency.clone(),
-                    budget_remaining: 150_u64
+                    budget_remaining: Some(150_u64
                         .checked_sub(actual_charge.units)
-                        .ok_or(ChannelError::ArithmeticOverflow)?,
-                    budget_total: 150,
+                        .ok_or(ChannelError::ArithmeticOverflow)?),
+                    budget_total: Some(150),
                     delegation_depth: 0,
                     root_budget_holder: fixture.trust.payer_id.clone(),
                     payment_reference: None,

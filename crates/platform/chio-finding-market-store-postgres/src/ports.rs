@@ -128,8 +128,10 @@ const fn write_outcome(outcome: HostedJobWriteOutcome) -> HostedPortWriteOutcome
     }
 }
 
-const fn map_error(error: HostedMarketStoreError) -> HostedMarketPortError {
+fn map_error(error: HostedMarketStoreError) -> HostedMarketPortError {
     match error {
+        HostedMarketStoreError::InvalidInput(source) => HostedMarketPortError::InvalidInput(source),
+        HostedMarketStoreError::CorruptInput(source) => HostedMarketPortError::CorruptInput(source),
         HostedMarketStoreError::Configuration
         | HostedMarketStoreError::MigrationDrift
         | HostedMarketStoreError::Unavailable => HostedMarketPortError::Unavailable,

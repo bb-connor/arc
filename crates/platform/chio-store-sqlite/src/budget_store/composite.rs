@@ -1,9 +1,22 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use rusqlite::{params, Connection, Transaction};
 
+mod admission_custody;
+mod caller_resume;
 mod cumulative_model;
 mod event_projection;
 mod model;
+mod native_capture;
+mod nonce;
+mod preflight;
+pub(crate) use nonce::{
+    verify_compensated_budget_hold_tx, verify_nonce_budget_phase_tx, NonceBudgetPhase,
+};
+pub(crate) use preflight::{
+    preflight_authorization_commit_index, verify_preflight_hold,
+    NoncePreflightAuthorizationBinding, NoncePreflightHoldState,
+};
 mod transitions;
 
 pub(crate) use transitions::AdmissionCaptureBinding;
@@ -14,14 +27,18 @@ use model::*;
 use transitions::*;
 use validation::*;
 
-#[derive(Clone, Copy)]
-pub(crate) struct AdmissionAuthorizationBinding<'a> {
+pub(crate) struct AdmissionAuthorizationBinding<'a, 'l> {
     pub(crate) operation: &'a chio_kernel::admission_operation::AdmissionOperationV1,
-    pub(crate) recovery_lease: &'a chio_kernel::admission_operation::AdmissionRecoveryLease,
+    pub(crate) recovery: crate::admission_operation_store::RecoveryAuthority<'a, 'l>,
     pub(crate) payment_journal: Option<&'a PaymentJournalRecord>,
     pub(crate) credit_exposure:
         Option<&'a chio_credit::obligation::CreditExposureReservationRequest>,
     pub(crate) trusted_now_unix_ms: u64,
+}
+
+enum AuthorizationParticipant<'a, 'l> {
+    Executable(AdmissionAuthorizationBinding<'a, 'l>),
+    NoncePreflight(NoncePreflightAuthorizationBinding<'a>),
 }
 
 impl SqliteBudgetStore {
@@ -110,7 +127,7 @@ impl SqliteBudgetStore {
     pub(crate) fn authorize_composite_hold_and_commit_admission(
         &self,
         request: BudgetAuthorizeHoldRequest,
-        binding: AdmissionAuthorizationBinding<'_>,
+        binding: AdmissionAuthorizationBinding<'_, '_>,
     ) -> Result<
         (
             BudgetAuthorizeHoldDecision,
@@ -118,7 +135,10 @@ impl SqliteBudgetStore {
         ),
         BudgetStoreError,
     > {
-        let (decision, operation) = self.authorize_composite_hold_inner(request, Some(binding))?;
+        let (decision, operation) = self.authorize_composite_hold_inner(
+            request,
+            Some(AuthorizationParticipant::Executable(binding)),
+        )?;
         let operation = operation.ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "combined budget authorization omitted its admission operation".to_owned(),
@@ -130,7 +150,7 @@ impl SqliteBudgetStore {
     fn authorize_composite_hold_inner(
         &self,
         request: BudgetAuthorizeHoldRequest,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        mut binding: Option<AuthorizationParticipant<'_, '_>>,
     ) -> Result<
         (
             BudgetAuthorizeHoldDecision,
@@ -139,6 +159,18 @@ impl SqliteBudgetStore {
         BudgetStoreError,
     > {
         request.validate()?;
+        let preflight_identity = request.admission_binding.as_ref().is_some_and(|binding| {
+            binding
+                .operation_id
+                .starts_with(chio_kernel::admission_operation::NONCE_PREFLIGHT_BUDGET_PREFIX)
+        });
+        if preflight_identity
+            != matches!(binding, Some(AuthorizationParticipant::NoncePreflight(_)))
+        {
+            return Err(BudgetStoreError::Invariant(
+                "nonce preflight budget identity requires its owning participant".into(),
+            ));
+        }
         let quotas = normalized_quotas(&request)?;
         validate_composite_sqlite_range(&request, &quotas)?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
@@ -183,7 +215,18 @@ impl SqliteBudgetStore {
                     "budget event_id `{event_id}` was reused for a different mutation"
                 )));
             }
+            if let Some(AuthorizationParticipant::Executable(binding)) = binding.as_mut() {
+                if let Some(decision) =
+                    self.resume_approved_caller_hold(&transaction, &existing, binding)?
+                {
+                    // The original operation and its approved hold already
+                    // exist. Revalidation is read-only and creates no event.
+                    transaction.rollback()?;
+                    return Ok((decision, Some(binding.operation.clone())));
+                }
+            }
             let decision = self.authorization_decision_from_event(&transaction, &existing)?;
+            let joint = binding.is_some();
             let operation = self.bind_authorization_to_admission(
                 &transaction,
                 &request,
@@ -191,7 +234,7 @@ impl SqliteBudgetStore {
                 binding,
                 false,
             )?;
-            if binding.is_some() {
+            if joint {
                 self.commit_joint_transaction(transaction)?;
                 self.sync_joint_anchor(&connection)?;
             } else {
@@ -284,13 +327,9 @@ impl SqliteBudgetStore {
             current.total_cost_exposed,
             current.total_cost_realized_spend,
         )?;
-        let requested_total = committed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "committed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
+        let requested_total = ExposureUnits::new(committed)
+            .try_add(ExposureUnits::new(request.requested_exposure_units))?
+            .get();
         let mut allowed = !revoked_member
             && request
                 .max_cost_per_invocation
@@ -309,11 +348,14 @@ impl SqliteBudgetStore {
                             quota.key.owner_id, state.maximum, quota.max_invocations
                         )));
                     }
-                    let used = state.reserved.checked_add(state.captured).ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "reserved + captured quota count overflowed u32".to_string(),
-                        )
-                    })?;
+                    let used = InvocationCount::new(state.reserved)
+                        .try_add(InvocationCount::new(state.captured))
+                        .map(InvocationCount::get)
+                        .map_err(|_| {
+                            BudgetStoreError::Overflow(
+                                "reserved + captured quota count overflowed u32".to_string(),
+                            )
+                        })?;
                     allowed &= used < state.maximum;
                     quota_before.push(state);
                 }
@@ -352,15 +394,10 @@ impl SqliteBudgetStore {
             .as_ref()
             .zip(cumulative_before.as_ref())
             .map(|(cumulative, account)| {
-                let prospective = account
-                    .reserved
-                    .checked_add(account.captured)
-                    .and_then(|used| used.checked_add(cumulative.requested_authorized.units))
-                    .ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "cumulative authorized units overflowed u64".to_string(),
-                        )
-                    })?;
+                let prospective = ExposureUnits::new(account.reserved)
+                    .try_add(ExposureUnits::new(account.captured))?
+                    .try_add(ExposureUnits::new(cumulative.requested_authorized.units))?
+                    .get();
                 Ok::<_, BudgetStoreError>(if prospective >= cumulative.effective_threshold.units {
                     BudgetCumulativeApprovalState::PendingApproval
                 } else {
@@ -370,26 +407,28 @@ impl SqliteBudgetStore {
             .transpose()?;
 
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        let recorded_at = unix_now();
+        let recorded_at = self.unix_now()?;
         let mut usage_after = current.clone();
         let mut quota_after = quota_before.clone();
         let mut cumulative_after = cumulative_before.clone();
         if allowed {
-            usage_after.invocation_count =
-                usage_after.invocation_count.checked_add(1).ok_or_else(|| {
+            usage_after.invocation_count = InvocationCount::new(usage_after.invocation_count)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
                 })?;
-            usage_after.total_cost_exposed = usage_after
-                .total_cost_exposed
-                .checked_add(request.requested_exposure_units)
-                .ok_or_else(|| {
+            usage_after.total_cost_exposed = ExposureUnits::new(usage_after.total_cost_exposed)
+                .try_add(ExposureUnits::new(request.requested_exposure_units))
+                .map(ExposureUnits::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow("total cost exposure overflowed u64".to_string())
                 })?;
             usage_after.updated_at = recorded_at;
             usage_after.seq = event_seq;
-            write_usage(&transaction, &usage_after)?;
+            write_usage(&transaction, &current, &usage_after)?;
 
-            Self::create_hold(
+            self.create_hold(
                 &transaction,
                 hold_id,
                 &request.capability_id,
@@ -406,11 +445,14 @@ impl SqliteBudgetStore {
                 request.requested_exposure_units,
             )?;
             for (quota, state) in quotas.iter().zip(&mut quota_after) {
-                state.reserved = state.reserved.checked_add(1).ok_or_else(|| {
-                    BudgetStoreError::Overflow(
-                        "reserved invocation quota overflowed u32".to_string(),
-                    )
-                })?;
+                state.reserved = InvocationCount::new(state.reserved)
+                    .try_add(InvocationCount::new(1))
+                    .map(InvocationCount::get)
+                    .map_err(|_| {
+                        BudgetStoreError::Overflow(
+                            "reserved invocation quota overflowed u32".to_string(),
+                        )
+                    })?;
                 state.version = state.version.checked_add(1).ok_or_else(|| {
                     BudgetStoreError::Overflow(
                         "invocation quota version overflowed u64".to_string(),
@@ -425,10 +467,10 @@ impl SqliteBudgetStore {
                 cumulative_state,
                 cumulative_after.as_mut(),
             ) {
-                account.reserved = account
-                    .reserved
-                    .checked_add(cumulative.requested_authorized.units)
-                    .ok_or_else(|| {
+                account.reserved = ExposureUnits::new(account.reserved)
+                    .try_add(ExposureUnits::new(cumulative.requested_authorized.units))
+                    .map(ExposureUnits::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "reserved cumulative approval overflowed u64".to_string(),
                         )
@@ -461,7 +503,7 @@ impl SqliteBudgetStore {
         } else {
             BudgetMutationKind::ReserveInvocation
         };
-        let event = Self::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(event_id),
             Some(hold_id),
@@ -524,12 +566,20 @@ impl SqliteBudgetStore {
         transaction: &Transaction<'_>,
         request: &BudgetAuthorizeHoldRequest,
         decision: &BudgetAuthorizeHoldDecision,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        binding: Option<AuthorizationParticipant<'_, '_>>,
         insert_journal: bool,
     ) -> Result<Option<chio_kernel::admission_operation::AdmissionOperationV1>, BudgetStoreError>
     {
         let Some(binding) = binding else {
             return Ok(None);
+        };
+        let binding = match binding {
+            AuthorizationParticipant::Executable(binding) => binding,
+            AuthorizationParticipant::NoncePreflight(binding) => {
+                return self
+                    .bind_nonce_preflight(transaction, request, decision, binding, insert_journal)
+                    .map(Some);
+            }
         };
         // A denied authorization reserves nothing, so its operation is untouched. An
         // approval-required authorization does reserve budget, so its binding is still
@@ -542,6 +592,23 @@ impl SqliteBudgetStore {
         let admission = request.admission_binding.as_ref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted admission binding".into())
         })?;
+        crate::admission_operation_store::verify_runtime_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_approval_budget_selection_tx(
+            transaction, binding.operation, request.grant_index,
+            chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_dpop_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted hold_id".into())
         })?;
@@ -663,7 +730,10 @@ impl SqliteBudgetStore {
                 }
                 credit_exposure
                     .authorities
-                    .ensure_current_at(binding.trusted_now_unix_ms / 1_000)
+                    .ensure_current_at(
+                        chio_security_types::clock::UnixMillis::new(binding.trusted_now_unix_ms)
+                            .as_secs(),
+                    )
                     .map_err(|error| {
                         BudgetStoreError::Invariant(format!(
                             "credit exposure authority is not current: {error}"
@@ -779,13 +849,31 @@ impl SqliteBudgetStore {
         } else {
             chio_kernel::admission_operation::AdmissionOperationState::Prepared
         };
+        let recovery_lease = crate::admission_operation_store::resolve_recovery_authority(
+            transaction,
+            owner,
+            binding.recovery,
+            binding.trusted_now_unix_ms,
+        )
+        .map_err(|error| match error {
+            chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced => {
+                BudgetStoreError::Fenced {
+                    expected_epoch: owner.fence.owner_epoch,
+                    actual_epoch: None,
+                }
+            }
+            chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(
+                detail,
+            ) => BudgetStoreError::OutcomeUnknown(detail),
+            error => BudgetStoreError::Invariant(error.to_string()),
+        })?;
         let operation = if binding.operation.state() == authorization_source {
             crate::admission_operation_store::advance_budget_authorization_tx(
                 transaction,
                 owner,
                 crate::admission_operation_store::BudgetAuthorizationAdvance {
                     expected: binding.operation,
-                    recovery_lease: binding.recovery_lease,
+                    recovery_lease: &recovery_lease,
                     hold_id,
                     payment_required: requires_payment,
                     credit_exposure_reservation_digest: credit_exposure_reservation

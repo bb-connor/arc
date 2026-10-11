@@ -190,7 +190,7 @@ fn reopen(path: &Path) -> SqliteBudgetStore {
     let lock_root = path.join("locks");
     secure_create_dir_all(&lock_root, "create lock root");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
-    SqliteAuthorityStore::open_serving(&database, &lock_root)
+    crate::test_authority::open_serving(&database, &lock_root)
         .expect("open serving authority")
         .budget_store()
 }
@@ -265,6 +265,7 @@ fn v6_operation_authorization_index_migrates_to_ignore_denials() {
             "#,
         )
         .expect("install v6 operation index");
+    install_empty_legacy_payment_journal(&connection).expect("install predecessor payment catalog");
     crate::stamp_schema_version(&connection, "budget", 6).expect("stamp v6 budget schema");
     drop(connection);
 
@@ -593,6 +594,7 @@ fn v9_event_quota_projection_migrates_without_losing_history() {
             "#,
         )
         .expect("install v9 event quota table");
+    install_empty_legacy_payment_journal(&connection).expect("install predecessor payment catalog");
     crate::stamp_schema_version(&connection, "budget", 9).expect("stamp v9 budget schema");
     drop(connection);
 
@@ -617,11 +619,19 @@ fn v9_event_quota_projection_migrates_without_losing_history() {
     let _ = fs::remove_dir_all(path);
 }
 
-/// Every payment journal row rendered with its exact stored value and type, so a
-/// table rebuild that alters or drops a row is visible in a single comparison.
+const ORIGINAL_PAYMENT_JOURNAL_COLUMNS: &str = "operation_id, journal_version,
+ request_namespace_digest, request_id, capability_id, grant_index, hold_id, rail, rail_mode,
+ authorization_id, transaction_id, amount_units, settle_action, settle_amount_units,
+ release_authority_kind, release_authority_evidence_id, release_authority_evidence_digest,
+ release_authority_operation_version, currency, state, created_at_unix_ms, updated_at_unix_ms";
+
+/// Every original payment journal field rendered with its exact stored value and
+/// type, so a table rebuild that alters or drops a row is visible.
 fn payment_journal_rows(connection: &Connection) -> Vec<String> {
     let mut statement = connection
-        .prepare("SELECT * FROM payment_journal ORDER BY operation_id")
+        .prepare(&format!(
+            "SELECT {ORIGINAL_PAYMENT_JOURNAL_COLUMNS} FROM payment_journal ORDER BY operation_id"
+        ))
         .expect("prepare payment journal scan");
     let column_count = statement.column_count();
     statement
@@ -949,6 +959,15 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
     assert!(table_sql.contains("state = 'closed'"));
     assert_eq!(table_sql, provisioned_sql);
     assert_eq!(payment_journal_rows(&connection), seeded);
+    let invented_authorization_facts: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM payment_journal
+             WHERE authorized_amount_units IS NOT NULL OR authorization_attempt IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .expect("inspect newly added authorization fields");
+    assert_eq!(invented_authorization_facts, 0);
 
     let restored: Vec<String> = {
         let mut statement = connection
@@ -1345,7 +1364,7 @@ fn cumulative_approval_state_flip_cannot_skip_attachment() {
     drop(store);
 
     let database = path.join("authority.sqlite3");
-    let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+    let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
         Ok(_) => panic!("serving must reject a cumulative approval state flip"),
         Err(error) => error,
     };
@@ -1382,7 +1401,7 @@ fn serving_rejects_structured_hold_event_frontier_corruption() {
             .expect("open raw database")
             .execute(corruption, [])
             .expect("corrupt structured hold frontier");
-        let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+        let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
             Ok(_) => panic!("serving must reject structured {id} frontier corruption"),
             Err(error) => error,
         };
@@ -1428,7 +1447,7 @@ fn serving_rejects_cumulative_operation_corruption_hidden_by_account_totals() {
             .expect("open raw database")
             .execute_batch(corruption)
             .expect("corrupt cumulative projection");
-        let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+        let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
             Ok(_) => panic!("serving must reject cumulative {id} corruption"),
             Err(error) => error,
         };
@@ -1593,3 +1612,6 @@ fn millisecond_shaped_supplemental_expiry_is_rejected() {
 
     let _ = fs::remove_dir_all(path);
 }
+
+#[path = "composite/injected_clock.rs"]
+mod injected_clock;

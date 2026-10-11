@@ -1,0 +1,156 @@
+{
+  "schema": "chio.security.owner-renewal-followup.v1",
+  "observed_utc": "2026-10-11T06:06:10.097445+00:00",
+  "source_stage_head": "70bf8863d470e787800478f7f0b8608ab6520989",
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "new_requirement_ids": [
+    "incoming-pr1160-owner-renewal-20261011:CI-SNAPSHOT-COUNTS"
+  ],
+  "owner_campaign": {
+    "source": "e4bc85e479cf41d2b1c2b3ce7199b172e4ec4491",
+    "summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/summary.json",
+      "sha256": "c47aca9e4884492ad3fc9b5b880ab779fbf398697add33dfb541227659cf7aa6"
+    },
+    "classification": "Failed campaign retained; later source repairs require their own renewal.",
+    "control_plane": {
+      "passed": 1968,
+      "failed": 3,
+      "ignored": 1,
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/03-chio-control-plane-owning/result.json",
+        "sha256": "60376050a0a4ccca6c8c961668908e6af15679c2eafa4ad7fed46829f5ee2872"
+      }
+    },
+    "store": {
+      "top_level_passed": 2404,
+      "top_level_failed": 2,
+      "top_level_ignored": 13,
+      "nested_child_passed": 1,
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/04-chio-store-sqlite-owning/result.json",
+        "sha256": "3f9f0bf49878b54680415103608b14816f8722d68906d3592bae291820bcc08d"
+      },
+      "log": {
+        "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/04-chio-store-sqlite-owning/output.log",
+        "sha256": "ed69e9a1a97550ce164aac6c51357b2f721bcd86b7374dc21ee7c97e78e12690"
+      }
+    },
+    "strict": {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/05-strict-changed-owners/result.json",
+        "sha256": "594bd88db35c598ded4fab784bd411dc66030b2debef832b7a2e6ae40613edf1"
+      },
+      "accepted": true,
+      "scope": "Default-feature all-target strict lint for secret-broker, CLI, decoy, file-custody, control-plane and store on e4bc; later source needs renewed strict."
+    }
+  },
+  "repairs": {
+    "R2-022-fixture": {
+      "producer": "0f6743a6ecf51d830d5c9deb8adfcda097170b8e",
+      "integration": "2d78d54c17cfbd234ea065a1e642f2455c5d6f4e",
+      "files": {
+        "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/reservation.rs": "62a1371bcd78ac5c2f3e5a7fb8df00d0f128c9343c9b974b17eac683fdb2f903"
+      },
+      "cause": "The successor fixture used timeline 1700 for reservation authority while the retained open trust was 1500. The unchanged reservation verifier requires equality and correctly refused before the version-fence behavior.",
+      "repair": "Use open.trust.trusted_time_unix_ms for authority, preserving flow timeline and every assertion.",
+      "review": "Claude 2026-10-11T05:47:10Z and Root source approval; producer/integrator bytes equal.",
+      "remaining": [
+        "Genuine unchanged-production version-fence Original after fixture correction.",
+        "Six composed reservation controls and strict owner renewal."
+      ]
+    },
+    "CI-BROKER-MARKER": {
+      "producer": "80f3282d530e50deaebca01641f85d8b66e2a093",
+      "integration": "7f5340784d706c8c207e459aa88fff052385e405",
+      "files": {
+        "crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs": "8f9048917c4ddb175eaaa7bcc7a6e9b33b715d0b891be213c4bfec83677f77c6",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_cutpoints.rs": "5e22663f9d73c6acb5c182e7193f9cb17e923f4ba21adcf74be608ecccc9c60a",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_effect_observation.rs": "e44658a0a3af1ee956659ab02030a49d09ea31f60859907b8cb4c65cdedb841c"
+      },
+      "cause": "The provider-effect observer saw a created but empty marker while its writer had not completed. The same publication race existed for the release marker.",
+      "repair": "Stage complete private marker bytes in a distinct same-directory sibling, then rename atomically. Existing write_private callers and every assertion remain unchanged.",
+      "review": "Claude 2026-10-11T05:54:20Z and Root source approval; producer/integrator bytes equal.",
+      "remaining": [
+        "Actual serial portable gate and thirteen native process cases with eight threads, followed by default/native strict."
+      ]
+    },
+    "CI-SNAPSHOT-COUNTS": {
+      "integration": "70bf8863d470e787800478f7f0b8608ab6520989",
+      "files": {
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/count_parity_sequence.rs": "5dc6b2f836f00aa90053e1ff1880028484408b34b461995520e67e7a9868239e"
+      },
+      "cause": "In seed0x6a09e667f3bcc908 epoch0 step4, the background count observer read the intentionally chmod0640 backing file. Correct custody refusal was caught and misclassified as count corruption because the deliberately damaged lineage was not registered. No differing count values were observed.",
+      "repair": "Register that exact lineage before the deliberate custody fault, as projection tamper already does. Retain Invalid refusal, dropped-lineage lease rejection, rebuilding and all healthy-lineage count checks.",
+      "review": "Claude source APPROVE 2026-10-11T06:01:43Z.",
+      "isolated_control": {
+        "path": "/tmp/pr1160-ci-batch-20261010/snapshot-count-parity-original-e4bc/result.json",
+        "sha256": "496a2e7b82c12638f46247dafb38465b15d45b6be90c85eddc3b026028e36a13"
+      },
+      "isolated_control_scope": "The unchanged source passed the isolated campaign; this does not erase its genuine broad failure.",
+      "remaining": [
+        "Full composed snapshot family:151 tests at eight threads, with seven pre-existing ignored campaigns retained.",
+        "Strict store renewal."
+      ]
+    }
+  },
+  "native_predecessor_diagnostic": {
+    "compiled_source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+    "threads": 8,
+    "umask": "022",
+    "passed": 7,
+    "failed": 6,
+    "log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-blocking-dns/trace-cf46-t8.log",
+      "sha256": "1f16cfd5c8e7aba62e99da9efb351378b22d3f25421a6e94b7b4e3b5767a8f62"
+    },
+    "source_probe": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-blocking-dns/trace-cf46-evidence-only.patch",
+      "sha256": "7437e7724057e791437a4132003aeda4a03c8b64f64df340deb4a026983ffe62"
+    },
+    "findings": [
+      "Five captures finished after the existing ten-second fence, at about10.5-10.9 seconds; retained errors include expiry and store conflicts.",
+      "The sixth failure is empty marker bytes, repaired separately above."
+    ],
+    "boundary": "This diagnostic predates the composed history-checkpoint cadence repair. It does not qualify its latency or the final serial/parallel gate."
+  },
+  "static_renewal": {
+    "campaign": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review4-static-5d1676/result.json",
+      "sha256": "49eb5343f9e8a46a63dfd7e20e37105dc20aa5714afd0fa3be8d408de8aaea76"
+    },
+    "correction": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review4-static-5d1676/regression-inventory-corrected.json",
+      "sha256": "bedfb67cd12c90605bd98f160c09e575485d8c383e5d3963c1b93d30ff41f8ed"
+    },
+    "scope": "Format, hygiene, clock inventory, negative assertions and ledger passed on5d1676. The initial regression command used a nonexistent .py file; setup failure retained. The actual .sh gate then passed.",
+    "later_marker_hygiene": {
+      "path": "/tmp/pr1160-ci-batch-20261010/marker-hygiene-7f534078.log",
+      "sha256": "b81a8a12be4c237976e418d235bcbf79e8089fbc2023c4aec1a280e79e114355"
+    },
+    "later_snapshot_hygiene": {
+      "path": "/tmp/pr1160-ci-batch-20261010/snapshot-count-fixture-hygiene.log",
+      "sha256": "b81a8a12be4c237976e418d235bcbf79e8089fbc2023c4aec1a280e79e114355"
+    }
+  },
+  "review_refresh": {
+    "head": "974f22914bd339a62933831650c3d55dbaf76987",
+    "snapshot": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review-threads-latest.json",
+      "sha256": "23957bfba707363f22ac241f637d5e325d3c7acc4234cce93531b3c6b3490a67"
+    },
+    "total_threads": 65,
+    "unresolved_threads": 33,
+    "unanswered_threads": 0,
+    "scope": "All33 unresolved threads last answered by bb-connor at this observation, not resolved or reapproved on the unpublished candidate."
+  },
+  "remaining_acceptance": [
+    "Finish exact recorded Original, cold-oracle mutation, focused runtime and strict renewals.",
+    "Resolve the intermittent runtime proof-fixture package/report hash mismatch; repeated passing controls alone do not explain the prior failure.",
+    "Publish one replacement candidate and obtain all four required checks green on that exact head, classified other failures and answered review threads.",
+    "Report landing readiness before the authorized merge action."
+  ],
+  "hosted_qualified": false,
+  "merged": false,
+  "production_ready": false
+}

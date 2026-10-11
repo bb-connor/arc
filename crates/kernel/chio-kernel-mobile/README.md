@@ -41,7 +41,7 @@ with a matching UDL declaration.
 
 | Function | Purpose |
 |----------|---------|
-| `evaluate(request_json)` | Evaluate a tool-call request against a capability; a kernel-core deny (including `PendingApproval`) is returned as JSON, not thrown. |
+| `evaluate(request_json)` | Evaluate a tool-call request against a capability; a kernel-core deny (including `PendingApproval`) is returned as JSON, not thrown. A grant that needs a mediated kernel (DPoP, invocation or spend limits, cumulative approval, or an aggregate invocation budget) is denied. Revocation is not checked. |
 | `sign_receipt(body_json, canonical_content_hex, signing_seed_hex)` | WYSIWYS signer: recomputes `content_hash` over the caller-supplied canonical preimage, refusing to sign on mismatch. |
 | `sign_receipt_relaying_trusted_body(body_json, signing_seed_hex)` | Relay-sign a body an upstream trusted producer already minted, without recomputing `content_hash`. |
 | `verify_capability(token_json, authority_pub_hex)` | Verify a capability against one trusted authority key, using the device clock. |
@@ -51,9 +51,9 @@ with a matching UDL declaration.
 | `verify_app_attest_evidence(key_id, challenge_hex, app_id, attestation_cbor_hex, previous_counter)` | Verify an Apple App Attest attestation object via `chio-custody-hw`. |
 | `attest_play_integrity(nonce_hex)` | Build the Play Integrity challenge envelope platform evidence must bind to. |
 | `verify_play_integrity_evidence(token, expected_nonce, expected_package_name, expected_audience, jwks_json)` | Verify a Play Integrity JWS against the pinned Google JWKS. |
-| `verify_mobile_receipt(receipt_json, evidence_json)` | Shape-check a receipt against attestation evidence; returns a non-authoritative status. |
+| `inspect_mobile_receipt_envelopes(receipt_json, evidence_json)` | Shape-check a receipt against attestation evidence; returns a non-authoritative status. |
 
-Also exported: the `VerifiedCapability` and `PortablePassportMetadata` UDL
+Also exported: the `CapabilityVerificationRecord` and `PortablePassportMetadata` UDL
 records, the `ChioMobileError` error enum, and the `MobileClock` / `MobileRng`
 adapters.
 

@@ -85,6 +85,13 @@ fn frost_registered_signed_artifacts_are_runtime_supported() {
             ),
         ),
         (
+            "chio.frost.dkg-round2-sealed.v1",
+            (
+                "frost_dkg_round2_sealed",
+                "spec/schemas/chio-frost/v1/dkg-round2-sealed.schema.json",
+            ),
+        ),
+        (
             "chio.frost.epoch-checkpoint.v1",
             (
                 "frost_epoch_checkpoint",

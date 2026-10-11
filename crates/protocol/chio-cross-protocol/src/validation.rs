@@ -8,12 +8,33 @@ use crate::execution::CrossProtocolExecutionRequest;
 
 pub(crate) fn validate_execution_request_boundary(
     request: &CrossProtocolExecutionRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
 ) -> Result<(), BridgeError> {
     validate_request_identity_field("origin_request_id", &request.origin_request_id)?;
     validate_request_identity_field("kernel_request_id", &request.kernel_request_id)?;
     validate_request_identity_field("target_server_id", &request.target_server_id)?;
     validate_request_identity_field("target_tool_name", &request.target_tool_name)?;
     validate_request_identity_field("agent_id", &request.agent_id)?;
+    match (
+        request.security_context.as_ref(),
+        request.authenticated_session_id.as_ref(),
+    ) {
+        (None, Some(_)) => {
+            return Err(BridgeError::InvalidRequest(
+                "authenticated session requires an authoritative security context".to_string(),
+            ));
+        }
+        (Some(security_context), Some(authenticated_session_id))
+            if security_context.as_v1().session_id().as_str()
+                != authenticated_session_id.as_str() =>
+        {
+            return Err(BridgeError::InvalidRequest(
+                "authoritative security context does not match the authenticated session"
+                    .to_string(),
+            ));
+        }
+        _ => {}
+    }
     if request.approval_token.is_some() && !request.approval_tokens.is_empty() {
         return Err(BridgeError::InvalidRequest(
             "cross-protocol execution must not mix singular and threshold approval tokens"
@@ -31,6 +52,14 @@ pub(crate) fn validate_execution_request_boundary(
                 .to_string(),
         ));
     }
+    registry
+        .validate_invocation_arguments(
+            &request.target_server_id,
+            &request.target_tool_name,
+            &request.bridge_security,
+            &request.arguments,
+        )
+        .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
     Ok(())
 }
 

@@ -6,11 +6,8 @@ use serde_json::Value;
 use crate::native::FunctionCallPart;
 
 pub(crate) fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Gemini generateContent payload was not JSON: {error}"
-        ))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = chio_provider_adapter_core::response_body(value, "Gemini generateContent")?;
     classify_content_policy(&body)?;
     extract_function_calls(&body)
@@ -34,7 +31,14 @@ fn gemini_safety_block_reason(body: &Value) -> Option<String> {
         .map(str::trim)
         .filter(|reason| !reason.is_empty())
     {
-        return Some(format!("promptFeedback.blockReason={block_reason}"));
+        return Some(
+            if block_reason == "SAFETY" {
+                "promptFeedback.blockReason=SAFETY"
+            } else {
+                "promptFeedback blocked the request"
+            }
+            .into(),
+        );
     };
 
     body.get("candidates")
@@ -56,9 +60,8 @@ fn gemini_safety_block_reason(body: &Value) -> Option<String> {
 
 fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {
     if let Some(call) = body.get("functionCall") {
-        let parsed: FunctionCallPart = serde_json::from_value(call.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Gemini functionCall part was malformed: {error}"))
-        })?;
+        let parsed: FunctionCallPart =
+            chio_provider_adapter_core::input::typed(call.clone()).map_err(ProviderError::from)?;
         return Ok(vec![parsed]);
     }
     let candidates = body.get("candidates").and_then(Value::as_array);
@@ -75,11 +78,8 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
             for part in parts {
                 if let Some(call) = part.get("functionCall") {
                     let parsed: FunctionCallPart =
-                        serde_json::from_value(call.clone()).map_err(|error| {
-                            ProviderError::Malformed(format!(
-                                "Gemini functionCall part was malformed: {error}"
-                            ))
-                        })?;
+                        chio_provider_adapter_core::input::typed(call.clone())
+                            .map_err(ProviderError::from)?;
                     calls.push(parsed);
                 }
             }
@@ -129,5 +129,17 @@ mod tests {
 
         assert!(matches!(err, ProviderError::ContentPolicy(_)));
         assert!(err.to_string().contains("SAFETY"));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod diagnostic_tests {
+    #[test]
+    fn refusal_diagnostics_do_not_echo_arbitrary_provider_text() {
+        let payload =
+            serde_json::json!({"promptFeedback":{"blockReason":"private-provider-payload"}});
+        let error = super::classify_content_policy(&payload).unwrap_err();
+        assert!(!format!("{error} {error:?}").contains("private-provider-payload"));
     }
 }

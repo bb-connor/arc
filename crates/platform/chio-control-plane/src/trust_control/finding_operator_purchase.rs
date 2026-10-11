@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
@@ -170,7 +169,10 @@ pub struct FindingOperatorPurchaseExecutor {
 }
 
 impl FindingOperatorPurchaseExecutor {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         storage: FindingOperatorPurchaseStorage,
         market: FindingMarketConfig,
@@ -317,7 +319,7 @@ impl FindingOperatorPurchaseExecutor {
                 return Ok(now);
             }
         }
-        unix_timestamp_now()
+        unix_timestamp_now().map_err(FindingPurchaseExecutionError::from)
     }
 
     fn credential(
@@ -508,13 +510,16 @@ impl FindingOperatorPurchaseExecutor {
             Arc::new(resolver),
         )));
         let dpop = DpopConfig::default();
-        kernel.set_dpop_store(
-            DpopNonceStore::new(
-                dpop.nonce_store_capacity,
-                std::time::Duration::from_secs(dpop.proof_ttl_secs),
-            ),
-            dpop,
-        );
+        kernel
+            .set_dpop_store(
+                DpopNonceStore::new(
+                    dpop.nonce_store_capacity,
+                    std::time::Duration::from_secs(dpop.proof_ttl_secs),
+                )
+                .map_err(execution_internal)?,
+                dpop,
+            )
+            .map_err(execution_internal)?;
         kernel.set_finding_purchase_verifier(Arc::new(MarketFindingPurchaseVerifier::new(
             PurchaseVerificationAuthorities {
                 venue_authority: self.market.venue.key().map_err(execution_internal)?,
@@ -778,7 +783,10 @@ impl FindingOperatorPurchaseExecutor {
         Ok(Some(job))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn prepare_purchase_job(
         &self,
         buyer: &AuthenticatedFindingBuyer,
@@ -1038,7 +1046,7 @@ impl FindingOperatorPurchaseExecutor {
         authenticated: &AuthenticatedFindingBuyer,
         request: &FindingPurchaseRequest,
     ) -> Result<FindingPurchaseResult, FindingPurchaseExecutionError> {
-        if request.max_price.units > i64::MAX as u64 {
+        if i64::try_from(request.max_price.units).is_err() {
             return Err(FindingPurchaseExecutionError::Rejected(
                 "maximum price exceeds the durable payment range".to_owned(),
             ));
@@ -1367,6 +1375,7 @@ impl FindingOperatorPurchaseExecutor {
         let capability = ask.body.token_offer.clone();
         let dpop = DpopProof::sign(
             DpopProofBody {
+                replay_authority: None,
                 schema: DPOP_SCHEMA.to_owned(),
                 capability_id: capability.id.clone(),
                 tool_server: bundle.admission.body.server_id.clone(),
@@ -1405,6 +1414,7 @@ impl FindingOperatorPurchaseExecutor {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .map_err(|error| release_predispatch(execution_internal(error)))?;
         #[cfg(test)]
@@ -1689,11 +1699,9 @@ fn validate_credential_text(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn unix_timestamp_now() -> Result<u64, FindingPurchaseExecutionError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(execution_internal)
+fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn execution_internal(error: impl std::fmt::Display) -> FindingPurchaseExecutionError {

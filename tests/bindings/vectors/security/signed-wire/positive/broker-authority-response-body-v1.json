@@ -1,0 +1,1 @@
+{"authority":"34b4d9043156cb6dcf0beb0a2949b7559c940d2bcb6dbe8c53a9b30278e3a746","issuedAtUnixSeconds":1700000001,"requestDigest":"c07e857eb0725ab5c237deffaa99baf2dd7f6db71a42a544935ff9011ff90afd","requestId":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","result":{"kind":"rejected","response":{"code":"vector_denied"}},"schema":"chio.broker-authority-rpc.v1"}

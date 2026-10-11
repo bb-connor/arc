@@ -368,10 +368,6 @@ pub struct ApprovalMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub conditions: Vec<String>,
 
-    /// Whether this approval was part of a batch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub batch_approval_id: Option<String>,
-
     /// The channel through which the human responded.
     pub channel: String,
 
@@ -713,117 +709,18 @@ constraints: vec![
 
 ---
 
-## 9. Batch Approval
+## 9. Batch Decisions
 
-Per-call approval creates friction for repetitive operations. Batch approval
-lets a human pre-approve a class of calls for a bounded time window.
+A human can submit decisions for several existing approval requests together.
+Each request retains its own signed authorization, request binding and replay
+protection. The existing kernel flow and API Protect batch response endpoint
+support this operation.
 
-### Batch Approval Token
-
-```rust
-/// A blanket approval covering multiple future tool calls.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BatchApprovalToken {
-    /// Unique batch approval identifier.
-    pub id: String,
-
-    /// The approver who issued this blanket approval.
-    pub approver: PublicKey,
-
-    /// The agent this approval applies to.
-    pub subject: PublicKey,
-
-    /// Tool server scope (exact or glob).
-    pub server_pattern: String,
-
-    /// Tool name scope (exact or glob).
-    pub tool_pattern: String,
-
-    /// Maximum amount per individual call (if applicable).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_amount_per_call: Option<MonetaryAmount>,
-
-    /// Maximum total amount across all calls in this batch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_total_amount: Option<MonetaryAmount>,
-
-    /// Maximum number of calls this batch covers.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_calls: Option<u32>,
-
-    /// Batch validity window.
-    pub not_before: u64,
-    pub not_after: u64,
-
-    /// Ed25519 signature over the canonical JSON of all fields above.
-    pub signature: Signature,
-}
-```
-
-### Batch Approval Examples
-
-```
-"Approve all search calls for the next hour"
-  -> server_pattern: "search-server"
-     tool_pattern: "*"
-     max_calls: None
-     not_after: now + 3600
-
-"Approve up to 20 database reads in the next 30 minutes"
-  -> server_pattern: "db-server"
-     tool_pattern: "read_*"
-     max_calls: Some(20)
-     not_after: now + 1800
-
-"Approve payments under $100 for the next 4 hours, max $500 total"
-  -> server_pattern: "payment-server"
-     tool_pattern: "charge"
-     max_amount_per_call: Some(MonetaryAmount { units: 100, currency: "USD" })
-     max_total_amount: Some(MonetaryAmount { units: 500, currency: "USD" })
-     not_after: now + 14400
-```
-
-### Kernel Batch Evaluation
-
-When the kernel encounters a `RequireApprovalAbove` (or similar) constraint,
-it checks for a valid batch approval before dispatching to channels:
-
-```
-1. Guard returns PendingApproval
-2. Kernel checks batch approval store for a matching BatchApprovalToken:
-   a. subject matches agent
-   b. server_pattern covers server_id
-   c. tool_pattern covers tool_name
-   d. Current time is within [not_before, not_after)
-   e. Amount is within max_amount_per_call (if set)
-   f. Running total + this amount <= max_total_amount (if set)
-   g. Running count + 1 <= max_calls (if set)
-3. If matching batch found:
-   a. Increment running count and total
-   b. Proceed as Approved (receipt references batch_approval_id)
-4. If no matching batch:
-   a. Dispatch to approval channels as normal
-```
-
-### Batch Approval Receipt
-
-Calls approved via batch carry the batch reference in the receipt metadata:
-
-```json
-{
-  "decision": {
-    "verdict": "approved_and_executed",
-    "approval_token_id": "batch-ba-7f3a...",
-    "approver": "ed25519:abc123..."
-  },
-  "metadata": {
-    "batch_approval_id": "ba-7f3a...",
-    "batch_call_index": 7,
-    "batch_remaining_calls": 13,
-    "batch_remaining_amount_units": 350
-  }
-}
-```
+The earlier proposal for pattern-matched standing approvals was removed on
+2026-09-27. It had no production enforcement owner, and separate matching and
+usage updates could not atomically authorize a bounded call. There is no
+standing-approval token or store API. Future reusable approval authority would
+require a separate design with atomic consumption at the execution boundary.
 
 ---
 
@@ -1111,7 +1008,6 @@ The kernel ships a built-in guard that evaluates approval constraints:
 ```rust
 pub struct ApprovalGuard {
     approval_store: Chio<dyn ApprovalStore>,
-    batch_store: Chio<dyn BatchApprovalStore>,
     channels: Vec<Chio<dyn ApprovalChannel>>,
     escalation_config: Option<EscalationChain>,
 }
@@ -1133,11 +1029,7 @@ impl Guard for ApprovalGuard {
                                 if let Some(token) = &ctx.request.approval_token {
                                     return self.validate_approval_token(ctx, token);
                                 }
-                                // Check for matching batch approval.
-                                if self.check_batch_approval(ctx)? {
-                                    return Ok(Verdict::Allow);
-                                }
-                                // No token, no batch -- require approval.
+                                // Require approval when the request has no valid token.
                                 return Ok(Verdict::PendingApproval(
                                     self.build_approval_request(ctx, "threshold")?
                                 ));
@@ -1162,9 +1054,6 @@ impl Guard for ApprovalGuard {
                     if let Some(token) = &ctx.request.approval_token {
                         return self.validate_approval_token(ctx, token);
                     }
-                    if self.check_batch_approval(ctx)? {
-                        return Ok(Verdict::Allow);
-                    }
                     return Ok(Verdict::PendingApproval(
                         self.build_approval_request(ctx, "always")?
                     ));
@@ -1178,9 +1067,6 @@ impl Guard for ApprovalGuard {
                     if invocation_count < *count as u64 {
                         if let Some(token) = &ctx.request.approval_token {
                             return self.validate_approval_token(ctx, token);
-                        }
-                        if self.check_batch_approval(ctx)? {
-                            return Ok(Verdict::Allow);
                         }
                         return Ok(Verdict::PendingApproval(
                             self.build_approval_request(ctx, "first_n")?
@@ -1231,32 +1117,7 @@ pub trait ApprovalStore: Send + Sync {
     ) -> Result<u64, StoreError>;
 }
 
-/// Persistent store for batch approvals.
-#[async_trait]
-pub trait BatchApprovalStore: Send + Sync {
-    /// Store a new batch approval.
-    async fn store(&self, batch: &BatchApprovalToken) -> Result<(), StoreError>;
 
-    /// Find a batch approval matching the given context.
-    async fn find_matching(
-        &self,
-        agent_id: &AgentId,
-        server_id: &str,
-        tool_name: &str,
-        amount: Option<&MonetaryAmount>,
-        now: u64,
-    ) -> Result<Option<BatchApprovalToken>, StoreError>;
-
-    /// Increment usage counters for a batch approval.
-    async fn record_usage(
-        &self,
-        batch_id: &str,
-        amount: Option<&MonetaryAmount>,
-    ) -> Result<(), StoreError>;
-
-    /// Revoke a batch approval.
-    async fn revoke(&self, batch_id: &str) -> Result<(), StoreError>;
-}
 ```
 
 ---
@@ -1289,7 +1150,7 @@ A customer support agent needs to issue a refund of $450. The grant has
 1. Capability validation passes (agent has grant for `payment-server:issue_refund`).
 2. ApprovalGuard evaluates `RequireApprovalAbove { threshold_units: 200 }`.
 3. `governed_intent.max_amount.units` (450) >= 200 -- approval required.
-4. No `approval_token` on the request. No matching batch.
+4. No `approval_token` on the request.
 5. Guard returns `Verdict::PendingApproval(approval_request)`.
 
 ### Step 3: Kernel Dispatches Approval Request
@@ -1487,7 +1348,7 @@ timeout_seconds = 3600
 2. Add `PendingApproval`, `ApprovedAndExecuted`, `HumanDenied` variants
    to `Decision` in `chio-core-types::receipt`.
 3. Update kernel evaluation loop for ternary verdicts.
-4. Add `ApprovalStore` and `BatchApprovalStore` traits.
+4. Add the request-bound `ApprovalStore` trait.
 5. Add SQLite implementation in `chio-store-sqlite`.
 
 ### Phase 2: Approval Guard and HTTP API
@@ -1502,7 +1363,7 @@ timeout_seconds = 3600
 1. Implement `SlackChannel` with Block Kit interactive messages.
 2. Implement `DashboardChannel` with WebSocket push.
 3. Implement `EmailChannel` with signed action links.
-4. Add batch approval support.
+4. Support submitting multiple request-bound decisions together.
 
 ### Phase 4: Framework Integration
 

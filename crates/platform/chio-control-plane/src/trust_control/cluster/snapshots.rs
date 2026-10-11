@@ -38,19 +38,28 @@ pub(crate) async fn handle_internal_authority_snapshot(
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = match SqliteCapabilityAuthority::open(path) {
+        let authority = match SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            path,
+            state.finding_challenge_clock.clone(),
+            match state.config.authority_replication_clock_policy() {
+                Ok(policy) => policy,
+                Err(error) => {
+                    return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                }
+            },
+        ) {
             Ok(authority) => authority,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
             }
         };
-        let snapshot = match authority.snapshot() {
+        let snapshot = match authority.signed_snapshot() {
             Ok(snapshot) => snapshot,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
             }
         };
-        return Json(authority_snapshot_view(snapshot)).into_response();
+        return Json(snapshot).into_response();
     }
 
     plain_http_error(
@@ -62,17 +71,15 @@ pub(crate) async fn handle_internal_authority_snapshot(
 pub(crate) fn cluster_replication_heads(
     state: &TrustServiceState,
 ) -> Result<ClusterReplicationHeadsView, CliError> {
-    let (tool_seq, child_seq, lineage_seq) =
-        if let Some(path) = state.config.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open(path)?;
-            (
-                store.max_tool_receipt_seq()?,
-                store.max_child_receipt_seq()?,
-                store.max_lineage_seq()?,
-            )
-        } else {
-            (0, 0, 0)
-        };
+    let (tool_seq, child_seq, lineage_seq) = if let Some(store) = state.receipt_store.as_deref() {
+        (
+            store.max_tool_receipt_seq()?,
+            store.max_child_receipt_seq()?,
+            store.max_lineage_seq()?,
+        )
+    } else {
+        (0, 0, 0)
+    };
     let budget_seq = match state
         .optional_budget_store()
         .map_err(|error| CliError::cli_other_error(error.to_string()))?
@@ -112,18 +119,47 @@ pub(crate) fn cluster_replication_heads(
     })
 }
 
+/// This node's signed authority envelope for a full snapshot, or `None` when it
+/// cannot authenticate one right now. The importer then keeps its own pinned
+/// authority and meets the refusal on its authority lane, so the replicated
+/// streams in the snapshot never wait on authority.
+fn export_signed_authority(
+    state: &TrustServiceState,
+    path: &Path,
+) -> Option<AuthoritySnapshotView> {
+    let exported = state
+        .config
+        .authority_replication_clock_policy()
+        .and_then(|policy| {
+            SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+                path,
+                state.finding_challenge_clock.clone(),
+                policy,
+            )
+            .map_err(CliError::from)
+        })
+        .and_then(|authority| authority.signed_snapshot().map_err(CliError::from));
+    match exported {
+        Ok(envelope) => Some(envelope),
+        Err(error) => {
+            warn!(%error, "cluster snapshot carries no signed authority envelope");
+            None
+        }
+    }
+}
+
 pub(crate) fn build_cluster_state_snapshot(
     state: &TrustServiceState,
 ) -> Result<ClusterStateSnapshotResponse, CliError> {
-    let generated_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let generated_at = clock_now;
     let consensus = cluster_consensus_view(state);
     let authority_lease = cluster_authority_lease_view(state);
-    let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        Some(authority_snapshot_view(authority.snapshot()?))
-    } else {
-        None
-    };
+    let authority = state
+        .config
+        .authority_db_path
+        .as_deref()
+        .and_then(|path| export_signed_authority(state, path));
 
     let revocation_export = if let Some(store) = state
         .optional_revocation_store()
@@ -140,13 +176,12 @@ pub(crate) fn build_cluster_state_snapshot(
     } = revocation_export;
 
     let (tool_receipts, child_receipts, lineage) =
-        if let Some(path) = state.config.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open(path)?;
+        if let Some(store) = state.receipt_store.as_deref() {
             let read_context = ReceiptReadContext::admin_service();
             (
-                collect_tool_receipt_views(&store, &read_context)?,
-                collect_child_receipt_views(&store, &read_context)?,
-                collect_lineage_views(&store)?,
+                collect_tool_receipt_views(store, &read_context)?,
+                collect_child_receipt_views(store, &read_context)?,
+                collect_lineage_views(store)?,
             )
         } else {
             (Vec::new(), Vec::new(), Vec::new())
@@ -283,11 +318,33 @@ pub(crate) fn build_cluster_state_snapshot(
     })
 }
 
+/// The signed-authority half of a snapshot import, reported apart from the
+/// replicated streams because they never depend on it.
+pub(crate) type SnapshotAuthorityOutcome = Result<(), CliError>;
+
+/// Applies a peer's full snapshot and fails if any part of it, the signed
+/// authority envelope included, is refused.
+#[cfg(test)]
 pub(crate) fn apply_cluster_snapshot(
     state: &TrustServiceState,
     peer_url: &str,
     snapshot: ClusterStateSnapshotResponse,
 ) -> Result<(), CliError> {
+    let context = super::authority_evidence::authority_sync_context(state);
+    recover_cluster_snapshot(state, peer_url, snapshot, context)?
+}
+
+/// Recovers every replicated stream in a peer's full snapshot: revocations,
+/// receipts, lineage, budgets, the cluster fence and the peer cursors. The
+/// signed authority envelope is imported after the streams and its outcome is
+/// returned on its own, so a refused envelope never withholds a revocation or
+/// leaves the peer pending a snapshot.
+pub(super) fn recover_cluster_snapshot(
+    state: &TrustServiceState,
+    peer_url: &str,
+    snapshot: ClusterStateSnapshotResponse,
+    authority_context: Option<ClusterAuthorityReadContext>,
+) -> Result<SnapshotAuthorityOutcome, CliError> {
     let ClusterStateSnapshotResponse {
         generated_at,
         election_term,
@@ -306,14 +363,8 @@ pub(crate) fn apply_cluster_snapshot(
         budget_origin_ack_heads,
     } = snapshot;
 
+    normalize_cluster_config_url(peer_url, true)?;
     let validated_revocation_cursor = validate_revocation_snapshot(&revocations, &replication)?;
-
-    if let (Some(path), Some(authority_view)) =
-        (state.config.authority_db_path.as_deref(), authority)
-    {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        authority.apply_snapshot(&authority_snapshot_from_view(authority_view))?;
-    }
 
     if let Some(store) = state
         .optional_revocation_store()
@@ -327,8 +378,7 @@ pub(crate) fn apply_cluster_snapshot(
         }
     }
 
-    if let Some(path) = state.config.receipt_db_path.as_deref() {
-        let mut store = SqliteReceiptStore::open(path)?;
+    if let Some(store) = state.receipt_store.as_deref() {
         for record in &tool_receipts {
             let receipt: ChioReceipt = serde_json::from_value(record.receipt.clone())?;
             store.append_chio_receipt(&receipt)?;
@@ -419,6 +469,8 @@ pub(crate) fn apply_cluster_snapshot(
         );
     }
 
+    let authority = import_snapshot_authority(state, peer_url, authority, &authority_context);
+
     seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref())?;
 
     update_peer_state(state, peer_url, |peer| {
@@ -436,8 +488,8 @@ pub(crate) fn apply_cluster_snapshot(
         // is the single site that clears it WITHOUT going through
         // `finalize_peer_sync_round` (which re-records a validated ack via
         // `update_peer_budget_acks`). If we cleared `force_snapshot` here but left the
-        // old (stale-high) ack map in place, ANY early return after this point (an
-        // authority-sync error, a puller error, a transient failure) would skip
+        // old (stale-high) ack map in place, ANY early return after this point (a
+        // puller error, a transient failure) would skip
         // finalize and leave a Healthy, not-force_snapshot peer WITNESSING at an ack
         // head that this round never validated - an OVER-COUNT / budget double-spend.
         // Snapshot recovery is precisely our admission that our incremental view of
@@ -448,6 +500,19 @@ pub(crate) fn apply_cluster_snapshot(
         peer.force_snapshot = false;
     });
 
+    Ok(authority)
+}
+
+fn import_snapshot_authority(
+    state: &TrustServiceState,
+    peer_url: &str,
+    authority: Option<AuthoritySnapshotView>,
+    context: &Option<ClusterAuthorityReadContext>,
+) -> SnapshotAuthorityOutcome {
+    let (Some(_), Some(envelope)) = (state.config.authority_db_path.as_deref(), authority) else {
+        return Ok(());
+    };
+    super::authority_evidence::accept_peer_authority_envelope(state, peer_url, &envelope, context)?;
     Ok(())
 }
 
@@ -455,7 +520,7 @@ fn validate_revocation_snapshot(
     records: &[RevocationRecordView],
     replication: &ClusterReplicationHeadsView,
 ) -> Result<Option<RevocationCursor>, CliError> {
-    for pair in records.windows(2) {
+    for pair in records.array_windows::<2>() {
         let previous = (&pair[0].revoked_at, pair[0].capability_id.as_str());
         let current = (&pair[1].revoked_at, pair[1].capability_id.as_str());
         if current <= previous {
@@ -547,6 +612,7 @@ fn seed_cluster_authority_from_snapshot(
     snapshot_election_term: u64,
     authority_lease: Option<&ClusterAuthorityLeaseView>,
 ) -> Result<(), CliError> {
+    let clock_now = unix_timestamp_now()?;
     let Some(cluster) = state.cluster.as_ref() else {
         return Ok(());
     };
@@ -560,8 +626,12 @@ fn seed_cluster_authority_from_snapshot(
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            path,
+            state.finding_challenge_clock.clone(),
+            state.config.authority_replication_clock_policy()?,
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         authority
             .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -576,7 +646,7 @@ fn seed_cluster_authority_from_snapshot(
                 .as_deref()
                 .is_some_and(|leader| leader != guard.self_url);
         if conflicting_same_term_self_leader {
-            let now = unix_timestamp_now();
+            let now = clock_now;
             guard.election_term = guard.election_term.saturating_add(1);
             guard.last_leader_url = Some(guard.self_url.clone());
             guard.term_started_at = Some(now);

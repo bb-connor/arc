@@ -1,0 +1,202 @@
+{
+  "schema": "chio.security.review2-source-composition.v1",
+  "observed_utc": "2026-10-11T03:18:03.467135+00:00",
+  "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-010",
+    "incoming-pr1160-review2-20261011:R2-014",
+    "incoming-pr1160-review2-20261011:R2-016",
+    "incoming-pr1160-review2-20261011:R2-017",
+    "incoming-pr1160-review2-20261011:R2-022",
+    "incoming-pr1160-review2-20261011:R2-024"
+  ],
+  "classification": "Reviewed source composed privately; Originals and owner qualification pending",
+  "items": {
+    "R2-010": {
+      "producer": [
+        "7c7c348ab7f529d0b67a1cc091b8ae341a450d73",
+        "b11a6aebc0898c1c2de2a895efde53b34561f2a5"
+      ],
+      "integrator": [
+        "28cfc9817dc0ff883e77f372bd13b9eb45e38999",
+        "01efd545735fdc5e58268ed28005a2dbee494d3a",
+        "71ea814333920ce187d51873824e568eae80f24b"
+      ],
+      "contract": "Reclaim expired pre-capture custody only under its existing operation gate; preserve captured/later ownership and orphan evidence, report service faults, and sweep on the existing bounded idle cadence.",
+      "source_files_sha256": {
+        "crates/security/chio-secret-broker/src/daemon_runtime.rs": "cbf9326f73b80bbe8b18c3468b0e15c7460d44dd1f425f7d2237f7a88450236e",
+        "crates/security/chio-secret-broker/src/generic_https.rs": "dc42b0e4da98386695c1bca1540cf2e7b70c91295397bf02d882aa193a354978",
+        "crates/security/chio-secret-broker/src/service/custody.rs": "da7be39731a620ac09f77d1cf3ab60955cc1677d53184ede179781756ed7aa3b",
+        "crates/security/chio-secret-broker/src/service/custody/registration.rs": "a7bb4630eddc316da6f4faa1b5d320c6599285002e5522847bb4d5cb513169af",
+        "crates/security/chio-secret-broker/src/service/lifecycle.rs": "7c587e10b736128f40da36a00adabbca9abde47d10cf90fdacbd891ef244c80a",
+        "crates/security/chio-secret-broker/src/service/tests.rs": "720dcf060a8cbfb6fc3f31301692242950b1a00ec11b0e648ba99d3ad9cc7f2c",
+        "crates/security/chio-secret-broker/src/service/tests/custody_cases.rs": "7448d3c7a0f20b7a640f18242c3892274589b877f500e67a1d2dc085ce684714",
+        "scripts/check-secret-broker-boundary.sh": "cb253a3bfc243b833ef67a709d58d13e593e9896c621ae466abaa885a1e5f25a",
+        "scripts/tests/check-secret-broker-boundary.test.py": "e7019ee93b2c3d1e62886961bef18ea59e545485db217c8b2347238316170b11"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-010-independent-review-v3.md",
+        "sha256": "015926904f2b396cea110d190b498443a5b8c055e937b6959d5bcd60bb3fe71b"
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ]
+    },
+    "R2-014": {
+      "producer": [
+        "068b5fef8a891477e9aef72ae69fde82aecdc19d"
+      ],
+      "integrator": [
+        "4c202412270c938d4e187066e12fe11027ca1f88"
+      ],
+      "contract": "Validate every effect against the immutable captured state before applying the ordered effects to a working copy.",
+      "source_files_sha256": {
+        "crates/core/chio-response-model/src/simulation.rs": "0152384de55515f94ac5ce61d4bc8795075bcb39ac069e38320e240950d7c402",
+        "crates/security/chio-quarantine/tests/response_dry_run.rs": "97d4fd32e29b54112615a3445ec134d68ca5d8f170be32e33a11cc1079ed6e6e",
+        "crates/security/chio-quarantine/tests/response_support/simulation.rs": "069f2b11d4e3669cc521d639d32aebc51379e04c299619efa9c8079b02da169d"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-r2-014-016-386c728c-source-review.md",
+        "sha256": "91d7af7668de69a7d08bd4cefe4667343a0168e3c651b9a5cb4f93ed5df49912"
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ]
+    },
+    "R2-016": {
+      "producer": [
+        "386c728cd4b8bdedc3561016246efe344e2ce44e"
+      ],
+      "integrator": [
+        "6346cd4896c01f4ec6a7412cea0f2be7c4499fd7"
+      ],
+      "contract": "Refuse present nonempty or nonarray message_start content before emitting output or invoking evaluation; preserve absent and empty content controls.",
+      "source_files_sha256": {
+        "crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs": "5c7ca84bc3c5a17c882449a64ba11cf81eb4d637cc3634a367e3346babda9507",
+        "crates/protocol/chio-anthropic-tools-adapter/tests/streaming.rs": "48952a968cc85c2b3d89f0d9181997da0e3df686951ee4f6d572c2335d06c05d"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-r2-014-016-386c728c-source-review.md",
+        "sha256": "91d7af7668de69a7d08bd4cefe4667343a0168e3c651b9a5cb4f93ed5df49912"
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ]
+    },
+    "R2-017": {
+      "producer": [
+        "e00d780e9f807b9f0cf79e842a46728a87910c2a",
+        "e9cf09d567157e1857acef2853278a21306013f3"
+      ],
+      "integrator": [
+        "d343c99709dfe6457f80078baecb9c5cc80c8d76",
+        "e629e4775c8d9ad145e442692c0d4edecbc1d999",
+        "c83c217c72844d0c3e7497d0fc1e22a5dbf0afe0"
+      ],
+      "contract": "Forward the accepted authority pin from Start into Serve; the process fixture owns its child immediately, drains stdout, bounds HTTP and uses fixed canonical timestamps.",
+      "source_files_sha256": {
+        "crates/products/chio-cli/src/cli/dispatch/mod.rs": "0bbdb2520c806648ceee80e66546fdf276248701198c041968934f69590b3549",
+        "crates/products/chio-cli/src/cli/runtime.rs": "acda7ed5f5bf38d8afe7921d1c4af328505cf049e26f27273f0441027671c2b5",
+        "crates/products/chio-cli/tests/start_control_authority_pin.rs": "2cc4bd60b4c87ebebf41d0429ada3d23a17deb75bb5e051da3fcf935d04d2e74"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "source": "Claude coordination mailbox",
+        "entry_utc": "2026-10-11T03:08:54Z",
+        "quoted_review": "## 2026-10-11T03:08:54Z claude\n- Source review APPROVED: c83c217c72 (R2-017 test successor, test-only, start_control_authority_pin.rs).\n  - expires_at is 4_102_444_800 (2100), inside the canonical safe-integer range, with no wall clock.\n  - The Sidecar guard owns the child from spawn, so a banner timeout can no longer leak it.\n  - Drop kills, waits, THEN joins the stdout reader, which sees EOF, so there is no hang and no broken pipe.\n  - The 10 s REQUEST_TIMEOUT bounds the HTTP validate call.\n  - The invariant comment is accurate. No production change.\n- c1 cherry-picks c83 onto its e9cf stack and runs the matching GREEN. The R2-017 Original comes from its detached e00d worktree (start files reverted to 974f), which is queued now.\n- Store owner transfer acknowledged. Run c keeps only the named R2-022 test, the channel_lifecycle_store::tests:: module and clippy.",
+        "integrator_production_review": "Root inspected the producer delta: dispatch forwards the already-parsed key to cmd_start; cmd_start reuses trusted_capability_issuers to combine that key with validated environment issuers. Existing parsing, token handling and Serve configuration remain intact. Claude independently approved the Root test successor."
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ]
+    },
+    "R2-022": {
+      "producer": [
+        "86dd6c2807ffdd10dafd84388038ecb1d45e297d"
+      ],
+      "integrator": [
+        "3c8e1016b493ff00582fb16b01f99c4c80948056"
+      ],
+      "contract": "Allow the next legitimate service reservation after completion while retaining exact prior state/fence checks and canonical schema version-increment enforcement.",
+      "source_files_sha256": {
+        "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/prepared.rs": "acdac2730fa7aece61469ed77ee5f47ec07aea019b27170dd1d4ad40e9537b99",
+        "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/reservation.rs": "1ddca9f7a11c328df50870b4fee5103382661c9b07b1d4bca79b553da6e90aa1",
+        "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/reservation.rs": "668f84d6222fb75f77686eb66e0ee79816b5bdd34217844fafda1a3000ed4ff4",
+        "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/reservation/terminal.rs": "60e42dc53ff8cd9a6dce9bc8d0f3f37731966241bf6e88af629696f7e04921ea"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-022-024-independent-source-review.md",
+        "sha256": "5c1effbb2041a47a357fd31d6a2b73726c47c21653db3ff4aed614123908617d"
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ],
+      "bounded_premise": "Legitimate lifecycle writers are initial ON CONFLICT DO NOTHING insertion and two version/fence-guarded updates. Arbitrary out-of-band SQL REPLACE is an inherited caveat, not claimed repaired."
+    },
+    "R2-024": {
+      "producer": [
+        "977a99c207638b05881d8ba996bbc2a7494eecff"
+      ],
+      "integrator": [
+        "aac3544d6224f86bb295801ed737de86a42df047"
+      ],
+      "contract": "Offline mobile allow projection uses the verified matched grant index and refuses unsupported DPoP and accounting requirements; upstream aggregate/cumulative refusal stays intact.",
+      "source_files_sha256": {
+        "crates/kernel/chio-kernel-mobile/README.md": "026c7ca8f2af5dfa33993d26c3effdacc70bd5ad589f9a89034e370afe3916c1",
+        "crates/kernel/chio-kernel-mobile/bindings/README.md": "662c93a427b5067ff1483083093d01e60a72eaa8a581a45b6e00204f668353d5",
+        "crates/kernel/chio-kernel-mobile/src/lib.rs": "99cf3bac859693538cca3e8578a226528c5df6ba57926b8b929a8ea0efe61347",
+        "crates/kernel/chio-kernel-mobile/tests/ffi_roundtrip.rs": "8583d240e1d3963e5796ccbcd673f68abf37cc33df63a1e5e302f36439c8bedf"
+      },
+      "source_checkpoint": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "source_reviewed": true,
+      "runtime_qualified": false,
+      "independent_review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-022-024-independent-source-review.md",
+        "sha256": "5c1effbb2041a47a357fd31d6a2b73726c47c21653db3ff4aed614123908617d"
+      },
+      "remaining_acceptance": [
+        "Retain genuine Original evidence and complete focused and composed owning tests plus strict lint.",
+        "Four required hosted checks green on the exact published successor, other failures classified, review threads answered.",
+        "Fresh Connor merge go-ahead."
+      ]
+    }
+  },
+  "retained_fixture_failures": {
+    "core_library_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/composed-kernel-owners-d4dd/01-chio-kernel-core-owning/result.json",
+      "sha256": "c30ee1b065dc3308250ace2102b79f3b5264768d1f2e51e968261e5ce686c52d"
+    },
+    "core_library_successor": {
+      "path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/01-chio-kernel-core-owning/result.json",
+      "sha256": "5c73bbebf1f30c3bca8f71697bf585013773a77b940d91f9ce9aaa401d04bee6"
+    },
+    "notes": "Earlier core 88PASS/2FAIL fixture defects preserved; corrected full90PASS on cf46. Later combined strict still running."
+  },
+  "hosted_qualified": false,
+  "merged": false
+}

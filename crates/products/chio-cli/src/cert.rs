@@ -1,14 +1,23 @@
 // CLI handlers for `chio cert` commands.
 
-use std::collections::BTreeSet;
 use std::path::Path;
 
 use chio_acp_proxy::{
-    generate_compliance_certificate, verify_compliance_certificate, ComplianceCertificate,
-    ComplianceConfig, ComplianceReceiptEntry, VerificationMode,
+    generate_compliance_certificate_with_coverage, verify_compliance_certificate,
+    CertificateVerificationScope, ComplianceCertificate, VerificationMode,
 };
 
 use crate::CliError;
+#[cfg(test)]
+use chio_acp_proxy::{generate_compliance_certificate, ComplianceConfig};
+
+mod session_receipts;
+use session_receipts::{certificate_entries, load_session_receipts, snapshot_reference};
+mod profile;
+
+#[cfg(test)]
+#[path = "cert/session_receipts_tests.rs"]
+mod session_receipts_tests;
 
 /// `chio cert generate` -- walk the receipt store for a session and produce
 /// a signed compliance certificate.
@@ -20,27 +29,63 @@ pub fn cmd_cert_generate(
     authority_seed_file: Option<&Path>,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let default_seed_path = std::path::PathBuf::from(".chio-authority-seed");
-    let seed_path = authority_seed_file.unwrap_or(&default_seed_path);
-    let keypair = crate::load_or_create_authority_keypair(seed_path)?;
-
-    let db_path = receipt_db.to_string_lossy();
-    let conn = rusqlite::Connection::open(receipt_db).map_err(|e| {
-        CliError::cli_other_error(format!("failed to open receipt db {db_path}: {e}"))
-    })?;
-
-    let receipts = load_session_receipts(&conn, session_id)?;
-
-    let config = ComplianceConfig {
+    cmd_cert_generate_with_profile(CertificateGenerateOptions {
+        session_id,
+        receipt_db,
         budget_limit,
-        required_guards: Vec::new(),
-        authorized_scopes: Vec::new(),
-        expected_tenant_id: None,
-        trusted_kernel_keys: BTreeSet::from([keypair.public_key().to_hex()]),
-    };
+        output,
+        authority_seed_file,
+        json_output,
+        profile_path: None,
+    })
+}
 
-    let cert = generate_compliance_certificate(session_id, &receipts, &config, &keypair)
-        .map_err(|e| CliError::cli_other_error(format!("certificate generation failed: {e}")))?;
+pub(crate) struct CertificateGenerateOptions<'a> {
+    pub session_id: &'a str,
+    pub receipt_db: &'a Path,
+    pub budget_limit: u64,
+    pub output: Option<&'a Path>,
+    pub authority_seed_file: Option<&'a Path>,
+    pub json_output: bool,
+    pub profile_path: Option<&'a Path>,
+}
+
+pub(crate) fn cmd_cert_generate_with_profile(
+    options: CertificateGenerateOptions<'_>,
+) -> Result<(), CliError> {
+    let CertificateGenerateOptions {
+        session_id,
+        receipt_db,
+        budget_limit,
+        output,
+        authority_seed_file,
+        json_output,
+        profile_path,
+    } = options;
+    let default_seed_path = std::path::PathBuf::from(".chio-authority-seed");
+    let keypair =
+        crate::load_existing_authority_keypair(authority_seed_file.unwrap_or(&default_seed_path))?;
+    let config = profile::load_profile(
+        profile_path,
+        &keypair.public_key(),
+        (budget_limit != 0).then_some(budget_limit),
+    )?;
+    let snapshot = load_session_receipts(
+        receipt_db,
+        session_id,
+        &keypair.public_key(),
+        config.expected_tenant_id.as_deref(),
+    )?;
+    let entries = certificate_entries(&snapshot);
+    let cert = generate_compliance_certificate_with_coverage(
+        session_id,
+        &entries,
+        &config,
+        &keypair,
+        &chio_acp_proxy::AcpClock::default(),
+        snapshot_reference(&snapshot),
+    )
+    .map_err(certificate_generation_error)?;
 
     let cert_json = serde_json::to_string_pretty(&cert)
         .map_err(|e| CliError::cli_other_error(format!("serialization failed: {e}")))?;
@@ -64,6 +109,12 @@ pub fn cmd_cert_generate(
     Ok(())
 }
 
+fn certificate_generation_error(error: chio_acp_proxy::ComplianceCertificateError) -> CliError {
+    let spec = chio_errors::_generated::error_codes::lookup_error_code(error.code())
+        .unwrap_or(&chio_errors::_generated::error_codes::KERNEL_INTERNAL_ERROR);
+    CliError::with_source(spec, error)
+}
+
 /// `chio cert verify` -- verify a compliance certificate.
 pub fn cmd_cert_verify(
     certificate_path: &Path,
@@ -72,47 +123,79 @@ pub fn cmd_cert_verify(
     trusted_kernel_pubkey: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let cert_text = std::fs::read_to_string(certificate_path)
-        .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
+    cmd_cert_verify_with_profile(CertificateVerifyOptions {
+        certificate_path,
+        full,
+        receipt_db,
+        trusted_kernel_pubkey,
+        json_output,
+        profile_path: None,
+    })
+}
 
-    let cert: ComplianceCertificate = serde_json::from_str(&cert_text)
-        .map_err(|e| CliError::cli_other_error(format!("failed to parse certificate: {e}")))?;
+pub(crate) struct CertificateVerifyOptions<'a> {
+    pub certificate_path: &'a Path,
+    pub full: bool,
+    pub receipt_db: Option<&'a Path>,
+    pub trusted_kernel_pubkey: &'a Path,
+    pub json_output: bool,
+    pub profile_path: Option<&'a Path>,
+}
 
+pub(crate) fn cmd_cert_verify_with_profile(
+    options: CertificateVerifyOptions<'_>,
+) -> Result<(), CliError> {
+    let CertificateVerifyOptions {
+        certificate_path,
+        full,
+        receipt_db,
+        trusted_kernel_pubkey,
+        json_output,
+        profile_path,
+    } = options;
+    let cert: ComplianceCertificate =
+        crate::input::text(&crate::input::read_text(certificate_path)?)?;
+    let trusted_kernel_key =
+        crate::load_trusted_kernel_pubkey(trusted_kernel_pubkey).map_err(|source| {
+            CliError::with_public_source(
+                &chio_errors::_generated::error_codes::ATTEST_RECEIPT_VERIFICATION_FAILED,
+                "trusted certificate kernel key could not be loaded",
+                source,
+            )
+        })?;
+    let config = profile::load_profile(profile_path, &trusted_kernel_key, None)?;
+    let snapshot = if full {
+        let path = receipt_db.ok_or_else(|| {
+            CliError::cli_other_error("full-bundle verification requires --receipt-db")
+        })?;
+        Some(load_session_receipts(
+            path,
+            &cert.body.session_id,
+            &trusted_kernel_key,
+            config.expected_tenant_id.as_deref(),
+        )?)
+    } else {
+        None
+    };
+    let entries = snapshot.as_ref().map(certificate_entries);
     let mode = if full {
         VerificationMode::FullBundle
     } else {
         VerificationMode::Lightweight
     };
-
-    let receipts = if full {
-        if let Some(db_path) = receipt_db {
-            let conn = rusqlite::Connection::open(db_path).map_err(|e| {
-                CliError::cli_other_error(format!("failed to open receipt db: {e}"))
-            })?;
-            let entries = load_session_receipts(&conn, &cert.body.session_id)?;
-            Some(entries)
-        } else {
-            return Err(CliError::cli_other_error(
-                "full-bundle verification requires --receipt-db".to_string(),
-            ));
+    let mut result = verify_compliance_certificate(&cert, mode, entries.as_deref(), &config);
+    if let Some(snapshot) = &snapshot {
+        if cert.body.coverage.as_ref() != Some(&snapshot_reference(snapshot)) {
+            result.passed = false;
+            result.body_consistent = false;
+            result.verification_scope = CertificateVerificationScope::Unverified;
+            result.summary = "signed snapshot reference differs from the exact authenticated retained tool snapshot; collect a fresh certificate".into();
+        } else if result.passed {
+            result.verification_scope =
+                CertificateVerificationScope::AuthenticatedRetainedToolSnapshot;
+            result.summary = format!("authenticated retained tool snapshot verified through claim entry {}; session lifetime closure is not asserted", snapshot.coverage().snapshot_end_entry_seq);
         }
-    } else {
-        None
-    };
-
-    let trusted_kernel_key =
-        crate::load_trusted_kernel_pubkey(trusted_kernel_pubkey).map_err(|e| {
-            CliError::cli_other_error(format!("failed to load trusted kernel pubkey: {e}"))
-        })?;
-    let config = ComplianceConfig {
-        budget_limit: 0,
-        required_guards: Vec::new(),
-        authorized_scopes: Vec::new(),
-        expected_tenant_id: None,
-        trusted_kernel_keys: BTreeSet::from([trusted_kernel_key.to_hex()]),
-    };
-
-    let result = verify_compliance_certificate(&cert, mode, receipts.as_deref(), &config);
+    }
 
     if json_output {
         let result_json = serde_json::to_string_pretty(&result)
@@ -125,7 +208,10 @@ pub fn cmd_cert_verify(
     }
 
     if !result.passed {
-        std::process::exit(1);
+        return Err(CliError::registry_error(
+            &chio_errors::_generated::error_codes::ATTEST_RECEIPT_VERIFICATION_FAILED,
+            "certificate verification failed",
+        ));
     }
 
     Ok(())
@@ -133,11 +219,10 @@ pub fn cmd_cert_verify(
 
 /// `chio cert inspect` -- display certificate contents.
 pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<(), CliError> {
-    let cert_text = std::fs::read_to_string(certificate_path)
+    let cert_text = crate::input::read_text(certificate_path)
         .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
 
-    let cert: ComplianceCertificate = serde_json::from_str(&cert_text)
-        .map_err(|e| CliError::cli_other_error(format!("failed to parse certificate: {e}")))?;
+    let cert: ComplianceCertificate = crate::input::text(&cert_text)?;
 
     if json_output {
         println!(
@@ -150,6 +235,14 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
         println!("Schema:         {}", cert.body.schema);
         println!("Issued at:      {}", cert.body.issued_at);
         println!("Receipt count:  {}", cert.body.receipt_count);
+        if let Some(count) = cert.body.invocation_count {
+            println!("Allowed mediated receipts: {count} (not dispatch or spend proof)");
+        }
+        match cert.body.coverage.as_ref() {
+            Some(chio_acp_proxy::ComplianceCoverage::SuppliedReceiptSet) => println!("Coverage: supplied receipt set"),
+            Some(chio_acp_proxy::ComplianceCoverage::RetainedSnapshotReference { snapshot_end_entry_seq, .. }) => println!("Coverage: signed snapshot reference through claim entry {snapshot_end_entry_seq}; full verification requires the authenticated store"),
+            None => println!("Coverage: legacy signed assertion"),
+        }
         println!("First receipt:  {}", cert.body.first_receipt_at);
         println!("Last receipt:   {}", cert.body.last_receipt_at);
         println!(
@@ -169,28 +262,31 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
             }
         );
         println!(
-            "Scope:          {}",
-            if cert.body.scope_compliant {
-                "compliant"
-            } else {
-                "VIOLATED"
-            }
+            "Tool targets:   {}",
+            check_label(
+                cert.body.checks.as_ref().map(|checks| checks.tool_targets),
+                cert.body.scope_compliant
+            )
         );
         println!(
-            "Budget:         {}",
-            if cert.body.budget_compliant {
-                "compliant"
-            } else {
-                "EXCEEDED"
-            }
+            "Allowed receipts: {}",
+            check_label(
+                cert.body
+                    .checks
+                    .as_ref()
+                    .map(|checks| checks.allowed_mediated_receipt_limit),
+                cert.body.budget_compliant
+            )
         );
         println!(
             "Guards:         {}",
-            if cert.body.guards_compliant {
-                "compliant"
-            } else {
-                "BYPASSED"
-            }
+            check_label(
+                cert.body
+                    .checks
+                    .as_ref()
+                    .map(|checks| checks.required_guards),
+                cert.body.guards_compliant
+            )
         );
         if !cert.body.anomalies.is_empty() {
             println!("Anomalies:");
@@ -205,46 +301,78 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
     Ok(())
 }
 
-/// Load Chio receipts for a given session from the SQLite receipt store.
-///
-/// This queries the `chio_receipts` table for receipts whose
-/// `capability_id` starts with `acp-session:{session_id}`.
-fn load_session_receipts(
-    conn: &rusqlite::Connection,
-    session_id: &str,
-) -> Result<Vec<ComplianceReceiptEntry>, CliError> {
-    let table_exists: bool = conn
-        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chio_receipts'")
-        .and_then(|mut stmt| stmt.exists([]))
-        .unwrap_or(false);
-
-    if !table_exists {
-        return Ok(Vec::new());
+fn check_label(
+    status: Option<chio_acp_proxy::ComplianceCheckStatus>,
+    legacy_passed: bool,
+) -> &'static str {
+    match status {
+        Some(chio_acp_proxy::ComplianceCheckStatus::Passed) => "checked and passed",
+        Some(chio_acp_proxy::ComplianceCheckStatus::NotEvaluated) => "not evaluated",
+        Some(chio_acp_proxy::ComplianceCheckStatus::NotApplicable) => "not applicable",
+        None if legacy_passed => "legacy signed assertion (not reverified)",
+        None => "legacy check did not pass",
     }
+}
 
-    let capability_prefix = format!("acp-session:{session_id}");
-    let mut stmt = conn
-        .prepare(
-            "SELECT rowid, json_data FROM chio_receipts WHERE capability_id LIKE ?1 ORDER BY rowid",
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn certificate_diagnostic_reports_missing_evidence_without_signing_failure(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let seed = directory.path().join("seed");
+        std::fs::write(&seed, "57".repeat(32))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let native = generate_compliance_certificate(
+            "private-session",
+            &[],
+            &ComplianceConfig::default(),
+            &chio_core::Keypair::from_seed(&[87; 32]),
+            &chio_acp_proxy::AcpClock::default(),
         )
-        .map_err(|e| CliError::cli_other_error(format!("SQL prepare failed: {e}")))?;
-
-    let rows = stmt
-        .query_map([format!("{capability_prefix}%")], |row| {
-            let seq: i64 = row.get(0)?;
-            let json_data: String = row.get(1)?;
-            Ok((seq as u64, json_data))
-        })
-        .map_err(|e| CliError::cli_other_error(format!("SQL query failed: {e}")))?;
-
-    let mut entries = Vec::new();
-    for row in rows {
-        let (seq, json_data) =
-            row.map_err(|e| CliError::cli_other_error(format!("row read failed: {e}")))?;
-        let receipt: chio_core::receipt::body::ChioReceipt = serde_json::from_str(&json_data)
-            .map_err(|e| CliError::cli_other_error(format!("receipt parse failed: {e}")))?;
-        entries.push(ComplianceReceiptEntry { receipt, seq });
+        .err()
+        .ok_or("empty session was certified")?;
+        let error = certificate_generation_error(native);
+        assert_eq!(
+            error.report().code,
+            "urn:chio:error:attest:provenance-missing"
+        );
+        let native = std::error::Error::source(&error)
+            .and_then(std::error::Error::source)
+            .and_then(|source| source.downcast_ref::<chio_acp_proxy::ComplianceCertificateError>());
+        assert!(matches!(
+            native,
+            Some(chio_acp_proxy::ComplianceCertificateError::EmptySession(_))
+        ));
+        assert!(!format!("{error} {error:?} {:?}", error.report()).contains("private-session"));
+        Ok(())
     }
 
-    Ok(entries)
+    #[test]
+    fn certificate_inspection_labels_unconfigured_checks_honestly() {
+        assert_eq!(
+            check_label(
+                Some(chio_acp_proxy::ComplianceCheckStatus::NotEvaluated),
+                false
+            ),
+            "not evaluated"
+        );
+        assert_eq!(
+            check_label(
+                Some(chio_acp_proxy::ComplianceCheckStatus::NotApplicable),
+                false
+            ),
+            "not applicable"
+        );
+        assert_eq!(
+            check_label(None, true),
+            "legacy signed assertion (not reverified)"
+        );
+    }
 }

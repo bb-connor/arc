@@ -1,11 +1,17 @@
+#[cfg(any(test, feature = "fuzz"))]
 use std::io::BufRead;
 
+#[cfg(any(test, feature = "fuzz"))]
 use serde_json::Value;
-use tracing::debug;
 
+#[cfg(any(test, feature = "fuzz"))]
 use crate::edge::AdapterError;
 
 pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
+// Broker structured responses encode admitted upstream bytes as JSON arrays.
+// Keep the outgoing request bound independent of this response envelope budget.
+#[cfg(any(test, feature = "fuzz"))]
+pub(crate) const MAX_STDIO_MCP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Read one newline-delimited JSON-RPC frame.
 ///
@@ -13,9 +19,22 @@ pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
 /// returned as `Ok(None)` so callers can map it to their own connection state.
 /// A non-empty EOF before the newline delimiter is a parse error because MCP
 /// stdio framing is line-delimited.
+#[cfg(any(test, feature = "fuzz"))]
 pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Value>, AdapterError> {
+    read_jsonrpc_frame_with_admission(reader, |_| Ok(()))
+        .map(|frame| frame.map(|(value, ())| value))
+}
+
+/// Admit the complete bounded wire frame before allocating its JSON tree.
+/// The returned admission follows the decoded value, and is dropped on a
+/// canonical decoding error. Syntax and duplicate-key authority stay here.
+#[cfg(any(test, feature = "fuzz"))]
+pub(crate) fn read_jsonrpc_frame_with_admission<T>(
+    reader: &mut impl BufRead,
+    mut admit: impl FnMut(&str) -> Result<T, AdapterError>,
+) -> Result<Option<(Value, T)>, AdapterError> {
     loop {
-        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
+        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_RESPONSE_BYTES)? else {
             return Ok(None);
         };
 
@@ -24,14 +43,17 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
             continue;
         }
 
-        debug!("<- {}", line.trim_end());
-
-        return serde_json::from_str(trimmed)
-            .map(Some)
-            .map_err(|e| AdapterError::ParseError(format!("invalid JSON from MCP server: {e}")));
+        let admission = admit(&line)?;
+        let value = chio_core::canonical::UntrustedJsonText::from_wire(
+            trimmed.as_bytes(),
+            MAX_STDIO_MCP_RESPONSE_BYTES,
+        )?
+        .decode_document()?;
+        return Ok(Some((value, admission)));
     }
 }
 
+#[cfg(any(test, feature = "fuzz"))]
 fn read_bounded_line(
     reader: &mut impl BufRead,
     max_bytes: usize,
@@ -65,9 +87,13 @@ fn read_bounded_line(
 
         reader.consume(take);
         if exceeds_limit {
-            return Err(AdapterError::ParseError(format!(
-                "MCP JSON-RPC frame exceeded {max_bytes} bytes"
-            )));
+            // The connection is terminal. Draining an attacker-controlled tail
+            // could block forever and would discard the original size bound.
+            return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+                bytes: bytes.len().saturating_add(take),
+                bound: max_bytes,
+            }
+            .into());
         }
 
         if has_newline {
@@ -76,7 +102,7 @@ fn read_bounded_line(
     }
 
     String::from_utf8(bytes).map(Some).map_err(|error| {
-        AdapterError::ParseError(format!("MCP JSON-RPC frame was not UTF-8: {error}"))
+        chio_core::canonical::UntrustedJsonError::NotUtf8(error.utf8_error()).into()
     })
 }
 
@@ -86,6 +112,28 @@ mod tests {
     use std::io::BufReader;
 
     use super::*;
+
+    #[test]
+    fn producer_numbers_survive_stdio_frames() -> Result<(), Box<dyn std::error::Error>> {
+        let wire = b"{\"jsonrpc\":\"2.0\",\"params\":{\"n\":0.50,\"tiny\":1e-05,\"id\":9007199254740993}}\n";
+        let value =
+            read_jsonrpc_frame(&mut BufReader::new(wire.as_slice()))?.ok_or("missing frame")?;
+        assert_eq!(value["params"]["n"].as_f64(), Some(0.5));
+        assert_eq!(value["params"]["tiny"].as_f64(), Some(0.00001));
+        assert_eq!(value["params"]["id"].as_u64(), Some(9007199254740993));
+        Ok(())
+    }
+
+    #[test]
+    fn protocol_boundary_rejects_duplicate_authority_keys() {
+        let bytes = br#"{"jsonrpc":"2.0","params":{"_meta":{"chioRequestId":"first","chioRequestId":"second"}}}
+"#;
+        let error = read_jsonrpc_frame(&mut &bytes[..]).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:attest:signed-json-invalid-input"
+        );
+    }
 
     #[test]
     fn frame_reader_returns_none_on_clean_eof() {
@@ -117,12 +165,36 @@ mod tests {
 
     #[test]
     fn frame_reader_rejects_oversized_frame() {
-        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1));
+        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_RESPONSE_BYTES + 1));
         let mut reader = BufReader::new(input.as_bytes());
         let err = read_jsonrpc_frame(&mut reader).unwrap_err();
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                )
+            ),
             "expected ParseError, got: {err}"
+        );
+    }
+
+    #[test]
+    fn structured_response_can_exceed_the_request_budget() {
+        let body = vec![255_u8; 524_288];
+        let input = serde_json::to_string(&serde_json::json!({
+            "jsonrpc":"2.0", "id":1, "result":{"structuredContent":{"body":body}}
+        }))
+        .unwrap()
+            + "\n";
+        assert!(input.len() > MAX_STDIO_MCP_FRAME_BYTES);
+        let frame = read_jsonrpc_frame(&mut input.as_bytes()).unwrap().unwrap();
+        assert_eq!(
+            frame["result"]["structuredContent"]["body"]
+                .as_array()
+                .unwrap()
+                .len(),
+            524_288
         );
     }
 }

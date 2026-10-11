@@ -1,0 +1,566 @@
+{
+  "schema": "chio.pr1160.checkpoint-delta-qualification.v1",
+  "observed_utc": "2026-10-11T16:24:14.963944+00:00",
+  "published_predecessor": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "qualified_private_source": "38d772e91653b6ec564e4a8a8c312650e972e4f0",
+  "runtime_qualified_source": "998745d26d2aa7224989bfb6c5727948a792ea82",
+  "requirement": "incoming-pr1160-exact-head-20261011:REVIEW-9E9-CHECKPOINT",
+  "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6109135494",
+  "repair": {
+    "producer": "0e7da86bbceba235dc66663f2a8e295e29bf92ea",
+    "composition": "662908fa0cb71c146bafc45844e2c93f50ba7b22",
+    "exact_refusal_controls": "96296573b6d804e99a8829b161bde46787f312c5",
+    "initial_metadata": "998745d26d2aa7224989bfb6c5727948a792ea82",
+    "final_metadata": "38d772e91653b6ec564e4a8a8c312650e972e4f0",
+    "checkpoint_patch_sha256": "0e94559d862d3346404bf0529b46b66ef0ff69efd772860ca90ca98264559917",
+    "producer_amendment": "e455 was never integrated; 0e7 adds comment precision, record-size assertion, explicit archive verification and reopen refusal."
+  },
+  "behavior": [
+    "Version 1 keyframes keep their serialization and column order. Version 2 deltas are rejected by the original reader.",
+    "Every delta own-row read checks a domain-separated ordered digest of table-name lengths/names, canonical row lengths/bytes, final count and byte total.",
+    "The folded chain checks its actual base totals, sequence continuity, exact removals, duplicate additions, recomputed charges, final fingerprints and totals.",
+    "Persisted metadata validation and the seal planner use the same base+charged-changes <=2*max(current,1) predicate for row counts and row bytes.",
+    "Every delta charges at least one row and one byte, including empty seals. Oversized row/byte changes or tombstone bursts produce a full keyframe.",
+    "Archive validation verifies all deltas, including those superseded by a later keyframe; real reopen rejects a substituted superseded delta row.",
+    "The five-event cadence, replay limits, row/byte/record caps, schema version36 and immutable history remain unchanged."
+  ],
+  "genuine_original": {
+    "source": "9e9cf98942",
+    "test_only_overlay": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/checkpoint-delta/original-overlay.patch",
+      "sha256": "7b3f2afc032d27e6c9b83725a32c0e5d08dd299f610e0033d3f09a20dbc22d22"
+    },
+    "log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/checkpoint-delta/original.log",
+      "sha256": "c215dec2988055ec59d09537454d9a144017efa2c1d4a52aa5e5a97b9be79bf8"
+    },
+    "passed": 0,
+    "failed": 1,
+    "seconds": 25.09,
+    "observation": "24 checkpoints retain1644 rows versus115 row changes and34 initial rows; the fixture bound264 is exceeded.",
+    "scope": "A growing-live-set witness of repeated full-image archive growth, not a universal linear bound for every repaired workload."
+  },
+  "producer_final": {
+    "source": "0e7da86bbc",
+    "focused_passed": 36,
+    "focused_failed": 0,
+    "focused": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/checkpoint-delta/run-c7-02/focused.log",
+      "sha256": "a36aef2b881983d9993391aa9db04a5a3fa3cf48f13bd58c340d81dc2d21b671"
+    },
+    "summary": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/checkpoint-delta/run-c7-02/summary.txt",
+      "sha256": "1f292c8e0986c28c7a9cacde148328856c80e28599306a27f1044d7ba267ebd6"
+    },
+    "scope": "Producer source only; final composition is separately executed below."
+  },
+  "composed": {
+    "source": "998745d26d2aa7224989bfb6c5727948a792ea82",
+    "records": [
+      {
+        "label": "checkpoint-focused",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--features",
+          "admission-test-support",
+          "--lib",
+          "--",
+          "security_participant_state::checkpoint::",
+          "security_participant_state::egress::retention::superseded_delta_added_row_substitution_is_refused"
+        ],
+        "exit": 0,
+        "seconds": 584.6,
+        "counts": [
+          [
+            36,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "7d83e29f31f4fcd2ce1f91683cabf807efa4abb3c0aa0e7a960d9d6615f141c9",
+        "source_stable": true,
+        "missing_controls": [],
+        "accepted": true
+      },
+      {
+        "label": "participant-state-owner",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--features",
+          "admission-test-support",
+          "--lib",
+          "security_participant_state::"
+        ],
+        "exit": 0,
+        "seconds": 1547.04,
+        "counts": [
+          [
+            188,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "bac5c96f9d42cd3568866731cdcab8081c2ca2ca6cabb1a0b713a0b71970a70d",
+        "source_stable": true,
+        "missing_controls": [],
+        "accepted": true
+      },
+      {
+        "label": "native-cadence",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "security::adapters::tests::native_flow::support::participant_history_cadence::native_participant_history_verification_stays_bounded_across_sequential_calls",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 701.57,
+        "counts": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "e565b268ffd5c92a180563c1b5ef52e62069102e670ae84dfa2fc587b44edcfe",
+        "source_stable": true,
+        "missing_controls": [],
+        "accepted": true
+      },
+      {
+        "label": "owner-strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "-p",
+          "chio-control-plane",
+          "--all-targets",
+          "--features",
+          "chio-store-sqlite/admission-test-support",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 257.49,
+        "counts": [],
+        "log_sha256": "f597c1a08a96d4db5a057ab6c1cf1407e42bc885f5a69be782991c93fe5d1887",
+        "source_stable": true,
+        "missing_controls": [],
+        "accepted": true
+      }
+    ],
+    "accepted": true
+  },
+  "measured_cadence": {
+    "source": "998745d26d2aa7224989bfb6c5727948a792ea82",
+    "final_call": {
+      "call": 16,
+      "journal_before": 76,
+      "journal_after": 81,
+      "image_rows": 12,
+      "seals": 15,
+      "sealed_rows": 60,
+      "walks": 45,
+      "visits": 120,
+      "max_walk": 5,
+      "threads": 1,
+      "elapsed_ms": 20085
+    },
+    "final_image_probes": [
+      {
+        "kind": "snapshot",
+        "traversals": 141,
+        "visits": 564,
+        "max_traversal": 8
+      },
+      {
+        "kind": "current",
+        "traversals": 45,
+        "visits": 465,
+        "max_traversal": 12
+      },
+      {
+        "kind": "imported",
+        "traversals": 0,
+        "visits": 0,
+        "max_traversal": 0
+      },
+      {
+        "kind": "copy",
+        "traversals": 1,
+        "visits": 8,
+        "max_traversal": 8
+      }
+    ],
+    "scope": "Existing16-call debug fixture with image-visit instrumentation. Counters are source-scoped observations, not production latency or load acceptance."
+  },
+  "static_metadata": {
+    "source": "998745d26d2aa7224989bfb6c5727948a792ea82",
+    "scope": "Static source and schema inventories only, no proof execution.",
+    "source_review_report_sha256": "fd1491fb1393001cf6d9e57d9ae7f14fef06c6460faba05ca3b16e7865254b04",
+    "anchor_unit_tests": {
+      "passed": 25,
+      "failed": 0,
+      "filtered_binaries": 3,
+      "log_sha256": "b476b9f91246e3666924baceac5e5c7dad95749708c36c59d15404b538565ea7"
+    },
+    "renewal": [
+      {
+        "label": "mirrors-renew-v2",
+        "exit": 0,
+        "seconds": 3.91,
+        "sha256": "e13f2b1286a760892e67e8ddf51412b6b7ff06a3e1fb8e9fc09af806f7584cce"
+      },
+      {
+        "label": "mirrors-final",
+        "exit": 0,
+        "seconds": 3.78,
+        "sha256": "b8c3de37ecf82ae4bad9f88c6bb06ecc4644c25b28c12e30081b7f7e548b46a1"
+      },
+      {
+        "label": "coverage-renew",
+        "exit": 0,
+        "seconds": 4.11,
+        "sha256": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+      },
+      {
+        "label": "coverage-final",
+        "exit": 0,
+        "seconds": 4.01,
+        "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+      }
+    ],
+    "other_guards": [
+      {
+        "label": "hygiene",
+        "exit": 0,
+        "seconds": 5.33,
+        "sha256": "316d2149e4ed42c2321c0be7327edd46d12489f970fa09533aae5a398163bb70"
+      },
+      {
+        "label": "security-ci",
+        "exit": 0,
+        "seconds": 2.18,
+        "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      },
+      {
+        "label": "clock",
+        "exit": 0,
+        "seconds": 28.63,
+        "sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b"
+      },
+      {
+        "label": "domains",
+        "exit": 0,
+        "seconds": 1.48,
+        "sha256": "2438750968c8881feb9560b30286aed3111340f154f1ba532d0a9bad6dc9e0de"
+      },
+      {
+        "label": "flow-selftest",
+        "exit": 0,
+        "seconds": 2.0,
+        "sha256": "d62f4d6d68a811fed3faff073bdc31efddd6c46fa9b20384df30541284957659"
+      },
+      {
+        "label": "negative-assertions",
+        "exit": 0,
+        "seconds": 1.29,
+        "sha256": "5d096f1ed75dc8ced9733161cdfdd5c6df8308e63998ef6c8f39c9d05c9b43cd"
+      },
+      {
+        "label": "apalache-contract",
+        "exit": 0,
+        "seconds": 0.1,
+        "sha256": "523cb78090d956a1f7592bfa9c68b0fd42a7b257dd53e47240b02b1aad97d706"
+      }
+    ],
+    "logs": {
+      "final-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mirrors-before.log": "545a874dec0f4b24ac3918ad4786b3a6ea27fa0a90844cee4283a60d6cbd7080",
+      "anchor-tests.log": "b476b9f91246e3666924baceac5e5c7dad95749708c36c59d15404b538565ea7",
+      "wire-final.log": "7bd408fe10382a98be619af9bad3535a76b1aae93dde0b3c7819d69d45c11234",
+      "mirrors-renew.log": "1b24618d9760fe640d4e41530e48cc1afb9c85fce42a7ce15102a73d3ebb0181",
+      "coverage-final.log": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646",
+      "wire-renew.log": "c2171b946d63f3408964fee34a423028d361f10f28bac3845d0e1adc1a1b1b40",
+      "mirrors-final.log": "b8c3de37ecf82ae4bad9f88c6bb06ecc4644c25b28c12e30081b7f7e548b46a1",
+      "xtask-build.log": "2334265c10516253a20c6b6055f04ea233de2ff03954b726990a16a95b6e7b6d",
+      "mirrors-renew-v2.log": "e13f2b1286a760892e67e8ddf51412b6b7ff06a3e1fb8e9fc09af806f7584cce",
+      "coverage-renew.log": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+    },
+    "retained_failures": [
+      "Initial wire check rejected missing v2 identifier.",
+      "Initial mirror check rejected removed rows::visit.",
+      "First renewal rejected required rows::visit inventory. Mandatory coverage now targets actual implementations."
+    ],
+    "claims": [
+      "256 abstraction source anchors match",
+      "65 proof coverage rows and179 retained artifacts unchanged",
+      "No artifact or proof acceptance status edited",
+      "One acknowledged wire format v2 added; v1 retained",
+      "1241 negative assertion baseline unchanged"
+    ]
+  },
+  "policy_constant_controls": {
+    "observed_utc": "2026-10-11T16:23:59.447436+00:00",
+    "base": "998745d26d2aa7224989bfb6c5727948a792ea82",
+    "accepted": true,
+    "records": [
+      {
+        "label": "original-missing-enrollment",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "xtask",
+          "--bin",
+          "xtask",
+          "formal_mirrors::dispatch_anchors::tests::extracted_validators_and_drop_clock_failures_remain_drift_guarded",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "counts": [
+          [
+            0,
+            1,
+            0
+          ]
+        ],
+        "seconds": 62.9,
+        "sha256": "07a58d47d6794d2d4d90d64483f0f911c981ad50293279f317f220a736687f71"
+      },
+      {
+        "label": "owner-green",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "xtask",
+          "--bin",
+          "xtask",
+          "formal_mirrors::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "counts": [
+          [
+            25,
+            0,
+            0
+          ]
+        ],
+        "seconds": 19.3,
+        "sha256": "640768e116e394666b0b7b7660e9d963e20ee42c15e37cbfb1f016175a13d74c"
+      },
+      {
+        "label": "strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "xtask",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 116.4,
+        "sha256": "ac7e15ba3519fb700fa476bddfe0cf4be0c3b70d084e22e31e61ab9ca21554ea"
+      },
+      {
+        "label": "binary",
+        "command": [
+          "cargo",
+          "build",
+          "--locked",
+          "-p",
+          "xtask"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 12.06,
+        "sha256": "da73036aa20cfcc3fea409333c9a42477ac553ae5683da0973d56605db138afb"
+      },
+      {
+        "label": "mandatory-anchors",
+        "command": [
+          "/var/tmp/pr1160-root-final-20261009/debug/xtask",
+          "check",
+          "formal-mirrors"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 3.85,
+        "sha256": "b8c3de37ecf82ae4bad9f88c6bb06ecc4644c25b28c12e30081b7f7e548b46a1"
+      },
+      {
+        "label": "coverage-renew",
+        "command": [
+          "/var/tmp/pr1160-root-final-20261009/debug/xtask",
+          "gen",
+          "proof-coverage"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 4.05,
+        "sha256": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+      },
+      {
+        "label": "coverage-check",
+        "command": [
+          "/var/tmp/pr1160-root-final-20261009/debug/xtask",
+          "gen",
+          "proof-coverage",
+          "--check"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 4.06,
+        "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+      },
+      {
+        "label": "format",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "counts": [],
+        "seconds": 29.23,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "input_private_sha256": {
+      "xtask/src/formal_mirrors/dispatch_anchors.rs": "46d474a6a3e6e8e28dba8c16f5a8e0985d12ae3d46b8ce812d9e00d19f6473ac",
+      "formal/proof-manifest.toml": "64daec9cf129882d4d5a43a25b5a38e4d381ff7fe367793e25e7f74740613c10",
+      "docs/formal/COVERAGE.md": "3827d5645ce038597be98dc029e93852127d397903be5776e33d32f02a2221a6"
+    },
+    "qualified_metadata_sha256": {
+      "xtask/src/formal_mirrors/dispatch_anchors.rs": "46d474a6a3e6e8e28dba8c16f5a8e0985d12ae3d46b8ce812d9e00d19f6473ac",
+      "formal/proof-manifest.toml": "64daec9cf129882d4d5a43a25b5a38e4d381ff7fe367793e25e7f74740613c10",
+      "docs/formal/COVERAGE.md": "3827d5645ce038597be98dc029e93852127d397903be5776e33d32f02a2221a6"
+    },
+    "original_overlay_sha256": "a3c7c695958fe843d7b7b026f8c15eb4f1930a23bc077af549bdb2c80e0a2173",
+    "scope": "Rust source-inventory unit controls only; no formal proof execution. Original998 production inventory with additive two-case mutation overlay; private fixed inventory and exact hashes qualified. Runtime source998 remains independently frozen and verified.",
+    "warm_restored_clean": true
+  },
+  "review": {
+    "source": {
+      "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-final-independent-review/source-review-20261011T150557Z.json",
+      "sha256": "7b157c4da5dd0d92a85dcb5e4637c118275584210f3074e05b7ff9dcf9e87fbe"
+    },
+    "amendment_and_oracles": {
+      "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-final-independent-review/amendment-review-20261011T152210Z.json",
+      "sha256": "fd1491fb1393001cf6d9e57d9ae7f14fef06c6460faba05ca3b16e7865254b04"
+    },
+    "reviewed_source_sha256": {
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs": "41713fd2530992da2a413ba74ab0feb0e7f18c36d62739108629d22f9dbd9b24",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs": "93489d804b67a7746b54f648f9c7ec7b9f5b58016162f78e0332e0325567d4aa",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs": "c72abae849c992073963ad0951aa905d81589c7dd70da069ea092466398362a7",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs": "276aaaf383a08325d0bfe94d8ea9a842ce644cf8e521fa5757dcb34e48f54ee0",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta_tests.rs": "b3f62bf77681b32503175bc098bc180d0544ea8b13a07f30ca2fb93b50f0caab",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs": "28e0ad85db220ccb0a368e4c7c7857247f4ea8ec0a29cfaf2954f872de1c6099"
+    },
+    "metadata_original_finding": {
+      "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-final-independent-review/metadata-review-20261011T152737Z.json",
+      "sha256": "561de84ecce5e0fa413f38b56c1b43c63959e93bf850b941680aa88c8ad15001"
+    },
+    "metadata_amendment": {
+      "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-final-independent-review/metadata-amendment-review-20261011T153622Z.json",
+      "sha256": "7d0baa1906f737a683547413ec00f7d250e28c303891aaf0d077f762633f2183"
+    },
+    "claude_exact_oracle_approval_utc": "2026-10-11T15:26:45Z",
+    "claude_metadata_approval_utc": "2026-10-11T15:28:59Z",
+    "scope": "Bounded source approvals, no reviewer-executed tests or formal proof claims."
+  },
+  "retained_failed_attempts": [
+    {
+      "observed_utc": "2026-10-11T15:04:42.543578+00:00",
+      "first_campaign": {
+        "base": "9e9cf98942",
+        "dirty_diff_sha256_prefix": "79f4669d32823c48",
+        "passed": 35,
+        "failed": 1,
+        "seconds": 332.92,
+        "failure": "native_checkpoint_superseded_delta_added_row_substitution_refuses: no later keyframe superseded the delta",
+        "fmt_exit": 1,
+        "clock_exit": 0,
+        "hygiene_exit": 0,
+        "flow_selftest_exit": 0,
+        "evidence_status": "Terminal output observed by Root. Original c7-focused.log and fmt log were overwritten by producer renewal; full immutable log not currently retained. This observation is not a reconstructed full log."
+      },
+      "second_campaign": {
+        "passed": 0,
+        "failed": 1,
+        "seconds": 4.73,
+        "failure": "Invariant: native security state: native flow observation is stale or absent",
+        "log_sha256": "769f15538ea9407a9bc7c1dd7398da9ea17584a5cc6333054f5ded60a532c7f4",
+        "log_path": "/tmp/pr1160-ci-batch-20261010/checkpoint-producer-observations/stale-generation-fixture.log"
+      },
+      "genuine_original": "Separate original.log c215dec2988055ec59d09537454d9a144017efa2c1d4a52aa5e5a97b9be79bf8 remains present and immutable."
+    },
+    {
+      "log": {
+        "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-producer-observations/wrong-verifier-fixture.log",
+        "sha256": "d4a63bb9ff06e9554cc50727980f78115d2575e543ee0fd2975182f6c7e0b99c"
+      },
+      "passed": 35,
+      "failed": 1,
+      "seconds": 278.56,
+      "cause": "Fixture called initialization/current-view native::verify_all instead of native::checkpoint::verify_all. This does not establish a production archive bypass."
+    },
+    {
+      "log": {
+        "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-producer-observations/archive-refusal-renewal.log",
+        "sha256": "6c7418135f049c8d9f992f36c51d34534164526cd1874238ef330a384b891ecf"
+      },
+      "passed": 1,
+      "failed": 0,
+      "seconds": 62.15,
+      "scope": "Narrow corrected draft control only; final released and composed campaigns remain separate."
+    }
+  ],
+  "limits": [
+    "The factor-two reconstruction bound counts row payloads and canonical row bytes, not total I/O, allocated memory, record parsing or CPU.",
+    "The chain reads one keyframe plus at most2*max(current_rows,1) delta records; each canonical record may require up to64KiB of parsing and hashing.",
+    "Retained storage is delta-added rows plus every full keyframe copy. Forced copies preclude a universal two-times-changes storage bound.",
+    "Dirty-table fingerprint work across historical images can still have quadratic CPU cost. The growing-state retention control does not prove linear CPU.",
+    "The actual original-reader rejection is source-reviewed; this audit does not claim execution of an old compiled binary.",
+    "Cold-state readiness, byte-capacity recovery, broader native latency/concurrency and proof qualification remain separately open.",
+    "Local changed-boundary acceptance is not hosted qualification, merge authorization, operational activation or release readiness."
+  ],
+  "retained_local_archive": {
+    "path": "/home/connor/lanes/pr1160-root-evidence/checkpoint-delta-20261011",
+    "manifest_sha256": "2bdaddf569188095a80a54e07804abca892907ca6a6ab236306778906ee2c24c",
+    "files": 62,
+    "scope": "Copies verified byte-for-byte after terminal qualification. Historical producer logs that were overwritten remain unavailable, as disclosed above."
+  }
+}

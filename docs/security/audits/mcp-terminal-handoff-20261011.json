@@ -1,0 +1,299 @@
+{
+  "schema": "chio.security.mcp-terminal-handoff.v1",
+  "source": "7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0",
+  "base": "07d780147c703e7009837ef990494efd7f02211d",
+  "producer": {
+    "producer": "1c24c4af0c66a99470d8f290d1a6fba90e73f361",
+    "composition": "7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0",
+    "files": [
+      {
+        "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+        "sha256": "bc74571b5cea7a9c511dda3c2c731c9a7eada6704618b0ded11ab4734d803de3"
+      },
+      {
+        "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+        "sha256": "2c9365ba4796d91c035cacbe5664922969e58681505d2acaa9b18dc153055efe"
+      },
+      {
+        "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/ledger.rs",
+        "sha256": "8f0657ea6e21b159cd1f2863830bf040b41bc2d4dcd8d6d886f3f4f594125684"
+      },
+      {
+        "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_worker.rs",
+        "sha256": "6c4b5b5afe160a90fea52580c7c0443585eb2cf0ad01700a377c8668647909cd"
+      },
+      {
+        "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs",
+        "sha256": "078e05c0fa1f74534b66c7947c7627227a1f02cd277ea9d174ccb5f776057884"
+      }
+    ],
+    "all_producer_files_equal": true
+  },
+  "scope": "Atomic active-to-terminal diagnostic handoff with unchanged durable authority refusal and immutable terminal records.",
+  "hosted_original": {
+    "run": 38165670603,
+    "job": 114549003013,
+    "test": "mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse",
+    "result": "42 passed; 1 failed; 1 ignored",
+    "failure": "admin trust lookup expected200, actual404 during idle expiry",
+    "log_sha256": "e907cebdce8a65f108a1028ec09ff93b473d8400d6f0b074582ea1ba0e318c06"
+  },
+  "contracts": [
+    "Acquire per-session terminalization, active map, then terminal map before any mutation. All awaits precede state changes.",
+    "Commit durable intent, update lifecycle, and transfer map ownership without another await. Drop global map guards before upstream shutdown and durable finalization.",
+    "Publish the same diagnostic bytes carried by the durable tombstone once. Repeated retirement retains the existing record and does not recreate a purged record.",
+    "Clock and persistence fallback diagnostics confer no dispatch, resume, signed epoch, or successful durable-finalization claim. Preserve errors and operator reconciliation."
+  ],
+  "source_reviews": [
+    "Claude approved cumulative07d7..7a6ea13c8c at2026-10-11T20:26:22Z and final test1c24c4af0c at20:31:47Z.",
+    "Root reviewed cumulative production paths, lock ordering, cancellation, immutable retirement, real fault controls and final test; all5 producer files byte-identical in composition."
+  ],
+  "producer_evidence": [
+    {
+      "file": "original-r3-20261011T162115.log",
+      "sha256": "5c2207e8a82ebb7f0854e950f55001d9d0623e876d8cafa3a6da9e0433652e6e",
+      "scope": "Genuine Original on07d7 production: 0 passed,5failed at visibility/cancellation/fallback assertions."
+    },
+    {
+      "file": "original-r4-vs-9a05-20261011T162724.log",
+      "sha256": "15cf3901e4d72ce3bd1307ce0cf0af33cdfe95b4d0d334c8546071539c70fd1d",
+      "scope": "Genuine overwrite Original on9a05 production:0passed,1failed at retained Arc identity."
+    },
+    {
+      "file": "fixed-r4-lib-20261011T162813.log",
+      "sha256": "38196b071b272c7e405bf22e2fa43f868b7d2f2e4d71d0f0e83b2828c1a91b8d",
+      "scope": "Producer final library198passed,0failed."
+    },
+    {
+      "file": "repeat-r4-20261011T162813.log",
+      "sha256": "e5ae7590214a03e9c120c23fae7fe1b5cef863022ff35bcb4f62336b891abca1",
+      "scope": "Six new regressions,50runs; each6passed,0failed."
+    },
+    {
+      "file": "clippy-r4-20261011T162813.log",
+      "sha256": "9fb49484e3d335c7e785b1b7fef32981fa01f93ffcea9a02fd1abcc7f86a260c",
+      "scope": "Producer strict alltargetsPASS."
+    },
+    {
+      "file": "fmt-r4-20261011T162813.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "Producer fmtPASS."
+    },
+    {
+      "file": "clocks-r4-20261011T162813.log",
+      "sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b",
+      "scope": "Producer clockgatePASS."
+    }
+  ],
+  "limits": [
+    "Local compiler/test evidence is Linux aarch64; the x86_64 enforcing chio-cli mcp_serve_http suite requires successor hosted qualification.",
+    "SQLite terminal prepare now holds both global map guards; lookups wait for this synchronous durable handoff.",
+    "No complete Kani proof, trusted authorization, cold activation, or native latency qualification is established by this repair.",
+    "Four required exact-head checks and final review remain necessary; this private source is not hosted-qualified or merged."
+  ],
+  "captured_utc": "2026-10-11T20:42:07.796408+00:00",
+  "qualification": {
+    "commands": [
+      {
+        "source": "7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0",
+        "root": "/home/connor/lanes/pr1160-tripwire-input",
+        "environment": {
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "RUST_TEST_THREADS": "4",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input"
+        },
+        "argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-mcp-remote",
+          "--lib"
+        ],
+        "started_utc": "2026-10-11T20:33:02.292158+00:00",
+        "elapsed_seconds": 335.622,
+        "exit": 0,
+        "log_sha256": "924d8425e60c67188dca6bb79b7912d0af9c7ebfaacdfdce4b00bb73e71c26eb"
+      },
+      {
+        "source": "7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0",
+        "root": "/home/connor/lanes/pr1160-tripwire-input",
+        "environment": {
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "RUST_TEST_THREADS": "4",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input"
+        },
+        "argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-mcp-remote",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started_utc": "2026-10-11T20:38:38.016198+00:00",
+        "elapsed_seconds": 183.22,
+        "exit": 0,
+        "log_sha256": "430590021506df6eb97dfc3c7624049ec627e6971996a71f29b2b3ca012d24e4"
+      },
+      {
+        "label": "trust-census",
+        "argv": [
+          "python3",
+          "scripts/check-trust-boundaries.py"
+        ],
+        "started_utc": "2026-10-11T20:28:37.628034+00:00",
+        "elapsed_seconds": 103.936,
+        "exit": 0,
+        "log_sha256": "e8086932b2921312c8030f13c66704b798492939ce16ad2acf25c5ea5b420a53",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "security-clocks",
+        "argv": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "started_utc": "2026-10-11T20:28:37.639410+00:00",
+        "elapsed_seconds": 33.868,
+        "exit": 0,
+        "log_sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "adapter-no-bypass",
+        "argv": [
+          "bash",
+          "scripts/check-adapter-no-bypass.sh"
+        ],
+        "started_utc": "2026-10-11T20:28:37.626146+00:00",
+        "elapsed_seconds": 73.53,
+        "exit": 0,
+        "log_sha256": "b515d6857fd514d0088e71961c58874a58d00b4bbc216d112e0f829c4fe361af",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "rust-file-hygiene",
+        "argv": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "started_utc": "2026-10-11T20:29:56.538433+00:00",
+        "elapsed_seconds": 5.521,
+        "exit": 0,
+        "log_sha256": "abb22d442d322d34b5592439a2b611e3319be8bc4c4a16dfb0d62758b120f147",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "negative-assertions",
+        "argv": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "started_utc": "2026-10-11T20:30:24.729440+00:00",
+        "elapsed_seconds": 1.324,
+        "exit": 0,
+        "log_sha256": "5d096f1ed75dc8ced9733161cdfdd5c6df8308e63998ef6c8f39c9d05c9b43cd",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "formal-mirrors",
+        "argv": [
+          "cargo",
+          "xtask",
+          "check",
+          "formal-mirrors"
+        ],
+        "started_utc": "2026-10-11T20:30:24.725314+00:00",
+        "elapsed_seconds": 4.948,
+        "exit": 0,
+        "log_sha256": "b8c3de37ecf82ae4bad9f88c6bb06ecc4644c25b28c12e30081b7f7e548b46a1",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "proof-coverage",
+        "argv": [
+          "cargo",
+          "xtask",
+          "gen",
+          "proof-coverage",
+          "--check"
+        ],
+        "started_utc": "2026-10-11T20:30:24.723077+00:00",
+        "elapsed_seconds": 5.057,
+        "exit": 0,
+        "log_sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "patch-hygiene-with-local-event",
+        "argv": [
+          "env",
+          "GITHUB_EVENT_PATH=/tmp/pr1160-ci-batch-20261010/mcp-terminal-composition/local-pull-request-event.json",
+          "GITHUB_EVENT_NAME=pull_request",
+          "GITHUB_SHA=f04e7a20928850432775f1084eabb2db23aa0bb3",
+          "python3",
+          "scripts/check-patch-hygiene.py"
+        ],
+        "started_utc": "2026-10-11T20:29:22.194500+00:00",
+        "elapsed_seconds": 2.647,
+        "exit": 0,
+        "log_sha256": "398768c98e9305609f7cf1cb92572bdde39a7ba743d8c8bce8fa3242050c4300",
+        "scope": "f04e production-equivalent composition before final test-only addition"
+      },
+      {
+        "label": "final-test-static",
+        "argv": [
+          "python3",
+          "-c",
+          "import subprocess; commands=[[\"cargo\",\"fmt\",\"--all\",\"--\",\"--check\"],[\"python3\",\"scripts/check-rust-file-hygiene.py\"],[\"python3\",\"scripts/check-negative-assertions.py\"]]; [subprocess.run(c,check=True) for c in commands]"
+        ],
+        "started_utc": "2026-10-11T20:33:03.177205+00:00",
+        "elapsed_seconds": 34.274,
+        "exit": 0,
+        "log_sha256": "180c520d357aa2c388a08aa62ba1c4d18904ac119d600d17123f653bee9e60ff",
+        "scope": "Final7d08 test-only addition"
+      }
+    ],
+    "library_passed": 198,
+    "library_failed": 0,
+    "strict_all_targets": true,
+    "host_platform": "aarch64 Linux",
+    "formal_execution_started": false,
+    "metadata_only_proof_coverage": true,
+    "published": false,
+    "hosted_qualified": false,
+    "merged": false
+  },
+  "retained_incomplete_invocation": {
+    "label": "patch-hygiene",
+    "exit": 1,
+    "reason": "Local command omitted GITHUB_EVENT_PATH; rejected before source check. Correct candidate/base local event rerun passed.",
+    "log_sha256": "f267124b024ecba4df9a981faedb530e5938d1d7f65679373dab6a66a37993c6"
+  },
+  "publication_ruling": {
+    "source": "Claude mailbox2026-10-11T20:38:35Z relaying direct owner instruction; Root ack20:39Z",
+    "decision": "Publish this batch after local library/strict qualification without awaiting predecessor Workspace/MSRV. Preserve cancelled predecessor results as incomplete. Exact replacement four-green merge bar remains unchanged."
+  },
+  "archive": {
+    "path": "/home/connor/lanes/pr1160-root-evidence/mcp-terminal-7d08ffffc4-20261011",
+    "manifest_sha256": "cbb2668f5f27a9a83bd9c7ddc23423ea803d63c10de16645b52d5730e77e6efb"
+  }
+}

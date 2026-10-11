@@ -286,6 +286,9 @@ fn test_capital_book_report_export_surfaces() {
         |event| event.loss_event_id.as_deref() == Some(reserve_release.body.event_id.as_str())
     ));
 
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
+
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([

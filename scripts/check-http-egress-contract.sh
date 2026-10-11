@@ -23,7 +23,7 @@
 # - `chio-http-core` (re-exports the contract)
 # - `chio-mcp-adapter` (kernel-side adapter that owns its own protocol stack)
 # - test files (`tests.rs`, `*-tests.rs`, files under `tests/` or
-#   `crates/*/tests/`).
+#   `crates/*/tests/`), plus named `*_tests/` modules bound by `cfg(test)`.
 #
 # Fail-closed: ambiguous matches (e.g. unrecognized aliases) are reported
 # rather than silently skipped.
@@ -170,6 +170,13 @@ for file in "${CANDIDATE_FILES[@]}"; do
     case "$rel" in
         */tests.rs|*/tests/*|*-tests.rs)
             continue
+            ;;
+        */*_tests/*)
+            # Require a compiler-enforced file boundary. A guarded ancestor can
+            # also import this file through a production alias or be unreachable.
+            if [[ "$(head -n 1 "$file")" == '#![cfg(test)]' ]]; then
+                continue
+            fi
             ;;
     esac
 

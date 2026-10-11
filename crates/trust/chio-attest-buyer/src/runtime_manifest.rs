@@ -7,8 +7,9 @@ use crate::types::{RuntimeEvidenceManifest, RuntimeEvidenceManifestEntry};
 pub fn runtime_evidence_manifest_from_json(
     json: &str,
 ) -> Result<RuntimeEvidenceManifest, BuyerAttestationError> {
-    let runtime_core: chio_runtime_core::RuntimeEvidenceManifest = serde_json::from_str(json)
-        .map_err(|error| json_error("Chio runtime evidence manifest JSON", error))?;
+    let runtime_core: chio_runtime_core::RuntimeEvidenceManifest =
+        crate::input::decode(json.as_bytes())
+            .map_err(|error| json_error("Chio runtime evidence manifest JSON", error))?;
     chio_runtime_core::validate_runtime_evidence_manifest(&runtime_core)
         .map_err(BuyerAttestationError::from_runtime)?;
     Ok(RuntimeEvidenceManifest {

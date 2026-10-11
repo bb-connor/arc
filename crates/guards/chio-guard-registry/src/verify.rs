@@ -4,8 +4,6 @@
 //! `chio_attest_verify::AttestVerifier` trait object, forwards bytes to that
 //! trait, and maps every verifier failure into a fail-closed registry error.
 
-use std::fs;
-
 use chio_attest_verify::AttestError;
 use serde::Serialize;
 
@@ -391,15 +389,18 @@ fn require_rekor_inclusion_verified(attestation: &VerifiedAttestation) -> Result
 }
 
 fn read_cache_file(path: &std::path::Path) -> Result<Vec<u8>> {
-    fs::read(path).map_err(|source| GuardRegistryError::CacheIo {
-        operation: "read",
-        path: path.to_path_buf(),
-        source,
+    crate::input::read_file(path, crate::input::MAX_ARTIFACT_BYTES).map_err(|source| {
+        GuardRegistryError::CacheIo {
+            operation: "read",
+            path: path.to_path_buf(),
+            source,
+        }
     })
 }
 
 fn map_attest_error(error: AttestError) -> GuardRegistryError {
     match error {
+        AttestError::Input(source) => GuardRegistryError::Input(source),
         AttestError::Io(source) => GuardRegistryError::VerifyIo { source },
         AttestError::SignatureMismatch => GuardRegistryError::VerifySignatureMismatch,
         AttestError::IdentityMismatch => GuardRegistryError::VerifyWrongSubject,

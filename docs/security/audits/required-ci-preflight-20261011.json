@@ -1,0 +1,499 @@
+{
+  "schema": "chio.pr1160.required-ci-preflight.v1",
+  "staged_source": "0df8edfaa110a136b1b02c85fb97764d2cbd2221",
+  "published_source": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+  "metadata_repair": {
+    "commit": "ac99dbbf041fe6552a01e33c88d9a88339a41e52",
+    "model_body_unchanged": true,
+    "stale_anchors": 8,
+    "new_timing_anchor": "ChioKernel::timed_dispatch",
+    "mirror_entries": 255,
+    "coverage_rows": 65,
+    "coverage_artifacts": 179,
+    "claude_review": "2026-10-11T10:24:57Z APPROVE"
+  },
+  "ci_order_repair": {
+    "commit": "6335dbc1c07918c4567c93a40f9ba9213a4797e1",
+    "changed_step_contents": false,
+    "changed_other_jobs": false,
+    "claude_review": "2026-10-11T10:25:42Z APPROVE"
+  },
+  "local_evidence": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/original.json",
+      "sha256": "ee153f31e7a9476663681b0165eb757854acf3441a7197460852c0ddcae42b1c"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/metadata-green.json",
+      "sha256": "293a2b2e0d3e3572ab77ac488e2cee8b4bdf03ea3cc1f69a50aa330915bace1b"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/ci-order-equivalence.json",
+      "sha256": "181f30a81da3b64dd59223b170d0e79ab26bc0fd5ab40d6d9c9010fd989d7e64"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/local-environment.json",
+      "sha256": "73946992a60d186859353da02f1ab2b00de8b5ad0d61bdc76a8fc5644e08a692"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/remaining-preflight/summary.json",
+      "sha256": "f850a02422fe2d87342df516ae0f2e9c54d05bc726baa127ee6f9a44a668ac96"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/launch-prerequisite-renewal/summary.json",
+      "sha256": "c7fa4a6fb7a2dd20968027c9c70865fba446ae83a8e45915b15bacd2367ee9c6"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/repaired-launch/summary.json",
+      "sha256": "5a8b5fa9329dce0a13fe19f7b162c92c8e3106d7aa81795282a69c3446da8186"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/remaining-build-boundaries/summary.json",
+      "sha256": "8da629fcf6e1fa21d7a191a6021cbf184e5c77da638cebd469b057d24d64468f"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/local-failure-classifications.json",
+      "sha256": "7775681e6380acc369f469b7800a06528e026fd098042c0abd71b2791b65bce3"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/consumer-platform-classification.json",
+      "sha256": "28dc0ae49eae83cf5287bc8512e75acfb6a6d2647c3881733f6b7e33ae00d1ad"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/consumer-portable-tail/partial.json",
+      "sha256": "b883f460179e23170225a3b50e90b37d1eba105e74131b1cc844c37623cb2aa2"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/consumer-portable-tail/root-cancellation.json",
+      "sha256": "9d417c3e10158a588c501e70a9b2207df619e628d952b1fcef71eefb6ec95ea7"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/consumer-tail-resume-plan.json",
+      "sha256": "fc90eea57bba5f8eb942a164041c1095d0b8b42bea768dfc5bebccb0a149bec8"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/consumer-portable-tail-resumed/summary.json",
+      "sha256": "e725125a96f1eae61da361a2499ef807c19a2f21c9d5eb774be42f5456a4bc1c"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/default-dependency-boundaries/summary.json",
+      "sha256": "19a6465bea36e96d86a27223efc2238ec02f1b1428c579eb572f494031d26385"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/market-composition.json",
+      "sha256": "0c56557082e226ebde484209804de9aed859e8ca3f79f4d8a617bcd67362232d"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/weak-key-ordering-review.json",
+      "sha256": "9dda85567d35200898dee3701ce7795ad2b2b8bfb83632e44b93b06c7183e19a"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/adapter-inventory-scope.json",
+      "sha256": "779735435ba9edb13d03024f6a0696146f0300a58c4edf17b2ddccff12252470"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/claude-optional-independent.json",
+      "sha256": "283b7d57d96c3226457a4ed7241ea4ca4cbfc3d76ddc77533b56b38a423e4f31"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/composed-successor/summary.json",
+      "sha256": "c1f78d958d8d2a6c2629545c7acc38f3149dc72c49be0254bfc6f93372cf9cdc"
+    }
+  ],
+  "hosted_snapshot": {
+    "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/hosted-snapshot-1133/latest.json",
+    "sha256": "6f9e978f6bcd4d2aca13b914abcab3a3768c6ea6183a744d61fa456e75466853"
+  },
+  "hosted_classifications": {
+    "path": "/tmp/pr1160-ci-batch-20261010/mirror-repair/hosted-snapshot-1133/classifications.json",
+    "sha256": "4f37ca974817fe054efd8cd6a34477fdc27247f3758a74e4d250c93107d3391f"
+  },
+  "status": "terminal-local-preflight",
+  "proof_obligations": {
+    "weights": {
+      "jobs": [
+        114427953778,
+        114427679001
+      ],
+      "proof_passed": false,
+      "owner_accepted": false,
+      "budget_seconds": 1800,
+      "scope": "Additional mandatory proof timeout; not covered by attestation-only amendment. Ordinary next-head CI may supply evidence; otherwise explicit merge disposition required."
+    },
+    "attestation": "Earlier owner-accepted open residual stays separate."
+  },
+  "boundaries": [
+    "No proof execution in this metadata repair.",
+    "Earlier failed and missing-prerequisite campaigns remain nonpassing.",
+    "Local aarch64 qualification does not replace exact-head hosted checks or native x86 enforcement.",
+    "No trusted authorization or repository variable mutation.",
+    "User merge authorization remains required."
+  ],
+  "observed_utc": "2026-10-11T11:34:25.860502+00:00",
+  "hosted_required_checks": {
+    "run": 38125088895,
+    "build_lint_test": {
+      "job": 114427678878,
+      "conclusion": "failure",
+      "cause": "Eight stale formal model anchor entries; repaired locally, hosted successor pending."
+    },
+    "msrv": {
+      "job": 114427678978,
+      "conclusion": null,
+      "status": "in_progress"
+    },
+    "cargo_vet": {
+      "job": 114427679033,
+      "conclusion": "success"
+    },
+    "cargo_deny": {
+      "job": 114427678956,
+      "conclusion": "success"
+    },
+    "all_required_green": false,
+    "observed_failed_or_cancelled": 17,
+    "unclassified_failed_or_cancelled": 0
+  },
+  "market_repair": {
+    "producer": "c0cdc15bf4f6a46fbabbeca4072d583d34d9c94f",
+    "integration": "336f65214a242a512e85e275c45c834e4e69abc1",
+    "trees_identical": true,
+    "path": "crates/economy/chio-open-market/src/finding_pheromone.rs",
+    "file_sha256": "02c6799abc9d55565dd14ab72f19b49fbddaec7f1b4d35f458dda40061694c75",
+    "source_review": "Root and Claude approve existing weak-owner preflight before strict verification; tests unchanged.",
+    "producer_evidence": [
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/original.log",
+        "sha256": "5fc941d0cadb6f66358d57eab0f1948186def0ab34312cabfc193e3c3500f271",
+        "test_summaries": [
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 filtered out; finished in 0.04s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/actual-error.log",
+        "sha256": "85db90b0488760e622d4f149d450da45041b47e74e06f89222c6bdba6ece615c",
+        "test_summaries": [
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 filtered out; finished in 0.04s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/green-open-market.log",
+        "sha256": "fdab9792879c68cfbb39133a710d9b4eb185b83c7cbb548d81c9335009b79735",
+        "test_summaries": [
+          "test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+          "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+          "test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s",
+          "test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/clippy.log",
+        "sha256": "f95ac488c6a53e1330d57a662aed4cedd0d175a579659d5f80140f4fdcccbe43",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/clock-gate.log",
+        "sha256": "34ea77cdbde7c8dc3ce6ed6d00d59fd877a29d872072fb8edaca38f14407762c",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/hygiene.log",
+        "sha256": "b95fdb90b028551ac3cafbb195b2af90b5ee1a7712c1e7c783c67c8eba91e29a",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/cli-finding.log",
+        "sha256": "e03ee5555c6ae5eb761d34ef79b6689309857994e19a4ba0822aa844971fbe80",
+        "test_summaries": [
+          "test result: ok. 115 passed; 0 failed; 0 ignored; 0 measured; 662 filtered out; finished in 9.94s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/finding-crates.log",
+        "sha256": "04cad34c97a7aa483b9ab5e7dc74c9158b7d3036ee8f141d720112eb54571a8b",
+        "test_summaries": [
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s",
+          "test result: ok. 42 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+          "test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c7-market-weak/green-ticket.log",
+        "sha256": "7aea5adc9a1046961517c3b2fd356bc45d93d13a039f01eed450ef7b42af0a56",
+        "test_summaries": []
+      }
+    ],
+    "root_composed_owning_renewal": "Final source 0df8: finding_admission 55 passed; strict all-target lint passed.",
+    "invariant": "Weak listing owner is refused before strict signature verification; strict verification and tests unchanged. Original was refusal provenance regression, not acceptance of invalid signatures."
+  },
+  "adapter_inventory": {
+    "commit": "0df8edfaa110a136b1b02c85fb97764d2cbd2221",
+    "original": "Two stale targets and three unclassified dispatch edges on 6335.",
+    "repair": "Update D034/D038 targets and add D092 for the owned session guard-attempt wrapper. All paths retain full guarded async kernel mediation.",
+    "scanner_or_exception_changed": false,
+    "early_ci_step_added": true,
+    "later_full_consumer_gate_retained": true,
+    "claude_call_chain_review": "2026-10-11T11:20:15Z APPROVE",
+    "claude_diff_review": "2026-10-11T11:25:41Z APPROVE"
+  },
+  "local_results": {
+    "final_composed_renewal": {
+      "source": "0df8edfaa110a136b1b02c85fb97764d2cbd2221",
+      "commands": [
+        {
+          "label": "market-admission",
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "chio-open-market",
+            "--test",
+            "finding_admission"
+          ],
+          "exit": 0,
+          "seconds": 7.68,
+          "log_sha256": "5b451a29a114e472aba9ce427436e2a4957a0c822a4d623f0d267613e0edab7c",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:24:45.967400+00:00"
+        },
+        {
+          "label": "market-strict",
+          "argv": [
+            "cargo",
+            "clippy",
+            "--locked",
+            "-p",
+            "chio-open-market",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 33.76,
+          "log_sha256": "2f25a9557c5540e3b5d652d794d8e13b298e703deb8caad833ad878ea44f1b29",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:25:19.920459+00:00"
+        },
+        {
+          "label": "adapter-mediation",
+          "argv": [
+            "cargo",
+            "xtask",
+            "check",
+            "adapter-no-bypass"
+          ],
+          "exit": 0,
+          "seconds": 11.51,
+          "log_sha256": "b515d6857fd514d0088e71961c58874a58d00b4bbc216d112e0f829c4fe361af",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:25:31.625479+00:00"
+        },
+        {
+          "label": "formal-mirrors",
+          "argv": [
+            "cargo",
+            "xtask",
+            "check",
+            "formal-mirrors"
+          ],
+          "exit": 0,
+          "seconds": 4.36,
+          "log_sha256": "32660d7b426aecb3cd830bd98d4f3eb570d68858978cc7f4fd58ec84b2e70211",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:25:36.180198+00:00"
+        },
+        {
+          "label": "proof-coverage",
+          "argv": [
+            "cargo",
+            "xtask",
+            "gen",
+            "proof-coverage",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 4.74,
+          "log_sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:25:41.116064+00:00"
+        },
+        {
+          "label": "format",
+          "argv": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 28.11,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:26:09.427570+00:00"
+        },
+        {
+          "label": "ci-contract",
+          "argv": [
+            "python3",
+            "scripts/check-security-ci-contract.py"
+          ],
+          "exit": 0,
+          "seconds": 2.24,
+          "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:26:11.850793+00:00"
+        },
+        {
+          "label": "rust-hygiene",
+          "argv": [
+            "python3",
+            "scripts/check-rust-file-hygiene.py"
+          ],
+          "exit": 0,
+          "seconds": 5.5,
+          "log_sha256": "7cfafa6b731fa6ba5f4c57e612ce4b308e1ca1bc16c6ec49880559dc84b0f306",
+          "source_stable": true,
+          "observed_utc": "2026-10-11T11:26:17.548093+00:00"
+        }
+      ],
+      "accepted": true
+    },
+    "predecessor_broad_sweep": {
+      "source": "6335dbc1c07918c4567c93a40f9ba9213a4797e1",
+      "whole_campaign_passed": false,
+      "passed": [
+        "workspace strict Clippy (lib, bins, examples)",
+        "workspace build",
+        "policy analysis",
+        "protocol peer negotiation (12 exact)",
+        "market build and strict lint",
+        "CLI finding (115)",
+        "finding/verifier (268; two ignored)",
+        "Tokio console smoke (one)"
+      ],
+      "failed": [
+        "consumer boundaries: local aarch64 cannot qualify native Linux x86_64 enforcement",
+        "open-market: weak-owner refusal ordering, repaired and renewed",
+        "conformance: five live-peer targets require missing enforcing-host CHIO_CAGE_INIT"
+      ]
+    },
+    "consumer_supplement": {
+      "whole_gate_passed": false,
+      "portable_runtime_controls_passed": 18,
+      "http_egress_passed": true,
+      "adapter_original_failed": true,
+      "adapter_final_passed": true,
+      "native_cases_not_qualified_locally": [
+        "ready-session restart",
+        "policy tightening"
+      ],
+      "interruption": "Root stopped only its own supplemental process group after discovering overlap with its primary target writer. Seven completed controls retained; interrupted eighth and remaining controls renewed after primary terminal. Cancellation is not a pass."
+    },
+    "release_and_launch_preflight": "Initial 13/16 pass; coverage stale and dashboard unavailable remain failed originals. After dashboard build and metadata repair both launch checks pass. Local Node24/npm11 differs from hosted Node22.",
+    "optional_feature_preflight": {
+      "source": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+      "worktree_clean_after": true,
+      "observed_phase_start_sources_clean": true,
+      "records": [
+        {
+          "label": "1-kernel-clippy-lib",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/1-kernel-clippy-lib.log",
+          "sha256": "f63156f3beb883012fa58df7260c54aed062c992328650aab802e9f0625c1cf7",
+          "test_summaries": []
+        },
+        {
+          "label": "2-kernel-clippy-finding-market",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/2-kernel-clippy-finding-market.log",
+          "sha256": "4cf86cb2c72067975c41781c16a824f5425d95173a3691c7fbe8a2db7b9cc9ae",
+          "test_summaries": []
+        },
+        {
+          "label": "3-cli-iroh-build",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/3-cli-iroh-build.log",
+          "sha256": "be4c31282bad043302f03a565facf423c809d2c0ed7799812b2c641c3eb19654",
+          "test_summaries": []
+        },
+        {
+          "label": "4-cli-iroh-clippy",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/4-cli-iroh-clippy.log",
+          "sha256": "1c512f455ecf39779800666b7f7751134a759c3fc7746adc9639b602f4aa8e58",
+          "test_summaries": []
+        },
+        {
+          "label": "5-cli-iroh-test",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/5-cli-iroh-test.log",
+          "sha256": "6ce39a11887ebce67009fce465f2ae9f121daa4a60831b134d51e547db9566fb",
+          "test_summaries": [
+            "test result: ok. 813 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 111.51s"
+          ]
+        },
+        {
+          "label": "6-wasm-guards-lib",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/6-wasm-guards-lib.log",
+          "sha256": "afcd7ea4b6235cffb9a685cff26b8e4d5041f5a53bd1f00bf16123cd40e8cc9d",
+          "test_summaries": [
+            "test result: ok. 151 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s"
+          ]
+        },
+        {
+          "label": "7a-py-fixture",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/7a-py-fixture.log",
+          "sha256": "5fb5630c26cdbe556334673f5c61d8e1abc273bdcc64f91921f4b006961f1db2",
+          "test_summaries": []
+        },
+        {
+          "label": "7b-py-guard-integration",
+          "exit": 0,
+          "log_path": "/home/connor/lanes/claude-pr1160-evidence/ci-lanes-36d77/7b-py-guard-integration.log",
+          "sha256": "9f3c2d34d7dfd7a1e8a4960beea3ebca856571ee1fb2a56c9927b3dc934a4c52",
+          "test_summaries": [
+            "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 241.97s"
+          ]
+        }
+      ],
+      "fixture": {
+        "path": "/home/connor/lanes/claude-ci-lanes-36d77/sdks/guard/chio-guard-py/dist/tool-gate.wasm",
+        "bytes": 18417812,
+        "sha256": "a9fdb453735b3b155ada78915e990caa6cd7ab7bf3ad5a06bf463f7bba66ec30"
+      },
+      "scope": "Independent log/exit/source/artifact verification; tests executed by Claude C5. Local platform flags differ from hosted, as recorded."
+    },
+    "scope": "Source-specific Linux aarch64 local evidence; no full hosted, proof, native enforcing-host, latency or cold-state activation qualification."
+  },
+  "remaining_acceptance": [
+    "Wait for all four required checks on published 36d77 to report; batch any remaining genuine failure into one reviewed replacement.",
+    "Obtain four required green checks on the replacement head, classify every other failure and answer all review threads.",
+    "If mandatory weights proof remains open, obtain explicit user disposition distinct from the attestation-only amendment.",
+    "Report exact head and residuals for user merge go-ahead; no automatic merge."
+  ],
+  "post_merge_obligations": [
+    "Trusted enterprise/controller authorization and reusable-definition freshness; no authorization rotation in this batch.",
+    "Committed Linux evidence variable and native/trusted product acceptance; no repository variable mutation.",
+    "Previously accepted attestation-only Kani residual; additional weights timeout is not included.",
+    "Operational cold-state preparation/activation and native latency/concurrency qualification remain open."
+  ]
+}

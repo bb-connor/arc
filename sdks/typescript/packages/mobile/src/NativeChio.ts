@@ -1,6 +1,6 @@
 export type ChioNativeModule = {
   evaluate(requestJson: string): Promise<string>;
-  signReceipt(bodyJson: string, signingSeedHex: string): Promise<string>;
+  signReceipt(bodyJson: string, canonicalContentHex: string, signingSeedHex: string): Promise<string>;
   verifyCapability(tokenJson: string, authorityPubHex: string): Promise<unknown>;
   verifyPassport(
     envelopeJson: string,
@@ -9,7 +9,7 @@ export type ChioNativeModule = {
   ): Promise<unknown>;
   attestAppAttest(keyId: string, challengeHex: string): Promise<string>;
   attestPlayIntegrity(nonceHex: string): Promise<string>;
-  verifyMobileReceipt(receiptJson: string, evidenceJson: string): Promise<string>;
+  inspectMobileReceiptEnvelopes(receiptJson: string, evidenceJson: string): Promise<string>;
 };
 
 let nativeModule: ChioNativeModule | undefined;

@@ -87,7 +87,8 @@
       "enum": [
         "caller_executed",
         "host_executed_provider_reported",
-        "host_executed_unmediated"
+        "host_executed_unmediated",
+        "chio_internal"
       ],
       "description": "Signed classification of where the tool effect executed relative to Chio."
     },

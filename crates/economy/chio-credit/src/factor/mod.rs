@@ -46,6 +46,8 @@ const BASIS_POINTS_DENOMINATOR: u16 = 10_000;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum FactorError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("invalid factor field '{0}'")]
     InvalidField(&'static str),
     #[error("factor binding does not match")]
@@ -95,18 +97,11 @@ fn canonical_bytes(value: &impl Serialize) -> Result<Vec<u8>, FactorError> {
     canonical_json_bytes(value).map_err(|error| FactorError::Canonicalization(error.to_string()))
 }
 
-fn parse_canonical<T>(bytes: &[u8], artifact: &str) -> Result<T, FactorError>
+fn parse_canonical<T>(bytes: &[u8], _artifact: &str) -> Result<T, FactorError>
 where
     T: DeserializeOwned + Serialize,
 {
-    let value: T = serde_json::from_slice(bytes)
-        .map_err(|error| FactorError::Canonicalization(error.to_string()))?;
-    if canonical_bytes(&value)?.as_slice() != bytes {
-        return Err(FactorError::Canonicalization(format!(
-            "{artifact} is not canonical"
-        )));
-    }
-    Ok(value)
+    crate::input::canonical(bytes, crate::input::MAX_EVIDENCE_BYTES).map_err(Into::into)
 }
 
 fn domain_digest(domain: &[u8], value: &impl Serialize) -> Result<String, FactorError> {
@@ -175,5 +170,22 @@ fn validate_amount(
         Err(FactorError::InvalidField(field))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod original_input_tests {
+    use super::*;
+    #[test]
+    fn original_factor_input_preserves_native_cause() {
+        let error = match parse_canonical::<serde_json::Value>(
+            br#"{"private-marker":1,"private-marker":2}"#,
+            "test",
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("ambiguous factor input accepted"),
+        };
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
     }
 }

@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::canonical::canonical_json_bytes;
 use crate::capability::{
     runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence},
-    trust_policy::{canonicalize_attestation_verifier, AttestationTrustPolicy},
+    trust_policy::canonicalize_attestation_verifier,
     workload_identity::WorkloadIdentity,
 };
 use crate::crypto::sha256_hex;
@@ -748,91 +748,6 @@ pub fn derive_runtime_attestation_appraisal(
             schema: evidence.schema.clone(),
         }),
     }
-}
-
-pub fn verify_runtime_attestation_record(
-    evidence: &RuntimeAttestationEvidence,
-    trust_policy: Option<&AttestationTrustPolicy>,
-    now: u64,
-) -> Result<VerifiedRuntimeAttestationRecord, RuntimeAttestationVerificationError> {
-    let appraisal = derive_runtime_attestation_appraisal(evidence)?;
-    let subject = verified_runtime_attestation_subject(evidence)?;
-    let policy_outcome = verify_runtime_attestation_policy_outcome(evidence, trust_policy, now)?;
-    Ok(VerifiedRuntimeAttestationRecord {
-        evidence: evidence.clone(),
-        provenance: VerifiedRuntimeAttestationProvenance {
-            verifier_family: appraisal.verifier_family,
-            verifier_adapter: appraisal.adapter.clone(),
-            canonical_verifier: canonicalize_attestation_verifier(&evidence.verifier),
-            matched_trust_rule: policy_outcome.matched_trust_rule.clone(),
-        },
-        appraisal,
-        policy_outcome: policy_outcome.outcome,
-        subject,
-        verified_at: now,
-    })
-}
-
-fn verified_runtime_attestation_subject(
-    evidence: &RuntimeAttestationEvidence,
-) -> Result<RuntimeAttestationAppraisalResultSubject, RuntimeAttestationVerificationError> {
-    Ok(RuntimeAttestationAppraisalResultSubject {
-        runtime_identity: evidence.runtime_identity.clone(),
-        workload_identity: evidence.normalized_workload_identity()?,
-    })
-}
-
-#[derive(Debug, Clone)]
-struct VerifiedRuntimeAttestationPolicyVerification {
-    outcome: RuntimeAttestationPolicyOutcome,
-    matched_trust_rule: Option<String>,
-}
-
-fn verify_runtime_attestation_policy_outcome(
-    evidence: &RuntimeAttestationEvidence,
-    trust_policy: Option<&AttestationTrustPolicy>,
-    now: u64,
-) -> Result<VerifiedRuntimeAttestationPolicyVerification, RuntimeAttestationVerificationError> {
-    let trust_policy_configured = trust_policy.is_some_and(|policy| !policy.rules.is_empty());
-    if trust_policy_configured {
-        let resolved = evidence
-            .resolve_effective_runtime_assurance(trust_policy, now)
-            .map_err(RuntimeAttestationVerificationError::TrustPolicy)?;
-        let matched_trust_rule = resolved.matched_rule.clone();
-        return Ok(VerifiedRuntimeAttestationPolicyVerification {
-            outcome: RuntimeAttestationPolicyOutcome {
-                trust_policy_configured: true,
-                accepted: true,
-                effective_tier: resolved.effective_tier,
-                reason: matched_trust_rule
-                    .as_ref()
-                    .map(|rule| format!("matched attestation trust rule `{rule}`")),
-            },
-            matched_trust_rule,
-        });
-    }
-
-    evidence.validate_workload_identity_binding()?;
-    if !evidence.is_valid_at(now) {
-        return Err(RuntimeAttestationVerificationError::StaleEvidence {
-            now,
-            issued_at: evidence.issued_at,
-            expires_at: evidence.expires_at,
-        });
-    }
-
-    Ok(VerifiedRuntimeAttestationPolicyVerification {
-        outcome: RuntimeAttestationPolicyOutcome {
-            trust_policy_configured: false,
-            accepted: false,
-            effective_tier: RuntimeAssuranceTier::None,
-            reason: Some(
-                "runtime attestation evidence did not cross a local verified trust boundary"
-                    .to_string(),
-            ),
-        },
-        matched_trust_rule: None,
-    })
 }
 
 fn extract_vendor_claims(

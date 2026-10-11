@@ -1,0 +1,381 @@
+{
+  "schema": "chio.final-repair-components.v1",
+  "observed_at": "2026-10-10T08:15:14.729864+00:00",
+  "source_stage": "982a95175b757836c39a179723eca490f9a0a518",
+  "published_source": "633cf1d2f6b4a35008beb4b165c357fc42046251",
+  "published_status": "withdrawn",
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "budget": {
+    "producer": "51b2b093d71337d5bc3c4287657fbf2eaa31b47a",
+    "integration": "36d1ea8efd4a1776d17224a7a589aa9a202d78c9",
+    "packet": {
+      "path": "/tmp/pr1160-legacy-hold-projection-20261010/qualification.json",
+      "sha256": "1c401cf83ecf8e52a5081deed084cecfb8836c8091fced9e10ded7f3aa759334"
+    },
+    "manifest": {
+      "path": "/tmp/pr1160-legacy-hold-projection-20261010/frozen-v5-source.json",
+      "sha256": "cbf69fe50ed58399f85af3fbef752a4fef6ad3b46e7cb166870b8a11beed386e"
+    },
+    "acceptance": "V4 owning59PASS; final V5 strict and five static gates PASS. Six test-only borrowed-slice substitutions independently reviewed. Final V5 runtime remains pending in Root composition."
+  },
+  "cli": {
+    "integration": "982a95175b757836c39a179723eca490f9a0a518",
+    "manifest": {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-source-frozen-v4.json",
+      "sha256": "13f06a1433476df4ef95ae3e0142bef981d805054cc1f8e1d549916fc42970a9"
+    },
+    "acceptance": "V3 has31 focused passes and one ignored certify case; V4 only relocates the unchanged test module to EOF. Final V4 strict CLI all-targets and five static gates PASS; V4 runtime renewal remains pending in Root composition.",
+    "commands": [
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-file-units-v3.result.json",
+          "sha256": "cc8e824b8dc328a484a5f036d616d85b5418969caa8eb0aff4897e965adf30f0"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-file-units-v3.log",
+          "sha256": "a2e6df481ea1c82a70bf18dc44a393cbd1aed8ba6ce46e7135d154d25564aabb"
+        },
+        "summaries": [
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 773 filtered out; finished in 0.10s"
+        ]
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-focused-v3.result.json",
+          "sha256": "120d24b59d57f0daffbf0de62358cacabd65a3841e2823c0d77990ca53188a4f"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-focused-v3.log",
+          "sha256": "c9bffd05b1b842e471edecd2f76e5a88045a193dc6431b4080cccd7dd2545eac"
+        },
+        "summaries": [
+          "test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.69s",
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.50s"
+        ]
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-signed-reads-v3.result.json",
+          "sha256": "a8c7c31a536aa1a6cd2b50dd548f2bf6e168a60855878104b36797b47d4bd860"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-signed-reads-v3.log",
+          "sha256": "70a3137b3cf5ad7495bb656fe21f10bc3e4e3ad1aa69607ad1a184b0287475b4"
+        },
+        "summaries": [
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 7.66s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.72s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 8.80s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.86s"
+        ]
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-strict-v4.result.json",
+          "sha256": "28457231cfe54807f822d8dd3d43e2c66ba6041e997a06e380f5ffd2d3153b07"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-strict-v4.log",
+          "sha256": "6d2a8a038a710b45d0613997baa7634019d86fac2d28f8effab55476a073cb64"
+        },
+        "summaries": []
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-format-v4.result.json",
+          "sha256": "067873563d41cddc9a3b376ea9d08886bf4a7b3fc392b40dfc074e6b3dc309f9"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-format-v4.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "summaries": []
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-negative-v4.result.json",
+          "sha256": "b99f91646824da9362443f7a65b0fff9037c729a8dd210c7da0b3aa6a324637d"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-negative-v4.log",
+          "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4"
+        },
+        "summaries": []
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-hygiene-v4.result.json",
+          "sha256": "a3abba242039ef6a1bc9f62a3a04627aba427752c104fcf869e1e15e39afab96"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-hygiene-v4.log",
+          "sha256": "c2c92c6835d06abf513b8e58234c2eafe5997d574ce262649191545230782161"
+        },
+        "summaries": []
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-clocks-v4.result.json",
+          "sha256": "3e16089dbd4cfb1cf8b9e026ffda6562c2c4f8c52946abcb4afe2fc5aebab638"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-clocks-v4.log",
+          "sha256": "ca8df35e43fd01f74906c5a32c73b0bc3b8d6879c6ffc664e099d887fd8d52ed"
+        },
+        "summaries": []
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-trust-v4.result.json",
+          "sha256": "ab8457b66da89af7e6966d90ab34da647d6756f538888ea032394ce764c20224"
+        },
+        "log": {
+          "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-trust-v4.log",
+          "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69"
+        },
+        "summaries": []
+      }
+    ],
+    "review": {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/independent-file-publication-v3.md",
+      "sha256": "def5648e4bab5157252c5e85e3a2c6f321f4e5f02e1db6399bde96c8fd2685d8"
+    },
+    "layout_review": {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/independent-file-publication-v4-addendum.md",
+      "sha256": "5a09d47cc685679a6fca51d53adbe8930b9e93d099b4d6b72662f0c70eaa0d5d"
+    },
+    "source_sha256": {
+      "crates/products/chio-cli/README.md": "3bf25640c71db34f53073553c9a9b045843e3f251b772f2b3c7b8667758f9cd2",
+      "crates/products/chio-cli/src/cli/runtime/trust_reports.rs": "2dcc3de23b87c1735228f0647d6028c464b1fa1ed9ce93a086380bb5ff6e6c2c",
+      "crates/products/chio-cli/src/cli/trust/credit.rs": "7051850d324334631b7d47b66dd6d53e1fa6dd4c37fc0b494b5b34aa5c6b79b6",
+      "crates/products/chio-cli/src/cli/trust/liability.rs": "e80ba5b71d1fbb89a4ed21899f03c9071c0fb046fe076469041cf6cb21bba96a",
+      "crates/products/chio-cli/src/cli/trust/shared.rs": "66062f1f0b44b513794d902030917d6cd3c388c4c345912802cefa467ca55cb4",
+      "crates/products/chio-cli/src/cli/trust/underwriting.rs": "8af7902d0629caa986e4b7d2dbb257e73b04ff0d2f25064d70446f5e7c3bbf3a",
+      "crates/products/chio-cli/tests/receipt_query_capital.rs": "c80feca22eb3722150bcd8407171e16bd50b4b9847472ec6a7e13be627197b6b",
+      "crates/products/chio-cli/tests/receipt_query_credit_exposure.rs": "8ac7dda618b702f2b12f180df174a252b16de7069ac7de0bb1500b69bd7d36ab",
+      "crates/products/chio-cli/tests/receipt_query_credit_loss.rs": "79657176ce6cb0c7234590e0de148429ba36b97387d59ce7b552c2068b1aca59",
+      "crates/products/chio-cli/tests/receipt_query_evidence.rs": "d9bbbaa0d8079afa170771840b3d9fefd6b2e7779749aaff495aee96fdc744ec",
+      "crates/products/chio-cli/tests/cli_signing_custody.rs": "91e3b0bcf6da80546da9c02b50d30d30c41d7194a71da5a4c5310bf64c9a474e"
+    },
+    "native_windows_execution": "unverified"
+  },
+  "new_review_findings": [
+    {
+      "id": "FINAL-CLI-WINDOWS-PUBLICATION",
+      "priority": "P1",
+      "contract": "Sync the published seed file on every platform; perform parent-directory synchronization only on Unix. Native Windows execution remains unverified.",
+      "state": "source-repaired-component-verified",
+      "source_repair": "982a95175b757836c39a179723eca490f9a0a518"
+    },
+    {
+      "id": "FINAL-CLI-SECRET-BUFFER-GROWTH",
+      "priority": "P2",
+      "contract": "Write the zeroizing seed buffer without growth that could free its original allocation unwiped.",
+      "state": "source-repaired-component-verified",
+      "source_repair": "982a95175b757836c39a179723eca490f9a0a518"
+    },
+    {
+      "id": "FINAL-CLI-DIRECTORY-PATH",
+      "priority": "P2",
+      "contract": "Reject trailing directory-shaped seed paths before owner initialization; preserve the exact configured file path.",
+      "state": "source-repaired-component-verified",
+      "source_repair": "982a95175b757836c39a179723eca490f9a0a518"
+    },
+    {
+      "id": "FINAL-CLI-PROVIDER-ORACLE",
+      "priority": "P2",
+      "contract": "The malformed-provider control must exercise an existing public validation refusal before custody creation; do not invent schema validation behavior.",
+      "state": "source-repaired-component-verified",
+      "source_repair": "982a95175b757836c39a179723eca490f9a0a518"
+    }
+  ],
+  "originals_and_prior_failures": [
+    {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/independent-file-publication-v2.md",
+      "sha256": "db761f68b01b1ab9fbc2e8d601e8c977de8abbc733688f234a593c280d4473ad"
+    },
+    {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/original-directory-path-v2.result.json",
+      "sha256": "bdbc5e414ce24b04c2b7558b1fd23825c39faef66942c8865b85fa7f75f168ea"
+    },
+    {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-focused-v1.result.json",
+      "sha256": "98c0dd96bff232faa3282e0fc346f5e9c5d14a8d1dca8d510bfa4a4e652ec2d9"
+    },
+    {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-focused-v2.result.json",
+      "sha256": "2366cecbec5f70301310b449102b887bc1332ce74a8b37c68f702a018f44f94b"
+    },
+    {
+      "path": "/tmp/pr1160-cli-custody-bootstrap-20261010/repaired-strict-v3.result.json",
+      "sha256": "d2d464d13127f3521b80d0bbf165613fa903cad80b2f2d77c167e4003e2d6f05"
+    }
+  ],
+  "archived_current_states": {
+    "incoming-pr1160-final-qualification-20261010:FINAL-CLI-SIGNER-BOOTSTRAP": {
+      "requirement_id": "incoming-pr1160-final-qualification-20261010:FINAL-CLI-SIGNER-BOOTSTRAP",
+      "label": "FINAL-CLI-SIGNER-BOOTSTRAP",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-candidate-withdrawal-20261010.json",
+          "sha256": "d5b23a834627116e44efcca2bfb3fdea5efa110a43c11b3fe75ead50027a42c9",
+          "source_commit": "372639e706b2a37f4ab13f365c638395e5c9d336",
+          "scope": "Withdrawn633cf failures retained; five obligations tracked. Only smoke component repaired, no candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete four open repairs with genuine Original witnesses, owning runtime and strict lint.",
+        "Independently review new production CLI and budget-cache repairs; compose all source changes and renew metadata.",
+        "Preserve failed, partial, cancelled and ignored evidence separately. Prior independent report does not clear subsequent runtime failures.",
+        "Publish a replacement only after local boundary qualification; require all four protected exact-source hosted checks and normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 preview gate. No proof campaign or release-readiness claim."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "5cb7ec5ee4791d56ab2407b31178d8145f25f830"
+    },
+    "incoming-pr1160-final-qualification-20261010:FINAL-LEGACY-BUDGET-REPLAY": {
+      "requirement_id": "incoming-pr1160-final-qualification-20261010:FINAL-LEGACY-BUDGET-REPLAY",
+      "label": "FINAL-LEGACY-BUDGET-REPLAY",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-candidate-withdrawal-20261010.json",
+          "sha256": "d5b23a834627116e44efcca2bfb3fdea5efa110a43c11b3fe75ead50027a42c9",
+          "source_commit": "372639e706b2a37f4ab13f365c638395e5c9d336",
+          "scope": "Withdrawn633cf failures retained; five obligations tracked. Only smoke component repaired, no candidate or hosted qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Complete four open repairs with genuine Original witnesses, owning runtime and strict lint.",
+        "Independently review new production CLI and budget-cache repairs; compose all source changes and renew metadata.",
+        "Preserve failed, partial, cancelled and ignored evidence separately. Prior independent report does not clear subsequent runtime failures.",
+        "Publish a replacement only after local boundary qualification; require all four protected exact-source hosted checks and normal protected merge.",
+        "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 preview gate. No proof campaign or release-readiness claim."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "5cb7ec5ee4791d56ab2407b31178d8145f25f830"
+    },
+    "incoming-pr1160-final-repair-review-20261010:FINAL-BUDGET-LIST-SEQUENCE": {
+      "requirement_id": "incoming-pr1160-final-repair-review-20261010:FINAL-BUDGET-LIST-SEQUENCE",
+      "label": "FINAL-BUDGET-LIST-SEQUENCE",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-repair-review-intake-20261010.json",
+          "sha256": "7c27dbd07aee895da2182f4dec512d57d430630c66f5111a9141afaaf1ab04cb",
+          "source_commit": "74428c849ce31d008c25613ad5a672c008d08477",
+          "scope": "Four additional obligations and exact Original evidence, two integrated fixture components; no candidate qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Review and integrate source repairs with owning runtime, strict lint and exact source pins.",
+        "Compose final changed boundaries and refresh metadata; obtain independent final delta review.",
+        "Publish one replacement, require four protected exact-SHA hosted checks, and use normal protected merge."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "af0901caaeed06a11a572c6fc8dfefa114a5b97f"
+    },
+    "incoming-pr1160-final-repair-review-20261010:FINAL-BUDGET-REPLAY-REFUSAL-CACHE": {
+      "requirement_id": "incoming-pr1160-final-repair-review-20261010:FINAL-BUDGET-REPLAY-REFUSAL-CACHE",
+      "label": "FINAL-BUDGET-REPLAY-REFUSAL-CACHE",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-repair-review-intake-20261010.json",
+          "sha256": "7c27dbd07aee895da2182f4dec512d57d430630c66f5111a9141afaaf1ab04cb",
+          "source_commit": "74428c849ce31d008c25613ad5a672c008d08477",
+          "scope": "Four additional obligations and exact Original evidence, two integrated fixture components; no candidate qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Review and integrate source repairs with owning runtime, strict lint and exact source pins.",
+        "Compose final changed boundaries and refresh metadata; obtain independent final delta review.",
+        "Publish one replacement, require four protected exact-SHA hosted checks, and use normal protected merge."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "af0901caaeed06a11a572c6fc8dfefa114a5b97f"
+    },
+    "incoming-pr1160-final-repair-review-20261010:FINAL-CLI-SEED-PUBLICATION": {
+      "requirement_id": "incoming-pr1160-final-repair-review-20261010:FINAL-CLI-SEED-PUBLICATION",
+      "label": "FINAL-CLI-SEED-PUBLICATION",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-repair-review-intake-20261010.json",
+          "sha256": "7c27dbd07aee895da2182f4dec512d57d430630c66f5111a9141afaaf1ab04cb",
+          "source_commit": "74428c849ce31d008c25613ad5a672c008d08477",
+          "scope": "Four additional obligations and exact Original evidence, two integrated fixture components; no candidate qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Review and integrate source repairs with owning runtime, strict lint and exact source pins.",
+        "Compose final changed boundaries and refresh metadata; obtain independent final delta review.",
+        "Publish one replacement, require four protected exact-SHA hosted checks, and use normal protected merge."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "af0901caaeed06a11a572c6fc8dfefa114a5b97f"
+    },
+    "incoming-pr1160-final-repair-review-20261010:FINAL-CLI-SIGNED-READ-FIXTURES": {
+      "requirement_id": "incoming-pr1160-final-repair-review-20261010:FINAL-CLI-SIGNED-READ-FIXTURES",
+      "label": "FINAL-CLI-SIGNED-READ-FIXTURES",
+      "scope": "now",
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "repair-in-progress",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/final-repair-review-intake-20261010.json",
+          "sha256": "7c27dbd07aee895da2182f4dec512d57d430630c66f5111a9141afaaf1ab04cb",
+          "source_commit": "74428c849ce31d008c25613ad5a672c008d08477",
+          "scope": "Four additional obligations and exact Original evidence, two integrated fixture components; no candidate qualification."
+        }
+      ],
+      "remaining_acceptance": [
+        "Review and integrate source repairs with owning runtime, strict lint and exact source pins.",
+        "Compose final changed boundaries and refresh metadata; obtain independent final delta review.",
+        "Publish one replacement, require four protected exact-SHA hosted checks, and use normal protected merge."
+      ],
+      "merged": false,
+      "full_qualified": false,
+      "observed_source_head": "af0901caaeed06a11a572c6fc8dfefa114a5b97f"
+    }
+  },
+  "remaining_acceptance": [
+    "Renew generated metadata and run the 98 mandatory composed controls plus strict owning lint on a frozen candidate.",
+    "Obtain independent final delta review; preserve exact failed, skipped, ignored, unavailable and cancelled evidence.",
+    "Publish one replacement and obtain four protected exact-source hosted checks, accurate thread dispositions, and normal protected merge."
+  ],
+  "boundaries": [
+    "Only ordinary Rust tests and source review continued; the guard-blocked external experiment was not retried.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED and SEC-1160-COLDSTATE remains OPEN P1 before G5. No proof campaign or release-readiness claim."
+  ]
+}

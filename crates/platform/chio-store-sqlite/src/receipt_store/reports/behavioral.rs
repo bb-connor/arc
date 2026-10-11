@@ -20,8 +20,14 @@ impl SqliteReceiptStore {
         let capability_id = operator_query.capability_id.as_deref();
         let tool_server = operator_query.tool_server.as_deref();
         let tool_name = operator_query.tool_name.as_deref();
-        let since = operator_query.since.map(|value| value as i64);
-        let until = operator_query.until.map(|value| value as i64);
+        let since = operator_query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = operator_query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = operator_query.agent_subject.as_deref();
 
         let summary_sql = r#"
@@ -118,19 +124,30 @@ impl SqliteReceiptStore {
             |row| {
                 Ok((
                     BehavioralFeedSettlementSummary {
-                        pending_receipts: row.get::<_, i64>(0)?.max(0) as u64,
-                        settled_receipts: row.get::<_, i64>(1)?.max(0) as u64,
-                        failed_receipts: row.get::<_, i64>(2)?.max(0) as u64,
-                        not_applicable_receipts: row.get::<_, i64>(3)?.max(0) as u64,
-                        actionable_receipts: row.get::<_, i64>(4)?.max(0) as u64,
-                        reconciled_receipts: row.get::<_, i64>(5)?.max(0) as u64,
+                        pending_receipts: u64::try_from(row.get::<_, i64>(0)?.max(0))
+                            .unwrap_or_default(),
+                        settled_receipts: u64::try_from(row.get::<_, i64>(1)?.max(0))
+                            .unwrap_or_default(),
+                        failed_receipts: u64::try_from(row.get::<_, i64>(2)?.max(0))
+                            .unwrap_or_default(),
+                        not_applicable_receipts: u64::try_from(row.get::<_, i64>(3)?.max(0))
+                            .unwrap_or_default(),
+                        actionable_receipts: u64::try_from(row.get::<_, i64>(4)?.max(0))
+                            .unwrap_or_default(),
+                        reconciled_receipts: u64::try_from(row.get::<_, i64>(5)?.max(0))
+                            .unwrap_or_default(),
                     },
                     BehavioralFeedGovernedActionSummary {
-                        governed_receipts: row.get::<_, i64>(6)?.max(0) as u64,
-                        approval_receipts: row.get::<_, i64>(7)?.max(0) as u64,
-                        approved_receipts: row.get::<_, i64>(8)?.max(0) as u64,
-                        commerce_receipts: row.get::<_, i64>(9)?.max(0) as u64,
-                        max_amount_receipts: row.get::<_, i64>(10)?.max(0) as u64,
+                        governed_receipts: u64::try_from(row.get::<_, i64>(6)?.max(0))
+                            .unwrap_or_default(),
+                        approval_receipts: u64::try_from(row.get::<_, i64>(7)?.max(0))
+                            .unwrap_or_default(),
+                        approved_receipts: u64::try_from(row.get::<_, i64>(8)?.max(0))
+                            .unwrap_or_default(),
+                        commerce_receipts: u64::try_from(row.get::<_, i64>(9)?.max(0))
+                            .unwrap_or_default(),
+                        max_amount_receipts: u64::try_from(row.get::<_, i64>(10)?.max(0))
+                            .unwrap_or_default(),
                     },
                 ))
             },
@@ -163,7 +180,7 @@ impl SqliteReceiptStore {
                 ],
                 |row| row.get::<_, i64>(0),
             )
-            .map(|value| value.max(0) as u64)?;
+            .map(|value| u64::try_from(value.max(0)).unwrap_or_default())?;
 
         let rows_sql = r#"
             SELECT r.seq, r.raw_json
@@ -188,7 +205,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64,
+                crate::integer::checked::<_, i64>(row_limit)?,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -198,7 +215,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             receipts.push(self.behavioral_feed_receipt_row_from_receipt(receipt)?);
         }
@@ -227,8 +244,14 @@ impl SqliteReceiptStore {
         let capability_id = operator_query.capability_id.as_deref();
         let tool_server = operator_query.tool_server.as_deref();
         let tool_name = operator_query.tool_name.as_deref();
-        let since = operator_query.since.map(|value| value as i64);
-        let until = operator_query.until.map(|value| value as i64);
+        let since = operator_query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = operator_query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = operator_query.agent_subject.as_deref();
         let row_limit = limit.max(1);
 
@@ -266,7 +289,7 @@ impl SqliteReceiptStore {
                 ],
                 |row| row.get::<_, i64>(0),
             )
-            .map(|value| value.max(0) as u64)?;
+            .map(|value| u64::try_from(value.max(0)).unwrap_or_default())?;
 
         let rows_sql = r#"
             SELECT r.seq, r.raw_json
@@ -300,7 +323,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64
+                crate::integer::checked::<_, i64>(row_limit)?
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -311,7 +334,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             receipts.push(self.behavioral_feed_receipt_row_from_receipt(receipt)?);
         }

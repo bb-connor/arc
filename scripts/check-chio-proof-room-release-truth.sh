@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path.cwd()
+sys.path.insert(0, str(ROOT / "scripts"))
+from proof_room_historical_protocols import typed_historical_protocol
 TRUTH_PATH = Path(
     os.environ.get(
         "CHIO_PROOF_ROOM_RELEASE_TRUTH",
@@ -84,6 +86,12 @@ DEFAULT_DOC_EXCLUDES = (
     "docs/papers/",
     "docs/research/",
 )
+# Captured Rust source is immutable review evidence, not release copy. Pin the
+# exact reviewed bytes so this path cannot become a home for unscanned claims.
+HISTORICAL_SOURCE_SNAPSHOTS = {
+    "docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/kernel-source-before.json":
+        "b2350e625a2c78448768c7f8c23dbd3a2ee461e40bb1053cb628534111fa52c2",
+}
 
 ALLOW_CONTEXT_RE = re.compile(
     r"\b("
@@ -525,6 +533,12 @@ def configured_docs(defaults: tuple[str, ...]) -> list[Path]:
 
 def is_default_doc_excluded(path: Path) -> bool:
     relative_path = relative(path)
+    if relative_path in HISTORICAL_SOURCE_SNAPSHOTS:
+        if sha256_file(path) != HISTORICAL_SOURCE_SNAPSHOTS[relative_path]:
+            raise SystemExit(
+                f"proof-room.release.source-snapshot-digest-mismatch: {relative_path}"
+            )
+        return True
     return any(relative_path.startswith(prefix) for prefix in DEFAULT_DOC_EXCLUDES)
 
 
@@ -558,7 +572,22 @@ def claim_has_allowed_context(line: str, match: re.Match[str]) -> bool:
 
 
 def stop_pattern_has_allowed_context(line: str, match: re.Match[str]) -> bool:
-    return False
+    # A mandatory token-scope restriction describes Chio's approval boundary;
+    # it does not make the external protocol a source of authority. Match the
+    # complete candidate span so adjacent overclaims still fail independently.
+    # A negated premise or conditional suffix cannot borrow this restriction.
+    prefix = re.split(r'[.;!?"\n]', line[:match.start()])[-1].strip()
+    suffix = re.split(r'[.;!?"\n]', line[match.end():], maxsplit=1)[0].strip()
+    if suffix or re.fullmatch(r"(?:(?:Every|All)(?: emitted)?)?", prefix,
+                              re.IGNORECASE) is None:
+        return False
+    return re.fullmatch(
+        r"(?:x402|AP2|ACP-Commerce|web3(?: settlement)?)\s+"
+        r"(?:accepted\s+)?tokens?\s+must\s+remain\s+(?:inside|within)\s+"
+        r"(?:the\s+)?approval-bound\s+(?:token\s+)?authority",
+        match.group(0),
+        re.IGNORECASE,
+    ) is not None
 
 
 truth_doc = read_truth(TRUTH_PATH)
@@ -581,9 +610,22 @@ for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_CLAIM_DOCS)):
                 f"{relative(path)}:{line_no}: proof-room.release.unavailable: {key}: {guidance}"
             )
 for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_DOCS)):
+    # Provenance classifies only historical protocol spelling. Even an exact
+    # classified line remains subject to release truth and other stop patterns.
+    if any(typed_historical_protocol(ROOT, path, line, match) is not None
+           for match in COPY_STOP_PATTERNS["bare_acp"][0].finditer(line)):
+        for key, (pattern, guidance) in CLAIM_PATTERNS.items():
+            if not truth[key] and any(not claim_has_allowed_context(line, match)
+                                      for match in pattern.finditer(line)):
+                failures.append(
+                    f"{relative(path)}:{line_no}: proof-room.release.unavailable: {key}: {guidance}"
+                )
     for key, (pattern, guidance) in COPY_STOP_PATTERNS.items():
         if any(
-            not stop_pattern_has_allowed_context(line, match)
+            not (
+                key == "bare_acp"
+                and typed_historical_protocol(ROOT, path, line, match) is not None
+            ) and not stop_pattern_has_allowed_context(line, match)
             for match in pattern.finditer(line)
         ):
             failures.append(

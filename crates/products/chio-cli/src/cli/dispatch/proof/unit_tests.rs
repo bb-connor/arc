@@ -42,8 +42,7 @@ fn proof_test_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -
     }
 }
 
-fn verifier_profile_fixture(
-) -> (
+fn verifier_profile_fixture() -> (
     std::path::PathBuf,
     chio_finding::SignedFindingChallengeVerifierProfile,
     String,
@@ -270,10 +269,7 @@ fn only_verified_finding_claim_set_rows_force_cognition_market_routing() {
         "inspect exact advertised Finding claim",
     ));
     assert!(!proof_test_ok(
-        claim_set_bytes_advertise_verified_claim(
-            &finding_claim_set,
-            "claim.finding.status_fresh",
-        ),
+        claim_set_bytes_advertise_verified_claim(&finding_claim_set, "claim.finding.status_fresh",),
         "distinguish an unselected status claim",
     ));
 
@@ -406,7 +402,9 @@ fn cognition_market_trust_skips_status_configuration_for_non_status_claims() {
             Err(error) => error.to_string(),
         };
         assert!(
-            error.contains("purchase authority key does not match CHIO_FINDING_PURCHASE_AUTHORITY_KEY"),
+            error.contains(
+                "purchase authority key does not match CHIO_FINDING_PURCHASE_AUTHORITY_KEY"
+            ),
             "unexpected error: {error}"
         );
     }
@@ -440,7 +438,10 @@ fn cognition_market_trust_loads_status_for_profile_liveness_floor() {
     let mut body = profile.body;
     body.governance_authority = governance.public_key();
     body.required_facets = vec![chio_finding::FindingFacetKind::StatusLiveness];
-    body.profile_id = proof_test_ok(chio_finding::compute_profile_id(&body), "compute profile id");
+    body.profile_id = proof_test_ok(
+        chio_finding::compute_profile_id(&body),
+        "compute profile id",
+    );
     let signed = proof_test_ok(
         chio_core_types::receipt::lineage::SignedExportEnvelope::sign(body, &governance),
         "sign status-profile fixture",
@@ -713,17 +714,11 @@ fn proof_verify_routes_finding_claims_through_the_cognition_verifier() {
     {
         use std::os::unix::fs::PermissionsExt;
         proof_test_ok(
-            std::fs::set_permissions(
-                tempdir.path(),
-                std::fs::Permissions::from_mode(0o700),
-            ),
+            std::fs::set_permissions(tempdir.path(), std::fs::Permissions::from_mode(0o700)),
             "secure status authority parent",
         );
         proof_test_ok(
-            std::fs::set_permissions(
-                &authority_lock_root,
-                std::fs::Permissions::from_mode(0o700),
-            ),
+            std::fs::set_permissions(&authority_lock_root, std::fs::Permissions::from_mode(0o700)),
             "secure status authority lock root",
         );
     }
@@ -1027,10 +1022,8 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         std::fs::write(&verifier_path, b"not a directory"),
         "block verifier report directory",
     );
-    let sealing_error = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
+    let sealing_error =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
     assert!(
         sealing_error.is_err(),
         "unwritable verifier output must fail sealing"
@@ -1041,10 +1034,8 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         "remove verifier path blocker",
     );
     collect::fail_after_replay_reservation_once();
-    let interrupted = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
+    let interrupted =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
     assert!(interrupted.is_err_and(|error| error
         .to_string()
         .contains("injected failure after Agent-Web replay reservation")));
@@ -1067,10 +1058,8 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         Some(chio_store_sqlite::SqliteAgentWebReplayReservationState::Pending)
     );
     collect::fail_after_final_signature_link_once();
-    let link_interrupted = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
+    let link_interrupted =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
     assert!(link_interrupted.is_err_and(|error| error
         .to_string()
         .contains("injected failure after final bundle signature link")));
@@ -1095,13 +1084,10 @@ fn proof_collect_consumes_replays_only_after_sealing_succeeds() {
         Some(chio_store_sqlite::SqliteAgentWebReplayReservationState::Complete)
     );
 
-    let replay_error = collect::seal_collected_proof_bundle(
-        ProofCollectKind::AgentWebEnvelope,
-        &bundle,
-    );
-    assert!(replay_error.is_err_and(|error| error
-        .to_string()
-        .contains("replayed Standard Webhooks id")));
+    let replay_error =
+        collect::seal_collected_proof_bundle(ProofCollectKind::AgentWebEnvelope, &bundle);
+    assert!(replay_error
+        .is_err_and(|error| error.to_string().contains("replayed Standard Webhooks id")));
     for relative_path in [
         "bundle-signature.dsse.json",
         ".bundle-signature.dsse.json.pending",
@@ -1162,4 +1148,40 @@ fn merge_family_reports_rejects_ok_but_unverified_family_report() {
         merged.get("state").and_then(serde_json::Value::as_str),
         Some("verified")
     );
+}
+
+#[test]
+fn repeated_commerce_payload_references_consume_one_retention_budget() {
+    let dir = proof_test_ok(tempfile::tempdir(), "tempdir");
+    let bytes = b"{}";
+    proof_test_ok(
+        std::fs::write(dir.path().join("payload.json"), bytes),
+        "payload",
+    );
+    let nodes = vec![GraphArtifactNode {
+        id: None,
+        path: "payload.json".into(),
+        role: "payload".into(),
+        schema: Some(chio_commerce_order::COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID.into()),
+        sha256: Some(chio_core::sha256_hex(bytes)),
+    }];
+    let ledger = br#"{"protocol_projections":[{"protocol":"one","purpose":"pay","payload_path":"payload.json"},{"protocol":"two","purpose":"pay","payload_path":"payload.json"}]}"#;
+    let mut budget = crate::input::collection::Budget::default();
+    proof_test_ok(
+        budget.charge(crate::input::collection::MAX_BYTES - 3),
+        "reserve",
+    );
+    assert!(
+        load_commerce_mandate_protocol_payloads(dir.path(), &mut budget, &nodes, ledger).is_err()
+    );
+    let mut budget = crate::input::collection::Budget::default();
+    proof_test_ok(
+        budget.charge(crate::input::collection::MAX_BYTES - 4),
+        "reserve",
+    );
+    let payloads = proof_test_ok(
+        load_commerce_mandate_protocol_payloads(dir.path(), &mut budget, &nodes, ledger),
+        "exact budget",
+    );
+    assert_eq!(payloads.len(), 2);
 }

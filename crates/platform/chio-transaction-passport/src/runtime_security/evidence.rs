@@ -68,9 +68,8 @@ struct RuntimeEvidenceEdge {
 }
 
 pub(super) fn parse_graph(bytes: &[u8]) -> Result<RuntimeEvidenceGraph, TransactionPassportError> {
-    let graph: RuntimeEvidenceGraph = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let graph: RuntimeEvidenceGraph = crate::decode_evidence_json(bytes)?;
+    crate::validate_evidence_graph_size(graph.nodes.len(), graph.edges.len())?;
     if graph.schema != TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedEvidenceGraphSchema(
             graph.schema,
@@ -275,12 +274,7 @@ pub(super) fn parse_artifact<T: for<'de> Deserialize<'de>>(
             ),
         });
     }
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidRuntimeArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let value: serde_json::Value = crate::decode_evidence_json(bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -294,12 +288,7 @@ pub(super) fn parse_artifact<T: for<'de> Deserialize<'de>>(
             message: format!("unsupported schema: {schema}"),
         });
     }
-    serde_json::from_value(value).map_err(|error| {
-        TransactionPassportError::InvalidRuntimeArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
-    })
+    crate::input::project(value)
 }
 
 fn validate_node(node: &RuntimeEvidenceNode) -> Result<(), TransactionPassportError> {
@@ -343,5 +332,25 @@ fn require_non_empty(value: &str, field: &'static str) -> Result<(), Transaction
         ))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod input_tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    #[test]
+    fn original_runtime_graph_is_bounded_before_reference_traversal() {
+        let node = serde_json::json!({"id": "a".repeat(64), "sha256": "a".repeat(64),
+            "schema": "chio.receipt.v1", "path": "receipt.json", "role": "receipt"});
+        let mut value = serde_json::json!({"schema": TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID,
+            "id": "graph", "issued_at": "2026-10-01T00:00:00Z", "nodes": [node.clone()], "edges": []});
+        parse_graph(&serde_json::to_vec(&value).test_expect("graph encodes"))
+            .test_expect("positive runtime graph");
+        value["nodes"] = serde_json::Value::Array(vec![node; crate::MAX_EVIDENCE_ARTIFACTS + 1]);
+        let error = parse_graph(&serde_json::to_vec(&value).test_expect("graph encodes"))
+            .test_expect_err("node budget precedes duplicate/reference traversal");
+        assert_eq!(error, TransactionPassportError::EvidenceLimit);
     }
 }

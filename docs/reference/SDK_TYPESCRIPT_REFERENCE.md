@@ -118,7 +118,18 @@ const client = new ReceiptQueryClient(
 );
 ```
 
-An optional third argument accepts a custom `fetch` implementation for testing or non-browser environments.
+An optional third argument accepts a custom `fetch` implementation for testing or non-browser environments. An optional fourth argument sets the retry policy:
+
+```typescript
+interface ReceiptQueryClientOptions {
+  maxAttempts?: number;   // total attempts including the first; default 5
+  retryBudgetMs?: number; // retry budget per query call; default 30000
+}
+```
+
+`maxAttempts` must be a positive integer and `retryBudgetMs` a finite,
+nonnegative number; otherwise the constructor throws `RangeError`. Set
+`maxAttempts: 1` or `retryBudgetMs: 0` to disable retries.
 
 ### query
 
@@ -133,17 +144,30 @@ interface ReceiptQueryParams {
   minCost?: bigint;
   maxCost?: bigint;
   costCurrency?: string;
+  agentSubject?: string;
   cursor?: number;
   limit?: number;
 }
 
 interface ReceiptQueryResponse {
   totalCount: number;
-  nextCursor?: number;
+  nextCursor?: number | null;
   receipts: ChioReceipt[];
+  snapshot?: ReceiptQuerySnapshot;
 }
 
-async query(params?: ReceiptQueryParams): Promise<ReceiptQueryResponse>
+interface ReceiptQuerySnapshot {
+  id: string;
+  throughEntrySeq: number;
+  checkpointSeq: number | null;
+  observedAt: number;
+  recertifiedAt: number;
+}
+
+async query(
+  params?: ReceiptQueryParams,
+  options?: { signal?: AbortSignal },
+): Promise<ReceiptQueryResponse>
 ```
 
 Parameters map to the HTTP query string camelCase names documented in `docs/RECEIPT_QUERY_API.md`. All are optional.
@@ -152,17 +176,40 @@ Cost bounds use `bigint` so values through `18446744073709551615n` are encoded
 without JavaScript number rounding. Either bound requires a three-letter
 uppercase `costCurrency`.
 
-Throws `QueryError` (with `status` set to the HTTP status code) on non-2xx responses. Throws `TransportError` on network-level failures.
+`snapshot` names the authenticated snapshot version that answered. It is
+absent when the server predates snapshots, and `checkpointSeq` is `null`
+before the store's first checkpoint. `totalCount` is exact for that version
+and can change between pages.
+
+`query` retries only a `503` whose body carries one of the server codes
+`receipt_query_snapshot_building`, `receipt_query_snapshot_stale` or
+`receipt_query_busy`. It waits for the server's `Retry-After` (integer seconds
+or an HTTP date; 1 second when absent or unreadable) and retries while
+attempts remain and the wait ends within the retry budget. The budget applies
+to one `query` call, that is, to one page, not to a whole pagination. It does
+not retry `422`, `500`, `receipt_query_snapshot_unavailable`, or a `503`
+without one of those codes. Each attempt is bounded by the remaining budget
+and by 30 seconds (30 seconds when the budget is 0). Aborting `signal` cancels
+both the in-flight request and any retry wait.
+
+Throws `QueryError` on non-2xx responses, after any retries. `status` is the
+HTTP status of the last response, and `serverCode` is the server's `code`
+when the error body carries one; `code` stays `query_error`. Throws
+`TransportError` on network-level failures, and when the budget expires before
+a successful response with no earlier `QueryError` to report.
 
 ### paginate
 
 An async generator that iterates through all pages automatically:
 
 ```typescript
-async *paginate(params?: ReceiptQueryParams): AsyncGenerator<ChioReceipt[]>
+async *paginate(
+  params?: ReceiptQueryParams,
+  options?: { signal?: AbortSignal },
+): AsyncGenerator<ChioReceipt[]>
 ```
 
-Each yielded value is one page of receipts. The generator stops when `nextCursor` is absent in the response.
+Each yielded value is one page of receipts. Every page goes through `query`, so each page gets its own retry budget. A page can hold fewer than `limit` receipts while more remain; the generator continues until `nextCursor` is `null` or absent, and does not yield empty pages. It throws `QueryError` if a `nextCursor` does not advance past the cursor it was requested with.
 
 ```typescript
 for await (const page of client.paginate({ toolServer: "filesystem" })) {

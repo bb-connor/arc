@@ -1,7 +1,10 @@
+use super::*;
 #[test]
 fn session_lifecycle_is_hosted_by_kernel() {
     let kernel = make_kernel(make_config());
-    let session_id = kernel.open_session("agent-1".to_string(), Vec::new()).unwrap();
+    let session_id = kernel
+        .open_session("agent-1".to_string(), Vec::new())
+        .unwrap();
 
     assert_eq!(kernel.session_count(), 1);
     assert_eq!(
@@ -33,8 +36,12 @@ fn open_session_assigns_unique_ids_across_kernel_instances() {
     let kernel_a = make_kernel(make_config());
     let kernel_b = make_kernel(make_config());
 
-    let session_a = kernel_a.open_session("agent-a".to_string(), Vec::new()).unwrap();
-    let session_b = kernel_b.open_session("agent-b".to_string(), Vec::new()).unwrap();
+    let session_a = kernel_a
+        .open_session("agent-a".to_string(), Vec::new())
+        .unwrap();
+    let session_b = kernel_b
+        .open_session("agent-b".to_string(), Vec::new())
+        .unwrap();
 
     assert_ne!(session_a, session_b);
 }
@@ -44,7 +51,9 @@ fn open_session_assigns_unique_ids_across_kernel_instances() {
 #[test]
 fn open_session_id_has_csprng_structure() {
     let kernel = make_kernel(make_config());
-    let session_id = kernel.open_session("agent-a".to_string(), Vec::new()).unwrap();
+    let session_id = kernel
+        .open_session("agent-a".to_string(), Vec::new())
+        .unwrap();
     let raw = session_id.as_str();
 
     let suffix = raw
@@ -69,12 +78,11 @@ fn open_session_ids_do_not_collide_across_many_calls() {
     let mut seen = std::collections::HashSet::with_capacity(1024);
     let mut last: Option<SessionId> = None;
     for _ in 0..1024 {
-        let id = kernel.open_session("agent-a".to_string(), Vec::new()).unwrap();
+        let id = kernel
+            .open_session("agent-a".to_string(), Vec::new())
+            .unwrap();
         if let Some(previous) = last.as_ref() {
-            assert_ne!(
-                &id, previous,
-                "consecutive session ids must not be equal"
-            );
+            assert_ne!(&id, previous, "consecutive session ids must not be equal");
         }
         assert!(seen.insert(id.clone()), "session id collision: {id}");
         last = Some(id);
@@ -110,7 +118,9 @@ fn open_session_with_id_rejects_duplicate_ids() {
 #[test]
 fn open_session_with_id_rolls_back_insert_when_anchor_persistence_fails() {
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(FailingSessionAnchorReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(FailingSessionAnchorReceiptStore))
+        .unwrap();
     let session_id = SessionId::new("sess-anchor-fail");
 
     let error = kernel
@@ -125,7 +135,9 @@ fn open_session_with_id_rolls_back_insert_when_anchor_persistence_fails() {
     assert_eq!(kernel.session_count(), 0);
     assert!(kernel.session(&session_id).is_none());
 
-    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
     let opened = kernel
         .open_session_with_id(session_id.clone(), "agent-a".to_string(), Vec::new())
         .unwrap();
@@ -136,9 +148,13 @@ fn open_session_with_id_rolls_back_insert_when_anchor_persistence_fails() {
 #[test]
 fn set_session_auth_context_rolls_back_when_anchor_persistence_fails() {
     let mut kernel = make_kernel(make_config());
-    let session_id =
-        kernel.open_session_with_id(SessionId::new("sess-auth-rollback"), "agent-a".to_string(), Vec::new())
-            .unwrap();
+    let session_id = kernel
+        .open_session_with_id(
+            SessionId::new("sess-auth-rollback"),
+            "agent-a".to_string(),
+            Vec::new(),
+        )
+        .unwrap();
     let initial_auth = kernel
         .session(&session_id)
         .map(|session| session.auth_context())
@@ -148,7 +164,9 @@ fn set_session_auth_context_rolls_back_when_anchor_persistence_fails() {
         .map(|session| session.session_anchor())
         .unwrap();
 
-    kernel.set_receipt_store(Box::new(FailingSessionAnchorReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(FailingSessionAnchorReceiptStore))
+        .unwrap();
     let error = kernel
         .set_session_auth_context(
             &session_id,
@@ -250,7 +268,9 @@ fn close_session_persists_anonymous_anchor_and_rejects_late_auth_rotation() {
 fn close_session_with_sqlite_store_reuses_initial_anonymous_anchor() {
     let path = unique_receipt_db_path("session-close-anonymous-anchor");
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     let session_id = kernel
         .open_session_with_id(
             SessionId::new("sess-auth-close-sqlite"),
@@ -282,7 +302,9 @@ fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
     let kernel = make_kernel(config);
-    let session_id = kernel.open_session("agent-1".to_string(), Vec::new()).unwrap();
+    let session_id = kernel
+        .open_session("agent-1".to_string(), Vec::new())
+        .unwrap();
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
@@ -296,8 +318,12 @@ fn web3_evidence_required_activation_rejects_checkpoint_disabled() {
     config.require_web3_evidence = true;
     config.checkpoint_batch_size = 0;
     let mut kernel = make_kernel(config);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    let session_id = kernel.open_session("agent-1".to_string(), Vec::new()).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
+    let session_id = kernel
+        .open_session("agent-1".to_string(), Vec::new())
+        .unwrap();
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
@@ -311,8 +337,12 @@ fn web3_evidence_required_activation_rejects_append_only_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
     let mut kernel = make_kernel(config);
-    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
-    let session_id = kernel.open_session("agent-1".to_string(), Vec::new()).unwrap();
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
+    let session_id = kernel
+        .open_session("agent-1".to_string(), Vec::new())
+        .unwrap();
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
@@ -327,8 +357,12 @@ fn web3_evidence_required_activation_allows_checkpoint_capable_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
     let mut kernel = make_kernel(config);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    let session_id = kernel.open_session("agent-1".to_string(), Vec::new()).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
+    let session_id = kernel
+        .open_session("agent-1".to_string(), Vec::new())
+        .unwrap();
 
     kernel.activate_session(&session_id).unwrap();
     assert_eq!(
@@ -348,11 +382,14 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let context = make_operation_context(&session_id, "req-1", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -364,7 +401,7 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     }));
 
     let response = session_tool_call(
@@ -397,6 +434,7 @@ fn session_operation_forwards_supplemental_authorization_to_kernel_validation() 
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -438,7 +476,9 @@ fn session_operation_tool_call_malformed_nonce_clears_inflight() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let context = make_operation_context(
@@ -447,6 +487,7 @@ fn session_operation_tool_call_malformed_nonce_clears_inflight() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -478,7 +519,9 @@ fn session_operation_capability_list_uses_session_snapshot() {
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap])
+        .unwrap();
     let context = make_operation_context(&session_id, "control-1", &agent_kp.public_key().to_hex());
 
     let response = kernel
@@ -494,12 +537,15 @@ fn session_operation_capability_list_uses_session_snapshot() {
 fn session_operation_list_roots_uses_session_snapshot() {
     let kernel = make_kernel(make_config());
     let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -539,7 +585,9 @@ fn session_operation_list_roots_uses_session_snapshot() {
 fn kernel_exposes_normalized_session_roots_for_later_enforcement() {
     let kernel = make_kernel(make_config());
     let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .replace_session_roots(
@@ -591,7 +639,9 @@ fn kernel_exposes_normalized_session_roots_for_later_enforcement() {
 fn begin_child_request_requires_parent_lineage() {
     let kernel = make_kernel(make_config());
     let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let parent_context =
@@ -618,9 +668,13 @@ fn begin_child_request_requires_parent_lineage() {
 #[test]
 fn begin_session_request_clears_inflight_when_lineage_persistence_fails() {
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(FailingRequestLineageReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(FailingRequestLineageReceiptStore))
+        .unwrap();
     let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let context = make_operation_context(
@@ -650,7 +704,9 @@ fn begin_session_request_clears_inflight_when_lineage_persistence_fails() {
         "failed non-durable start does not leave in-memory lineage"
     );
 
-    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
     kernel
         .begin_session_request(&context, OperationKind::ToolCall, true)
         .unwrap();
@@ -659,9 +715,13 @@ fn begin_session_request_clears_inflight_when_lineage_persistence_fails() {
 #[test]
 fn begin_child_request_clears_child_inflight_when_lineage_persistence_fails() {
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
     let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let parent_context =
@@ -669,7 +729,9 @@ fn begin_child_request_clears_child_inflight_when_lineage_persistence_fails() {
     kernel
         .begin_session_request(&parent_context, OperationKind::ToolCall, true)
         .unwrap();
-    kernel.set_receipt_store(Box::new(FailingRequestLineageReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(FailingRequestLineageReceiptStore))
+        .unwrap();
 
     let child_request_id = RequestId::new("lineage-fail-child");
     let error = kernel
@@ -707,7 +769,9 @@ fn begin_child_request_clears_child_inflight_when_lineage_persistence_fails() {
         "failed child start does not leave in-memory lineage"
     );
 
-    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
     kernel
         .begin_child_request(
             &parent_context,
@@ -716,245 +780,6 @@ fn begin_child_request_clears_child_inflight_when_lineage_persistence_fails() {
             None,
             true,
         )
-        .unwrap();
-}
-
-#[test]
-fn sampling_validation_requires_policy_and_negotiation() {
-    let mut kernel = make_kernel(make_config());
-    let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
-    kernel.activate_session(&session_id).unwrap();
-
-    let parent_context =
-        make_operation_context(&session_id, "parent-1", &agent_kp.public_key().to_hex());
-    kernel
-        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
-        .unwrap();
-
-    let child_context = kernel
-        .begin_child_request(
-            &parent_context,
-            RequestId::new("child-1"),
-            OperationKind::CreateMessage,
-            None,
-            true,
-        )
-        .unwrap();
-    let operation = CreateMessageOperation {
-        messages: vec![SamplingMessage {
-            role: "user".to_string(),
-            content: serde_json::json!({
-                "type": "text",
-                "text": "Summarize the diff"
-            }),
-            meta: None,
-        }],
-        model_preferences: None,
-        system_prompt: None,
-        include_context: None,
-        temperature: None,
-        max_tokens: 256,
-        stop_sequences: vec![],
-        metadata: None,
-        tools: vec![],
-        tool_choice: None,
-    };
-
-    let denied = kernel.validate_sampling_request(&child_context, &operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::SamplingNotAllowedByPolicy)
-    ));
-
-    kernel.config.allow_sampling = true;
-    let denied = kernel.validate_sampling_request(&child_context, &operation);
-    assert!(matches!(denied, Err(KernelError::SamplingNotNegotiated)));
-
-    kernel
-        .set_session_peer_capabilities(
-            &session_id,
-            PeerCapabilities {
-                supports_progress: false,
-                supports_cancellation: false,
-                supports_subscriptions: false,
-                supports_chio_tool_streaming: false,
-                supports_roots: false,
-                roots_list_changed: false,
-                supports_sampling: true,
-                sampling_context: true,
-                sampling_tools: false,
-                supports_elicitation: false,
-                elicitation_form: false,
-                elicitation_url: false,
-            },
-        )
-        .unwrap();
-    kernel
-        .validate_sampling_request(&child_context, &operation)
-        .unwrap();
-
-    let tool_operation = CreateMessageOperation {
-        tools: vec![SamplingTool {
-            name: "search_docs".to_string(),
-            description: Some("Search docs".to_string()),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string" }
-                }
-            }),
-        }],
-        tool_choice: Some(SamplingToolChoice {
-            mode: "auto".to_string(),
-        }),
-        ..operation
-    };
-    let denied = kernel.validate_sampling_request(&child_context, &tool_operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::SamplingToolUseNotAllowedByPolicy)
-    ));
-
-    kernel.config.allow_sampling_tool_use = true;
-    let denied = kernel.validate_sampling_request(&child_context, &tool_operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::SamplingToolUseNotNegotiated)
-    ));
-}
-
-#[test]
-fn elicitation_validation_requires_policy_and_form_negotiation() {
-    let mut kernel = make_kernel(make_config());
-    let agent_kp = make_keypair();
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]).unwrap();
-    kernel.activate_session(&session_id).unwrap();
-
-    let parent_context = make_operation_context(
-        &session_id,
-        "parent-elicit-1",
-        &agent_kp.public_key().to_hex(),
-    );
-    kernel
-        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
-        .unwrap();
-
-    let child_context = kernel
-        .begin_child_request(
-            &parent_context,
-            RequestId::new("child-elicit-1"),
-            OperationKind::CreateElicitation,
-            None,
-            true,
-        )
-        .unwrap();
-    let operation = CreateElicitationOperation::Form {
-        meta: None,
-        message: "Which environment should this run against?".to_string(),
-        requested_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "environment": {
-                    "type": "string",
-                    "enum": ["staging", "production"]
-                }
-            },
-            "required": ["environment"]
-        }),
-    };
-
-    let denied = kernel.validate_elicitation_request(&child_context, &operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::ElicitationNotAllowedByPolicy)
-    ));
-
-    kernel.config.allow_elicitation = true;
-    let denied = kernel.validate_elicitation_request(&child_context, &operation);
-    assert!(matches!(denied, Err(KernelError::ElicitationNotNegotiated)));
-
-    kernel
-        .set_session_peer_capabilities(
-            &session_id,
-            PeerCapabilities {
-                supports_progress: false,
-                supports_cancellation: false,
-                supports_subscriptions: false,
-                supports_chio_tool_streaming: false,
-                supports_roots: false,
-                roots_list_changed: false,
-                supports_sampling: false,
-                sampling_context: false,
-                sampling_tools: false,
-                supports_elicitation: true,
-                elicitation_form: false,
-                elicitation_url: false,
-            },
-        )
-        .unwrap();
-    let denied = kernel.validate_elicitation_request(&child_context, &operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::ElicitationFormNotSupported)
-    ));
-
-    kernel
-        .set_session_peer_capabilities(
-            &session_id,
-            PeerCapabilities {
-                supports_progress: false,
-                supports_cancellation: false,
-                supports_subscriptions: false,
-                supports_chio_tool_streaming: false,
-                supports_roots: false,
-                roots_list_changed: false,
-                supports_sampling: false,
-                sampling_context: false,
-                sampling_tools: false,
-                supports_elicitation: true,
-                elicitation_form: true,
-                elicitation_url: false,
-            },
-        )
-        .unwrap();
-    kernel
-        .validate_elicitation_request(&child_context, &operation)
-        .unwrap();
-
-    let url_operation = CreateElicitationOperation::Url {
-        meta: None,
-        message: "Open the secure enrollment flow".to_string(),
-        url: "https://example.test/consent".to_string(),
-        elicitation_id: "elicitation-123".to_string(),
-    };
-    let denied = kernel.validate_elicitation_request(&child_context, &url_operation);
-    assert!(matches!(
-        denied,
-        Err(KernelError::ElicitationUrlNotSupported)
-    ));
-
-    kernel
-        .set_session_peer_capabilities(
-            &session_id,
-            PeerCapabilities {
-                supports_progress: false,
-                supports_cancellation: false,
-                supports_subscriptions: false,
-                supports_chio_tool_streaming: false,
-                supports_roots: false,
-                roots_list_changed: false,
-                supports_sampling: false,
-                sampling_context: false,
-                sampling_tools: false,
-                supports_elicitation: true,
-                elicitation_form: true,
-                elicitation_url: true,
-            },
-        )
-        .unwrap();
-    kernel
-        .validate_elicitation_request(&child_context, &url_operation)
         .unwrap();
 }
 
@@ -974,12 +799,15 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         make_scope(vec![make_grant("nested", "sample_via_client")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -1023,6 +851,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1034,7 +863,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1077,12 +906,15 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         make_scope(vec![make_grant("nested", "elicit_via_client")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -1123,6 +955,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "elicit_via_client".to_string(),
@@ -1134,7 +967,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1162,12 +995,15 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         make_scope(vec![make_grant("nested", "roots_via_client")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -1212,6 +1048,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "roots_via_client".to_string(),
@@ -1223,7 +1060,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1249,12 +1086,15 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         make_scope(vec![make_grant("nested", "sample_via_client")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: true,
                 supports_subscriptions: false,
@@ -1295,6 +1135,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1306,7 +1147,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1351,12 +1192,15 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         make_scope(vec![make_grant("nested", "sample_via_client")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: true,
                 supports_subscriptions: false,
@@ -1397,6 +1241,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1408,7 +1253,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1507,6 +1352,7 @@ fn tool_call_nested_flow_rejects_malformed_execution_nonce_without_inflight_leak
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1583,10 +1429,12 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         },
         300,
     );
-    let session_id = kernel.open_session(
-        agent_kp.public_key().to_hex(),
-        vec![tool_capability.clone(), resource_capability.clone()],
-    ).unwrap();
+    let session_id = kernel
+        .open_session(
+            agent_kp.public_key().to_hex(),
+            vec![tool_capability.clone(), resource_capability.clone()],
+        )
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .subscribe_session_resource(
@@ -1621,6 +1469,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: tool_capability,
         server_id: "nested".to_string(),
         tool_name: "notify_resources_via_client".to_string(),
@@ -1632,7 +1481,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     };
 
     let response = kernel
@@ -1662,7 +1511,9 @@ fn session_operation_list_resources_filters_to_session_scope() {
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     let context =
         make_operation_context(&session_id, "resources-1", &agent_kp.public_key().to_hex());
@@ -1691,7 +1542,9 @@ fn session_operation_read_resource_enforces_scope() {
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let allowed_context = make_operation_context(
@@ -1744,7 +1597,9 @@ fn session_operation_read_resource_enforces_session_roots_for_filesystem_resourc
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .replace_session_roots(
@@ -1820,7 +1675,9 @@ fn session_operation_read_resource_fails_closed_when_filesystem_roots_are_missin
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let context = make_operation_context(
@@ -1866,8 +1723,9 @@ fn subscribe_session_resource_requires_subscribe_operation() {
     };
     let read_only_cap = make_capability(&kernel, &agent_kp, read_only_scope, 300);
 
-    let session_id =
-        kernel.open_session(agent_kp.public_key().to_hex(), vec![read_only_cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![read_only_cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let denied = kernel.subscribe_session_resource(
@@ -1918,7 +1776,9 @@ fn unsubscribe_session_resource_is_idempotent() {
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
         .subscribe_session_resource(
@@ -1956,7 +1816,9 @@ fn session_operation_get_prompt_enforces_scope() {
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let list_context =
@@ -2016,7 +1878,9 @@ fn session_operation_completion_returns_candidates_and_enforces_scope() {
     };
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let prompt_context =

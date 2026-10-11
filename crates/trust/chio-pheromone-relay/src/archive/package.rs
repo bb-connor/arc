@@ -905,8 +905,8 @@ fn export_bundle_from_archive_package(
     )?;
     let manifest_bytes = archive_package_file_bytes(package, &manifest_path)?;
     let report_bytes = archive_package_file_bytes(package, &report_path)?;
-    let manifest: RelayAlertAssuranceExportManifest = serde_json::from_slice(manifest_bytes)?;
-    let report: RelayAlertAssuranceExportReport = serde_json::from_slice(report_bytes)?;
+    let manifest: RelayAlertAssuranceExportManifest = crate::input::decode(manifest_bytes)?;
+    let report: RelayAlertAssuranceExportReport = crate::input::decode(report_bytes)?;
     if manifest.body.bundle_id != bundle.bundle_id {
         return Err(PheromoneRelayError::ArchivePackageInvalid(
             "nested export manifest bundle id mismatch".to_string(),

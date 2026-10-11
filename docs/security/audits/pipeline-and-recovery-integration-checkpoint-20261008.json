@@ -1,0 +1,634 @@
+{
+  "schema": "chio.pr1160.pipeline-integration-checkpoint.v1",
+  "observed_utc": "2026-10-08T02:51:39.872395+00:00",
+  "source": "3beb954ac0c233a271d1ae98f4d3c5b949e51aaf",
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "qualified": false,
+  "merged": false,
+  "source_maps": [
+    {
+      "original_commit": "51a2add0007c8b2d9599a6ae5e281cd1e9f74a7a",
+      "integration_commit": "31f8368c0d2d362e5bd52270db22b23041973465",
+      "kind": "Original-only, currentruntimecapture inprogress"
+    },
+    {
+      "original_commit": "8fd3889ee0",
+      "integration_commit": "aa322dfff51c85724b0374a79e3ba31aec037aaf",
+      "kind": "terminal-refusal repair aftercurrentgenuineRED"
+    },
+    {
+      "original_commit": "5fbb4a9169",
+      "integration_commit": "9abe729f010089983121cc171ce3ae4d3ac70463",
+      "kind": "recovery-readiness Original only"
+    },
+    {
+      "original_commit": "c647f0216d",
+      "integration_commit": "10a37ad9eac8709466392c7f7abb679a109fcb20",
+      "kind": "recovery readiness repair aftergenuineRED"
+    },
+    {
+      "original_commit": "e05a5189e2",
+      "integration_commit": "e6b2d50a195c4de5679512eb62d21a1f68e019aa",
+      "kind": "readiness additivecontrols"
+    },
+    {
+      "original_commit": "93f1516ae7",
+      "integration_commit": "cb080f78e70bd1b99ffefeef0376c88081364083",
+      "kind": "fair teardown Original only"
+    },
+    {
+      "original_commit": "6fce144c5a",
+      "integration_commit": "d736632268db606576ca1a626ba15777cc7b0cab",
+      "kind": "fair teardown repair aftergenuineRED"
+    },
+    {
+      "original_commit": "ceb6fd88ca",
+      "integration_commit": "0c87b850b99915b0c03632f66e8d218e3025f97c",
+      "kind": "boundedparking controls"
+    },
+    {
+      "original_commit": "172d4a019f",
+      "integration_commit": "ce80fb676cf4e7c2baeb2fef2e4623119d95b56f",
+      "kind": "admission-close Original only"
+    },
+    {
+      "original_commit": "0a94ccc919",
+      "integration_commit": "11647f75a4b39b096d70aa6433a1345208eed027",
+      "kind": "admission-close Original readinessbarrier correction"
+    },
+    {
+      "original_commit": "Root fixturecompatibilitystage",
+      "integration_commit": "0d9c300a12395cdc009e57293ca2f3b85de32c57",
+      "kind": "Originaltest setup correction, assertions/deadlines unchanged"
+    },
+    {
+      "original_commit": "4655467a84",
+      "integration_commit": "84ef80f309d2398bfc1ecd4236d9756f91007133",
+      "kind": "admission-close repair aftercorrectedgenuineRED"
+    },
+    {
+      "original_commit": "ca26f24b18",
+      "integration_commit": "29a5a2ca13a66118360e5e57890cf81b0d7fe936",
+      "kind": "control-mutex Original only"
+    },
+    {
+      "original_commit": "44afd27ba0",
+      "integration_commit": "c9c846cfbe51b5e737c972e65bebe262f0d8b009",
+      "kind": "controlmutex repair aftergenuineRED"
+    },
+    {
+      "original_commit": "895f87f229",
+      "integration_commit": "1c6222f7952d7817b8f3c30fcdbacb872ad49c45",
+      "kind": "fairreservation predicate correction"
+    },
+    {
+      "original_commit": "dadf79979c",
+      "integration_commit": "432dd39a6d3c989ee78445641fdf6e3a1ba62d15",
+      "kind": "healthyTTLwait Original only"
+    },
+    {
+      "original_commit": "f6d334d1db",
+      "integration_commit": "c64c507e6b1fb10d4b2afe1294575aa1103289a6",
+      "kind": "healthy TTL repair after genuine 4 pass / 1 fail Original"
+    },
+    {
+      "original_commit": "a17c35881e",
+      "integration_commit": "e6384ebe44b162b16d830351b10aa58a9581156a",
+      "kind": "healthy TTL fault-accounting controls"
+    }
+  ],
+  "verification": [
+    {
+      "source": "31f8368c0d2d362e5bd52270db22b23041973465",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "terminal_response_refusal",
+        "published_batch_acknowledgement_fails_closed_without_durable_response_work",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "c4b16f1c7525b16775408862f629be1ed38d979ea6c8288304254a932484b550",
+      "scope": "first pipeline Original selection, inspectsetup vsruntime beforefix",
+      "name": "terminal-refusal-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/terminal-refusal-original.log",
+      "summaries": [
+        "test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 1399 filtered out; finished in 24.36s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "9abe729f010089983121cc171ce3ae4d3ac70463",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "terminal_response_refusal",
+        "published_batch_acknowledgement_fails_closed_without_durable_response_work",
+        "recovery_worker_readiness",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "884b6b60481f291601b85a173ffbf5ddaaa5df3ef5fd39342e58dbd5eaae2c2e",
+      "scope": "repairedterminalselection + readinessOriginal only",
+      "name": "terminal-green-readiness-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/terminal-green-readiness-original.log",
+      "summaries": [
+        "test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 1399 filtered out; finished in 27.08s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "cb080f78e70bd1b99ffefeef0376c88081364083",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "recovery_worker_readiness",
+        "recovery_readiness_starts_the_worker_while_admission_stays_closed",
+        "teardown_fair_progress_tests",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 0,
+      "log_sha256": "7a32a974800415b052bc5e2f57b4796816be22dd5a19735d1a108dab390a0850",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "readiness-green-fair-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/readiness-green-fair-original.log",
+      "summaries": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1405 filtered out; finished in 3.72s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "cb080f78e70bd1b99ffefeef0376c88081364083",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "never_ending_reserved_cleanup_does_not_block_an_independent_queued_cleanup",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "bb2d49c36c0061d89a973e116c4149bae339c53bc735d0c048e96237b9054f22",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "fair-original-corrected",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/fair-original-corrected.log",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1407 filtered out; finished in 5.97s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "11647f75a4b39b096d70aa6433a1345208eed027",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "fair_progress_tests",
+        "admission_closed_response_work",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "16c61cb46e3f1fd56a5b71b267fe6fcccbae84a976753e7694453b62c78467fe",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "fair-green-closed-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/fair-green-closed-original.log",
+      "summaries": [
+        "test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 1407 filtered out; finished in 67.83s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "0d9c300a12395cdc009e57293ca2f3b85de32c57",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "admission_closed_response_work",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "801600aeb5901a6c4d8f1bf32735d69291cf1cde72d914cf53bfdb464f56b300",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "corrected-closed-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/corrected-closed-original.log",
+      "summaries": [
+        "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 1409 filtered out; finished in 7.22s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "29a5a2ca13a66118360e5e57890cf81b0d7fe936",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "admission_closed_response_work",
+        "runtime_lease_tests",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "fa16aa5f1ab4cb472640f83dc486b07a6332e9efbe5459a95d35b1872db14586",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "closed-green-mutex-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/closed-green-mutex-original.log",
+      "summaries": [
+        "test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 1409 filtered out; finished in 5.98s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "432dd39a6d3c989ee78445641fdf6e3a1ba62d15",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "runtime_lease_tests",
+        "teardown_overlay_wait",
+        "fair_progress_tests",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "c3f96cd542e3723e3111b30c64f2172fdcb7936cfb8da6d4f0a84e82f5ac7142",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "mutex-green-ttl-original",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/mutex-green-ttl-original.log",
+      "summaries": [
+        "test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 1409 filtered out; finished in 23.93s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "e6384ebe44b162b16d830351b10aa58a9581156a",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "active_defense_host_tests",
+        "runtime_lease_tests",
+        "fair_progress_tests",
+        "terminal_rejection",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 0,
+      "log_sha256": "82673bef1550b590926ac3817c5475847e47b41ed1dd04e3563d5cc87ca76880",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "pipeline-composed-focused",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/pipeline-composed-focused.log",
+      "summaries": [
+        "test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 1381 filtered out; finished in 94.29s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "e6384ebe44b162b16d830351b10aa58a9581156a",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "security::event_consumer",
+        "security::scheduler_worker",
+        "security::orchestration",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 0,
+      "log_sha256": "77503c1016e815bf338dd3b6b41a6b0249983c85565720e9b37fbc1008c7e8bd",
+      "name": "pipeline-event-scheduler-owning",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/pipeline-event-scheduler-owning.log",
+      "summaries": [
+        "test result: ok. 174 passed; 0 failed; 1 ignored; 0 measured; 1242 filtered out; finished in 113.85s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1616 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "source": "e6384ebe44b162b16d830351b10aa58a9581156a",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "umask": "0002",
+      "exit_code": 0,
+      "log_sha256": "8d330758ebcaf762fe6bee7629e520fc1988d3e28a70a570e0f635fb183a0949",
+      "name": "pipeline-five-owner-strict",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/pipeline-five-owner-strict.log",
+      "summaries": []
+    },
+    {
+      "source": "11647f75a4b39b096d70aa6433a1345208eed027",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "payment_recovery",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 0,
+      "log_sha256": "3c1744a29ae123d213a3dbc0fb5a969546063b95e9f294301845c3915a2a9a75",
+      "scope": "selected owning cases; inspect each outcome and zero selections",
+      "name": "current-payment-recovery",
+      "log_path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/current-payment-recovery.log",
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1411 filtered out; finished in 0.00s",
+        "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 1587 filtered out; finished in 1.27s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2094 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "fuzz_locked_workspace": {
+    "source": "11647f75a4b39b096d70aa6433a1345208eed027",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline"
+    ],
+    "umask": "0002",
+    "exit_code": 0,
+    "log_sha256": "4fc3a519f1b2b40447776f7ea60c584be16b4370e1e31fca1ad1e95fec815b1b",
+    "scope": "currentlockedworkspace corpus/library; notnewASANnativequalification"
+  },
+  "static_checks": {
+    "fmt": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/composed-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "hygiene": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/composed-hygiene.log",
+      "sha256": "299f2fa60549a14e75b201f33dee8f1c3cbea7a8eb58f7d4abc5b3f88f1e3077"
+    },
+    "trust": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/composed-trust.log",
+      "sha256": "96a51536c5977548b9572e235597d8e0f8b3d43ad7d75026ff2f0048b492852e"
+    },
+    "ledger": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/composed-ledger.log",
+      "sha256": "4e0f4b17bc9fb33693747e24ed6ef97ce425081b04f23df035a0e55ef6a3ddd2"
+    }
+  },
+  "trust_gate_initial_failure": "One missing fuzz shared-reader census row; initial failure retained in composed-trust.log",
+  "trust_gate_after_exact_inventory_update": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/composed-trust-corrected.log",
+    "sha256": "3e7cd49c64e1d00bac3abb86362201ad479735d0a568d28eb47ee00fe65702e4"
+  },
+  "rulings": [
+    "The Original closed-work fixture must claim the exact bound v2 descriptor before prepare returns. A private cfg(test) SyntheticBound variant supplies that fixture. All Original assertions and production authority gates are preserved.",
+    "Initial closed-work store-conflict is a setup failure, not behavioral RED; the corrected Original reproduced two genuine failures before the repair.",
+    "A zero-test fairness selection is unrun; the corrected selector reproduced the fairness failure before the repair."
+  ],
+  "remaining": [
+    "Expired-overlay rollback accounting remains a confirmed P2 in the Claude pipeline lane; worker Ready alone does not prove healthy TTL waiting.",
+    "Effect-port and other assigned now repairs still require integration.",
+    "Whole-candidate default/PQ, native/cold/trusted/hosted qualification and protected landing remain open.",
+    "Fuzz tests exercise bounded decoding/evaluation, not aggregate ingress admission; no ASAN claim is derived from the 35 passing cases.",
+    "Financial 29 passing tests are local SQLite/kernel recovery evidence, not real-funds or external-rail qualification.",
+    "BROKER-SELECT is a newly identified potential request-id collision liveness defect; Original and selector proposal are assigned to Claude."
+  ]
+}

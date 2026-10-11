@@ -69,15 +69,21 @@ pub struct WitnessReceipt {
     pub body_hash: Hash,
 }
 
+/// Maximum retained opaque witness proof, including decoded base64 receipts.
+pub const MAX_WITNESS_PROOF_BYTES: usize = 1024 * 1024;
+
 mod serde_bytes_b64 {
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
+        if bytes.len() > super::MAX_WITNESS_PROOF_BYTES {
+            return Err(serde::ser::Error::custom("witness proof exceeds its bound"));
+        }
         serializer.serialize_str(&BASE64_STANDARD.encode(bytes))
     }
 
@@ -85,16 +91,38 @@ mod serde_bytes_b64 {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        BASE64_STANDARD
-            .decode(s.as_bytes())
-            .map_err(serde::de::Error::custom)
+        struct ProofVisitor;
+        impl serde::de::Visitor<'_> for ProofVisitor {
+            type Value = Vec<u8>;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("bounded base64 witness proof")
+            }
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Vec<u8>, E> {
+                if value.len() > super::MAX_WITNESS_PROOF_BYTES.div_ceil(3) * 4 {
+                    return Err(E::custom("witness proof exceeds its bound"));
+                }
+                let bytes = BASE64_STANDARD.decode(value).map_err(E::custom)?;
+                if bytes.len() > super::MAX_WITNESS_PROOF_BYTES {
+                    return Err(E::custom("witness proof exceeds its bound"));
+                }
+                Ok(bytes)
+            }
+        }
+        deserializer.deserialize_str(ProofVisitor)
     }
 }
 
 /// Errors raised by [`AnchorWitnessClient`] implementations.
 #[derive(Debug, thiserror::Error)]
 pub enum AnchorWitnessError {
+    #[error("invalid witness input: {0}")]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("invalid witness base64")]
+    Base64(#[source] base64::DecodeError),
+    #[error("witness clock failed: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error("witness transport failed")]
+    Transport(#[source] WitnessTransportError),
     #[error("witness network error: {0}")]
     Network(String),
     #[error("witness HTTP {status}: {body}")]
@@ -115,6 +143,29 @@ pub enum AnchorWitnessError {
     Config(String),
     #[error("witness lane signature verification failed: {0}")]
     SignatureInvalid(String),
+}
+
+/// A retained HTTP cause with input-independent public formatting.
+pub struct WitnessTransportError(reqwest::Error);
+impl std::fmt::Debug for WitnessTransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+impl std::fmt::Display for WitnessTransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("witness HTTP transport failed")
+    }
+}
+impl std::error::Error for WitnessTransportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+impl AnchorWitnessError {
+    fn transport(error: reqwest::Error) -> Self {
+        Self::Transport(WitnessTransportError(error.without_url()))
+    }
 }
 
 /// Witness-lane interface. [`rekor::RekorClient`] can satisfy

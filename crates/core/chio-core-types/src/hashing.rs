@@ -20,7 +20,7 @@ pub struct Hash {
 }
 
 mod hash_serde {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8; 32], s: S) -> core::result::Result<S::Ok, S::Error>
     where
@@ -33,12 +33,9 @@ mod hash_serde {
     where
         D: Deserializer<'de>,
     {
-        let hex_str = alloc::string::String::deserialize(d)?;
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
-        let bytes = hex::decode(hex_str).map_err(serde::de::Error::custom)?;
-        bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::custom("hash must be 32 bytes"))
+        crate::wire_text::deserialize(d, "a 32-byte hash string", |wire| {
+            super::Hash::from_hex(wire).map(|hash| hash.bytes)
+        })
     }
 }
 
@@ -52,17 +49,18 @@ impl Hash {
     pub fn from_hex(hex_str: &str) -> Result<Self> {
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
 
-        let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
-
-        if bytes.len() != 32 {
+        if !hex_str.len().is_multiple_of(2) {
+            return Err(Error::InvalidHex(hex::FromHexError::OddLength.to_string()));
+        }
+        if hex_str.len() != 64 {
             return Err(Error::InvalidHashLength {
                 expected: 32,
-                actual: bytes.len(),
+                actual: hex_str.len() / 2,
             });
         }
 
         let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
+        hex::decode_to_slice(hex_str, &mut arr).map_err(|e| Error::InvalidHex(e.to_string()))?;
         Ok(Self::from_bytes(arr))
     }
 
@@ -111,6 +109,35 @@ pub fn sha256(data: &[u8]) -> Hash {
     Hash::from_bytes(bytes)
 }
 
+/// Opaque incremental SHA-256 state for callers that cannot stage the complete
+/// plaintext preimage. The state has no serialization or raw Debug surface.
+pub struct Sha256State(Sha256);
+
+impl Sha256State {
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Sha256::new())
+    }
+
+    pub fn update(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    #[must_use]
+    pub fn finalize(mut self) -> Hash {
+        let result = self.0.finalize_reset();
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&result);
+        Hash::from_bytes(bytes)
+    }
+}
+
+impl Default for Sha256State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Compute SHA-256 hash and return as hex string (no prefix).
 ///
 /// This matches the convention of `crypto::sha256_hex` within chio-core.
@@ -121,9 +148,25 @@ pub fn sha256_hex(data: &[u8]) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incremental_sha256_matches_known_digest() {
+        let mut state = Sha256State::new();
+        state.update(b"he");
+        state.update(b"ll");
+        state.update(b"o");
+        assert_eq!(
+            state.finalize().to_hex(),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+    }
 
     #[test]
     fn test_sha256() {

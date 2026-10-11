@@ -6,7 +6,7 @@
 
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
-use chio_core::receipt::decision::Decision;
+use crate::sink_projection::SinkDecision;
 
 #[derive(Debug, Clone)]
 pub struct CefExporterConfig {
@@ -44,62 +44,92 @@ impl CefExporter {
     }
 
     pub fn format_event(&self, event: &SiemEvent) -> Result<String, ExportError> {
-        let receipt = &event.receipt;
-        let decision = decision_label(event);
-        let signature_id = signature_id(event);
-        let name = event_name(event);
-        let severity = severity(event);
-        let reason = reason_code(event);
-        let tenant_id = receipt.tenant_id.as_deref().unwrap_or("single-tenant");
-        let actor_subject =
-            metadata_str(receipt.metadata.as_ref(), "actor_subject").unwrap_or("chio-agent");
-        let redaction_status =
-            metadata_str(receipt.metadata.as_ref(), "redaction_status").unwrap_or("unknown");
-        let checkpoint_id = metadata_str(receipt.metadata.as_ref(), "checkpoint_id")
-            .unwrap_or("checkpoint-pending");
-        let rt_ms = receipt.timestamp.saturating_mul(1_000);
-
+        let projection = event.sink_projection();
+        let (signature_id, name) = match projection.decision {
+            SinkDecision::Authorized => ("chio.allow", "Chio allow"),
+            SinkDecision::Denied => ("chio.deny", "Chio guard deny"),
+            SinkDecision::Cancelled => ("chio.cancelled", "Chio cancelled"),
+            SinkDecision::Incomplete => ("chio.incomplete", "Chio incomplete"),
+            SinkDecision::TraceObservation => ("chio.trace_observation", "Chio trace observation"),
+            SinkDecision::AdvisoryEvaluation => {
+                ("chio.advisory_evaluation", "Chio advisory evaluation")
+            }
+            _ => ("chio.observation", "Chio observation"),
+        };
+        let severity = match projection.alert_severity {
+            crate::AlertSeverity::Info => 2,
+            crate::AlertSeverity::Low => 3,
+            crate::AlertSeverity::Medium => 5,
+            crate::AlertSeverity::High => 8,
+            crate::AlertSeverity::Critical => 10,
+        };
         let header = format!(
             "CEF:0|{}|{}|{}|{}|{}|{}|",
             escape_header(&self.config.device_vendor),
             escape_header(&self.config.device_product),
             escape_header(&self.config.device_version),
-            escape_header(signature_id),
-            escape_header(name),
-            severity
+            signature_id,
+            name,
+            severity,
         );
-
         let extension = [
-            ("rt", rt_ms.to_string()),
-            ("msg", reason.to_string()),
-            ("act", decision.to_string()),
-            ("suser", actor_subject.to_string()),
-            ("dvc", receipt.tool_server.clone()),
-            ("dvchost", receipt.tool_name.clone()),
+            ("rt", projection.timestamp.saturating_mul(1000).to_string()),
+            ("msg", projection.result_label().to_string()),
+            ("act", projection.decision_label().to_string()),
+            ("dvc", projection.tool_server_sha256.as_str().to_string()),
+            ("dvchost", projection.tool_name_sha256.as_str().to_string()),
             ("cs1Label", "receipt_id".to_string()),
-            ("cs1", receipt.id.clone()),
-            ("cs2Label", "capability_id".to_string()),
-            ("cs2", receipt.capability_id.clone()),
+            ("cs1", projection.event_reference().to_string()),
+            ("cs2Label", "capability_id_sha256".to_string()),
+            ("cs2", projection.capability_id_sha256.as_str().to_string()),
             ("cs3Label", "policy_hash".to_string()),
-            ("cs3", receipt.policy_hash.clone()),
+            (
+                "cs3",
+                projection
+                    .policy_hash
+                    .as_ref()
+                    .map(|value| value.as_str())
+                    .unwrap_or("absent")
+                    .to_string(),
+            ),
             ("cs4Label", "parameter_hash".to_string()),
-            ("cs4", receipt.action.parameter_hash.clone()),
-            ("cs5Label", "tenant_id".to_string()),
-            ("cs5", tenant_id.to_string()),
-            ("cs6Label", "redaction_status".to_string()),
-            ("cs6", redaction_status.to_string()),
-            ("flexString1Label", "checkpoint_id".to_string()),
-            ("flexString1", checkpoint_id.to_string()),
-            ("receiptKind", event.receipt_kind.clone()),
-            ("boundaryClass", event.boundary_class.clone()),
-            ("result", event.result.clone()),
-            ("authorized", event.authorized.to_string()),
+            (
+                "cs4",
+                projection
+                    .parameter_hash
+                    .as_ref()
+                    .map(|value| value.as_str())
+                    .unwrap_or("absent")
+                    .to_string(),
+            ),
+            ("cs5Label", "tenant_id_sha256".to_string()),
+            (
+                "cs5",
+                projection
+                    .tenant_id_sha256
+                    .as_ref()
+                    .map(|value| value.as_str())
+                    .unwrap_or("single-tenant")
+                    .to_string(),
+            ),
+            ("cs6Label", "source_redaction_mode".to_string()),
+            ("cs6", projection.source_redaction_mode.as_str().to_string()),
+            ("receiptKind", projection.receipt_kind.as_str().to_string()),
+            (
+                "boundaryClass",
+                projection.boundary_class.as_str().to_string(),
+            ),
+            ("result", projection.result_label().to_string()),
+            ("authorized", projection.authorized.to_string()),
+            ("signature_scope", "original_receipt".to_string()),
+            ("payload_included", "false".to_string()),
+            ("original_retrieval_required", "true".to_string()),
+            ("projection_signed", "false".to_string()),
         ]
         .into_iter()
         .map(|(key, value)| format!("{key}={}", escape_extension(&value)))
         .collect::<Vec<String>>()
         .join(" ");
-
         Ok(format!("{header}{extension}"))
     }
 }
@@ -114,93 +144,6 @@ impl Exporter for CefExporter {
 
     fn name(&self) -> &str {
         "cef"
-    }
-}
-
-fn metadata_str<'a>(metadata: Option<&'a serde_json::Value>, key: &str) -> Option<&'a str> {
-    metadata
-        .and_then(|value| value.get(key))
-        .and_then(|value| value.as_str())
-}
-
-fn decision_label(event: &SiemEvent) -> &str {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return event.receipt_kind.as_str();
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "allow",
-        Some(Decision::Deny { .. }) => "deny",
-        Some(Decision::Cancelled { .. }) => "cancelled",
-        Some(Decision::Incomplete { .. }) => "incomplete",
-        None => event.receipt_kind.as_str(),
-    }
-}
-
-fn signature_id(event: &SiemEvent) -> &str {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return match event.receipt_kind.as_str() {
-            "trace_observation" => "chio.trace_observation",
-            "advisory_evaluation" => "chio.advisory_evaluation",
-            _ => "chio.observation",
-        };
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "chio.allow",
-        Some(Decision::Deny { guard, .. }) => guard.as_str(),
-        Some(Decision::Cancelled { .. }) => "chio.cancelled",
-        Some(Decision::Incomplete { .. }) => "chio.incomplete",
-        None => match event.receipt_kind.as_str() {
-            "trace_observation" => "chio.trace_observation",
-            "advisory_evaluation" => "chio.advisory_evaluation",
-            _ => "chio.observation",
-        },
-    }
-}
-
-fn event_name(event: &SiemEvent) -> &'static str {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return match event.receipt_kind.as_str() {
-            "trace_observation" => "Chio trace observation",
-            "advisory_evaluation" => "Chio advisory evaluation",
-            _ => "Chio observation",
-        };
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "Chio allow",
-        Some(Decision::Deny { .. }) => "Chio guard deny",
-        Some(Decision::Cancelled { .. }) => "Chio cancelled",
-        Some(Decision::Incomplete { .. }) => "Chio incomplete",
-        None => match event.receipt_kind.as_str() {
-            "trace_observation" => "Chio trace observation",
-            "advisory_evaluation" => "Chio advisory evaluation",
-            _ => "Chio observation",
-        },
-    }
-}
-
-fn reason_code(event: &SiemEvent) -> &str {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return event.result.as_str();
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => "allow",
-        Some(Decision::Deny { reason, .. }) => reason.as_str(),
-        Some(Decision::Cancelled { reason }) => reason.as_str(),
-        Some(Decision::Incomplete { reason }) => reason.as_str(),
-        None => event.result.as_str(),
-    }
-}
-
-fn severity(event: &SiemEvent) -> u8 {
-    if !event.is_authorized() && matches!(&event.receipt.decision, Some(Decision::Allow)) {
-        return 3;
-    }
-    match &event.receipt.decision {
-        Some(Decision::Allow) => 2,
-        Some(Decision::Deny { .. }) => 8,
-        Some(Decision::Cancelled { .. }) => 4,
-        Some(Decision::Incomplete { .. }) => 5,
-        None => 3,
     }
 }
 

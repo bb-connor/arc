@@ -6,6 +6,11 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_openai::adapter::{OpenAiAdapter, OpenAiAdapterConfig, OPENAI_RESPONSES_API_VERSION};
 use chio_tool_call_fabric::{
     Principal, ProviderAdapter, ProviderError, ProviderId, ProviderRequest,
@@ -33,6 +38,48 @@ fn block_on<F: Future>(future: F) -> F::Output {
 
 fn raw(value: Value) -> ProviderRequest {
     ProviderRequest(serde_json::to_vec(&value).unwrap())
+}
+
+fn admitted_adapter(tool_name: &str) -> (OpenAiAdapter, ToolFlowDeclaration) {
+    let signer = Keypair::from_seed(&[54; 32]);
+    let flow = ToolFlowDeclaration::public_egress();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "openai-provider".to_string(),
+        name: "OpenAI provider".to_string(),
+        description: None,
+        version: "1".to_string(),
+        tools: vec![ToolDefinition {
+            name: tool_name.to_string(),
+            description: "Admitted OpenAI function".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: Some(flow.clone()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    let adapter = OpenAiAdapter::new_with_registry(
+        OpenAiAdapterConfig::new("org_chio_demo"),
+        "openai-provider",
+        &registry,
+    )
+    .unwrap();
+    (adapter, flow)
 }
 
 fn config_with_api_version(api_version: &str) -> OpenAiAdapterConfig {
@@ -124,6 +171,61 @@ fn lift_single_batch_response_builds_tool_invocation() {
             org_id: "org_chio_demo".to_string()
         }
     );
+}
+
+#[test]
+fn registry_bound_lift_preserves_exact_flow_sidecar() {
+    let (adapter, expected_flow) = admitted_adapter("get_weather");
+    let invocation = block_on(adapter.lift(raw(json!({
+        "type": "function_call",
+        "call_id": "call_flow_1",
+        "name": "get_weather",
+        "arguments": "{\"location\":\"NYC\"}"
+    }))))
+    .unwrap();
+
+    let security = invocation
+        .bridge_security
+        .as_ref()
+        .expect("registry-bound lift retains security");
+    assert!(security.has_registry_coordinates());
+    assert_eq!(
+        canonical_json_bytes(security.flow().expect("flow sidecar")).unwrap(),
+        canonical_json_bytes(&expected_flow).unwrap()
+    );
+}
+
+#[test]
+fn registry_bound_lift_rejects_tool_without_admitted_sidecar() {
+    let (adapter, _) = admitted_adapter("get_weather");
+    let error = adapter
+        .lift_batch(raw(json!({
+            "output": [{
+                "type": "function_call",
+                "call_id": "call_missing_security_1",
+                "name": "send_email",
+                "arguments": "{}"
+            }]
+        })))
+        .expect_err("missing admitted sidecar must fail closed");
+
+    assert!(error
+        .to_string()
+        .contains("security sidecar is missing for OpenAI tool `send_email`"));
+}
+
+#[test]
+fn registry_bound_constructor_rejects_missing_server() {
+    let error = OpenAiAdapter::new_with_registry(
+        OpenAiAdapterConfig::new("org_chio_demo"),
+        "missing-server",
+        &VerifiedManifestRegistry::default(),
+    )
+    .expect_err("missing admitted server must fail closed");
+
+    assert!(error
+        .to_string()
+        .contains("no OpenAI server `missing-server`"));
 }
 
 #[test]
@@ -294,7 +396,119 @@ fn lift_fails_closed_for_malformed_arguments() {
     }))))
     .expect_err("malformed arguments should deny lift");
 
-    assert!(err
-        .to_string()
-        .contains("tool arguments failed schema validation"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
+}
+
+#[test]
+fn protocol_boundary_rejects_duplicate_arguments() {
+    let adapter = chio_openai::OpenAiAdapter::new("org-test");
+    let raw = chio_tool_call_fabric::ProviderRequest(br#"{"output":[{"type":"function_call","call_id":"call-1","name":"read","arguments":"{\"path\":\"a\",\"path\":\"b\"}"}]}"#.to_vec());
+    let error = adapter
+        .lift_batch(raw)
+        .expect_err("duplicate arguments must reject");
+    assert!(error.to_string().contains("urn:chio:error:attest:"));
+}
+
+#[test]
+fn protocol_boundary_provider_payload_and_nested_arguments_fail_precisely() {
+    let adapter = OpenAiAdapter::new("org-test");
+    for arguments in ["{\"x\":1,\"x\":2}", "{\"x\":1e9999}", "[]", "null"] {
+        let error = adapter.lift_batch(raw(json!({"output":[{"type":"function_call", "call_id":"1", "name":"read", "arguments":arguments}]}))).unwrap_err();
+        assert!(matches!(error, ProviderError::UntrustedInput(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains(arguments));
+    }
+    let error = adapter
+        .lift_batch(raw(json!({"body": "{\"output\":[],\"output\":[]}"})))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
+    let error = adapter
+        .lift_batch(ProviderRequest(vec![b' '; 16 * 1024 * 1024 + 1]))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
+    ));
+}
+
+#[test]
+fn protocol_boundary_native_integer_arguments_remain_exact() {
+    let adapter = OpenAiAdapter::new("org-test");
+    let invocations = adapter
+        .lift_batch(raw(json!({"output":[{
+            "type":"function_call", "call_id":"1", "name":"read",
+            "arguments":"{\"x\":9007199254740993}"
+        }]})))
+        .unwrap();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(
+        invocations[0].arguments.as_slice(),
+        br#"{"x":9007199254740993}"#
+    );
+    invocations[0].validate().unwrap();
+}
+
+#[test]
+fn protocol_boundary_provenance_uses_injected_clock_and_rejects_faults() {
+    use chio_security_types::clock::*;
+    let payload = || {
+        raw(
+            json!({"output":[{"type":"function_call", "call_id":"1", "name":"read", "arguments":"{}"}]}),
+        )
+    };
+    let adapter =
+        OpenAiAdapter::new("org-test").with_clock(Arc::new(FixedClock::from_millis(1234)));
+    let calls = adapter.lift_batch(payload()).unwrap();
+    assert_eq!(
+        calls[0]
+            .provenance
+            .received_at
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+        1234
+    );
+    struct Failed;
+    impl Clock for Failed {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            Err(ClockError::Unavailable)
+        }
+    }
+    let adapter = adapter.with_clock(Arc::new(Failed));
+    assert!(matches!(
+        adapter.lift_batch(payload()),
+        Err(ProviderError::Clock(ClockError::Unavailable))
+    ));
+}
+
+#[test]
+fn lift_batch_rejects_a_client_executed_item_it_cannot_evaluate() {
+    let adapter = OpenAiAdapter::new(OpenAiAdapterConfig::new("org_chio_demo"));
+    let result = adapter.lift_batch(raw(json!({
+        "id": "resp_mixed",
+        "object": "response",
+        "output": [
+            {
+                "type": "function_call",
+                "call_id": "call_weather_1",
+                "name": "get_weather",
+                "arguments": "{\"location\":\"NYC\"}"
+            },
+            {
+                "type": "local_shell_call",
+                "call_id": "call_shell_1",
+                "action": {"type": "exec", "command": ["rm", "-rf", "/work"]}
+            }
+        ]
+    })));
+    assert!(
+        result.is_err(),
+        "mixed output must not silently drop the shell call"
+    );
 }

@@ -212,12 +212,9 @@ where
     T: serde::de::DeserializeOwned + serde::Serialize,
 {
     require_canonical_json_text(value, field, max_bytes)?;
-    let parsed: T =
-        serde_json::from_str(value).map_err(|_| FindingError::NonCanonicalBytes(field))?;
-    let reserialized = canonical_json_bytes(&parsed).map_err(|_| FindingError::Canonicalization)?;
-    if reserialized.as_slice() != value.as_bytes() {
-        return Err(FindingError::NonCanonicalBytes(field));
-    }
+    let parsed: T = chio_core_types::canonical::UntrustedJsonText::new(value)
+        .decode_canonical()
+        .map_err(|_| FindingError::NonCanonicalBytes(field))?;
     Ok(parsed)
 }
 

@@ -8,6 +8,7 @@
 //! reservation state live with the caller's admission-time check, never
 //! here.
 
+use chio_core_types::canonical::{SharedUntrustedJsonError, UntrustedJsonText};
 use chio_finding::{
     decode_purchase_context_b64, verify_finding, verify_signed_admission,
     verify_signed_seller_authorization, Finding, FindingPurchaseContext, SignedFindingAdmission,
@@ -50,12 +51,18 @@ pub fn derive_payment_operation_id(reservation_id: &str) -> String {
 /// denies the reveal.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum PurchaseVerificationError {
+    #[error("purchase context member {member} rejected: {source}")]
+    MemberInput {
+        member: &'static str,
+        #[source]
+        source: SharedUntrustedJsonError,
+    },
     #[error("purchase context rejected: {0}")]
-    Carrier(chio_finding::FindingError),
+    Carrier(#[source] chio_finding::FindingError),
     #[error("purchase context member {0} failed strict parsing")]
     Member(&'static str),
     #[error("signed finding rejected: {0}")]
-    Finding(chio_finding::FindingError),
+    Finding(#[source] chio_finding::FindingError),
     #[error("purchase context does not bind the marked finding sale")]
     MarkerMismatch,
     #[error("finding payload commitment does not equal the grant digest")]
@@ -65,11 +72,11 @@ pub enum PurchaseVerificationError {
     #[error("{0} envelope signature is not verifiable")]
     EnvelopeSignature(&'static str),
     #[error("venue admission rejected: {0}")]
-    Admission(chio_finding::FindingError),
+    Admission(#[source] chio_finding::FindingError),
     #[error("admission does not bind the carried {0} envelope")]
     AdmissionBindingMismatch(&'static str),
     #[error("seller authorization rejected: {0}")]
-    SellerAuthorization(chio_finding::FindingError),
+    SellerAuthorization(#[source] chio_finding::FindingError),
     #[error("seller authorization does not cover this sale")]
     SellerAuthorizationScope,
     #[error("token issuer is neither the finding issuer nor an authorized seller")]
@@ -134,15 +141,22 @@ fn parse_member<T: serde::de::DeserializeOwned>(
     text: &str,
     member: &'static str,
 ) -> Result<T, PurchaseVerificationError> {
-    serde_json::from_str(text).map_err(|_| PurchaseVerificationError::Member(member))
+    UntrustedJsonText::from_wire(
+        text.as_bytes(),
+        chio_finding::PURCHASE_CONTEXT_MAX_CANONICAL_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| PurchaseVerificationError::MemberInput {
+        member,
+        source: error.into(),
+    })
 }
 
 fn canonical_digest_of(
     text: &str,
     member: &'static str,
 ) -> Result<String, PurchaseVerificationError> {
-    let value: serde_json::Value =
-        serde_json::from_str(text).map_err(|_| PurchaseVerificationError::Member(member))?;
+    let value: serde_json::Value = parse_member(text, member)?;
     let bytes =
         canonical_json_bytes(&value).map_err(|_| PurchaseVerificationError::Member(member))?;
     Ok(sha256_hex(&bytes))
@@ -392,4 +406,23 @@ pub fn verify_purchase_context_pure(
         admission,
         seller_authorization: authorization,
     })
+}
+
+#[cfg(test)]
+mod original_input_tests {
+    use super::*;
+    #[test]
+    fn original_purchase_member_cannot_normalize_duplicate_fields() {
+        let valid = canonical_digest_of(r#"{"units":18446744073709551615}"#, "test");
+        assert!(valid.is_ok(), "native integer positive control");
+        let error = match canonical_digest_of(
+            r#"{"nested":{"private-marker":1,"private-marker":2}}"#,
+            "test",
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("ambiguous member acquired a canonical identity"),
+        };
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
+    }
 }

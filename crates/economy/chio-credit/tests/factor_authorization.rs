@@ -217,7 +217,8 @@ fn bind_authorization_requires_exact_canonical_bytes_and_configured_authority() 
     noncanonical.extend_from_slice(&bytes);
     assert!(matches!(
         verify_bind(&fixture, &noncanonical),
-        Err(FactorError::Canonicalization(_))
+        Err(FactorError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
 
     let rogue = Keypair::from_seed(&[84; 32]);
@@ -347,7 +348,8 @@ fn agreement_rejects_noncanonical_tampered_and_unknown_artifacts() -> TestResult
     noncanonical.extend_from_slice(&bytes);
     assert!(matches!(
         verify_agreement(&fixture, &bind, &noncanonical),
-        Err(FactorError::Canonicalization(_))
+        Err(FactorError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
 
     let mut tampered: serde_json::Value = serde_json::from_slice(&bytes)?;

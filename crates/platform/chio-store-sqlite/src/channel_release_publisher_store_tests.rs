@@ -53,7 +53,7 @@ fn fixture() -> TestResult<Fixture> {
         std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
     }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.channel_release_publisher_store();
     let fence = authority.mutation_fence();
     Ok(Fixture {
@@ -692,6 +692,7 @@ fn release_dispatch_requires_exact_durable_slot_and_verified_commit_identity() -
 
 #[test]
 fn immediate_claim_has_one_winner_and_exact_replay_has_no_permit() -> TestResult {
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -707,10 +708,7 @@ fn immediate_claim_has_one_winner_and_exact_replay_has_no_permit() -> TestResult
         let fence = fixture.fence.clone();
         let barrier = Arc::clone(&barrier);
         threads.push(std::thread::spawn(move || {
-            let _runtime = chio_kernel::scope_fixed_runtime_for_current_thread(
-                30,
-                std::iter::empty::<String>(),
-            );
+            let _runtime = chio_test_support::clock::scope_unix_secs(30);
             barrier.wait();
             store.claim_candidate_unqualified_for_test(&candidate, &fence, 30_000)
         }));
@@ -751,8 +749,7 @@ fn immediate_claim_has_one_winner_and_exact_replay_has_no_permit() -> TestResult
             .store
             .replay_candidate_unqualified_for_test(&candidate, &fixture.fence, 30_000)?;
     assert_eq!(replayed.as_ref(), Some(&retained));
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let ChannelReleasePermitClaimV1::ExactReplay(replayed) = fixture
         .store
         .claim_candidate_unqualified_for_test(&candidate, &fixture.fence, 29_999)?
@@ -765,8 +762,7 @@ fn immediate_claim_has_one_winner_and_exact_replay_has_no_permit() -> TestResult
 
 #[test]
 fn claim_rejects_substituted_authority_call_and_stale_store_fence() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -835,8 +831,7 @@ fn claim_rejects_substituted_authority_call_and_stale_store_fence() -> TestResul
 
 #[test]
 fn cutoff_and_nonclosing_durable_state_fail_closed_before_claim() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(50, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(50);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -881,8 +876,7 @@ fn cutoff_and_nonclosing_durable_state_fail_closed_before_claim() -> TestResult 
 
 #[test]
 fn unknown_submission_retains_consumed_permit_and_closing_reservation() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -925,8 +919,7 @@ fn unknown_submission_retains_consumed_permit_and_closing_reservation() -> TestR
 
 #[test]
 fn submitted_record_requires_an_evm_hash_and_replays_exactly() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -984,8 +977,7 @@ fn submitted_record_requires_an_evm_hash_and_replays_exactly() -> TestResult {
 
 #[test]
 fn startup_quarantines_incomplete_dispatch_without_rebroadcast() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(30);
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;
@@ -1006,7 +998,7 @@ fn startup_quarantines_incomplete_dispatch_without_rebroadcast() -> TestResult {
     drop(store);
     drop(_authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&_database, &_lock_root)?;
+    let reopened = crate::test_authority::open_serving(&_database, &_lock_root)?;
     let reopened_fence = reopened.mutation_fence();
     let publisher = reopened.channel_release_publisher_store();
     let quarantined = publisher
@@ -1049,7 +1041,7 @@ fn startup_quarantines_incomplete_dispatch_without_rebroadcast() -> TestResult {
     drop(publisher);
     drop(reopened);
 
-    let reopened_again = SqliteAuthorityStore::open_serving(&_database, &_lock_root)?;
+    let reopened_again = crate::test_authority::open_serving(&_database, &_lock_root)?;
     let publisher = reopened_again.channel_release_publisher_store();
     assert_eq!(
         publisher
@@ -1082,3 +1074,12 @@ fn secure_temp_directory(path: &std::path::Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
+
+#[path = "channel_release_publisher_store_tests/connection_recovery.rs"]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+#[cfg(unix)]
+mod connection_recovery;

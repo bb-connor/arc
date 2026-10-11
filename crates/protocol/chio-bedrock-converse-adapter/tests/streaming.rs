@@ -5,14 +5,19 @@ use std::sync::Arc;
 use chio_bedrock_converse_adapter::{
     transport, BedrockAdapter, BedrockAdapterConfig, BEDROCK_CONVERSE_API_VERSION,
 };
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{
     DenyReason, ProviderError, ProviderId, ProviderRequest, ReceiptId, Redaction, ToolResult,
     VerdictResult, DEFAULT_MAX_BUFFERED_RAW_FRAMES,
 };
 use serde_json::{json, Value};
 
-fn adapter() -> BedrockAdapter {
-    let cfg = BedrockAdapterConfig::new(
+fn raw_adapter() -> BedrockAdapter {
+    let config = BedrockAdapterConfig::new(
         "bedrock-1",
         "Bedrock Converse",
         "0.1.0",
@@ -23,7 +28,54 @@ fn adapter() -> BedrockAdapter {
     .with_assumed_role_session_arn(
         "arn:aws:sts::123456789012:assumed-role/ChioAgentRole/session-1",
     );
-    BedrockAdapter::new(cfg, Arc::new(transport::MockTransport::new())).unwrap()
+    BedrockAdapter::new(config, Arc::new(transport::MockTransport::new())).unwrap()
+}
+
+fn adapter() -> BedrockAdapter {
+    let signer = Keypair::from_seed(&[64; 32]);
+    let config = BedrockAdapterConfig::new(
+        "bedrock-1",
+        "Bedrock Converse",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        "arn:aws:iam::123456789012:role/ChioAgentRole",
+        "123456789012",
+    )
+    .with_assumed_role_session_arn(
+        "arn:aws:sts::123456789012:assumed-role/ChioAgentRole/session-1",
+    );
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Admitted Bedrock weather tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    BedrockAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .unwrap()
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -137,6 +189,24 @@ fn converse_batch_fixture() -> Value {
 }
 
 #[test]
+fn raw_projection_cannot_enter_stream_evaluator() {
+    let adapter = raw_adapter();
+    let mut evaluated = false;
+
+    let error = adapter
+        .gate_converse_stream(&stream_bytes(converse_stream_fixture()), |_invocation| {
+            evaluated = true;
+            Ok(allow_verdict())
+        })
+        .expect_err("raw projection must not be execution-ready");
+
+    assert!(error
+        .to_string()
+        .contains("requires a registry-admitted security sidecar"));
+    assert!(!evaluated);
+}
+
+#[test]
 fn gates_tool_use_at_content_block_start_and_forwards_after_allow() {
     let adapter = adapter();
     let events = converse_stream_fixture();
@@ -201,6 +271,7 @@ fn forbidden_late_tool_use_delta_fails_closed_before_forwarding() {
 fn non_empty_start_input_with_delta_fails_closed() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -241,6 +312,7 @@ fn non_empty_start_input_with_delta_fails_closed() {
 fn scalar_start_only_input_fails_closed_before_verdict() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -272,6 +344,7 @@ fn scalar_start_only_input_fails_closed_before_verdict() {
 fn streaming_tool_use_id_with_surrounding_whitespace_fails_closed() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -303,6 +376,7 @@ fn streaming_tool_use_id_with_surrounding_whitespace_fails_closed() {
 fn streaming_tool_use_name_with_surrounding_whitespace_fails_closed() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -339,13 +413,14 @@ fn malformed_json_event_fails_closed() {
         })
         .expect_err("invalid stream JSON should fail closed");
 
-    assert!(err.to_string().contains("event payload was not JSON"));
+    assert!(matches!(err, ProviderError::UntrustedInput(_)));
 }
 
 #[test]
 fn tool_use_delta_without_active_start_fails_closed() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockDelta": {
                 "contentBlockIndex": 0,
@@ -370,6 +445,7 @@ fn tool_use_delta_without_active_start_fails_closed() {
 fn mismatched_tool_use_block_index_fails_closed() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 1,
@@ -495,17 +571,20 @@ fn evaluator_errors_fail_closed() {
 #[test]
 fn zero_length_tool_use_deltas_count_toward_buffered_frame_limit() {
     let adapter = adapter();
-    let mut events = vec![json!({
-        "contentBlockStart": {
-            "contentBlockIndex": 0,
-            "start": {
-                "toolUse": {
-                    "toolUseId": "tooluse_many_empty",
-                    "name": "get_weather"
+    let mut events = vec![
+        json!({"messageStart":{"role":"assistant"}}),
+        json!({
+            "contentBlockStart": {
+                "contentBlockIndex": 0,
+                "start": {
+                    "toolUse": {
+                        "toolUseId": "tooluse_many_empty",
+                        "name": "get_weather"
+                    }
                 }
             }
-        }
-    })];
+        }),
+    ];
     for _ in 0..4097 {
         events.push(json!({
             "contentBlockDelta": {
@@ -533,17 +612,20 @@ fn zero_length_tool_use_deltas_count_toward_buffered_frame_limit() {
 #[test]
 fn content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit() {
     let adapter = adapter();
-    let mut events = vec![json!({
-        "contentBlockStart": {
-            "contentBlockIndex": 0,
-            "start": {
-                "toolUse": {
-                    "toolUseId": "tooluse_limit",
-                    "name": "get_weather"
+    let mut events = vec![
+        json!({"messageStart":{"role":"assistant"}}),
+        json!({
+            "contentBlockStart": {
+                "contentBlockIndex": 0,
+                "start": {
+                    "toolUse": {
+                        "toolUseId": "tooluse_limit",
+                        "name": "get_weather"
+                    }
                 }
             }
-        }
-    })];
+        }),
+    ];
     for _ in 0..(DEFAULT_MAX_BUFFERED_RAW_FRAMES - 1) {
         events.push(json!({
             "contentBlockDelta": {
@@ -578,6 +660,7 @@ fn content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit() {
 fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
     let adapter = adapter();
     let stream = json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -599,4 +682,30 @@ fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
 
     assert!(matches!(err, ProviderError::Malformed(_)));
     assert!(err.to_string().contains("raw frame bytes"));
+}
+
+#[test]
+fn invalid_event_tail_prevents_every_evaluator_call() {
+    let complete = converse_stream_fixture().as_array().unwrap().clone();
+    let mut missing = complete.clone();
+    missing.pop();
+    let mut duplicate = missing.clone();
+    duplicate.extend_from_slice(&complete[3..]);
+    let mut trailing = complete.clone();
+    trailing.push(json!({"contentBlockStop":{"contentBlockIndex":1}}));
+    let malformed_envelope = json!({"events":complete, "eventStream":[]});
+    for invalid in [
+        Value::Array(missing),
+        Value::Array(duplicate),
+        Value::Array(trailing),
+        malformed_envelope,
+    ] {
+        let mut calls = 0;
+        let result = adapter().gate_converse_stream(&stream_bytes(invalid), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        });
+        assert!(result.is_err());
+        assert_eq!(calls, 0);
+    }
 }

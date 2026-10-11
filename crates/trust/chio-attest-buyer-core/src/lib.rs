@@ -14,6 +14,8 @@ pub mod revocation;
 pub mod trust_bundle;
 pub(crate) mod validation;
 
+mod input;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;

@@ -149,7 +149,7 @@ jobs:
                observed_ref="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/pull/${PR_NUMBER}/merge" 2>/dev/null)"; then
               observed_sha="$(jq -r '.object.sha // ""' <<< "${observed_ref}" 2>/dev/null)" || observed_sha=''
               if [[ "${observed_sha}" =~ ^[0-9a-f]{40}$ ]] &&
-                 observed_object="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" 2>/dev/null)"; then
+                 timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" >/dev/null 2>&1; then
                 observed_matches=false
                 if test "${observed_sha}" = "${MERGE_COMMIT_SHA}"; then observed_matches=true; fi
                 printf 'Observed live merge=%s recorded_match=%s (observation only).\n' "${observed_sha}" "${observed_matches}" >> "${GITHUB_STEP_SUMMARY}"
@@ -544,7 +544,7 @@ jobs:
                observed_ref="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/ref/pull/${pr_number}/merge" 2>/dev/null)"; then
               observed_sha="$(jq -r '.object.sha // ""' <<< "${observed_ref}" 2>/dev/null)" || observed_sha=''
               if [[ "${observed_sha}" =~ ^[0-9a-f]{40}$ ]] &&
-                 observed_object="$(timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" 2>/dev/null)"; then
+                 timeout 15s gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/git/commits/${observed_sha}" >/dev/null 2>&1; then
                 observed_matches=false
                 if test "${observed_sha}" = "${merge_commit_sha}"; then observed_matches=true; fi
                 printf 'Observed live merge=%s recorded_match=%s (observation only).\n' "${observed_sha}" "${observed_matches}" >> "${GITHUB_STEP_SUMMARY}"

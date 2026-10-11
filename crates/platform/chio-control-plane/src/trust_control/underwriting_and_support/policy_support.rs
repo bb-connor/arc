@@ -2,13 +2,13 @@ use super::*;
 
 pub(crate) fn build_underwriting_policy_input(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingPolicyInput, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -34,11 +34,11 @@ pub(crate) fn build_underwriting_policy_input(
     let (settlements, governed_actions, metered_billing, selection) = receipt_store
         .query_behavioral_feed_receipts(&behavioral_query)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
-                receipt_db_path,
+                receipt_store,
                 budget_db_path,
                 subject_key,
                 normalized_query.since,
@@ -126,12 +126,14 @@ pub(crate) fn build_underwriting_compliance_evidence(
             report.export_query.agent_subject
         ));
     }
-    let observed_capabilities = selection
-        .receipts
-        .iter()
-        .map(|receipt| receipt.capability_id.clone())
-        .collect::<std::collections::BTreeSet<_>>()
-        .len() as u64;
+    let observed_capabilities = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .map(|receipt| receipt.capability_id.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+    );
     let latest_receipt_timestamp = selection
         .receipts
         .iter()
@@ -142,7 +144,7 @@ pub(crate) fn build_underwriting_compliance_evidence(
         activity.summary.deny_count,
         observed_capabilities,
         0,
-        activity.by_time.len() as u64,
+        crate::integer::count(activity.by_time.len()),
         0,
         latest_receipt_timestamp.map(|timestamp| generated_at.saturating_sub(timestamp)),
     );
@@ -212,26 +214,30 @@ fn build_underwriting_receipt_evidence(
     shared_evidence: &SharedEvidenceReferenceReport,
     selection: &chio_kernel::BehavioralFeedReceiptSelection,
 ) -> UnderwritingReceiptEvidence {
-    let runtime_assurance_receipts = selection
-        .receipts
-        .iter()
-        .filter(|receipt| {
-            receipt
-                .governed
-                .as_ref()
-                .and_then(|governed| governed.runtime_assurance.as_ref())
-                .is_some()
-        })
-        .count() as u64;
-    let call_chain_receipts = selection
-        .receipts
-        .iter()
-        .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
-        .count() as u64;
+    let runtime_assurance_receipts = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .filter(|receipt| {
+                receipt
+                    .governed
+                    .as_ref()
+                    .and_then(|governed| governed.runtime_assurance.as_ref())
+                    .is_some()
+            })
+            .count(),
+    );
+    let call_chain_receipts = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
+            .count(),
+    );
 
     UnderwritingReceiptEvidence {
         matching_receipts: selection.matching_receipts,
-        returned_receipts: selection.receipts.len() as u64,
+        returned_receipts: crate::integer::count(selection.receipts.len()),
         allow_count: activity.summary.allow_count,
         deny_count: activity.summary.deny_count,
         cancelled_count: activity.summary.cancelled_count,
@@ -641,6 +647,8 @@ fn underwriting_receipt_call_chain(
         })
 }
 
+/// Load owner-provisioned custody for node-local signed observations.
+/// A follower's local signer does not assert ownership of the replicated head.
 pub(crate) fn load_behavioral_feed_signing_keypair(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -650,8 +658,23 @@ pub(crate) fn load_behavioral_feed_signing_keypair(
             "behavioral feed export requires either --authority-seed-file or --authority-db, not both"
                 .to_string(),
         )),
-        (Some(path), None) => load_or_create_authority_keypair(path),
-        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?),
+        (Some(path), None) => crate::load_existing_authority_keypair(path),
+        (None, Some(path)) => {
+            use chio_store_sqlite::authority::{
+                AuthorityInspectionError, SqliteAuthorityInspection,
+            };
+
+            let inspection_error = |error| match error {
+                AuthorityInspectionError::Uninitialized => CliError::cli_other_error(
+                    "behavioral feed export requires an authority database already initialized by its owner",
+                ),
+                AuthorityInspectionError::Store(error) => error.into(),
+            };
+            SqliteAuthorityInspection::open_existing_with_clock(path, Arc::new(report_clock()))
+                .map_err(inspection_error)?
+                .local_keypair()
+                .map_err(inspection_error)
+        }
         (None, None) => Err(CliError::cli_other_error(
             "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed"
                 .to_string(),
@@ -695,7 +718,7 @@ pub(crate) fn build_budget_utilization_report(
 ) -> Result<BudgetUtilizationReport, Response> {
     let usages = if let Some(capability_id) = query.capability_id.as_deref() {
         budget_store
-            .list_usages(usize::MAX, Some(capability_id))
+            .list_all_usages_for_capability(capability_id)
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?
@@ -765,7 +788,7 @@ pub(crate) fn build_budget_utilization_report(
         })?;
         let invocation_utilization_rate = resolved
             .max_invocations
-            .and_then(|max| ratio_option(usage.invocation_count as u64, max as u64));
+            .and_then(|max| ratio_option(u64::from(usage.invocation_count), u64::from(max)));
         let cost_utilization_rate = resolved
             .max_total_cost_units
             .and_then(|max| ratio_option(committed_cost_units, max));
@@ -786,7 +809,7 @@ pub(crate) fn build_budget_utilization_report(
             || cost_utilization_rate.is_some_and(|rate| rate >= 0.8);
 
         matching_grants = matching_grants.saturating_add(1);
-        total_invocations = total_invocations.saturating_add(usage.invocation_count as u64);
+        total_invocations = total_invocations.saturating_add(u64::from(usage.invocation_count));
         total_committed_cost_units =
             total_committed_cost_units.saturating_add(committed_cost_units);
         distinct_capabilities.insert(usage.capability_id.clone());
@@ -832,9 +855,9 @@ pub(crate) fn build_budget_utilization_report(
                         let near_limit = exhausted
                             || invocation_utilization_rate.is_some_and(|rate| rate >= 0.8);
                         BudgetDimensionUsage {
-                            used: usage.invocation_count as u64,
-                            limit: max as u64,
-                            remaining: remaining_invocations.unwrap_or(0) as u64,
+                            used: u64::from(usage.invocation_count),
+                            limit: u64::from(max),
+                            remaining: u64::from(remaining_invocations.unwrap_or(0)),
                             utilization_rate: invocation_utilization_rate,
                             near_limit,
                             exhausted,
@@ -861,23 +884,28 @@ pub(crate) fn build_budget_utilization_report(
     Ok(BudgetUtilizationReport {
         summary: BudgetUtilizationSummary {
             matching_grants,
-            returned_grants: rows.len() as u64,
-            distinct_capabilities: distinct_capabilities.len() as u64,
-            distinct_subjects: distinct_subjects.len() as u64,
+            returned_grants: crate::integer::count(rows.len()),
+            distinct_capabilities: crate::integer::count(distinct_capabilities.len()),
+            distinct_subjects: crate::integer::count(distinct_subjects.len()),
             total_invocations,
             total_cost_charged: total_committed_cost_units,
             near_limit_count,
             exhausted_count,
             rows_missing_scope,
             rows_missing_lineage,
-            truncated: matching_grants > rows.len() as u64,
+            truncated: matching_grants > crate::integer::count(rows.len()),
         },
         rows,
     })
 }
 
 fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> ResolvedBudgetGrant {
-    let scope = match serde_json::from_str::<ChioScope>(&snapshot.grants_json) {
+    let scope = match chio_core::canonical::UntrustedJsonText::from_wire(
+        snapshot.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed::<ChioScope>())
+    {
         Ok(scope) => scope,
         Err(error) => {
             return ResolvedBudgetGrant {
@@ -890,7 +918,10 @@ fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> Reso
         }
     };
 
-    let Some(grant) = scope.grants.get(grant_index as usize) else {
+    let Some(grant) = usize::try_from(grant_index)
+        .ok()
+        .and_then(|index| scope.grants.get(index))
+    else {
         return ResolvedBudgetGrant {
             scope_resolution_error: Some(format!(
                 "grant_index {} is out of bounds for capability {}",
@@ -920,6 +951,10 @@ fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> Reso
     }
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Report ratios approximate counters as floating point and do not grant authority."
+)]
 fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     if denominator == 0 {
         None
@@ -928,24 +963,13 @@ fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     }
 }
 
-pub(crate) fn unix_timestamp_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn report_clock() -> impl chio_security_types::clock::Clock {
+    chio_security_types::clock::SystemClock
 }
 
-pub(crate) fn open_receipt_store(
-    config: &TrustServiceConfig,
-) -> Result<SqliteReceiptStore, Response> {
-    let Some(path) = config.receipt_db_path.as_deref() else {
-        return Err(plain_http_error(
-            StatusCode::CONFLICT,
-            "trust control service requires --receipt-db",
-        ));
-    };
-    SqliteReceiptStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+pub(crate) fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::Clock;
+    report_clock().unix_millis().map(|now| now.as_secs())
 }
 
 pub(crate) fn revocation_list_response(
@@ -977,4 +1001,38 @@ pub(crate) fn list_limit(requested: Option<usize>) -> usize {
 
 pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+#[path = "policy_support_tests.rs"]
+mod tests;
+
+/// Snapshot availability has a stable code; legacy errors keep their body.
+pub(crate) fn snapshot_error_response(error: ReceiptStoreError) -> Response {
+    let ReceiptStoreError::QuerySnapshot(error) = error else {
+        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    };
+    use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
+    let status = match &error {
+        ReceiptQuerySnapshotError::Invalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        ReceiptQuerySnapshotError::WorkBudgetExhausted(_)
+        | ReceiptQuerySnapshotError::ExportRefused(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        ReceiptQuerySnapshotError::Building { .. }
+        | ReceiptQuerySnapshotError::Stale
+        | ReceiptQuerySnapshotError::Busy
+        | ReceiptQuerySnapshotError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+    };
+    let mut response = (
+        status,
+        Json(json!({"error": error.to_string(), "code": error.wire_code()})),
+    )
+        .into_response();
+    if let Some(seconds) = error.retry_after_seconds() {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&seconds.to_string()) {
+            response
+                .headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, value);
+        }
+    }
+    response
 }

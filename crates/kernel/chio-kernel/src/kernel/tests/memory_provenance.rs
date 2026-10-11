@@ -1,25 +1,14 @@
+use super::*;
 // Memory-provenance tests.
 //
-// Included by `src/kernel/tests.rs`. Shares helper items from
-// `tests/all.rs` via the surrounding `tests.rs` `include!`s
-// (`make_config`, `make_keypair`, `make_scope`, `make_grant`,
-// `make_capability`, `EchoServer`, etc.).
-//
-// Coverage:
-//   * governed writes append provenance entries,
-//   * governed reads surface provenance metadata on the receipt,
-//   * reads of entries with no provenance are flagged as unverified,
-//   * hash-chain tamper is detected by verify_entry.
-//
-// `std::sync::Arc` is already brought into scope by the sibling
-// `tests/emergency.rs` include.
+// Shared fixtures are imported from the parent test module.
 
 fn install_provenance_store(
     kernel: &mut ChioKernel,
 ) -> Arc<crate::memory_provenance::InMemoryMemoryProvenanceStore> {
     let store = Arc::new(crate::memory_provenance::InMemoryMemoryProvenanceStore::new());
     kernel.set_memory_provenance_store(
-        store.clone() as Arc<dyn crate::memory_provenance::MemoryProvenanceStore>,
+        store.clone() as Arc<dyn crate::memory_provenance::MemoryProvenanceStore>
     );
     store
 }
@@ -163,7 +152,11 @@ fn memory_read_flags_chain_tamper_as_unverified() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
     let write_response = kernel
-        .evaluate_tool_call_blocking(&memory_write_request("req-write-tamper", &cap, "doc-tamper"))
+        .evaluate_tool_call_blocking(&memory_write_request(
+            "req-write-tamper",
+            &cap,
+            "doc-tamper",
+        ))
         .unwrap();
     let entry = store
         .latest_for_key("agent-context", "doc-tamper")
@@ -268,9 +261,7 @@ fn finding_memory_binding_denies_before_tool_dispatch() {
     let admission_error = kernel
         .validate_finding_memory_write_admission(&request)
         .expect_err("missing delivery receipt must fail admission");
-    assert!(admission_error
-        .to_string()
-        .contains("durable receipt"));
+    assert!(admission_error.to_string().contains("durable receipt"));
 
     let response = kernel
         .evaluate_tool_call_blocking(&request)
@@ -490,7 +481,8 @@ fn finding_memory_status_is_rechecked_after_checkpoint_preflight() {
         make_scope(vec![make_grant("srv-mem", "memory_write")]),
         300,
     );
-    let mut request = memory_write_request("finding-memory-checkpoint-race", &capability, "finding-1");
+    let mut request =
+        memory_write_request("finding-memory-checkpoint-race", &capability, "finding-1");
     request.arguments[crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT] =
         serde_json::json!(parent.id);
     request.governed_intent = Some(GovernedTransactionIntent {
@@ -509,10 +501,7 @@ fn finding_memory_status_is_rechecked_after_checkpoint_preflight() {
     });
 
     let error = kernel
-        .revalidate_finding_memory_write_status_before_dispatch(
-            &request,
-            current_unix_timestamp(),
-        )
+        .revalidate_finding_memory_write_status_before_dispatch(&request, current_unix_timestamp())
         .expect_err("a retraction during checkpoint preflight must deny dispatch");
     assert!(
         error
@@ -573,10 +562,7 @@ fn finding_memory_write_rejects_a_delivery_from_another_status_feed_before_dispa
 
     kernel.set_finding_status_proof_verifier(Arc::new(RetractedFindingStatusVerifier));
     let status_error = kernel
-        .revalidate_finding_memory_write_status_before_dispatch(
-            &request,
-            current_unix_timestamp(),
-        )
+        .revalidate_finding_memory_write_status_before_dispatch(&request, current_unix_timestamp())
         .expect_err("a different delivery feed must fail dispatch revalidation");
     assert!(status_error.to_string().contains("quarantine resolver"));
 
@@ -592,10 +578,7 @@ fn finding_memory_write_rejects_a_delivery_from_another_status_feed_before_dispa
 
     kernel.set_finding_delivery_receipt_authorities(vec![make_keypair().public_key()]);
     let authentication_error = kernel
-        .revalidate_finding_memory_write_status_before_dispatch(
-            &request,
-            current_unix_timestamp(),
-        )
+        .revalidate_finding_memory_write_status_before_dispatch(&request, current_unix_timestamp())
         .expect_err("dispatch revalidation must authenticate the latest retained receipt");
     assert!(authentication_error
         .to_string()

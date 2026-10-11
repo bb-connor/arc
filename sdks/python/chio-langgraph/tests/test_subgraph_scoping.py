@@ -16,15 +16,14 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 import pytest
-from chio_sdk.models import ChioScope, Operation, ToolGrant
-from chio_sdk.testing import allow_all
-
 from chio_langgraph import (
     ChioGraphConfig,
     ChioLangGraphConfigError,
     chio_node,
     enforce_subgraph_ceiling,
 )
+from chio_sdk.models import ChioScope, Operation, ToolGrant
+from chio_sdk.testing import allow_all
 
 
 class State(TypedDict, total=False):
@@ -74,12 +73,8 @@ class TestSubgraphWithinCeiling:
         def search_body(_state: State) -> dict[str, Any]:
             return {"value": "searched"}
 
-        wrapped_search = chio_node(
-            search_body, scope=_scope("search"), config=inner, name="search"
-        )
-        assert (await wrapped_search({"value": "x"})) == {
-            "value": "searched"
-        }
+        wrapped_search = chio_node(search_body, scope=_scope("search"), config=inner, name="search")
+        assert (await wrapped_search({"value": "x"})) == {"value": "searched"}
 
 
 # ---------------------------------------------------------------------------
@@ -97,9 +92,7 @@ class TestRegisterRefusesBroaderScope:
         inner = outer.subgraph_config()
 
         with pytest.raises(ChioLangGraphConfigError):
-            inner.register_node_scope(
-                "write", _scope("search", "browse", "write")
-            )
+            inner.register_node_scope("write", _scope("search", "browse", "write"))
 
     async def test_chio_node_refuses_broader_scope(self) -> None:
         chio = allow_all()
@@ -163,19 +156,13 @@ class TestStandaloneCeilingCheck:
 
     def test_with_ceiling_rejects_broader(self) -> None:
         chio = allow_all()
-        cfg = ChioGraphConfig(
-            chio_client=chio, workflow_scope=_scope("search")
-        )
+        cfg = ChioGraphConfig(chio_client=chio, workflow_scope=_scope("search"))
         with pytest.raises(ChioLangGraphConfigError):
-            enforce_subgraph_ceiling(
-                cfg, "write", _scope("search", "write")
-            )
+            enforce_subgraph_ceiling(cfg, "write", _scope("search", "write"))
 
     def test_parent_ceiling_is_stricter_than_workflow_scope(self) -> None:
         chio = allow_all()
-        outer = ChioGraphConfig(
-            chio_client=chio, workflow_scope=_scope("search")
-        )
+        outer = ChioGraphConfig(chio_client=chio, workflow_scope=_scope("search"))
         # The subgraph claims a broader workflow_scope, but its
         # parent_ceiling (propagated from outer) is narrower. The
         # effective ceiling is parent_ceiling.

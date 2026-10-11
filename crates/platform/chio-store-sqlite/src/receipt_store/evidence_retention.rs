@@ -6,58 +6,8 @@ use super::support::{
 };
 use super::*;
 
-pub(crate) fn receipt_query_sql(
-    query: &ReceiptQuery,
-    tenant_fragment: &str,
-) -> Result<(String, String), ReceiptStoreError> {
-    let currency = query
-        .validated_cost_currency()
-        .map_err(ReceiptStoreError::ReadBoundary)?;
-    let cost_fragment = match (
-        query.min_cost.is_some(),
-        query.max_cost.is_some(),
-        currency.is_some(),
-    ) {
-        (false, false, false) => "AND ?13 IS NULL",
-        (false, false, true) => "AND r.cost_currency = ?13",
-        (true, false, true) => "AND r.cost_currency = ?13 AND r.cost_charged_be >= ?7",
-        (false, true, true) => "AND r.cost_currency = ?13 AND r.cost_charged_be <= ?8",
-        (true, true, true) => {
-            "AND r.cost_currency = ?13 AND r.cost_charged_be >= ?7 AND r.cost_charged_be <= ?8"
-        }
-        _ => {
-            return Err(ReceiptStoreError::ReadBoundary(
-                "receipt query cost bounds require a currency".to_string(),
-            ))
-        }
-    };
-    let from_where = format!(
-        r#"
-        FROM chio_tool_receipts r
-        LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
-        WHERE (?1 IS NULL OR r.capability_id = ?1)
-          AND (?2 IS NULL OR r.tool_server = ?2)
-          AND (?3 IS NULL OR r.tool_name = ?3)
-          AND (?4 IS NULL OR r.decision_kind = ?4)
-          AND (?5 IS NULL OR r.timestamp >= ?5)
-          AND (?6 IS NULL OR r.timestamp <= ?6)
-          {cost_fragment}
-          AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
-          AND {tenant_fragment}
-    "#
-    );
-    let data_sql = format!(
-        r#"
-        SELECT r.seq, r.raw_json
-        {from_where}
-          AND (?10 IS NULL OR r.seq > ?10)
-        ORDER BY r.seq ASC
-        LIMIT ?11
-    "#
-    );
-    let count_sql = format!("SELECT COUNT(*) {from_where}");
-    Ok((data_sql, count_sql))
-}
+#[path = "evidence_retention/dispatch.rs"]
+mod dispatch;
 
 impl SqliteReceiptStore {
     pub fn append_chio_receipt_returning_seq(
@@ -149,7 +99,8 @@ impl SqliteReceiptStore {
         let page_size: i64 = self
             .connection()?
             .query_row("PRAGMA page_size", [], |row| row.get(0))?;
-        Ok((page_count.max(0) as u64) * (page_size.max(0) as u64))
+        Ok(u64::try_from(page_count.max(0)).unwrap_or_default()
+            * u64::try_from(page_size.max(0)).unwrap_or_default())
     }
 
     /// Live logical size in bytes: `(page_count - freelist_count) * page_size`.
@@ -169,7 +120,7 @@ impl SqliteReceiptStore {
             [],
             |row| row.get::<_, Option<i64>>(0),
         )?;
-        Ok(ts.map(|t| t.max(0) as u64))
+        Ok(ts.map(|t| u64::try_from(t.max(0)).unwrap_or_default()))
     }
 
     /// Return the oldest live receipt timestamp for a tenant.
@@ -182,7 +133,7 @@ impl SqliteReceiptStore {
             params![tenant_id],
             |row| row.get::<_, Option<i64>>(0),
         )?;
-        Ok(ts.map(|t| t.max(0) as u64))
+        Ok(ts.map(|t| u64::try_from(t.max(0)).unwrap_or_default()))
     }
 
     /// Archive all receipts whose entire checkpointed prefix has aged past
@@ -221,229 +172,6 @@ impl SqliteReceiptStore {
     /// checkpointed batch has fully aged, i.e. a no-op rotation).
     pub fn rotate_if_needed(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
         self.dispatch_rotate(Box::new(config.clone()), None)
-    }
-
-    fn dispatch_rotate(
-        &self,
-        config: Box<RetentionConfig>,
-        explicit_cutoff: Option<u64>,
-    ) -> Result<u64, ReceiptStoreError> {
-        if config.tenant_id.is_some() {
-            // Tenant-scoped archival is not expressible as a prefix watermark,
-            // so reject here before any partial work runs.
-            return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
-        }
-        let config = match explicit_cutoff {
-            Some(cutoff) => {
-                let mut config = config;
-                config.retention_days = 0;
-                config.explicit_cutoff_unix_secs = Some(cutoff);
-                config
-            }
-            None => config,
-        };
-        let (response, result) = std::sync::mpsc::sync_channel(1);
-        // A rotation is an in-flight writer just like an append or a Write job:
-        // increment BEFORE handing the command to the actor so a concurrent
-        // `receipt_store_health` cannot observe a dequeued-but-uncounted
-        // rotation, mirroring `ReceiptCommitActor::append` and
-        // `WriterHandle::run_write_kind`. The Rotate actor arm decrements
-        // unconditionally on dequeue; any send or recv failure here undoes the
-        // speculative increment so a rejected rotation never leaks inflight.
-        let health = &self.receipt_commit_actor.health;
-        health
-            .inflight
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if let Err(error) = self
-            .receipt_commit_actor
-            .sender
-            .try_send(ReceiptCommitCommand::Rotate { config, response })
-        {
-            atomic_saturating_sub(&health.inflight, 1);
-            return Err(match error {
-                std::sync::mpsc::TrySendError::Full(_) => receipt_actor_saturated_error(),
-                std::sync::mpsc::TrySendError::Disconnected(_) => receipt_actor_unavailable_error(),
-            });
-        }
-        match result.recv() {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                atomic_saturating_sub(&health.inflight, 1);
-                Err(receipt_actor_unavailable_error())
-            }
-        }
-    }
-
-    /// Internal implementation for `query_receipts` (called from `receipt_query` module).
-    ///
-    /// Requires access to the private `connection` field, so it lives here in `receipt_store`.
-    pub(crate) fn query_receipts_impl(
-        &self,
-        query: &ReceiptQuery,
-    ) -> Result<ReceiptQueryResult, ReceiptStoreError> {
-        // Validate the `outcome` filter against the known decision_kind values.
-        // Silently accepting unknown values would return zero results and could
-        // mask caller bugs; fail explicitly instead.
-        const VALID_OUTCOMES: &[&str] = &["allow", "deny", "cancelled", "incomplete"];
-        if let Some(outcome) = query.outcome.as_deref() {
-            if !VALID_OUTCOMES.contains(&outcome) {
-                return Err(ReceiptStoreError::InvalidOutcome(format!(
-                    "unknown outcome filter {:?}; valid values are: allow, deny, cancelled, incomplete",
-                    outcome
-                )));
-            }
-        }
-
-        let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
-
-        // Receipt read isolation: admin contexts can read all rows, tenant
-        // contexts see exact tenant rows by default, and local compatibility
-        // mode may include NULL-tenant (pre-multitenant) rows.
-        let read_scope = query
-            .effective_read_scope()
-            .map_err(ReceiptStoreError::ReadBoundary)?;
-        let tenant_fragment = match (
-            read_scope.tenant.as_deref(),
-            read_scope.include_null_tenant && !self.strict_tenant_isolation_enabled(),
-        ) {
-            (None, _) => "(?12 IS NULL)",
-            (Some(_), true) => "(r.tenant_id = ?12 OR r.tenant_id IS NULL)",
-            (Some(_), false) => "(r.tenant_id = ?12)",
-        };
-
-        let (data_sql, count_sql) = receipt_query_sql(query, tenant_fragment)?;
-
-        let cap_id = query.capability_id.as_deref();
-        let tool_srv = query.tool_server.as_deref();
-        let tool_nm = query.tool_name.as_deref();
-        let outcome = query.outcome.as_deref();
-        let since = query.since.map(|v| v as i64);
-        let until = query.until.map(|v| v as i64);
-        let min_cost = query.min_cost.map(|value| value.to_be_bytes().to_vec());
-        let max_cost = query.max_cost.map(|value| value.to_be_bytes().to_vec());
-        let agent_sub = query.agent_subject.as_deref();
-        let tenant = read_scope.tenant.as_deref();
-        let cost_currency = query.cost_currency.as_deref();
-        let mut connection = self.connection()?;
-        let transaction =
-            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
-        // Convert cursor to signed i64 for SQLite. SQLite AUTOINCREMENT seq
-        // values are bounded by i64::MAX; a cursor above that can never be
-        // exceeded. Convert with a checked cast: on overflow return an empty
-        // receipts page (the cursor excludes everything) while still reporting
-        // the correct total_count for the uncursored filter set.
-        let cursor_i64: Option<i64> = match query.cursor {
-            None => None,
-            Some(c) => match i64::try_from(c) {
-                Ok(v) => Some(v),
-                Err(_) => {
-                    // cursor > i64::MAX: no AUTOINCREMENT seq can exceed it.
-                    // Run only the count query (no cursor applied) and return empty.
-                    // ?10 and ?11 (cursor/limit) are not used in the count query
-                    // but must still bind placeholders if we reuse `params!`;
-                    // the count SQL uses only ?1..=?9 and ?12, so we need to
-                    // bind ?10 and ?11 as NULL / 0 to keep indexes stable.
-                    let total_count: u64 = transaction
-                        .query_row(
-                            &count_sql,
-                            params![
-                                cap_id,
-                                tool_srv,
-                                tool_nm,
-                                outcome,
-                                since,
-                                until,
-                                min_cost,
-                                max_cost,
-                                agent_sub,
-                                // ?10, ?11 unused in count_sql but bound so ?12
-                                // resolves to the tenant filter.
-                                None::<i64>,
-                                0i64,
-                                tenant,
-                                cost_currency,
-                            ],
-                            |row| row.get::<_, i64>(0),
-                        )
-                        .map(|n| n.max(0) as u64)?;
-                    transaction.commit()?;
-                    return Ok(ReceiptQueryResult {
-                        receipts: Vec::new(),
-                        total_count,
-                        next_cursor: None,
-                    });
-                }
-            },
-        };
-
-        let receipts = {
-            let mut statement = transaction.prepare(&data_sql)?;
-            let rows = statement.query_map(
-                params![
-                    cap_id,
-                    tool_srv,
-                    tool_nm,
-                    outcome,
-                    since,
-                    until,
-                    min_cost,
-                    max_cost,
-                    agent_sub,
-                    cursor_i64,
-                    limit as i64,
-                    tenant,
-                    cost_currency,
-                ],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )?;
-
-            let mut receipts = Vec::new();
-            for row in rows {
-                let (seq, raw_json) = row?;
-                let seq = seq.max(0) as u64;
-                let receipt =
-                    decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
-                receipts.push(StoredToolReceipt { seq, receipt });
-            }
-            receipts
-        };
-
-        let total_count: u64 = transaction
-            .query_row(
-                &count_sql,
-                params![
-                    cap_id,
-                    tool_srv,
-                    tool_nm,
-                    outcome,
-                    since,
-                    until,
-                    min_cost,
-                    max_cost,
-                    agent_sub,
-                    // ?10, ?11 unused in count_sql; bound to keep ?12 stable.
-                    None::<i64>,
-                    0i64,
-                    tenant,
-                    cost_currency,
-                ],
-                |row| row.get::<_, i64>(0),
-            )
-            .map(|n| n.max(0) as u64)?;
-
-        // next_cursor is Some(last_seq) when the page is full (more results may exist).
-        let next_cursor = if receipts.len() == limit {
-            receipts.last().map(|r| r.seq)
-        } else {
-            None
-        };
-        transaction.commit()?;
-
-        Ok(ReceiptQueryResult {
-            receipts,
-            total_count,
-            next_cursor,
-        })
     }
 }
 
@@ -494,8 +222,13 @@ impl SqliteReceiptStore {
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
+    verified_checkpoint_ceiling: Option<u64>,
 ) -> Result<u64, ReceiptStoreError> {
     let cutoff = sqlite_i64(cutoff_unix_secs, "retention cutoff")?;
+    let ceiling = verified_checkpoint_ceiling
+        .map(|value| sqlite_i64(value, "verified checkpoint ceiling"))
+        .transpose()?
+        .unwrap_or(i64::MAX);
     let settlement_attempts_installed: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM main.sqlite_master \
          WHERE type = 'table' AND name = 'settle_attempts')",
@@ -517,7 +250,7 @@ fn compute_archival_watermark(
         r#"
         SELECT COALESCE(MAX(kc.batch_end_seq), 0)
         FROM kernel_checkpoints kc
-        WHERE NOT EXISTS (
+        WHERE kc.batch_end_seq <= ?2 AND NOT EXISTS (
             SELECT 1 FROM claim_receipt_log_entries e
             WHERE e.entry_seq <= kc.batch_end_seq
               AND e.timestamp >= ?1
@@ -551,7 +284,8 @@ fn compute_archival_watermark(
         {active_settlement_guard}
         "#
     );
-    let watermark: i64 = connection.query_row(&query, params![cutoff], |row| row.get(0))?;
+    let watermark: i64 =
+        connection.query_row(&query, params![cutoff, ceiling], |row| row.get(0))?;
     sqlite_u64(watermark, "retention watermark")
 }
 
@@ -560,15 +294,16 @@ fn compute_archival_watermark(
 fn resolve_rotation_cutoff(
     connection: &rusqlite::Connection,
     config: &RetentionConfig,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<Option<u64>, ReceiptStoreError> {
+    let now = clock.unix_millis()?.as_secs();
     if let Some(cutoff) = config.explicit_cutoff_unix_secs {
         return Ok(Some(cutoff));
     }
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
+    let time_cutoff =
+        now.saturating_sub(config.retention_days.checked_mul(86_400).ok_or_else(|| {
+            ReceiptStoreError::ReadBoundary("retention duration overflow".into())
+        })?);
     // Trigger thresholds are measured over the claim receipt log, which projects
     // BOTH tool and child receipts. Reading only chio_tool_receipts would leave a
     // store whose aged (or oldest-checkpointed) evidence is child-only stuck below
@@ -590,7 +325,7 @@ fn resolve_rotation_cutoff(
     // whenever the store is over its limit, independent of the time trigger.
     let mut cutoff: Option<u64> = None;
     if let Some(oldest_ts) = oldest {
-        if (oldest_ts.max(0) as u64) < time_cutoff {
+        if u64::try_from(oldest_ts.max(0)).unwrap_or_default() < time_cutoff {
             cutoff = Some(time_cutoff);
         }
     }
@@ -616,7 +351,11 @@ fn resolve_rotation_cutoff(
             // `max_size_bytes`. Advance the cutoff one second past the median so
             // receipts at the median become eligible and a checkpointed prefix
             // can actually age out.
-            let size_cutoff = (median_ts.max(0) as u64).saturating_add(1);
+            let size_cutoff = sqlite_u64(median_ts, "retention median timestamp")?
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::ReadBoundary("retention cutoff overflow".into())
+                })?;
             cutoff = Some(cutoff.map_or(size_cutoff, |current| current.max(size_cutoff)));
         }
     }
@@ -636,7 +375,8 @@ fn live_db_size_bytes_on_connection(
         connection.query_row("PRAGMA freelist_count", [], |row| row.get(0))?;
     let page_size: i64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
     let live_pages = (page_count - freelist_count).max(0);
-    Ok((live_pages as u64) * (page_size.max(0) as u64))
+    Ok(crate::integer::checked::<_, u64>(live_pages)?
+        * u64::try_from(page_size.max(0)).unwrap_or_default())
 }
 
 /// Materialize the sibling archive database file before a rotation `ATTACH`es
@@ -857,10 +597,12 @@ pub(super) fn rotate_on_writer_connection(
     config: &RetentionConfig,
     verified_checkpoint_ceiling: Option<u64>,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
     if config.tenant_id.is_some() {
         return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
     }
+    clock.unix_millis()?;
     // One-time migration: enable incremental auto-vacuum on a legacy store
     // that predates this pragma so the first rotation on the drained writer
     // starts reclaiming freed pages. A no-op once migrated.
@@ -876,7 +618,7 @@ pub(super) fn rotate_on_writer_connection(
     // on a missing table after the archive copy has already run and roll the
     // whole rotation back into an endless retry.
     super::support::ensure_receipt_retention_watermark_table(connection)?;
-    let Some(cutoff) = resolve_rotation_cutoff(connection, config)? else {
+    let Some(cutoff) = resolve_rotation_cutoff(connection, config, clock)? else {
         return Ok(0);
     };
     archive_range(
@@ -885,6 +627,7 @@ pub(super) fn rotate_on_writer_connection(
         &config.archive_path,
         verified_checkpoint_ceiling,
         rollback_anchor,
+        clock,
     )
 }
 
@@ -899,12 +642,13 @@ fn archive_range(
     archive_path: &str,
     verified_checkpoint_ceiling: Option<u64>,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
-    // Never archive past the checkpoint boundary the caller has verified. The
-    // ceiling is itself a checkpoint `batch_end_seq`, and `compute_archival_watermark`
-    // returns one too, so the minimum still lands on a real boundary.
-    let watermark = compute_archival_watermark(connection, cutoff_unix_secs)?
-        .min(verified_checkpoint_ceiling.unwrap_or(u64::MAX));
+    // Eligibility is not monotone: a later checkpoint may contain both ends of
+    // a dependency that an earlier checkpoint splits. Bound the candidates
+    // before selecting an eligible prefix, never clamp the result afterward.
+    let watermark =
+        compute_archival_watermark(connection, cutoff_unix_secs, verified_checkpoint_ceiling)?;
     if watermark == 0 {
         return Ok(0); // fail-safe: nothing checkpointed has fully aged.
     }
@@ -946,6 +690,7 @@ fn archive_range(
             cutoff_unix_secs,
             &archive_path,
             rollback_anchor,
+            clock,
         )?;
         Ok(archived)
     })();
@@ -1051,6 +796,11 @@ pub(super) fn create_archive_schema(
                     typeof(cost_charged_be) = 'blob' AND
                     length(cost_charged_be) = 8
                 )
+            ),
+            attempted_cost_be BLOB CHECK (
+                attempted_cost_be IS NULL OR (
+                    typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+                )
             )
         );
         CREATE TABLE IF NOT EXISTS archive.chio_child_receipts (
@@ -1066,7 +816,8 @@ pub(super) fn create_archive_schema(
             batch_start_seq INTEGER NOT NULL, batch_end_seq INTEGER NOT NULL,
             tree_size INTEGER NOT NULL, merkle_root TEXT NOT NULL,
             issued_at INTEGER NOT NULL, statement_json TEXT NOT NULL,
-            signature TEXT NOT NULL, kernel_key TEXT NOT NULL
+            signature TEXT NOT NULL, kernel_key TEXT NOT NULL,
+            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
         );
         CREATE TABLE IF NOT EXISTS archive.capability_lineage (
             capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
@@ -1118,18 +869,18 @@ pub(super) fn create_archive_schema(
             checkpoint_seq INTEGER PRIMARY KEY, batch_start_seq INTEGER NOT NULL,
             batch_end_seq INTEGER NOT NULL, tree_size INTEGER NOT NULL,
             merkle_root TEXT NOT NULL, issued_at INTEGER NOT NULL, kernel_key TEXT NOT NULL,
-            previous_checkpoint_sha256 TEXT, statement_json TEXT NOT NULL, signature TEXT NOT NULL
+            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), statement_json TEXT NOT NULL, signature TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_predecessor_witnesses (
             predecessor_checkpoint_seq INTEGER NOT NULL, witness_checkpoint_seq INTEGER PRIMARY KEY,
-            previous_checkpoint_sha256 TEXT NOT NULL, witnessed_at INTEGER NOT NULL,
+            previous_checkpoint_sha256 TEXT NOT NULL CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), witnessed_at INTEGER NOT NULL,
             witness_statement_json TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_publication_metadata (
             checkpoint_seq INTEGER PRIMARY KEY, publication_schema TEXT NOT NULL,
             merkle_root TEXT NOT NULL, published_at INTEGER NOT NULL, kernel_key TEXT NOT NULL,
             log_tree_size INTEGER NOT NULL, entry_start_seq INTEGER NOT NULL,
-            entry_end_seq INTEGER NOT NULL, previous_checkpoint_sha256 TEXT
+            entry_end_seq INTEGER NOT NULL, previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_publication_trust_anchor_bindings (
             checkpoint_seq INTEGER PRIMARY KEY, binding_json TEXT NOT NULL
@@ -1140,6 +891,8 @@ pub(super) fn create_archive_schema(
         ) STRICT;
         "#,
     )?;
+    super::support::migrate_checkpoint_predecessor_column(&transaction, CheckpointSchema::Archive)?;
+    super::support::ensure_archive_security_evidence_schema(&transaction)?;
     transaction.execute(
         "INSERT OR IGNORE INTO archive.chio_receipt_sink_identity (singleton, sink_id) \
          VALUES (1, ?1)",
@@ -1158,8 +911,11 @@ pub(super) fn create_archive_schema(
             "retention archive sink identity is not canonical".to_owned(),
         ));
     }
-    if archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-        migrate_archive_receipt_cost_projection(&transaction)?;
+    if archive_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+        migrate_archive_receipt_cost_projection(
+            &transaction,
+            archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
+        )?;
     }
     verify_archive_receipt_cost_projection(&transaction)?;
     for (column, definition) in [
@@ -1254,10 +1010,10 @@ pub(super) fn copy_archived_prefix(
         INSERT OR IGNORE INTO archive.chio_tool_receipts
             (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
              grant_index, tool_server, tool_name, decision_kind, policy_hash,
-             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be)
+             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be)
             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
                    grant_index, tool_server, tool_name, decision_kind, policy_hash,
-                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be
+                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be
             FROM main.chio_tool_receipts WHERE seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
@@ -1299,6 +1055,10 @@ pub(super) fn copy_archived_prefix(
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
         INSERT OR IGNORE INTO archive.chio_authorization_receipt_consumptions
             SELECT * FROM main.chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (
+                SELECT receipt_id FROM main.claim_receipt_log_entries
+                WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
+        INSERT OR IGNORE INTO archive.chio_security_evidence_index
+            SELECT * FROM main.chio_security_evidence_index WHERE receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
         INSERT OR IGNORE INTO archive.receipt_lineage_statements
@@ -1354,7 +1114,16 @@ fn verify_co_archival_complete(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<(), ReceiptStoreError> {
-    let checks: [(&'static str, String, String); 9] = [
+    let checks: [(&'static str, String, String); 10] = [
+        (
+            "chio_security_evidence_index",
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index WHERE receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')"),
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index m WHERE m.receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') \
+                AND EXISTS (SELECT 1 FROM archive.chio_security_evidence_index a \
+                WHERE a.evidence_id = m.evidence_id AND a.receipt_id = m.receipt_id)"),
+        ),
         (
             // Present AND every column identical: `archive_sql` counts only live
             // prefix rows whose archive row matches on the `seq` primary key and
@@ -1381,7 +1150,8 @@ fn verify_co_archival_complete(
                  AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json \
                  AND a.tenant_id IS m.tenant_id \
                  AND a.cost_currency IS m.cost_currency \
-                 AND a.cost_charged_be IS m.cost_charged_be)"
+                 AND a.cost_charged_be IS m.cost_charged_be
+                 AND a.attempted_cost_be IS m.attempted_cost_be)"
             ),
         ),
         (
@@ -1435,7 +1205,7 @@ fn verify_co_archival_complete(
                  AND a.batch_end_seq IS m.batch_end_seq AND a.tree_size IS m.tree_size \
                  AND a.merkle_root IS m.merkle_root AND a.issued_at IS m.issued_at \
                  AND a.statement_json IS m.statement_json AND a.signature IS m.signature \
-                 AND a.kernel_key IS m.kernel_key)"
+                 AND a.kernel_key IS m.kernel_key AND a.previous_checkpoint_sha256 IS m.previous_checkpoint_sha256)"
             ),
         ),
         (
@@ -1591,11 +1361,9 @@ pub(super) fn delete_archived_prefix_in_tx(
     cutoff_unix_secs: u64,
     archive_path: &str,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<(), ReceiptStoreError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let now = clock.unix_millis()?.as_secs();
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let rollback_generation = rollback_anchor
         .map(|anchor| {
@@ -1631,6 +1399,14 @@ pub(super) fn delete_archived_prefix_in_tx(
     // prefix intact and re-runnable.
     ensure_archive_path_matches_ledger(&tx, archive_path)?;
     ensure_committed_prefix_still_backed(&tx)?;
+    // A new dependency may have been copied faithfully while invalidating the
+    // selected boundary. Check that exact prefix under the destructive lock.
+    let selected = sqlite_positive_u64(w, "selected archival watermark")?;
+    if compute_archival_watermark(&tx, cutoff_unix_secs, Some(selected))? != selected {
+        return Err(ReceiptStoreError::Conflict(
+            "selected archive prefix is no longer eligible for retention".into(),
+        ));
+    }
     tx.execute_batch(&format!(
         r#"
         DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;
@@ -1726,7 +1502,9 @@ pub(super) fn delete_archived_prefix_in_tx(
 pub(super) fn retention_repair_on_writer(
     connection: &mut rusqlite::Connection,
     archive_path: &str,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
+    clock.unix_millis()?;
     // 1. extra = claim-log receipt_ids absent from BOTH source tables.
     let extras: Vec<(i64, String)> = {
         let mut stmt = connection.prepare(
@@ -1914,12 +1692,9 @@ pub(super) fn retention_repair_on_writer(
     //    stays attached through the transaction so the tombstones can be stamped
     //    from the archived rows, and is detached only once the repair commits
     //    (DETACH cannot run inside an open transaction).
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let removed = extras.len() as u64;
+    let removed = crate::integer::count(extras.len());
     let repair_result = (|| -> Result<(), ReceiptStoreError> {
+        let now = clock.unix_millis()?.as_secs();
         let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
         let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

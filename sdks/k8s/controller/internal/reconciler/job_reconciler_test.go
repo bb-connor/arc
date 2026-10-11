@@ -120,7 +120,8 @@ func governedJob() *batchv1.Job {
 				LabelGoverned: "true",
 			},
 			Annotations: map[string]string{
-				AnnotationScopes: "tools:search, tools:fetch",
+				AnnotationScopes:           "tools:search, tools:fetch",
+				AnnotationSubjectPublicKey: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
 			},
 		},
 	}
@@ -555,7 +556,7 @@ func TestChioClient_EndToEndViaHTTPStub(t *testing.T) {
 	client := chioapi.NewClient(srv.URL, "", srv.Client())
 
 	ctx := context.Background()
-	cap, err := client.Mint(ctx, chioapi.MintRequest{Subject: "job/default/demo", Scopes: []string{"tools:search"}, JobUID: "u"})
+	cap, err := client.Mint(ctx, chioapi.MintRequest{Subject: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", Scopes: []string{"tools:search"}, JobUID: "u"})
 	if err != nil {
 		t.Fatalf("mint: %v", err)
 	}
@@ -585,7 +586,7 @@ func TestChioClient_ServerError_IsUnreachable(t *testing.T) {
 	}))
 	defer srv.Close()
 	client := chioapi.NewClient(srv.URL, "", srv.Client())
-	_, err := client.Mint(context.Background(), chioapi.MintRequest{Subject: "job/x/y", JobUID: "u"})
+	_, err := client.Mint(context.Background(), chioapi.MintRequest{Subject: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", JobUID: "u"})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -602,7 +603,7 @@ func TestChioClient_SendsControlBearerToken(t *testing.T) {
 		resp := chioapi.MintResponse{Capability: chioapi.CapabilityToken{
 			ID:        "server-cap",
 			Issuer:    "issuer-server",
-			Subject:   "job/default/demo",
+			Subject:   "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
 			IssuedAt:  time.Now().UTC(),
 			ExpiresAt: time.Now().Add(time.Hour).UTC(),
 			Signature: "signature-server",
@@ -615,7 +616,7 @@ func TestChioClient_SendsControlBearerToken(t *testing.T) {
 	client := chioapi.NewClient(srv.URL, "cluster-control-token", srv.Client())
 	if _, err := client.Mint(
 		context.Background(),
-		chioapi.MintRequest{Subject: "job/default/demo", JobUID: "u"},
+		chioapi.MintRequest{Subject: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", JobUID: "u"},
 	); err != nil {
 		t.Fatalf("mint: %v", err)
 	}
@@ -924,4 +925,44 @@ func errorsIs(err, target error) bool {
 		e = u.Unwrap()
 	}
 	return false
+}
+
+// Caller identities are public keys provisioned by the workload operator.
+func TestReconcile_RejectsInvalidSubjectBeforeMintAndJobMutation(t *testing.T) {
+	for _, subject := range []string{"", "job/default/demo", "bb", "not-a-public-key", " d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"} {
+		t.Run(subject, func(t *testing.T) {
+			chio := &stubChioClient{}
+			job := governedJob()
+			job.Annotations["chio.world/subject-public-key"] = subject
+			r, c := buildReconciler(t, chio, job)
+			key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+			if err == nil {
+				t.Fatal("invalid subject must reject before mutation")
+			}
+			mint, _, _ := chio.counts()
+			if mint != 0 {
+				t.Fatalf("invalid subject minted %d times", mint)
+			}
+			var got batchv1.Job
+			if err := c.Get(context.Background(), key, &got); err != nil {
+				t.Fatal(err)
+			}
+			if len(got.Finalizers) != 0 || got.Annotations[AnnotationCapabilityID] != "" {
+				t.Fatalf("invalid subject changed job authority state: %+v", got.ObjectMeta)
+			}
+		})
+	}
+}
+
+func TestReconcile_PreservesCallerOwnedSubjectKey(t *testing.T) {
+	const publicKey = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+	chio := &stubChioClient{}
+	job := governedJob()
+	job.Annotations["chio.world/subject-public-key"] = publicKey
+	r, _ := buildReconciler(t, chio, job)
+	reconcileUntilStable(t, r, types.NamespacedName{Namespace: job.Namespace, Name: job.Name})
+	if chio.lastMint.Subject != publicKey {
+		t.Fatalf("mint changed caller key: %q", chio.lastMint.Subject)
+	}
 }

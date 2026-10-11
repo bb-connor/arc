@@ -72,3 +72,9 @@ run_until_drained(server, controller.subscribe(), hygiene.drain_timeout, async {
   despite the shared prefix.
 - `chio-proof-room`, `chio-api-protect`, `chio-control-plane`, and other
   `chio-*` services - serve sites that wrap their `Router` with this crate.
+
+## Listener transport
+
+See the [shared HTTP transport guide](../../../docs/security/http-transport.md) for
+TLS identity files, explicit plaintext policy, client endpoint rules and revocation
+response semantics.

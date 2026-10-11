@@ -1135,10 +1135,10 @@ fn build_advance_fixture(
                     grant_index: 0,
                     cost_charged: actual_charge.units,
                     currency: actual_charge.currency.clone(),
-                    budget_remaining: 150_u64.checked_sub(actual_charge.units).ok_or(
+                    budget_remaining: Some(150_u64.checked_sub(actual_charge.units).ok_or(
                         AdmissionOperationError::TerminalProjectionBindingMismatch
-                    )?,
-                    budget_total: 150,
+                    )?),
+                    budget_total: Some(150),
                     delegation_depth: 0,
                     root_budget_holder: channel_fixture.trust.payer_id.clone(),
                     payment_reference: None,
@@ -1391,6 +1391,7 @@ fn capabilities() -> AdmissionProjectionCapabilities {
         channel_terminal: true,
         credit_exposure_terminal: true,
         economic_mutation_terminal: true,
+        execution_nonce_participant: false,
     }
 }
 

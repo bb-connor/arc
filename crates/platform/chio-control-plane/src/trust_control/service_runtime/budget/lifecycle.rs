@@ -59,8 +59,7 @@ impl RemoteBudgetStore {
                 "remote invocation capture response returned an invalid captured state",
             ));
         }
-        self.cache_structured_usage(&request.capability_id, request.grant_index, usage)?;
-        Ok(match decision {
+        let result = match decision {
             StructuredBudgetMutationDecisionView::Applied => {
                 BudgetInvocationCaptureDecision::Captured(mutation)
             }
@@ -72,7 +71,9 @@ impl RemoteBudgetStore {
                     "remote invocation capture omitted exact replay status",
                 ));
             }
-        })
+        };
+        self.cache_structured_usage(&request.capability_id, request.grant_index, usage)?;
+        Ok(result)
     }
 
     pub(super) fn reverse_budget_hold_remote(

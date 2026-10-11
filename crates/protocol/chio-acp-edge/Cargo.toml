@@ -13,7 +13,6 @@ name = "chio_acp_edge"
 
 [features]
 default = []
-compatibility-surface = []
 # Enables `chio_acp_edge::fuzz`, the libFuzzer entry-point module driving
 # the decode-then-handle_jsonrpc pipeline. Off by default; turned on only
 # by the `chio-fuzz` standalone workspace at `../../fuzz`. Production builds
@@ -25,6 +24,7 @@ chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-edge-metrics = { workspace = true }
 chio-kernel = { workspace = true }
+chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
 chio-mcp-edge = { workspace = true }
 serde = { workspace = true }

@@ -191,7 +191,8 @@ impl ChildRequestReceipt {
 
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
-        self.kernel_key.verify_canonical(&body, &self.signature)
+        self.kernel_key
+            .verify_canonical_strict(&body, &self.signature)
     }
 
     /// Verify the child-request receipt signature and enforce the configured
@@ -395,7 +396,8 @@ impl ReceiptLineageStatement {
             "receipt lineage statement",
         )?;
         let body = self.body();
-        self.kernel_key.verify_canonical(&body, &self.signature)
+        self.kernel_key
+            .verify_canonical_strict(&body, &self.signature)
     }
 
     #[must_use]
@@ -443,6 +445,6 @@ where
     /// Verify the envelope signature against the embedded signer key.
     pub fn verify_signature(&self) -> Result<bool> {
         self.signer_key
-            .verify_canonical(&self.body, &self.signature)
+            .verify_canonical_strict(&self.body, &self.signature)
     }
 }

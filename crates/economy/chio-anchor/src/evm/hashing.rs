@@ -14,7 +14,13 @@ pub fn operator_key_hash(binding: &SignedWeb3IdentityBinding) -> Result<B256, An
             binding.certificate.chio_public_key.algorithm()
         )));
     }
-    Ok(keccak256(binding.certificate.chio_public_key.as_bytes()))
+    Ok(keccak256(
+        binding
+            .certificate
+            .chio_public_key
+            .ed25519_bytes()
+            .map_err(|_| AnchorError::InvalidBinding("Ed25519 public key required".into()))?,
+    ))
 }
 
 pub fn operator_key_hash_hex(binding: &SignedWeb3IdentityBinding) -> Result<String, AnchorError> {

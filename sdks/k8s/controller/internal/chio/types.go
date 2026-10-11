@@ -123,7 +123,8 @@ func unixSeconds(t time.Time) uint64 {
 
 // MintRequest requests a capability grant for a Kubernetes Job.
 type MintRequest struct {
-	// Subject is typically "job/<namespace>/<name>".
+	// Subject is the caller-owned public key (64 hex characters for Ed25519).
+	// Namespace, name and UID are public labels, never subject signing seeds.
 	Subject string `json:"subject"`
 	// Scopes requested by the Job (drawn from the Job's annotations).
 	Scopes []string `json:"scopes"`

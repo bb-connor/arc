@@ -2,7 +2,7 @@
 //!
 //! This module models the trust-boundary invariants of the public
 //! surfaces of `chio-weights` that are tractable for symbolic
-//! execution under Kani's default unwind budget:
+//! execution under the explicitly checked loop bounds below:
 //!
 //! - `weights_hash_of` (free `pub fn` at `src/card.rs:274`).
 //! - `ModelCard::require_live` (`pub fn` at `src/card.rs:236`).
@@ -11,13 +11,11 @@
 //!
 //! # What these harnesses model and what they do not
 //!
-//! `weights_hash_of` is exercised directly: its body is a pure SHA-256
-//! over a byte slice followed by lowercase-hex encoding. Kani can
-//! verify the determinism and tampering algebra over a small
-//! symbolic input (the SHA-256 implementation itself transitively
-//! involves a fixed-iteration loop that fits within a bounded
-//! `#[kani::unwind]` envelope). The harnesses therefore exercise the
-//! real `pub fn` rather than an algebraic surrogate.
+//! `weights_hash_of` exercises the real portable SHA-256 implementation over
+//! every four-byte input. It checks determinism and lowercase encoding.
+//! Noncollision is the audited ASSUME-SHA256 assumption, not a concrete proof.
+//! The original input and flip-position domain and inequality are preserved
+//! as an unproved opt-in obligation in `kani_crypto_research`.
 //!
 //! `ModelCard::validate` and `ModelCard::from_canonical_json` build
 //! arbitrary-length `String` and `BTreeSet<String>` payloads through
@@ -38,9 +36,22 @@
 //!
 //! # Bound parameters
 //!
-//! - Symbolic byte arrays are <= 4 bytes (the smallest size that
-//!   exercises the SHA-256 length-encoding while staying within the
-//!   `#[kani::unwind(8)]` envelope).
+//! Every harness ends in one `kani::cover!` named after the harness, so
+//! a run that cuts the success path cannot report the assertions as
+//! proved. Bounds retain unwinding checks
+//! (a loop running `k` times needs bound `k + 1`):
+//!
+//! - `weights_hash_of` over 4 bytes: one 64-byte SHA-256 block.
+//!   `GenericArray::<u8, U64>::default` (64), the padding zero fill
+//!   (64 - 4 - 1 = 59), `soft::compress` word load (16) and block loop
+//!   (1), digest output words (8), the 32-byte output defaults (32),
+//!   the 64-byte hex buffer and UTF-8 scan (65), and a 64-byte `memcmp` for the
+//!   `String` comparisons. Largest: 65.
+//! - `ModelCard::new` and `validate`: `is_lowercase_sha256_hex` runs
+//!   `.all` over 64 bytes (65); the `trim` comparisons are `memcmp`
+//!   over 26 (`issuer`) and 15 (`training_data_class`) equal bytes.
+//! - `WeightsError::urn`: `memcmp` over the 23-byte prefix and over
+//!   equal URNs of at most 40 bytes (41).
 //! - `StringSet` predicates are NOT exercised here; the underlying
 //!   `BTreeSet<String>` lookup exceeds the workspace
 //!   `#[kani::unwind(8)]` envelope. The runtime tests in
@@ -49,8 +60,11 @@
 //!   ordering relative to `expires_at`; the card body itself is built
 //!   from constants because `ModelCard::new` calls into `chrono` and
 //!   `serde` paths that are intractable for symbolic execution.
-//! - Per-harness `#[kani::unwind(8)]` matches the workspace default
-//!   established by `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs`.
+//! - Owned results and cards are forgotten after their assertions.
+//!   `WeightsError` reaches `chio_core_types::Error` through
+//!   `UntrustedJsonError`, whose drop glue recurses through two
+//!   variants, and `ModelCard` drops two `BTreeSet<String>` values.
+//!   Destructors are outside every property below.
 //!
 //! # Anti-pattern guard
 //!
@@ -96,25 +110,16 @@ fn fixture_card(issued_at: DateTime<Utc>, expires_at: DateTime<Utc>) -> ModelCar
     }
 }
 
-/// Real public surface exercised symbolically: `weights_hash_of` MUST
-/// be deterministic (re-running with byte-identical input MUST
-/// produce the same digest hex) AND fail-closed under one-byte
-/// tampering (flipping any byte in the input MUST change the digest
-/// hex). Together these arms pin the binding determinism property the
-/// kernel-binding refusal path relies on when it byte-compares the
-/// runtime-loaded `weights_hash` against the card's declared
-/// `weights_hash`.
-///
-/// Production entry: `chio_weights::card::weights_hash_of`
-/// (`pub fn` in `crates/trust/chio-weights/src/card.rs`,
-/// re-exported via `crates/trust/chio-weights/src/lib.rs`).
+/// Real SHA-256 determinism and lowercase digest shape over every four-byte input.
+/// Noncollision relies on ASSUME-SHA256; the original inequality is unproved research.
+/// Production entry: `chio_weights::card::weights_hash_of`.
 #[kani::proof]
-#[kani::unwind(8)]
-pub fn public_weights_hash_of_determinism_and_tampering() {
-    // Symbolic 4-byte input. SHA-256's compression function processes
-    // a single 64-byte block here (a 4-byte payload always fits in
-    // one block under the 1-bit + length padding), so the loop count
-    // is bounded by `#[kani::unwind(8)]`.
+#[kani::solver(kissat)]
+#[kani::unwind(66)]
+pub fn public_weights_hash_of_determinism_and_shape() {
+    // A 4-byte message plus the 0x80 delimiter and the 8-byte length
+    // fits one 64-byte SHA-256 block. The tampered position ranges over
+    // every byte of the message (the original noncollision domain).
     let bytes: [u8; 4] = kani::any();
     let flip_index: u8 = kani::any();
     kani::assume((flip_index as usize) < bytes.len());
@@ -137,14 +142,9 @@ pub fn public_weights_hash_of_determinism_and_tampering() {
         assert!(matches!(*byte, b'0'..=b'9' | b'a'..=b'f'));
     }
 
-    // (3) Tampering. Flipping a single bit in the input MUST change
-    // the digest. The kernel binding refusal path therefore cannot
-    // be tricked by a runtime that loads tampered weights and hopes
-    // the digest collides.
-    let mut tampered = bytes;
-    tampered[flip_index as usize] ^= 0x01;
-    let tampered_digest = weights_hash_of(&tampered);
-    assert_ne!(first, tampered_digest);
+    // Noncollision is ASSUME-SHA256, not an assertion proved by this harness.
+    // The original four-byte noncollision obligation remains in kani_crypto_research.
+    kani::cover!(true, "public_weights_hash_of_determinism_and_shape");
 }
 
 /// Real public surface exercised symbolically: `ModelCard::require_live`
@@ -157,7 +157,7 @@ pub fn public_weights_hash_of_determinism_and_tampering() {
 /// Production entry: `chio_weights::card::ModelCard::require_live`
 /// (`pub fn` in `crates/trust/chio-weights/src/card.rs`).
 #[kani::proof]
-#[kani::unwind(8)]
+#[kani::unwind(66)]
 pub fn public_model_card_require_live_fail_closed() {
     // Fixed reference timestamps. `chrono::Utc.with_ymd_and_hms` is
     // a const-shaped path; the `LocalResult::Single` arm is taken
@@ -209,6 +209,9 @@ pub fn public_model_card_require_live_fail_closed() {
         // any other variant would lose the registered code.
         assert!(matches!(result, Err(WeightsError::Expired { .. })));
     }
+    core::mem::forget(result);
+    core::mem::forget(card);
+    kani::cover!(true, "public_model_card_require_live_fail_closed");
 }
 
 /// Real public surface exercised symbolically: `WeightsError::urn`
@@ -286,6 +289,8 @@ pub fn public_weights_error_urn_is_stable() {
         _ => unreachable!(),
     };
     assert_eq!(urn, expected);
+    core::mem::forget(err);
+    kani::cover!(true, "public_weights_error_urn_is_stable");
 }
 
 /// Real public surface exercised symbolically: `ModelCard`'s
@@ -299,7 +304,7 @@ pub fn public_weights_error_urn_is_stable() {
 ///   (`pub fn` in `crates/trust/chio-weights/src/card.rs`).
 /// - `chio_weights::card::CARD_VERSION_V1` constant.
 #[kani::proof]
-#[kani::unwind(8)]
+#[kani::unwind(66)]
 pub fn public_model_card_new_pins_schema_version() {
     let issued_at = match Utc.with_ymd_and_hms(2026, 4, 30, 12, 0, 0) {
         chrono::LocalResult::Single(t) => t,
@@ -318,10 +323,14 @@ pub fn public_model_card_new_pins_schema_version() {
     // constructed card. Re-validation after construction MUST
     // succeed; the kernel calls `validate()` on every deserialised
     // card and a non-idempotent path would reject good inputs.
-    assert!(card.validate().is_ok());
+    let revalidated = card.validate();
+    assert!(revalidated.is_ok());
+    core::mem::forget(revalidated);
 
     // (3) `expires_at >= issued_at` is preserved. `ModelCard::new`
     // refuses inputs that violate this; we double-check the
     // accessors agree with the constructor's contract.
     assert!(card.expires_at >= card.issued_at);
+    core::mem::forget(card);
+    kani::cover!(true, "public_model_card_new_pins_schema_version");
 }

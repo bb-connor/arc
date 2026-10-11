@@ -1,0 +1,119 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.702760224,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.9047600999999998,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib",
+            "budget_store::tests::composite_lifecycle::every_quota_participant_exhausts_atomically_and_maximum_is_immutable",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-store-sqlite",
+          "file": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
+          "function": {
+            "function_name": "SqliteBudgetStore::authorize_composite_hold_inner",
+            "return_type": "-> Result<(BudgetAuthorizeHoldDecision, Option<chio_kernel::admission_operation::AdmissionOperationV1>,), BudgetStoreError, >",
+            "span": {
+              "start": {
+                "line": 149,
+                "column": 5
+              },
+              "end": {
+                "line": 562,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 359,
+              "column": 37
+            },
+            "end": {
+              "line": 359,
+              "column": 38
+            }
+          },
+          "replacement": "<=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__platform__chio-store-sqlite__src__budget_store__composite.rs_line_359_col_37.log",
+      "diff_path": "diff/crates__platform__chio-store-sqlite__src__budget_store__composite.rs_line_359_col_37.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 48.097821215,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.954727202,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib",
+            "budget_store::tests::composite_lifecycle::every_quota_participant_exhausts_atomically_and_maximum_is_immutable",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

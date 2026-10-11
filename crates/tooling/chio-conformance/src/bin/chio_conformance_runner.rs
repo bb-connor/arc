@@ -21,6 +21,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--results-dir" => options.results_dir = next_path(&mut args, &flag)?,
             "--report-output" => options.report_output = next_path(&mut args, &flag)?,
             "--policy" => options.policy_path = next_path(&mut args, &flag)?,
+            "--reviewed-tools" => options.reviewed_tools_path = next_path(&mut args, &flag)?,
             "--upstream-server" => options.upstream_server_script = next_path(&mut args, &flag)?,
             "--auth-mode" => {
                 options.auth_mode =

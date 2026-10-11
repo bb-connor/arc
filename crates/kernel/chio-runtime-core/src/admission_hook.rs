@@ -2,12 +2,17 @@ use crate::*;
 
 use chio_core_types::PublicKey;
 
+mod dispatch_validity;
 mod dsse;
 mod metadata;
+mod operation_owned;
+mod preparation;
 mod request;
+mod reservation;
 mod store_artifacts;
 mod swarm_authority;
 mod swarm_ref;
+mod swarm_request_binding;
 mod treaty_evidence;
 mod treaty_ref;
 
@@ -187,6 +192,9 @@ pub struct ChioRuntimeAdmissionHook<S> {
     runtime_peer_weights: Option<SignedRuntimePeerWeights>,
     swarm_witness_keys: Vec<PublicKey>,
     fixed_now_unix_ms: Option<u64>,
+    operation_owned_binding: Option<
+        chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
+    >,
 }
 
 impl<S> ChioRuntimeAdmissionHook<S> {
@@ -202,7 +210,27 @@ impl<S> ChioRuntimeAdmissionHook<S> {
             runtime_peer_weights: None,
             swarm_witness_keys: Vec::new(),
             fixed_now_unix_ms: None,
+            operation_owned_binding: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_operation_owned_runtime_replay(
+        mut self,
+        binding: chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
+    ) -> Self {
+        self.operation_owned_binding = Some(binding);
+        self
+    }
+
+    fn admission_time(&self, trusted_now_unix_ms: u64) -> Result<u64, KernelError> {
+        if self.operation_owned_binding.is_some() && self.fixed_now_unix_ms.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "operation-owned runtime admission cannot override the kernel's trusted clock"
+                    .into(),
+            ));
+        }
+        Ok(self.fixed_now_unix_ms.unwrap_or(trusted_now_unix_ms))
     }
 
     #[must_use]
@@ -260,6 +288,17 @@ where
         let admission_ref = match admission_ref_from_request(context.request) {
             Ok(reference) => reference,
             Err(_) if !request_has_chio_runtime_context(context.request) => {
+                if context
+                    .admission_metadata
+                    .and_then(|metadata| metadata.get("chio_runtime"))
+                    .and_then(|runtime| runtime.get("accepted"))
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true)
+                {
+                    return Err(KernelError::Internal(
+                        "runtime admission context disappeared before dispatch".to_string(),
+                    ));
+                }
                 if context.request.federated_origin_kernel_id.is_some() {
                     return Err(KernelError::Internal(
                         "runtime admission revalidation requires treaty context for a federated request"
@@ -296,7 +335,7 @@ where
             ));
         }
 
-        let now_unix_ms = self.fixed_now_unix_ms.unwrap_or(context.now_unix_ms);
+        let now_unix_ms = self.admission_time(context.now_unix_ms)?;
         if self.profile.schema != CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA
             || now_unix_ms < self.profile.issued_at_unix_ms
             || now_unix_ms >= self.profile.expires_at_unix_ms
@@ -457,34 +496,45 @@ where
             ))
         })?;
         let verified_swarm_route_metadata = runtime.get("verified_swarm_route_metadata");
-        let swarm_continuation_id = swarm_reference
+        let verified_swarm = swarm_reference
             .as_ref()
             .map(|reference| {
                 verify_swarm_authority_reference_from_store(
                     &self.store,
                     reference,
+                    context.request,
                     &self.swarm_witness_keys,
                     verified_swarm_route_metadata,
                     now_unix_ms,
                 )
-                .map(|verified| verified.continuation_id_to_consume)
             })
             .transpose()
             .map_err(|error| {
                 KernelError::Internal(format!(
                     "runtime swarm authority revalidation failed: {error}"
                 ))
-            })?
-            .flatten();
+            })?;
+        if runtime.get("verified_swarm_request_binding")
+            != verified_swarm
+                .as_ref()
+                .map(|verified| &verified.request_binding)
+        {
+            return Err(KernelError::Internal(
+                "runtime swarm request binding changed before dispatch".to_string(),
+            ));
+        }
+        let swarm_continuation_id = verified_swarm
+            .as_ref()
+            .and_then(|verified| verified.continuation_id_to_consume.as_deref());
 
         let mut action_class_id = None;
-        let treaty_continuation_id = match treaty_ref_from_request(context.request) {
+        let verified_treaty = match treaty_ref_from_request(context.request) {
             Ok(Some(treaty_ref)) => {
                 action_class_id = Some(treaty_ref.action_class_id.clone());
                 Some(
                     verify_treaty_reference_from_store(
                         &self.store,
-                        &admission_ref.admission_id,
+                        &bundle,
                         &treaty_ref,
                         context.request,
                         now_unix_ms,
@@ -493,10 +543,8 @@ where
                         KernelError::Internal(format!(
                             "runtime treaty revalidation failed: {error}"
                         ))
-                    })?
-                    .continuation_id,
+                    })?,
                 )
-                .flatten()
             }
             Ok(None) if context.request.federated_origin_kernel_id.is_some() => {
                 return Err(KernelError::Internal(
@@ -511,27 +559,33 @@ where
             }
         };
 
-        for (key, expected) in [
-            (
-                "reserved_destructive_lease_id",
-                bundle
-                    .destructive
-                    .then_some(bundle.lease_id.as_deref())
-                    .flatten(),
-            ),
-            (
-                "reserved_treaty_continuation_id",
-                treaty_continuation_id.as_deref(),
-            ),
-            (
-                "reserved_swarm_continuation_id",
-                swarm_continuation_id.as_deref(),
-            ),
-        ] {
-            if runtime.get(key).and_then(serde_json::Value::as_str) != expected {
-                return Err(KernelError::Internal(format!(
-                    "runtime admission reservation {key} changed before dispatch"
-                )));
+        if self.operation_owned_binding.is_some() {
+            operation_owned::verify_revalidation_material(
+                runtime,
+                &bundle,
+                verified_treaty.as_ref(),
+                verified_swarm.as_ref(),
+            )?;
+        } else {
+            let treaty_continuation_id = verified_treaty
+                .as_ref()
+                .and_then(|verified| verified.continuation_id.as_deref());
+            for (key, expected) in [
+                (
+                    "reserved_destructive_lease_id",
+                    bundle
+                        .destructive
+                        .then_some(bundle.lease_id.as_deref())
+                        .flatten(),
+                ),
+                ("reserved_treaty_continuation_id", treaty_continuation_id),
+                ("reserved_swarm_continuation_id", swarm_continuation_id),
+            ] {
+                if runtime.get(key).and_then(serde_json::Value::as_str) != expected {
+                    return Err(KernelError::Internal(format!(
+                        "runtime admission reservation {key} changed before dispatch"
+                    )));
+                }
             }
         }
 
@@ -687,386 +741,23 @@ where
         &self,
         context: &KernelRuntimeAdmissionContext<'_>,
     ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
-        let admission_ref = match admission_ref_from_request(context.request) {
-            Ok(reference) => reference,
-            Err(_) if !request_has_chio_runtime_context(context.request) => {
-                if context.request.federated_origin_kernel_id.is_some() {
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio treaty-bound runtime admission context missing",
-                        Some(runtime_context_denial_metadata(
-                            "missing_chio_treaty_context",
-                        )),
-                    ));
-                }
-                return Ok(KernelRuntimeAdmissionDecision::allow(None));
-            }
-            Err(code) => {
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio runtime admission reference missing or invalid",
-                    Some(runtime_context_denial_metadata(code)),
-                ));
-            }
-        };
-        let binding = match RuntimeRequestBinding::from_tool_call_request(
-            context.request,
-            &context.local_kernel_id,
-        ) {
-            Ok(binding) => binding,
-            Err(error) => {
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio runtime admission request binding failed",
-                    Some(runtime_denial_metadata(
-                        &admission_ref.admission_id,
-                        error.code(),
-                    )),
-                ));
-            }
-        };
-        let _preloaded_bundle = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.store.bundle(&admission_ref.admission_id)
-        })) {
-            Ok(Ok(Some(bundle))) => {
-                if let Some(expected_hash) = admission_ref.bundle_sha256.as_deref() {
-                    let actual = runtime_admission_bundle_sha256(&bundle)
-                        .map_err(|error| KernelError::Internal(error.to_string()))?;
-                    if actual != expected_hash {
-                        return Ok(KernelRuntimeAdmissionDecision::deny(
-                            "chio runtime admission bundle hash mismatch",
-                            Some(runtime_denial_metadata(
-                                &admission_ref.admission_id,
-                                "admission_bundle_hash_mismatch",
-                            )),
-                        ));
-                    }
-                }
-                Some(bundle)
-            }
-            Ok(Ok(None)) => None,
-            Ok(Err(error)) => return Err(KernelError::Internal(error.to_string())),
-            Err(_) => {
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio runtime admission bundle lookup panicked",
-                    Some(runtime_denial_metadata(
-                        &admission_ref.admission_id,
-                        "admission_bundle_store_error",
-                    )),
-                ));
-            }
-        };
-        let admission_now_unix_ms = self.fixed_now_unix_ms.unwrap_or(context.now_unix_ms);
-        let mut treaty_continuation_id_to_consume = None;
-        let mut swarm_continuation_id_to_consume = None;
-        let mut verified_swarm_route_metadata = None;
-        let mut federation_treaty_material = None;
-        let mut runtime_action_class_id = None;
-        let swarm_reference = match swarm_ref_from_request(context.request) {
-            Ok(reference) => reference,
-            Err(code) => {
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio swarm-bound runtime admission reference invalid",
-                    Some(runtime_denial_metadata(&admission_ref.admission_id, code)),
-                ));
-            }
-        };
-        if let Some(reference) = swarm_reference.as_ref() {
-            match verify_swarm_authority_reference_from_store(
-                &self.store,
-                reference,
-                &self.swarm_witness_keys,
-                context.extra_metadata,
-                admission_now_unix_ms,
-            ) {
-                Ok(verified) => {
-                    swarm_continuation_id_to_consume = verified.continuation_id_to_consume;
-                    verified_swarm_route_metadata = Some(verified.route_metadata);
-                }
-                Err(ChioRuntimeError::Rejected { code, .. }) => {
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio swarm-bound runtime admission denied",
-                        Some(runtime_denial_metadata(&admission_ref.admission_id, code)),
-                    ));
-                }
-                Err(error) => return Err(KernelError::Internal(error.to_string())),
-            }
+        if self.operation_owned_binding.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "operation-owned runtime hook requires kernel claim authority".into(),
+            ));
         }
-        match treaty_ref_from_request(context.request) {
-            Ok(Some(treaty_ref)) => {
-                runtime_action_class_id = Some(treaty_ref.action_class_id.clone());
-                match verify_treaty_reference_from_store(
-                    &self.store,
-                    &admission_ref.admission_id,
-                    &treaty_ref,
-                    context.request,
-                    admission_now_unix_ms,
-                ) {
-                    Ok(verified) => {
-                        treaty_continuation_id_to_consume = verified.continuation_id;
-                        federation_treaty_material = verified.federation_treaty_material;
-                    }
-                    Err(ChioRuntimeError::Rejected { code, .. }) => {
-                        return Ok(KernelRuntimeAdmissionDecision::deny(
-                            "chio treaty-bound runtime admission denied",
-                            Some(runtime_denial_metadata(&admission_ref.admission_id, code)),
-                        ));
-                    }
-                    Err(error) => return Err(KernelError::Internal(error.to_string())),
-                }
-            }
-            Ok(None) => {
-                if context.request.federated_origin_kernel_id.is_some() {
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio treaty-bound runtime admission context missing",
-                        Some(runtime_denial_metadata(
-                            &admission_ref.admission_id,
-                            "missing_chio_treaty_context",
-                        )),
-                    ));
-                }
-            }
-            Err(code) => {
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio treaty-bound runtime admission reference invalid",
-                    Some(runtime_denial_metadata(&admission_ref.admission_id, code)),
-                ));
-            }
-        }
-        if let Some(continuation_id) = treaty_continuation_id_to_consume.as_deref() {
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                self.store
-                    .consume_treaty_continuation(continuation_id, &admission_ref.admission_id)
-            })) {
-                Ok(Ok(())) => {}
-                Ok(Err(ChioRuntimeError::Rejected { code, .. })) => {
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio treaty-bound runtime continuation replay denied",
-                        Some(runtime_denial_metadata(&admission_ref.admission_id, code)),
-                    ));
-                }
-                Ok(Err(error)) => {
-                    let metadata = ambiguous_consumption_metadata(
-                        runtime_denial_metadata(
-                            &admission_ref.admission_id,
-                            "treaty_continuation_consume_error",
-                        ),
-                        "ambiguous_treaty_continuation_id",
-                        continuation_id,
-                        &error.to_string(),
-                    );
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        format!("chio treaty-bound runtime continuation failed: {error}"),
-                        Some(metadata),
-                    ));
-                }
-                Err(_) => {
-                    let metadata = ambiguous_consumption_metadata(
-                        runtime_denial_metadata(
-                            &admission_ref.admission_id,
-                            "treaty_continuation_consume_error",
-                        ),
-                        "ambiguous_treaty_continuation_id",
-                        continuation_id,
-                        "treaty continuation consume callback panicked",
-                    );
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio treaty-bound runtime continuation callback panicked",
-                        Some(metadata),
-                    ));
-                }
-            }
-        }
-        if let Some(continuation_id) = swarm_continuation_id_to_consume.as_deref() {
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                self.store
-                    .consume_swarm_continuation(continuation_id, &admission_ref.admission_id)
-            })) {
-                Ok(Ok(())) => {}
-                Ok(Err(ChioRuntimeError::Rejected { code, .. })) => {
-                    let reservations = continuation_reservation_metadata(
-                        &admission_ref.admission_id,
-                        None,
-                        treaty_continuation_id_to_consume.as_deref(),
-                        None,
-                    );
-                    let metadata = self.denial_metadata_after_release(
-                        runtime_denial_metadata(&admission_ref.admission_id, code),
-                        &reservations,
-                    );
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio swarm-bound runtime continuation replay denied",
-                        Some(metadata),
-                    ));
-                }
-                Ok(Err(error)) => {
-                    let reservations = continuation_reservation_metadata(
-                        &admission_ref.admission_id,
-                        None,
-                        treaty_continuation_id_to_consume.as_deref(),
-                        None,
-                    );
-                    let base_metadata = ambiguous_consumption_metadata(
-                        runtime_denial_metadata(
-                            &admission_ref.admission_id,
-                            "swarm_continuation_consume_error",
-                        ),
-                        "ambiguous_swarm_continuation_id",
-                        continuation_id,
-                        &error.to_string(),
-                    );
-                    let metadata = self.denial_metadata_after_release(base_metadata, &reservations);
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        format!("chio swarm-bound runtime continuation failed: {error}"),
-                        Some(metadata),
-                    ));
-                }
-                Err(_) => {
-                    let reservations = continuation_reservation_metadata(
-                        &admission_ref.admission_id,
-                        None,
-                        treaty_continuation_id_to_consume.as_deref(),
-                        None,
-                    );
-                    let base_metadata = ambiguous_consumption_metadata(
-                        runtime_denial_metadata(
-                            &admission_ref.admission_id,
-                            "swarm_continuation_consume_error",
-                        ),
-                        "ambiguous_swarm_continuation_id",
-                        continuation_id,
-                        "swarm continuation consume callback panicked",
-                    );
-                    let metadata = self.denial_metadata_after_release(base_metadata, &reservations);
-                    return Ok(KernelRuntimeAdmissionDecision::deny(
-                        "chio swarm-bound runtime continuation callback panicked",
-                        Some(metadata),
-                    ));
-                }
-            }
-        }
-        let reservation_tracker = RuntimeAdmissionReservationTracker::default();
-        let report = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            evaluate_runtime_admission_tracked(
-                RuntimeAdmissionInput {
-                    profile: &self.profile,
-                    store: &self.store,
-                    admission_id: &admission_ref.admission_id,
-                    request: &binding,
-                    action_class_id: runtime_action_class_id.as_deref(),
-                    runtime_trust_input: self.runtime_trust_input.as_ref(),
-                    trusted_verifier_keys: &self.trusted_verifier_keys,
-                    pheromone_query_report: self.pheromone_query_report.as_ref(),
-                    runtime_pheromone_policy: self.runtime_pheromone_policy.as_ref(),
-                    runtime_peer_weights: self.runtime_peer_weights.as_ref(),
-                    now_unix_ms: admission_now_unix_ms,
-                },
-                Some(&reservation_tracker),
-            )
-        })) {
-            Ok(Ok(report)) => report,
-            Ok(Err(error)) => {
-                let reservations = continuation_reservation_metadata(
-                    &admission_ref.admission_id,
-                    None,
-                    treaty_continuation_id_to_consume.as_deref(),
-                    swarm_continuation_id_to_consume.as_deref(),
-                );
-                let metadata = self.denial_metadata_after_release(
-                    runtime_denial_metadata(
-                        &admission_ref.admission_id,
-                        "runtime_admission_evaluation_error",
-                    ),
-                    &reservations,
-                );
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    format!("chio runtime admission evaluation failed: {error}"),
-                    Some(metadata),
-                ));
-            }
-            Err(_) => {
-                let destructive_lease_id = reservation_tracker.destructive_lease_id();
-                let reservations = continuation_reservation_metadata(
-                    &admission_ref.admission_id,
-                    destructive_lease_id.as_deref(),
-                    treaty_continuation_id_to_consume.as_deref(),
-                    swarm_continuation_id_to_consume.as_deref(),
-                );
-                let metadata = self.denial_metadata_after_release(
-                    runtime_denial_metadata(
-                        &admission_ref.admission_id,
-                        "runtime_admission_evaluation_error",
-                    ),
-                    &reservations,
-                );
-                return Ok(KernelRuntimeAdmissionDecision::deny(
-                    "chio runtime admission evaluation panicked",
-                    Some(metadata),
-                ));
-            }
-        };
-        if report.accepted {
-            let mut metadata = report.receipt_metadata;
-            let runtime_metadata_key = "chio_runtime";
-            if let Some(continuation_id) = treaty_continuation_id_to_consume.as_deref() {
-                metadata[runtime_metadata_key]["reserved_treaty_continuation_id"] =
-                    serde_json::json!(continuation_id);
-            }
-            if let Some(continuation_id) = swarm_continuation_id_to_consume.as_deref() {
-                metadata[runtime_metadata_key]["reserved_swarm_continuation_id"] =
-                    serde_json::json!(continuation_id);
-            }
-            if let Some(route_metadata) = verified_swarm_route_metadata {
-                metadata[runtime_metadata_key]["verified_swarm_route_metadata"] = route_metadata;
-            }
-            if let Some(material) = federation_treaty_material {
-                return Ok(
-                    KernelRuntimeAdmissionDecision::allow_with_verified_treaty_material(
-                        Some(metadata),
-                        material,
-                    ),
-                );
-            }
-            Ok(KernelRuntimeAdmissionDecision::allow(Some(metadata)))
-        } else {
-            // A failed release has ambiguous effects. Retrying it could erase
-            // a marker reacquired after the callback returned.
-            let release_previously_failed = report
-                .receipt_metadata
-                .get("chio_runtime")
-                .and_then(|runtime| runtime.get("reservation_release_failed"))
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false);
-            let destructive_lease_id = (!release_previously_failed)
-                .then(|| {
-                    report
-                        .receipt_metadata
-                        .get("chio_runtime")
-                        .and_then(|runtime| runtime.get("reserved_destructive_lease_id"))
-                        .and_then(serde_json::Value::as_str)
-                })
-                .flatten();
-            let reservations = continuation_reservation_metadata(
-                &admission_ref.admission_id,
-                destructive_lease_id,
-                treaty_continuation_id_to_consume.as_deref(),
-                swarm_continuation_id_to_consume.as_deref(),
-            );
-            let metadata = match self.release_reservations(&reservations) {
-                Ok(()) => {
-                    strip_released_reservation_metadata(report.receipt_metadata, &reservations)
-                }
-                Err(failure) => release_failure_metadata(
-                    report.receipt_metadata,
-                    &failure.reservations,
-                    &failure,
-                ),
-            };
-            Ok(KernelRuntimeAdmissionDecision::deny(
-                "chio runtime admission denied",
-                Some(metadata),
-            ))
+        match self.prepare_request(context)? {
+            preparation::HookAdmissionPreparation::Immediate(decision) => Ok(*decision),
+            preparation::HookAdmissionPreparation::Prepared(prepared) => prepared.reserve(),
         }
     }
 
     fn release_reserved(&self, metadata: &serde_json::Value) -> Result<(), KernelError> {
+        if self.operation_owned_binding.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "operation-owned runtime claims cannot be released through legacy metadata".into(),
+            ));
+        }
         self.release_reservations(metadata)
             .map_err(|failure| KernelError::Internal(failure.reason))
     }
@@ -1075,10 +766,150 @@ where
         true
     }
 
+    fn runtime_participant_binding(
+        &self,
+    ) -> Option<&chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1>{
+        self.operation_owned_binding.as_ref()
+    }
+
+    fn evaluate_operation_owned(
+        &self,
+        context: &KernelRuntimeAdmissionContext<'_>,
+        authority: &chio_kernel::RuntimeParticipantClaimAuthority<'_>,
+    ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
+        if self.operation_owned_binding.as_ref() != Some(authority.binding()) {
+            return Err(KernelError::DurableAdmission(
+                "runtime claim authority does not match the configured source generation".into(),
+            ));
+        }
+        self.store
+            .verify_operation_owned_replay_source(authority.source_snapshot())
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        match self.prepare_request(context)? {
+            preparation::HookAdmissionPreparation::Immediate(decision) if !decision.allowed => {
+                Ok(*decision)
+            }
+            preparation::HookAdmissionPreparation::Immediate(_) => {
+                Ok(KernelRuntimeAdmissionDecision::deny(
+                    "operation-owned runtime admission requires a complete prepared plan",
+                    Some(runtime_context_denial_metadata(
+                        "missing_operation_owned_runtime_plan",
+                    )),
+                ))
+            }
+            preparation::HookAdmissionPreparation::Prepared(prepared) => {
+                prepared.reserve_operation_owned(authority)
+            }
+        }
+    }
+
+    fn enforces_swarm_authority(&self) -> bool {
+        true
+    }
+
+    fn revalidate_reserved_operation(
+        &self,
+        context: &KernelRuntimeAdmissionContext<'_>,
+        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
+    ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
+        self.store
+            .verify_operation_owned_replay_source(source)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        match self.prepare_request(context)? {
+            preparation::HookAdmissionPreparation::Prepared(prepared) => {
+                prepared.resume_operation_owned(claim, context.now_unix_ms)
+            }
+            preparation::HookAdmissionPreparation::Immediate(decision) if !decision.allowed => {
+                Ok(*decision)
+            }
+            preparation::HookAdmissionPreparation::Immediate(_) => {
+                Err(KernelError::DurableAdmission(
+                    "reserved runtime revalidation requires its complete original plan".into(),
+                ))
+            }
+        }
+    }
+
     fn revalidate_before_dispatch(
         &self,
         context: &KernelRuntimeAdmissionRevalidationContext<'_>,
     ) -> Result<(), KernelError> {
+        if self.operation_owned_binding.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "operation-owned runtime revalidation requires the activated source".into(),
+            ));
+        }
         self.revalidate_admitted_request(context)
+    }
+
+    fn revalidate_operation_owned_before_dispatch(
+        &self,
+        context: &KernelRuntimeAdmissionRevalidationContext<'_>,
+        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), KernelError> {
+        let binding = self.operation_owned_binding.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "operation-owned runtime profile is not configured".into(),
+            )
+        })?;
+        if source.runtime_authority_id() != binding.runtime_authority_id().as_str() {
+            return Err(KernelError::DurableAdmission(
+                "runtime revalidation source authority differs".into(),
+            ));
+        }
+        self.store
+            .verify_operation_owned_replay_source(source)
+            .map_err(|error| {
+                KernelError::DurableAdmission(format!(
+                    "runtime revalidation source verification failed: {error}"
+                ))
+            })?;
+        self.revalidate_admitted_request(context)
+    }
+
+    fn revalidate_operation_owned_for_native_capture(
+        &self,
+        context: &KernelRuntimeAdmissionRevalidationContext<'_>,
+        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        intent: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimIntentV1,
+    ) -> Result<
+        chio_kernel::admission_operation::runtime_participant::RuntimeDispatchValidity,
+        KernelError,
+    > {
+        self.revalidate_operation_owned_before_dispatch(context, source)?;
+        if context
+            .matched_grant_index
+            .and_then(|index| u32::try_from(index).ok())
+            != Some(intent.grant_index())
+        {
+            return Err(KernelError::DurableAdmission(
+                "native runtime selected another grant".into(),
+            ));
+        }
+        let preparation_context = KernelRuntimeAdmissionContext {
+            request: context.request,
+            extra_metadata: context
+                .admission_metadata
+                .and_then(|metadata| metadata.get("chio_runtime"))
+                .and_then(|runtime| runtime.get("verified_swarm_route_metadata"))
+                .or(context.admission_metadata),
+            now_unix_ms: context.now_unix_ms,
+            now_unix_secs: context.now_unix_secs,
+            matched_grant_index: context.matched_grant_index,
+            local_kernel_id: context.local_kernel_id.clone(),
+        };
+        // Rebuild the original material digest using the same read-only verifier
+        // and codec as acquisition. No metadata digest can stand in for this.
+        match self.prepare_request(&preparation_context)? {
+            preparation::HookAdmissionPreparation::Prepared(prepared) => {
+                prepared.verify_owned_dispatch(intent, context.now_unix_ms)
+            }
+            preparation::HookAdmissionPreparation::Immediate(_) => {
+                Err(KernelError::DurableAdmission(
+                    "native runtime capture requires its complete verified plan".into(),
+                ))
+            }
+        }
     }
 }

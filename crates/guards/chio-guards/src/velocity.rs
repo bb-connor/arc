@@ -506,6 +506,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -550,13 +551,12 @@ mod tests {
         server_id: &'a String,
         grant_index: Option<usize>,
     ) -> chio_kernel::GuardContext<'a> {
-        chio_kernel::GuardContext {
-            request,
-            scope,
-            agent_id,
-            server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: grant_index,
+        {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(request, scope)
+                .with_matched_grant_index(grant_index);
+            constructed_guard_context.agent_id = agent_id;
+            constructed_guard_context.server_id = server_id;
+            constructed_guard_context
         }
     }
 
@@ -1355,6 +1355,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let request_b = chio_kernel::ToolCallRequest {
             request_id: "req-b".to_string(),
@@ -1372,6 +1373,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         // Exhaust cap-a.

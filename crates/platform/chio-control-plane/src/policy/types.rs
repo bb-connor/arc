@@ -173,6 +173,11 @@ pub struct KernelPolicyConfig {
     #[serde(default)]
     pub require_web3_evidence: bool,
 
+    /// Require stored swarm authority and exact task/capability binding on
+    /// every tool call, even when the caller omits governed-intent metadata.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub require_swarm_admission: bool,
+
     /// Allow local process-only receipt logs when no durable receipt store is
     /// configured. This is intended for tests and local scaffolds only.
     #[serde(default)]
@@ -205,6 +210,7 @@ impl Default for KernelPolicyConfig {
             allow_sampling_tool_use: false,
             allow_elicitation: false,
             require_web3_evidence: false,
+            require_swarm_admission: false,
             allow_ephemeral_receipt_log: false,
             allow_ephemeral_revocation_store: false,
             durable_admission_mode: chio_kernel::admission_operation::DurableAdmissionMode::default(
@@ -242,6 +248,10 @@ impl KernelPolicyConfig {
 
 pub(super) fn default_max_capability_ttl() -> u64 {
     3600
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 fn default_delegation_depth_limit() -> u32 {

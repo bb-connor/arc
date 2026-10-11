@@ -268,6 +268,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         (request, scope, agent_id, server_id)
     }
@@ -311,13 +312,11 @@ mod tests {
         let guard = ForbiddenPathGuard::new();
         let (allowed_request, allowed_scope, allowed_agent, allowed_server) =
             revalidation_context_parts("/app/src/main.rs");
-        let allowed_context = GuardContext {
-            request: &allowed_request,
-            scope: &allowed_scope,
-            agent_id: &allowed_agent,
-            server_id: &allowed_server,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let allowed_context = {
+            let mut constructed_guard_context = GuardContext::new(&allowed_request, &allowed_scope);
+            constructed_guard_context.agent_id = &allowed_agent;
+            constructed_guard_context.server_id = &allowed_server;
+            constructed_guard_context
         };
         guard
             .revalidate_before_dispatch(&allowed_context)
@@ -325,13 +324,11 @@ mod tests {
 
         let (blocked_request, blocked_scope, blocked_agent, blocked_server) =
             revalidation_context_parts("/etc/shadow");
-        let blocked_context = GuardContext {
-            request: &blocked_request,
-            scope: &blocked_scope,
-            agent_id: &blocked_agent,
-            server_id: &blocked_server,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let blocked_context = {
+            let mut constructed_guard_context = GuardContext::new(&blocked_request, &blocked_scope);
+            constructed_guard_context.agent_id = &blocked_agent;
+            constructed_guard_context.server_id = &blocked_server;
+            constructed_guard_context
         };
         let error = guard
             .revalidate_before_dispatch(&blocked_context)

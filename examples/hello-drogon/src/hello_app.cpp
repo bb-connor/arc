@@ -89,7 +89,6 @@ drogon::HttpResponsePtr json_response(const Json::Value& body,
 void configure_chio_from_env() {
   chio::drogon::Options options;
   options.sidecar_url = env_or_default("CHIO_SIDECAR_URL", "http://127.0.0.1:9090");
-  options.sidecar_failure_mode = chio::drogon::SidecarFailureMode::FailClosed;
   chio::drogon::configure(std::move(options));
 }
 

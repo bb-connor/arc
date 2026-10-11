@@ -11,7 +11,7 @@ use chio_core_types::capability::{
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
-use chio_core_types::crypto::Keypair;
+use chio_core_types::crypto::{Keypair, PublicKey};
 use chio_core_types::delegation_receipt::ScopeAttenuation;
 use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::BoundaryClass,
@@ -340,6 +340,43 @@ fn evaluate_pure_rejects_unsupported_authorization_extensions() {
         .expect_err("unsupported authorization extension must fail closed");
 
     assert_eq!(error.code, "unsupported_authorization_extension");
+}
+
+#[test]
+fn browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let input = EvaluateRequestJson {
+        request: make_request_json(&subject),
+        capability: make_capability(&subject, &issuer),
+        trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+        clock_override_unix_secs: Some(ISSUED_AT + 1),
+        session_filesystem_roots: None,
+        peer_capabilities: None,
+        direct_root_capability: None,
+        capability_trust_roots: BTreeMap::new(),
+        parent_budget_snapshots: std::vec![],
+    };
+    let positive = evaluate_pure(input.clone(), &FixedClock::new(ISSUED_AT + 1)).unwrap();
+    assert_eq!(positive.capability_verdict, "allow");
+    assert!(!positive.authorized);
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut value = serde_json::to_value(&input).unwrap();
+        value["request"][field] = if field == "approval_tokens" {
+            serde_json::json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            serde_json::json!({"artifact":field})
+        };
+        let changed: EvaluateRequestJson = serde_json::from_value(value).unwrap();
+        let error = evaluate_pure(changed, &FixedClock::new(ISSUED_AT + 1)).unwrap_err();
+        assert_eq!(error.code, "unsupported_authorization_extension", "{field}");
+    }
 }
 
 #[test]
@@ -1093,4 +1130,198 @@ fn verify_receipt_pure_rejects_malformed_envelope() {
     let err = verify_receipt_pure(b"not a receipt", &[])
         .expect_err("malformed envelope must surface as an error");
     assert_eq!(err.code, "invalid_receipt_envelope");
+}
+
+const RECEIPT_RECORD_SCHEMA: &str = "receipt/record.schema.json";
+
+fn repo_fixture(relative: &str) -> serde_json::Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join(relative);
+    serde_json::from_str(&std::fs::read_to_string(path).expect("fixture exists"))
+        .expect("fixture parses")
+}
+
+fn receipt_vector_cases() -> std::vec::Vec<serde_json::Value> {
+    repo_fixture("tests/bindings/vectors/receipt/v1.json")["cases"]
+        .as_array()
+        .expect("receipt vector cases")
+        .clone()
+}
+
+fn receipt_vector(case_id: &str) -> serde_json::Value {
+    receipt_vector_cases()
+        .into_iter()
+        .find(|case| case["id"] == case_id)
+        .expect("receipt vector case")
+}
+
+fn corpus_signer(receipt: &serde_json::Value) -> PublicKey {
+    PublicKey::from_hex(receipt["kernel_key"].as_str().expect("kernel_key"))
+        .expect("kernel_key is hex")
+}
+
+fn inject_once(text: &str, anchor: &str, inserted: &str) -> String {
+    assert_eq!(text.matches(anchor).count(), 1, "anchor {anchor}");
+    text.replacen(anchor, &std::format!("{anchor}{inserted}"), 1)
+}
+
+#[test]
+fn verify_receipt_pure_rejects_raw_duplicate_key_receipts_at_original_bytes() {
+    let corpus = repo_fixture("tests/bindings/fixtures/protocol-primitives-v1.json");
+    let valid = corpus["cases"]
+        .as_array()
+        .expect("cases array")
+        .iter()
+        .find(|case| case["name"] == "receipt-internal-origin")
+        .expect("valid receipt case");
+    assert_eq!(valid["valid"], serde_json::json!(true));
+    let mut rejected = std::vec::Vec::new();
+    for case in corpus["raw_cases"].as_array().expect("raw_cases array") {
+        if case["schema_file"] != RECEIPT_RECORD_SCHEMA {
+            continue;
+        }
+        let name = case["name"].as_str().expect("raw case name");
+        let text = case["instance_text"]
+            .as_str()
+            .expect("raw case instance_text");
+        let collapsed: serde_json::Value = serde_json::from_str(text).expect("raw case is JSON");
+        assert_eq!(collapsed, valid["instance"], "raw case {name} collapses");
+        let signer = corpus_signer(&collapsed);
+
+        for envelope in [
+            serde_json::to_vec(&collapsed).unwrap(),
+            serde_json::to_vec_pretty(&collapsed).unwrap(),
+            chio_core_types::canonical_json_bytes(&collapsed).unwrap(),
+        ] {
+            let result = verify_receipt_pure(&envelope, core::slice::from_ref(&signer));
+            assert!(
+                result.is_ok(),
+                "valid corpus receipt {name} must decode: {result:?}"
+            );
+        }
+
+        match verify_receipt_pure(text.as_bytes(), core::slice::from_ref(&signer)) {
+            Err(error) => assert_eq!(error.code, "invalid_receipt_envelope", "raw case {name}"),
+            Ok(result) => panic!("raw case {name} with duplicate keys was decoded: {result:?}"),
+        }
+        rejected.push(name.to_string());
+    }
+    assert_eq!(
+        rejected,
+        ["receipt-duplicate-id", "receipt-duplicate-parameter"]
+    );
+}
+
+#[test]
+fn verify_receipt_pure_rejects_duplicate_keys_in_a_validly_signed_receipt() {
+    let case = receipt_vector("allow_receipt");
+    let signer = corpus_signer(&case["receipt"]);
+    let compact = serde_json::to_string(&case["receipt"]).unwrap();
+    let verified = verify_receipt_pure(compact.as_bytes(), core::slice::from_ref(&signer))
+        .expect("signed vector decodes");
+    assert!(verified.ok && verified.authorized);
+
+    for (label, forged) in [
+        (
+            "nested action.parameters",
+            inject_once(&compact, r#""parameters":{"#, r#""path":"/etc/shadow","#),
+        ),
+        (
+            "nested metadata",
+            inject_once(&compact, r#""metadata":{"#, r#""surface":"forged","#),
+        ),
+        (
+            "top-level tool_name",
+            compact.replacen('{', r#"{"tool_name":"shell_exec","#, 1),
+        ),
+    ] {
+        let collapsed: serde_json::Value = serde_json::from_str(&forged).unwrap();
+        assert_eq!(collapsed, case["receipt"], "{label} collapses last-wins");
+        match verify_receipt_pure(forged.as_bytes(), core::slice::from_ref(&signer)) {
+            Err(error) => assert_eq!(error.code, "invalid_receipt_envelope", "{label}"),
+            Ok(result) => panic!("duplicate {label} key was decoded: {result:?}"),
+        }
+    }
+}
+
+#[test]
+fn verify_receipt_pure_matches_receipt_binding_vectors_natively() {
+    for case in receipt_vector_cases() {
+        let id = case["id"].as_str().expect("vector id");
+        let expected = &case["expected"];
+        let signer = corpus_signer(&case["receipt"]);
+        for envelope in [
+            serde_json::to_vec(&case["receipt"]).unwrap(),
+            serde_json::to_vec_pretty(&case["receipt"]).unwrap(),
+        ] {
+            let result =
+                serde_json::to_value(verify_receipt_pure(&envelope, &[]).expect("vector decodes"))
+                    .unwrap();
+            for field in [
+                "ok",
+                "signature_valid",
+                "parameter_hash_valid",
+                "receipt_id_valid",
+                "decision",
+                "receipt_kind",
+                "boundary_class",
+                "authorized",
+                "signer_key_hex",
+                "signer_trusted",
+            ] {
+                assert_eq!(result[field], expected[field], "vector {id} field {field}");
+            }
+            assert_eq!(result["receipt_id"], case["receipt"]["id"], "vector {id}");
+
+            let pinned = verify_receipt_pure(&envelope, core::slice::from_ref(&signer))
+                .expect("vector decodes with a pinned signer");
+            assert_eq!(
+                pinned.ok,
+                expected["signature_valid"] == true
+                    && expected["parameter_hash_valid"] == true
+                    && expected["receipt_id_valid"] == true,
+                "vector {id} pinned ok"
+            );
+        }
+    }
+}
+
+#[test]
+fn verify_receipt_pure_accepts_full_width_integers_and_nested_parameters() {
+    let seed = [17u8; 32];
+    let parameters = serde_json::json!({
+        "limits": {"max": u64::MAX, "min": i64::MIN, "zero": 0},
+        "nested": [{"path": "/workspace/a", "flags": [true, false, null]}, [1, [2, [3]]]],
+        "ratio": 0.25,
+        "unicode": "caf\u{e9} \u{2028}",
+    });
+    let mut body = make_signed_receipt(seed).body();
+    body.timestamp = u64::MAX;
+    body.action = ToolCallAction::from_parameters(parameters).unwrap();
+    body.metadata = Some(serde_json::json!({"sequence": u64::MAX, "window": {"offset": i64::MIN}}));
+    let receipt = sign_receipt_relaying_trusted_body_pure(
+        SignReceiptRequestJson {
+            body,
+            canonical_content: None,
+        },
+        &seed,
+    )
+    .unwrap();
+
+    for envelope in [
+        serde_json::to_vec(&receipt).unwrap(),
+        serde_json::to_vec_pretty(&receipt).unwrap(),
+    ] {
+        assert!(std::str::from_utf8(&envelope)
+            .unwrap()
+            .contains("18446744073709551615"));
+        let result = verify_receipt_pure(&envelope, core::slice::from_ref(&receipt.kernel_key))
+            .expect("full-width signed receipt decodes");
+        assert!(result.ok);
+        assert!(result.signature_valid);
+        assert!(result.parameter_hash_valid);
+        assert!(result.receipt_id_valid);
+        assert_eq!(result.receipt_id, receipt.id);
+    }
 }

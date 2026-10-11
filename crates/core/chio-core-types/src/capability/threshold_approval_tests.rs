@@ -1,7 +1,7 @@
 use crate::crypto::{sha256_hex, Keypair};
 
 use super::governance::{
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
+    ApprovalSetBody, ThresholdApprovalProposal, ThresholdApprovalProposalBody,
     THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 
@@ -41,13 +41,13 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
     proposal.validate_at(1_499).unwrap();
     assert!(proposal.validate_at(1_500).is_err());
 
-    let first = VerifiedApprovalSetBody::new(
+    let first = ApprovalSetBody::new(
         vec![sha256_hex(b"token-b"), sha256_hex(b"token-a")],
         &proposal,
     )
     .unwrap();
-    assert!(VerifiedApprovalSetBody::new(vec![sha256_hex(b"token-a")], &proposal).is_err());
-    let second = VerifiedApprovalSetBody::new(
+    assert!(ApprovalSetBody::new(vec![sha256_hex(b"token-a")], &proposal).is_err());
+    let second = ApprovalSetBody::new(
         vec![sha256_hex(b"token-a"), sha256_hex(b"token-b")],
         &proposal,
     )

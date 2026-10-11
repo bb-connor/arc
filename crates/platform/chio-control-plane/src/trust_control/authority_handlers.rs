@@ -8,9 +8,10 @@ use super::report_rendering::{
     forward_scim_post_to_leader,
 };
 use super::report_validation::{
-    enforce_authority_mutation_fence, load_authority_status, load_capability_authority,
-    refresh_authority_mutation_fence, rotate_authority, validate_authority_mutation_auth,
-    validate_service_auth,
+    enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
+    load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
+    run_authority_commit, validate_authority_issue_auth, validate_authority_mutation_auth,
+    validate_authority_mutation_term, validate_authority_workload_auth, validate_service_auth,
 };
 use super::*;
 
@@ -18,12 +19,44 @@ pub(crate) async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
+    if let Err(response) = validate_authority_workload_auth(&headers, &state.config) {
+        return response;
+    }
+    match inspect_authority_state(&state, load_authority_status_for_state).await {
+        Ok(status) => Json(status).into_response(),
+        Err(response) => response,
+    }
+}
+
+pub(crate) async fn handle_authority_key_log_sync(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<AuthorityKeyLogSyncRequest>,
+) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match load_authority_status(&state.config) {
-        Ok(status) => Json(status).into_response(),
-        Err(response) => response,
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "authority key-log synchronization is unavailable",
+        );
+    };
+    let response = match keyring.key_log_synchronization_response(request.base.as_ref()) {
+        Ok(response) => response,
+        Err(_) => {
+            return plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "authority key-log synchronization could not read witnessed history",
+            );
+        }
+    };
+    match canonical_json_bytes(&response) {
+        Ok(body) => ([(CONTENT_TYPE, "application/json")], body).into_response(),
+        Err(_) => plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "authority key-log synchronization could not encode witnessed history",
+        ),
     }
 }
 
@@ -31,27 +64,37 @@ pub(crate) async fn handle_rotate_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
-        return response;
-    }
+    let forwarded = match validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
+        Ok(forwarded) => forwarded,
+        Err(response) => return response,
+    };
     match forward_authority_post_to_leader(&state, AUTHORITY_PATH, &json!({})).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
-    if let Err(response) = enforce_authority_mutation_fence(&state) {
+    run_authority_commit(&state, move |state| {
+        validate_authority_mutation_term(state, forwarded.as_ref())?;
+        Ok(rotate_authority_blocking(state))
+    })
+    .await
+    .unwrap_or_else(std::convert::identity)
+}
+
+fn rotate_authority_blocking(state: &TrustServiceState) -> Response {
+    if let Err(response) = enforce_authority_mutation_fence(state) {
         return response;
     }
-    match rotate_authority(&state.config) {
+    match rotate_authority_for_state(state) {
         Ok(status) => {
-            if let Err(response) = refresh_authority_mutation_fence(&state) {
+            if let Err(response) = refresh_authority_mutation_fence(state) {
                 return response;
             }
             respond_after_leader_visible_write(
-                &state,
+                state,
                 "rotated authority was not visible on the leader after write",
                 || {
-                    let visible_status = load_authority_status(&state.config)?;
+                    let visible_status = load_authority_status_for_state(state)?;
                     if visible_status.generation == status.generation
                         && visible_status.public_key == status.public_key
                     {
@@ -71,16 +114,28 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    if let Err(response) = validate_authority_mutation_auth(&headers, &state, ISSUE_CAPABILITY_PATH)
-    {
-        return response;
-    }
+    let forwarded = match validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
+        Ok(forwarded) => forwarded,
+        Err(response) => return response,
+    };
     match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
-    if let Err(response) = enforce_authority_mutation_fence(&state) {
+    inspect_authority_state(&state, move |state| {
+        validate_authority_mutation_term(state, forwarded.as_ref())?;
+        Ok(issue_capability_blocking(state, payload))
+    })
+    .await
+    .unwrap_or_else(std::convert::identity)
+}
+
+fn issue_capability_blocking(
+    state: &TrustServiceState,
+    payload: IssueCapabilityRequest,
+) -> Response {
+    if let Err(response) = enforce_authority_mutation_fence(state) {
         return response;
     }
     let subject = match PublicKey::from_hex(&payload.subject_public_key) {
@@ -95,7 +150,7 @@ pub(crate) async fn handle_issue_capability(
             );
         }
     }
-    match load_capability_authority(&state.config) {
+    match load_capability_authority(state) {
         Ok(authority) => {
             match authority.issue_capability_with_attestation(
                 &subject,
@@ -121,6 +176,10 @@ pub(crate) async fn handle_scim_create_user(
     headers: HeaderMap,
     Json(payload): Json<ScimUserResource>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -137,7 +196,7 @@ pub(crate) async fn handle_scim_create_user(
         Ok(values) => values,
         Err(error) => return scim_error_response(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let mut record = match build_scim_user_record(&provider, payload, now, None) {
         Ok(record) => record,
         Err(error) => return scim_error_response(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -160,6 +219,10 @@ pub(crate) async fn handle_scim_delete_user(
     AxumPath(user_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -181,7 +244,7 @@ pub(crate) async fn handle_scim_delete_user(
     if !record.active() {
         return scim_json_response(StatusCode::OK, &record.scim_user);
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let revocation_store = match state.revocation_store() {
         Ok(store) => store,
         Err(response) => return response,
@@ -204,7 +267,7 @@ pub(crate) async fn handle_scim_delete_user(
             }
         }
     }
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -425,6 +488,10 @@ pub(crate) async fn handle_evaluate_federation_policy(
     headers: HeaderMap,
     Json(request): Json<FederationAdmissionEvaluationRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -433,7 +500,7 @@ pub(crate) async fn handle_evaluate_federation_policy(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     match service_runtime::issuance::evaluate_federation_policy_request(&state, &request, now) {
         Ok(response) => Json(response).into_response(),
         Err(error) if error.to_string().contains("was not found") => {
@@ -486,6 +553,10 @@ pub(crate) async fn handle_revoke_capability(
     headers: HeaderMap,
     Json(payload): Json<RevokeCapabilityRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -504,7 +575,7 @@ pub(crate) async fn handle_revoke_capability(
                 // A locally originated capability revoke: the revoke instant is
                 // now, so the propagation lag is ~0. Emit so the
                 // capability-revocation SLO reflects real capability revokes.
-                let revoked_now = i64::try_from(unix_timestamp_now()).unwrap_or(0);
+                let revoked_now = i64::try_from(clock_now).unwrap_or(0);
                 super::cluster::observe_capability_revocation_lag(revoked_now);
             }
             respond_after_leader_visible_write(

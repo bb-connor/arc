@@ -9,6 +9,24 @@ enum ReleaseFault {
 enum ConsumeFault {
     Error,
     Panic,
+    ErrorAfterConsume,
+    PanicAfterConsume,
+}
+
+fn injected_consume_fault(
+    fault: Option<ConsumeFault>,
+    after_consume: bool,
+    participant: &str,
+) -> Result<(), ChioRuntimeError> {
+    match (fault, after_consume) {
+        (Some(ConsumeFault::Error), false) | (Some(ConsumeFault::ErrorAfterConsume), true) => Err(
+            ChioRuntimeError::Store(format!("injected {participant} consume failure")),
+        ),
+        (Some(ConsumeFault::Panic), false) | (Some(ConsumeFault::PanicAfterConsume), true) => {
+            panic!("{participant} consume callback panicked (after consume: {after_consume})");
+        }
+        _ => Ok(()),
+    }
 }
 
 #[derive(Clone)]
@@ -16,6 +34,8 @@ struct FaultInjectingAdmissionStore {
     inner: InMemoryRuntimeAdmissionStore,
     bundle_calls: std::sync::Arc<std::sync::atomic::AtomicU64>,
     panic_bundle_on_call: Option<u64>,
+    bundle_snapshots: Option<(RuntimeAdmissionBundle, RuntimeAdmissionBundle)>,
+    artifact_tamper_kind: Option<&'static str>,
     destructive_consume_fault: Option<ConsumeFault>,
     treaty_consume_fault: Option<ConsumeFault>,
     swarm_consume_fault: Option<ConsumeFault>,
@@ -23,6 +43,10 @@ struct FaultInjectingAdmissionStore {
     reject_trust_floor: bool,
     destructive_release_fault: Option<ReleaseFault>,
     treaty_release_error: bool,
+    destructive_consumes: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    treaty_consumes: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    swarm_consumes: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    trust_floor_writes: std::sync::Arc<std::sync::atomic::AtomicU64>,
     destructive_releases: std::sync::Arc<std::sync::atomic::AtomicU64>,
     treaty_releases: std::sync::Arc<std::sync::atomic::AtomicU64>,
     swarm_releases: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -34,6 +58,8 @@ impl FaultInjectingAdmissionStore {
             inner,
             bundle_calls: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             panic_bundle_on_call: None,
+            bundle_snapshots: None,
+            artifact_tamper_kind: None,
             destructive_consume_fault: None,
             treaty_consume_fault: None,
             swarm_consume_fault: None,
@@ -41,10 +67,27 @@ impl FaultInjectingAdmissionStore {
             reject_trust_floor: false,
             destructive_release_fault: None,
             treaty_release_error: false,
+            destructive_consumes: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            treaty_consumes: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            swarm_consumes: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            trust_floor_writes: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             destructive_releases: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             treaty_releases: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             swarm_releases: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
+    }
+
+    fn mutation_counts(&self) -> [u64; 7] {
+        [
+            &self.treaty_consumes,
+            &self.swarm_consumes,
+            &self.destructive_consumes,
+            &self.trust_floor_writes,
+            &self.treaty_releases,
+            &self.swarm_releases,
+            &self.destructive_releases,
+        ]
+        .map(|counter| counter.load(std::sync::atomic::Ordering::SeqCst))
     }
 }
 
@@ -59,6 +102,9 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         if self.panic_bundle_on_call == Some(call) {
             panic!("injected admission bundle callback panic on call {call}");
         }
+        if let Some((first, subsequent)) = self.bundle_snapshots.as_ref() {
+            return Ok(Some(if call == 0 { first } else { subsequent }.clone()));
+        }
         self.inner.bundle(admission_id)
     }
 
@@ -67,8 +113,16 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         evidence_kind: &str,
         evidence_id: &str,
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
-        self.inner
-            .treaty_runtime_artifact(evidence_kind, evidence_id)
+        let mut record = self
+            .inner
+            .treaty_runtime_artifact(evidence_kind, evidence_id)?;
+        if self.artifact_tamper_kind == Some(evidence_kind) {
+            if let Some(record) = record.as_mut() {
+                // Keep the advertised digest and request reference unchanged.
+                record.raw_json["uncommitted_fixture_field"] = serde_json::json!(true);
+            }
+        }
+        Ok(record)
     }
 
     fn swarm_authority_bundle(
@@ -83,18 +137,12 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         lease_id: &str,
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
-        match self.destructive_consume_fault {
-            Some(ConsumeFault::Error) => {
-                return Err(ChioRuntimeError::Store(
-                    "injected destructive consume failure".to_string(),
-                ));
-            }
-            Some(ConsumeFault::Panic) => {
-                panic!("destructive consume callback panicked before delegating");
-            }
-            None => {}
-        }
-        self.inner.consume_destructive_lease(lease_id, admission_id)
+        self.destructive_consumes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        injected_consume_fault(self.destructive_consume_fault, false, "destructive")?;
+        self.inner
+            .consume_destructive_lease(lease_id, admission_id)?;
+        injected_consume_fault(self.destructive_consume_fault, true, "destructive")
     }
 
     fn release_destructive_lease(
@@ -125,19 +173,12 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         continuation_id: &str,
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
-        match self.treaty_consume_fault {
-            Some(ConsumeFault::Error) => {
-                return Err(ChioRuntimeError::Store(
-                    "injected treaty consume failure".to_string(),
-                ));
-            }
-            Some(ConsumeFault::Panic) => {
-                panic!("treaty consume callback panicked before delegating");
-            }
-            None => {}
-        }
+        self.treaty_consumes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        injected_consume_fault(self.treaty_consume_fault, false, "treaty")?;
         self.inner
-            .consume_treaty_continuation(continuation_id, admission_id)
+            .consume_treaty_continuation(continuation_id, admission_id)?;
+        injected_consume_fault(self.treaty_consume_fault, true, "treaty")
     }
 
     fn release_treaty_continuation(
@@ -161,19 +202,12 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         continuation_id: &str,
         admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
-        match self.swarm_consume_fault {
-            Some(ConsumeFault::Error) => {
-                return Err(ChioRuntimeError::Store(
-                    "injected swarm consume failure".to_string(),
-                ));
-            }
-            Some(ConsumeFault::Panic) => {
-                panic!("swarm consume callback panicked before delegating");
-            }
-            None => {}
-        }
+        self.swarm_consumes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        injected_consume_fault(self.swarm_consume_fault, false, "swarm")?;
         self.inner
-            .consume_swarm_continuation(continuation_id, admission_id)
+            .consume_swarm_continuation(continuation_id, admission_id)?;
+        injected_consume_fault(self.swarm_consume_fault, true, "swarm")
     }
 
     fn release_swarm_continuation(
@@ -199,6 +233,8 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         &self,
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
+        self.trust_floor_writes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.inner.record_runtime_trust_floor(entry)
     }
 
@@ -207,6 +243,8 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         entry: RuntimeTrustFloorEntry,
         previous_hash_sha256: Option<&str>,
     ) -> Result<(), ChioRuntimeError> {
+        self.trust_floor_writes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if self.panic_trust_floor {
             self.inner
                 .validate_and_record_runtime_trust_floor(entry, previous_hash_sha256)?;
@@ -557,12 +595,12 @@ fn swarm_consume_error_releases_treaty_and_preserves_same_admission_swarm_marker
 }
 
 #[test]
-fn evaluator_bundle_panic_releases_only_observed_continuation_reservations(
+fn destructive_consume_panic_releases_only_observed_continuation_reservations(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let inner = InMemoryRuntimeAdmissionStore::new();
     let (request, extra_metadata) = runtime_hook_cleanup_request(&inner, true)?;
-    let mut store = FaultInjectingAdmissionStore::new(inner);
-    store.panic_bundle_on_call = Some(2);
+    let mut store = FaultInjectingAdmissionStore::new(inner.clone());
+    store.destructive_consume_fault = Some(ConsumeFault::PanicAfterConsume);
     let observer = store.clone();
     let hook =
         allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
@@ -582,7 +620,7 @@ fn evaluator_bundle_panic_releases_only_observed_continuation_reservations(
         .ok_or_else(|| io::Error::other("runtime metadata missing"))?;
     assert_eq!(
         metadata["chio_runtime"]["failure_code"],
-        "admission_bundle_store_error"
+        "destructive_lease_consume_error"
     );
     assert_eq!(
         observer
@@ -605,6 +643,15 @@ fn evaluator_bundle_panic_releases_only_observed_continuation_reservations(
     assert!(metadata["chio_runtime"]
         .get("reservation_release_failed")
         .is_none());
+    assert_eq!(
+        metadata["chio_runtime"]["ambiguous_destructive_lease_id"],
+        "lease-live-1"
+    );
+    assert!(inner
+        .consume_destructive_lease("lease-live-1", "adm-live-1")
+        .is_err());
+    inner.consume_treaty_continuation("continue-runtime-1", "adm-live-1")?;
+    inner.consume_swarm_continuation("continuation-child-a", "adm-live-1")?;
     Ok(())
 }
 
@@ -822,5 +869,114 @@ fn ambiguous_release_failure_is_not_retried_after_same_admission_reacquire(
         Err(error) => error,
     };
     assert_eq!(replay.code(), "destructive_lease_replay");
+    Ok(())
+}
+
+#[test]
+fn consume_then_error_or_panic_keeps_ambiguous_marker_and_releases_only_prior_participants(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for participant in ["treaty", "swarm", "destructive"] {
+        for fault in [
+            ConsumeFault::ErrorAfterConsume,
+            ConsumeFault::PanicAfterConsume,
+        ] {
+            let inner = InMemoryRuntimeAdmissionStore::new();
+            let (request, extra_metadata) = runtime_hook_cleanup_request(&inner, true)?;
+            let mut store = FaultInjectingAdmissionStore::new(inner.clone());
+            let (expected_counts, ambiguous_key, ambiguous_id, failure_code) = match participant {
+                "treaty" => {
+                    store.treaty_consume_fault = Some(fault);
+                    (
+                        [1, 0, 0, 0, 0, 0, 0],
+                        "ambiguous_treaty_continuation_id",
+                        "continue-runtime-1",
+                        "treaty_continuation_consume_error",
+                    )
+                }
+                "swarm" => {
+                    store.swarm_consume_fault = Some(fault);
+                    (
+                        [1, 1, 0, 0, 1, 0, 0],
+                        "ambiguous_swarm_continuation_id",
+                        "continuation-child-a",
+                        "swarm_continuation_consume_error",
+                    )
+                }
+                _ => {
+                    store.destructive_consume_fault = Some(fault);
+                    (
+                        [1, 1, 1, 0, 1, 1, 0],
+                        "ambiguous_destructive_lease_id",
+                        "lease-live-1",
+                        "destructive_lease_consume_error",
+                    )
+                }
+            };
+            let observer = store.clone();
+            let hook = allowing_chio_policy_hook(store)?
+                .with_swarm_witness_keys(trusted_swarm_witness_keys());
+            let decision = hook.evaluate(&RuntimeAdmissionContext {
+                request: &request,
+                extra_metadata: extra_metadata.as_ref(),
+                now_unix_secs: 1_800_000_001,
+                now_unix_ms: 1_800_000_001_000,
+                matched_grant_index: Some(0),
+                local_kernel_id: "kernel.vendor-b".to_string(),
+            })?;
+
+            assert!(!decision.allowed);
+            assert!(!decision.has_verified_treaty_material());
+            assert_eq!(observer.mutation_counts(), expected_counts, "{participant}");
+            let metadata = decision.metadata.ok_or("runtime denial metadata")?;
+            assert_eq!(metadata["chio_runtime"]["accepted"], false);
+            assert_eq!(metadata["chio_runtime"]["failure_code"], failure_code);
+            assert_eq!(metadata["chio_runtime"][ambiguous_key], ambiguous_id);
+            assert_eq!(
+                metadata["chio_runtime"]["reservation_ownership_ambiguous"],
+                true
+            );
+            for key in [
+                "reserved_destructive_lease_id",
+                "reserved_treaty_continuation_id",
+                "reserved_swarm_continuation_id",
+                "reservation_release_failed",
+            ] {
+                assert!(metadata["chio_runtime"].get(key).is_none(), "{metadata}");
+            }
+            assert!(inner
+                .runtime_trust_floor("did:chio:buyer-verifier", "verifier-key-1")?
+                .is_none());
+
+            // These markers were initially unused. The failed callback really
+            // consumed its marker, while earlier acknowledgements were released
+            // and later participants were never touched by the admission attempt.
+            for (name, replay_code, result) in [
+                (
+                    "treaty",
+                    "chio_treaty_continuation_replay",
+                    inner.consume_treaty_continuation("continue-runtime-1", "adm-live-1"),
+                ),
+                (
+                    "swarm",
+                    "chio_swarm_continuation_replay",
+                    inner.consume_swarm_continuation("continuation-child-a", "adm-live-1"),
+                ),
+                (
+                    "destructive",
+                    "destructive_lease_replay",
+                    inner.consume_destructive_lease("lease-live-1", "adm-live-1"),
+                ),
+            ] {
+                if name == participant {
+                    match result {
+                        Err(error) => assert_eq!(error.code(), replay_code),
+                        Ok(()) => return Err("ambiguous consumed marker was released".into()),
+                    }
+                } else {
+                    result?;
+                }
+            }
+        }
+    }
     Ok(())
 }

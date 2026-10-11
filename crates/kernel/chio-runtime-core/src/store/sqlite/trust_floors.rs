@@ -41,7 +41,7 @@ impl SqliteRuntimeOrchestrationStore {
                 latest_bundle_sha256,
                 latest_revocation_checkpoint_sha256,
             )| {
-                Ok(RuntimeTrustFloorEntry {
+                Ok::<_, ChioRuntimeError>(RuntimeTrustFloorEntry {
                     verifier_id,
                     key_id,
                     highest_version: sqlite_u64(highest_version, "runtime trust floor version")?,
@@ -122,7 +122,7 @@ impl SqliteRuntimeOrchestrationStore {
                     latest_bundle_sha256,
                     latest_revocation_checkpoint_sha256,
                 )| {
-                    Ok(RuntimeTrustFloorEntry {
+                    Ok::<_, ChioRuntimeError>(RuntimeTrustFloorEntry {
                         verifier_id,
                         key_id,
                         highest_version: sqlite_u64(

@@ -91,15 +91,15 @@ pub(super) fn assemble_transaction_passport(
             "proof assemble requires a non-empty issued-at timestamp".to_string(),
         ));
     }
-    ensure_regular_file(verifier_policy, "verifier policy")?;
+    let verifier_policy_bytes = crate::input::read(verifier_policy)?;
+    let _: serde_json::Value = crate::input::json(&verifier_policy_bytes)?;
     ensure_no_reserved_roots(artifact_dir)?;
     let source_nodes = assemble_evidence_nodes(artifact_dir)?;
     ensure_required_receipt(&source_nodes)?;
 
     fixture::copy_dir_contents(artifact_dir, out)?;
     let verifier_policy_out = out.join("verifier-policy.json");
-    fs::copy(verifier_policy, &verifier_policy_out)?;
-    let verifier_policy_bytes = fs::read(&verifier_policy_out)?;
+    fs::write(&verifier_policy_out, &verifier_policy_bytes)?;
     let claim_set_bytes =
         assembled_claim_set_bytes(passport_id, issued_at, &verifier_policy_bytes)?;
     let claim_set_sha256 = chio_core::sha256_hex(&claim_set_bytes);
@@ -115,7 +115,7 @@ pub(super) fn assemble_transaction_passport(
     };
     let evidence_graph_path = out.join("evidence-graph.json");
     write_json_line_file(&evidence_graph_path, &graph)?;
-    let evidence_graph_bytes = fs::read(&evidence_graph_path)?;
+    let evidence_graph_bytes = crate::input::read(&evidence_graph_path)?;
 
     let keypair = super::collect::proof_collect_bundle_signer_from_env()?;
     let mut passport = serde_json::json!({
@@ -132,7 +132,7 @@ pub(super) fn assemble_transaction_passport(
         "signature": ""
     });
     let typed_passport: chio_control_plane::transaction_passport::TransactionPassport =
-        serde_json::from_value(passport.clone())?;
+        crate::input::project(passport.clone())?;
     passport["signature"] = serde_json::Value::String(
         chio_control_plane::transaction_passport::sign_transaction_passport(
             &typed_passport,
@@ -168,18 +168,6 @@ fn write_assemble_report(report: &ProofAssembleReport, json_output: bool) -> Res
     Ok(())
 }
 
-fn ensure_regular_file(path: &Path, label: &str) -> Result<(), CliError> {
-    let file_type = fs::symlink_metadata(path)?.file_type();
-    if file_type.is_file() {
-        Ok(())
-    } else {
-        Err(CliError::cli_io_error(format!(
-            "proof assemble {label} is not a regular file: {}",
-            path.display()
-        )))
-    }
-}
-
 fn ensure_no_reserved_roots(artifact_dir: &Path) -> Result<(), CliError> {
     for name in RESERVED_ASSEMBLE_ROOTS {
         let path = artifact_dir.join(name);
@@ -202,7 +190,7 @@ fn assembled_claim_set_bytes(
     issued_at: &str,
     verifier_policy_bytes: &[u8],
 ) -> Result<Vec<u8>, CliError> {
-    let policy: serde_json::Value = serde_json::from_slice(verifier_policy_bytes)?;
+    let policy: serde_json::Value = crate::input::json(verifier_policy_bytes)?;
     let mut claims = policy
         .get("required_claims")
         .and_then(serde_json::Value::as_array)
@@ -267,29 +255,16 @@ fn collect_json_entries(
     current: &Path,
     entries: &mut Vec<(String, Vec<u8>)>,
 ) -> Result<(), CliError> {
-    let mut children = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
-    children.sort_by_key(|child| child.file_name());
-    for child in children {
-        let path = child.path();
-        let file_type = fs::symlink_metadata(&path)?.file_type();
-        if file_type.is_dir() {
-            collect_json_entries(root, &path, entries)?;
-        } else if file_type.is_file() {
-            let relative = relative_artifact_path(root, &path)?;
-            if relative == "transaction-passport.json" || relative == "evidence-graph.json" {
-                continue;
-            }
-            if relative.ends_with(".json") {
-                entries.push((relative, fs::read(path)?));
-            }
-        } else {
-            return Err(CliError::cli_other_error(format!(
-                "unsupported proof assemble artifact type: {}",
-                path.display()
-            )));
+    crate::input::collection::walk_files(current, |path, budget| {
+        let relative = relative_artifact_path(root, path)?;
+        if relative != "transaction-passport.json"
+            && relative != "evidence-graph.json"
+            && relative.ends_with(".json")
+        {
+            entries.push((relative, budget.read(path)?));
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 fn relative_artifact_path(root: &Path, path: &Path) -> Result<String, CliError> {
@@ -310,7 +285,7 @@ fn relative_artifact_path(root: &Path, path: &Path) -> Result<String, CliError> 
 }
 
 fn evidence_node_for_entry(path: &str, bytes: &[u8]) -> Result<AssembledEvidenceNode, CliError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)?;
+    let value: serde_json::Value = crate::input::json(bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)

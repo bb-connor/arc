@@ -53,14 +53,15 @@ impl GuardRegistryClient {
         &self,
         request: GuardPullRequest<'_>,
     ) -> Result<GuardPullResponse> {
-        let (manifest_json, manifest_digest) = self
-            .client
-            .pull_manifest_raw(
-                request.reference.as_oci_reference(),
-                &request.credentials.to_registry_auth(),
-                &[GUARD_OCI_MANIFEST_MEDIA_TYPE],
+        let manifest_json = self
+            .pull_manifest_bytes(
+                request.reference,
+                request.credentials,
+                request.reference.digest().as_str(),
+                GUARD_OCI_MANIFEST_MEDIA_TYPE,
             )
             .await?;
+        let manifest_digest = request.reference.digest().as_str().to_string();
         ensure_manifest_digest_matches(request.reference, &manifest_digest)?;
 
         let artifact = self

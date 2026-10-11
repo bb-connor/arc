@@ -1,0 +1,22 @@
+[package]
+name = "chio-rust-preview-consumer"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.94"
+publish = false
+
+# This consumer is copied outside the repository by the package assembler.
+[workspace]
+
+[dependencies]
+chio-core = { version = "=0.1.0", registry = "chio-preview" }
+chio-kernel = { version = "=0.1.0", registry = "chio-preview" }
+chio-kernel-core = { version = "=0.1.0", registry = "chio-preview" }
+chio-store-sqlite = { version = "=0.1.0", registry = "chio-preview" }
+chio-swarm-authority = { version = "=0.1.0", registry = "chio-preview" }
+async-trait = { version = "0.1", registry = "chio-preview" }
+serde_json = { version = "1", registry = "chio-preview" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

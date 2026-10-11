@@ -14,7 +14,7 @@ const GENERATOR_VERSION: u32 = 3;
 const MARKDOWN_PATH: &str = "docs/formal/COVERAGE.md";
 const JSON_PATH: &str = "target/formal/coverage.json";
 const COMMIT_TOKEN: &str = "@GIT_COMMIT@";
-const GENERATOR_SOURCE_PATHS: [&str; 12] = [
+const GENERATOR_SOURCE_PATHS: [&str; 13] = [
     "xtask/src/proof_coverage.rs",
     "xtask/src/proof_coverage/build.rs",
     "xtask/src/proof_coverage/common.rs",
@@ -27,6 +27,7 @@ const GENERATOR_SOURCE_PATHS: [&str; 12] = [
     "xtask/src/proof_coverage/tests/aeneas.rs",
     "xtask/src/proof_coverage/tests/mod.rs",
     "xtask/src/proof_coverage/tests/mutation.rs",
+    "xtask/src/proof_coverage/tests/open_residual.rs",
 ];
 const BASE_LANES: [&str; 8] = [
     "lean", "aeneas", "creusot", "kani", "tla", "diff", "fuzz", "mutants",
@@ -58,6 +59,12 @@ struct MappingSurfaceResolution {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+enum KaniOpenResidual {
+    #[serde(rename = "KANI-ATTEST-DECOMP")]
+    AttestationDecomposition,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct KaniHarness {
     #[serde(rename = "crate")]
     crate_name: String,
@@ -67,6 +74,8 @@ struct KaniHarness {
     notes: String,
     #[serde(default)]
     primary_rust_symbol: Option<String>,
+    #[serde(default)]
+    open_residual: Option<KaniOpenResidual>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]

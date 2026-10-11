@@ -138,7 +138,7 @@ fn strict_ruleset_blocks_tools_by_default() {
 #[test]
 fn permissive_ruleset_allows_all_tools() {
     let compiled = load_builtin("permissive").expect("compile permissive");
-    // No tool_access block -> permissive scope falls back to wildcard.
+    // The development builtin explicitly opts into wildcard tool authority.
     assert_eq!(compiled.default_scope.grants.len(), 1);
     assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
 }

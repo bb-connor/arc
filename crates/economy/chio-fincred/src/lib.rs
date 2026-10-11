@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
 
+mod domains;
+pub use domains::{
+    FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN, FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN,
+};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core_types::{

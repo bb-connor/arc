@@ -1,0 +1,17 @@
+[bindings.kotlin]
+cdylib_name = "chio_kernel_mobile"
+
+# Kotlin exceptions inherit `message`. Keep the Rust field and FFI unchanged,
+# and give the generated payload a distinct name in this language only.
+[bindings.kotlin.rename]
+"ChioMobileError.InvalidJson.message" = "detail"
+"ChioMobileError.InvalidHex.message" = "detail"
+"ChioMobileError.WeakEntropy.message" = "detail"
+"ChioMobileError.InvalidCapability.message" = "detail"
+"ChioMobileError.InvalidPassport.message" = "detail"
+"ChioMobileError.AttestationUnavailable.message" = "detail"
+"ChioMobileError.AttestationRejected.message" = "detail"
+"ChioMobileError.KernelKeyMismatch.message" = "detail"
+"ChioMobileError.SigningFailed.message" = "detail"
+"ChioMobileError.EvaluationDenied.message" = "detail"
+"ChioMobileError.Internal.message" = "detail"

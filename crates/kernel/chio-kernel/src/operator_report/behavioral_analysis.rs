@@ -158,7 +158,8 @@ pub type SignedBehavioralFeed = SignedExportEnvelope<BehavioralFeedReport>;
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EmaBaselineState {
-    /// Number of samples folded into the baseline.
+    /// Number of samples folded into the baseline, saturating at u64::MAX.
+    /// At that limit this is a lower bound, used only for the two-sample warmup.
     pub sample_count: u64,
     /// Exponentially-weighted mean.
     pub ema_mean: f64,

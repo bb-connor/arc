@@ -10,7 +10,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-manifest = { workspace = true }
+chio-security-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::net::{IpAddr, Ipv6Addr};
 use std::path::Path;
 
@@ -414,10 +415,20 @@ pub struct LocalDevnetDeployment {
 
 impl LocalDevnetDeployment {
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, SettlementError> {
-        let body = fs::read_to_string(path.as_ref())
-            .map_err(|error| SettlementError::Serialization(error.to_string()))?;
-        serde_json::from_str(&body)
-            .map_err(|error| SettlementError::Serialization(error.to_string()))
+        const MAX_DEPLOYMENT_BYTES: usize = 1024 * 1024;
+        let file = File::open(path)?;
+        if !file.metadata()?.is_file() {
+            return Err(SettlementError::InvalidInput(
+                "deployment must be a regular file".to_owned(),
+            ));
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_DEPLOYMENT_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_DEPLOYMENT_BYTES)
+            .and_then(|input| input.decode_signed())
+            .map_err(chio_core::canonical::SharedUntrustedJsonError::from)
+            .map_err(Into::into)
     }
 
     pub fn into_chain_config(self) -> Result<SettlementChainConfig, SettlementError> {

@@ -7,10 +7,8 @@ paths:
     post:
       operationId: requestRfq
       summary: Request bids from all candidate providers.
-      x-chio-tool-name: request_rfq
       x-chio-side-effects: false
       x-chio-approval-required: false
-      x-chio-cost-units: 0
       requestBody:
         required: true
         content:
@@ -28,10 +26,8 @@ paths:
     post:
       operationId: requestQuote
       summary: Request a provider quote.
-      x-chio-tool-name: request_quote
       x-chio-side-effects: false
       x-chio-approval-required: false
-      x-chio-cost-units: 0
       requestBody:
         required: true
         content:
@@ -49,10 +45,8 @@ paths:
     post:
       operationId: requestPaymentRequirements
       summary: Return x402-style payment requirements.
-      x-chio-tool-name: request_payment_requirements
       x-chio-side-effects: false
       x-chio-approval-required: false
-      x-chio-cost-units: 0
       requestBody:
         required: true
         content:
@@ -70,10 +64,8 @@ paths:
     post:
       operationId: submitPaymentProof
       summary: Accept a Chio-mediated x402 payment proof.
-      x-chio-tool-name: submit_payment_proof
       x-chio-side-effects: true
       x-chio-approval-required: true
-      x-chio-cost-units: 0
       requestBody:
         required: true
         content:
@@ -91,10 +83,8 @@ paths:
     post:
       operationId: acceptFulfillment
       summary: Accept a provider fulfillment package.
-      x-chio-tool-name: accept_fulfillment
       x-chio-side-effects: true
       x-chio-approval-required: true
-      x-chio-cost-units: 125000
       requestBody:
         required: true
         content:

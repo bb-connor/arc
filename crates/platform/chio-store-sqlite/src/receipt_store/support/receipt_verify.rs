@@ -1,10 +1,9 @@
 use super::*;
 
-pub(crate) fn unix_timestamp_now_i64() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
+pub(crate) fn unix_timestamp_now_i64(
+    clock: &crate::store_clock::StoreClock,
+) -> Result<i64, ReceiptStoreError> {
+    Ok(clock.now_secs()?)
 }
 
 pub(crate) fn sqlite_i64(value: u64, field: &str) -> Result<i64, ReceiptStoreError> {
@@ -41,6 +40,29 @@ pub(crate) fn sqlite_bool(value: bool) -> i64 {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static RECEIPT_SIGNATURE_VERIFICATIONS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Stored receipt signature verifications performed on this thread.
+#[cfg(test)]
+pub(crate) fn receipt_signature_verifications() -> u64 {
+    RECEIPT_SIGNATURE_VERIFICATIONS.with(std::cell::Cell::get)
+}
+
+/// Stored receipt signature verifications performed on any thread, including
+/// the writer actor.
+#[cfg(test)]
+pub(crate) static ALL_THREAD_RECEIPT_SIGNATURE_VERIFICATIONS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+fn count_receipt_signature_verification() {
+    RECEIPT_SIGNATURE_VERIFICATIONS.with(|count| count.set(count.get() + 1));
+    ALL_THREAD_RECEIPT_SIGNATURE_VERIFICATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 pub(crate) fn ensure_chio_receipt_verified(receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
     ensure_chio_receipt_verified_with_context(receipt, "tool receipt", None)
 }
@@ -71,6 +93,8 @@ pub(crate) fn ensure_chio_receipt_verified_with_context(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
+    #[cfg(test)]
+    count_receipt_signature_verification();
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
     // The standalone SQLite verifier has no policy handle. Keep the
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
@@ -103,6 +127,8 @@ pub(crate) fn ensure_child_receipt_verified_with_context(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
+    #[cfg(test)]
+    count_receipt_signature_verification();
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
     // The standalone SQLite verifier has no policy handle. Keep the
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
@@ -126,12 +152,7 @@ pub(crate) fn decode_verified_chio_receipt(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<ChioReceipt, ReceiptStoreError> {
-    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
-        ReceiptStoreError::Conflict(format!(
-            "{} failed to decode: {error}",
-            format_receipt_context(receipt_kind, None, seq)
-        ))
-    })?;
+    let value = decode_stored_json(raw_json)?;
     let receipt_id = value
         .get("id")
         .and_then(|field| field.as_str())
@@ -151,12 +172,7 @@ pub(crate) fn decode_verified_child_receipt(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<ChildRequestReceipt, ReceiptStoreError> {
-    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
-        ReceiptStoreError::Conflict(format!(
-            "{} failed to decode: {error}",
-            format_receipt_context(receipt_kind, None, seq)
-        ))
-    })?;
+    let value = decode_stored_json(raw_json)?;
     let receipt_id = value
         .get("id")
         .and_then(|field| field.as_str())
@@ -169,4 +185,12 @@ pub(crate) fn decode_verified_child_receipt(
     })?;
     ensure_child_receipt_verified_with_context(&receipt, receipt_kind, seq)?;
     Ok(receipt)
+}
+
+/// Preserve both typed JSON and canonical writer encodings, including
+/// full-width u64 amounts, while refusing lossy input before signature checks.
+fn decode_stored_json(raw_json: &str) -> Result<serde_json::Value, ReceiptStoreError> {
+    chio_core::canonical::UntrustedJsonText::new(raw_json)
+        .decode_signed()
+        .map_err(ReceiptStoreError::from)
 }

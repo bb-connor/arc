@@ -1,0 +1,394 @@
+{
+  "schema": "chio.attestation-proof-resource-diagnostics.v1",
+  "observed_at": "2026-10-09T18:26:47.803084+00:00",
+  "stage_head": "c311a29c8a14bb06f93de4eeb91be20ea5e6fef8",
+  "scope": "Supported solver and resource-accounting diagnostics only; no qualifying production proof, source change or tool enrollment",
+  "prior_z3_terminal": "/tmp/pr1160-cbmc-smt-repair-20261009/mandatory-memory26/TERMINAL-REVIEW.json",
+  "model_sha256": "ce9bfd06fa6bd5a0030e5cebec0f4a981d423f815b9a5c6e9eae3625a29e6324",
+  "original_mandatory_contract": {
+    "key_seeds": 256,
+    "one_hot_root_positions": 32,
+    "real_sha_calls": 3,
+    "global_unwind": 136,
+    "scoped_encoder_bounds": [
+      6,
+      66
+    ],
+    "scoped_sha_bounds": [
+      17,
+      3
+    ],
+    "padding_bound": 65,
+    "field_sensitivity_array_size": 135,
+    "new_assumption": false
+  },
+  "cvc5_version": "1.3.0",
+  "official_assets": {
+    "x86_64": {
+      "url": "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.0/cvc5-Linux-x86_64-static.zip",
+      "asset_sha256": "1e5a30c66f8fc3b65ddac69a3ac299bf03914cc58fc562e0ab6c730bf6bbfe6f",
+      "binary_sha256": "ebd791329b7c2f112e7b36b455459cf685710ac326cbf3004990ea9098b0254b"
+    },
+    "arm64": {
+      "url": "https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.0/cvc5-Linux-arm64-static.zip",
+      "asset_sha256": "5e559ed880052aba4c0830b53429ba6c00207847d30b89684929aba548781802",
+      "binary_sha256": "be9d14f6ec8c3dccd1fddfff3f606cbdce3568cc275dc5cb080edd474214927f"
+    },
+    "provenance_limit": "Official release assets and GitHub API digest verified; no upstream signature or artifact attestation available."
+  },
+  "generation": {
+    "started_at": "2026-10-09T18:03:59.189408+00:00",
+    "scope": "CVC5 encoding diagnostic only, same existing prepared model and all properties; no Rust compile or shared source mutation",
+    "argv": [
+      "/tmp/pr1160-cbmc-smt-repair-20261009/kani-0.68.0/bin/cbmc",
+      "--no-malloc-may-fail",
+      "--no-undefined-shift-check",
+      "--no-signed-overflow-check",
+      "--nan-check",
+      "--no-self-loops-to-assumptions",
+      "--no-pointer-primitive-check",
+      "--object-bits",
+      "16",
+      "--unwind",
+      "136",
+      "--cvc5",
+      "--slice-formula",
+      "--unwindset",
+      "_RNvNtNtCs421ME1tLpEh_15chio_core_types6crypto8encoding17fill_prefixed_hex.0:6,_RNvNtNtCs421ME1tLpEh_15chio_core_types6crypto8encoding17fill_prefixed_hex.1:66,_RNvNtNtCsahRR1uCpYjw_4sha26sha2564soft8compress.0:17,_RNvNtNtCsahRR1uCpYjw_4sha26sha2564soft8compress.1:3,_RINvMs4_Cs1d6UHoOCtrx_12block_bufferINtB6_11BlockBufferINtNtCsj9WDbrNwqA_7typenum4uint4UIntIBS_IBS_IBS_IBS_IBS_IBS_NtBU_5UTermNtNtBW_3bit2B1ENtB22_2B0EB2f_EB2f_EB2f_EB2f_EB2f_ENtB6_5EagerE10digest_padNCNvXs3_NtCsahRR1uCpYjw_4sha28core_apiNtB3k_13Sha256VarCoreNtNtCs1oubtmlgvR9_6digest8core_api18VariableOutputCore22finalize_variable_core0ECsjIBdJLu0RXi_18chio_attest_verify.0:65",
+      "--max-field-sensitivity-array-size",
+      "135",
+      "/tmp/pr1160-cvc5-diagnostic-20261009/prepared-model.out",
+      "--verbosity",
+      "9",
+      "--json-ui",
+      "--outfile",
+      "/tmp/pr1160-cvc5-diagnostic-20261009/problem-cvc5.smt2"
+    ],
+    "model_sha256": "ce9bfd06fa6bd5a0030e5cebec0f4a981d423f815b9a5c6e9eae3625a29e6324",
+    "time_limit_seconds": 600,
+    "address_limit_gib": 14,
+    "acceptance": false,
+    "exit_code": 0,
+    "termination_reason": null,
+    "elapsed_seconds": 448.80527091305703,
+    "model_stable": true,
+    "terminal_at": "2026-10-09T18:11:28.001219+00:00",
+    "generation_log_sha256": "401636f4ab2a094a9a7ccc3485ee6fedf3071bafd85366dbc12bfb54952c0fc4",
+    "formula_bytes": 557768560,
+    "formula_sha256": "385f66dfde361265aaa47fe793decc1f86110a4394142322504542d2abcddc1a"
+  },
+  "small_solver_controls": [
+    {
+      "case": "sat_model",
+      "exit_code": 0,
+      "stdout": "sat\n((x #b00101010))\n",
+      "stderr": "",
+      "matches_expected": true,
+      "elapsed_seconds": 0.003086500000790693
+    },
+    {
+      "case": "unsat",
+      "exit_code": 0,
+      "stdout": "unsat\n",
+      "stderr": "",
+      "matches_expected": true,
+      "elapsed_seconds": 0.0030741660011699423
+    }
+  ],
+  "private_cbmc_component_controls": {
+    "scope": "Pinned CVC5 with private CBMC, component controls only",
+    "expected_command_outcomes": 10,
+    "positive_cyclic_pointer": true,
+    "positive_dependent_array": true,
+    "negative_value": true,
+    "negative_pointer": true,
+    "negative_symbolic_pointer": true,
+    "unwind_refusal": true,
+    "exact_kani_cover": true,
+    "false_kani_assertion": true,
+    "unreachable_cover_refused": true,
+    "solver_error_refused": true,
+    "mandatory_proof_qualified": false
+  },
+  "address_capped_solver": {
+    "scope": "Standalone native-CVC5 encoding diagnostic; not complete Kani assertions and cover acceptance",
+    "formula_sha256": "385f66dfde361265aaa47fe793decc1f86110a4394142322504542d2abcddc1a",
+    "formula_bytes": 557768560,
+    "model_sha256": "ce9bfd06fa6bd5a0030e5cebec0f4a981d423f815b9a5c6e9eae3625a29e6324",
+    "binary_sha256": "ebd791329b7c2f112e7b36b455459cf685710ac326cbf3004990ea9098b0254b",
+    "binary_version": "1.3.0",
+    "deadline_seconds": 300,
+    "address_limit_gib": 14,
+    "proof_qualified": false,
+    "generation_record_sha256": "4b48c4ab5ea14a36f34c52a47283fd96b619d3731e7828a65b9b9d9c35d331b9",
+    "elapsed_seconds": 66.65320390599845,
+    "exit_code": 1,
+    "termination_reason": null,
+    "peak_group_rss_kib": 9062780,
+    "remaining_group_members": [],
+    "formula_stable": true,
+    "binary_stable": true,
+    "stdout_prefix": "(error \"std::bad_alloc\")\n",
+    "stdout_sha256": "0b587f3c8e4bb99a4ff60e875d953eab326dca1c5d2981dadd63c1547654f727",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "terminal_at": "2026-10-09T18:12:50.994080+00:00"
+  },
+  "physical_memory_capped_solver": {
+    "scope": "Same formula under actual RAM accounting, no proof acceptance",
+    "reason": "Prior virtual-address cap refused at 8.6GiB sampled RSS. Test whether address reservation rather than physical CI memory is limiting, with stricter actual RAM ceiling. No original constraint/assertion/domain edits.",
+    "cgroup": "/sys/fs/cgroup/system.slice/pr1160-cvc5-physical-20261009.service",
+    "memory_max_bytes": 10737418240,
+    "memory_swap_max_bytes": 0,
+    "deadline_seconds": 300,
+    "binary_sha256": "be9d14f6ec8c3dccd1fddfff3f606cbdce3568cc275dc5cb080edd474214927f",
+    "formula_sha256": "385f66dfde361265aaa47fe793decc1f86110a4394142322504542d2abcddc1a",
+    "address_limit_bytes": 34359738368,
+    "started_at": "2026-10-09T18:16:59.837908+00:00",
+    "proof_qualified": false,
+    "exit_code": -9,
+    "termination_reason": null,
+    "elapsed_seconds": 96.99435037793592,
+    "memory_peak_bytes": 10737418240,
+    "memory_events": "low 0\nhigh 0\nmax 38\noom 1\noom_kill 1\noom_group_kill 0\n",
+    "formula_stable": true,
+    "binary_stable": true,
+    "terminal_at": "2026-10-09T18:18:37.256745+00:00",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_prefix": "",
+    "remaining_pids": [
+      "1348945"
+    ]
+  },
+  "physical_control_cleanup": {
+    "unit_terminal_properties": "ControlGroup=\nActiveState=inactive\nSubState=dead\n",
+    "remaining_pids_in_record_explanation": "Only the recording supervisor remained during its own terminal write. The systemd unit was subsequently verified inactive/dead with no control group."
+  },
+  "separable_ci_repair_reconciliation": {
+    "stage_head": "c311a29c8a14bb06f93de4eeb91be20ea5e6fef8",
+    "same": [
+      "crates/protocol/chio-cohere-tools-adapter/src/streaming.rs",
+      "examples/mini-swe-recovery/qualify_operator.py",
+      "scripts/check-actions-workflow-syntax.py",
+      "scripts/tests/check-actions-workflow-syntax.test.py",
+      "sdks/python/chio-mini-swe/tests/test_operator_diagnostics.py"
+    ],
+    "different": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/formal-pr-smoke.yml",
+      ".kani/harnesses.toml",
+      "Cargo.lock",
+      "crates/core/chio-core-types/Cargo.toml",
+      "crates/core/chio-core-types/src/crypto.rs",
+      "crates/core/chio-core-types/src/crypto/encoding.rs",
+      "crates/core/chio-core-types/tests/hex_wire_compatibility.rs",
+      "crates/kernel/chio-kernel-core/Cargo.toml",
+      "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs",
+      "crates/kernel/chio-kernel-core/src/receipts.rs",
+      "crates/trust/chio-attest-verify/Cargo.toml",
+      "crates/trust/chio-attest-verify/src/kani_crypto_research.rs",
+      "crates/trust/chio-attest-verify/src/kani_public_harnesses.rs",
+      "crates/trust/chio-attest-verify/src/lib.rs",
+      "crates/trust/chio-attest-verify/src/quote.rs",
+      "crates/trust/chio-attest-verify/tests/report_data_allocations.rs",
+      "crates/trust/chio-attest-verify/tests/report_data_symbolic_domain.rs",
+      "crates/trust/chio-weights/Cargo.toml",
+      "crates/trust/chio-weights/src/card.rs",
+      "crates/trust/chio-weights/src/kani_crypto_research.rs",
+      "crates/trust/chio-weights/src/kani_public_harnesses.rs",
+      "crates/trust/chio-weights/src/lib.rs",
+      "crates/trust/chio-weights/tests/hash_binding.rs",
+      "deploy/docker/Dockerfile.security-evidence-runner",
+      "docs/formal/COVERAGE.md",
+      "docs/formal/CRYPTO_PROOF_SCOPE.md",
+      "formal/assumptions.toml",
+      "formal/rust-verification/crypto-proof-scope.toml",
+      "formal/rust-verification/kani-public-harnesses.toml",
+      "scripts/check-kani-cover.py",
+      "scripts/check-kani-crypto-scope.py",
+      "scripts/check-kani-function-bound.py",
+      "scripts/check-kani-public-core.sh",
+      "scripts/check-kani-public-harnesses.py",
+      "scripts/check-rust-verification-gates.sh",
+      "scripts/check-security-ci-contract.py",
+      "scripts/run-kani-manifest.sh",
+      "scripts/run-kani-with-cover.sh",
+      "scripts/tests/check-kani-crypto-scope.test.py",
+      "scripts/tests/check-kani-public-harnesses.test.py",
+      "scripts/tests/check-rust-verification-gates.test.sh",
+      "scripts/tests/run-kani-function-bound.test.py",
+      "scripts/tests/run-kani-reachability.test.py"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/PLAN.md",
+      "sha256": "85f4b45fc863488beff9a3dafb6942aea0c6b20bfd92d62d287a3d33445e0bc1"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/GENERATION-PLAN.json",
+      "sha256": "e466a8f833f9c02cc449c9a3938192271fd513c824e12af2ff6117970e20bffd"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/GENERATION-RESULT.json",
+      "sha256": "4b48c4ab5ea14a36f34c52a47283fd96b619d3731e7828a65b9b9d9c35d331b9"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/generation.log",
+      "sha256": "401636f4ab2a094a9a7ccc3485ee6fedf3071bafd85366dbc12bfb54952c0fc4"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/generation.time",
+      "sha256": "75cca77d301d78204abb557cf38d2d1ee9200c11923c5c5ea28c83698966f0df"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/SOLVER-PLAN.json",
+      "sha256": "e3c1fcef523dda9690495242a7afd09bd57b422360b8afa36d0ec32a6560b559"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/SOLVER-RESULT.json",
+      "sha256": "83908117c6efdc5ba703dd7efd9f18fc202a961f556b01f1913cb65d8295882d"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/solver.stdout",
+      "sha256": "0b587f3c8e4bb99a4ff60e875d953eab326dca1c5d2981dadd63c1547654f727"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/solver.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/solver.resources.jsonl",
+      "sha256": "cb91332008006eff1886fcf5bbfdf41220a9648e8750d0d69f8cee596d6fab41"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/small-controls.json",
+      "sha256": "be04af79c3df5841bd761ba699cf9d5329951739fba0812922fe86d4cd9a9d38"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/controls/RESULTS.json",
+      "sha256": "68c939f98cd974ac96692d50c91a14a3ebbb31b7aab844b5a330ce0da35a7e33"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/controls/REVIEW.json",
+      "sha256": "1a8045e51c6811255f80291088dd776aa123588afcb04385bfbf05f7daa770fe"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/physical-memory/PLAN.json",
+      "sha256": "eb03199f1f89d27dee5e04a0680abb1a77f6ad9544f07cbe34076de9b77d665e"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/physical-memory/RESULT.json",
+      "sha256": "e225554fd297fcad2a41213d31f1df6519d5d024be57b4c651d9a8876e49e9bb"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/physical-memory/resources.jsonl",
+      "sha256": "c512ba4a3bcb672991cfe183ed09a67f484e82897aaf2c2ca304f309ef54c0e3"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/physical-memory/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/physical-memory/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/pr1160-cvc5-diagnostic-20261009/source-batch-reconciliation.json",
+      "sha256": "6df6f5424f4f5559f1b126f4140a5eb105df43a0d5648e1e15701c0b55cec600"
+    }
+  ],
+  "mandatory_proof_qualified": false,
+  "tool_enrolled": false,
+  "candidate_qualified": false,
+  "merged": false,
+  "next_acceptance": "Reduce proof-model cost without narrowing the complete original domain, dropping assertions or changing crypto assumptions. Both supported-backend resource controls and the partial partition probe remain unqualified; no larger blind retries or full32-way campaign is justified by this evidence.",
+  "partial_partition_probe": {
+    "result": {
+      "scope": "Nonqualifying root00 feasibility probe; 256/8192 input pairs only",
+      "exit_code": -15,
+      "termination_reason": "300s_timeout",
+      "elapsed_seconds": 301.00453082099557,
+      "peak_group_rss_kib": 5733020,
+      "remaining_group_members": [],
+      "source_stable": true,
+      "whole_domain_qualified": false
+    },
+    "source": {
+      "source_origin": "/tmp/pr1160-kani-direct-index-20261009/source-capsule",
+      "probe_source": "/tmp/pr1160-proof-partition-probe-20261009/source-capsule",
+      "source_changes": [
+        "crates/trust/chio-attest-verify/src/kani_public_harnesses.rs"
+      ],
+      "original_harness_sha256": "ac5332043d20f16d0ff41acaccc9cb35982e8941d20cd5d565521736774348b9",
+      "probe_harness_sha256": "2c289adea2aaf1b968fc4ef6426d255e818bf12a97c13a2d09d482030b2164d8",
+      "patch_sha256": "8e9dd8c1b6e01b94007834181abdf08c727f3021c621079672359b6878a2cd08",
+      "original_input_pairs": 8192,
+      "probe_input_pairs": 256,
+      "original_scope_preserved": false,
+      "qualification_eligible": false,
+      "reason": "Specialized partial-domain diagnostic only, source gate must refuse"
+    },
+    "scope_refusal": {
+      "command": [
+        "python3",
+        "/home/connor/lanes/pr1160-kani-repair/scripts/check-kani-crypto-scope.py",
+        "--root",
+        "/tmp/pr1160-proof-partition-probe-20261009/source-capsule"
+      ],
+      "exit_code": 1,
+      "gate_manifest": "/home/connor/lanes/pr1160-kani-repair/formal/rust-verification/crypto-proof-scope.toml",
+      "qualifying_gate_still_refuses": true,
+      "reason": "This diagnostic is intentionally partial; rejection is required, never waived for CI."
+    },
+    "scope_manifest_overlay": {
+      "path": "formal/rust-verification/crypto-proof-scope.toml",
+      "from": "/home/connor/lanes/pr1160-kani-repair",
+      "sha256": "a19a5fa15624c3341d4ab7ecf55a0d1784cc1084761082a440cede9060ed673d",
+      "reason": "Apply the strengthened scope guard to the disposable copy; expected rejection. No shared source or gate edit."
+    },
+    "observation": "Two intermediate SAT queries returned, but no final assertion or exact-cover verdict was produced. No full32-way implementation is justified by this probe.",
+    "artifacts": [
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/PLAN.md",
+        "sha256": "2f5bf2547dd67144dd5f261fe4cc9aebedc491a9f2d1595f6f5ddf39dd1815d2"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/SOURCE.json",
+        "sha256": "2514bb4701a802d170aa7e4ad1c3aadaf8833de3435148c6d17cc99002ecd3a9"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/probe.patch",
+        "sha256": "8e9dd8c1b6e01b94007834181abdf08c727f3021c621079672359b6878a2cd08"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/SCOPE-CONTROL.json",
+        "sha256": "d2489ab716981ecb804c4a3fca741fcb8aee5760d7b4e9593a71638e9852a047"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/scope-refusal.log",
+        "sha256": "cf64573f936821c317ab7128a14c7572369709ac30cf05557a24211364db4beb"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/RUN-PLAN.json",
+        "sha256": "3ffc6e5d0a35ed40b8e0f336204a89e9403f5e5c552bd3d929748fdeacff7bc5"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/RESULT.json",
+        "sha256": "ee4c48a8d90abf7be3846d9cdedb4edd39eb2cd23d3c8f46dd53b4eff5a33879"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/run.log",
+        "sha256": "c17d7782103fdb6da6fd1a9401d2333b313c070570763a22dc02db6b37b6a067"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/resources.jsonl",
+        "sha256": "32e4c7a46edb52301b70d1f4e56d80cd937e5f998f3eedcdf3050fc8e9b58b24"
+      },
+      {
+        "path": "/tmp/pr1160-proof-partition-probe-20261009/POST-SAT-PROCESS-OBSERVATION.json",
+        "sha256": "41e5626c7db91831aa253ef0e63d26ea080c3f22900db778dc006f15cd49b66a"
+      }
+    ]
+  }
+}

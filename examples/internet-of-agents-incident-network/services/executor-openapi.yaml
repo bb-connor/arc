@@ -12,7 +12,6 @@ paths:
   /execute:
     post:
       operationId: execute
-      x-chio-tool-name: execute
       requestBody:
         required: true
         content:

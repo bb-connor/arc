@@ -15,7 +15,9 @@ Concretely:
 - `sdks/swift/Package.swift` declares a local `binaryTarget` for
   `ChioKernel`.
 - `Frameworks/ChioKernel.xcframework` contains the generated static
-  libraries and UniFFI Swift headers.
+  libraries, C headers and `module.modulemap` for the FFI module.
+- `Sources/chio_kernel_mobile` compiles the generated Swift bindings as a
+  package target. The public wrapper imports that required target directly.
 - The C-ABI mobile attestation entry points
   (`crates/kernel/chio-kernel-mobile/src/lib.rs`) return challenge envelopes
   and verifier results instead of `AttestationUnavailable`.
@@ -26,11 +28,24 @@ The build script:
 
 1. Build the Rust static libraries for iOS device and simulator
    targets.
-2. Run `uniffi-bindgen generate --language swift`.
+2. Run the workspace-locked `chio-kernel-mobile` bindgen example so the Swift
+   generator and Rust scaffolding use the same UniFFI version.
 3. Create
    `target/release-qualification/mobile-kernel/ios/ChioKernel.xcframework`.
-4. Copy the produced artifact into `sdks/swift/Frameworks/` to refresh
-   the committed binary target.
+4. With `--install`, copy the framework, generated Swift source and hashed build
+   manifest into the package together. Run `bash scripts/test-swift-sdk.sh` on
+   macOS to exercise the actual native calls and non-authoritative inspection.
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+bash scripts/build-ios-framework.sh --install
+bash scripts/test-swift-sdk.sh
+```
+
+CI tests the committed package separately from the rebuild. A successful rebuild
+does not qualify stale bundled artifacts. Keep both lanes passing before landing
+an FFI change. Missing generated bindings fail compilation rather than silently
+using an unavailable stub.
 
 ## Minimum Platform
 

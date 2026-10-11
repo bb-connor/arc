@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Chio cross-language conformance tooling.
 //!
 //! Loads conformance scenarios and recorded results, drives the native and
@@ -5,6 +6,8 @@
 //! Markdown compatibility reports.
 
 pub mod econsim;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod load;
 mod model;
 mod native_suite;

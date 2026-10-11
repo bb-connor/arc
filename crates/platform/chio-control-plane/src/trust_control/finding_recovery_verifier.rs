@@ -16,24 +16,28 @@ use chio_store_sqlite::{
 };
 
 /// Classify a pure recovery-verification rejection into the seam's closed
-/// denial vocabulary, preserving the exact prose.
+/// denial vocabulary while retaining the local native cause.
 fn recovery_denial(error: RecoveryVerificationError) -> FindingDenial {
     use RecoveryVerificationError as E;
     let code = match &error {
-        E::Carrier | E::Member(_) => FindingDenialCode::CarrierInvalid,
+        E::Carrier
+        | E::CarrierInput(_)
+        | E::CarrierEncoding(_)
+        | E::Member(_)
+        | E::MemberInput { .. } => FindingDenialCode::CarrierInvalid,
         E::CapabilitySignature
         | E::PurchaseRecord
         | E::DeliveryReceiptSignature
         | E::RecoveryIssuer => FindingDenialCode::AuthorityInvalid,
         E::CapabilityBinding
         | E::CapabilityProfile
-        | E::PurchaseContext
+        | E::PurchaseContext(_)
         | E::PurchaseRecordBinding
         | E::DeliveryReceiptBinding
         | E::RecoveryIdentity
         | E::SubjectMismatch => FindingDenialCode::BindingMismatch,
     };
-    FindingDenial::new(code, error.to_string())
+    FindingDenial::with_source(code, "recovery context verification failed", error)
 }
 
 /// Classify a durable quota/lineage store failure, preserving the exact
@@ -191,5 +195,42 @@ impl FindingRecoveryVerifier for MarketFindingRecoveryVerifier {
             })
             .map(|_| ())
             .map_err(recovery_store_denial)
+    }
+}
+
+#[cfg(test)]
+mod economy_input_tests {
+    use super::*;
+    #[test]
+    fn economy_native_input_cause_survives_kernel_denial() {
+        let input = chio_core::canonical::UntrustedJsonText::new("private-marker");
+        let source = match input.decode_signed::<serde_json::Value>() {
+            Err(error) => error,
+            Ok(_) => panic!("invalid fixture accepted"),
+        };
+        let denial = recovery_denial(RecoveryVerificationError::MemberInput {
+            member: "test_member",
+            source: source.into(),
+        })
+        .prefixed("admission");
+        assert_eq!(denial.code(), FindingDenialCode::CarrierInvalid);
+        let mut current = std::error::Error::source(&denial);
+        let mut found = false;
+        while let Some(source) = current {
+            if let Some(input) = source.downcast_ref::<chio_core::canonical::UntrustedJsonError>() {
+                assert_eq!(
+                    input.code(),
+                    "urn:chio:error:attest:signed-json-invalid-input"
+                );
+                found = true;
+                break;
+            }
+            current = source.source();
+        }
+        assert!(found, "original input cause lost across denial adapter");
+        assert!(!format!("{denial:?} {denial}").contains("private-marker"));
+        let clone = denial.clone();
+        assert_eq!(clone, denial);
+        assert!(std::error::Error::source(&clone).is_some());
     }
 }

@@ -86,10 +86,10 @@ pub(crate) use lane_parser::parse_iroh_lanes;
 /// long-term passport / relay signing key. `seedHex` is the 32-byte ed25519 seed as
 /// hex. Kept minimal on purpose: the passport key (loaded elsewhere) endorses this
 /// transport `EndpointId` inside the issuer-signed directory bundle.
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct IrohTransportKeyDocument {
-    pub(crate) seed_hex: String,
+    pub(crate) seed_hex: crate::input::private::Seed,
 }
 
 /// Optional rotation-state input for the transport-directory bundle, mirroring the
@@ -225,16 +225,10 @@ fn relay_mode_from_urls(urls: &[String]) -> Result<RelayMode, CliError> {
 
 /// Load the transport ed25519 secret key from a `{ "seedHex": ".." }` file.
 fn load_transport_secret_key(path: &Path) -> Result<SecretKey, CliError> {
-    let json = read_utf8_json_file(path, "Chio iroh transport key")?;
-    let document: IrohTransportKeyDocument = serde_json::from_str(&json)
-        .map_err(|error| CliError::cli_other_error(format!("Chio iroh transport key: {error}")))?;
-    let bytes = hex::decode(document.seed_hex.trim()).map_err(|error| {
-        CliError::cli_other_error(format!("Chio iroh transport key seedHex: {error}"))
-    })?;
-    let seed: [u8; 32] = bytes.as_slice().try_into().map_err(|_| {
-        CliError::cli_other_error(
-            "Chio iroh transport key seedHex: must decode to exactly 32 bytes".to_string(),
-        )
+    let document: IrohTransportKeyDocument = crate::input::private::read(path)?;
+    let mut seed = zeroize::Zeroizing::new([0u8; 32]);
+    hex::decode_to_slice(document.seed_hex.as_str(), seed.as_mut()).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_OTHER, source)
     })?;
     Ok(SecretKey::from_bytes(&seed))
 }
@@ -264,7 +258,7 @@ fn transport_bundle_trust(
         )
     })?;
     let json = read_utf8_json_file(path, "Chio iroh transport trusted issuers")?;
-    let document: RelayTrustedIssuersDocument = serde_json::from_str(&json).map_err(|error| {
+    let document: RelayTrustedIssuersDocument = crate::input::text(&json).map_err(|error| {
         CliError::cli_other_error(format!("Chio iroh transport trusted issuers: {error}"))
     })?;
     // The SAME minVersion the HTTP peer-directory loader enforces as its trusted
@@ -299,7 +293,7 @@ fn transport_bundle_trust(
         Some(state_path) => {
             let state_json =
                 read_utf8_json_file(state_path, "Chio iroh transport directory state")?;
-            let state: IrohTransportDirectoryStateDocument = serde_json::from_str(&state_json)
+            let state: IrohTransportDirectoryStateDocument = crate::input::text(&state_json)
                 .map_err(|error| {
                     CliError::cli_other_error(format!(
                         "Chio iroh transport directory state: {error}"
@@ -352,7 +346,7 @@ pub(crate) fn load_iroh_serve_inputs(
     let directory_json =
         read_utf8_json_file(directory_path, "Chio iroh transport directory bundle")?;
     let bundle: TransportDirectoryBundleDocument =
-        serde_json::from_str(&directory_json).map_err(|error| {
+        crate::input::text(&directory_json).map_err(|error| {
             CliError::cli_other_error(format!("Chio iroh transport directory bundle: {error}"))
         })?;
     let trust =
@@ -516,7 +510,7 @@ pub(crate) struct DirectoryReloadConfig {
 fn read_bundle_document(path: &Path) -> Result<TransportDirectoryBundleDocument, String> {
     let json = read_utf8_json_file(path, "Chio iroh transport directory bundle")
         .map_err(|error| error.to_string())?;
-    serde_json::from_str(&json).map_err(|error| error.to_string())
+    crate::input::text(&json).map_err(|error| error.to_string())
 }
 
 /// The canonical sha256 of a parsed bundle document. This matches the value the gate
@@ -550,7 +544,7 @@ fn read_trusted_issuers(
 ) -> Result<(Vec<TrustedTransportDirectoryIssuer>, u64), TrustedIssuersReloadError> {
     let json = read_utf8_json_file(path, "Chio iroh transport trusted issuers")
         .map_err(|error| TrustedIssuersReloadError::Read(error.to_string()))?;
-    let document: super::relay::RelayTrustedIssuersDocument = serde_json::from_str(&json)
+    let document: super::relay::RelayTrustedIssuersDocument = crate::input::text(&json)
         .map_err(|error| TrustedIssuersReloadError::Read(error.to_string()))?;
     let trusted_min_version = document.min_version.unwrap_or(0);
     let issuers: Vec<TrustedTransportDirectoryIssuer> = document
@@ -1007,30 +1001,9 @@ fn next_reload_delay(
     }
 }
 
-/// Bounded poll loop: re-verify the directory and either swap in a successor, alarm +
-/// deny-all on expiry, or keep last-good. Wakes at most every `interval`, but also
-/// exactly at the running directory's expiry deadline (see [`next_reload_delay`]) so an
-/// expired directory fails closed promptly instead of admitting until the next fixed
-/// poll. A dedicated task feeds shared state (the admission gate and the alive flag)
-/// and is joined on shutdown.
-pub(crate) async fn run_directory_reloader(
-    gate: DirectoryGate,
-    config: DirectoryReloadConfig,
-    now_fn: Arc<dyn Fn() -> u64 + Send + Sync>,
-    alive: Arc<std::sync::atomic::AtomicBool>,
-) {
-    let mut state = ReloadState::from_gate(&gate);
-    loop {
-        let now = now_fn();
-        directory_reload_step(&gate, &config, now, &mut state, &alive);
-        // Schedule off the LIVE gate's expiry (re-read after the step and with a fresh
-        // clock): if the directory was still admitting at the step but its deadline elapsed
-        // before this delay is computed, the gate expiry is now in the past and the reloader
-        // rechecks immediately to fail it closed, rather than admitting for another interval.
-        let delay = next_reload_delay(config.interval, now_fn(), gate.current_expires_at_unix_ms());
-        tokio::time::sleep(delay).await;
-    }
-}
+#[path = "iroh_mount/reloader.rs"]
+mod reloader;
+pub(crate) use reloader::run_directory_reloader;
 
 /// Per-tick router-liveness step, testable without a live router: flip the
 /// `chio_iroh_router_alive` gauge and, on the transition to dead, log an alarm so a
@@ -1168,7 +1141,8 @@ pub(crate) async fn build_iroh_router(
     let bound_sockets = endpoint.bound_sockets();
 
     // The shared clock the handler stamps received batches with.
-    let now_fn: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(unix_now_ms);
+    let now_fn: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> =
+        Arc::new(|| unix_now_ms().map_err(std::io::Error::other));
     // Inbound directory-scope gate: reuse the shipped enforce_peer_batch_directory_scope
     // against the SAME peer directory the HTTP relay holds, so the iroh ingress path
     // applies the identical Origin/Hub + frame-cap + treaty-subscription + ladder-pin
@@ -1346,6 +1320,9 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::atomic::Ordering;
 
+    mod directory_fixtures;
+    use directory_fixtures::{write_issuers_with_min_version, write_local_binding_bundle_at};
+
     const NOW: u64 = 2_000_000;
 
     fn endpoint_from_seed(seed: u8) -> EndpointId {
@@ -1421,7 +1398,7 @@ mod tests {
             _authenticated_sender_kernel_id: String,
             _received_at_unix_ms: u64,
         ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
-            Err(PheromoneRelayError::Json(
+            Err(PheromoneRelayError::TransportError(
                 "test receiver never accepts".to_string(),
             ))
         }
@@ -1444,7 +1421,7 @@ mod tests {
             _received_at_unix_ms: u64,
         ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
             self.called.store(true, Ordering::SeqCst);
-            Err(PheromoneRelayError::Json(
+            Err(PheromoneRelayError::TransportError(
                 "receiver must not be reached for an out-of-scope sender".to_string(),
             ))
         }
@@ -1494,6 +1471,33 @@ mod tests {
             frames: Vec::new(),
             flushed_at_unix_ms: NOW,
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_seed_accepts_pretty_json_and_rejects_ambiguous_fields(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("seed.json");
+        let seed = "01".repeat(32);
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{  "seedHex": "{seed}" }}
+"#
+            ),
+        )?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        load_transport_secret_key(&path)?;
+        for tail in [
+            format!(r#", "seedHex":"{seed}""#),
+            r#", "extra":"secret""#.into(),
+        ] {
+            std::fs::write(&path, format!(r#"{{  "seedHex":"{seed}"{tail} }}"#))?;
+            assert!(load_transport_secret_key(&path).is_err());
+        }
+        Ok(())
     }
 
     #[test]
@@ -1558,6 +1562,7 @@ mod tests {
             "{\"seedHex\":\"".to_string() + &"11".repeat(32) + "\"}",
         )
         .unwrap();
+        private_key_permissions(&key_path);
 
         let error = match load_iroh_serve_inputs(
             true,
@@ -1590,6 +1595,14 @@ mod tests {
     /// The seedHex the test transport-key files carry, matching `transport_seed`.
     /// A file carrying this seed loads to a `SecretKey` whose public is
     /// `endpoint_from_seed(transport_seed)`.
+    fn private_key_permissions(path: &Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+    }
+
     fn transport_key_json(transport_seed: u8) -> String {
         let seed_hex = hex::encode([transport_seed; 32]);
         format!("{{\"seedHex\":\"{seed_hex}\"}}")
@@ -2215,22 +2228,6 @@ mod tests {
         );
     }
 
-    /// Write a trusted-issuers file at `dir/issuers.json` pinning `min_version`
-    /// (camelCase on the wire) with the standard issuer key. Returns its path.
-    fn write_issuers_with_min_version(dir: &std::path::Path, min_version: u64) -> PathBuf {
-        let issuer = Keypair::from_seed(&[240u8; 32]);
-        let issuers_path = dir.join("issuers.json");
-        let issuers = serde_json::json!({
-            "issuers": [{
-                "issuer": "did:chio:issuer",
-                "keyId": "issuer-key-1",
-                "publicKey": issuer.public_key(),
-            }],
-            "minVersion": min_version,
-        });
-        std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
-        issuers_path
-    }
 
     #[test]
     fn directory_reload_denies_newer_successor_below_raised_min_version() {
@@ -2599,30 +2596,6 @@ mod tests {
         );
     }
 
-    /// Write a signed successor to a FIXED `path` (so successive versions overwrite one
-    /// bundle the reloader re-reads), binding the LOCAL node at `local_transport_seed`
-    /// (pass [`LOCAL_TRANSPORT_SEED`] to REBIND this node, any other seed to ROTATE it
-    /// away), peer `did:chio:bob` live, chaining onto `previous_version_sha256`. Returns
-    /// the full-document body hash (the successor's chain pin).
-    fn write_local_binding_bundle_at(
-        path: &std::path::Path,
-        version: u64,
-        local_transport_seed: u8,
-        previous_version_sha256: Option<String>,
-    ) -> String {
-        let (bundle_json, _issuer) = build_signed_bundle_json(
-            vec![
-                local_relay_entry(local_transport_seed),
-                directory_entry("did:chio:bob", 7, 24),
-            ],
-            version,
-            previous_version_sha256,
-        );
-        std::fs::write(path, &bundle_json).unwrap();
-        let bundle: TransportDirectoryBundleDocument = serde_json::from_str(&bundle_json).unwrap();
-        sha256_hex(&canonical_json_bytes(&bundle).unwrap())
-    }
-
     #[test]
     fn directory_reload_advances_chain_after_local_binding_revoked() {
         // When a valid v2 successor rotates or tombstones this node (LocalBindingRevoked
@@ -2810,6 +2783,7 @@ mod tests {
             "{\"seedHex\":\"".to_string() + &"11".repeat(32) + "\"}",
         )
         .unwrap();
+        private_key_permissions(&key_path);
 
         // Without the rotation state, the successor is rejected fail-closed: its
         // previousVersionSha256 cannot chain onto the genesis default of None.
@@ -2886,6 +2860,7 @@ mod tests {
             "{\"seedHex\":\"".to_string() + &"11".repeat(32) + "\"}",
         )
         .unwrap();
+        private_key_permissions(&key_path);
 
         // No state file: the floor comes from minVersion (5), so version 3 is rejected.
         let rejected = load_iroh_serve_inputs(
@@ -2990,6 +2965,7 @@ mod tests {
         });
         std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
         std::fs::write(&key_path, transport_key_json(LOCAL_TRANSPORT_SEED)).unwrap();
+        private_key_permissions(&key_path);
 
         let inputs = load_iroh_serve_inputs(
             true,
@@ -3035,6 +3011,7 @@ mod tests {
         // A key whose public endpoint (seed 0x22) is NOT the endorsed local one
         // (LOCAL_TRANSPORT_SEED, 0x11).
         std::fs::write(&key_path, transport_key_json(0x22)).unwrap();
+        private_key_permissions(&key_path);
 
         let error = match load_iroh_serve_inputs(
             true,
@@ -3081,6 +3058,7 @@ mod tests {
         });
         std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
         std::fs::write(&key_path, transport_key_json(LOCAL_TRANSPORT_SEED)).unwrap();
+        private_key_permissions(&key_path);
 
         let error = match load_iroh_serve_inputs(
             true,

@@ -151,13 +151,9 @@ pub fn parse_purchase_context(raw: &[u8]) -> Result<FindingPurchaseContext, Find
     if strict.as_slice() != raw {
         return Err(FindingError::NonCanonicalBytes("purchase_context"));
     }
-    let context: FindingPurchaseContext =
-        serde_json::from_slice(raw).map_err(|_| FindingError::InvalidField("purchase_context"))?;
-    let reserialized = chio_core_types::canonical_json_bytes(&context)
-        .map_err(|_| FindingError::Canonicalization)?;
-    if reserialized.as_slice() != raw {
-        return Err(FindingError::NonCanonicalBytes("purchase_context"));
-    }
+    let context: FindingPurchaseContext = chio_core_types::canonical::UntrustedJsonText::new(text)
+        .decode_canonical()
+        .map_err(|_| FindingError::InvalidField("purchase_context"))?;
     context.validate()?;
     Ok(context)
 }

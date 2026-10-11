@@ -1,0 +1,119 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.702740619,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.657386582,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib",
+            "budget_store::tests::composite_lifecycle::composite_release_and_reverse_restore_durable_reservations",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-store-sqlite",
+          "file": "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/terminal.rs",
+          "function": {
+            "function_name": "SqliteBudgetStore::reverse_composite_hold",
+            "return_type": "-> Result<BudgetReverseHoldDecision, BudgetStoreError>",
+            "span": {
+              "start": {
+                "line": 177,
+                "column": 5
+              },
+              "end": {
+                "line": 413,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 235,
+              "column": 31
+            },
+            "end": {
+              "line": 235,
+              "column": 33
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__platform__chio-store-sqlite__src__budget_store__composite__transitions__terminal.rs_line_235_col_31.log",
+      "diff_path": "diff/crates__platform__chio-store-sqlite__src__budget_store__composite__transitions__terminal.rs_line_235_col_31.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 48.185762019,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.006536363,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-store-sqlite@0.1.0",
+            "--locked",
+            "--lib",
+            "budget_store::tests::composite_lifecycle::composite_release_and_reverse_restore_durable_reservations",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "chio.security.review-dispositions.v1",
+  "review_source": "claude-pr1160-evidence/hammer/root-fixes-f04-f09-f10-review.md",
+  "review_sha256": "e279d97c4490b9065644435d143b7a44e7bd6306f298cc30697ff280f382c7ca",
+  "reviewed_commits": [
+    "bd9bd6a20183c6e29a17a076a4be556e41effed4",
+    "d9e3359e3a9ed5adafba9f25ee8b929c0ef3c660",
+    "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3"
+  ],
+  "review_method": "Independent read-only source review; no tests or builds by reviewer.",
+  "findings": [
+    {
+      "id": "FINAL-F04-OPERATOR",
+      "priority": "P2",
+      "scope": "now",
+      "status": "implementation-open",
+      "requirement": "The deployed service must expose an operator-authenticated local-node quota increase and immediate resource retry, with bounded work and no integrity bypass.",
+      "disposition": "Assigned Claude isolated operator lane; HTTP Original, real quota recovery, deterministic wake and cancellation controls required."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-1",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Tenant snapshot errors can disclose global counts and resource diagnostics.",
+      "disposition": "Review the authenticated tenant error boundary separately; F09 readiness-only claim is scoped to the public receiptQuerySnapshot health object."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-2",
+      "priority": "P3",
+      "scope": "now",
+      "status": "covered-by-operator-acceptance-open",
+      "requirement": "Quota/retry wake tests must distinguish explicit wake from expiration of the backoff timer, and cover cancellation.",
+      "disposition": "Required under FINAL-F04-OPERATOR, with deterministic wake reason or epoch observation."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-3",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Strengthen scheduler-independent recovery observations and distinguish generation changes from lineage replacement.",
+      "disposition": "Existing bounded liveness waits remain limited evidence. Operator controls will add deterministic wake evidence; broader test-observer cleanup stays separate."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-4",
+      "priority": "P3",
+      "scope": "now",
+      "status": "covered-by-operator-acceptance-open",
+      "requirement": "Public receipt snapshot health must retain its exact configured/state shape in unavailable and building states.",
+      "disposition": "Required additional controls in FINAL-F04-OPERATOR, using real quota-unavailable and explicit building observations."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-5",
+      "priority": "P3",
+      "scope": "now",
+      "status": "evidence-reconciled-candidate-review-open",
+      "requirement": "Forwarding isolation evidence must show authenticated progress while public admission is occupied and retain genuine Original failures.",
+      "disposition": "Original2F10failures are retained in a0PASS5FAIL combined campaign; actual producer14PASS and composed26PASS evidence is pinned in public-forwarding-qualification-20261009.json. A post-completion permit assertion alone is not proof; the concurrent authenticated writes with one old shared permit are the substantive control."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-6",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Measure and reduce extra walker holds for quota and health telemetry without weakening integrity.",
+      "disposition": "No latency regression was measured by this read-only review. Keep this optimization and its required serving-latency evidence separate."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-7",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Avoid last-owner snapshot database destruction on the async health caller, and assess transient readiness sampling contention.",
+      "disposition": "Narrow potential latency window, no demonstrated blocking outage. Preserve as a concrete lifecycle/telemetry follow-up."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-8",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Assess repeated Ready-to-Capacity cycles resetting resource backoff and triggering bounded rebuild work.",
+      "disposition": "Current behavior follows successful-publication reset semantics and remains rate-bounded; measure realistic churn before changing retry policy."
+    },
+    {
+      "id": "ROOT-REVIEW-P3-9",
+      "priority": "P3",
+      "scope": "later",
+      "status": "open-followup",
+      "requirement": "Assess how public-forward transport failure changes peer health used by authenticated routing.",
+      "disposition": "Existing shared peer-health policy is broader than admission isolation. Require a concrete transport/consensus contract and regression before changing it."
+    }
+  ],
+  "qualification": "Every finding is retained. Required operator source and tests remain open. Follow-ups are not described as repaired or qualified.",
+  "merged": false,
+  "hosted_qualified": false
+}

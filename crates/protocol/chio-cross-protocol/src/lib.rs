@@ -14,7 +14,6 @@ pub mod lifecycle;
 pub mod orchestrator;
 pub mod routing;
 pub mod semantic_hints;
-pub mod sync_bridge_shared;
 mod validation;
 
 #[cfg(test)]

@@ -112,10 +112,13 @@ pub fn load_signed_guard(
     fuel_limit: u64,
     manifest: &crate::manifest::GuardManifest,
 ) -> Result<Box<dyn crate::abi::WasmGuardAbi>, WasmGuardError> {
-    let wasm_bytes = std::fs::read(wasm_path).map_err(|e| WasmGuardError::ModuleLoad {
-        path: wasm_path.to_string(),
-        reason: e.to_string(),
-    })?;
+    let wasm_bytes =
+        crate::input::read_file(std::path::Path::new(wasm_path), DEFAULT_MAX_MODULE_SIZE).map_err(
+            |source| WasmGuardError::InputFile {
+                path: wasm_path.into(),
+                source,
+            },
+        )?;
 
     let verify_span =
         crate::observability::guard_verify_span(crate::observability::VERIFY_MODE_ED25519, None);
@@ -790,17 +793,9 @@ fn read_structured_deny_reason(
         return None;
     }
 
-    // Try to parse as JSON GuestDenyResponse
-    match serde_json::from_slice::<crate::abi::GuestDenyResponse>(&buf) {
-        Ok(resp) => Some(resp.reason),
-        Err(_) => {
-            // Not valid JSON -- try as plain UTF-8 string
-            std::str::from_utf8(&buf)
-                .ok()
-                .map(|s| s.trim_end_matches('\0').to_string())
-                .filter(|s| !s.is_empty())
-        }
-    }
+    crate::input::decode::<crate::abi::GuestDenyResponse>(&buf)
+        .ok()
+        .map(|response| response.reason)
 }
 
 /// Try to read a deny reason string from the guest memory region after
@@ -1129,10 +1124,14 @@ pub fn load_guards_from_policy(
         // 3. Obtain bytes and enforce the signing policy.
         let wasm_bytes = match &guard_spec.module {
             PolicyModuleSource::Path { module_path } => {
-                let bytes = std::fs::read(module_path).map_err(|e| {
-                    LoadError::Runtime(WasmGuardError::ModuleLoad {
-                        path: module_path.clone(),
-                        reason: e.to_string(),
+                let bytes = crate::input::read_file(
+                    std::path::Path::new(module_path),
+                    DEFAULT_MAX_MODULE_SIZE,
+                )
+                .map_err(|source| {
+                    LoadError::Runtime(WasmGuardError::InputFile {
+                        path: module_path.into(),
+                        source,
                     })
                 })?;
 

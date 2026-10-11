@@ -412,6 +412,10 @@ impl MemoryProvenanceStore for InMemoryMemoryProvenanceStore {
             .cloned())
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Position comes from this locked unchanged vector; the predecessor index is used only when position is nonzero."
+    )]
     fn verify_entry(
         &self,
         entry_id: &str,

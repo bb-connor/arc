@@ -69,9 +69,17 @@ fn regenerate(scenario: &Path, store_dir: &Path, out_dir: &Path)
 
 The `src/lib.rs` tests replay
 `examples/chio-3vendor/fixtures/runtime-spine/scenario.json` after rewriting it
-into an executable scenario, and expect a `runtime_proof_semantic_parity_mismatch`
-failure: the crate's built-in fixture baseline does not match a freshly executed
-run of that scenario.
+into an executable scenario. The baseline clock (`1_766_000_001_000` ms) must
+produce independently verified proof packages with exact package and verifier
+report hashes matching the checked-in baseline on two fresh stores. A different
+clock deliberately produces `runtime_proof_semantic_parity_mismatch`.
+
+The baseline commits to durable outcome identity, including retained federation
+context and receipt-signing identity. Changing those authenticated inputs changes
+outcome IDs, receipt signatures and dependent proof hashes even when the tool
+results are identical. Refresh fixtures only after explaining that change and
+verifying the regenerated proof; do not relax exact parity to accept it. The CLI's
+recursive-swarm template uses its own clock (`1_800_000_001_000` ms) and baseline.
 
 ## See also
 

@@ -92,11 +92,10 @@ pub(super) fn inspect(
             "local path identity continuity marker changed while reading",
         ));
     }
-    let record: PathIdentityRecord = serde_json::from_slice(&encoded).map_err(|error| {
-        invalid(format!(
-            "local path identity continuity marker is not canonical JSON: {error}"
-        ))
-    })?;
+    let record: PathIdentityRecord =
+        chio_core::canonical::UntrustedJsonText::from_wire(&encoded, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(SqliteServingOwnerError::from)?;
     validate_record(
         &record,
         canonical_database_path,
@@ -179,6 +178,116 @@ pub(super) fn ensure(
     inspect(lock_root, canonical_database_path, Some(store_uuid))
         .map(|_| ())
         .map_err(|error| outcome_unknown(error.to_string()))
+}
+
+/// Remove only the identity marker belonging to this relocated authority.
+/// Copied markers legitimately have a new inode; their canonical path and
+/// store UUID must still match. Unrelated authorities keep their continuity.
+pub(super) fn remove_for_relocation(
+    lock_root: &Path,
+    database_path: &Path,
+    store_uuid: &str,
+    copied_only: bool,
+) -> Result<(), SqliteServingOwnerError> {
+    let path = marker_path(lock_root, database_path)?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    validate_marker_metadata(lock_root, &metadata)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let file = options.open(&path)?;
+    validate_inode_identity(&metadata, &file.metadata()?, None)?;
+    let mut bytes = Vec::new();
+    file.take(MAX_MARKER_BYTES + 1).read_to_end(&mut bytes)?;
+    if crate::integer::count(bytes.len()) > MAX_MARKER_BYTES {
+        return Err(invalid("oversized relocation marker"));
+    }
+    let record: PathIdentityRecord =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(SqliteServingOwnerError::from)?;
+    if record.format != FORMAT
+        || record.store_uuid != store_uuid
+        || record.canonical_database_path != path_text(database_path)?
+        || canonical_json_bytes(&record)
+            .map_err(|_| invalid("invalid relocation marker encoding"))?
+            != bytes
+    {
+        return Err(invalid(
+            "relocation marker belongs to a different authority",
+        ));
+    }
+    if copied_only
+        && record.marker_device == read_u64(metadata_device(&metadata)?, "marker_device")?
+        && record.marker_inode == read_u64(metadata_inode(&metadata)?, "marker_inode")?
+    {
+        return Ok(());
+    }
+    validate_inode_identity(&metadata, &fs::symlink_metadata(&path)?, None)?;
+    fs::remove_file(path)?;
+    Ok(())
+}
+
+/// Whether this lock root bound `canonical_database_path` to `store_uuid`
+/// itself: its marker holds exactly the record `ensure` writes in place,
+/// naming the marker's own device and inode. Only provisioning, serving and
+/// a committed import write one. A marker copied from another lock root names
+/// the device and inode of its original and binds nothing here; relocation
+/// then removes it, or refuses it when it is not a marker of this authority.
+/// The numbers are local identity evidence, not a global file identity: a
+/// copy from another host or filesystem whose numbers happen to coincide
+/// with its own reads as bound, and the import refuses rather than admits.
+pub(super) fn bound_in_place(
+    lock_root: &Path,
+    canonical_database_path: &Path,
+    store_uuid: &str,
+) -> Result<bool, SqliteServingOwnerError> {
+    let marker_path = marker_path(lock_root, canonical_database_path)?;
+    let path_metadata = match fs::symlink_metadata(&marker_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    validate_marker_metadata(lock_root, &path_metadata)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let file = options.open(&marker_path)?;
+    let file_metadata = file.metadata()?;
+    validate_inode_identity(&path_metadata, &file_metadata, None)?;
+    let in_place = PathIdentityRecord {
+        format: FORMAT.to_string(),
+        canonical_database_path: path_text(canonical_database_path)?,
+        store_uuid: store_uuid.to_string(),
+        marker_device: read_u64(
+            metadata_device(&file_metadata)?,
+            "path identity marker device",
+        )?,
+        marker_inode: read_u64(
+            metadata_inode(&file_metadata)?,
+            "path identity marker inode",
+        )?,
+    };
+    let expected = canonical_json_bytes(&in_place).map_err(|error| {
+        invalid(format!(
+            "local path identity continuity marker encoding failed: {error}"
+        ))
+    })?;
+    let mut bytes = Vec::with_capacity(expected.len());
+    file.take(MAX_MARKER_BYTES + 1).read_to_end(&mut bytes)?;
+    Ok(bytes == expected)
 }
 
 fn validate_record(

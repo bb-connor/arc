@@ -5,9 +5,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
-use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::receipt::{body::ChioReceipt, decision::Decision};
 use serde_json::{json, Value};
@@ -15,62 +13,20 @@ use serde_json::{json, Value};
 #[path = "mcp_serve/sampling_progress.rs"]
 mod sampling_progress;
 
-struct TestDir {
-    path: PathBuf,
-    _guard: MutexGuard<'static, ()>,
-}
+#[path = "support/mcp_security.rs"]
+mod mcp_security;
 
-impl std::ops::Deref for TestDir {
-    type Target = Path;
-
-    fn deref(&self) -> &Self::Target {
-        self.path.as_path()
-    }
-}
-
-impl AsRef<Path> for TestDir {
-    fn as_ref(&self) -> &Path {
-        self.path.as_path()
-    }
-}
-
-fn unique_test_dir() -> TestDir {
-    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    let guard = TEST_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("chio-cli-mcp-serve-{nonce}"));
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    builder.create(&path).expect("create private test dir");
-    TestDir {
-        path,
-        _guard: guard,
-    }
-}
-
-fn chio_command_with_session_db(dir: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
-    command.arg("--session-db").arg(dir.join("session.sqlite3"));
-    command
-}
+#[path = "mcp_serve/test_directory.rs"]
+mod test_directory;
+use test_directory::unique_test_dir;
 
 fn write_mock_server_script(dir: &Path) -> PathBuf {
-    let script = r##"
+    let script = concat!(
+        include_str!("support/native_mcp_stdio.py"),
+        r##"
 import json
 import os
 import sys
-import threading
 import time
 
 TOOLS = [
@@ -282,7 +238,7 @@ def respond(payload):
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
 
-FILESYSTEM_RESOURCES = os.environ.get("CHIO_TEST_FILESYSTEM_RESOURCES") == "1"
+FILESYSTEM_RESOURCES = "--filesystem-resources" in sys.argv[1:]
 
 RESOURCES = [
     {
@@ -338,7 +294,7 @@ PROMPTS = [
 
 CLIENT_CAPABILITIES = {}
 
-for raw in sys.stdin:
+for raw in native_io:
     line = raw.strip()
     if not line:
         continue
@@ -412,7 +368,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("id") != sample_request_id or sample_response.get("method"):
                     continue
                 if sample_response.get("error"):
@@ -480,7 +436,7 @@ for raw in sys.stdin:
             sample_task_id = None
             status_notifications = 0
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -504,7 +460,7 @@ for raw in sys.stdin:
             if sample_task_id is None:
                 continue
 
-            time.sleep(0.15)
+            native_io.sleep(0.15)
 
             task_get_request_id = f"task-get-{message['id']}"
             respond({
@@ -516,7 +472,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -548,7 +504,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -623,7 +579,7 @@ for raw in sys.stdin:
             sample_task_id = None
             status_notifications = 0
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -671,7 +627,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -703,7 +659,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -772,7 +728,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("id") != elicitation_request_id or elicitation_response.get("method"):
                     continue
                 if elicitation_response.get("error"):
@@ -842,7 +798,7 @@ for raw in sys.stdin:
             elicitation_task_id = None
             status_notifications = 0
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -866,7 +822,7 @@ for raw in sys.stdin:
             if elicitation_task_id is None:
                 continue
 
-            time.sleep(0.15)
+            native_io.sleep(0.15)
 
             task_get_request_id = f"elicit-task-get-{message['id']}"
             respond({
@@ -878,7 +834,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -910,7 +866,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -972,7 +928,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("id") != elicitation_request_id or elicitation_response.get("method"):
                     continue
                 if elicitation_response.get("error"):
@@ -989,8 +945,7 @@ for raw in sys.stdin:
                 action = elicitation_response["result"]["action"]
 
                 if action == "accept":
-                    def emit_completion_notification():
-                        time.sleep(0.10)
+                    def emit_completion_notification(elicitation_id=elicitation_id):
                         respond({
                             "jsonrpc": "2.0",
                             "method": "notifications/elicitation/complete",
@@ -999,7 +954,7 @@ for raw in sys.stdin:
                             }
                         })
 
-                    threading.Thread(target=emit_completion_notification, daemon=True).start()
+                    native_io.schedule(0.10, emit_completion_notification)
 
                 respond({
                     "jsonrpc": "2.0",
@@ -1037,7 +992,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                roots_response = json.loads(sys.stdin.readline())
+                roots_response = json.loads(native_io.readline())
                 if roots_response.get("id") != roots_request_id or roots_response.get("method"):
                     continue
                 if roots_response.get("error"):
@@ -1108,7 +1063,6 @@ for raw in sys.stdin:
 
         if tool_name == "notify_resources_background":
             def emit_notifications():
-                time.sleep(0.10)
                 respond({
                     "jsonrpc": "2.0",
                     "method": "notifications/resources/updated",
@@ -1128,7 +1082,7 @@ for raw in sys.stdin:
                     "method": "notifications/resources/list_changed"
                 })
 
-            threading.Thread(target=emit_notifications, daemon=True).start()
+            native_io.schedule(0.10, emit_notifications)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1141,7 +1095,6 @@ for raw in sys.stdin:
 
         if tool_name == "notify_catalog_changes_background":
             def emit_catalog_notifications():
-                time.sleep(0.10)
                 respond({
                     "jsonrpc": "2.0",
                     "method": "notifications/tools/list_changed"
@@ -1151,7 +1104,7 @@ for raw in sys.stdin:
                     "method": "notifications/prompts/list_changed"
                 })
 
-            threading.Thread(target=emit_catalog_notifications, daemon=True).start()
+            native_io.schedule(0.10, emit_catalog_notifications)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1167,7 +1120,7 @@ for raw in sys.stdin:
             sys.exit(0)
 
         if tool_name == "slow_echo":
-            time.sleep(0.25)
+            native_io.sleep(0.25)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1326,11 +1279,143 @@ for raw in sys.stdin:
         "id": message.get("id"),
         "error": {"code": -32601, "message": f"unknown method: {method}"}
     })
-"##;
+"##
+    );
 
     let path = dir.join("mock_mcp_server.py");
     fs::write(&path, script).expect("write mock MCP server");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("secure mock MCP server permissions");
+    }
     path
+}
+
+fn spawn_secured_mcp_serve(
+    dir: &Path,
+    policy_path: &Path,
+    script_path: &Path,
+    filesystem_resources: bool,
+) -> SecuredMcpChild {
+    let target_command = mcp_security::resolve_executable("/usr/bin/python3");
+    let script_path = fs::canonicalize(script_path).expect("canonicalize mock MCP server script");
+    let mut target_args = vec![script_path
+        .to_str()
+        .expect("mock MCP server path is UTF-8")
+        .to_string()];
+    if filesystem_resources {
+        target_args.push("--filesystem-resources".to_string());
+    }
+    let security = mcp_security::materialize_mcp_security(
+        &dir.join("security"),
+        Path::new(env!("CARGO_BIN_EXE_chio")),
+        &target_command,
+        &target_args,
+        dir,
+        "wrapped-mock",
+        "Wrapped Mock",
+        "0.1.0",
+        &[],
+    );
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    command
+        .current_dir(dir)
+        .arg("--session-db")
+        .arg(dir.join("session.sqlite3"))
+        .args([
+            "mcp",
+            "serve",
+            "--policy",
+            policy_path.to_str().expect("policy path"),
+            "--server-id",
+            "wrapped-mock",
+            "--server-name",
+            "Wrapped Mock",
+            "--server-version",
+            "0.1.0",
+            "--signed-manifest",
+            security
+                .signed_manifest_path
+                .to_str()
+                .expect("signed manifest path"),
+            "--manifest-public-key",
+            &security.manifest_public_key,
+            "--cage-policy",
+            security
+                .cage_policy_path
+                .to_str()
+                .expect("cage policy path"),
+            "--cage-policy-signer",
+            &security.cage_policy_signer,
+            "--",
+            security
+                .target_command
+                .to_str()
+                .expect("MCP target command path"),
+        ])
+        .args(&security.target_args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    SecuredMcpChild::new(command.spawn().expect("spawn secured chio mcp serve"))
+}
+
+struct SecuredMcpChild {
+    process: std::process::Child,
+    stdin: Option<std::process::ChildStdin>,
+    stdout: Option<std::process::ChildStdout>,
+    stderr: Option<std::io::Cursor<Vec<u8>>>,
+    stderr_reader: Option<std::thread::JoinHandle<std::io::Result<Vec<u8>>>>,
+}
+
+impl SecuredMcpChild {
+    fn new(mut process: std::process::Child) -> Self {
+        let stdin = process.stdin.take();
+        let stdout = process.stdout.take();
+        let stderr = process.stderr.take().expect("capture secured MCP stderr");
+        let stderr_reader = std::thread::spawn(move || {
+            let mut stderr = stderr;
+            let mut bytes = Vec::new();
+            stderr.read_to_end(&mut bytes)?;
+            Ok(bytes)
+        });
+
+        Self {
+            process,
+            stdin,
+            stdout,
+            stderr: None,
+            stderr_reader: Some(stderr_reader),
+        }
+    }
+
+    fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        let status = self.process.wait()?;
+        let reader = self
+            .stderr_reader
+            .take()
+            .expect("secured MCP stderr reader is available");
+        let bytes = reader
+            .join()
+            .map_err(|_| std::io::Error::other("secured MCP stderr reader panicked"))??;
+        self.stderr = Some(std::io::Cursor::new(bytes));
+        Ok(status)
+    }
+}
+
+impl Drop for SecuredMcpChild {
+    fn drop(&mut self) {
+        if self.process.try_wait().ok().flatten().is_none() {
+            let _ = self.process.kill();
+            let _ = self.process.wait();
+        }
+        if let Some(reader) = self.stderr_reader.take() {
+            let _ = reader.join();
+        }
+    }
 }
 
 fn write_policy(dir: &Path) -> PathBuf {
@@ -1776,25 +1861,7 @@ fn mcp_serve_wraps_mcp_server_with_policy_filtered_edge() {
     let policy_path = write_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -1909,25 +1976,7 @@ fn mcp_serve_wraps_resources_prompts_and_completion() {
     let policy_path = write_context_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2117,26 +2166,7 @@ fn mcp_serve_enforces_filesystem_resource_roots_with_signed_evidence() {
     let policy_path = write_filesystem_resource_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .env("CHIO_TEST_FILESYSTEM_RESOURCES", "1")
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, true);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2263,26 +2293,7 @@ fn mcp_serve_denies_filesystem_resources_when_roots_are_missing() {
     let policy_path = write_filesystem_resource_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .env("CHIO_TEST_FILESYSTEM_RESOURCES", "1")
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, true);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2374,25 +2385,7 @@ fn mcp_serve_propagates_wrapped_resource_notifications_for_subscribed_uris() {
     let policy_path = write_resource_notification_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2494,25 +2487,7 @@ fn mcp_serve_propagates_wrapped_background_resource_notifications_while_idle() {
     let policy_path = write_resource_notification_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2620,25 +2595,7 @@ fn mcp_serve_propagates_wrapped_catalog_change_notifications_while_idle() {
     let policy_path = write_resource_notification_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2728,25 +2685,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
     let policy_path = write_incomplete_tool_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2798,7 +2737,10 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
     let message = tool_response["result"]["content"][0]["text"]
         .as_str()
         .expect("tool error text");
-    assert!(message.contains("closed stdout"));
+    assert!(
+        message.contains("closed stdout") || message.contains("process exited"),
+        "unexpected natural-exit error: {message}"
+    );
 
     drop(stdin);
 
@@ -2823,25 +2765,7 @@ fn mcp_serve_proxies_wrapped_sampling_and_roots_requests() {
     fs::create_dir_all(&dir).expect("create temp dir");
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -2985,25 +2909,7 @@ fn mcp_serve_supports_task_augmented_wrapped_sampling_requests() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3101,25 +3007,7 @@ fn mcp_serve_supports_task_augmented_wrapped_elicitation_requests() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3221,25 +3109,7 @@ fn mcp_serve_forwards_wrapped_url_elicitation_completion_notifications() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3348,25 +3218,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3460,25 +3312,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3576,25 +3410,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3684,25 +3500,7 @@ fn mcp_serve_completes_task_in_background_and_emits_status_notification() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3826,25 +3624,7 @@ fn mcp_serve_progresses_background_tasks_while_client_keeps_sending_requests() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -3962,25 +3742,7 @@ fn mcp_serve_tags_nested_task_messages_with_related_task_metadata() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4108,25 +3870,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");
@@ -4259,25 +4003,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
     let policy_path = write_nested_flow_policy(&dir);
     let script_path = write_mock_server_script(&dir);
 
-    let mut child = chio_command_with_session_db(&dir)
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-            policy_path.to_str().expect("policy path"),
-            "--server-id",
-            "wrapped-mock",
-            "--server-name",
-            "Wrapped Mock",
-            "--",
-            "python3",
-            script_path.to_str().expect("script path"),
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn chio mcp serve");
+    let mut child = spawn_secured_mcp_serve(&dir, &policy_path, &script_path, false);
 
     let mut stdin = child.stdin.take().expect("child stdin");
     let stdout = child.stdout.take().expect("child stdout");

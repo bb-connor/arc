@@ -1,0 +1,220 @@
+{
+  "schema": "chio.final-candidate-withdrawal.v1",
+  "observed_at": "2026-10-10T07:02:06.187555+00:00",
+  "source_stage": "5cb7ec5ee4791d56ab2407b31178d8145f25f830",
+  "published_source": "633cf1d2f6b4a35008beb4b165c357fc42046251",
+  "runtime_source": "6caf9979ae705d701a825f402266dbcd024e85a8",
+  "candidate_status": "withdrawn-local-runtime-failures",
+  "candidate_qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "rejection": {
+    "schema": "chio.final-candidate-rejection.v1",
+    "observed_at": "2026-10-10T06:50:28.653357+00:00",
+    "published_source": "633cf1d2f6b4a35008beb4b165c357fc42046251",
+    "runtime_source": "6caf9979ae705d701a825f402266dbcd024e85a8",
+    "runtime_source_equivalence": "Published successor changes only two generated Docker manifests; all root manifests, locks, Rust and test sources identical.",
+    "landing_candidate_status": "withdrawn",
+    "hosted_qualified": false,
+    "merged": false,
+    "local_results": {
+      "composed_campaign": "FAILED",
+      "broad_control_plane": "TIMEOUT1201.81seconds with506 observed pass, no observed testfail; unrun tests remain unqualified",
+      "bounded_control_plane": {
+        "passed": 921,
+        "failed": 3,
+        "ignored": 0,
+        "enumerated": 924,
+        "mandatory": 230
+      },
+      "certify": {
+        "passed": 9,
+        "failed": 4,
+        "ignored": 1
+      },
+      "selected_store": {
+        "passed": 334,
+        "failed": 0,
+        "ignored": 10
+      },
+      "selected_kernel": {
+        "passed": 52,
+        "failed": 0
+      },
+      "passport": {
+        "passed": 30,
+        "failed": 0
+      },
+      "adjacent_registry": {
+        "passed": 2,
+        "failed": 0
+      },
+      "startup": {
+        "passed": 1,
+        "failed": 0
+      },
+      "owning_strict_alltargets": "PASS",
+      "format": "PASS"
+    },
+    "open_repairs": [
+      "FINAL-REPLICATION-ENVELOPE-FIXTURE",
+      "FINAL-ATTESTATION-ISSUANCE-FIXTURE",
+      "FINAL-CLI-SIGNER-BOOTSTRAP",
+      "FINAL-LEGACY-BUDGET-REPLAY"
+    ],
+    "integrated_staged_repair": {
+      "id": "FINAL-HELLO-AUTHORITY-PERMISSIONS",
+      "producer": "e92f2be31b081838d1daa98db8f5f045323078b7",
+      "stage_commit": "5cb7ec5ee4",
+      "hosted_jobs": [
+        "114151564375",
+        "114151564336"
+      ],
+      "scope": "Original directory mode oracle and stale500 refusal expectation repaired; six fixturecontrols and actual CLI authority+sidecar smoke pass. Does not prove complete hosted C++ jobs."
+    },
+    "ci_cancellation": {
+      "run": 38030942301,
+      "reason": "Known actual local failures make current head ineligible. Four protected jobs still queued at cancellation; conserve CI and publish fresh replacement only after repairs.",
+      "qualification": "CANCELLED, not success, ignored or skipped; no authority/branch protection changes."
+    },
+    "proof_boundary": "No proof campaign executed; KANI-PROOF-QUAL remains OPEN/UNPROVED.",
+    "artifacts": [
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/composed-6caf9979ae/summary.json",
+        "sha256": "68a63eccc53f129b6a3c21ea15dbdb8f2e20eb961b949a3b32541b7901cb7647"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/cp-boundaries-6caf9979ae/summary.json",
+        "sha256": "d0b4a5dcfe0b140bbe69fed54a57fe761f9922ba68a3cb5993068e253d0fdc9e"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/cp-boundaries-6caf9979ae/named-validation.json",
+        "sha256": "177202333b9fe84fdb90d441f07dfebb28cfaec5bc590a706e88a3cf89122d63"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/authority-replication-repeat-6caf/summary.json",
+        "sha256": "f01ec077d32bbfd89d1b08f009decfd16ad8b216aabf747d017b3da44d1bbda3"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/attestation-issuance-original-6caf/result.json",
+        "sha256": "57ada029d4f46ebaa4357eb77154fd0e9336e5b2b357b31a9ace653fdbab4b70"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/legacy-hold-original-6caf/result.json",
+        "sha256": "9bbf1f9e81685dd453665c01b8bd3acee77c9271b580e4d0ae22cb0120bf3208"
+      },
+      {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/hello-authority-handoff.json",
+        "sha256": "15db36960de3b85b5ce4b712b8e4c0041b7829203ca57b0ed70269a7725242b0"
+      }
+    ]
+  },
+  "rejection_record": {
+    "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/candidate-633cf-rejection.json",
+    "sha256": "aa15a9426415eccc27c0669b660d89133c56693e807c53b15e1a877383f7f864"
+  },
+  "obligations": [
+    {
+      "id": "FINAL-HELLO-AUTHORITY-PERMISSIONS",
+      "priority": "P2",
+      "scope": "now",
+      "contract": "Authority smoke must accept private snapshot directories at0700 and regular state files at0600, reject special files and symlinks, and expect the typed503 custody refusal for an unsafe existing parent.",
+      "state": "component-repaired-stage-only"
+    },
+    {
+      "id": "FINAL-REPLICATION-ENVELOPE-FIXTURE",
+      "priority": "P2",
+      "scope": "now",
+      "contract": "Replication tests must distinguish current signed source envelopes from genuinely stale issuance-time replays. Retain both injected-issuer refusals and kernel denial without weakening production replay guards.",
+      "state": "repair-in-progress"
+    },
+    {
+      "id": "FINAL-ATTESTATION-ISSUANCE-FIXTURE",
+      "priority": "P2",
+      "scope": "now",
+      "contract": "Authenticated attestation issuance fixture must explicitly provision owner custody before its healthy issuance control, then refuse unsigned matching attestation without minting a capability.",
+      "state": "repair-in-progress"
+    },
+    {
+      "id": "FINAL-CLI-SIGNER-BOOTSTRAP",
+      "priority": "P2",
+      "scope": "now",
+      "contract": "Explicit local CLI issuer commands must provision owner signing custody after input and receipt preflight; remote operations and read/export paths must remain existing-only. Fresh and existing SQLite/seed custody must work without hiding missing-custody export failures.",
+      "state": "repair-in-progress"
+    },
+    {
+      "id": "FINAL-LEGACY-BUDGET-REPLAY",
+      "priority": "P2",
+      "scope": "now",
+      "contract": "Remote budget cache must distinguish authoritative event-time fields from partial legacy responses, hydrate complete reads, preserve every observed same-sequence field, and refuse inconsistent authoritative projections without poisoning cache.",
+      "state": "repair-in-progress"
+    }
+  ],
+  "downstream_smoke": {
+    "result": {
+      "argv": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "bash",
+        "examples/hello-drogon/smoke.sh"
+      ],
+      "exit": 0,
+      "seconds": 36.56464066775516,
+      "source": "5cb7ec5ee4791d56ab2407b31178d8145f25f830",
+      "source_stable": true,
+      "fixture_root": "/tmp/pr1160-drogon-private-q3cowtvv",
+      "runtime_source": "6caf9979ae705d701a825f402266dbcd024e85a8",
+      "binary_sha256": "4d46ad6d6ae514d9dee0b65f2e3c20a4d2fd53d1204828b901d4a32da0fca1cb",
+      "log_sha256": "07ce3dc68548e414587bce3706f44d8eae788c25c2416091b4c04d1633f59684"
+    },
+    "record": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/drogon-downstream-v3-5cb7/result.json",
+      "sha256": "a0ec0bc38226a2aa4ee505d647c32e8d2ae0ec7441697844104b1be672f5befa"
+    },
+    "scope": "Actual owning C++ contract plus Drogon allow/deny and receipt smoke, production-identical copied CLI. Does not qualify entire Conan/vcpkg or hosted jobs.",
+    "prior_attempts": [
+      {
+        "record": {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/drogon-downstream-5cb7/result.json",
+          "sha256": "523d6b0ea421f7989a236a1bf502406ef36db5c1a8cdb76bbcfbcb25bbd65a0c"
+        },
+        "classification": "root-harness-cancellation-wrong-Cargo-target"
+      },
+      {
+        "record": {
+          "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/drogon-downstream-v2-5cb7/result.json",
+          "sha256": "adac53f0fe019a53fc57b2251f766e87a993943ddfa10d398378e380b785811d"
+        },
+        "classification": "root-fixture-group-writable-ancestor-correctly-refused"
+      }
+    ]
+  },
+  "hosted_aggregate_failures": [
+    {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/hosted/apalache-633cf-terminal.log",
+        "sha256": "83bc8b9b5b82cbf9abd3300ec5fc407d650fc9c2f761da1d851e73f570ced72f"
+      },
+      "reason": "Cancelled dependency results; no solver counterexample or pass established."
+    },
+    {
+      "record": {
+        "path": "/tmp/pr1160-final-review-20261009/hosted/security-contract-633cf-terminal.log",
+        "sha256": "2d41bdeaa16488284a525411ea876f1efd1c0417cf180590dbe30aa2c99cef21"
+      },
+      "reason": "Empty committed evidence output and cancelled dependency results in intentionally cancelled CI run."
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete four open repairs with genuine Original witnesses, owning runtime and strict lint.",
+    "Independently review new production CLI and budget-cache repairs; compose all source changes and renew metadata.",
+    "Preserve failed, partial, cancelled and ignored evidence separately. Prior independent report does not clear subsequent runtime failures.",
+    "Publish a replacement only after local boundary qualification; require all four protected exact-source hosted checks and normal protected merge.",
+    "Retain KANI-PROOF-QUAL OPEN/UNPROVED and SEC-1160-COLDSTATE OPEN P1 preview gate. No proof campaign or release-readiness claim."
+  ],
+  "requirement_count_before": 1931,
+  "requirement_count_after": 1936
+}

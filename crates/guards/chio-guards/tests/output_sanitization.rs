@@ -185,6 +185,28 @@ fn rejects_invalid_ssn_area() {
 }
 
 #[test]
+fn compact_ssn_preserves_digest_identities() {
+    let sanitizer = OutputSanitizer::new();
+    let identity = "mini-provider:4380e5ef3e1a9532d2075f0dfa6c78116fc3b90cd623ef23dd639770666dadba";
+    let input = serde_json::json!({"model_id": identity}).to_string();
+    let result = sanitizer.sanitize_text(&input);
+    assert!(!result.was_redacted);
+    assert_eq!(result.sanitized, input);
+}
+
+#[test]
+fn compact_ssn_redacts_adjacent_numeric_tokens_without_consuming_separator() {
+    let sanitizer = OutputSanitizer::new();
+    for input in ["123456789,234567891", "SSN: 123456789", "🚨123456789🚨"] {
+        let result = sanitizer.sanitize_text(input);
+        assert!(result.was_redacted, "{input}");
+        assert!(!result.sanitized.contains("123456789"), "{input}");
+        assert!(!result.sanitized.contains("234567891"), "{input}");
+        assert!(result.findings.iter().any(|f| f.id == "pii_ssn_compact"));
+    }
+}
+
+#[test]
 fn detects_credit_card_with_luhn() {
     let s = OutputSanitizer::new();
     let r = s.sanitize_text("card: 4111 1111 1111 1111");

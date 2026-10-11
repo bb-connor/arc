@@ -70,6 +70,14 @@ to it.
   `ChioRuntimeAdmissionStore` surface it records run and step state and
   evidence artifacts, reports status, recovery drills, and scheduler ticks,
   and grants fenced run leases (`acquire_run_lease`, `heartbeat_run_lease`).
+  `register_run` inserts pending work once. Protected run, step and artifact
+  writers require the caller's `RuntimeRunLease`; they validate current durable
+  ownership, integer timestamp storage and exclusive expiry under the committing
+  IMMEDIATE transaction, after observing the store-owned clock. The step's
+  destructive-operation `lease_id` is separate evidence. One-shot consumers use
+  `acquire_current_run_lease` and `complete_run_write` to atomically commit all
+  progress and release ownership. The explicit-time scheduler APIs remain trusted
+  orchestration entry points. Registration never borrows their active token.
 - All five store wrapper types implement `Debug`
   (`runtime_public_store_wrappers_are_debuggable` in `tests/runtime_boundary.rs`);
   `JsonRuntimeTrustFloorStateStore`, `LayeredRuntimeAdmissionStore`, and

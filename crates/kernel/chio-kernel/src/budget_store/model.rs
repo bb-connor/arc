@@ -8,7 +8,7 @@ pub(crate) fn validate_authorization_artifact_digests(
     if (require_nonempty && digests.is_empty())
         || digests.len() > MAX_AUTHORIZATION_ARTIFACT_DIGESTS
         || digests.iter().any(|digest| !is_sha256_digest(digest))
-        || digests.windows(2).any(|pair| pair[0] >= pair[1])
+        || digests.array_windows::<2>().any(|pair| pair[0] >= pair[1])
     {
         return Err(BudgetStoreError::Invariant(format!(
             "authorization artifact digests must contain {} to {MAX_AUTHORIZATION_ARTIFACT_DIGESTS} sorted unique SHA-256 values",

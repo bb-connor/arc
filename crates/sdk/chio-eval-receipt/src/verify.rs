@@ -5,6 +5,7 @@
 //! and PGP verification stay fail-closed until the release lane supplies
 //! external verifier tooling.
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::receipt::body::ChioReceipt;
 use serde_json::{Map, Value};
 
@@ -258,8 +259,11 @@ fn verify_receipt_payload(
     }
 }
 
+/// Decodes the preserved receipt bytes with the signed-wire contract, so a
+/// duplicate object key at any depth rejects before the signature check.
 fn verify_chio_receipt_payload(scenario_id: &str, payload: &str) -> Result<(), BundleError> {
-    let receipt: ChioReceipt = serde_json::from_str(payload)
+    let receipt: ChioReceipt = UntrustedJsonText::new(payload)
+        .decode_signed()
         .map_err(|_| BundleError::InvalidReceiptPayload(scenario_id.to_owned()))?;
     let is_valid = receipt
         .verify_signature()
@@ -915,6 +919,206 @@ mod tests {
             .map_err(|err| BundleError::Canonicalization(err.to_string()))?;
         serde_json::to_string(&receipt)
             .map_err(|err| BundleError::Canonicalization(err.to_string()))
+    }
+
+    const RECEIPT_RECORD_SCHEMA: &str = "receipt/record.schema.json";
+    const BUNDLE_SCENARIO_ID: &str = "capability-subset-001-read-exact";
+
+    fn repo_fixture(relative: &str) -> Result<Value, BundleError> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .join(relative);
+        let text =
+            std::fs::read_to_string(path).map_err(|err| BundleError::Json(err.to_string()))?;
+        serde_json::from_str(&text).map_err(|err| BundleError::Json(err.to_string()))
+    }
+
+    fn receipt_vector_cases() -> Result<Vec<Value>, BundleError> {
+        repo_fixture("tests/bindings/vectors/receipt/v1.json")?["cases"]
+            .as_array()
+            .cloned()
+            .ok_or(BundleError::WrongType("receipt vector cases"))
+    }
+
+    fn to_json(value: &Value) -> Result<String, BundleError> {
+        serde_json::to_string(value).map_err(|err| BundleError::Json(err.to_string()))
+    }
+
+    fn to_pretty_json(value: &Value) -> Result<String, BundleError> {
+        serde_json::to_string_pretty(value).map_err(|err| BundleError::Json(err.to_string()))
+    }
+
+    fn from_json(text: &str) -> Result<Value, BundleError> {
+        serde_json::from_str(text).map_err(|err| BundleError::Json(err.to_string()))
+    }
+
+    fn assert_rejects_payload(payload: &str, label: &str) -> Result<(), BundleError> {
+        let bundle = signed_bundle_with_receipt_payload(payload)?;
+        for (verifier, result) in [
+            ("fixture", verify_fixture_bundle(&bundle)),
+            ("production", verify_bundle(&bundle)),
+        ] {
+            assert!(
+                matches!(
+                    &result,
+                    Err(BundleError::InvalidReceiptPayload(id)) if id == BUNDLE_SCENARIO_ID
+                ),
+                "{verifier} verifier did not reject duplicate keys in {label}: {result:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_raw_duplicate_key_receipt_payloads_at_original_bytes() -> Result<(), BundleError> {
+        let corpus = repo_fixture("tests/bindings/fixtures/protocol-primitives-v1.json")?;
+        let valid = corpus["cases"]
+            .as_array()
+            .ok_or(BundleError::WrongType("cases"))?
+            .iter()
+            .find(|case| case["name"] == "receipt-internal-origin")
+            .ok_or(BundleError::MissingField("receipt-internal-origin"))?;
+        assert_eq!(valid["valid"], json!(true));
+        let raw_cases = corpus["raw_cases"]
+            .as_array()
+            .ok_or(BundleError::WrongType("raw_cases"))?;
+        let mut rejected = Vec::new();
+        for case in raw_cases {
+            if case["schema_file"] != RECEIPT_RECORD_SCHEMA {
+                continue;
+            }
+            let name = case["name"]
+                .as_str()
+                .ok_or(BundleError::WrongType("raw_cases[].name"))?;
+            let text = case["instance_text"]
+                .as_str()
+                .ok_or(BundleError::WrongType("raw_cases[].instance_text"))?;
+            let collapsed = from_json(text)?;
+            assert_eq!(collapsed, valid["instance"], "raw case {name} collapses");
+            let canonical = chio_core_types::canonicalize(&collapsed)
+                .map_err(|err| BundleError::Canonicalization(err.to_string()))?;
+            for payload in [to_json(&collapsed)?, to_pretty_json(&collapsed)?, canonical] {
+                let bundle = signed_bundle_with_receipt_payload(&payload)?;
+                let result = verify_fixture_bundle(&bundle);
+                assert!(
+                    !matches!(result, Err(BundleError::InvalidReceiptPayload(_))),
+                    "valid corpus receipt {name} must decode: {result:?}"
+                );
+            }
+            assert_rejects_payload(text, name)?;
+            rejected.push(name.to_owned());
+        }
+        assert_eq!(
+            rejected,
+            ["receipt-duplicate-id", "receipt-duplicate-parameter"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_duplicate_keys_in_a_validly_signed_receipt_payload() -> Result<(), BundleError> {
+        let case = receipt_vector_cases()?
+            .into_iter()
+            .find(|case| case["id"] == "allow_receipt")
+            .ok_or(BundleError::MissingField("allow_receipt"))?;
+        let compact = to_json(&case["receipt"])?;
+        verify_fixture_bundle(&signed_bundle_with_receipt_payload(&compact)?)?;
+
+        for (label, anchor, inserted) in [
+            (
+                "nested action.parameters",
+                r#""parameters":{"#,
+                r#""path":"/etc/shadow","#,
+            ),
+            (
+                "nested metadata",
+                r#""metadata":{"#,
+                r#""surface":"forged","#,
+            ),
+            ("top-level tool_name", "", r#""tool_name":"shell_exec","#),
+        ] {
+            let forged = if anchor.is_empty() {
+                compact.replacen('{', &format!("{{{inserted}"), 1)
+            } else {
+                assert_eq!(compact.matches(anchor).count(), 1, "anchor {anchor}");
+                compact.replacen(anchor, &format!("{anchor}{inserted}"), 1)
+            };
+            assert_eq!(
+                from_json(&forged)?,
+                case["receipt"],
+                "{label} collapses last-wins"
+            );
+            assert_rejects_payload(&forged, label)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_binding_vectors_verify_by_embedded_signature() -> Result<(), BundleError> {
+        for case in receipt_vector_cases()? {
+            let id = case["id"].as_str().ok_or(BundleError::WrongType("id"))?;
+            let signature_valid = case["expected"]["signature_valid"] == true;
+            for payload in [
+                to_json(&case["receipt"])?,
+                to_pretty_json(&case["receipt"])?,
+            ] {
+                let result = verify_fixture_bundle(&signed_bundle_with_receipt_payload(&payload)?);
+                if signature_valid {
+                    assert!(result.is_ok(), "vector {id}: {result:?}");
+                } else {
+                    assert!(
+                        matches!(result, Err(BundleError::InvalidReceiptSignature(_))),
+                        "vector {id}: {result:?}"
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn verifies_receipt_payload_with_full_width_integers_and_nested_parameters(
+    ) -> Result<(), BundleError> {
+        let keypair = Keypair::from_seed(&[43u8; 32]);
+        let action = ToolCallAction::from_parameters(json!({
+            "limits": {"max": u64::MAX, "min": i64::MIN, "zero": 0},
+            "nested": [{"path": "/workspace/a", "flags": [true, false, null]}, [1, [2, [3]]]],
+            "ratio": 0.25,
+            "unicode": "caf\u{e9} \u{2028}",
+        }))
+        .map_err(|err| BundleError::Canonicalization(err.to_string()))?;
+        let body = ChioReceiptBody {
+            id: "receipt-full-width".to_owned(),
+            timestamp: u64::MAX,
+            capability_id: BUNDLE_SCENARIO_ID.to_owned(),
+            tool_server: "eval-fixture".to_owned(),
+            tool_name: "read".to_owned(),
+            action,
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: crate::export::sha256_hex(b"full-width"),
+            policy_hash: "policy-test".to_owned(),
+            evidence: Vec::new(),
+            metadata: Some(json!({"sequence": u64::MAX, "window": {"offset": i64::MIN}})),
+            trust_level: TrustLevel::Mediated,
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        };
+        let receipt = ChioReceipt::sign(body, &keypair)
+            .map_err(|err| BundleError::Canonicalization(err.to_string()))?;
+        let receipt =
+            serde_json::to_value(&receipt).map_err(|err| BundleError::Json(err.to_string()))?;
+        for payload in [to_json(&receipt)?, to_pretty_json(&receipt)?] {
+            assert!(payload.contains("18446744073709551615"));
+            verify_fixture_bundle(&signed_bundle_with_receipt_payload(&payload)?)?;
+        }
+        Ok(())
     }
 
     fn signed_bundle_with_mutation(

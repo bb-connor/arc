@@ -21,15 +21,15 @@ let package = Package(
             name: "ChioKernel",
             path: "Frameworks/ChioKernel.xcframework"
         ),
-        .systemLibrary(
-            name: "ChioFFI",
-            path: "Sources/ChioFFI"
+        .target(
+            name: "chio_kernel_mobile",
+            dependencies: ["ChioKernel"],
+            path: "Sources/chio_kernel_mobile"
         ),
         .target(
             name: "Chio",
             dependencies: [
-                "ChioKernel",
-                "ChioFFI"
+                "chio_kernel_mobile"
             ]
         ),
         .testTarget(

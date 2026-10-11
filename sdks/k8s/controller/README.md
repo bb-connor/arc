@@ -29,6 +29,22 @@ clients; it does not open raw watches via `client-go`. The single reconciler
    the finalizer ensures the reconciler gets a last chance to release the
    grant before the Job object is garbage-collected.
 
+### Caller subject key provisioning
+
+Before creating a governed Job, provision an Ed25519 signing key for its agent
+and put only its 64-character hex public key in the Job annotation
+`chio.world/subject-public-key`. Supply the private key to the workload through
+your existing signer or secret custody mechanism; do not put it in Job metadata
+or derive it from a namespace, name or UID. The controller forwards the public
+key unchanged. Missing or malformed annotation values reject before finalizer
+or grant mutation and before contacting the mint endpoint. The sidecar performs
+cryptographic public-key validation.
+
+Existing Jobs that need a fresh grant must add this annotation. Already minted
+grants retain their signed subject until expiry or operator revocation; remint
+after provisioning a real caller key. The canonical shorthand scope endpoint
+does not request DPoP, so these grants retain bearer semantics.
+
 ### Fail-closed behavior
 
 If the Chio sidecar is unreachable at mint time (HTTP transport error or
@@ -59,7 +75,7 @@ converges without additional sidecar calls.
 | `--leader-elect`             | `false`                                                   | Enable leader election.             |
 | `--leader-election-namespace`| `chio-system`                                              | Namespace for the leader lease.     |
 | `--chio-sidecar-url`          | `http://chio-sidecar.chio-system.svc.cluster.local:9090`    | Chio sidecar base URL.               |
-| `--chio-sidecar-control-token`| `""`                                                     | Bearer token for remote sidecar control APIs; required for non-loopback sidecars. |
+| `--chio-sidecar-control-token`| `""`                                                     | Required bearer token for sidecar control APIs, including loopback sidecars. |
 | `--chio-request-timeout`      | `10s`                                                     | HTTP timeout for sidecar calls.     |
 | `--max-concurrent-reconciles`| `4`                                                       | Parallelism.                        |
 
@@ -67,8 +83,9 @@ The sidecar URL can also be provided via the `CHIO_SIDECAR_URL` environment
 variable. The control token can be provided via
 `CHIO_SIDECAR_CONTROL_TOKEN`.
 
-If `CHIO_SIDECAR_URL` points at a non-loopback sidecar service, configure the
-same `CHIO_SIDECAR_CONTROL_TOKEN` on both the controller and the sidecar. The
+Configure the same dedicated `CHIO_SIDECAR_CONTROL_TOKEN` on both the controller
+and the sidecar, including when they communicate over loopback. An absent or
+blank token disables sidecar control access. Do not expose it to agents. The
 shipped `config/manager/manager.yaml` requires that token via the
 `chio-sidecar-control` Secret.
 
@@ -101,6 +118,8 @@ metadata:
     chio.world/governed: "true"
   annotations:
     chio.world/scopes: "tools:search,tools:fetch"
+    # Replace with the public key of the separately provisioned workload signer.
+    chio.world/subject-public-key: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 spec:
   template:
     spec:

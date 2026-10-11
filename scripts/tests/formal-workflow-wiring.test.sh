@@ -21,6 +21,7 @@ fi
 
 python3 - <<'PY'
 from pathlib import Path
+import re
 
 workflow = Path(".github/workflows/formal-pr-smoke.yml").read_text(encoding="utf-8")
 lake_cache_lines = [line for line in workflow.splitlines() if "runner.os }}-lake-" in line]
@@ -38,10 +39,21 @@ job_end = workflow.index("\n  kani-manifest-pr:", job_start)
 job = workflow[job_start:job_end]
 if "timeout-minutes: 120" not in job:
     raise SystemExit("public Kani PR job does not retain its 120-minute budget")
-if workflow.count("if ! cargo kani --version >/dev/null 2>&1; then") != 2:
-    raise SystemExit("formal PR Kani jobs do not repair incomplete tool caches")
-if workflow.count("cargo kani setup") != 2:
-    raise SystemExit("formal PR Kani jobs do not ensure the verifier is installed")
+for name in ("kani-public-pr", "kani-manifest-pr"):
+    start = workflow.index(f"  {name}:")
+    remainder = workflow[start:]
+    next_job = re.search(r"\n  [a-z][a-z0-9-]*:\n", remainder)
+    job = remainder[:next_job.start()] if next_job else remainder
+    if job.count("bash scripts/install-kani-toolchain.sh") != 1:
+        raise SystemExit(f"{name} must run the pinned Kani installer exactly once")
+    if "run: cargo kani --version" not in job:
+        raise SystemExit(f"{name} must verify the installed Kani version")
+
+installer = Path("scripts/install-kani-toolchain.sh").read_text(encoding="utf-8")
+if "cargo kani setup" not in installer:
+    raise SystemExit("the pinned Kani installer must provision the verifier")
+if 'sha256sum --check --strict' not in installer or 'git -C "$work/source" apply --check "$patch"' not in installer:
+    raise SystemExit("the Kani source repair must retain its digest and patch checks")
 
 ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 for command in (

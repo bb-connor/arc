@@ -1,3 +1,5 @@
+use chio_fincred::FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN;
+use chio_fincred::FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN;
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
@@ -30,8 +32,6 @@ use crate::{
     CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA,
 };
 
-const SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
-const SOURCE_DISCLOSURE_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-disclosure.v1\0";
 const SOURCE_CHECKPOINT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-checkpoint-digest.v1\0";
 const EXPOSURE_RECEIPT_MEMBER_SCHEMA_V1: &str = "chio.fincred.exposure-receipt-member.v1";
 const EXPOSURE_DECISION_MEMBER_SCHEMA_V1: &str = "chio.fincred.exposure-decision-member.v1";
@@ -40,6 +40,8 @@ const MAX_SOURCE_ARTIFACT_BYTES: usize = 512 * 1024;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum FinancialCredentialProjectionError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("settlement reliability window contains no authenticated obligations")]
     EmptyWindow,
     #[error("settlement reliability counts are inconsistent")]
@@ -538,7 +540,7 @@ fn source_bundle_artifact<T: Serialize>(
     Ok(FinancialSourceBundleArtifactV1 {
         role,
         artifact_schema: artifact_schema.to_string(),
-        artifact_digest: domain_digest(SOURCE_ARTIFACT_DIGEST_DOMAIN, &canonical),
+        artifact_digest: domain_digest(FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN, &canonical),
         canonical_artifact,
     })
 }
@@ -673,14 +675,7 @@ fn inspect_financial_source_member(
 fn parse_canonical_source_artifact<T: DeserializeOwned + Serialize>(
     canonical: &str,
 ) -> Result<T, FinancialCredentialProjectionError> {
-    let value = serde_json::from_str::<T>(canonical)
-        .map_err(|error| FinancialCredentialProjectionError::InvalidSource(error.to_string()))?;
-    let round_trip = canonical_json_bytes(&value)
-        .map_err(|error| FinancialCredentialProjectionError::InvalidSource(error.to_string()))?;
-    if round_trip != canonical.as_bytes() {
-        return Err(FinancialCredentialProjectionError::InvalidSourceSchema);
-    }
-    Ok(value)
+    crate::input::canonical(canonical.as_bytes(), MAX_SOURCE_ARTIFACT_BYTES).map_err(Into::into)
 }
 
 fn validate_exposure_report_members(

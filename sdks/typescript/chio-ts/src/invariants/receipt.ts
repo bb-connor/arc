@@ -1,6 +1,6 @@
-import { canonicalizeJson, canonicalizeJsonString } from "./json.ts";
+import { canonicalizeJson, canonicalizeJsonString, parseJsonTextUniqueKeys } from "./json.ts";
 import { publicKeyHexMatches, sha256Hex, verifyChioSignature } from "./crypto.ts";
-import { ChioInvariantError, parseJsonText } from "./errors.ts";
+import { ChioInvariantError } from "./errors.ts";
 
 function safeVerifyReceiptSignature(
   signedBytes: string,
@@ -77,8 +77,9 @@ export interface ReceiptVerification {
   ok: boolean;
 }
 
+/** Signed receipt text; a repeated object key at any depth throws a `json` ChioInvariantError. */
 export function parseReceiptJson(input: string): ChioReceipt {
-  return parseJsonText(input);
+  return parseJsonTextUniqueKeys(input);
 }
 
 export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "algorithm" | "signature"> {

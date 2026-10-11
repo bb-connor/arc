@@ -502,7 +502,8 @@ fn changed_unsupported_surface(policy: &HushSpec, against: &HushSpec) -> bool {
             {
                 return true;
             }
-            if new.require_confirmation != old.require_confirmation
+            if new.dpop_required != old.dpop_required
+                || new.require_confirmation != old.require_confirmation
                 || new.require_runtime_assurance_tier != old.require_runtime_assurance_tier
                 || new.prefer_runtime_assurance_tier != old.prefer_runtime_assurance_tier
                 || new.require_workload_identity != old.require_workload_identity
@@ -512,7 +513,8 @@ fn changed_unsupported_surface(policy: &HushSpec, against: &HushSpec) -> bool {
             }
         }
         (Some(new), None) | (None, Some(new)) => {
-            if !new.require_confirmation.is_empty()
+            if new.dpop_required == Some(true)
+                || !new.require_confirmation.is_empty()
                 || new.require_runtime_assurance_tier.is_some()
                 || new.prefer_runtime_assurance_tier.is_some()
                 || new.require_workload_identity.is_some()

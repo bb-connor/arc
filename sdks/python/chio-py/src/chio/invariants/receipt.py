@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..errors import ChioInvariantError, parse_json_text
+from ..errors import ChioInvariantError, parse_json_text_unique_keys
 from .hashing import sha256_hex_utf8
 from .json import canonicalize_json
 from .signing import (
@@ -30,7 +30,9 @@ def _safe_verify_receipt_signature(
 
 
 def parse_receipt_json(input_text: str) -> dict[str, Any]:
-    return parse_json_text(input_text)
+    """Decode signed receipt text. A repeated object key at any depth raises
+    ``ChioInvariantError`` with code ``json`` before any field is read."""
+    return parse_json_text_unique_keys(input_text)
 
 
 def _receipt_body(receipt: dict[str, Any]) -> dict[str, Any]:

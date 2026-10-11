@@ -13,3 +13,5 @@ This directory holds shared conformance assets such as:
   Minimal stdio MCP server used by the live remote HTTP harness.
 - `policy.yaml`
   Chio policy that grants the wrapped MCP core fixture tool, resource, and prompt access.
+- `reviewed-tools.json`
+  Reviewed tool surface used to provision the harness's signed manifest and native-launch policy.

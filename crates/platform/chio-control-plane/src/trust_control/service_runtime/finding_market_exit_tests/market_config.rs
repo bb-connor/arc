@@ -1,4 +1,6 @@
-fn market_config() -> FindingMarketConfig {
+use super::*;
+
+pub(super) fn market_config() -> FindingMarketConfig {
     FindingMarketConfig {
         venue_id: VENUE_ID.to_string(),
         venue: authority_pin(6, "venue"),

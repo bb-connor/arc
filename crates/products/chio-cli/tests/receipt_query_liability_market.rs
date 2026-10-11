@@ -850,7 +850,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
         };
         let signed = SignedCreditFacility::sign(artifact, &Keypair::generate())
             .expect("sign controlled grant facility");
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
         store
             .record_credit_facility(&signed)
             .expect("record controlled grant facility");

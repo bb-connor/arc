@@ -257,6 +257,9 @@ pub struct VerifiedAttestation {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AttestError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("signature does not verify")]
@@ -349,3 +352,7 @@ pub trait QuoteVerifier: Send + Sync {
         context: &QuoteVerificationContext<'_>,
     ) -> Result<VerifiedQuote, AttestError>;
 }
+
+// Unproved research obligations are opt-in and never part of mandatory enrollment.
+#[cfg(all(kani, feature = "kani-research"))]
+mod kani_crypto_research;

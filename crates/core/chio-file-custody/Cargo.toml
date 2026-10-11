@@ -1,0 +1,15 @@
+[package]
+name = "chio-file-custody"
+description = "Audited descriptor ACL inspection for Chio file custody"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.93"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+libc = { workspace = true }
+
+[lints]
+workspace = true

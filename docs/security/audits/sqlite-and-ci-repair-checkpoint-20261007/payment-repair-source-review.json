@@ -1,0 +1,268 @@
+{
+  "schema": "chio.security.payment-repair-source-review.v1",
+  "reviewer": "published_repair_review",
+  "verdict": "SourceAccepted for the exact amended six-case payment repair bytes; no supported P0/P1/P2 finding in this scoped repair.",
+  "findings": [],
+  "SourceAccepted": true,
+  "qualified_candidate": false,
+  "patch_path": "/tmp/chio-pr1160-qualification-20261007/payment-ddl-whitespace-stage/amended-six-cases/complete-payment-repair.patch",
+  "patch_sha256": "4682c0581ada3cd6dca5f6a445ce09a5d68fda9f240a37715bafca93cbbaf4a3",
+  "published_original_base": "fffbab1ef24babd0cee5096dbcf8f3cab4c3e08b",
+  "current_base": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+  "source_checkout": "/home/connor/lanes/integration",
+  "scope": "Seven amended patch files: two production proposal paths and five private test fixture/control paths, with eleven frozen source read guards. The separate tool-outcome version assertion commit and other owning failures are not payment source-review scope.",
+  "guard": {
+    "pre_install": {
+      "checks": [
+        {
+          "after_match": true,
+          "before_match": true,
+          "lane": "production",
+          "lane_patch_match": true,
+          "new_destinations_absent": true,
+          "source_guards_match": true
+        },
+        {
+          "after_match": true,
+          "before_match": true,
+          "lane": "fixtures",
+          "lane_patch_match": true,
+          "new_destinations_absent": true,
+          "source_guards_match": true
+        }
+      ],
+      "complete_patch_sha256": "4682c0581ada3cd6dca5f6a445ce09a5d68fda9f240a37715bafca93cbbaf4a3",
+      "declared_patch_sha256": "4682c0581ada3cd6dca5f6a445ce09a5d68fda9f240a37715bafca93cbbaf4a3",
+      "head": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+      "in_memory_patch_coherence": [
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs"
+        },
+        {
+          "matches_guarded_after": true,
+          "path": "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs"
+        }
+      ],
+      "recorded_utc": "2026-10-07T15:18:10.581628+00:00",
+      "required_patch_matches": true,
+      "source_read_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "3a8e9f2765ae0c8398a80a7f6f253cef393bda227b51a1d5cb5c983b900fd3c2",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/legacy_v11.sql": "dc3c51358e9e25a55c332f944a7e57a3cb11828836998d5fca47b91c706c6e52",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/schema.sql": "5a6500942f719d101a596e2c8a02aa856e54dba9be102845162e7b90ef993fec",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "7cd67b15d2972c490fe2d812c9ed137e13eab2e11d29ef230654b21dbf09fdc4",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": "e9fc8095504cae13dd5d8c8911ed8f0d5cd5013de7583b370a30e4b44d07fb3b",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "30f4b1432b840e09238bdfd743e79c50896debffde2c0023daf068a82af0a234",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f8e9faf2d512f1157ad7774badf0e3dc264cb04565e3dbdb887246b1b697b522",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "f3c47edeeff1e8d9c5e04fabfb55706433b29a29eda34e8568f111f81ac5cd74",
+        "crates/platform/chio-store-sqlite/src/lib.rs": "f94d87a74ea7925b4f7dde8e4c1dd4e3b1579aaf0ea940d9791975be0367414e",
+        "crates/platform/chio-store-sqlite/src/security_state/codec.rs": "dcdabfd0d0def8139d089ca93f8b9b4b16ef023f5b6d734e33e82315e8dcdc0b",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "a0cae93e3e0e75c745ee4429be90dcd28567cc6951a52cd89f41b6ef8c73f686"
+      },
+      "staged_after_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "87ec13214c8c4f8c5ad2ac2659bc260055194a20bcceed0c245337180ed2f5b7",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs": "b6ef375d92717b5f94480dd38f709330cee2e3572b1aeaed8d8420be3c40115d",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "a19ea6ff3bf098aa575d87b28867572dafa108907e24388b4cea3788f387eb48",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "67442a0859eb509e002f02c083e1b942f8ba92016acc6ef3b0d7337eb40f7aa0",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f4b890d342668bd29c629aae4b3fe4b0b063810d02c79cca8727327a7f0b0e2f",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "016471f0a33bf427be429687849b8d6daf99b541f4fca30d8c773d3f524e7856",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "39ca2b7aecb3bbeca38a8a52427d2e8771f22baade5253d4a0cdd21a12b9cff1"
+      },
+      "staged_before_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "3a8e9f2765ae0c8398a80a7f6f253cef393bda227b51a1d5cb5c983b900fd3c2",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "7cd67b15d2972c490fe2d812c9ed137e13eab2e11d29ef230654b21dbf09fdc4",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "30f4b1432b840e09238bdfd743e79c50896debffde2c0023daf068a82af0a234",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f8e9faf2d512f1157ad7774badf0e3dc264cb04565e3dbdb887246b1b697b522",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "f3c47edeeff1e8d9c5e04fabfb55706433b29a29eda34e8568f111f81ac5cd74",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "a0cae93e3e0e75c745ee4429be90dcd28567cc6951a52cd89f41b6ef8c73f686"
+      },
+      "worktree_status": ""
+    },
+    "installation_transition": {
+      "checks": [
+        {
+          "declared_source_sha": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+          "lane": "production",
+          "lane_patch_match": true,
+          "source_guards_match": false
+        },
+        {
+          "declared_source_sha": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+          "lane": "fixtures",
+          "lane_patch_match": true,
+          "source_guards_match": false
+        }
+      ],
+      "complete_patch_sha256": "4682c0581ada3cd6dca5f6a445ce09a5d68fda9f240a37715bafca93cbbaf4a3",
+      "head": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+      "intervening_changed_files": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_security_release_tests.rs"
+      ],
+      "original_owning_capture": {
+        "path": "/tmp/chio-pr1160-qualification-20261007/sqlite-full-owning.log",
+        "sha256": "9a4d82e4c4f25e4a9897801f3437acc016fa8326693e5b8d8739a6eab3e71552",
+        "terminal_result": "test result: FAILED. 2049 passed; 10 failed; 3 ignored; 0 measured; 0 filtered out; finished in 4668.54s"
+      },
+      "production_normalizer_body_unchanged_from_initial": true,
+      "recorded_utc": "2026-10-07T15:21:16.056212+00:00",
+      "source_read_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "87ec13214c8c4f8c5ad2ac2659bc260055194a20bcceed0c245337180ed2f5b7",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/legacy_v11.sql": "dc3c51358e9e25a55c332f944a7e57a3cb11828836998d5fca47b91c706c6e52",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/schema.sql": "5a6500942f719d101a596e2c8a02aa856e54dba9be102845162e7b90ef993fec",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "a19ea6ff3bf098aa575d87b28867572dafa108907e24388b4cea3788f387eb48",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": "e9fc8095504cae13dd5d8c8911ed8f0d5cd5013de7583b370a30e4b44d07fb3b",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "67442a0859eb509e002f02c083e1b942f8ba92016acc6ef3b0d7337eb40f7aa0",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f4b890d342668bd29c629aae4b3fe4b0b063810d02c79cca8727327a7f0b0e2f",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "016471f0a33bf427be429687849b8d6daf99b541f4fca30d8c773d3f524e7856",
+        "crates/platform/chio-store-sqlite/src/lib.rs": "f94d87a74ea7925b4f7dde8e4c1dd4e3b1579aaf0ea940d9791975be0367414e",
+        "crates/platform/chio-store-sqlite/src/security_state/codec.rs": "dcdabfd0d0def8139d089ca93f8b9b4b16ef023f5b6d734e33e82315e8dcdc0b",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "39ca2b7aecb3bbeca38a8a52427d2e8771f22baade5253d4a0cdd21a12b9cff1"
+      },
+      "staged_after_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "87ec13214c8c4f8c5ad2ac2659bc260055194a20bcceed0c245337180ed2f5b7",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs": "b6ef375d92717b5f94480dd38f709330cee2e3572b1aeaed8d8420be3c40115d",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "a19ea6ff3bf098aa575d87b28867572dafa108907e24388b4cea3788f387eb48",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "67442a0859eb509e002f02c083e1b942f8ba92016acc6ef3b0d7337eb40f7aa0",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f4b890d342668bd29c629aae4b3fe4b0b063810d02c79cca8727327a7f0b0e2f",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "016471f0a33bf427be429687849b8d6daf99b541f4fca30d8c773d3f524e7856",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "39ca2b7aecb3bbeca38a8a52427d2e8771f22baade5253d4a0cdd21a12b9cff1"
+      },
+      "staged_before_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "3a8e9f2765ae0c8398a80a7f6f253cef393bda227b51a1d5cb5c983b900fd3c2",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "7cd67b15d2972c490fe2d812c9ed137e13eab2e11d29ef230654b21dbf09fdc4",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "30f4b1432b840e09238bdfd743e79c50896debffde2c0023daf068a82af0a234",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f8e9faf2d512f1157ad7774badf0e3dc264cb04565e3dbdb887246b1b697b522",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "f3c47edeeff1e8d9c5e04fabfb55706433b29a29eda34e8568f111f81ac5cd74",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "a0cae93e3e0e75c745ee4429be90dcd28567cc6951a52cd89f41b6ef8c73f686"
+      },
+      "worktree_status": " M crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs\n M crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs\n M crates/platform/chio-store-sqlite/src/serving_owner/tests.rs\n?? crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs\n"
+    },
+    "post_install": {
+      "all_installed_files_match_reviewed_stage": true,
+      "branch": "integration/process-security-m4",
+      "complete_patch_sha256": "4682c0581ada3cd6dca5f6a445ce09a5d68fda9f240a37715bafca93cbbaf4a3",
+      "head": "085b8d7f0e3b5d87e1d58da1684df57c458d6812",
+      "installed_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "87ec13214c8c4f8c5ad2ac2659bc260055194a20bcceed0c245337180ed2f5b7",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs": "b6ef375d92717b5f94480dd38f709330cee2e3572b1aeaed8d8420be3c40115d",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "a19ea6ff3bf098aa575d87b28867572dafa108907e24388b4cea3788f387eb48",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "67442a0859eb509e002f02c083e1b942f8ba92016acc6ef3b0d7337eb40f7aa0",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f4b890d342668bd29c629aae4b3fe4b0b063810d02c79cca8727327a7f0b0e2f",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "016471f0a33bf427be429687849b8d6daf99b541f4fca30d8c773d3f524e7856",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "39ca2b7aecb3bbeca38a8a52427d2e8771f22baade5253d4a0cdd21a12b9cff1"
+      },
+      "manifest_pins": {
+        "fixtures": {
+          "sha256": "5605d2c4161141627ba335a07253a1206847654670b24e29a624ba8cb7fd8dce",
+          "source_sha": "085b8d7f0e3b5d87e1d58da1684df57c458d6812"
+        },
+        "production": {
+          "sha256": "9b41e3d56555738d7605a7c26f8ce0cb3afd323c930b0d1ab49e252df64d6ba9",
+          "source_sha": "085b8d7f0e3b5d87e1d58da1684df57c458d6812"
+        }
+      },
+      "recorded_utc": "2026-10-07T15:23:01.492436+00:00",
+      "source_context_hashes": {
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs": "87ec13214c8c4f8c5ad2ac2659bc260055194a20bcceed0c245337180ed2f5b7",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/legacy_v11.sql": "dc3c51358e9e25a55c332f944a7e57a3cb11828836998d5fca47b91c706c6e52",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/schema.sql": "5a6500942f719d101a596e2c8a02aa856e54dba9be102845162e7b90ef993fec",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs": "a19ea6ff3bf098aa575d87b28867572dafa108907e24388b4cea3788f387eb48",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": "e9fc8095504cae13dd5d8c8911ed8f0d5cd5013de7583b370a30e4b44d07fb3b",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs": "67442a0859eb509e002f02c083e1b942f8ba92016acc6ef3b0d7337eb40f7aa0",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs": "f4b890d342668bd29c629aae4b3fe4b0b063810d02c79cca8727327a7f0b0e2f",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs": "016471f0a33bf427be429687849b8d6daf99b541f4fca30d8c773d3f524e7856",
+        "crates/platform/chio-store-sqlite/src/lib.rs": "f94d87a74ea7925b4f7dde8e4c1dd4e3b1579aaf0ea940d9791975be0367414e",
+        "crates/platform/chio-store-sqlite/src/security_state/codec.rs": "dcdabfd0d0def8139d089ca93f8b9b4b16ef023f5b6d734e33e82315e8dcdc0b",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs": "39ca2b7aecb3bbeca38a8a52427d2e8771f22baade5253d4a0cdd21a12b9cff1"
+      },
+      "worktree_status": " M crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs\n M crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs\n M crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs\n M crates/platform/chio-store-sqlite/src/serving_owner/tests.rs\n?? crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs\n"
+    },
+    "assessment": "The pre-install snapshot was clean at 085b. During review root rebound manifests from fffbab to 085b, preserved originals and installed the exact reviewed patch. Staged before/after/patch bytes did not change, and every installed file now matches the staged after hash. The end worktree is intentionally dirty with these seven files; no unchanged-source or clean-end claim is made.",
+    "intervening_commit": "fffbab..085b changes only two expected-schema-version assertions in tool_outcome_security_release_tests.rs. All payment read-guarded bytes were unchanged before installation.",
+    "stage_patch_coherence": "Read-only in-memory application of all seven patch sections exactly reproduced their guarded after files; no patch was applied by this reviewer."
+  },
+  "production_assessment": [
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment.rs:82",
+      "assessment": "Only optional catalog SQL text is normalized. Catalog tuple type/name/table-name identity, Option::None, ordering, namespace inventory, raw sixteen-object and 131072-byte bounds, schema12/legacy11 definitions, migration data copy, count/foreign-key checks and version/cancellation gates remain unchanged."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs:6",
+      "assessment": "The payment-private function collapses ASCII whitespace only outside quoted strings/identifiers, preserves escaped quote bytes and token separators, and retains non-ASCII bytes. An outside-quote line/block comment returns the entire original SQL unchanged. Both expected bundled schemas contain no comments, so comment-newline changes cannot silently remove CHECK enforcement through normalization. No punctuation/case/keyword rewriting or production visibility widening occurs.",
+      "production_body_unchanged_from_initial": true
+    }
+  ],
+  "fixture_assessment": [
+    {
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs:97",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs:268",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs:597",
+        "crates/platform/chio-store-sqlite/src/budget_store/tests/durability.rs:398"
+      ],
+      "assessment": "False v6/v9/v1 predecessors now atomically install the exact legacy11 journal only after journal and release-evidence row counts are both zero. Other budget history and existing fixture assertions remain. Production still refuses current schema12 catalogs with old version stamps."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs:622",
+      "assessment": "The authentic v10 pre-cancellation migration compares all original twenty-two SQLite fields with their stored value types, then independently requires both new nullable authorization fields to remain NULL. Existing seeded release evidence, foreign-key checks, guard restoration, permitted cancellation and second-reopen assertions remain."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs:1531",
+      "assessment": "The sixth offline-upgrade fixture locally checks both payment tables have zero facts, atomically rebuilds only the empty journal to the exact legacy11 definition and then stamps budget3/revocation1. Existing owner fencing, repeated-provision idempotence and admission/revocation projection equality remain. No sibling or public API visibility is widened."
+    }
+  ],
+  "precise_new_controls": [
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/sql_normalizer.rs:89",
+      "assessment": "The line-comment semantic control creates two actual SQLite tables and requires SqliteFailure, ConstraintViolation, extended SQLITE_CONSTRAINT_CHECK and exact CHECK message for the enforced table; the comment-omitted table accepts the same negative value. Raw normalization outputs must remain distinct."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/composite_schema/payment/tests.rs:277",
+      "assessment": "Current schema12 stamped 0/1/3/6/9/10/11 must return the exact unsupported-predecessor Invariant reason. A pre-cancellation predecessor stamped 11 must return that exact reason, while stamp12 must return exact schema12 catalog-differs. Existing constraint513, quoted-message and partial-catalog negatives are unchanged."
+    }
+  ],
+  "retained_runtime_evidence": {
+    "original_owning": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/sqlite-full-owning.log",
+      "sha256": "9a4d82e4c4f25e4a9897801f3437acc016fa8326693e5b8d8739a6eab3e71552",
+      "terminal_result": "test result: FAILED. 2049 passed; 10 failed; 3 ignored; 0 measured; 0 filtered out; finished in 4668.54s"
+    },
+    "focused_after": {
+      "all_six_original_and_six_new_cases_passed": true,
+      "path": "/tmp/chio-pr1160-qualification-20261007/payment-originals-and-controls-green12.log",
+      "selector_count": 12,
+      "sha256": "196c49ebf71525724ee2412de9651c277b8b41a756ba5907c0f1d196f4234358",
+      "test_results": [
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 2056 filtered out; finished in 11.35s"
+      ]
+    },
+    "assessment": "The original complete owning campaign is terminal failed: 2049 passed, 10 failed, 3 ignored. This repair addresses six named original failures. The root-owned focused run includes those same six originals plus six new controls and records 12 passed, 0 failed, 0 ignored. Earlier five-case wording is superseded by this complete six-case set.",
+    "reviewer_Cargo_executions": []
+  },
+  "pending": [
+    "Root's full payment schema and composite-lifecycle owning run remains active at handoff.",
+    "Retained negative controls, affected inclusive strict checks and full SQLite owning rerun are not declared complete by this report.",
+    "The other four failures in the original full owning campaign remain separate repair/qualification work.",
+    "Broader complete-candidate independent review, native/cold/trusted/controller authorization, full benchmarks, hosted exact-source CI and protected landing remain outside SourceAccepted."
+  ]
+}

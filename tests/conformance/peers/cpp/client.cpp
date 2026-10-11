@@ -391,6 +391,45 @@ chio::NestedCallbackRouter conformance_nested_router() {
   return router;
 }
 
+void install_session_router(chio::Session& session) {
+  session.on_message(conformance_nested_router().bind(session));
+}
+
+// A client that declares roots answers server requests on every request
+// stream. The session router serves RPCs that pass no handler of their own and
+// is cleared when the guard ends.
+class SessionRouterGuard {
+ public:
+  explicit SessionRouterGuard(chio::Session& session) : session_(session) {
+    install_session_router(session_);
+  }
+
+  ~SessionRouterGuard() { session_.on_message({}); }
+
+  SessionRouterGuard(const SessionRouterGuard&) = delete;
+  SessionRouterGuard& operator=(const SessionRouterGuard&) = delete;
+
+ private:
+  chio::Session& session_;
+};
+
+// An RPC that passes its own handler runs with the session router cleared, so
+// each server request is answered once. The session router returns on exit.
+class ExplicitHandlerScope {
+ public:
+  explicit ExplicitHandlerScope(chio::Session& session) : session_(session) {
+    session_.on_message({});
+  }
+
+  ~ExplicitHandlerScope() { install_session_router(session_); }
+
+  ExplicitHandlerScope(const ExplicitHandlerScope&) = delete;
+  ExplicitHandlerScope& operator=(const ExplicitHandlerScope&) = delete;
+
+ private:
+  chio::Session& session_;
+};
+
 class ReceiveGuard {
  public:
   ReceiveGuard(chio::Session& session, chio::MessageHandler handler)
@@ -811,6 +850,8 @@ Result run_scenario(const Scenario& scenario,
     bool saw_resource = false;
     bool saw_tool = false;
     bool saw_prompt = false;
+    auto router = conformance_nested_router();
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "emit_fixture_notifications",
         "{\"count\":3,\"message\":\"hello from cpp notification peer\",\"uri\":\"fixture://docs/alpha\"}",
@@ -818,7 +859,7 @@ Result run_scenario(const Scenario& scenario,
           saw_resource = saw_resource || message.method == "notifications/resources/list_changed";
           saw_tool = saw_tool || message.method == "notifications/tools/list_changed";
           saw_prompt = saw_prompt || message.method == "notifications/prompts/list_changed";
-          return chio::Result<void>::success();
+          return router.bind(session)(message);
         });
     if (response &&
         ((saw_resource && saw_tool && saw_prompt) ||
@@ -842,6 +883,8 @@ Result run_scenario(const Scenario& scenario,
                   "resources_subscribe_succeeds",
                   error_text(subscribed.error()));
     }
+    auto router = conformance_nested_router();
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "emit_fixture_notifications",
         "{\"count\":2,\"uri\":\"fixture://docs/alpha\"}",
@@ -849,7 +892,7 @@ Result run_scenario(const Scenario& scenario,
           saw_update = saw_update ||
                        (message.method == "notifications/resources/updated" &&
                         contains(message.raw_json, uri));
-          return chio::Result<void>::success();
+          return router.bind(session)(message);
         });
     if (response && (saw_update || contains(response.value(), "notifications/resources/updated"))) {
       return pass(scenario, elapsed_ms(started), "subscribed_resource_update_is_forwarded");
@@ -863,6 +906,7 @@ Result run_scenario(const Scenario& scenario,
   if (scenario.id == "nested-sampling-create-message") {
     auto router = conformance_nested_router();
     bool saw_sampling = false;
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "sampled_echo",
         "{\"message\":\"nested callback sampling request\"}",
@@ -882,6 +926,7 @@ Result run_scenario(const Scenario& scenario,
   if (scenario.id == "nested-elicitation-form-create") {
     auto router = conformance_nested_router();
     bool saw_elicitation = false;
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "elicited_echo",
         "{\"message\":\"nested callback form elicitation request\"}",
@@ -902,6 +947,7 @@ Result run_scenario(const Scenario& scenario,
   if (scenario.id == "nested-elicitation-url-create") {
     auto router = conformance_nested_router();
     bool saw_elicitation = false;
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "url_elicited_echo",
         "{\"message\":\"nested callback url elicitation request\"}",
@@ -923,6 +969,7 @@ Result run_scenario(const Scenario& scenario,
   if (scenario.id == "nested-roots-list") {
     auto router = conformance_nested_router();
     bool saw_roots = false;
+    ExplicitHandlerScope explicit_handler(session);
     auto response = session.call_tool(
         "roots_echo",
         "{\"message\":\"nested callback roots request\"}",
@@ -1017,6 +1064,7 @@ int main(int argc, char** argv) {
         }
       } else {
         auto session = initialized.move_value();
+        SessionRouterGuard session_router(session);
         for (const auto& scenario : scenarios) {
           results.push_back(
               run_scenario(scenario, args, auth_context.value(), session, transport));

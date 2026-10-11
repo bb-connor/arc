@@ -1,0 +1,123 @@
+{
+  "schema": "chio.security.production-repair-checkpoint.v1",
+  "recorded_utc": "2026-10-07T12:28:03.056064+00:00",
+  "source_commit": "e446a408ea69c7cbb5539dc15deb00da7f24d485",
+  "landing_pr": 1160,
+  "qualified_candidate": false,
+  "merged": false,
+  "completed_source_repairs": {
+    "revoked_caller_isolation": "1225dc4893",
+    "external_vs_owned_status_oracles": "1da7e41663",
+    "private_benchmark_fixture": "9b4dd8c2f3",
+    "bounded_legacy_recovery": "e446a408ea",
+    "historical_schema_builders": "6f395ba2ae"
+  },
+  "earlier_immutable_evidence": [
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-current-native26-1df6-result-packet.json",
+      "sha256": "6107d031b6ab275b0e0ee290af0d03e999c53f56bfa903ae94995a8418f5d1e5",
+      "scope": "Focused native12, paid clock6 and cancellation/retry8 pass; initial strict failure remains separate."
+    },
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-1df6-alias-strict-pass-result-packet.json",
+      "sha256": "822f88685b9ea5309c9ee40a6d59df789d5946d48cffc8413a56392cc20e3759",
+      "scope": "Three-owner default all-targets strict pass after test-only aliases."
+    },
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-77b9-f030-coverage19-strict-result-packet.json",
+      "sha256": "7000fed4d1f50e171582ed232633e429b50f8580341bc84486d5b8b8687ef8dd",
+      "scope": "19 executions, 15 unique cases across default and admission support; both inclusive strict variants pass."
+    },
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-c84e-independent30-result-packet.json",
+      "sha256": "ad5f0a5f3fd427f5c1cc9ea5810ad95549296e0ae2606ee4def42ea463fd574a",
+      "scope": "Caller3, witness/chronology13, migration13 and six-version public control pass; initial range lint failure retained."
+    },
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-c84e-original-causes-constructor-strict-result-packet.json",
+      "sha256": "2bc456a912c0a828c89a740cfc4c8251c00b0f510ea66dd72fbb7f4d7d175132",
+      "scope": "Revocation original1/2; caller2 pass; external-write diagnostic0/1; constructor0775 refusal versus0700 success; three strict variants pass."
+    },
+    {
+      "path": "/home/connor/.cache/chio-security-landing-20261004/sprawl-execution/ci-feedback-20261005/integration-9d1-caller-deferred-legacy11-strict-result-packet.json",
+      "sha256": "e045e43b75a7d44b46535ede7e3d2228706dcb2792e72d6cdd74487c694dbc20",
+      "scope": "Revocation same3/global5/deferred1 pass; legacy2 ordering failures retained; two strict variants pass."
+    }
+  ],
+  "pagination_evidence": [
+    {
+      "name": "legacy-original3.log",
+      "sha256": "7f3158d63caa195fc3eff1bf7858959203142beb6ddad249a57f213f59ce96eb",
+      "category": "compiler setup failure, no runtime",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/legacy-original3.log",
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/legacy-original3.log.gz",
+      "compressed_sha256": "5097bad216d303d6c6538d4c556a00253eceefedff970147b82911c11212a257"
+    },
+    {
+      "name": "legacy-original3-runtime.log",
+      "sha256": "f93dc7beda91d393d1d538211fb0768fffe0795aaa9c561a5ab49d40827f6fce",
+      "category": "same deterministic test RED with2 existing controls passing",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/legacy-original3-runtime.log",
+      "counts": {
+        "passed": 2,
+        "failed": 1
+      },
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/legacy-original3-runtime.log.gz",
+      "compressed_sha256": "453513542bc59920c6caa5c0f654095cbd2d09f03686acccd9c588d2b69c1674"
+    },
+    {
+      "name": "legacy-green6.log",
+      "sha256": "13b59c5198a43738df2064be6d0c82f33b5e3829e967d4014b8ba16788d40982",
+      "category": "same regression and five exact controls GREEN6",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/legacy-green6.log",
+      "counts": {
+        "passed": 6,
+        "failed": 0
+      },
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/legacy-green6.log.gz",
+      "compressed_sha256": "708e942e370b41e0202c1b295c4fc2b29307aa446e7da5ee46fe504c8b40a976"
+    },
+    {
+      "name": "recovery-owning.log",
+      "sha256": "a2f91aa562f2d9ad308bae3dedc87ca24fea9cf9d53d5e40b42a78a0f35d2ca3",
+      "category": "complete selected recovery family34PASS",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/recovery-owning.log",
+      "counts": {
+        "passed": 34,
+        "failed": 0
+      },
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/recovery-owning.log.gz",
+      "compressed_sha256": "9ddfee228be178092400cb893ddaae6736ff3e79e0f47f9c70dc638ae1eccfef"
+    },
+    {
+      "name": "legacy-owning-strict.log",
+      "sha256": "589dd0c473dd53d0096fc8b5340d1f69eae9798ef03047c64eb676e2b978ae73",
+      "category": "three affected crates all-targets dependency-inclusive strictPASS",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/legacy-owning-strict.log",
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/legacy-owning-strict.log.gz",
+      "compressed_sha256": "939ca234f2cf046fd10884b23860c4a77f5dd42cd78fb4ed5af09526f1656c2c"
+    },
+    {
+      "name": "negative-gate.log",
+      "sha256": "897161cd4db645803bc8f94e7409695a5e18d5200539a8ad39682ab644f47997",
+      "category": "unchanged1249 weak-assertion baselinePASS",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/negative-gate.log",
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/negative-gate.log.gz",
+      "compressed_sha256": "fcb5755e7b61fd4214906c02841e700527973bf3989df4f7cc6defbc1265eeb6"
+    },
+    {
+      "name": "rust-hygiene.log",
+      "sha256": "c48278bb170fed8b344379b48eda0cd75a585dcc5aaea7ad9ef3bb91bdf8260a",
+      "category": "unchanged source-size gatesPASS",
+      "retained_log": "/tmp/chio-pr1160-qualification-20261007/rust-hygiene.log",
+      "repository_log": "docs/security/audits/production-repair-checkpoint-20261007/rust-hygiene.log.gz",
+      "compressed_sha256": "94ae8ae373e974d0fb67bcaa8c06c827f0309f010bca75bfe84c7895f104bc08"
+    }
+  ],
+  "remaining": [
+    "Remaining whole owning/default/optional feature suites and full benchmark workloads.",
+    "Final clean-source ledger/catalog/codegen/schema/supply-chain verification.",
+    "Exact-source independent review; request Greptile when available and retain unavailable attempts.",
+    "Required cold mutation, native/trusted evidence, terminal exact-source CI and protected main landing."
+  ]
+}

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Sibling-sum budget enforcement for delegated capability tokens.
 //!
 //! `CapabilityToken::validate_schema` already enforces the per-token cap
@@ -21,15 +22,23 @@
 //!
 //! ## Overflow safety
 //!
-//! [`BudgetSplit::current_total_child_bps`] returns a `u32` and the admit
-//! check uses `u32` arithmetic so two `u16::MAX` siblings cannot overflow
-//! into a wraparound that silently passes the cap. The parent share itself
-//! is bounded by [`MAX_BUDGET_SHARE_BPS`] which the per-token validator
-//! enforces at load time.
+//! [`BudgetSplit::current_total_child_bps`] returns a checked `u32` sum or
+//! [`BudgetSplitError::ShareTotalOverflow`]. Admission also checks holder and
+//! proposed-share additions, so numeric exhaustion grants no new lease. The
+//! parent share is bounded by [`MAX_BUDGET_SHARE_BPS`] which the per-token
+//! validator enforces at load time.
 
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use core::fmt;
+
+mod registry;
+
+pub use registry::InMemoryBudgetRegistry;
+
+#[cfg(test)]
+#[path = "budget_split/boundary_tests.rs"]
+mod boundary_tests;
 
 /// Hard ceiling on any single token's budget share in basis points.
 ///
@@ -37,6 +46,22 @@ use core::fmt;
 /// threshold; the constant is re-exported so registry implementations can
 /// share the same bound.
 pub const MAX_BUDGET_SHARE_BPS: u16 = 10_000;
+
+/// Most child edges one parent split retains. Zero-share children never
+/// exhaust the share sum, so this bounds them independently.
+pub const MAX_CHILDREN_PER_PARENT: usize = 10_000;
+
+/// Most child-id bytes (1 MiB) one parent split retains across its edges.
+pub const MAX_RETAINED_CHILD_ID_BYTES: usize = 1_048_576;
+
+/// Most parents one [`InMemoryBudgetRegistry`] retains.
+pub const MAX_BUDGET_PARENTS: usize = 10_000;
+
+/// Most child edges one [`InMemoryBudgetRegistry`] retains across all parents.
+pub const MAX_REGISTRY_CHILD_EDGES: usize = 100_000;
+
+/// Most owned id bytes (16 MiB) one [`InMemoryBudgetRegistry`] retains.
+pub const MAX_REGISTRY_RETAINED_ID_BYTES: usize = 16_777_216;
 
 /// A single admitted child edge: the share it claimed plus a reference count
 /// of the active evaluations currently holding it.
@@ -89,12 +114,25 @@ pub struct BudgetSplit {
     pub parent_share_bps: u16,
     /// Map from child capability ID to its admitted share and active-holder
     /// reference count. See [`ChildAdmission`] for why the count is required.
-    pub children: BTreeMap<String, ChildAdmission>,
+    children: BTreeMap<String, ChildAdmission>,
+    /// Child-id bytes retained by edges admitted through this split, bounded
+    /// by [`MAX_RETAINED_CHILD_ID_BYTES`].
+    retained_child_id_bytes: usize,
 }
 
 /// Errors raised by [`BudgetSplit`] admission and release operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BudgetSplitError {
+    /// Another lease cannot be represented; the existing holders stay owned.
+    HolderCountOverflow {
+        /// Child whose holder count is exhausted.
+        child_id: String,
+    },
+    /// The supplied split cannot represent its exact sibling-share sum.
+    ShareTotalOverflow {
+        /// Parent whose accounting is invalid.
+        parent_token_id: String,
+    },
     /// The proposed child share alone exceeds the per-token cap of
     /// [`MAX_BUDGET_SHARE_BPS`]. Per-token validation usually catches this
     /// first; the registry repeats the check so a bypass cannot widen the
@@ -117,6 +155,31 @@ pub enum BudgetSplitError {
         current_total_child_bps: u32,
         /// The parent's own share, in basis points.
         parent_share_bps: u16,
+    },
+    /// Admitting another distinct child would exceed
+    /// [`MAX_CHILDREN_PER_PARENT`] or [`MAX_RETAINED_CHILD_ID_BYTES`].
+    /// Existing edges keep their idempotent re-admit and release paths.
+    ChildCapacityExhausted {
+        /// Parent whose retained child capacity is exhausted.
+        parent_token_id: String,
+    },
+    /// Retaining another parent or child edge would exceed a registry-wide
+    /// bound, even after reclaiming expired parents without live holders.
+    RegistryCapacityExhausted {
+        /// Parent whose registration or child admission was refused.
+        parent_token_id: String,
+    },
+    /// A new parent registration is already expired at the registry's
+    /// trusted time, so nothing is registered.
+    ExpiredParent {
+        /// Parent capability id that was refused.
+        parent_token_id: String,
+    },
+    /// The parent is already registered with a different expiry. The
+    /// original registration is kept.
+    ParentExpiryConflict {
+        /// Parent capability id that was refused.
+        parent_token_id: String,
     },
     /// The parent token is unknown to the registry. This happens when the
     /// verifier sees a delegation chain whose root was never registered, or
@@ -150,6 +213,10 @@ pub enum BudgetSplitError {
 impl fmt::Display for BudgetSplitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BudgetSplitError::HolderCountOverflow { child_id } =>
+                write!(f, "child {child_id} holder count is exhausted"),
+            BudgetSplitError::ShareTotalOverflow { parent_token_id } =>
+                write!(f, "parent {parent_token_id} sibling-share sum overflows u32"),
             BudgetSplitError::ChildShareExceedsCap {
                 child_id,
                 share_bps,
@@ -166,6 +233,21 @@ impl fmt::Display for BudgetSplitError {
             } => write!(
                 f,
                 "child {child_id} share {share_bps} bps + sibling sum {current_total_child_bps} bps > parent share {parent_share_bps} bps"
+            ),
+            BudgetSplitError::ChildCapacityExhausted { parent_token_id } => write!(
+                f,
+                "parent {parent_token_id} retains its maximum number of child edges or child-id bytes"
+            ),
+            BudgetSplitError::RegistryCapacityExhausted { parent_token_id } => write!(
+                f,
+                "budget registry cannot retain more state for parent {parent_token_id}"
+            ),
+            BudgetSplitError::ExpiredParent { parent_token_id } => {
+                write!(f, "parent capability {parent_token_id} is already expired")
+            }
+            BudgetSplitError::ParentExpiryConflict { parent_token_id } => write!(
+                f,
+                "parent capability {parent_token_id} is registered with a different expiry"
             ),
             BudgetSplitError::UnknownParent { parent_token_id } => {
                 write!(f, "parent capability {parent_token_id} is not registered")
@@ -223,21 +305,30 @@ impl BudgetSplit {
             parent_token_id,
             parent_share_bps,
             children: BTreeMap::new(),
+            retained_child_id_bytes: 0,
         }
     }
 
-    /// Return the running sum of admitted sibling shares as a `u32` to avoid
-    /// overflow even on a maximally adversarial set of admitted children.
+    /// Return the exact running sum, refusing an unrepresentable public split.
     ///
     /// Each present edge counts its share exactly once regardless of how many
     /// overlapping evaluations hold it: the share is charged against the parent
     /// per edge, not per holder.
-    #[must_use]
-    pub fn current_total_child_bps(&self) -> u32 {
+    pub fn current_total_child_bps(&self) -> Result<u32, BudgetSplitError> {
         self.children
             .values()
-            .map(|admission| u32::from(admission.share_bps))
-            .sum()
+            .try_fold(0_u32, |sum, admission| {
+                sum.checked_add(u32::from(admission.share_bps))
+            })
+            .ok_or_else(|| BudgetSplitError::ShareTotalOverflow {
+                parent_token_id: self.parent_token_id.clone(),
+            })
+    }
+
+    /// Return the number of child edges currently charged against this parent.
+    #[must_use]
+    pub fn child_count(&self) -> usize {
+        self.children.len()
     }
 
     /// Return the share currently recorded for `child_id`, if this child has
@@ -271,7 +362,8 @@ impl BudgetSplit {
     /// Returns [`BudgetSplitError`] - acquiring NO lease - when the child share
     /// alone exceeds the per-token cap, when the proposed share would
     /// oversubscribe the parent, or when a different share has already been
-    /// recorded for this child id.
+    /// recorded for this child id. Numeric exhaustion of the holder count or
+    /// sibling total also refuses admission without changing the split.
     pub fn try_admit_child(
         &mut self,
         child_id: String,
@@ -322,14 +414,24 @@ impl BudgetSplit {
                 // holder count untouched: it never releases, so incrementing
                 // here would pin the edge upward forever.
                 if let AdmitMode::Lease = mode {
-                    existing.holders = existing.holders.saturating_add(1);
+                    existing.holders = existing.holders.checked_add(1).ok_or_else(|| {
+                        BudgetSplitError::HolderCountOverflow {
+                            child_id: child_id.clone(),
+                        }
+                    })?;
                 }
                 return Ok(());
             }
             return Err(BudgetSplitError::DuplicateChild { child_id });
         }
-        let running = self.current_total_child_bps();
-        let proposed_total = running.saturating_add(u32::from(share_bps));
+        // Existing leases do not alter the share sum and retain their O(log n)
+        // lookup path. Only a new edge needs the sibling scan.
+        let running = self.current_total_child_bps()?;
+        let proposed_total = running.checked_add(u32::from(share_bps)).ok_or_else(|| {
+            BudgetSplitError::ShareTotalOverflow {
+                parent_token_id: self.parent_token_id.clone(),
+            }
+        })?;
         if proposed_total > u32::from(self.parent_share_bps) {
             return Err(BudgetSplitError::OversubscribedSiblings {
                 child_id,
@@ -338,6 +440,14 @@ impl BudgetSplit {
                 parent_share_bps: self.parent_share_bps,
             });
         }
+        let retained_child_id_bytes = self
+            .retained_child_id_bytes
+            .checked_add(child_id.len())
+            .filter(|bytes| *bytes <= MAX_RETAINED_CHILD_ID_BYTES)
+            .filter(|_| self.children.len() < MAX_CHILDREN_PER_PARENT)
+            .ok_or_else(|| BudgetSplitError::ChildCapacityExhausted {
+                parent_token_id: self.parent_token_id.clone(),
+            })?;
         // Fresh edge. A Lease records itself as the first live holder; a
         // VerifyOnly commit charges the share for sibling-sum accounting but
         // records NO holder, so it never has to be released to free the edge.
@@ -347,6 +457,7 @@ impl BudgetSplit {
         };
         self.children
             .insert(child_id, ChildAdmission { share_bps, holders });
+        self.retained_child_id_bytes = retained_child_id_bytes;
         Ok(())
     }
 
@@ -380,9 +491,12 @@ impl BudgetSplit {
                 actual_share_bps: admission.share_bps,
             });
         }
+        // VerifyOnly edges legitimately have zero holders; cleanup removes
+        // those as well as an edge whose last real holder is being released.
         admission.holders = admission.holders.saturating_sub(1);
-        if admission.holders == 0 {
-            let _ = self.children.remove(child_id);
+        if admission.holders == 0 && self.children.remove(child_id).is_some() {
+            self.retained_child_id_bytes =
+                self.retained_child_id_bytes.saturating_sub(child_id.len());
         }
         Ok(())
     }
@@ -505,106 +619,6 @@ impl BudgetRegistry for NoopBudgetRegistry {
     fn evict_parent(&mut self, _parent_token_id: &str) {}
 }
 
-/// Pure in-memory [`BudgetRegistry`] backed by a [`BTreeMap`].
-///
-/// This implementation is `no_std` friendly: it keeps a deterministic map
-/// keyed by parent capability id and never reaches for clocks, locks, or
-/// allocators outside `alloc`. Hosted callers that need shared mutable
-/// access across threads should wrap it in their own `Mutex` / `RwLock`.
-#[derive(Debug, Default, Clone)]
-pub struct InMemoryBudgetRegistry {
-    splits: BTreeMap<String, BudgetSplit>,
-}
-
-impl InMemoryBudgetRegistry {
-    /// Build an empty registry.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            splits: BTreeMap::new(),
-        }
-    }
-
-    /// Borrow the live split for `parent_token_id`, if any. Useful for
-    /// tests and operator dashboards that want to inspect headroom.
-    #[must_use]
-    pub fn split(&self, parent_token_id: &str) -> Option<&BudgetSplit> {
-        self.splits.get(parent_token_id)
-    }
-}
-
-impl BudgetRegistry for InMemoryBudgetRegistry {
-    fn register_parent(
-        &mut self,
-        parent_token_id: String,
-        parent_share_bps: u16,
-    ) -> Result<(), BudgetSplitError> {
-        if parent_share_bps > MAX_BUDGET_SHARE_BPS {
-            return Err(BudgetSplitError::ChildShareExceedsCap {
-                child_id: parent_token_id,
-                share_bps: parent_share_bps,
-            });
-        }
-        if let Some(existing) = self.splits.get(&parent_token_id) {
-            if existing.parent_share_bps == parent_share_bps {
-                return Ok(());
-            }
-            return Err(BudgetSplitError::DuplicateChild {
-                child_id: parent_token_id,
-            });
-        }
-        self.splits.insert(
-            parent_token_id.clone(),
-            BudgetSplit::new(parent_token_id, parent_share_bps),
-        );
-        Ok(())
-    }
-
-    fn try_admit_child(
-        &mut self,
-        parent_token_id: &str,
-        child_token_id: String,
-        share_bps: u16,
-    ) -> Result<(), BudgetSplitError> {
-        match self.splits.get_mut(parent_token_id) {
-            Some(split) => split.try_admit_child(child_token_id, share_bps),
-            None => Err(BudgetSplitError::UnknownParent {
-                parent_token_id: parent_token_id.into(),
-            }),
-        }
-    }
-
-    fn verify_child_admission(
-        &mut self,
-        parent_token_id: &str,
-        child_token_id: String,
-        share_bps: u16,
-    ) -> Result<(), BudgetSplitError> {
-        match self.splits.get_mut(parent_token_id) {
-            Some(split) => split.verify_child_admission(child_token_id, share_bps),
-            None => Err(BudgetSplitError::UnknownParent {
-                parent_token_id: parent_token_id.into(),
-            }),
-        }
-    }
-
-    fn release_child(
-        &mut self,
-        parent_token_id: &str,
-        child_token_id: &str,
-        expected_share_bps: u16,
-    ) -> Result<(), BudgetSplitError> {
-        match self.splits.get_mut(parent_token_id) {
-            Some(split) => split.release_child(child_token_id, expected_share_bps),
-            None => Ok(()),
-        }
-    }
-
-    fn evict_parent(&mut self, parent_token_id: &str) {
-        let _ = self.splits.remove(parent_token_id);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,7 +627,7 @@ mod tests {
     #[test]
     fn empty_split_total_is_zero() {
         let split = BudgetSplit::new("parent".to_string(), 5_000);
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
     }
 
     #[test]
@@ -622,7 +636,7 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("first child fits");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -649,7 +663,7 @@ mod tests {
             other => panic!("unexpected error: {other:?}"),
         }
         // Failed child must not be recorded.
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -670,7 +684,7 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("idempotent re-admit");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -684,7 +698,7 @@ mod tests {
             .expect_err("different share must fail");
         assert!(matches!(err, BudgetSplitError::DuplicateChild { .. }));
         // Original share is preserved.
-        assert_eq!(split.current_total_child_bps(), 2_000);
+        assert_eq!(split.current_total_child_bps(), Ok(2_000));
     }
 
     #[test]
@@ -693,12 +707,12 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("child admits");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
 
         split
             .release_child("child-a", 4_000)
             .expect("matching release succeeds");
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
 
         split
             .try_admit_child("child-b".to_string(), 5_000)
@@ -719,7 +733,7 @@ mod tests {
             error,
             BudgetSplitError::ReleaseShareMismatch { .. }
         ));
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -1061,6 +1075,7 @@ mod tests {
             parent_token_id: "parent".to_string(),
             parent_share_bps: MAX_BUDGET_SHARE_BPS,
             children: BTreeMap::new(),
+            retained_child_id_bytes: 0,
         };
         // Synthetic stress: two MAX_BUDGET_SHARE_BPS siblings would sum past
         // u16::MAX. The registry would never admit both, but the running
@@ -1081,7 +1096,7 @@ mod tests {
         );
         assert_eq!(
             split.current_total_child_bps(),
-            u32::from(MAX_BUDGET_SHARE_BPS) * 2
+            Ok(u32::from(MAX_BUDGET_SHARE_BPS) * 2)
         );
     }
 }

@@ -209,10 +209,10 @@ production verification always uses the pinned Google JWKS. Throws
 `ChioMobileError.attestationRejected(message:)` on any verification
 failure.
 
-### `verifyMobileReceipt`
+### `inspectMobileReceiptEnvelopes`
 
 ```swift
-public func verifyMobileReceipt(receiptJson: String, evidenceJson: String) throws -> String
+public func inspectMobileReceiptEnvelopes(receiptJson: String, evidenceJson: String) throws -> String
 ```
 
 Shape-checks a mobile receipt against App Attest or Play Integrity

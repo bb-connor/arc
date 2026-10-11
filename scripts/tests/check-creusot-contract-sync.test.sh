@@ -47,6 +47,7 @@ copy_fixture() {
   cp "$REPO_ROOT/.kani/harnesses.toml" "$root/.kani/"
   cp "$REPO_ROOT/scripts/check-creusot-body-sync.sh" "$root/scripts/"
   cp "$REPO_ROOT/scripts/check-rust-verification-gates.sh" "$root/scripts/"
+  cp "$REPO_ROOT/scripts/kani_open_residual.py" "$root/scripts/"
   cp "$REPO_ROOT/formal/rust-verification/creusot-contracts.toml" \
     "$root/formal/rust-verification/"
   cp "$REPO_ROOT/formal/rust-verification/kani-harnesses.toml" \

@@ -1,0 +1,157 @@
+{
+  "schema": "chio.receipt-snapshot-local-checkpoint.v1",
+  "observed_utc": "2026-10-09T11:02:16.305263+00:00",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "staged_head": "4fe1f22f160d7f51ab70d130e5ef3f2ab469661f",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "stage_promoted_to_source": false,
+  "candidate_qualified": false,
+  "merged": false,
+  "requirement_id": "incoming-pr1160-review-20261009:V25",
+  "landing_pr": 1160,
+  "source_repairs": {
+    "persistent_store_and_snapshot_types": [
+      "640dadf88d2cbae97d2e830697c4b070d7dde552",
+      "49384b531162c04081ae3b621e9cd991d9e77a15",
+      "0cb5ac14c23f7f1a172f3cdc26ce4b26dc784ba3"
+    ],
+    "http_and_export": "ae6d6add56f7ec0ad25944f4ba64bdf15bba21cc",
+    "linux_private_backing": "e0caca7dfb8e5c70a55d4150f1bedd4dc18daf82",
+    "linux_file_custody": "3be51fb0dcf00604706c04a7abe3698b3b53371c",
+    "operator_quota": "557d396c300659ec59b989f66789f3c54140a0a7",
+    "guarded_budget_replay": [
+      "8e9a27c1596ada0a337d34e1f99bc5c928762b4f",
+      "4adbcabeb5e36fdeaffa4a39975ca7b337571c80"
+    ],
+    "maximum_timestamp": "6b43d594ae011db76d3da8178dea3d0cf6291906",
+    "recertification_owned_bytes": "f24a5240e6e50d46400bee27f5e869b79ca2c568",
+    "nested_resource_classification": "5679eaceeee400badb725793b1e8b062427c192c",
+    "bounded_leader_forwarding": [
+      "e58e36cf374ff4bd12807c54853b299a0f6b0d92",
+      "c383e74882a4a1b5e384afcc1e38b6e270217676"
+    ],
+    "forward_finalization_regressions": "4fe1f22f160d7f51ab70d130e5ef3f2ab469661f"
+  },
+  "local_verification": [
+    {
+      "scope": "snapshot and budget store",
+      "source": "5679eaceeee400badb725793b1e8b062427c192c",
+      "summary": "266 distinct tests pass: snapshot/backing103, budget159 and four deterministic lease controls; one explicit subprocess helper. The first command passed224 but the expected-count oracle correctly refused qualification. The same-source disjoint42-test complement closes the selection gap.",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/store-5679/JOINED-RESULT.json",
+          "sha256": "9df81d0b84ee4a4d0f6ec02f59ebe1b5cd7c4add50fd1d7b6879aaa2259fbeff"
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/store-5679/source.json",
+          "sha256": "1cc6d21f94ba4d0d10f662bfc6b98b91626c16d08c7da2e15e4c413036b82f9b"
+        }
+      ]
+    },
+    {
+      "scope": "MCP and kernel",
+      "source": "5679eaceeee400badb725793b1e8b062427c192c",
+      "summary": "MCP owning192 and kernel query7 tests pass.",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/mcp-kernel-5679/RESULTS.json",
+          "sha256": "11cb42b8ce8439f546bc60119addd5981b67080d07df054d5a2e2320c92dbb2e"
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/mcp-kernel-5679/source.json",
+          "sha256": "1cc6d21f94ba4d0d10f662bfc6b98b91626c16d08c7da2e15e4c413036b82f9b"
+        }
+      ]
+    },
+    {
+      "scope": "CLI cluster",
+      "source": "c383e74882a4a1b5e384afcc1e38b6e270217676",
+      "summary": "Eight tests pass, three existing ignores. Includes snapshot hold and no-hold replay.",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/cluster-c383/RESULTS.json",
+          "sha256": "a7442758884348b5b78fc21f8ee16a06ae3d8fa5cf0028e0e4473675dd1df463"
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/cluster-c383/source.json",
+          "sha256": "4f96df41ab837f3fb5a9154c9bc3fd99cc0da4e0dc035032c2be479265b41970"
+        }
+      ]
+    },
+    {
+      "scope": "control plane and strict owners",
+      "source": "c383e74882a4a1b5e384afcc1e38b6e270217676",
+      "summary": "Exact93-test name set passes; strict all-target Clippy passes for kernel, control-plane, CLI, store, runtime and MCP. Does not include the finalization test-only follow-up at4fe.",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/cp-core-c383/RESULTS.json",
+          "sha256": "c61cd0dd0d7ac18f0e13a949f5285bb0089e8822afdd4c300a020f3aca4dfbc9"
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/cp-core-c383/TEST-INVENTORY.json",
+          "sha256": "b93974b15045bc61208388a87d02dbafaf306821a77301e8ce07488a57c24271"
+        },
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/cp-core-c383/source.json",
+          "sha256": "4f96df41ab837f3fb5a9154c9bc3fd99cc0da4e0dc035032c2be479265b41970"
+        }
+      ]
+    },
+    {
+      "scope": "static contracts",
+      "source": "5679eaceeee400badb725793b1e8b062427c192c",
+      "summary": "HTTP contract selftests/gate, trust boundaries, clocks, file hygiene and negative assertions pass. No baseline allowance.",
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-v25-final-20261009/static-5679/RESULTS.json",
+          "sha256": "8ef1a11859e85c70c58a436d0856618939c479c926248cb68f0f3c6680d80391"
+        }
+      ]
+    }
+  ],
+  "capacity": {
+    "source_head": "f24a5240e6e50d46400bee27f5e869b79ca2c568",
+    "test_overlay_sha256": {
+      "receipt_query_snapshot/tests.rs": "1fea153ca1b5c68b0bcb88a175b9e3352f31fc988124bc75bc3c02d45d21c177",
+      "receipt_query_snapshot/tests/capacity.rs": "562d93c1a21dd153dfd0a8bac0a00bbcbd264daef7fe094b77710bf0ec39bd5f",
+      "receipt_query_snapshot/tests/capacity/linux_file.rs": "b535c1b88c2bf0051a788ab3e0fe52d5b30db0e594f886d878781d62c4267710"
+    },
+    "release_binary_sha256": "62450083ce720243211f414896c6f5a76bed7b7da2ba5798e5d6d74c85656642",
+    "synthetic_memory": {
+      "status": "passed",
+      "tests": 2,
+      "elapsed_seconds": 864.7,
+      "projection_rows": 10000000,
+      "large_field_rows": 100000,
+      "projection_used_bytes": 5288763392,
+      "projection_quota_bytes": 68719476736,
+      "projection_peak_rss_kib": 6379248,
+      "count_rows_compared": 45404,
+      "count_mismatches": 0,
+      "default_quota_bytes": 2147483648,
+      "default_quota_committed_rows": 4639744,
+      "used_bytes_at_capacity_refusal": 2147397632,
+      "partial_batch_published": false,
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/task8/claimed-memory.log",
+        "sha256": "1e5139b7f245cbf8f8928cf4d48dae8631dcef22d7740a1e19e4d9fbcf16865c"
+      },
+      "limit": "Synthetic projection and quota behavior only. The10M case uses a larger quota and does not claim10M rows fit the default2GiB. Broad filters may return the documented work-budget refusal."
+    },
+    "signed_linux": {
+      "status": "running",
+      "required_receipts": 1000000,
+      "qualification_claimed": false
+    },
+    "development_runs": "Retained separately as claimed=false, including failed predecessors;100k signed is not the1M acceptance run."
+  },
+  "remaining_acceptance": [
+    "Terminal1M signed Linux capacity result and committed exact test/evidence handoff.",
+    "Compose the assigned issuer-trust/SSRF and public-worker repairs after genuine regression evidence.",
+    "Renew the final narrow control-plane delta, including the two paused forward-finalization controls.",
+    "Complete mandatory original-domain real-SHA attestation proof with exact completion cover. Latest full run timed out1807.336s with no verdict; alternate solver diagnostics do not qualify it.",
+    "Promote stage to Source, finish exact-candidate static/generated/proof checks and independent review dispositions.",
+    "Batch push and obtain the four exact protected checks, then protected merge. Broader native/trusted and release acceptance stays separate."
+  ],
+  "preservation": "Historical requirement objects and previous evidence remain unchanged. This is a staged local observation, not a source, hosted, native-product, release or merge qualification."
+}

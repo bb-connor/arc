@@ -106,7 +106,9 @@ fn crypto_context_verified_report_rejects_context_report_drift() -> Result<(), B
     .err()
     .ok_or("drifted crypto context report unexpectedly verified")?;
 
-    assert!(error.contains("disclosure_context_audience_mismatch"));
+    assert!(error
+        .to_string()
+        .contains("disclosure_context_audience_mismatch"));
     Ok(())
 }
 
@@ -134,7 +136,9 @@ fn crypto_context_verified_report_rejects_unsigned_report() -> Result<(), Box<dy
     .err()
     .ok_or("unsigned crypto context report unexpectedly verified")?;
 
-    assert!(error.contains("crypto context report signature missing"));
+    assert!(error
+        .to_string()
+        .contains("crypto context report signature missing"));
     Ok(())
 }
 
@@ -152,7 +156,7 @@ fn crypto_context_verified_report_requires_bbs_proof_material() -> Result<(), Bo
     .err()
     .ok_or("crypto context report unexpectedly verified without BBS proof material")?;
 
-    assert!(error.contains("missing BBS proof material"));
+    assert!(error.to_string().contains("missing BBS proof material"));
     Ok(())
 }
 
@@ -414,7 +418,9 @@ fn source_standalone_verifier_can_skip_passport_signature_check() -> Result<(), 
         .err()
         .ok_or("tampered signature unexpectedly verified")?;
     assert!(
-        error.contains("transaction passport signature invalid"),
+        error
+            .to_string()
+            .contains("transaction passport signature invalid"),
         "{error}"
     );
 
@@ -434,8 +440,10 @@ fn source_standalone_verifier_can_skip_passport_signature_check() -> Result<(), 
         .err()
         .ok_or("tampered governed-action artifact unexpectedly verified")?;
     assert!(
-        error.contains("evidence graph artifact digest mismatch")
-            && error.contains("kernel-receipt.json"),
+        error
+            .to_string()
+            .contains("evidence graph artifact digest mismatch")
+            && error.to_string().contains("kernel-receipt.json"),
         "{error}"
     );
     Ok(())

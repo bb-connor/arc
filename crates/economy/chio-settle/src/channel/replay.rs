@@ -137,18 +137,9 @@ impl ChannelTransitionReplayAuthorityPinsV1 {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ChannelError> {
-        if bytes.is_empty() || bytes.len() > MAX_CHANNEL_TRANSITION_REPLAY_AUTHORITY_PINS_BYTES {
-            return Err(ChannelError::InvalidField(
-                "channel_transition_replay_authority_pins_size",
-            ));
-        }
-        let pins: Self = serde_json::from_slice(bytes)
-            .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
-        if pins.canonical_bytes()?.as_slice() != bytes {
-            return Err(ChannelError::Canonicalization(
-                "channel transition replay authority pins are not canonical".to_owned(),
-            ));
-        }
+        let pins: Self =
+            crate::input::canonical(bytes, MAX_CHANNEL_TRANSITION_REPLAY_AUTHORITY_PINS_BYTES)?;
+        pins.validate()?;
         Ok(pins)
     }
 
@@ -787,18 +778,8 @@ impl ChannelTransitionReplayVerifierV1 {
         bytes: &[u8],
         expected_authority_pins: &ChannelTransitionReplayAuthorityPinsV1,
     ) -> Result<Self, ChannelError> {
-        if bytes.is_empty() || bytes.len() > MAX_CHANNEL_TRANSITION_REPLAY_BYTES {
-            return Err(ChannelError::InvalidField("channel_transition_replay_size"));
-        }
-        let descriptor: ChannelTransitionReplayDescriptorV1 = serde_json::from_slice(bytes)
-            .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
-        let canonical = canonical_json_bytes(&descriptor)
-            .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
-        if canonical.as_slice() != bytes {
-            return Err(ChannelError::Canonicalization(
-                "channel transition replay descriptor is not canonical".to_owned(),
-            ));
-        }
+        let descriptor: ChannelTransitionReplayDescriptorV1 =
+            crate::input::canonical(bytes, MAX_CHANNEL_TRANSITION_REPLAY_BYTES)?;
         let reconstructed = descriptor.reconstruct(expected_authority_pins)?;
         Ok(Self {
             descriptor,

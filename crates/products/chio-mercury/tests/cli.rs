@@ -19,6 +19,14 @@ use chio_mercury_core::{
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
+#[path = "cli/evidence_fixture.rs"]
+mod evidence_fixture;
+use evidence_fixture::{export_fixture_package, mercury_receipt_with_ts};
+
+#[path = "cli/signed_reader.rs"]
+mod signed_reader;
+use signed_reader::write_mercury_bundle_manifest;
+
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -33,60 +41,6 @@ fn workspace_root() -> PathBuf {
         .nth(3)
         .expect("workspace root")
         .to_path_buf()
-}
-
-fn mercury_receipt_with_ts(
-    id: &str,
-    capability_id: &str,
-    timestamp: u64,
-    keypair: &Keypair,
-) -> ChioReceipt {
-    let mercury_metadata = sample_mercury_receipt_metadata();
-    let metadata = mercury_metadata
-        .into_receipt_metadata_value()
-        .expect("mercury metadata value");
-    ChioReceipt::sign(
-        ChioReceiptBody {
-            id: id.to_string(),
-            timestamp,
-            capability_id: capability_id.to_string(),
-            tool_server: "mercury".to_string(),
-            tool_name: "release_control".to_string(),
-            action: ToolCallAction::from_parameters(serde_json::json!({
-                "workflowId": mercury_metadata.business_ids.workflow_id,
-                "eventId": mercury_metadata.chronology.event_id,
-                "decisionType": mercury_metadata.decision_context.decision_type.as_str(),
-                "stage": mercury_metadata.chronology.stage,
-                "toolName": "release_control",
-            }))
-            .expect("action"),
-            decision: Some(Decision::Allow),
-            receipt_kind: Default::default(),
-            boundary_class: Default::default(),
-            observation_outcome: None,
-            tool_origin: Default::default(),
-            redaction_mode: Default::default(),
-            actor_chain: Vec::new(),
-            content_hash: "content-1".to_string(),
-            policy_hash: "policy-1".to_string(),
-            evidence: Vec::new(),
-            metadata: Some(metadata),
-            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-            tenant_id: None,
-            kernel_key: keypair.public_key(),
-            bbs_projection_version: None,
-        },
-        keypair,
-    )
-    .expect("sign mercury receipt")
-}
-
-fn write_mercury_bundle_manifest(path: &Path) {
-    fs::write(
-        path,
-        serde_json::to_vec_pretty(&sample_mercury_bundle_manifest()).expect("bundle manifest"),
-    )
-    .expect("write bundle manifest");
 }
 
 fn write_supervised_live_capture(path: &Path, mode: MercurySupervisedLiveMode) {
@@ -117,25 +71,6 @@ fn write_degraded_supervised_live_capture(path: &Path) {
     .expect("write degraded supervised live capture");
 }
 
-fn export_fixture_package(receipt_db_path: &Path, output_dir: &Path) {
-    evidence_export::cmd_evidence_export(
-        output_dir,
-        None,
-        None,
-        None,
-        None,
-        None,
-        true,
-        None,
-        None,
-        false,
-        Some(receipt_db_path),
-        None,
-        None,
-    )
-    .expect("export evidence fixture package");
-}
-
 #[test]
 fn mercury_proof_and_inquiry_packages_export_and_verify() {
     let receipt_db_path = unique_path("chio-mercury-proof", ".sqlite3");
@@ -146,7 +81,7 @@ fn mercury_proof_and_inquiry_packages_export_and_verify() {
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
-        let issuer = Keypair::generate();
+        let issuer = Keypair::from_seed(&[58; 32]);
         let seq = store
             .append_chio_receipt_returning_seq(&mercury_receipt_with_ts(
                 "rcpt-mercury-1",
@@ -181,6 +116,8 @@ fn mercury_proof_and_inquiry_packages_export_and_verify() {
         .current_dir(workspace_root())
         .arg("proof")
         .arg("export")
+        .arg("--trusted-kernel-pubkey")
+        .arg(Keypair::from_seed(&[58; 32]).public_key().to_hex())
         .arg("--input")
         .arg(&output_dir)
         .arg("--output")

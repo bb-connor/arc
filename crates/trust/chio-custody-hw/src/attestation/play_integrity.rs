@@ -107,16 +107,29 @@ pub fn verify_play_integrity(
             "expected audience must not be empty".to_string(),
         ));
     }
-    let header = decode_header(input.token)
-        .map_err(|error| AttestationError::PlayIntegrityInvalidToken(error.to_string()))?;
+    super::play_integrity_input::validate_token(input.token)?;
+    let header = decode_header(input.token).map_err(AttestationError::from)?;
     let kid = header.kid.as_deref().ok_or_else(|| {
         AttestationError::PlayIntegrityInvalidToken("token header is missing kid".to_string())
     })?;
     let jwks_source = select_jwks(&input)?;
-    let jwks: JwkSet = serde_json::from_str(&jwks_source)
-        .map_err(|error| AttestationError::PlayIntegrityInvalidToken(format!("JWKS: {error}")))?;
+    let jwks: JwkSet = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        jwks_source.as_bytes(),
+        super::play_integrity_input::MAX_JWKS_BYTES,
+    )?
+    .decode_external()?;
+    let mut key_ids = std::collections::BTreeSet::new();
+    for key in &jwks.keys {
+        if let Some(id) = &key.common.key_id {
+            if !key_ids.insert(id) {
+                return Err(AttestationError::PlayIntegrityInvalidToken(
+                    "duplicate JWKS key id".into(),
+                ));
+            }
+        }
+    }
     let jwk = jwks.find(kid).ok_or_else(|| {
-        AttestationError::PlayIntegrityInvalidToken(format!("JWKS has no key for kid {kid}"))
+        AttestationError::PlayIntegrityInvalidToken("JWKS has no matching key id".into())
     })?;
     let algorithm = jwk_algorithm(jwk)?;
     if header.alg != algorithm {
@@ -126,8 +139,7 @@ pub fn verify_play_integrity(
         )));
     }
 
-    let decoding_key = DecodingKey::from_jwk(jwk)
-        .map_err(|error| AttestationError::PlayIntegrityInvalidToken(error.to_string()))?;
+    let decoding_key = DecodingKey::from_jwk(jwk).map_err(AttestationError::from)?;
     let mut validation = Validation::new(algorithm);
     validation.set_audience(&[input.expected_audience]);
     validation.set_issuer(&[GOOGLE_PLAY_INTEGRITY_ISSUER]);
@@ -135,7 +147,7 @@ pub fn verify_play_integrity(
     validation.required_spec_claims.insert("iss".to_string());
     validation.required_spec_claims.insert("exp".to_string());
     let token = decode::<PlayIntegrityClaims>(input.token, &decoding_key, &validation)
-        .map_err(|error| AttestationError::PlayIntegrityInvalidToken(error.to_string()))?;
+        .map_err(AttestationError::from)?;
     let claims = token.claims;
     let nonce = claim_nonce(&claims)?.to_string();
 
@@ -177,6 +189,10 @@ fn select_jwks(input: &PlayIntegrityVerificationInput<'_>) -> Result<String, Att
     // the production-readiness guard is intentionally NOT enforced here: the
     // fixture signer is the trust anchor these builds exercise.
     if input.allow_caller_supplied_jwks {
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            input.jwks_json.as_bytes(),
+            super::play_integrity_input::MAX_JWKS_BYTES,
+        )?;
         Ok(input.jwks_json.to_string())
     } else {
         Ok(play_integrity_pinned_jwks_json())

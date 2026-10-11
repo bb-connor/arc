@@ -1,0 +1,41 @@
+name: Release identity verification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/install/**'
+      - 'scripts/verify-release-identity.py'
+      - 'scripts/tests/release-identity.test.py'
+      - '.github/workflows/release-*.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/install/**'
+      - 'scripts/verify-release-identity.py'
+      - 'scripts/tests/release-identity.test.py'
+      - '.github/workflows/release-*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-documented-commands:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409
+        with:
+          cosign-release: v2.4.1
+      - name: Exercise exact identity and byte rejection with local signed fixtures
+        env:
+          RL1_TEST_EVIDENCE_DIR: ${{ runner.temp }}/release-identity-evidence
+        run: python3 scripts/tests/release-identity.test.py
+      - name: Retain local fixture evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-identity-local-fixtures
+          path: ${{ runner.temp }}/release-identity-evidence
+          if-no-files-found: error
+          retention-days: 30

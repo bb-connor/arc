@@ -14,7 +14,40 @@ from chio_hermes.commands import make_slash_handler
 from chio_hermes.handlers import make_handler
 from chio_hermes.manifest import TOOL_TABLE
 from chio_hermes.receipts import ReceiptBuffer
-from tests.conftest import make_configured_runtime
+from tests.conftest import make_configured_runtime, sample_capability
+
+
+def test_runtime_restores_full_capability_without_operator_bearer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import chio_sdk.client as client_module
+
+    from chio_hermes import cli
+
+    token = sample_capability()
+    monkeypatch.delenv("CHIO_POLICY_FILE", raising=False)
+    monkeypatch.setenv("CHIO_CAPABILITY_ID", token["id"])
+    monkeypatch.setenv("CHIO_SIDECAR_CONTROL_TOKEN", "operator-only")
+    monkeypatch.setenv("CHIO_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(cli, "_load_cache", lambda: [{
+        "capability_id": token["id"], "signed_capability": token, "revoked": False,
+    }])
+    constructor_args: dict[str, Any] = {}
+
+    def client_factory(**kwargs: Any) -> MockChioClient:
+        constructor_args.update(kwargs)
+        return MockChioClient()
+
+    monkeypatch.setattr(client_module, "ChioClient", client_factory)
+    handle = _runtime.build_runtime_handle()
+    assert handle.signed_capability == token
+    assert token["signature"] not in repr(handle)
+    assert "control_token" not in constructor_args
+
+    monkeypatch.setattr(cli, "_load_cache", lambda: [{
+        "capability_id": token["id"], "signed_capability": token, "revoked": True,
+    }])
+    assert _runtime.build_runtime_handle().signed_capability is None
 
 
 def _allow_all_policy(_t: str, _s: dict, _c: dict) -> MockVerdict:

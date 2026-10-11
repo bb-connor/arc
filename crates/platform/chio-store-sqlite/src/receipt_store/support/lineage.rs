@@ -438,7 +438,10 @@ pub(crate) fn refresh_receipt_lineage_rows_for_parent_receipt_tx(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn persist_session_anchor_tx(
     tx: &rusqlite::Transaction<'_>,
     session_id: &str,
@@ -570,7 +573,10 @@ pub(crate) fn persist_session_anchor_tx(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn persist_request_lineage_tx(
     tx: &rusqlite::Transaction<'_>,
     session_id: &str,
@@ -681,7 +687,10 @@ pub(crate) fn persist_request_lineage_tx(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn persist_receipt_lineage_statement_tx(
     tx: &rusqlite::Transaction<'_>,
     child_receipt_id: &str,
@@ -930,8 +939,11 @@ pub(crate) fn ensure_receipt_lineage_statement_for_receipt_id_tx(
     let Some((seq, raw_json)) = row else {
         return Ok(());
     };
-    let receipt =
-        decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq.max(0) as u64))?;
+    let receipt = decode_verified_chio_receipt(
+        &raw_json,
+        "persisted tool receipt",
+        Some(u64::try_from(seq.max(0)).unwrap_or_default()),
+    )?;
     let Some(governed) = extract_governed_transaction_metadata(&receipt) else {
         refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
         return Ok(());
@@ -1048,7 +1060,7 @@ pub(crate) fn backfill_provenance_lineage_tables(
         let receipt = decode_verified_child_receipt(
             &raw_json,
             "persisted child receipt",
-            Some(seq.max(0) as u64),
+            Some(u64::try_from(seq.max(0)).unwrap_or_default()),
         )?;
         persist_request_lineage_tx(
             tx,

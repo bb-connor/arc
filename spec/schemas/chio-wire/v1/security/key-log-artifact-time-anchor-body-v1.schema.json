@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-body-v1.schema.json",
+  "title": "Chio key-log artifact time anchor body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "anchor_id", "artifact_hash", "anchored_at", "anchor"],
+  "properties": {
+    "schema": { "const": "chio.key-log.artifact-time-anchor.v1" },
+    "anchor_id": { "$ref": "#/$defs/identifier" },
+    "artifact_hash": { "$ref": "#/$defs/hash" },
+    "anchored_at": { "$ref": "#/$defs/u64" },
+    "anchor": { "$ref": "#/$defs/anchor" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:/-]+$" },
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "u64": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "checkpointAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "checkpoint_sequence", "checkpoint_hash"],
+      "properties": {
+        "type": { "enum": ["receipt_checkpoint", "key_log_checkpoint"] },
+        "checkpoint_sequence": { "$ref": "#/$defs/u64" },
+        "checkpoint_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "externalAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "commitment"],
+      "properties": {
+        "type": { "const": "external" },
+        "commitment": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "anchor": {
+      "oneOf": [
+        { "$ref": "#/$defs/checkpointAnchor" },
+        { "$ref": "#/$defs/externalAnchor" }
+      ]
+    }
+  }
+}

@@ -26,7 +26,7 @@ pub struct KernelSignerCheckpointHealth {
     /// The error message from the most recent failed checkpoint
     /// attempt, if any. `None` when the last attempt succeeded (or no
     /// attempt has run yet).
-    pub last_checkpoint_error: Option<String>,
+    pub last_checkpoint_error: Option<std::sync::Arc<ReceiptSignError>>,
 }
 
 /// Kernel-backed receipt signer.
@@ -41,6 +41,7 @@ pub struct KernelSignerCheckpointHealth {
 /// caller still observes the signed receipt and the ACP message flow
 /// is not blocked.
 pub struct KernelReceiptSigner {
+    clock: AcpClock,
     keypair: Keypair,
     // Kept for receipt-provenance parity once signer metadata is surfaced.
     #[allow(dead_code)]
@@ -71,8 +72,10 @@ impl KernelReceiptSigner {
         server_id: impl Into<String>,
         store: Box<dyn ReceiptStore>,
         checkpoint_batch_size: u64,
+        clock: AcpClock,
     ) -> Self {
         Self {
+            clock,
             keypair,
             server_id: server_id.into(),
             store: Mutex::new(store),
@@ -93,9 +96,9 @@ impl KernelReceiptSigner {
             // that names the lock failure instead of panicking. This
             // keeps health endpoints alive even in the unlikely
             // poisoned-mutex case.
-            Err(err) => KernelSignerCheckpointHealth {
+            Err(_) => KernelSignerCheckpointHealth {
                 consecutive_failures: 0,
-                last_checkpoint_error: Some(format!("checkpoint health lock poisoned: {err}")),
+                last_checkpoint_error: Some(std::sync::Arc::new(ReceiptSignError::PoisonedStore)),
             },
         }
     }
@@ -103,145 +106,135 @@ impl KernelReceiptSigner {
     fn verify_live_authorization_receipt(
         &self,
         request: &AcpReceiptRequest,
+        event_timestamp: u64,
     ) -> Result<VerifiedAuthorizationContext, ReceiptSignError> {
         let entry = &request.audit_entry;
         let capability_id = entry.capability_id.as_deref().ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must carry the live capability id"
-                    .to_string(),
-            )
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                ReceiptBinding::Capability,
+            ))
         })?;
         if capability_id.is_empty() {
-            return Err(ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must carry the live capability id"
-                    .to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Missing(ReceiptBinding::Capability),
             ));
         }
         let authorization_receipt_id =
             entry.authorization_receipt_id.as_deref().ok_or_else(|| {
-                ReceiptSignError::SigningFailed(
-                    "cryptographically enforced ACP audit entries must reference an authorization receipt"
-                        .to_string(),
-                )
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::Receipt,
+                ))
             })?;
         if authorization_receipt_id.is_empty() {
-            return Err(ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must reference an authorization receipt"
-                    .to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Missing(ReceiptBinding::Receipt),
             ));
         }
         let authorization_request_id =
             entry.authorization_request_id.as_deref().ok_or_else(|| {
-                ReceiptSignError::SigningFailed(
-                    "cryptographically enforced ACP audit entries must reference the authorization request id"
-                        .to_string(),
-                )
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::Request,
+                ))
             })?;
         if authorization_request_id.is_empty() {
-            return Err(ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must reference the authorization request id"
-                    .to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Missing(ReceiptBinding::Request),
             ));
         }
         if entry.session_id.is_empty() || entry.tool_call_id.is_empty() {
-            return Err(ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must bind session and tool call ids"
-                    .to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Missing(ReceiptBinding::ToolCall),
             ));
         }
         let authorization_tool_call_id =
             entry.authorization_tool_call_id.as_deref().ok_or_else(|| {
-                ReceiptSignError::SigningFailed(
-                    "cryptographically enforced ACP audit entries must reference the authorization tool call id"
-                        .to_string(),
-                )
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::ToolCall,
+                ))
             })?;
         if authorization_tool_call_id != entry.tool_call_id.as_str() {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt tool call id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::ToolCall),
             ));
         }
-        let authorization_correlation_id =
-            entry.authorization_correlation_id.as_deref().ok_or_else(|| {
-                ReceiptSignError::SigningFailed(
-                    "cryptographically enforced ACP audit entries must reference the authorization correlation id"
-                        .to_string(),
-                )
+        let authorization_correlation_id = entry
+            .authorization_correlation_id
+            .as_deref()
+            .ok_or_else(|| {
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::Correlation,
+                ))
             })?;
         if authorization_correlation_id.is_empty() {
-            return Err(ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must reference the authorization correlation id"
-                    .to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Missing(ReceiptBinding::Correlation),
             ));
         }
-        let authorization_operation = entry.authorization_operation.as_deref().ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must reference the authorization operation"
-                    .to_string(),
-            )
-        })?;
+        let authorization_operation =
+            entry.authorization_operation.as_deref().ok_or_else(|| {
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::Operation,
+                ))
+            })?;
         let authorization_resource = entry.authorization_resource.as_deref().ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "cryptographically enforced ACP audit entries must reference the authorization resource"
-                    .to_string(),
-            )
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                ReceiptBinding::Resource,
+            ))
         })?;
-        let authorization_parameter_hash =
-            entry.authorization_parameter_hash.as_deref().ok_or_else(|| {
-                ReceiptSignError::SigningFailed(
-                    "cryptographically enforced ACP audit entries must reference the authorization parameter hash"
-                        .to_string(),
-                )
+        let authorization_parameter_hash = entry
+            .authorization_parameter_hash
+            .as_deref()
+            .ok_or_else(|| {
+                ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                    ReceiptBinding::ParameterHash,
+                ))
             })?;
 
         let authorization_receipt = {
-            let store = self.store.lock().map_err(|e| {
-                ReceiptSignError::SigningFailed(format!("store lock poisoned: {e}"))
-            })?;
+            let store = self
+                .store
+                .lock()
+                .map_err(|_| ReceiptSignError::PoisonedStore)?;
             store
                 .load_chio_receipt(authorization_receipt_id)
-                .map_err(|e| {
-                    ReceiptSignError::SigningFailed(format!(
-                        "failed to load ACP authorization receipt: {e}"
-                    ))
-                })?
+                .map_err(ReceiptSignError::Store)?
                 .ok_or_else(|| {
-                    ReceiptSignError::SigningFailed(format!(
-                        "authorization receipt {authorization_receipt_id} was not found"
+                    ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                        ReceiptBinding::Receipt,
                     ))
                 })?
         };
 
         if authorization_receipt.id != authorization_receipt_id {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Receipt),
             ));
         }
-        if !authorization_receipt.verify_signature().map_err(|error| {
-            ReceiptSignError::SigningFailed(format!(
-                "authorization receipt signature verification failed: {error}"
-            ))
-        })? {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt signature verification failed".to_string(),
+        if !authorization_receipt
+            .verify_signature()
+            .map_err(ReceiptSignError::Canonical)?
+        {
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::InvalidSignature,
             ));
+        }
+        if authorization_receipt.timestamp > event_timestamp {
+            return Err(
+                AcpAuditError::Clock(chio_security_types::clock::ClockError::NotYetValid).into(),
+            );
         }
         if authorization_receipt.kernel_key != self.keypair.public_key() {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt signer mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Signer),
             ));
         }
         if !authorization_receipt
             .action
             .verify_hash()
-            .map_err(|error| {
-                ReceiptSignError::SigningFailed(format!(
-                    "authorization receipt parameter hash verification failed: {error}"
-                ))
-            })?
+            .map_err(ReceiptSignError::Canonical)?
         {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt parameter hash mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::ParameterHash),
             ));
         }
         let action_parameters = &authorization_receipt.action.parameters;
@@ -249,42 +242,38 @@ impl KernelReceiptSigner {
             .get("authorization_parameter_hash")
             .and_then(serde_json::Value::as_str);
         if action_authorization_parameter_hash != Some(authorization_parameter_hash) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt action parameter hash mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::ParameterHash),
             ));
         }
         let operation_payload = action_parameters.get("operation_payload").ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "authorization receipt must cover the full ACP operation payload".to_string(),
-            )
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                ReceiptBinding::OperationPayload,
+            ))
         })?;
         let operation_payload_bytes = chio_core::canonical::canonical_json_bytes(operation_payload)
-            .map_err(|error| {
-                ReceiptSignError::SigningFailed(format!(
-                    "authorization receipt operation payload canonicalization failed: {error}"
-                ))
-            })?;
+            .map_err(ReceiptSignError::Canonical)?;
         let operation_payload_hash = chio_core::sha256_hex(&operation_payload_bytes);
         if operation_payload_hash != authorization_parameter_hash {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt operation payload hash mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::OperationPayload),
             ));
         }
         if authorization_receipt.capability_id != capability_id {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt capability mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Capability),
             ));
         }
         if authorization_receipt.tool_server != request.tool_server
             || authorization_receipt.tool_name != request.tool_name
         {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt tool target mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Tool),
             ));
         }
         if !authorization_receipt.is_allowed() {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt must be a mediated allow".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::NotAuthorizing,
             ));
         }
         let stored_request_id = authorization_receipt
@@ -294,27 +283,25 @@ impl KernelReceiptSigner {
             .and_then(|context| context.get("request_id"))
             .and_then(serde_json::Value::as_str);
         if stored_request_id != Some(authorization_request_id) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt request id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Request),
             ));
         }
         let stored_session_id = action_parameters
             .get("session_id")
             .and_then(serde_json::Value::as_str);
         if stored_session_id != Some(entry.session_id.as_str()) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt session id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Session),
             ));
         }
         let stored_tool_call_id = action_parameters.get("tool_call_id").ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "authorization receipt must carry a tool call id field".to_string(),
-            )
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                ReceiptBinding::ToolCall,
+            ))
         })?;
         let stored_tool_call_id = stored_tool_call_id.as_str().ok_or_else(|| {
-            ReceiptSignError::SigningFailed(
-                "authorization receipt tool call id must be a string".to_string(),
-            )
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::MalformedToolCall)
         })?;
         // Deferred-bind semantics: ACP fs/read_text_file, fs/write_text_file,
         // and terminal/create requests do not carry a `toolCallId` at the
@@ -329,32 +316,32 @@ impl KernelReceiptSigner {
         // equality check between `entry.authorization_tool_call_id` and
         // `entry.tool_call_id` above.
         if !stored_tool_call_id.is_empty() && stored_tool_call_id != authorization_tool_call_id {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt tool call id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::ToolCall),
             ));
         }
         let stored_correlation_id = action_parameters
             .get("authorization_correlation_id")
             .and_then(serde_json::Value::as_str);
         if stored_correlation_id != Some(authorization_correlation_id) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt correlation id mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Correlation),
             ));
         }
         let stored_operation = action_parameters
             .get("operation")
             .and_then(serde_json::Value::as_str);
         if stored_operation != Some(authorization_operation) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt operation mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Operation),
             ));
         }
         let stored_resource = action_parameters
             .get("resource")
             .and_then(serde_json::Value::as_str);
         if stored_resource != Some(authorization_resource) {
-            return Err(ReceiptSignError::SigningFailed(
-                "authorization receipt resource mismatch".to_string(),
+            return Err(ReceiptSignError::Authorization(
+                ReceiptAuthorizationError::Mismatch(ReceiptBinding::Resource),
             ));
         }
         // Tenant id is optional: the kernel legitimately signs receipts with
@@ -363,8 +350,8 @@ impl KernelReceiptSigner {
         // valid `Some(<non-empty>)` values unchanged.
         let tenant_id = match authorization_receipt.tenant_id.clone() {
             Some(tenant_id) if tenant_id.trim().is_empty() => {
-                return Err(ReceiptSignError::SigningFailed(
-                    "authorization receipt tenant id must not be empty when present".to_string(),
+                return Err(ReceiptSignError::Authorization(
+                    ReceiptAuthorizationError::InvalidTenant,
                 ));
             }
             other => other,
@@ -385,21 +372,19 @@ impl KernelReceiptSigner {
             return Ok(());
         }
 
-        let latest_committed = store.latest_committed_entry_seq().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("receipt checkpoint status failed: {e}"))
-        })?;
-        let latest_checkpointed = store.latest_checkpointed_entry_seq().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("receipt checkpoint status failed: {e}"))
-        })?;
+        let latest_committed = store
+            .latest_committed_entry_seq()
+            .map_err(ReceiptSignError::Store)?;
+        let latest_checkpointed = store
+            .latest_checkpointed_entry_seq()
+            .map_err(ReceiptSignError::Store)?;
         if latest_committed.saturating_sub(latest_checkpointed) < self.checkpoint_batch_size {
             return Ok(());
         }
 
         let report = store
             .create_next_receipt_checkpoint(self.checkpoint_batch_size, &self.keypair)
-            .map_err(|e| {
-                ReceiptSignError::SigningFailed(format!("receipt checkpoint creation failed: {e}"))
-            })?;
+            .map_err(ReceiptSignError::Store)?;
 
         if report.created {
             tracing::debug!(
@@ -415,9 +400,7 @@ impl KernelReceiptSigner {
             .saturating_sub(report.latest_checkpointed_entry_seq)
             >= self.checkpoint_batch_size
         {
-            return Err(ReceiptSignError::SigningFailed(
-                "receipt checkpoint creation did not cover an eligible receipt range".to_string(),
-            ));
+            return Err(ReceiptSignError::CheckpointUnavailable);
         }
 
         Ok(())
@@ -426,7 +409,7 @@ impl KernelReceiptSigner {
     /// Note a checkpoint failure into the health snapshot and emit a
     /// tracing warning. Does not return an error: callers must not
     /// block successful receipt flows on checkpoint errors.
-    fn record_checkpoint_failure(&self, receipt_id: &str, err: &ReceiptSignError) {
+    fn record_checkpoint_failure(&self, receipt_id: &str, err: ReceiptSignError) {
         let err_string = err.to_string();
         tracing::warn!(
             receipt_id = %receipt_id,
@@ -435,7 +418,7 @@ impl KernelReceiptSigner {
         );
         if let Ok(mut health) = self.checkpoint_health.lock() {
             health.consecutive_failures = health.consecutive_failures.saturating_add(1);
-            health.last_checkpoint_error = Some(err_string);
+            health.last_checkpoint_error = Some(std::sync::Arc::new(err));
         }
     }
 
@@ -456,18 +439,14 @@ impl ReceiptSigner for KernelReceiptSigner {
     ) -> Result<ChioReceipt, ReceiptSignError> {
         let entry = &request.audit_entry;
 
-        let timestamp = entry.timestamp.parse::<u64>().unwrap_or_else(|_| {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-        });
+        let now = self.clock.read().map_err(AcpAuditError::from)?;
+        let timestamp = clock::event_timestamp(&entry.timestamp, now)?;
         let enforcement_mode = entry
             .enforcement_mode
             .unwrap_or(AcpEnforcementMode::AuditOnly);
         let authorization_context =
             if enforcement_mode == AcpEnforcementMode::CryptographicallyEnforced {
-                Some(self.verify_live_authorization_receipt(request)?)
+                Some(self.verify_live_authorization_receipt(request, timestamp)?)
             } else {
                 None
             };
@@ -494,7 +473,7 @@ impl ReceiptSigner for KernelReceiptSigner {
             action_parameters["operation_payload"] = context.operation_payload.clone();
         }
         let action = ToolCallAction::from_parameters(action_parameters)
-            .map_err(|e| ReceiptSignError::SigningFailed(format!("hash ACP parameters: {e}")))?;
+            .map_err(ReceiptSignError::Canonical)?;
 
         let body = ChioReceiptBody {
             // `ChioReceipt::sign` replaces this with the canonical
@@ -571,8 +550,8 @@ impl ReceiptSigner for KernelReceiptSigner {
             bbs_projection_version: None,
         };
 
-        let receipt = ChioReceipt::sign(body, &self.keypair)
-            .map_err(|e| ReceiptSignError::SigningFailed(format!("Ed25519 signing failed: {e}")))?;
+        let receipt =
+            ChioReceipt::sign(body, &self.keypair).map_err(ReceiptSignError::Canonical)?;
 
         // Append to the receipt store. The append itself is part of
         // the signing boundary and fails closed: if the receipt cannot
@@ -587,9 +566,10 @@ impl ReceiptSigner for KernelReceiptSigner {
         // warning instead, then fall through to return the signed
         // receipt to the caller.
         {
-            let store = self.store.lock().map_err(|e| {
-                ReceiptSignError::SigningFailed(format!("store lock poisoned: {e}"))
-            })?;
+            let store = self
+                .store
+                .lock()
+                .map_err(|_| ReceiptSignError::PoisonedStore)?;
             if let Some(context) = &authorization_context {
                 let consumption = AuthorizationReceiptConsumption {
                     authorization_receipt_id: context.authorization_receipt_id.clone(),
@@ -599,20 +579,18 @@ impl ReceiptSigner for KernelReceiptSigner {
                     tool_call_id: context.tool_call_id.clone(),
                     tenant_id: context.tenant_id.clone(),
                     parameter_hash: context.parameter_hash.clone(),
-                    consumed_at_unix_ms: timestamp.saturating_mul(1000),
+                    consumed_at_unix_ms: now.unix_millis().get(),
                 };
                 store
                     .append_chio_receipt_consuming_authorization(&receipt, &consumption)
-                    .map_err(|e| {
-                        ReceiptSignError::SigningFailed(format!("receipt store append failed: {e}"))
-                    })?;
+                    .map_err(ReceiptSignError::Store)?;
             } else {
-                store.append_chio_receipt(&receipt).map_err(|e| {
-                    ReceiptSignError::SigningFailed(format!("receipt store append failed: {e}"))
-                })?;
+                store
+                    .append_chio_receipt(&receipt)
+                    .map_err(ReceiptSignError::Store)?;
             }
             if let Err(err) = self.checkpoint_after_append(store.as_ref()) {
-                self.record_checkpoint_failure(&receipt.id, &err);
+                self.record_checkpoint_failure(&receipt.id, err);
             } else {
                 self.record_checkpoint_success();
             }

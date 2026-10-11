@@ -81,8 +81,8 @@ pub(crate) fn build_credit_bond_terms(
     let coverage_ratio_bps = if reserve_requirement_units == 0 {
         10_000
     } else {
-        (((collateral_units as u128) * 10_000) / (reserve_requirement_units as u128))
-            .min(u16::MAX as u128) as u16
+        u16::try_from(u128::from(collateral_units) * 10_000 / u128::from(reserve_requirement_units))
+            .unwrap_or(u16::MAX)
     };
 
     CreditBondTerms {
@@ -431,7 +431,8 @@ pub(crate) fn credit_bond_reserve_units(units: u64, ratio_bps: u16) -> u64 {
     if units == 0 || ratio_bps == 0 {
         0
     } else {
-        (((units as u128) * (ratio_bps as u128)).div_ceil(10_000_u128)).min(u64::MAX as u128) as u64
+        u64::try_from((u128::from(units) * u128::from(ratio_bps)).div_ceil(10_000))
+            .unwrap_or(u64::MAX)
     }
 }
 
@@ -471,19 +472,25 @@ pub(crate) fn build_credit_recent_loss_history(
     entries.truncate(limit);
     let summary = CreditRecentLossSummary {
         matching_loss_events,
-        returned_loss_events: entries.len() as u64,
-        failed_settlement_events: entries
-            .iter()
-            .filter(|entry| entry.settlement_status == SettlementStatus::Failed)
-            .count() as u64,
-        provisional_loss_events: entries
-            .iter()
-            .filter(|entry| entry.provisional_loss_amount.is_some())
-            .count() as u64,
-        recovered_events: entries
-            .iter()
-            .filter(|entry| entry.recovered_amount.is_some())
-            .count() as u64,
+        returned_loss_events: crate::integer::count(entries.len()),
+        failed_settlement_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.settlement_status == SettlementStatus::Failed)
+                .count(),
+        ),
+        provisional_loss_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.provisional_loss_amount.is_some())
+                .count(),
+        ),
+        recovered_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.recovered_amount.is_some())
+                .count(),
+        ),
     };
     Ok(CreditRecentLossHistory { summary, entries })
 }
@@ -615,6 +622,10 @@ pub(crate) fn capital_book_receipt_evidence(
     evidence_refs
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Statistical score dimensions approximate integer totals; monetary amounts remain exact integer units."
+)]
 pub(crate) fn build_credit_scorecard_dimensions(
     subject_key: &str,
     exposure: &ExposureLedgerReport,
@@ -623,7 +634,10 @@ pub(crate) fn build_credit_scorecard_dimensions(
 ) -> Vec<CreditScorecardDimension> {
     let settlement_penalty = credit_scorecard_penalty_ratio(
         credit_scorecard_total_units(&exposure.positions, |position| {
-            position.failed_units.saturating_mul(2) + position.pending_units
+            position
+                .failed_units
+                .saturating_mul(2)
+                .saturating_add(position.pending_units)
         }) as f64
             / 2.0,
         exposure_units,
@@ -716,7 +730,7 @@ pub(crate) fn build_credit_scorecard_probation(
     CreditScorecardProbationStatus {
         probationary: inspection.probationary || confidence == CreditScorecardConfidence::Low,
         reasons,
-        receipt_count: inspection.scorecard.history_depth.receipt_count as u64,
+        receipt_count: crate::integer::count(inspection.scorecard.history_depth.receipt_count),
         span_days: inspection.scorecard.history_depth.span_days,
         target_receipt_count: inspection.probationary_receipt_count,
         target_span_days: inspection.probationary_min_days,
@@ -855,7 +869,7 @@ pub(crate) fn build_credit_scorecard_anomalies(
 pub(crate) fn resolve_credit_scorecard_confidence(
     inspection: &issuance::LocalReputationInspection,
 ) -> CreditScorecardConfidence {
-    let receipt_count = inspection.scorecard.history_depth.receipt_count as u64;
+    let receipt_count = crate::integer::count(inspection.scorecard.history_depth.receipt_count);
     let span_days = inspection.scorecard.history_depth.span_days;
     let mut confidence = if receipt_count >= 100 && span_days >= 30 {
         CreditScorecardConfidence::High
@@ -965,22 +979,20 @@ where
 }
 
 pub fn build_signed_underwriting_policy_input(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
 ) -> Result<SignedUnderwritingPolicyInput, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair up front so its public key can anchor the
     // reputation scoring trust set; an empty set would silently filter every
     // signed receipt out (see chio-reputation::receipt_integrity_valid).
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_underwriting_policy_input(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
@@ -992,16 +1004,14 @@ pub fn build_signed_underwriting_policy_input(
 }
 
 pub fn build_underwriting_decision_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingDecisionReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_underwriting_decision_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
@@ -1013,7 +1023,6 @@ pub fn build_underwriting_decision_report(
 
 pub(crate) fn build_underwriting_decision_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     query: &UnderwritingPolicyInputQuery,
@@ -1022,7 +1031,6 @@ pub(crate) fn build_underwriting_decision_report_from_store(
 ) -> Result<UnderwritingDecisionReport, TrustHttpError> {
     let input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         query,
@@ -1035,16 +1043,14 @@ pub(crate) fn build_underwriting_decision_report_from_store(
 }
 
 pub fn build_underwriting_simulation_report(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &UnderwritingSimulationRequest,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingSimulationReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     build_underwriting_simulation_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         request,
@@ -1056,16 +1062,15 @@ pub fn build_underwriting_simulation_report(
 
 pub(crate) fn build_underwriting_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
-    receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &UnderwritingSimulationRequest,
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingSimulationReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let input = build_underwriting_policy_input(
         receipt_store,
-        receipt_db_path,
         budget_db_path,
         certification_registry_file,
         &request.query,
@@ -1083,7 +1088,7 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
 
     Ok(UnderwritingSimulationReport {
         schema: UNDERWRITING_SIMULATION_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         input,
         delta: build_underwriting_simulation_delta(&default_evaluation, &simulated_evaluation),
         default_evaluation,
@@ -1092,7 +1097,7 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
 }
 
 pub fn issue_signed_underwriting_decision(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1101,7 +1106,7 @@ pub fn issue_signed_underwriting_decision(
     supersedes_decision_id: Option<&str>,
 ) -> Result<SignedUnderwritingDecision, CliError> {
     issue_signed_underwriting_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         authority_seed_path,
         authority_db_path,
@@ -1115,7 +1120,7 @@ pub fn issue_signed_underwriting_decision(
 }
 
 pub(crate) fn issue_signed_underwriting_decision_detailed(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1125,7 +1130,7 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
     read_context: chio_kernel::ReceiptReadContext,
     fiscal_runtime: Option<&TrustFiscalRuntime>,
 ) -> Result<SignedUnderwritingDecision, TrustHttpError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let clock_now = unix_timestamp_now()?;
     // Load the signing keypair first so its public key anchors the reputation
     // scoring trust set (chio-reputation::receipt_integrity_valid fails closed
     // on an empty set, which would zero out the reputation contribution).
@@ -1133,16 +1138,15 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let trusted_kernel_keys = vec![keypair.public_key().to_hex()];
     let report = build_underwriting_decision_report_from_store(
-        &receipt_store,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         certification_registry_file,
         query,
         read_context.clone(),
         &trusted_kernel_keys,
     )?;
-    let quoted_exposure = build_underwriting_quoted_exposure(&receipt_store, query, read_context)?;
-    let issued_at = unix_timestamp_now();
+    let quoted_exposure = build_underwriting_quoted_exposure(receipt_store, query, read_context)?;
+    let issued_at = clock_now;
     let mut artifact = if let Some(runtime) = fiscal_runtime {
         runtime
             .with_resolver(|resolver| {
@@ -1175,30 +1179,27 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
 }
 
 pub fn list_underwriting_decisions(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     query: &UnderwritingDecisionQuery,
 ) -> Result<UnderwritingDecisionListReport, CliError> {
-    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .query_underwriting_decisions(query)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn create_underwriting_appeal(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &UnderwritingAppealCreateRequest,
 ) -> Result<UnderwritingAppealRecord, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .create_underwriting_appeal(request)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 pub fn resolve_underwriting_appeal(
-    receipt_db_path: &Path,
+    receipt_store: &SqliteReceiptStore,
     request: &UnderwritingAppealResolveRequest,
 ) -> Result<UnderwritingAppealRecord, CliError> {
-    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     receipt_store
         .resolve_underwriting_appeal(request)
         .map_err(|error| CliError::cli_other_error(error.to_string()))
@@ -1479,6 +1480,10 @@ mod policy_support;
 
 pub(crate) use self::policy_support::*;
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "underwriting_and_support/behavioral_signing_custody_tests.rs"]
+mod behavioral_signing_custody_tests;
+
 #[cfg(test)]
 mod underwriting_and_support_tests {
     use super::*;
@@ -1497,15 +1502,20 @@ mod underwriting_and_support_tests {
 
     #[test]
     fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
-        let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let source_path = directory.path().join("source.sqlite3");
+        let follower_path = directory.path().join("follower.sqlite3");
         let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
         let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
         let follower_local_key = follower.local_keypair().test_unwrap();
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_unwrap();
-        let snapshot = source.snapshot().test_unwrap();
-        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
+        let snapshot = source.signed_snapshot().test_unwrap();
+        assert!(follower.apply_signed_snapshot(&snapshot).test_unwrap());
         assert!(follower.current_keypair().is_err());
 
         let signing_key =
@@ -1519,7 +1529,8 @@ mod underwriting_and_support_tests {
     #[test]
     fn underwriting_compliance_evidence_rejects_subject_mismatch() {
         let activity = chio_kernel::ReceiptAnalyticsResponse {
-            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
+            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2)
+                .test_unwrap(),
             by_agent: Vec::new(),
             by_tool: Vec::new(),
             by_time: Vec::new(),
@@ -1561,13 +1572,18 @@ mod underwriting_and_support_tests {
 
     fn minimal_trust_service_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_unwrap(),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
+            authority_workload_token: None,
             receipt_db_path: None,
+            receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
             authority_seed_path: None,
             authority_db_path: None,
+            authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -1587,6 +1603,7 @@ mod underwriting_and_support_tests {
             certification_public_metadata_ttl_seconds: 900,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
+            authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,

@@ -13,7 +13,10 @@ pub struct InclusionStep {
 
 /// Classify one level of a carry-last-node RFC 6962 inclusion-proof walk.
 #[must_use]
-#[allow(clippy::manual_is_multiple_of)] // Matches the extraction-safe scalar mirror.
+#[allow(
+    clippy::manual_is_multiple_of,
+    reason = "Keep arithmetic in the explicit form consumed by the existing formal model."
+)] // Matches the extraction-safe scalar mirror.
 pub fn inclusion_step(index: u64, size: u64) -> InclusionStep {
     let sibling_on_left = index % 2 != 0;
     let right_sibling_exists = match index.checked_add(1) {

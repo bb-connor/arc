@@ -1,0 +1,82 @@
+{
+  "schema": "chio.security.wallet-export-signer.v1",
+  "observed_utc": "2026-10-10T01:06:50.134220+00:00",
+  "source_stage_head": "f68f9ca52bab0bc57206887d4140f63cc5b1bd57",
+  "repairs": {
+    "wallet": {
+      "producer": "b23d5b4a36622644875d4eb7d334604c64c0eb7d",
+      "integration": "6c789a7cc000c7b454985e9b0a13e65256305e5f",
+      "state": "offload-repaired-independent-parallel-failure-open"
+    },
+    "export": {
+      "producers": [
+        "db28ba9ef8642874f62034a2d2f354c7ee1ac6b8",
+        "a8623528d7a535e424f419ed9093b2cc0a8f9fe9"
+      ],
+      "integrations": [
+        "b7267d59e184c7766034474393294d80cb2fc881",
+        "f68f9ca52bab0bc57206887d4140f63cc5b1bd57"
+      ],
+      "state": "component-repaired-independent-review-pending"
+    },
+    "passport_signer": {
+      "producer": "a0f54fc5d5c3ebcd17adbccf3b535c0ccbb210c5",
+      "integration": "92c63a5ea182edb3a8bf845d17ae6aa7bb1841a4",
+      "state": "component-repaired-core-composition-and-parallel-review-pending"
+    }
+  },
+  "evidence": [
+    {
+      "path": "/tmp/pr1160-wallet-ingress-final-20261010/qualification.json",
+      "sha256": "4fac0b9ece6a4d11cfb7af1774128def163d6a91e9889398886f970b89d41271"
+    },
+    {
+      "path": "/tmp/pr1160-wallet-ingress-final-20261010/lock-order-qualification.json",
+      "sha256": "010814970846a9e10cdddcaf23be3ef9cb15a41fef6aa739c8b8048b9adce345"
+    },
+    {
+      "path": "/tmp/pr1160-issuer-authority-20261009/qualification.json",
+      "sha256": "539309a9188e51b90e47d05af2ddcf726f1385ac0464b4ef300fbb25a29490b7"
+    },
+    {
+      "path": "/tmp/pr1160-final-review-20261009/PASSPORT-SIGNER-PRODUCER-VERIFIED.json",
+      "sha256": "608b5be5dfba38fda16fb4b1e07b39203ea3a98a0f2e3e7ac73483be231ab15a"
+    }
+  ],
+  "composition_review": {
+    "files_matching_producer": 20,
+    "differing_files": [
+      "docs/security/trust-boundary-inventory.json"
+    ],
+    "accepted_difference": "Trust inventory retains separately reviewed passport registry update#2 ordinal. All20remaining file hashes match final producer source. No runtime or hosted composition claim.",
+    "initial_verification_assertion": "An overconservative assertion expected service_types to differ too; actual source hash matches, so the assertion was corrected before any audit write."
+  },
+  "new_finding": {
+    "label": "F047-WALLET-LANE-ISOLATION",
+    "priority": "P1",
+    "scope": "now",
+    "state": "confirmed-repair-in-progress",
+    "requirement": "Independent service wallet checks must not consume one global lane; each constructed service retains four clone-shared permits.",
+    "reviewed_source": "b23d5b4a36622644875d4eb7d334604c64c0eb7d",
+    "evidence": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-wallet-b23d-review-named.log",
+      "sha256": "611e17adaeb6dbd4114729d3425183f1121d2ce1fe022ab73ca4e80ebbada5a7"
+    },
+    "observed": "First eight-thread reviewer run14PASS3FAIL, expected401 received503; independent from registry writer lane. The preserved original wallet port already had this design.",
+    "remaining_acceptance": [
+      "Service-owned wallet IngressLane, same capacity4, clone-shared; fresh independent test fixtures.",
+      "Preserve source-pinned genuine Original and exact refusals/cancellation/no body polling.",
+      "Twenty repeated eight-thread runs and affected owning suite; no test serialization or capacity increase."
+    ]
+  },
+  "qualification_limits": [
+    "Original failed and compile-error campaigns remain separate.",
+    "Final export75focusedPASS, strictstore renewed; CP/store strict on previous one-file-private-helper revision retained.",
+    "Signer37serialPASS, strictCPalltargetsPASS; defaultparallel and finalcore composition pending.",
+    "Wallet Original0PASS1FAIL and75combinedPASS/strict retained, but eight-thread qualification now reopened.",
+    "No proof campaigns, audit exemptions, baseline or capacity increases.",
+    "Independent exact-source review, final local composition, four protected exact-source hosted checks and normal merge remain."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

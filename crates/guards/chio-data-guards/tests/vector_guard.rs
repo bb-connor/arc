@@ -68,6 +68,7 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (scope, agent_id, server_id, req)
@@ -90,13 +91,12 @@ fn evaluate_with_matched_grant(
     matched_grant_index: Option<usize>,
 ) -> Verdict {
     let (scope, agent_id, server_id, req) = make_request(tool, args, scope);
-    let ctx = GuardContext {
-        request: &req,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index,
+    let ctx = {
+        let mut constructed_guard_context =
+            GuardContext::new(&req, &scope).with_matched_grant_index(matched_grant_index);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     guard
         .evaluate(&ctx)

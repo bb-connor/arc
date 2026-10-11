@@ -110,13 +110,15 @@ fn make_edge() -> Option<ChioMcpEdge> {
 /// Drive arbitrary bytes through the decode-then-evaluator-dispatch
 /// trust-boundary pipeline.
 ///
-/// Bytes are interpreted as a newline-delimited JSON-RPC stream. Every
-/// non-empty trimmed line is parsed with `serde_json::from_str` and, on
-/// success, forwarded to [`ChioMcpEdge::handle_jsonrpc`] against a fresh
-/// per-iteration edge fixture. Errors and method-not-found responses are
-/// silently consumed: the only outcomes are an `Err`-shaped JSON-RPC response
-/// (good), an `Ok`-shaped JSON-RPC response (good), `None` for a notification
-/// (good), or a panic / abort (which libFuzzer reports as a crash).
+/// Bytes are interpreted as a newline-delimited JSON-RPC stream. Each frame is
+/// read by the production stdio line reader under the production stdio frame
+/// bound, blank frames are skipped, and every other frame is decoded with
+/// [`crate::decode_mcp_request`] and, on success, forwarded to
+/// [`ChioMcpEdge::handle_jsonrpc`] against a fresh per-iteration edge fixture.
+/// Errors and method-not-found responses are silently consumed: the only
+/// outcomes are an `Err`-shaped JSON-RPC response (good), an `Ok`-shaped
+/// JSON-RPC response (good), `None` for a notification (good), or a panic /
+/// abort (which libFuzzer reports as a crash).
 ///
 /// The fixture is rebuilt fresh on every iteration so libFuzzer-injected
 /// sequences cannot poison cross-iteration kernel or session state.
@@ -126,12 +128,19 @@ pub fn fuzz_mcp_envelope_decode(data: &[u8]) {
         Some(edge) => edge,
         None => return,
     };
+    let bound = crate::runtime::framing::MAX_STDIO_MCP_FRAME_BYTES;
     loop {
-        match crate::runtime::framing::read_jsonrpc_frame(&mut reader) {
-            Ok(Some(message)) => {
+        let line = match crate::ingress::framing::read_bounded_line(&mut reader, bound) {
+            Ok(Some(line)) => line,
+            Ok(None) | Err(_) => return,
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        match crate::decode_mcp_request(line.as_bytes(), bound) {
+            Ok(message) => {
                 let _ = edge.handle_jsonrpc(message);
             }
-            Ok(None) => return,
             Err(_) => return,
         }
     }

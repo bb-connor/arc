@@ -28,12 +28,27 @@ pub const DEFAULT_MAX_TENANT_CONCURRENCY_BUCKETS: usize = 1024;
 #[derive(Clone)]
 pub struct KernelService {
     kernel: Arc<chio_kernel::ChioKernel>,
+    peer_capabilities: chio_core_types::capability::features::CapabilityNegotiation,
 }
 
 impl KernelService {
     /// Create a new kernel dispatch service.
     pub fn new(kernel: Arc<chio_kernel::ChioKernel>) -> Self {
-        Self { kernel }
+        Self {
+            kernel,
+            peer_capabilities: Default::default(),
+        }
+    }
+
+    /// Bind a profile established by the trusted host for this service's peer.
+    /// Request metadata and the tenant limiter key cannot negotiate authority.
+    pub fn with_peer_capabilities(
+        mut self,
+        profile: &chio_core_types::capability::features::CapabilityNegotiation,
+    ) -> Result<Self, chio_core_types::Error> {
+        profile.validate()?;
+        self.peer_capabilities = profile.clone();
+        Ok(self)
     }
 
     /// Return the shared kernel used by this service.
@@ -67,6 +82,9 @@ pub type KernelResponse = chio_kernel::ToolCallResponse;
 /// Errors returned by the kernel service stack.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelServiceError {
+    /// A request requires authorization fields absent from the peer profile.
+    #[error("peer authorization profile: {0}")]
+    PeerCapabilities(chio_core_types::Error),
     /// Inner kernel evaluation failed.
     #[error("kernel: {0}")]
     Kernel(#[from] chio_kernel::KernelError),
@@ -98,8 +116,10 @@ impl Service<KernelRequest> for KernelService {
 
     fn call(&mut self, req: KernelRequest) -> Self::Future {
         let kernel = Arc::clone(&self.kernel);
+        let peer_validation = req.call.validate_peer_capabilities(&self.peer_capabilities);
 
         Box::pin(async move {
+            peer_validation.map_err(KernelServiceError::PeerCapabilities)?;
             // Translate the kernel error explicitly rather than via the blanket
             // `?`/`From` conversion so an RSS soft-ceiling shed surfaces as the
             // retryable service overload variant (see `map_kernel_error`).
@@ -464,7 +484,10 @@ mod tests {
     };
     use tower::ServiceExt;
 
-    struct EchoServer;
+    #[derive(Default)]
+    struct EchoServer {
+        calls: Arc<AtomicUsize>,
+    }
 
     #[async_trait::async_trait]
     impl ToolServerConnection for EchoServer {
@@ -482,6 +505,7 @@ mod tests {
             arguments: serde_json::Value,
             _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
         ) -> Result<serde_json::Value, KernelError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(serde_json::json!({
                 "tool": tool_name,
                 "arguments": arguments,
@@ -634,6 +658,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         KernelRequest::new(call, "tenant-a")
     }
@@ -641,7 +666,7 @@ mod tests {
     #[tokio::test]
     async fn kernel_service_dispatches_through_kernel() {
         let mut kernel = ChioKernel::new(make_config());
-        kernel.register_tool_server(Box::new(EchoServer));
+        kernel.register_tool_server(Box::new(EchoServer::default()));
         let request = make_kernel_request(&kernel);
         let mut service = build_layered(Arc::new(kernel), 16, Duration::from_secs(5));
 
@@ -662,6 +687,52 @@ mod tests {
             other => panic!("expected value output, got {other:?}"),
         }
         assert_eq!(response.receipt.body().tool_name, "echo");
+    }
+
+    #[tokio::test]
+    async fn kernel_service_rejects_unnegotiated_extensions_before_effect_or_receipt() {
+        use chio_core_types::capability::features::{
+            CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET,
+        };
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut kernel = ChioKernel::new(make_config());
+        kernel.register_tool_server(Box::new(EchoServer {
+            calls: Arc::clone(&calls),
+        }));
+        let positive = make_kernel_request(&kernel);
+        let mut extension = make_kernel_request(&kernel);
+        extension.call.request_id = "tower-unnegotiated".to_string();
+        extension.call.capability.aggregate_invocation_budget = Some(
+            serde_json::from_value(
+                serde_json::json!({"scope": "capability", "max_invocations": 1}),
+            )
+            .unwrap_or_else(|error| panic!("aggregate fixture: {error}")),
+        );
+        let kernel = Arc::new(kernel);
+        let mut service = KernelService::new(Arc::clone(&kernel));
+        let response = service
+            .call(positive)
+            .await
+            .unwrap_or_else(|error| panic!("positive invocation: {error}"));
+        assert_eq!(response.verdict, chio_kernel::Verdict::Allow);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let receipt_count = kernel.receipt_log().receipts().len();
+
+        let Err(KernelServiceError::PeerCapabilities(error)) = service.call(extension).await else {
+            panic!("an unnegotiated aggregate must reject at the peer boundary");
+        };
+        assert!(error.to_string().contains(AGGREGATE_INVOCATION_BUDGET));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(kernel.receipt_log().receipts().len(), receipt_count);
+
+        let malformed = CapabilityNegotiation {
+            schema: "unknown".to_string(),
+            ..Default::default()
+        };
+        assert!(KernelService::new(kernel)
+            .with_peer_capabilities(&malformed)
+            .is_err());
     }
 
     #[tokio::test]

@@ -46,8 +46,13 @@ impl FindingOperatorFilingResolver {
                 break;
             }
             for record in records {
-                let bundle: FindingOperatorBundle = serde_json::from_slice(&record.bundle_json)
-                    .map_err(|error| format!("retained operator bundle is invalid: {error}"))?;
+                let bundle: FindingOperatorBundle =
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        &record.bundle_json,
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|error| error.code().to_owned())?;
                 let indexes = finding_operator_bundle_artifact_indexes(&bundle, None)?;
                 bundles
                     .put_with_artifact_indexes(&record.finding_id, &record.bundle_json, &indexes)
@@ -67,8 +72,12 @@ impl FindingOperatorFilingResolver {
             Err(FindingOperatorBundleStoreError::NotFound) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let bundle: FindingOperatorBundle = serde_json::from_slice(&record.bundle_json)
-            .map_err(|error| format!("retained operator bundle is invalid: {error}"))?;
+        let bundle: FindingOperatorBundle = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.bundle_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| error.code().to_owned())?;
         let expected = finding_operator_bundle_artifact_indexes(&bundle, None)?
             .into_iter()
             .find(|index| index.kind == kind)
@@ -97,8 +106,12 @@ impl FindingOperatorFilingResolver {
             Err(FindingOperatorBundleStoreError::NotFound) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let policy: FindingAuthorityPin = serde_json::from_slice(&record.policy_json)
-            .map_err(|_| "retained challenge authority policy is invalid".to_owned())?;
+        let policy: FindingAuthorityPin = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.policy_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| error.code().to_owned())?;
         policy
             .validate("retained challenge authority")
             .map_err(|_| "retained challenge authority policy is invalid".to_owned())?;
@@ -373,8 +386,12 @@ impl FindingFilingResolver for FindingOperatorFilingResolver {
             Err(FindingOperatorBundleStoreError::NotFound) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let round: FindingAuditRound = serde_json::from_slice(&record.round_json)
-            .map_err(|_| "retained audit round is invalid".to_owned())?;
+        let round: FindingAuditRound = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.round_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| error.code().to_owned())?;
         if signed_envelope_sha256(&round.epoch).map_err(|error| error.to_string())?
             != epoch_envelope_sha256
         {
@@ -394,8 +411,12 @@ impl FindingFilingResolver for FindingOperatorFilingResolver {
             Err(FindingOperatorBundleStoreError::NotFound) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let bundle: FindingOperatorBundle = serde_json::from_slice(&record.bundle_json)
-            .map_err(|error| format!("retained operator bundle is invalid: {error}"))?;
+        let bundle: FindingOperatorBundle = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.bundle_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| error.code().to_owned())?;
         let admission = bundle.admission;
         Ok((admission.body.finding_id == finding_id
             && admission.body.listing_id == listing_id
@@ -429,8 +450,10 @@ impl FindingFilingResolver for FindingOperatorFilingResolver {
         let Some(policy_json) = indexed.authority_policy_json else {
             return Ok(None);
         };
-        let policy: FindingAuthorityPin = serde_json::from_slice(&policy_json)
-            .map_err(|error| format!("retained venue policy is invalid: {error}"))?;
+        let policy: FindingAuthorityPin =
+            chio_core::canonical::UntrustedJsonText::from_wire(&policy_json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| error.code().to_owned())?;
         let key = policy
             .validate("retained venue")
             .map_err(|error| error.to_string())?;
@@ -461,8 +484,10 @@ impl FindingFilingResolver for FindingOperatorFilingResolver {
         let Some(policy_json) = indexed.authority_policy_json else {
             return Ok(None);
         };
-        let policy: FindingAuthorityPin = serde_json::from_slice(&policy_json)
-            .map_err(|error| format!("retained governance policy is invalid: {error}"))?;
+        let policy: FindingAuthorityPin =
+            chio_core::canonical::UntrustedJsonText::from_wire(&policy_json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| error.code().to_owned())?;
         let key = policy
             .validate("retained governance")
             .map_err(|error| error.to_string())?;

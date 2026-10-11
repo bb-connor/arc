@@ -82,6 +82,7 @@ jobs:
           # language-specific binding trees.
           git diff --exit-code \
             crates/core/chio-core-types/src/_generated \
+            crates/core/chio-errors/src/_generated \
             crates/trust/chio-federation/src/_generated \
             crates/tooling/chio-conformance/tests/_generated \
             docs/reference/generated/STATE_MACHINES.md \
@@ -98,6 +99,7 @@ jobs:
           # untracked files and fail if any land in a path the lanes write to.
           untracked=$(git ls-files --others --exclude-standard -- \
             crates/core/chio-core-types/src/_generated \
+            crates/core/chio-errors/src/_generated \
             crates/trust/chio-federation/src/_generated \
             crates/tooling/chio-conformance/tests/_generated \
             docs/reference/generated/STATE_MACHINES.md \

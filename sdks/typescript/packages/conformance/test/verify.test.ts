@@ -68,6 +68,20 @@ function makeValidChioReceiptRecord(
 }
 
 describe("validateReceiptStructure", () => {
+  it.each([
+    "caller_executed",
+    "host_executed_provider_reported",
+    "host_executed_unmediated",
+    "chio_internal",
+  ] as const)("accepts current tool origin %s", (toolOrigin) => {
+    expect(validateReceiptStructure(makeValidReceipt({ tool_origin: toolOrigin }))).toEqual([]);
+  });
+
+  it.each(["unknown_origin", null])("rejects invalid tool origin %s", (toolOrigin) => {
+    const receipt = { ...makeValidReceipt(), tool_origin: toolOrigin } as HttpReceipt;
+    expect(validateReceiptStructure(receipt)).toContain("receipt.tool_origin must be a current v1 tool origin");
+  });
+
   it("valid receipt produces no errors", () => {
     const errors = validateReceiptStructure(makeValidReceipt());
     expect(errors).toEqual([]);
@@ -150,6 +164,20 @@ describe("validateReceiptStructure", () => {
 });
 
 describe("validateChioReceiptRecordStructure", () => {
+  it.each([
+    "caller_executed",
+    "host_executed_provider_reported",
+    "host_executed_unmediated",
+    "chio_internal",
+  ] as const)("accepts current tool origin %s", (toolOrigin) => {
+    expect(validateChioReceiptRecordStructure(makeValidChioReceiptRecord({ tool_origin: toolOrigin }))).toEqual([]);
+  });
+
+  it.each(["unknown_origin", null])("rejects invalid tool origin %s", (toolOrigin) => {
+    const receipt = { ...makeValidChioReceiptRecord(), tool_origin: toolOrigin } as Receipt_Record.ChioReceiptRecord;
+    expect(validateChioReceiptRecordStructure(receipt)).toContain("receipt.tool_origin must be a current v1 tool origin");
+  });
+
   it("accepts a semantically valid mediated receipt", () => {
     expect(validateChioReceiptRecordStructure(makeValidChioReceiptRecord())).toEqual([]);
   });

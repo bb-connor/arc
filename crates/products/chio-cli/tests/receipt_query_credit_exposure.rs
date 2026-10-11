@@ -179,6 +179,9 @@ fn test_exposure_ledger_report_surfaces() {
         Some(quoted_premium_units)
     );
 
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
+
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
@@ -480,6 +483,9 @@ fn test_credit_scorecard_report_surfaces() {
     assert!(report.body.anomalies.iter().any(|anomaly| {
         anomaly.code == chio_core::credit::CreditScorecardReasonCode::FailedSettlementBacklog
     }));
+
+    chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes CLI signing authority");
 
     let cli_output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())

@@ -25,7 +25,6 @@ use chio_store_sqlite::{
     SqliteFindingStatusStore, VerifiedFindingStatusProofInput,
 };
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{
     FindingStatusOperatorPin, FindingStatusServiceBond, FINDING_STATUS_MAX_EPOCH_AGE_SECS,
@@ -39,21 +38,7 @@ struct PortableStatusMaterial {
     verified: VerifiedFindingStatusProof,
 }
 
-pub(crate) trait FindingStatusAdmissionClock: Send + Sync {
-    fn now_unix_secs(&self) -> Result<u64, String>;
-}
-
-#[derive(Debug, Default)]
-struct SystemFindingStatusAdmissionClock;
-
-impl FindingStatusAdmissionClock for SystemFindingStatusAdmissionClock {
-    fn now_unix_secs(&self) -> Result<u64, String> {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .map_err(|error| format!("finding status clock is unavailable: {error}"))
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 struct ProofFields<'a> {
     feed_id: &'a str,
@@ -250,7 +235,7 @@ pub struct MarketFindingStatusVerifier {
     service_bond: FindingStatusServiceBond,
     max_epoch_age_secs: u64,
     store: SqliteFindingStatusStore,
-    clock: Arc<dyn FindingStatusAdmissionClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl MarketFindingStatusVerifier {
@@ -267,7 +252,7 @@ impl MarketFindingStatusVerifier {
             service_bond,
             max_epoch_age_secs,
             store,
-            Arc::new(SystemFindingStatusAdmissionClock),
+            Arc::new(SystemClock),
         )
     }
 
@@ -276,7 +261,7 @@ impl MarketFindingStatusVerifier {
         service_bond: FindingStatusServiceBond,
         max_epoch_age_secs: u64,
         store: SqliteFindingStatusStore,
-        clock: Arc<dyn FindingStatusAdmissionClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, String> {
         if max_epoch_age_secs == 0 || max_epoch_age_secs > FINDING_STATUS_MAX_EPOCH_AGE_SECS {
             return Err(
@@ -410,8 +395,9 @@ impl FindingStatusProofVerifier for MarketFindingStatusVerifier {
             .map_err(|error| FindingDenial::unavailable(error.to_string()))?;
         let refreshed_now = self.observe_trusted_now(
             self.clock
-                .now_unix_secs()
-                .map_err(FindingDenial::unavailable)?,
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)
+                .map_err(|error| FindingDenial::unavailable(error.to_string()))?,
         )?;
         let refreshed_material = self.verify_at(view, refreshed_now, true)?;
         if &refreshed_material.verified != verified {
@@ -472,8 +458,9 @@ impl FindingStatusProofVerifier for MarketFindingStatusVerifier {
         // maximum epoch age, so `status_for_purchase` alone is not sufficient.
         let final_now = self.observe_trusted_now(
             self.clock
-                .now_unix_secs()
-                .map_err(FindingDenial::unavailable)?,
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)
+                .map_err(|error| FindingDenial::unavailable(error.to_string()))?,
         )?;
         verify_epoch_record(
             &self.operator,

@@ -23,26 +23,34 @@ impl ChioKernel {
                 .map(|m| m.currency.clone())
                 .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
                 .unwrap_or_else(|| "USD".to_string());
-            let budget_total = grant
-                .max_total_cost
-                .as_ref()
-                .map(|m| m.units)
-                .unwrap_or(u64::MAX);
+            let budget_total = grant.max_total_cost.as_ref().map(|m| m.units);
             let attempted_cost = grant
                 .max_cost_per_invocation
                 .as_ref()
                 .map(|m| m.units)
                 .unwrap_or(0);
-            let delegation_depth = cap.delegation_chain.len() as u32;
+            let delegation_depth = crate::receipt_support::checked_receipt_count(
+                cap.delegation_chain.len(),
+                "delegation depth",
+            )?;
             let root_budget_holder = cap.issuer.to_hex();
             let (payment_reference, settlement_status) =
                 ReceiptSettlement::not_applicable().into_receipt_parts();
 
+            let usage = self.with_budget_store(|store| Ok(store.get_usage(&cap.id, mg.index)?))?;
+            let committed = usage
+                .map(|usage| usage.committed_cost_units())
+                .transpose()?
+                .unwrap_or(0);
+            let budget_remaining = financial_budget_remaining(budget_total, committed)?;
             let financial_meta = FinancialReceiptMetadata {
-                grant_index: mg.index as u32,
+                grant_index: crate::receipt_support::checked_receipt_count(
+                    mg.index,
+                    "grant index",
+                )?,
                 cost_charged: 0,
                 currency,
-                budget_remaining: budget_total,
+                budget_remaining,
                 budget_total,
                 delegation_depth,
                 root_budget_holder,
@@ -64,7 +72,7 @@ impl ChioKernel {
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(mg.index)),
+                    receipt_attribution_metadata(cap, Some(mg.index))?,
                     deny_extra_metadata,
                 ),
                 request_metadata,
@@ -111,7 +119,10 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(request, reason, timestamp, None, extra_metadata)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -136,29 +147,28 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn build_pre_execution_monetary_deny_response_with_recording(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
+    /// Financial receipt metadata for a pre-execution budget hold that never
+    /// reached dispatch: nothing is charged and the attempted cost is recorded.
+    pub(crate) fn pre_execution_financial_metadata(
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-        record_mode: ReceiptRecordMode,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let delegation_depth = cap.delegation_chain.len() as u32;
+    ) -> Result<Option<serde_json::Value>, KernelError> {
+        let delegation_depth = crate::receipt_support::checked_receipt_count(
+            cap.delegation_chain.len(),
+            "delegation depth",
+        )?;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) =
             ReceiptSettlement::not_applicable().into_receipt_parts();
-        let budget_remaining = charge
-            .budget_total
-            .saturating_sub(committed_cost_after_release);
+        let budget_remaining =
+            financial_budget_remaining(charge.budget_total, committed_cost_after_release)?;
 
         let financial_meta = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: 0,
             currency: charge.currency.clone(),
             budget_remaining,
@@ -171,7 +181,27 @@ impl ChioKernel {
             oracle_evidence: None,
             attempted_cost: Some(charge.cost_charged),
         };
-        let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
+        Ok(Some(serde_json::json!({ "financial": financial_meta })))
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
+    fn build_pre_execution_monetary_deny_response_with_recording(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        charge: &BudgetChargeResult,
+        committed_cost_after_release: u64,
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        record_mode: ReceiptRecordMode,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let financial_metadata =
+            Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
             merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
         let request_metadata = request_receipt_metadata_with_payee_binding(
@@ -201,7 +231,7 @@ impl ChioKernel {
             canonical_content: receipt_content.canonical_content,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                    receipt_attribution_metadata(cap, Some(charge.grant_index))?,
                     deny_extra_metadata,
                 ),
                 request_metadata,
@@ -280,7 +310,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
@@ -427,7 +457,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -467,7 +500,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn build_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
@@ -509,7 +545,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),

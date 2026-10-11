@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
@@ -181,8 +181,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo install cargo-mutants --version 25.3.1 --locked
-          cargo install kani-verifier --version "${CHIO_KANI_VERSION}" --locked
-          cargo kani setup
+          bash scripts/install-kani-toolchain.sh
           cargo mutants --version
           cargo kani --version
 

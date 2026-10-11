@@ -1,4 +1,6 @@
-use chio_core_types::{canonical_json_bytes_from_str, sha256_hex};
+use chio_core_types::canonical::{UntrustedJsonError, UntrustedJsonText};
+use chio_core_types::sha256_hex;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::HostedMarketStoreError;
 
@@ -30,25 +32,53 @@ pub(crate) fn validate_digest(
     Err(HostedMarketStoreError::Invalid(field))
 }
 
+/// Verify original canonical bytes before any typed projection.
+fn canonical_input(bytes: &[u8]) -> Result<UntrustedJsonText<'_>, UntrustedJsonError> {
+    let input = UntrustedJsonText::from_wire(bytes, MAX_JOB_JSON_BYTES)?;
+    if input.canonicalize()? != bytes {
+        return Err(UntrustedJsonError::NonCanonical);
+    }
+    Ok(input)
+}
+
 pub(crate) fn validate_canonical_json(
     bytes: &[u8],
-    field: &'static str,
+    _field: &'static str,
 ) -> Result<(), HostedMarketStoreError> {
-    if bytes.is_empty() || bytes.len() > MAX_JOB_JSON_BYTES {
-        return Err(HostedMarketStoreError::Invalid(field));
-    }
-    let raw = std::str::from_utf8(bytes).map_err(|_| HostedMarketStoreError::Invalid(field))?;
-    let canonical =
-        canonical_json_bytes_from_str(raw).map_err(|_| HostedMarketStoreError::Invalid(field))?;
-    if canonical != bytes {
-        return Err(HostedMarketStoreError::Invalid(field));
-    }
-    Ok(())
+    canonical_input(bytes)
+        .map(|_| ())
+        .map_err(|error| HostedMarketStoreError::InvalidInput(error.into()))
+}
+
+pub(crate) fn decode_durable<T: DeserializeOwned>(
+    bytes: &[u8],
+) -> Result<T, HostedMarketStoreError> {
+    canonical_input(bytes)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| HostedMarketStoreError::CorruptInput(error.into()))
+}
+
+/// Checkpoint and principal writers serialize native typed integers. Requiring
+/// the external I-JSON range here would reject their own valid signed records.
+pub(crate) fn decode_native_durable<T: DeserializeOwned + Serialize>(
+    bytes: &[u8],
+) -> Result<T, HostedMarketStoreError> {
+    UntrustedJsonText::from_wire(bytes, MAX_JOB_JSON_BYTES)
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| HostedMarketStoreError::CorruptInput(error.into()))
+}
+
+pub(crate) fn decode_artifact<T: DeserializeOwned + Serialize>(
+    bytes: &[u8],
+) -> Result<T, HostedMarketStoreError> {
+    canonical_input(bytes)
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| HostedMarketStoreError::InvalidInput(error.into()))
 }
 
 pub(crate) fn verify_payload(digest: &str, bytes: &[u8]) -> Result<(), HostedMarketStoreError> {
     validate_digest(digest, "durable digest")?;
-    validate_canonical_json(bytes, "durable JSON")?;
+    canonical_input(bytes).map_err(|error| HostedMarketStoreError::CorruptInput(error.into()))?;
     if sha256_hex(bytes) != digest {
         return Err(HostedMarketStoreError::DigestMismatch);
     }
@@ -90,4 +120,36 @@ pub(crate) fn unavailable(error: sqlx::Error) -> HostedMarketStoreError {
     };
     tracing::warn!(class, error = %error, "hosted market store operation failed");
     HostedMarketStoreError::Unavailable
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    #[test]
+    fn durable_original_bytes_reject_ambiguity_and_noncanonical_identity() {
+        let valid = br#"{"count":7}"#;
+        assert_eq!(
+            decode_durable::<serde_json::Value>(valid).test_expect("valid durable JSON"),
+            serde_json::json!({"count": 7})
+        );
+        for bytes in [
+            br#"{"private-marker":1,"private-marker":2}"#.as_slice(),
+            b" {\"count\":7}",
+            b"{\"count\":7.0}",
+        ] {
+            let error = decode_durable::<serde_json::Value>(bytes)
+                .test_expect_err("original identity must reject");
+            assert!(matches!(&error, HostedMarketStoreError::CorruptInput(_)));
+            assert!(std::error::Error::source(&error).is_some());
+            assert!(!format!("{error:?} {error}").contains("private-marker"));
+        }
+        let oversized = vec![b' '; MAX_JOB_JSON_BYTES + 1];
+        let error =
+            decode_durable::<serde_json::Value>(&oversized).test_expect_err("readback is bounded");
+        assert!(
+            matches!(error, HostedMarketStoreError::CorruptInput(source) if source.code() == "urn:chio:error:attest:signed-json-too-large")
+        );
+    }
 }

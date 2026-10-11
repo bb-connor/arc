@@ -90,7 +90,7 @@ int main(void) {
 }
 EOF
 
-ffi_lib="${repo_root}/target/debug/libchio_bindings_ffi.a"
+ffi_lib="${CARGO_TARGET_DIR:-${repo_root}/target}/debug/libchio_bindings_ffi.a"
 extra_link=()
 case "$(uname -s)" in
   Darwin)
@@ -122,7 +122,7 @@ cmake -S sdks/cpp/chio-cpp -B "${build_dir}" \
   -DCHIO_CPP_BUILD_EXAMPLES=ON \
   -DCHIO_CPP_ENABLE_CURL=OFF
 cmake --build "${build_dir}"
-ctest --test-dir "${build_dir}" --output-on-failure
+ctest --test-dir "${build_dir}" --output-on-failure --no-tests=error
 
 rm -rf "${prefix_dir}" "${consumer_dir}"
 cmake --install "${build_dir}" --prefix "${prefix_dir}"

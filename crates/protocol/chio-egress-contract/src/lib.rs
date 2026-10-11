@@ -58,6 +58,9 @@ pub struct PreparedHttpEgressContract {
 /// Fail-closed reasons returned by HTTP egress contract enforcement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpEgressError {
+    #[cfg(feature = "reqwest-egress")]
+    #[error("urn:chio:error:transport:http-failed")]
+    Transport(#[from] reqwest_helper::RequestFailure),
     #[error("outbound HTTP egress requires a declared HttpEgressContract")]
     MissingContract,
     #[error("invalid HttpEgressContract: {0}")]
@@ -668,6 +671,11 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
 /// point and substrate adapters can keep their existing client builder.
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper;
+
+#[cfg(feature = "reqwest-egress")]
+mod operator_readiness;
+#[cfg(feature = "reqwest-egress")]
+pub use operator_readiness::{OperatorReadinessError, OperatorReadinessProbe};
 
 #[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]

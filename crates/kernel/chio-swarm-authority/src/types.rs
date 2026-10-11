@@ -14,6 +14,13 @@ pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
 
 pub const CLAIM_SWARM_TASK_GRAPH_BOUND: &str = "claim.swarm.task_graph_bound";
+
+/// Structural ceilings checked before any graph walk. Bundles can be stored
+/// before their signatures are verified, so these bound the verifier's work on
+/// unauthenticated input.
+pub const MAX_SWARM_GRAPH_TASKS: usize = 1_024;
+pub const MAX_SWARM_GRAPH_EDGES: usize = 4_096;
+pub const MAX_SWARM_GRAPH_JOINS: usize = 1_024;
 pub const CLAIM_SWARM_CONTINUATION_FRESH: &str = "claim.swarm.continuation_fresh";
 pub const CLAIM_SWARM_ATTENUATION_WITNESS_CHAIN_BOUND: &str =
     "claim.swarm.attenuation_witness_chain_bound";

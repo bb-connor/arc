@@ -26,31 +26,23 @@ impl TerminalGuard {
     pub fn check_command(&self, command: &str, args: &[String]) -> Result<(), AcpProxyError> {
         // Fail-closed: empty allowlist means deny everything.
         if self.allowed_commands.is_empty() {
-            return Err(AcpProxyError::AccessDenied(
-                "terminal denied: no allowed commands configured".to_string(),
-            ));
+            return Err(AcpProxyError::Guard(AcpGuardError::EmptyAllowlist));
         }
 
         if command.is_empty() {
-            return Err(AcpProxyError::AccessDenied(
-                "terminal denied: empty command".to_string(),
-            ));
+            return Err(AcpProxyError::Guard(AcpGuardError::EmptyCommand));
         }
 
         let allowed = self.allowed_commands.iter().any(|c| c == command);
 
         if !allowed {
-            return Err(AcpProxyError::AccessDenied(format!(
-                "terminal denied: command not allowed: {command}"
-            )));
+            return Err(AcpProxyError::Guard(AcpGuardError::CommandOutsideScope));
         }
 
         // Check arguments for shell injection patterns.
         for arg in args {
             if contains_shell_metachar(arg) {
-                return Err(AcpProxyError::AccessDenied(format!(
-                    "terminal denied: suspicious argument: {arg}"
-                )));
+                return Err(AcpProxyError::Guard(AcpGuardError::ShellArgument));
             }
         }
 

@@ -2,6 +2,8 @@ use super::*;
 
 #[derive(Debug, Error)]
 pub enum ReplayError {
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("read fixture {path:?}: {source}")]
     ReadFixture {
         path: PathBuf,
@@ -19,7 +21,7 @@ pub enum ReplayError {
         path: PathBuf,
         line: usize,
         #[source]
-        source: serde_json::Error,
+        source: chio_core::canonical::UntrustedJsonError,
     },
     #[error("invalid fixture {path:?}: {message}")]
     InvalidFixture { path: PathBuf, message: String },
@@ -187,13 +189,32 @@ pub(super) fn fixture_paths_for_dir(root: PathBuf) -> Result<Vec<PathBuf>, Repla
         source,
     })?;
     let mut paths = Vec::new();
-    for entry in entries {
+    for (index, entry) in entries.enumerate() {
+        if index >= 4096 {
+            return Err(invalid_fixture(
+                &root,
+                "fixture directory entry limit exceeded",
+            ));
+        }
         let entry = entry.map_err(|source| ReplayError::ReadFixtureDir {
             path: root.clone(),
             source,
         })?;
         let path = entry.path();
         if path.extension().and_then(|ext| ext.to_str()) == Some("ndjson") {
+            if !entry
+                .file_type()
+                .map_err(|source| ReplayError::ReadFixtureDir {
+                    path: root.clone(),
+                    source,
+                })?
+                .is_file()
+            {
+                return Err(invalid_fixture(
+                    &path,
+                    "fixture directory contains a nonregular member",
+                ));
+            }
             paths.push(path);
         }
     }
@@ -204,7 +225,7 @@ pub(super) fn fixture_paths_for_dir(root: PathBuf) -> Result<Vec<PathBuf>, Repla
 /// Load an NDJSON fixture from disk.
 pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, ReplayError> {
     let path = path.as_ref().to_path_buf();
-    let body = fs::read_to_string(&path).map_err(|source| ReplayError::ReadFixture {
+    let body = crate::input::read_fixture(&path).map_err(|source| ReplayError::ReadFixture {
         path: path.clone(),
         source,
     })?;
@@ -215,14 +236,16 @@ pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, Re
             continue;
         }
 
-        let record = serde_json::from_str::<CaptureRecord>(line).map_err(|source| {
-            ReplayError::ParseLine {
+        let record =
+            crate::input::text::<CaptureRecord>(line).map_err(|source| ReplayError::ParseLine {
                 path: path.clone(),
                 line: line_index + 1,
                 source,
-            }
-        })?;
+            })?;
         validate_record(&path, &record)?;
+        if records.len() >= chio_provider_adapter_core::input::MAX_RECORDS {
+            return Err(invalid_fixture(&path, "fixture record limit exceeded"));
+        }
         records.push(record);
     }
 
@@ -408,7 +431,7 @@ impl ProviderCaptureFixture {
         let invocation_value = record.payload.get("invocation").ok_or_else(|| {
             invalid_fixture(&self.path, "kernel_verdict payload was missing invocation")
         })?;
-        let invocation = serde_json::from_value::<ComparableInvocation>(invocation_value.clone())?;
+        let invocation = crate::input::typed::<ComparableInvocation>(invocation_value.clone())?;
 
         if invocation.provenance.request_id != invocation_id {
             return Err(invalid_fixture(

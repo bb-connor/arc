@@ -18,6 +18,8 @@ pub const MAX_SIGNED_FISCAL_SCHEDULE_BYTES: usize = 1_048_576;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum FiscalError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("fiscal canonicalization failed: {0}")]
     Canonicalization(String),
     #[error("invalid fiscal field: {0}")]
@@ -74,7 +76,10 @@ impl FiscalSigner {
 
 pub fn fiscal_signer_key_id(public_key: &PublicKey) -> Result<String, FiscalError> {
     let raw = match public_key.algorithm() {
-        SigningAlgorithm::Ed25519 => public_key.as_bytes().to_vec(),
+        SigningAlgorithm::Ed25519 => public_key
+            .ed25519_bytes()
+            .map_err(|_| FiscalError::UnsupportedSignerAlgorithm)?
+            .to_vec(),
         SigningAlgorithm::P256 => decode_prefixed_key(public_key, "p256:")?,
         SigningAlgorithm::P384 => decode_prefixed_key(public_key, "p384:")?,
         SigningAlgorithm::Hybrid => return Err(FiscalError::UnsupportedSignerAlgorithm),
@@ -394,18 +399,9 @@ impl VerifiedFiscalCharter {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, FiscalError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_FISCAL_CHARTER_BYTES {
-            return Err(FiscalError::InvalidField("signed_charter.size"));
-        }
-        let signed: SignedFiscalCharter = serde_json::from_slice(bytes)
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
-        let verified = Self::verify(signed)?;
-        if verified.canonical_bytes()?.as_slice() != bytes {
-            return Err(FiscalError::Canonicalization(
-                "signed fiscal charter is not canonical".to_string(),
-            ));
-        }
-        Ok(verified)
+        let signed: SignedFiscalCharter =
+            crate::input::canonical(bytes, MAX_SIGNED_FISCAL_CHARTER_BYTES)?;
+        Self::verify(signed)
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, FiscalError> {
@@ -673,18 +669,9 @@ impl VerifiedFiscalSchedule {
         charter: &VerifiedFiscalCharter,
         predecessor: Option<&VerifiedFiscalSchedule>,
     ) -> Result<Self, FiscalError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_FISCAL_SCHEDULE_BYTES {
-            return Err(FiscalError::InvalidField("signed_schedule.size"));
-        }
-        let signed: SignedFiscalSchedule = serde_json::from_slice(bytes)
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
-        let verified = Self::verify(signed, charter, predecessor)?;
-        if verified.canonical_bytes()?.as_slice() != bytes {
-            return Err(FiscalError::Canonicalization(
-                "signed fiscal schedule is not canonical".to_string(),
-            ));
-        }
-        Ok(verified)
+        let signed: SignedFiscalSchedule =
+            crate::input::canonical(bytes, MAX_SIGNED_FISCAL_SCHEDULE_BYTES)?;
+        Self::verify(signed, charter, predecessor)
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, FiscalError> {

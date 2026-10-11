@@ -11,10 +11,14 @@ use serde::{Deserialize, Serialize};
 /// Wire shape:
 ///
 /// ```json
-/// { "functionCall": { "name": "...", "args": { ... } } }
+/// { "functionCall": { "id": "...", "name": "...", "args": { ... } } }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FunctionCallPart {
+    /// Provider-assigned call id. A response must echo it in
+    /// [`FunctionResponsePart::id`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// Tool name registered on the request `tools.functionDeclarations`.
     pub name: String,
     /// JSON arguments object the model wants the tool invoked with.
@@ -25,9 +29,17 @@ impl FunctionCallPart {
     /// Construct a freshly-typed function-call part.
     pub fn new(name: impl Into<String>, args: serde_json::Value) -> Self {
         Self {
+            id: None,
             name: name.into(),
             args,
         }
+    }
+
+    /// Attach the provider-assigned call id.
+    #[must_use]
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 }
 
@@ -36,10 +48,13 @@ impl FunctionCallPart {
 /// Wire shape:
 ///
 /// ```json
-/// { "functionResponse": { "name": "...", "response": { ... } } }
+/// { "functionResponse": { "id": "...", "name": "...", "response": { ... } } }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FunctionResponsePart {
+    /// Call id matching [`FunctionCallPart::id`], when the call carried one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// Function name matching [`FunctionCallPart::name`].
     pub name: String,
     /// JSON object Gemini consumes as the tool result.
@@ -50,6 +65,7 @@ impl FunctionResponsePart {
     /// Construct a function-response part.
     pub fn new(name: impl Into<String>, response: serde_json::Value) -> Self {
         Self {
+            id: None,
             name: name.into(),
             response,
         }

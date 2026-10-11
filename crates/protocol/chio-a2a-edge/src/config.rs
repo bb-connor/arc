@@ -3,6 +3,9 @@
 /// Configuration for the A2A edge.
 #[derive(Debug, Clone)]
 pub struct A2aEdgeConfig {
+    /// Authenticated peer profile established by the embedding host. Absent
+    /// extensions remain disabled; invocation metadata cannot change this.
+    pub peer_capabilities: chio_core::capability::features::CapabilityNegotiation,
     /// Name to advertise in the Agent Card.
     pub agent_name: String,
     /// Description for the Agent Card.
@@ -18,6 +21,7 @@ pub struct A2aEdgeConfig {
 impl Default for A2aEdgeConfig {
     fn default() -> Self {
         Self {
+            peer_capabilities: Default::default(),
             agent_name: "Chio A2A Edge".to_string(),
             agent_description: "Chio-governed tools exposed as A2A skills".to_string(),
             agent_version: "0.1.0".to_string(),
@@ -29,6 +33,9 @@ impl Default for A2aEdgeConfig {
 
 impl A2aEdgeConfig {
     fn validate_for_agent_card(&self) -> Result<(), A2aEdgeError> {
+        self.peer_capabilities
+            .validate()
+            .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
         reject_invalid_agent_card_field("name", &self.agent_name)?;
         reject_invalid_agent_card_field("version", &self.agent_version)?;
         reject_invalid_agent_card_field("endpoint URL", &self.endpoint_url)?;

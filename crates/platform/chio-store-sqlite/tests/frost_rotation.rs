@@ -57,8 +57,12 @@ impl StoreFixture {
     }
 
     fn open(&self) -> (SqliteAuthorityStore, SqliteFrostStore) {
-        let authority = SqliteAuthorityStore::open_serving(&self.database, &self.lock_root)
-            .unwrap_or_else(|error| panic!("open authority: {error}"));
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &self.database,
+            &self.lock_root,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap_or_else(|error| panic!("open authority: {error}"));
         let frost = authority.frost_store();
         (authority, frost)
     }
@@ -82,6 +86,10 @@ fn participants() -> Vec<ParticipantFixture> {
             participant_id: format!("operator-{}", index + 1),
             transport_key_id: format!("operator-{}.dkg.v1", index + 1),
             transport_public_key: key.public_key(),
+            sealing_key_id: format!("operator-{}.sealing.v1", index + 1),
+            sealing_public_key: test_sealing_key_for(index)
+                .public_key()
+                .unwrap_or_else(|e| panic!("fixture sealing key: {e}")),
         })
         .collect::<Vec<_>>();
     keys.into_iter()
@@ -126,6 +134,7 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
         .begin_ceremony(
             &participants[0].config,
             &participants[0].transport_key,
+            &test_sealing_key(&participants[0].config),
             &custody(),
             &mut rng,
             &authority.mutation_fence(),
@@ -140,6 +149,7 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
         .begin_ceremony(
             &participants[0].config,
             &participants[0].transport_key,
+            &test_sealing_key(&participants[0].config),
             &custody(),
             &mut retry_rng,
             &authority.mutation_fence(),
@@ -153,9 +163,13 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
     let mut peer_round1_secrets = Vec::new();
     for (index, participant) in participants.iter().enumerate().skip(1) {
         let mut rng = ChaCha20Rng::from_seed([index as u8 + 1; 32]);
-        let transition =
-            begin_frost_ceremony(&participant.config, &participant.transport_key, &mut rng)
-                .unwrap_or_else(|error| panic!("peer round one: {error}"));
+        let transition = begin_frost_ceremony(
+            &participant.config,
+            &participant.transport_key,
+            &test_sealing_key(&participant.config),
+            &mut rng,
+        )
+        .unwrap_or_else(|error| panic!("peer round one: {error}"));
         round1.push(transition.package);
         peer_round1_secrets.push(transition.secret);
     }
@@ -171,6 +185,22 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
         )
         .unwrap_or_else(|error| panic!("persist round two: {error}"));
     assert_eq!(second.state, FrostCeremonyState::Round2Ready);
+
+    for package in &second.packages {
+        let recipient = participants
+            .iter()
+            .find(|p| p.config.local_participant_id == package.recipient_participant_id())
+            .unwrap_or_else(|| panic!("recipient"));
+        let opened = package
+            .open(&recipient.config, &test_sealing_key(&recipient.config))
+            .unwrap_or_else(|e| panic!("open outbound: {e}"));
+        let secret = opened.secret_bytes();
+        assert_database_files_exclude(&fixture.database, secret);
+        assert_database_files_exclude(&fixture.database, hex::encode(secret).as_bytes());
+        let encoded = serde_json::to_vec(secret)
+            .unwrap_or_else(|error| panic!("encode test needle: {error}"));
+        assert_database_files_exclude(&fixture.database, &encoded);
+    }
 
     (authority, frost) = reopen(&fixture, authority, frost);
     let replayed_second = frost
@@ -203,6 +233,20 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
         round2.extend(transition.packages);
     }
 
+    for package in round2
+        .iter()
+        .filter(|p| p.recipient_participant_id() == participants[0].config.local_participant_id)
+    {
+        frost
+            .accept_round2_package(
+                &participants[0].config,
+                &custody(),
+                package,
+                &authority.mutation_fence(),
+                2_500,
+            )
+            .unwrap_or_else(|e| panic!("accept local input: {e}"));
+    }
     let completed = frost
         .complete_ceremony(
             &participants[0].config,
@@ -250,6 +294,7 @@ fn frost_rotation_ceremony_rejects_changed_config_and_wrong_custody_generation()
         .begin_ceremony(
             &participants[0].config,
             &participants[0].transport_key,
+            &test_sealing_key(&participants[0].config),
             &custody(),
             &mut rng,
             &authority.mutation_fence(),
@@ -270,10 +315,11 @@ fn frost_rotation_ceremony_rejects_changed_config_and_wrong_custody_generation()
         .begin_ceremony(
             &changed,
             &participants[0].transport_key,
+            &test_sealing_key(&changed),
             &custody(),
             &mut retry_rng,
             &authority.mutation_fence(),
-            1_001,
+            1_001
         )
         .is_err());
 }
@@ -288,6 +334,7 @@ fn frost_rotation_ceremony_never_persists_round_material_in_plaintext() {
         .begin_ceremony(
             &participants[0].config,
             &participants[0].transport_key,
+            &test_sealing_key(&participants[0].config),
             &custody(),
             &mut rng,
             &authority.mutation_fence(),
@@ -316,3 +363,21 @@ fn assert_database_files_exclude(database: &Path, needle: &[u8]) {
         }
     }
 }
+
+fn test_sealing_key_for(index: usize) -> chio_federation_authority::FrostSealingKey {
+    let byte = u8::try_from(index).unwrap_or_else(|_| panic!("fixture index"));
+    chio_federation_authority::FrostSealingKey::from_custody_bytes(zeroize::Zeroizing::new(
+        [0x80 + byte; 32],
+    ))
+}
+fn test_sealing_key(config: &FrostCeremonyConfig) -> chio_federation_authority::FrostSealingKey {
+    let index = config
+        .participants
+        .iter()
+        .position(|p| p.participant_id == config.local_participant_id)
+        .unwrap_or_else(|| panic!("local fixture participant"));
+    test_sealing_key_for(index)
+}
+
+#[path = "support/frost_round2_inbox.rs"]
+mod inbox;

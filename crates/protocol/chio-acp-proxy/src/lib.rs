@@ -18,7 +18,16 @@
 
 #![forbid(unsafe_code)]
 
+mod rejection;
+pub use rejection::{AcpGuardError, AcpProtocolError};
+mod receipt_error;
+pub use receipt_error::{ReceiptAuthorizationError, ReceiptBinding, ReceiptSignError};
+mod clock;
+use chio_security_types::clock::Clock;
+pub use clock::{AcpAuditError, AcpClock};
+mod input;
 use chio_core::crypto::PublicKey;
+pub use input::{AcpFrameReader, AcpMessage, MAX_ACP_MESSAGE_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -41,26 +50,44 @@ include!("telemetry.rs");
 include!("interceptor.rs");
 include!("transport.rs");
 include!("proxy.rs");
-include!("tests.rs");
+#[cfg(test)]
+mod tests;
 
 // ---------- error type ----------
 
 /// Errors produced by the ACP proxy.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum AcpProxyError {
-    /// A JSON-RPC protocol-level error (malformed message, bad params).
-    #[error("protocol error: {0}")]
-    Protocol(String),
+    #[error("{0}")]
+    Audit(#[from] AcpAuditError),
+    #[error("{0}")]
+    Receipt(#[from] ReceiptSignError),
+    #[error("{0}")]
+    SharedInput(#[from] chio_core::canonical::SharedUntrustedJsonError),
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("urn:chio:error:transport:upstream-failure")]
+    Io(#[from] std::io::Error),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    TruncatedFrame,
+    #[error("urn:chio:error:transport:upstream-failure")]
+    ClosedTransport,
+    #[error("{0}")]
+    Capability(#[from] CapabilityCheckError),
 
-    /// Access was denied by a guard or policy check.
-    #[error("access denied: {0}")]
-    AccessDenied(String),
+    /// A JSON-RPC semantic error.
+    #[error("{0}")]
+    Protocol(#[from] AcpProtocolError),
+    /// A local guard rejected access.
+    #[error("{0}")]
+    Guard(#[from] AcpGuardError),
+    /// A required child pipe was unavailable.
+    #[error("urn:chio:error:transport:upstream-failure")]
+    PipeUnavailable,
+}
 
-    /// A path traversal attempt was detected.
-    #[error("path traversal detected: {0}")]
-    PathTraversal(String),
-
-    /// A transport-level error (process spawn, pipe I/O).
-    #[error("transport error: {0}")]
-    Transport(String),
+impl std::fmt::Debug for AcpProxyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
 }

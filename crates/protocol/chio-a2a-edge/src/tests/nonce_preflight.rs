@@ -61,7 +61,7 @@ fn test_kernel_config() -> KernelConfig {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test Server".to_string(),
         description: Some("Test".to_string()),
@@ -72,8 +72,14 @@ fn test_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -199,14 +205,20 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
         .to_string()
         .contains("handle_send_message_with_request_id"));
     let stream_error = edge
-        .handle_stream_message("echo", &request, &retry_execution)
+        .handle_stream_message("echo", &request, &kernel, &retry_execution)
         .test_expect_err("generated stream IDs must reject execution nonces");
     assert!(stream_error
         .to_string()
         .contains("handle_stream_message_with_request_id"));
 
-    edge.handle_stream_message_with_request_id(request_id, "echo", &request, &retry_execution)
-        .test_expect("stable stream IDs should accept execution nonces");
+    edge.handle_stream_message_with_request_id(
+        request_id,
+        "echo",
+        &request,
+        &kernel,
+        &retry_execution,
+    )
+    .test_expect("stable stream IDs should accept execution nonces");
     let retry = edge
         .handle_send_message_with_request_id(
             request_id,

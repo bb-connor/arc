@@ -73,6 +73,7 @@ fn make_request(request_id: &str, tenant_id: &str) -> KernelRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     KernelRequest::new(call, tenant_id)

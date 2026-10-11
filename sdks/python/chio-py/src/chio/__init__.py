@@ -26,25 +26,32 @@ from .nested import (
     rpc_result,
     sampling_text_result,
 )
-from .receipt_query import ReceiptQueryClient, ReceiptQueryParams, ReceiptQueryResponse
+from .receipt_query import (
+    ReceiptQueryClient,
+    ReceiptQueryParams,
+    ReceiptQueryResponse,
+    ReceiptQuerySnapshot,
+)
 from .session import ChioSession, initialize_session
 from .version import __version__
 
 __all__ = [
-    "NestedCallbackRouter",
-    "ChioError",
     "ChioClient",
+    "ChioError",
     "ChioInvariantError",
     "ChioQueryError",
     "ChioRpcError",
     "ChioSession",
     "ChioTransportError",
+    "NestedCallbackRouter",
     "ReceiptQueryClient",
     "ReceiptQueryParams",
     "ReceiptQueryResponse",
+    "ReceiptQuerySnapshot",
     "SessionHandshake",
     "StaticBearerAuth",
     "TransportResponse",
+    "__version__",
     "authorization_server_metadata_url",
     "discover_oauth_metadata",
     "elicitation_accept_result",
@@ -59,5 +66,4 @@ __all__ = [
     "rpc_result",
     "sampling_text_result",
     "static_bearer_auth",
-    "__version__",
 ]

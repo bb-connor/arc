@@ -287,3 +287,40 @@ fn endpoint_returns_ok_even_when_every_step_is_denied() {
         assert_eq!(step.verdict, StepVerdictKind::Denied);
     }
 }
+
+#[test]
+fn original_plan_arguments_keep_unsigned_float_spellings_without_weakening_capabilities() {
+    let kernel = build_kernel(&["read_file"]);
+    let agent = Keypair::generate();
+    let cap = issue_capability(&kernel, &agent, &["read_file"]);
+    let request = PlanEvaluationRequest {
+        plan_id: "plan-float".into(),
+        planner_capability_id: cap.id.clone(),
+        planner_capability: cap.clone(),
+        agent_id: cap.subject.to_hex(),
+        steps: vec![planned_call(
+            "float",
+            "read_file",
+            serde_json::json!({"amount": 0.1}),
+        )],
+    };
+    let ordinary = serde_json::to_string(&request)
+        .expect("request encodes")
+        .replace("0.1", "0.10");
+    let response =
+        handle_evaluate_plan(&kernel, ordinary.as_bytes()).expect("unsigned floats are valid");
+    assert_eq!(response.plan_verdict, PlanVerdict::Allowed);
+    let signed = ordinary.replace(
+        "\"planner_capability\":{",
+        "\"planner_capability\":{\"ignored\":0.10,",
+    );
+    assert!(matches!(
+        handle_evaluate_plan(&kernel, signed.as_bytes()),
+        Err(PlanHandlerError::BadRequest(_))
+    ));
+    let ambiguous = ordinary.replace("\"amount\":0.10", "\"amount\":0.10,\"amount\":0.2");
+    assert!(matches!(
+        handle_evaluate_plan(&kernel, ambiguous.as_bytes()),
+        Err(PlanHandlerError::BadRequest(_))
+    ));
+}

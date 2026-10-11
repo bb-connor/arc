@@ -1,0 +1,23 @@
+# Narrow authority OID local-read integration review
+
+Source verdict: no new actionable security or correctness finding in the frozen patch. Its local-issuer change is sufficient to remove the remaining direct-post authority write path after the previously reviewed authority repair is integrated. Final acceptance remains pending immutable owner handoff and composed strict qualification.
+
+Frozen patch SHA-256: `d183e7e5822622bea5c189fec6363b4e590cadc791562674793ad1223b448177`, 11,128 bytes. A byte-identical review copy is retained at `/tmp/pr1160-authority-oid-local-swap-d183e7e5822622bea5c189fec6363b4e590cadc791562674793ad1223b448177.patch`. The observed patch already contains the new DB test's `#[cfg(target_os = "linux")]`; the earlier reported 11,099-byte version is not the reviewed artifact.
+
+Reviewed context: Root stage `3f4dd7869f1ae9052a122f166dd50b4cb8ffa70b`, tree `d4871414dd9f39a6567dbeed117dbbb88f8382a8`, together with authority chain `5320c191afe5cb91d57970ea514070344b6053a1 -> cbb002cfb748cfcab1f586f2771a047ee76c9916 -> 20369e255f532d1fd474c88bd156947505f33c13` (previous independent review). Root stage differs from the producer's stated stage `254abd6d07` only in two documentation files. No combined Git tree or build qualification is claimed here.
+
+The five-file patch changes three production files and two test files. `plan_portable_issuer_keys` now accepts the injected service clock and resolves a local advertised issuer with `resolve_public_oid4vp_verifier_trusted_public_keys`. That path uses the existing-only authority inspection, including descriptor custody, schema/WAL, floor, and lifecycle validation. The direct-post handler passes the same `finding_challenge_clock` that it uses for initial and final acceptance times. It cannot bootstrap or update the local authority through this resolution path.
+
+The empty-allowlist/local trust decision and remote issuer allowlist, pinning, transport, offload, and final expiry checks are unchanged. The old writable verifier-key resolver is removed. Its remaining metadata and public request-object consumers are already switched by the authority chain; the patch switches its remaining portable-issuer caller. Test callers supply the clock without changing their trust assertions. The pre-existing seed-status fallback boundary remains as recorded in the earlier authority review.
+
+The new regression invokes the actual direct-post handler with a local DB-issued credential and requires a successful verification response. A separate READ_ONLY connection checks `PRAGMA data_version` and the persisted authority clock floor before/after. Normal verifier-request consumption is allowed; the witness observes the authority DB separately. This is a meaningful write regression, rather than a helper mock or an expected error response. The Linux attribute now avoids running the DB-custody fixture on unsupported platforms; no native non-Linux execution is asserted.
+
+Read producer evidence under `/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/`:
+
+- `oid-local-swap-red.log`, SHA-256 `6070ec512d519e1c928d73ae85f94e5b22f16065f5f092f1b8e244e28dfcf47a`: the log identifies composition `411dd5bb115801f4342bd908eb1cf06f1db42f8d` with the swap withheld and only the new test overlaid. One genuine test fails after successful verification because authority data_version advances from 2 to 3; exit 101.
+- `oid-local-swap-green.log`, SHA-256 `6fb9ff233da36fff9346b31213e5eca8edeee0c97a1afdd47d7c34dcaa478665`: 20 passed, zero failed/ignored, including the new DB witness; exit 0, test execution 0.83 s.
+- `oid-local-swap-clippy.log`, SHA-256 `664cef27f01b3f70e37624460ffe941a1b557311a20a1d822de3361963649c62`: SSH transport timed out while checks were running, exit 255. Root separately confirmed the builder was unreachable. This is interrupted infrastructure evidence with no strict-lint verdict, not a passing check.
+
+The source review applies only to the frozen digest. Producer logs do not yet provide an immutable final source manifest linking the reviewed 11,128 bytes and all surrounding composition to their runs; the Linux attribute may postdate the logged Linux campaign. Await the owner's immutable handoff, preserve the original failure and interrupted lint separately, and renew the required composed boundary before qualification. No additional regression test is demanded by this narrow source review.
+
+No Cargo, builds, owner source edits, ledger/mailbox edits, or subagents were used. Only separate review artifacts were written under `/tmp`. The earlier independent authority and response-finalization reviews are preserved. No hosted, merge, release, or activation readiness is claimed.

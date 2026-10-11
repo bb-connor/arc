@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, Keypair, StoreMutationFence};
@@ -26,6 +26,8 @@ const ZERO_DIGEST: &str = "00000000000000000000000000000000000000000000000000000
 
 #[derive(Debug, thiserror::Error)]
 pub enum FiscalStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("fiscal store is unavailable: {0}")]
     Unavailable(String),
     #[error("fiscal store mutation was fenced")]
@@ -156,13 +158,13 @@ struct PreparedFiscalRotationMutation {
 
 #[derive(Clone)]
 pub struct SqliteFiscalStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<crate::store_connection::StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFiscalStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<crate::store_connection::StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -174,7 +176,7 @@ impl SqliteFiscalStore {
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FiscalStoreError> {
         self.connection
             .lock()
-            .map_err(|_| invariant("fiscal store lock is poisoned"))
+            .map_err(|fenced| FiscalStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -357,7 +359,10 @@ impl SqliteFiscalStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn admit_proposal(
         &self,
         proposal: &VerifiedFiscalProposal,
@@ -652,9 +657,9 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
         let policy: FiscalGenesisPolicy =
-            serde_json::from_slice(&policy_json).map_err(|error| {
-                invariant(format!("stored fiscal genesis policy is invalid: {error}"))
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&policy_json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         if canonical_json_bytes(&policy).map_err(canonical_error)? != policy_json
             || policy.policy_id != policy_id
             || policy.digest()? != policy_digest
@@ -739,10 +744,10 @@ impl SqliteFiscalStore {
                 .optional()
                 .map_err(sqlite_error)?
                 .ok_or(FiscalStoreError::NotFound)?;
-            let signed: chio_fiscal::SignedFiscalSchedule = serde_json::from_slice(&bytes)
-                .map_err(|error| {
-                    invariant(format!("stored fiscal schedule is invalid: {error}"))
-                })?;
+            let signed: chio_fiscal::SignedFiscalSchedule =
+                chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                    .and_then(|input| input.decode_signed())
+                    .map_err(FiscalStoreError::from)?;
             if canonical_json_bytes(&signed).map_err(canonical_error)? != bytes
                 || signed.body.schedule_id != id
             {
@@ -810,8 +815,10 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .map(|row| {
                 let bytes = row.map_err(sqlite_error)?;
-                let artifact: T = serde_json::from_slice(&bytes)
-                    .map_err(|error| invariant(format!("{label} is invalid: {error}")))?;
+                let artifact: T =
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                        .and_then(|input| input.decode_signed())
+                        .map_err(FiscalStoreError::from)?;
                 if canonical_json_bytes(&artifact).map_err(canonical_error)? != bytes {
                     return Err(invariant(format!("{label} is not canonical")));
                 }
@@ -889,9 +896,9 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
         let state: FiscalProposalAdmissionState =
-            serde_json::from_slice(&json).map_err(|error| {
-                invariant(format!("stored fiscal admission state is invalid: {error}"))
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         let expected_status = match state.status {
             FiscalProposalAdmissionStatus::Admitted => "admitted",
             FiscalProposalAdmissionStatus::Activated => "activated",
@@ -926,124 +933,10 @@ impl SqliteFiscalStore {
         )
     }
 
-    pub fn bind_legacy_fee_schedule(
-        &self,
-        legacy_schedule: &SignedOpenMarketFeeSchedule,
-        schedule: &VerifiedFiscalSchedule,
-        fence: &StoreMutationFence,
-    ) -> Result<(), FiscalStoreError> {
-        legacy_schedule
-            .body
-            .validate()
-            .map_err(|error| invariant(format!("legacy fee schedule is invalid: {error}")))?;
-        if !legacy_schedule
-            .verify_signature()
-            .map_err(|error| invariant(format!("legacy fee schedule signature failed: {error}")))?
-        {
-            return Err(invariant("legacy fee schedule signature is invalid"));
-        }
-        let FiscalParams::OpenMarketFeeAndBondSchedule { legacy_body } = &schedule.body().params
-        else {
-            return Err(FiscalStoreError::Conflict);
-        };
-        if legacy_body.as_ref() != &legacy_schedule.body {
-            return Err(FiscalStoreError::Conflict);
-        }
-        let legacy_schedule_id = &legacy_schedule.body.fee_schedule_id;
-        let legacy_envelope_json =
-            canonical_json_bytes(legacy_schedule).map_err(canonical_error)?;
-        let legacy_envelope_digest = sha256_hex(&legacy_envelope_json);
-        let schedule_json = schedule.canonical_bytes()?;
-        let schedule_digest = sha256_hex(&schedule_json);
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, fence)?;
-        let retained = transaction
-            .query_row(
-                "SELECT fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest FROM fiscal_legacy_fee_schedule_bindings WHERE legacy_schedule_id = ?1",
-                [legacy_schedule_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                    ))
-                },
-            )
-            .optional()
-            .map_err(sqlite_error)?;
-        if let Some((schedule_id, digest, envelope_digest)) = retained {
-            if schedule_id != schedule.body().schedule_id
-                || digest != schedule_digest
-                || envelope_digest != legacy_envelope_digest
-            {
-                return Err(FiscalStoreError::Conflict);
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(());
-        }
-        let exact_schedule = transaction
-            .query_row(
-                "SELECT schedule_digest = ?1 AND signed_json = ?2 FROM fiscal_schedules WHERE schedule_id = ?3",
-                params![&schedule_digest, &schedule_json, &schedule.body().schedule_id],
-                |row| row.get::<_, bool>(0),
-            )
-            .optional()
-            .map_err(sqlite_error)?
-            .unwrap_or(false);
-        if !exact_schedule {
-            return Err(FiscalStoreError::Conflict);
-        }
-        transaction
-            .execute(
-                "INSERT INTO fiscal_legacy_fee_schedule_bindings (legacy_schedule_id, fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest) VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    legacy_schedule_id,
-                    &schedule.body().schedule_id,
-                    &schedule_digest,
-                    &legacy_envelope_digest,
-                ],
-            )
-            .map_err(sqlite_error)?;
-        let projection_key = format!("legacy-fee:{legacy_schedule_id}");
-        append_projection_commit(
-            &transaction,
-            &self.serving_owner,
-            &projection_key,
-            1,
-            "bind_legacy_fee_schedule",
-            &schedule_digest,
-        )?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)
-    }
-
-    pub fn load_legacy_fee_schedule_binding(
-        &self,
-        fiscal_schedule_id: &str,
-    ) -> Result<FiscalLegacyFeeScheduleBindingRecord, FiscalStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let record = transaction
-            .query_row(
-                "SELECT legacy_schedule_id, fiscal_schedule_id, fiscal_schedule_digest, legacy_envelope_digest FROM fiscal_legacy_fee_schedule_bindings WHERE fiscal_schedule_id = ?1",
-                [fiscal_schedule_id],
-                |row| {
-                    Ok(FiscalLegacyFeeScheduleBindingRecord {
-                        legacy_schedule_id: row.get(0)?,
-                        fiscal_schedule_id: row.get(1)?,
-                        fiscal_schedule_digest: row.get(2)?,
-                        legacy_envelope_digest: row.get(3)?,
-                    })
-                },
-            )
-            .optional()
-            .map_err(sqlite_error)?
-            .ok_or(FiscalStoreError::NotFound)?;
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(record)
-    }
-
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn persist_immutable_artifact(
         &self,
         table: &str,
@@ -1182,7 +1075,10 @@ impl SqliteFiscalStore {
         self.stage_advance_inner(advance, next_authority, None, None, fence)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_activation_advance(
         &self,
         advance: &VerifiedFiscalContinuityAdvance,
@@ -1203,7 +1099,10 @@ impl SqliteFiscalStore {
         self.stage_advance_inner(advance, next_authority, Some(&mutation), None, fence)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_charter_rotation_advance(
         &self,
         advance: &VerifiedFiscalContinuityAdvance,
@@ -1523,8 +1422,10 @@ impl SqliteFiscalStore {
             .optional()
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
-        let state: FiscalAuthorityState = serde_json::from_slice(&json)
-            .map_err(|error| invariant(format!("stored fiscal authority is invalid: {error}")))?;
+        let state: FiscalAuthorityState =
+            chio_core::canonical::UntrustedJsonText::from_wire(&json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         state.validate()?;
         if canonical_json_bytes(&state).map_err(canonical_error)? != json {
             return Err(invariant("stored fiscal authority is not canonical"));
@@ -1758,7 +1659,10 @@ fn prepare_activation_mutation(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn prepare_rotation_mutation(
     advance: &VerifiedFiscalContinuityAdvance,
     activation: &VerifiedFiscalActivation,
@@ -1843,7 +1747,7 @@ fn prepare_rotation_mutation(
         });
     }
     if schedules
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].domain >= pair[1].domain)
     {
         return Err(FiscalStoreError::Conflict);
@@ -2716,7 +2620,10 @@ fn ensure_legacy_envelope_digest_column(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn verify_exact_genesis(
     transaction: &Transaction<'_>,
     policy_json: &[u8],
@@ -2899,38 +2806,9 @@ fn verify_owner(
     )
 }
 
-fn canonical_digest(value: &impl Serialize) -> Result<String, FiscalStoreError> {
-    canonical_json_bytes(value)
-        .map(|bytes| sha256_hex(&bytes))
-        .map_err(canonical_error)
-}
-
-fn canonical_error(error: impl std::fmt::Display) -> FiscalStoreError {
-    invariant(format!("canonical fiscal encoding failed: {error}"))
-}
-
-fn sqlite_error(error: rusqlite::Error) -> FiscalStoreError {
-    FiscalStoreError::Unavailable(error.to_string())
-}
-
-fn map_owner_error(error: SqliteServingOwnerError) -> FiscalStoreError {
-    match error {
-        SqliteServingOwnerError::OutcomeUnknown(detail) => FiscalStoreError::OutcomeUnknown(detail),
-        other => FiscalStoreError::Unavailable(other.to_string()),
-    }
-}
-
-fn invariant(detail: impl Into<String>) -> FiscalStoreError {
-    FiscalStoreError::Invariant(detail.into())
-}
-
-fn sqlite_i64(value: u64, field: &str) -> Result<i64, FiscalStoreError> {
-    i64::try_from(value).map_err(|_| invariant(format!("{field} exceeds SQLite INTEGER")))
-}
-
-fn read_u64(value: i64, field: &str) -> Result<u64, FiscalStoreError> {
-    u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
-}
+mod boundary;
+use boundary::*;
+mod legacy_fee_binding;
 
 #[cfg(test)]
 #[path = "fiscal_store_tests.rs"]

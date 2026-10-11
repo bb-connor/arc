@@ -163,7 +163,10 @@ pub struct EconomicStateRecovery {
 }
 
 impl EconomicStateRecovery {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         cache: SqliteEconomicStateCache,
         anchor: Arc<dyn EconomicStateAnchor>,
@@ -917,10 +920,9 @@ fn effect_cancellation_batch_shape(
     if !contains_no_effect {
         return EffectCancellationBatchShape::None;
     }
-    if batch.transitions.len() == 1
+    if matches!(batch.transitions.as_slice(), [transition] if transition.prepared_effect.is_none())
         && batch.effect_slots.is_empty()
         && batch.request_replays.is_empty()
-        && batch.transitions[0].prepared_effect.is_none()
     {
         EffectCancellationBatchShape::Exact
     } else {
@@ -940,5 +942,9 @@ fn validate_trusted_time(value: u64) -> Result<(), EconomicStateRecoveryError> {
 
 #[cfg(test)]
 #[path = "economic_state_recovery_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

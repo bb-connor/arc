@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json",
+  "title": "Chio correlated finding receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "policy",
+    "finding_id",
+    "finding_hash",
+    "rule_id",
+    "rule_version_hash",
+    "group_key_hash",
+    "ordered_event_ids",
+    "ordered_evidence_digests",
+    "ordered_source_receipt_ids",
+    "first_event_time_unix_ms",
+    "last_event_time_unix_ms",
+    "lineage_seed"
+  ],
+  "properties": {
+    "header": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+    "policy": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/policy" },
+    "finding_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+    "finding_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+    "rule_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+    "rule_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+    "group_key_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+    "ordered_event_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" }
+    },
+    "ordered_evidence_digests": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" }
+    },
+    "ordered_source_receipt_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" }
+    },
+    "first_event_time_unix_ms": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/time" },
+    "last_event_time_unix_ms": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/time" },
+    "lineage_seed": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" }
+  }
+}

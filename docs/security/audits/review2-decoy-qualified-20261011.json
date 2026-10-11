@@ -1,0 +1,248 @@
+{
+  "schema": "chio.security.review2-decoy-qualification.v1",
+  "observed_utc": "2026-10-11T02:56:18.372687+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-019"
+  ],
+  "source_repair": {
+    "checkpoint": "e4c7d57db2f1aabcee2b9bcb4536fceaab884709",
+    "producer_and_followup_commits": [
+      "5031aab4f249bf40d4855862f54b308d3999ef79",
+      "f455fafccfea774bb8580ffc8a2ec2c660cd97d0",
+      "8e3bc827dc508052aabffb768a70208c06fa1d5e",
+      "2860ee3a62a4e5ddf55dc5ab88d33eb0ba1a25a0",
+      "c03d70740f8514c60f10fb51dde7575d154579f4",
+      "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad"
+    ],
+    "files": [
+      "crates/security/chio-decoy/src/materialize.rs",
+      "crates/security/chio-decoy/src/materialize/concurrency_tests.rs",
+      "crates/security/chio-decoy/tests/materialize.rs",
+      "crates/security/chio-decoy/tests/materialize_darwin_acl.rs",
+      "crates/security/chio-decoy/Cargo.toml",
+      "crates/core/chio-file-custody/src/lib.rs",
+      "crates/core/chio-file-custody/src/darwin_acl.rs",
+      "crates/core/chio-file-custody/Cargo.toml",
+      "scripts/check-deception-security.sh",
+      "scripts/tests/check-deception-security.test.sh",
+      "Cargo.lock"
+    ],
+    "file_sha256": {
+      "crates/security/chio-decoy/src/materialize.rs": "5cfc0199484a62ece8a7e340c497b3888c049da8472b76ac8a35448c539da425",
+      "crates/security/chio-decoy/src/materialize/concurrency_tests.rs": "d88be30cea6656833f273671be35a9208198f2bccc84be23bd0da691a3d8f735",
+      "crates/security/chio-decoy/tests/materialize.rs": "913df9387bcdf07412125646a0745568f9845f3933cbca6313bf32768c617ee1",
+      "crates/security/chio-decoy/tests/materialize_darwin_acl.rs": "964e292da8be1124b4d01be8a7242d703c45cc3dd9d1690375c7fcf6583cdbf2",
+      "crates/security/chio-decoy/Cargo.toml": "0a1655c41092e2c9291e581c0fb80b469b5e7a31a4873f8dbf7add3a7a967fce",
+      "crates/core/chio-file-custody/src/lib.rs": "01862b6107c53d2fe44fd79bbaa98b684f3ea05c508ccb0818ad6f3ef553c3ab",
+      "crates/core/chio-file-custody/src/darwin_acl.rs": "20f933dcb0ec560c29504c1cf48bfa9724b35c1e3befb76642122161c0a1f8c4",
+      "crates/core/chio-file-custody/Cargo.toml": "6a0acc96fc294980f0816aa224d7b6c97d5feb91192a0f4177494cb9fe62a2fc",
+      "scripts/check-deception-security.sh": "7b7b36241cd29f65763739b6f694df1a04cbc37927b684cfc5f1c76a75c03689",
+      "scripts/tests/check-deception-security.test.sh": "06285c5235df05ad18c49de2f8dbf23cc127f6c41dadbd80a64d8c81506a8b90",
+      "Cargo.lock": "295abbeffba9c67f32df383bf9ecd17ec546150e05cc7395fb08edc9b5f4a427"
+    }
+  },
+  "contract": [
+    "Write into a private staging directory, authenticate staging ownership before recovery, sync before no-replace publication, and verify the exact final object for retries. Never reclaim an unauthenticated nonempty staging object or an unproven final object.",
+    "Validate platform descriptor custody through the shared chio-file-custody primitive. The Darwin ACL implementation was moved unchanged from chio-sqlite-file-identity and consumers depend directly on its true owner.",
+    "Serialize stage recovery/publication and receipt verification with a fresh nonblocking directory-descriptor lock. Refuse contention without waiting or mutating another writer's stage.",
+    "Explicitly unlock the open-file-description before closing the lock guard so a duplicated or inherited descriptor cannot retain a completed operation's lock. Retry interrupted unlock syscalls."
+  ],
+  "originals": [
+    {
+      "case": "interrupted final publication refused a healthy exact retry",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-019-original.log",
+        "sha256": "f48a65cda1b5c078ca40b7997e56a5b7d4e3ba175d5f70c75d5a9dd31242c9ee"
+      },
+      "result": "0 passed, 1 genuine assertion failure"
+    },
+    {
+      "case": "untagged staging object incorrectly reclaimed",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-019c-original.log",
+        "sha256": "b9b64c36e525cbc99f35c40ad209bb2d3e0539cb4492f59eecc53a68adac9f19"
+      },
+      "result": "0 passed, 1 genuine assertion failure; intermediate implementation 70cb4e9d3a"
+    },
+    {
+      "case": "concurrent exact retry replaces active durable stage",
+      "evidence": {
+        "path": "/tmp/pr1160-ci-batch-20261010/decoy-concurrency-original-v3/summary.json",
+        "sha256": "651222d99bfbece3580078eabf7ff1de73052b9dde40fa8aee73998859e9711a"
+      },
+      "result": "0 passed, 1 genuine assertion failure on test-only f455fafccf"
+    },
+    {
+      "case": "completed publication remains locked through duplicated descriptor",
+      "evidence": {
+        "path": "/tmp/pr1160-ci-batch-20261010/decoy-inherited-original/verified-original.json",
+        "sha256": "7eac2d649b769be83257be49f2e3acd6cffc697cf1be6b99e25569eec864f3e2"
+      },
+      "result": "0 passed, 1 genuine WouldBlock failure on test-only 2860ee3a62; initial extraction mismatch retained"
+    }
+  ],
+  "independent_source_reviews": [
+    {
+      "path": "/tmp/pr1160-r2-c2-persistence-independent-review-20261010/decoy-v3-review.json",
+      "sha256": "83f34e11323e51f535b2a23601f47ccfa26c444090217abbd2b107b4419c31fc"
+    },
+    {
+      "path": "/tmp/pr1160-r2-c2-persistence-independent-review-20261010/root-custody-addendum.json",
+      "sha256": "29b5d96b5042c6b3e4ab6bcbed04962f4a469054b3f103f4625778ebb81cc940"
+    },
+    {
+      "path": "/tmp/pr1160-r2-c2-persistence-independent-review-20261010/decoy-serialization-review.json",
+      "sha256": "f1a01f7b88a628aed06e3418d204be64567d7ae75399f24dc31c25ce0d2b4efe"
+    },
+    {
+      "path": "/tmp/pr1160-r2-c2-persistence-independent-review-20261010/decoy-inherited-lock-review.json",
+      "sha256": "38035f0c53b6edbe5aa7b4b42e041716e81889e82387f6221dd50f39cbf4806d"
+    }
+  ],
+  "linux": {
+    "tested_head": "ed76a3d3be8557487275854465c36c3060bf348d",
+    "campaign": {
+      "path": "/tmp/pr1160-ci-batch-20261010/decoy-inherited-green/summary.json",
+      "sha256": "2120b1d8fcfcdda5320d6853c4c3ef20cf807971c0bbe1ed14151268b0f6992c"
+    },
+    "owning_passed": 64,
+    "failed": 0,
+    "ignored": 0,
+    "strict_all_targets": "passed",
+    "deception_exact_controls": 108,
+    "commands": [
+      {
+        "label": "owning",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-decoy",
+          "--all-targets",
+          "--no-fail-fast"
+        ],
+        "exit": 0,
+        "seconds": 11.256776209920645,
+        "log_sha256": "80210fd4a8a4833e901a1cac5650eb40e070970e9dda9f40f02090355ec2041f",
+        "source_stable": true,
+        "inputs_stable": true,
+        "test_summaries": [
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+        ]
+      },
+      {
+        "label": "strict",
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-decoy",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 5.762949374970049,
+        "log_sha256": "27ac02de10dcc5275ad6a4c671a170b124279ea59c0749ca0590194c6f311b28",
+        "source_stable": true,
+        "inputs_stable": true,
+        "test_summaries": []
+      },
+      {
+        "label": "actual-108-inventories",
+        "argv": [
+          "bash",
+          "scripts/check-deception-security.sh"
+        ],
+        "exit": 0,
+        "seconds": 474.9291912401095,
+        "log_sha256": "944e8578c2bdb78c1c6c91b2a1239016e666d0d092ec7c1157a57b008989ba7e",
+        "source_stable": true,
+        "inputs_stable": true,
+        "test_summaries": [
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.25s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.02s",
+          "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.13s"
+        ]
+      }
+    ]
+  },
+  "native_darwin": {
+    "tested_head": "ed76a3d3be8557487275854465c36c3060bf348d",
+    "manifest": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/ed76/SHA256SUMS",
+      "sha256": "5e91ce1400e1c8fde88aa30e2d353ba5155ab6a3647fe8cab792173f179d07be"
+    },
+    "independent_evidence_reconciliation": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-019-darwin-ed76-closure.json",
+      "sha256": "0380ce2677a517884d030afda0f4ba05f7bedc32d79314be4d5a3b80ebb6fa2b"
+    },
+    "owning_executions_passed": 70,
+    "unit_and_integration": 68,
+    "compile_fail_doctests": 2,
+    "full_parallel_reruns": 10,
+    "passes_per_rerun": 70,
+    "native_acl_controls": 4,
+    "concurrency_controls": 4,
+    "strict_decoy_and_file_custody_all_targets": "passed",
+    "source_boundary": "Recorded clean ed76 with no dirty-status lines; packet does not include labelled before/after source-byte manifests. Independent reviewer verified all16 listed artifacts and c03 source identity."
+  },
+  "retained_attempts": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/decoy-concurrency-original/setup-error.json",
+      "sha256": "f3537e614434c918cfbc5b01e6a8c304b550db2e70b2b5f212a244371818cd91"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/decoy-concurrency-original-v2/setup-error.json",
+      "sha256": "bf3fa81c3a51504b180b3e68bdad424da0e5425c19654ea4209cd397e8e6326e"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/decoy-inherited-original/summary.json",
+      "sha256": "c982706bb48289bae84466c79598d6cab0332aaf5700c96732e2348a442777b5"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/decoy-inherited-repair-format.log",
+      "sha256": "7c05fd676293717d4e86399adc46df4248b09e734ae29ef4a5af58eabecdbc39"
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/1787/19-decoy-all.log",
+      "sha256": "4bf7322f03d9f4a4769555a200c96a3d8bf7671f23a48c53d871d86229d06c66"
+    }
+  ],
+  "limits": [
+    "Native1787 full owning failure is retained; later passing ACL reruns did not erase it. ed76 contains the deterministic successor repair.",
+    "Later f0b3af8ca5 changes only the crash-release comment: process termination releases a lock only after the last shared descriptor closes. Drop does not execute after SIGKILL; the explicit normal-return unlock does not promise crash release while inherited descriptors remain alive.",
+    "Unexpected non-EINTR unlock errors cannot be surfaced from Drop; no availability guarantee for those OS failures.",
+    "Linux zero-selected Darwin binary is not native evidence. Native all70 includes two compile-fail doctests; it is not70 independent production paths.",
+    "No hosted, whole workspace, merge, release or activation qualification."
+  ],
+  "remaining_acceptance": [
+    "Complete the composed candidate owning gates and other confirmed repairs.",
+    "Four required checks green on exact public successor; other failures classified and review threads answered.",
+    "Connor explicit merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

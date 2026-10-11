@@ -3,13 +3,13 @@
 //! FederationArtifactStore is configured, the co-sign hook writes through to it
 //! first, and accessors fall through to it on a cache miss.
 
-use std::sync::Mutex;
+use chio_security_types::clock::{Clock, ClockError, ClockFence};
+use std::sync::{Arc, Mutex};
 
 use chio_bounded::{BoundedMap, SizeGauge};
 use chio_federation::bilateral::DualSignedReceipt;
 use chio_federation::bilateral_dsse::DsseEnvelope;
 
-use crate::kernel::current_unix_timestamp;
 use crate::KernelError;
 
 pub trait FederationArtifactStore: Send + Sync {
@@ -46,6 +46,8 @@ const IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS: u64 = 3600;
 /// wires one up. A deployment requiring persistence installs a database-backed
 /// impl instead.
 pub struct InMemoryFederationArtifactStore {
+    clock: Arc<dyn Clock>,
+    clock_fence: Mutex<ClockFence>,
     dual: Mutex<BoundedMap<String, DualSignedReceipt>>,
     dual_gauge: SizeGauge,
     dsse: Mutex<BoundedMap<String, DsseEnvelope>>,
@@ -62,6 +64,14 @@ impl Default for InMemoryFederationArtifactStore {
 }
 
 impl InMemoryFederationArtifactStore {
+    fn now(&self) -> Result<u64, KernelError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis().as_secs())
+    }
+
     /// Construct with an explicit per-map capacity and idle TTL. This is the seam
     /// that lets a deployment wiring this reference store in from a CONFIGURED
     /// process memory budget honor a lowered `federation_cache_capacity` instead of
@@ -70,9 +80,24 @@ impl InMemoryFederationArtifactStore {
     /// honor it. Same seam class as the velocity/journal `from_memory_budget`
     /// constructors.
     pub fn with_capacity(capacity: usize, idle_ttl_secs: u64) -> Self {
+        Self::with_capacity_and_clock(
+            capacity,
+            idle_ttl_secs,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    /// Use the service clock for artifact retention and cache expiry.
+    pub fn with_capacity_and_clock(
+        capacity: usize,
+        idle_ttl_secs: u64,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         let dual_gauge = SizeGauge::new();
         let dsse_gauge = SizeGauge::new();
         Self {
+            clock,
+            clock_fence: Mutex::new(ClockFence::default()),
             dual: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dual_gauge.clone())),
             dual_gauge,
             dsse: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dsse_gauge.clone())),
@@ -104,7 +129,7 @@ impl InMemoryFederationArtifactStore {
 
 impl FederationArtifactStore for InMemoryFederationArtifactStore {
     fn put_dual_signed(&self, id: &str, receipt: &DualSignedReceipt) -> Result<(), KernelError> {
-        let now = current_unix_timestamp();
+        let now = self.now()?;
         let mut guard = match self.dual.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -117,7 +142,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn get_dual_signed(&self, id: &str) -> Result<Option<DualSignedReceipt>, KernelError> {
-        let now = current_unix_timestamp();
+        let now = self.now()?;
         let mut guard = match self.dual.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -126,7 +151,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError> {
-        let now = current_unix_timestamp();
+        let now = self.now()?;
         let mut guard = match self.dsse.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -136,7 +161,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn get_dsse(&self, id: &str) -> Result<Option<DsseEnvelope>, KernelError> {
-        let now = current_unix_timestamp();
+        let now = self.now()?;
         let mut guard = match self.dsse.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -147,7 +172,11 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )]
     use super::*;
 
     use chio_core::crypto::{Ed25519Backend, Keypair, SigningBackend};

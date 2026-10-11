@@ -1,5 +1,5 @@
-use super::*;
 use super::trust::validate_epoch;
+use super::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -142,9 +142,7 @@ pub struct LifecycleCheckpointPinV2 {
 pub type SignedLifecycleCheckpointPinV2 =
     chio_core::receipt::lineage::SignedExportEnvelope<LifecycleCheckpointPinV2>;
 
-pub trait TrustedClock {
-    fn now(&self) -> Result<u64, FinancialAuthorityAvailabilityError>;
-}
+pub use chio_security_types::clock::Clock;
 
 pub trait CrossIssuerLifecycleResolver {
     fn issuer_checkpoint(
@@ -430,15 +428,16 @@ pub fn resolve_cross_issuer_lifecycle_v2(
     resolver: &dyn CrossIssuerLifecycleResolver,
     generation_anchor: &dyn CrossIssuerLifecycleGenerationAnchor,
     high_water: &dyn CrossIssuerLifecycleHighWaterStore,
-    clock: &dyn TrustedClock,
+    clock: &dyn Clock,
 ) -> Result<VerifiedCrossIssuerLifecycleV2, CredentialError> {
     validate_text("lifecycle.resolverIdentity", resolver_identity)?;
     DidChio::from_str(issuer_did)?;
     validate_digest("lifecycle.sourcePassportId", source_passport_id)?;
     validate_digest("lifecycle.sourceManifestDigest", source_manifest_digest)?;
     let now = clock
-        .now()
-        .map_err(|error| availability_error("trusted clock", error))?;
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::as_secs)
+        .map_err(|error| authority_error(format!("trusted clock: {}", error.code())))?;
     validate_time("lifecycle.now", now)?;
     let checkpoint = resolver
         .issuer_checkpoint(resolver_identity, issuer_did, now)

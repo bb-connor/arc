@@ -14,12 +14,18 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let row_limit = query.economic_limit_or_default();
 
-        let matching_receipts = self.connection()?.query_row(
+        let matching_receipts = u64::try_from(self.connection()?.query_row(
             r#"
             SELECT COUNT(*)
             FROM chio_tool_receipts r
@@ -42,7 +48,7 @@ impl SqliteReceiptStore {
             ],
             |row| row.get::<_, i64>(0),
         )?
-        .max(0) as u64;
+        .max(0)).unwrap_or_default();
 
         let rows_sql = r#"
             SELECT
@@ -92,7 +98,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64
+                crate::integer::checked::<_, i64>(row_limit)?
             ],
             |row| {
                 Ok((
@@ -130,6 +136,8 @@ impl SqliteReceiptStore {
         let mut metering_evidence_missing_receipts = 0_u64;
         let mut metering_financial_mismatch_receipts = 0_u64;
 
+        // These counters count disjoint outcomes or subsets of one SQLite
+        // receipt scan, bounded by the table's signed rowid domain.
         for row in rows {
             let (
                 seq,
@@ -157,7 +165,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
                 ReceiptStoreError::Canonical(format!(
@@ -186,7 +194,8 @@ impl SqliteReceiptStore {
                     settlement_reconciliation_state,
                 ),
                 note: settlement_note,
-                updated_at: settlement_updated_at.map(|value| value.max(0) as u64),
+                updated_at: settlement_updated_at
+                    .map(|value| u64::try_from(value.max(0)).unwrap_or_default()),
             };
             if settlement.settlement_status == SettlementStatus::Pending {
                 pending_settlement_receipts = pending_settlement_receipts.saturating_add(1);
@@ -245,7 +254,8 @@ impl SqliteReceiptStore {
                     financial_mismatch: analysis.financial_mismatch,
                     evidence,
                     note: metering_note,
-                    updated_at: metering_updated_at.map(|value| value.max(0) as u64),
+                    updated_at: metering_updated_at
+                        .map(|value| u64::try_from(value.max(0)).unwrap_or_default()),
                 })
             } else {
                 None
@@ -253,7 +263,7 @@ impl SqliteReceiptStore {
 
             receipts.push(EconomicReceiptProjectionRow {
                 receipt_id,
-                timestamp: timestamp.max(0) as u64,
+                timestamp: u64::try_from(timestamp.max(0)).unwrap_or_default(),
                 capability_id,
                 subject_key,
                 tool_server,
@@ -268,7 +278,7 @@ impl SqliteReceiptStore {
         Ok(EconomicReceiptProjectionReport {
             summary: EconomicReceiptProjectionSummary {
                 matching_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts: crate::integer::count(receipts.len()),
                 metered_receipts,
                 pending_settlement_receipts,
                 failed_settlement_receipts,
@@ -276,7 +286,7 @@ impl SqliteReceiptStore {
                 metering_actionable_receipts,
                 metering_evidence_missing_receipts,
                 metering_financial_mismatch_receipts,
-                truncated: matching_receipts > receipts.len() as u64,
+                truncated: matching_receipts > crate::integer::count(receipts.len()),
             },
             receipts,
         })
@@ -356,7 +366,7 @@ impl SqliteReceiptStore {
 
         Ok(EconomicCompletionFlowReport {
             schema: ECONOMIC_COMPLETION_FLOW_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now(&self.clock)?,
             filters: normalized,
             summary: EconomicCompletionFlowSummary {
                 matching_receipts: economic_receipts.summary.matching_receipts,

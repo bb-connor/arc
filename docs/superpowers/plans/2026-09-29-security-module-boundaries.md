@@ -1,0 +1,114 @@
+# Security module boundaries and confinement helper implementation plan
+
+> **For agentic workers:** Use superpowers:executing-plans to implement this plan inline. The user approved this complete batch and requested minimal delegation.
+
+**Goal:** Replace textual assembly at the four approved security owners with compiler-enforced privacy, and isolate the privileged confinement helper's dependency graph.
+
+**Architecture:** Keep public protocol contracts stable while placing construction, validation, persistence, transport, and orchestration in named private modules. Move helper plan/envelope contracts into a small shared crate and child bootstrap into `chio-cage-init`; the parent launcher retains custody and evidence verification.
+
+**Tech Stack:** Rust 1.94.1, Cargo, SQLite, Linux descriptors, Landlock, seccomp, Python and shell repository gates.
+
+**Spec:** Packet 7 of `2026-09-26-security-engineering-excellence.md`, H11 of `../specs/2026-09-26-hardening-toolchain-spec.md`, and `docs/security/engineering-standard.md`.
+
+## Global constraints
+
+- Preserve signed bytes, schemas, runtime decisions, test cases, fail-closed validation, and public port contracts.
+- Use responsibility names, private modules, explicit imports, and the narrowest usable visibility. No compatibility implementation or duplicate validator.
+- Separate mechanical relocation, visibility restriction, and formatting commits. Ratchet hygiene caps through the gate.
+- Preserve async-signal-safe pre-exec closures and seccomp default denial at compilation, serialization, and installation.
+- Work on `packet/3-retention-accounting` in `/tmp/arc-security-launch`. Preserve preexisting `output/`.
+- Batch implementation and focused checks; no full-workspace campaign without a concrete integration reason. Disable incremental compilation to bound disk use.
+
+## Review focus
+
+- Private validated types cannot be constructed by orchestration or transport siblings.
+- Module moves retain every test, cfg condition, error classification, and signed-byte projection.
+- SQLite mutation helpers remain within the security-state owner and transaction guard.
+- Helper plan validation and FD custody do not diverge between parent and child.
+- Production helper features and packaging build the isolated crate; forbidden dependencies fail the budget gate.
+
+### Task 1: Security ports
+
+**Files:** Replace `crates/security/chio-security-types/src/ports_parts/*` with named modules under `src/ports/`; update `src/ports.rs`.
+
+**Interfaces:** Preserve the public `ports::*` API and no-std support; move private validation and commitment helpers into their responsible modules.
+
+- [x] Capture existing inventory and declaration boundaries; relocate complete Rust items without logic changes.
+- [x] Restrict construction and helper visibility; keep public reexports explicit.
+- [x] Run security-types unit/integration tests and no-default-features check. Expected: passing, unchanged test inventory.
+- [x] Commit mechanical relocation, privacy, and formatting separately.
+
+### Task 2: Broker service
+
+**Files:** Replace `crates/security/chio-secret-broker/src/service_parts/*` with named service execution, failure, sensitive wire, IPC deadline/lifecycle/prepared/response, and test modules.
+
+**Interfaces:** Preserve `BrokerService`, IPC framing, bounded zeroizing parsing, prepared dispatch and durable failure projections. Do not expose secret-bearing fields beyond their owner.
+
+- [x] Relocate complete items and tests, retaining typed rejection and absolute-deadline behavior.
+- [x] Restrict internal helpers to service or IPC ownership and retain private parser state.
+- [x] Run broker unit tests excluding the separately qualified process campaign; explicitly exercise wire, authority-time, prepared IPC, and deadline cases. Expected: passing inventory and no secret ownership regression.
+- [x] Commit relocation, privacy, and formatting separately.
+
+### Task 3: SQLite security state
+
+**Files:** Replace `crates/platform/chio-store-sqlite/src/security_state_parts/*` with schema, store, codec, event/correlation, lineage, scheduler/response/dispatch, and outbox modules under `src/security_state/`.
+
+**Interfaces:** Preserve `SqliteSecurityStateStore` and existing native transaction adapters. Keep connections and lifecycle custody private to security state.
+
+- [x] Move declarations and implementations into their responsibility owners; preserve SQL and integrity checks byte-for-byte.
+- [x] Restrict sibling access through `pub(super)` and narrow explicit exports.
+- [x] Run SQLite security-state, native flow, response, correlation, deadline, and retention owner tests. Expected: passing, unchanged test inventory.
+- [x] Commit relocation, privacy, and formatting separately.
+
+### Task 4: Control-plane security composition
+
+**Files:** Remove textual assembly from active response, event consumer, scheduler worker, adapters/effect port, and their included tests under `crates/platform/chio-control-plane/src/security/`.
+
+**Interfaces:** Preserve existing production adapter and orchestrator APIs, effect ownership, admission checks, and committed recovery.
+
+- [x] Cut implementation and test support into named modules, update imports and narrowly scoped test fixtures.
+- [x] Minimize visibility and remove obsolete fragments.
+- [x] Run the control-plane security owner tests and strict Clippy for all four changed owners. Expected: passing, no dropped tests.
+- [x] Ratchet hygiene and commit relocation, privacy, and formatting independently.
+
+### Task 5: Minimal confinement helper
+
+**Files:** Add `crates/security/chio-cage-init` and shared plan/envelope crate; update `chio-cage`, workspace manifests/lockfile, dependency budget, helper build/inventory and packaging scripts.
+
+**Interfaces:** One shared plan/launch/status wire contract and validation implementation. Parent owns launch supervision, child owns bootstrap and confinement. Preserve executable name `chio-cage-init`.
+
+- [x] Extract helper contracts and child bootstrap; remove the broad cage binary and bootstrap export.
+- [x] Update all helper recipes and test binary discovery to the new package.
+- [x] Measure normal musl graph, set exact ceiling, retire pending dependencies into denials; document the required JSON codec exception.
+- [x] Run gate self-tests including denied-dependency injection, cage/init tests and host compile checks, and measure available helper artifact linkage. Expected: focused checks pass; graph contains no denied dependency.
+- [x] Record native x86_64 enforcement limitations separately from host compile/test evidence.
+
+### Completion
+
+- [x] One fresh whole-batch review, one fix pass if needed, final focused verification.
+- [x] Record each task's result, evidence, scope rulings, and next batch in a committed execution report.
+
+
+Completion evidence: [execution record](../../reviews/2026-09-29-security-module-boundaries-execution.md).
+The control-plane qualification uses the focused owner selection, three native
+ledger cases and exact compiler privacy probes. The slow parallel native-flow
+campaign remains explicitly unqualified after its diagnosed wall-clock expiry;
+no full-workspace, native x86 or hosted acceptance is inferred from this batch.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [module ownership review](../../reviews/2026-10-01-execution-review-module-ownership.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Tasks 1 to 4 conform: after normalizing moves, imports and visibility the four cuts leave 2, 13, 0 and 47 lines, all explained; no test was dropped or ignored and nothing was widened to `pub`. Task 5 is partial. The compiler now checks owner privacy that textual includes used to leave open.
+
+Open findings against this plan:
+
+- **MO1, Low.** The "minimal" helper crate's 72-package graph has 49 packages reached only through `chio-core-types`, used for two functions; the budget gate does not block `url`, `idna` or `ed25519`.
+- **MO2, Low.** Removing upstream `nono` left nine unused `[patch.crates-io]` trees.
+- **MO3, Low.** `c5ca13ddd3` mixes the move, visibility, API, dependency surgery and gate rewrites in one 62-file commit, which this plan forbids; behavior was preserved.
+- **MO4, Low.** `chio-cage` fragments were pasted into their parents rather than made modules; `launch/linux.rs` sits 13 lines under its cap.
+- **MO5, Low.** The reservation-sealing fix copies the store's publication validator and runs it after recovery has acted.
+- **MO6, Low.** The hygiene ratchet pushed back eight unrelated allowlist deadlines.
+- **CA9, Medium.** This structural work ran on the candidate branch before the freeze, against the addendum's sequencing.
+
+**Next:** Cut the helper's dependency on `chio-core-types` (MO1) and drop the dead patch entries (MO2).

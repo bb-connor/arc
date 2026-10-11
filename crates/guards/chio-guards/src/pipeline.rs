@@ -290,6 +290,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         (request, scope, agent_id, server_id)
@@ -302,13 +303,11 @@ mod tests {
         pipeline.add(Box::new(AllowGuard));
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = pipeline.evaluate(&ctx);
@@ -326,13 +325,11 @@ mod tests {
         pipeline.add(Box::new(AllowGuard));
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = pipeline.evaluate(&ctx).expect("pipeline decision");
@@ -348,13 +345,11 @@ mod tests {
         pipeline.add(Box::new(ErrorGuard));
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = pipeline.evaluate(&ctx).expect("pipeline decision");
@@ -370,13 +365,11 @@ mod tests {
         let pipeline = GuardPipeline::new();
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = pipeline.evaluate(&ctx);
@@ -396,13 +389,11 @@ mod tests {
         pipeline.add(Box::new(AllowGuard));
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         assert!(pipeline.requires_dispatch_revalidation());
@@ -426,13 +417,12 @@ mod tests {
         }));
 
         let (request, scope, agent_id, server_id) = make_ctx();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: Some(0),
+        let ctx = {
+            let mut constructed_guard_context =
+                GuardContext::new(&request, &scope).with_matched_grant_index(Some(0));
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
         assert!(pipeline.requires_exact_released_output(&ctx));
         assert!(pipeline

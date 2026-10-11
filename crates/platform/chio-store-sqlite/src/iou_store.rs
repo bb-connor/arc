@@ -1,3 +1,5 @@
+// tenant-read-contract: iou_envelope; class=administrative; principal=settlement-worker
+// Contracts: docs/security/trust-boundary-inventory.json
 //! SQLite-backed persistence for IOU envelopes.
 //!
 //! The `iou_envelope` table is keyed by `receipt_id` so a finalized
@@ -18,6 +20,8 @@ use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
 
 use crate::receipt_store::{receipt_pool_connection, verify_rollback, ReceiptSinkQualification};
+
+const MAX_IOU_ENVELOPE_BYTES: usize = 1024 * 1024;
 
 /// SQL migration applied by [`SqliteIouEnvelopeStore::open_with_pool`]
 /// to create the `iou_envelope` table.
@@ -112,16 +116,40 @@ impl SqliteIouEnvelopeStore {
 }
 
 fn encode_envelope(envelope: &IouEnvelope) -> Result<Arc<[u8]>, IouEnvelopeStoreError> {
+    verify_envelope(envelope)?;
     let canonical = canonical_json_bytes(envelope)
         .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+    if canonical.len() > MAX_IOU_ENVELOPE_BYTES {
+        return Err(IouEnvelopeStoreError::Integrity("size limit"));
+    }
     Ok(Arc::from(canonical.into_boxed_slice()))
 }
 
 fn decode_envelope(canonical: &str) -> Result<IouEnvelope, IouEnvelopeStoreError> {
-    serde_json::from_str(canonical).map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))
+    let envelope = chio_core::canonical::UntrustedJsonText::from_wire(
+        canonical.as_bytes(),
+        MAX_IOU_ENVELOPE_BYTES,
+    )
+    .and_then(|input| input.decode_canonical())
+    .map_err(|_| IouEnvelopeStoreError::Integrity("canonical input"))?;
+    verify_envelope(&envelope)?;
+    Ok(envelope)
 }
 
-#[allow(clippy::too_many_arguments)]
+fn verify_envelope(envelope: &IouEnvelope) -> Result<(), IouEnvelopeStoreError> {
+    if !envelope
+        .verify_signature()
+        .map_err(|_| IouEnvelopeStoreError::Integrity("signature"))?
+    {
+        return Err(IouEnvelopeStoreError::Integrity("signature"));
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn insert_envelope_on_connection(
     connection: &rusqlite::Connection,
     receipt_id: &str,
@@ -238,6 +266,9 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                             &canonical,
                         )
                         .map_err(|err| match err {
+                            IouEnvelopeStoreError::Integrity(rule) => {
+                                chio_kernel::ReceiptStoreError::Canonical(rule.to_owned())
+                            }
                             IouEnvelopeStoreError::Conflict(message) => {
                                 chio_kernel::ReceiptStoreError::Conflict(message)
                             }
@@ -280,21 +311,42 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
         let connection = self.connection()?;
         let row = connection
             .query_row(
-                "SELECT canonical_json FROM iou_envelope WHERE receipt_id = ?1",
+                "SELECT canonical_json, tenant_id, iou_id, amount_units, currency, receipt_timestamp, issuer_key FROM iou_envelope WHERE receipt_id = ?1",
                 params![receipt_id],
-                |row| row.get::<_, String>(0),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?, row.get::<_, i64>(3)?, row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?, row.get::<_, String>(6)?)),
             )
             .optional()
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
         match row {
-            Some(canonical) => Ok(Some(decode_envelope(&canonical)?)),
+            Some((canonical, tenant, iou_id, amount, currency, timestamp, issuer)) => {
+                let envelope = decode_envelope(&canonical)?;
+                if envelope.body.receipt_id != receipt_id
+                    || envelope.body.tenant_id != tenant
+                    || envelope.body.iou_id != iou_id
+                    || i64::try_from(envelope.body.amount_units).ok() != Some(amount)
+                    || envelope.body.currency != currency
+                    || i64::try_from(envelope.body.receipt_timestamp).ok() != Some(timestamp)
+                    || serde_json::to_string(&envelope.body.issuer_key)
+                        .map_err(|error| IouEnvelopeStoreError::Backend(error.to_string()))?
+                        != issuer
+                {
+                    return Err(IouEnvelopeStoreError::Integrity("row binding"));
+                }
+                Ok(Some(envelope))
+            }
             None => Ok(None),
         }
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::crypto::{sha256_hex, Ed25519Backend, Keypair};
@@ -311,8 +363,8 @@ mod tests {
             grant_index: 0,
             cost_charged: cost,
             currency: "USD".to_string(),
-            budget_remaining: 1000 - cost,
-            budget_total: 1000,
+            budget_remaining: Some(1000 - cost),
+            budget_total: Some(1000),
             delegation_depth: 1,
             root_budget_holder: "tenant-a".to_string(),
             payment_reference: None,
@@ -379,6 +431,72 @@ mod tests {
             .unwrap()
             .expect("envelope was inserted");
         assert_eq!(fetched, envelope);
+    }
+
+    #[test]
+    fn signed_iou_readback_rejects_signature_and_tenant_projection_tampering() {
+        let kp = Keypair::from_seed(&[61; 32]);
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = make_priced_receipt(&kp, "exact-iou", 250);
+        let envelope = account.evaluate(&receipt).unwrap().unwrap();
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("signed-iou.sqlite");
+        let open = || {
+            let pool = Pool::builder()
+                .max_size(2)
+                .build(SqliteConnectionManager::file(&path))
+                .unwrap();
+            SqliteIouEnvelopeStore::open_with_pool(pool).unwrap()
+        };
+        let store = open();
+        store.insert(&envelope).unwrap();
+        assert_eq!(
+            store.get_by_receipt_id(&receipt.id).unwrap(),
+            Some(envelope.clone())
+        );
+        drop(store);
+        let store = open();
+        assert_eq!(
+            store.get_by_receipt_id(&receipt.id).unwrap(),
+            Some(envelope.clone())
+        );
+        let connection = store.connection().unwrap();
+        connection
+            .execute(
+                "UPDATE iou_envelope SET tenant_id = 'tenant-b' WHERE receipt_id = ?1",
+                [&receipt.id],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.get_by_receipt_id(&receipt.id),
+            Err(IouEnvelopeStoreError::Integrity("row binding"))
+        ));
+        connection
+            .execute(
+                "UPDATE iou_envelope SET tenant_id = 'tenant-a' WHERE receipt_id = ?1",
+                [&receipt.id],
+            )
+            .unwrap();
+        let mut tampered = envelope.clone();
+        tampered.body.amount_units += 1;
+        assert!(matches!(
+            store.insert(&tampered),
+            Err(IouEnvelopeStoreError::Integrity("signature"))
+        ));
+        let json = String::from_utf8(canonical_json_bytes(&tampered).unwrap()).unwrap();
+        connection
+            .execute(
+                "UPDATE iou_envelope SET canonical_json = ?1 WHERE receipt_id = ?2",
+                params![json, receipt.id],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.get_by_receipt_id(&receipt.id),
+            Err(IouEnvelopeStoreError::Integrity("signature"))
+        ));
     }
 
     #[test]

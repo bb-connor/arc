@@ -1,0 +1,219 @@
+{
+  "schema": "chio.authority-readonly-local-qualification.v1",
+  "observed_utc": "2026-10-09T13:38:32.406532+00:00",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "stage_head": "17c89ed9bd86d259799cd10165f0a4581ad6d7b9",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "stage_promoted_to_source": false,
+  "candidate_qualified": false,
+  "merged": false,
+  "source_repair": {
+    "commits": [
+      "4a6796411e3a6157907da6f030ad663bbd77b5db",
+      "4442862241a3f09043b19bb5ea1512481fbf4c03",
+      "9ae8cb48ba8c4ef27a85c7d94227dd085c454bbf",
+      "17c89ed9bd86d259799cd10165f0a4581ad6d7b9"
+    ],
+    "producer_commits": [
+      "5320c191afe5cb91d57970ea514070344b6053a1",
+      "cbb002cfb748cfcab1f586f2771a047ee76c9916",
+      "20369e255f532d1fd474c88bd156947505f33c13"
+    ],
+    "observed_source_head": "17c89ed9bd86d259799cd10165f0a4581ad6d7b9",
+    "observed_source_tree": "e3dfac26c0db4a48982e4857838fe8dd8c0abd84",
+    "files": [
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/public_authority_read.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs",
+      "crates/products/chio-cli/src/cli/runtime.rs"
+    ]
+  },
+  "verification_evidence": [
+    {
+      "path": "/tmp/pr1160-v25-final-20261009/authority-local/RESULTS.json",
+      "sha256": "3cd6c76f1f8840def50dfe02fc5b2b7385313e86de25df133500922f321ac245",
+      "scope": "Four terminal composed commands, explicit test names and nonzero minimum counts."
+    },
+    {
+      "path": "/tmp/pr1160-v25-final-20261009/authority-local/source.json",
+      "sha256": "a50d76ff0d4f9672474f19a1e5670b48eeb289a9ecf849350ec017f499ded139",
+      "scope": "Frozen 254-file source capsule at17c89."
+    },
+    {
+      "path": "/tmp/pr1160-v25-final-20261009/static-authority/RESULTS.json",
+      "sha256": "f78cf1cc067a293d513f2a1ee09261fbb7fc69cc7de0e6df30e9c7ec36e4c456",
+      "scope": "Six terminal static gates on byte-equivalent9ae8 plus exact OID overlay."
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/red.log",
+      "sha256": "caa9b15a2bab3bb5f958bbfcadc6e530d7c9cf4b6b5ca38b79242b2c21df9f80",
+      "scope": "Original4FAIL/2preservationPASS; no authority write/create behavior waived."
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/oid-local-swap-red.log",
+      "sha256": "6070ec512d519e1c928d73ae85f94e5b22f16065f5f092f1b8e244e28dfcf47a",
+      "scope": "Actual1FAIL: successful direct-post changed authority data_version2 to3."
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/oid-local-swap-green.log",
+      "sha256": "6fb9ff233da36fff9346b31213e5eca8edeee0c97a1afdd47d7c34dcaa478665",
+      "scope": "Owner20GREEN before Linux-only test attribute; composed witness renewed separately."
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/cp-lib-full.log",
+      "sha256": "5b79dd25dbf919203b0198b53afdf9bacd6e2c187d4c3eae9e23d5a908b65a98",
+      "scope": "Provider-preempted partial1299observedPASS/0observedFAIL of1516; SSH255, not full-suite qualification."
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/authority-readonly/oid-local-swap-clippy.log",
+      "sha256": "664cef27f01b3f70e37624460ffe941a1b557311a20a1d822de3361963649c62",
+      "scope": "Provider interruption255, not a strict-lint result."
+    },
+    {
+      "path": "docs/reviews/2026-10-09-pr1160-authority-readonly-review.md",
+      "sha256": "48c788db8cb526f8e1afcf937fc21d5df7debb232d5520a0d310cd78cb8e2fb5",
+      "scope": "Independent immutable source review; composed runtime qualification recorded separately."
+    },
+    {
+      "path": "docs/reviews/2026-10-09-pr1160-authority-oid-review.md",
+      "sha256": "94f7825cfe1404c738fa6ce5a04d8cc9aab734ce94446bf295ddf878b0d020b0",
+      "scope": "Independent immutable source review; composed runtime qualification recorded separately."
+    }
+  ],
+  "local_results": [
+    {
+      "name": "authority-public-composed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "receipt_query_snapshot_tests",
+        "leader_forward_admission",
+        "oid4vp_issuer_fetch_tests",
+        "portable_issuer_fetch::tests",
+        "public_passport_challenge_admission",
+        "search_admission",
+        "public_authority_reads",
+        "config_and_public_tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 675.0237259096466,
+      "terminal_at": "2026-10-09T13:11:41.238524+00:00",
+      "test_summaries": [
+        [
+          61,
+          0,
+          0
+        ]
+      ],
+      "minimum_passed": 61,
+      "missing_markers": [],
+      "missing_prior_test_names": [],
+      "accepted": true
+    },
+    {
+      "name": "authority-store",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "authority::"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 365.1884848708287,
+      "terminal_at": "2026-10-09T13:17:46.656684+00:00",
+      "test_summaries": [
+        [
+          38,
+          0,
+          0
+        ]
+      ],
+      "minimum_passed": 38,
+      "missing_markers": [],
+      "missing_prior_test_names": [],
+      "accepted": true
+    },
+    {
+      "name": "authority-cli",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "passport",
+        "--test",
+        "certify"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 661.8322220109403,
+      "terminal_at": "2026-10-09T13:28:48.712968+00:00",
+      "test_summaries": [
+        [
+          13,
+          0,
+          1
+        ],
+        [
+          30,
+          0,
+          0
+        ]
+      ],
+      "minimum_passed": 43,
+      "missing_markers": [],
+      "missing_prior_test_names": [],
+      "accepted": true
+    },
+    {
+      "name": "strict-authority",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-store-sqlite",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 466.7044988311827,
+      "terminal_at": "2026-10-09T13:36:35.719675+00:00",
+      "test_summaries": [],
+      "minimum_passed": 0,
+      "missing_markers": [],
+      "missing_prior_test_names": [],
+      "accepted": true
+    }
+  ],
+  "boundaries": [
+    "Public authority inspection never creates storage/schema/seed or writes authority data/time floor; ordinary SQLite WAL bookkeeping is permitted.",
+    "Trusted CLI startup provisions the configured authority database once; authenticated authority mutation and entitled credential issuance remain writable.",
+    "The seed-only status/JWKS raw-reader baseline remains unchanged and is not claimed descriptor-hardened by this repair.",
+    "Root resolves generic listings with both receipt-store and injected-clock arguments; resolved blob22d6d5fcd31b4cc7b9b8701dfe1d5df304bb3ffc matches producer."
+  ],
+  "remaining_acceptance": [
+    "Finish the separately tracked checkpoint/lineage/C20 repairs and proof qualification, then promote the complete stage to Source.",
+    "Independent final-candidate review and accurate current thread dispositions; four exact protected hosted checks and protected merge."
+  ],
+  "infrastructure_interruption": {
+    "path": "/tmp/pr1160-builder-preemption-20261009/observation.json",
+    "sha256": "a9a81be61cbad1f028f8d3f10b6c76b8331bf23098e93baaa743533fe5be4152",
+    "scope": "Provider preemption12:41:46.642Z and termination12:47:49.390Z. Interrupted results preserved; local qualification uses a separate private target."
+  }
+}

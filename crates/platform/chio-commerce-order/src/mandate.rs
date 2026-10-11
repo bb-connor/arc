@@ -292,12 +292,7 @@ fn validate_protocol_payload_document(
     payload: &CommerceMandateProtocolPayload,
 ) -> Result<(), CommerceOrderError> {
     let document: CommerceMandateProtocolPayloadDocument =
-        serde_json::from_slice(&payload.payload_bytes).map_err(|error| {
-            CommerceOrderError::MandateFailed(format!(
-                "mandate projection payload invalid JSON: {}/{}: {error}",
-                projection.protocol, projection.purpose
-            ))
-        })?;
+        crate::input::decode(&payload.payload_bytes)?;
     if document.schema != COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID {
         return Err(CommerceOrderError::MandateFailed(format!(
             "mandate projection payload schema mismatch: {}/{}",

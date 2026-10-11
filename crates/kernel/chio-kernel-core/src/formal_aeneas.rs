@@ -81,7 +81,10 @@ pub(crate) fn ledger_is_terminal(state: ReservationLedger) -> bool {
     )
 )]
 // Explicit matches keep checked-add semantics transparent to Aeneas.
-#[allow(clippy::manual_map)]
+#[allow(
+    clippy::manual_map,
+    reason = "The explicit match is the form consumed by the formal extraction tool."
+)]
 pub fn ledger_apply(state: ReservationLedger, op: u8, amount: u64) -> (ReservationLedger, bool) {
     let Some(total) = state.reserved.checked_add(state.committed) else {
         return (state, false);
@@ -111,6 +114,9 @@ pub fn ledger_apply(state: ReservationLedger, op: u8, amount: u64) -> (Reservati
         return (state, false);
     }
 
+    // Reviewed extraction boundary: the guard above proves this subtraction.
+    // accounting::proofs::checked_balance_refines_reservation_conservation
+    // checks the production ExposureUnits path against this full-u64 model.
     let outstanding = state.reserved - amount;
     let updated = match op {
         1 => match state.committed.checked_add(amount) {
@@ -153,12 +159,12 @@ pub struct InclusionStep {
     pub next_size: u64,
 }
 
-// Preserve the scalar match/if shape consumed by the generated Aeneas proof.
 #[allow(
     clippy::manual_is_multiple_of,
     clippy::needless_bool,
-    clippy::collapsible_match
-)]
+    clippy::collapsible_match,
+    reason = "Keep arithmetic in the explicit form consumed by the existing formal model. The explicit boolean is the form consumed by the formal extraction tool."
+)] // Aeneas scalar subset.
 pub fn inclusion_step(index: u64, size: u64) -> InclusionStep {
     let sibling_on_left = index % 2 != 0;
     let right_sibling_exists = match index.checked_add(1) {

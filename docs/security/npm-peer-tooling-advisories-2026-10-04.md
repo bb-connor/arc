@@ -98,3 +98,38 @@ removed because the candidate resolves sharp 0.35.4. Rust advisory gates are
 unaffected. Raw unfiltered and effective OSV results must both be retained with
 qualification evidence: an effective zero-finding result includes these accepted
 debts and must never be reported as all upstream vulnerabilities being fixed.
+
+## Foundation composition re-review
+
+The foundation uses Metro and metro-file-map 0.84.5 plus `@expo/metro` 56.0.2.
+The prerequisite used 0.84.4 and 56.0.0. The parent-inventory guard correctly
+rejected reuse of the earlier graph. The initial foundation graph contained
+nested copies of Metro and metro-file-map beneath `@expo/metro`; their incoming
+edges were included in that review.
+
+Both versions of these three packages were downloaded from the lockfile's npm
+archive URLs and verified against their SHA-512 integrity records before
+comparison. Every metro-file-map JavaScript file is byte-identical across the
+change. Its only changed file is package metadata. The inspected watcher still
+calls `micromatch.some`, and the affected braces path is unchanged. Metro's
+JavaScript delta replaces its image-size dependency with local image parsers;
+the Expo wrapper adds the corresponding forwarding module. Neither change adds
+a braces or node-forge consumer. The locked micromatch, braces, Expo CLI,
+code-signing certificates, node-forge and Expo records remain identical to the
+landed prerequisite. This re-review covers these advisory paths, not a blanket
+audit of the new image parsers or mobile product acceptance.
+
+The two advisory IDs, affected versions, directory scope and October 18 expiry
+remain unchanged. The archive integrity records, source deltas and repeated
+scope-guard evidence are retained with the foundation review repair bundle.
+
+The subsequent hosted CVE scan found stale lock entries despite the manifest's
+patched overrides. Regenerating the workspace and standalone node-http locks
+resolves brace-expansion 5.0.12, fast-uri 3.1.8/4.1.5 and undici 7.29.1. npm also
+deduplicates the nested Metro tree. The removed Metro, metro-file-map,
+metro-config and metro-transform-worker entries have the same versions,
+integrity hashes and dependency declarations as the retained root copies.
+The Expo forwarder now resolves those existing root copies. This removes two
+duplicate incoming edges from `REVIEWED_PARENTS`; it adds no consumer, affected
+version, advisory exception or expiry extension. The effective OSV scan passes
+with the original accepted advisory debts still visible in unfiltered evidence.

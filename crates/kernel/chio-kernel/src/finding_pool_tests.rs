@@ -648,24 +648,27 @@ fn kernel_with_keys_and_store(
 }
 
 fn kernel_without_receipt_store(kernel_key_seed: u8, pool_authority_seed: u8) -> ChioKernel {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::from_seed(&[kernel_key_seed; 32]),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-terminal-test".to_owned(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::from_seed(&[kernel_key_seed; 32]),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-terminal-test".to_owned(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     assert!(kernel
         .set_finding_pool_receipt_authority(Keypair::from_seed(&[pool_authority_seed; 32]))
         .is_ok());
@@ -676,24 +679,27 @@ fn kernel_without_receipt_store(kernel_key_seed: u8, pool_authority_seed: u8) ->
 fn finding_pool_rejects_unqualified_retention_archive() {
     let ledger = Arc::new(RecordingLedger::default());
     let sink_id = format!("receipt-sink:{:p}", Arc::as_ptr(&ledger));
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::from_seed(&[93; 32]),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-retention-test".to_owned(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: Some(crate::RetentionConfig::default()),
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::from_seed(&[93; 32]),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-retention-test".to_owned(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: Some(crate::RetentionConfig::default()),
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     assert!(kernel
         .set_finding_pool_receipt_authority(Keypair::from_seed(&[94; 32]))
         .is_ok());

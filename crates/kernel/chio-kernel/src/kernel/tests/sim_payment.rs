@@ -1,14 +1,13 @@
 // End-to-end kernel coverage for the sim payment adapter.
 //
-// Included by `src/kernel/tests.rs`; imports resolve through the surrounding
-// `kernel::tests` scope. All helpers from `tests/support.rs` and
-// `tests/support_monetary.rs` are in scope.
+// Shared fixtures live in the parent kernel test module.
 
+use super::*;
 use chio_core::capability::governance::{
     MeteredBillingContext, MeteredBillingQuote, MeteredSettlementMode,
 };
 
-fn make_mustprepay_intent(
+pub(super) fn make_mustprepay_intent(
     id: &str,
     server: &str,
     tool: &str,
@@ -65,16 +64,21 @@ fn build_mustprepay_fixture(cost: u64) -> MustPrepayFixture {
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
-    MustPrepayFixture { kernel, cap, agent_kp }
+    MustPrepayFixture {
+        kernel,
+        cap,
+        agent_kp,
+    }
 }
 
 fn mustprepay_tool_call(
     request_id: &str,
     cap: &CapabilityToken,
     agent_kp: &Keypair,
-    intent: GovernedTransactionIntent,
-    kernel: &ChioKernel,
+    mut intent: GovernedTransactionIntent,
+    kernel: &mut ChioKernel,
 ) -> ToolCallRequest {
+    bind_test_tool_approval(kernel, cap, &serde_json::json!({}), request_id, &mut intent);
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -97,6 +101,7 @@ fn mustprepay_tool_call(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -112,12 +117,15 @@ fn expect_financial_meta(response: &ToolCallResponse) -> &serde_json::Value {
 // sim authorize -> capture -> receipt fold stamps a sim-* payment reference.
 #[test]
 fn sim_adapter_settles_governed_mustprepay_onto_receipt() {
-    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(75);
     kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
 
-    let intent =
-        make_mustprepay_intent("intent-sim-settle", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-sim-settle", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-sim-settle", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-settle", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -140,12 +148,15 @@ fn sim_adapter_settles_governed_mustprepay_onto_receipt() {
 // MustPrepay with no adapter configured denies fail-closed.
 #[test]
 fn governed_mustprepay_without_adapter_is_denied_end_to_end() {
-    let MustPrepayFixture { kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(75);
     // no adapter set
 
-    let intent =
-        make_mustprepay_intent("intent-sim-deny", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-sim-deny", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-sim-deny", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-deny", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -172,9 +183,8 @@ fn governed_mustprepay_quote_above_per_invocation_ceiling_is_denied() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-over-per-call", "cost-srv", "compute", 500, "USD");
-    let request = mustprepay_tool_call("req-over-per-call", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-over-per-call", "cost-srv", "compute", 500, "USD");
+    let request = mustprepay_tool_call("req-over-per-call", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -202,9 +212,8 @@ fn governed_mustprepay_quote_above_cumulative_ceiling_is_denied() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-over-total", "cost-srv", "compute", 500, "USD");
-    let request = mustprepay_tool_call("req-over-total", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-over-total", "cost-srv", "compute", 500, "USD");
+    let request = mustprepay_tool_call("req-over-total", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -226,14 +235,16 @@ fn governed_mustprepay_against_cumulative_only_grant_is_denied() {
 
     let agent_kp = Keypair::generate();
     let mut grant = make_no_ceiling_mustprepay_grant();
-    grant.max_total_cost = Some(MonetaryAmount { units: 1000, currency: "USD".to_string() });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 1000,
+        currency: "USD".to_string(),
+    });
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-total-only", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-total-only", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-total-only", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-total-only", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -250,12 +261,15 @@ fn governed_mustprepay_against_cumulative_only_grant_is_denied() {
 // dispatch may already have occurred.
 #[test]
 fn sim_adapter_zero_actual_cost_retains_prepaid_charge() {
-    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(0);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(0);
     kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
 
-    let intent =
-        make_mustprepay_intent("intent-sim-zero", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-sim-zero", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-sim-zero", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-zero", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -302,8 +316,14 @@ async fn sim_adapter_abort_after_dispatch_retains_authorization() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-sim-abort", "cost-srv", "compute", 100, "USD");
+    let mut intent = make_mustprepay_intent("intent-sim-abort", "cost-srv", "compute", 100, "USD");
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({}),
+        "req-sim-abort",
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -326,6 +346,7 @@ async fn sim_adapter_abort_after_dispatch_retains_authorization() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let kernel = std::sync::Arc::new(kernel);
@@ -338,7 +359,9 @@ async fn sim_adapter_abort_after_dispatch_retains_authorization() {
         .await
         .expect("pending tool should be invoked before abort");
     eval.abort();
-    let join = eval.await.expect_err("aborted evaluation should not complete");
+    let join = eval
+        .await
+        .expect_err("aborted evaluation should not complete");
     assert!(join.is_cancelled());
 
     // Dispatch began, so the committed budget remains consumed.
@@ -372,14 +395,16 @@ async fn sim_adapter_abort_after_dispatch_retains_authorization() {
 
 // A grant without monetary ceiling whose approval threshold forces governed
 // admission. Shared by the no-charge MustPrepay settlement tests below.
-fn make_no_ceiling_mustprepay_grant() -> ToolGrant {
+pub(super) fn make_no_ceiling_mustprepay_grant() -> ToolGrant {
     ToolGrant {
         server_id: "cost-srv".to_string(),
         tool_name: "compute".to_string(),
         operations: vec![Operation::Invoke],
         constraints: vec![
             Constraint::GovernedIntentRequired,
-            Constraint::RequireApprovalAbove { threshold_units: 50 },
+            Constraint::RequireApprovalAbove {
+                threshold_units: 50,
+            },
         ],
         max_invocations: None,
         max_cost_per_invocation: None,
@@ -414,7 +439,7 @@ fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
 
     // Intent quotes 100 USD (above threshold 50), so an approval token is required.
     let intent = make_mustprepay_intent("intent-no-charge", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-charge", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call("req-no-charge", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -452,9 +477,8 @@ fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
         )
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-no-charge-cap", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-charge-cap", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-no-charge-cap", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-cap", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -504,9 +528,8 @@ fn mustprepay_no_budget_charge_receipt_financial_deserializes_with_quote() {
         .unwrap();
 
     // The intent quotes 100 USD (quoted_cost.units == max_units).
-    let intent =
-        make_mustprepay_intent("intent-no-charge-full", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-charge-full", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-no-charge-full", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-full", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
@@ -545,9 +568,8 @@ fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
         )
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-no-charge-deny", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-charge-deny", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-no-charge-deny", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-deny", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -585,7 +607,7 @@ fn mustprepay_no_budget_charge_retains_hold_after_ambiguous_dispatch() {
 
     let intent =
         make_mustprepay_intent("intent-no-charge-abort", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-charge-abort", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call("req-no-charge-abort", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -646,7 +668,15 @@ fn governed_mustprepay_quote_above_threshold_requires_approval() {
         .unwrap();
 
     // Quote 100 > threshold 50, max_amount absent: the prepaid quote alone forces approval.
-    let intent = make_no_ceiling_mustprepay_intent_over_threshold("intent-quote-gate", 100, "USD");
+    let mut intent =
+        make_no_ceiling_mustprepay_intent_over_threshold("intent-quote-gate", 100, "USD");
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({}),
+        "req-quote-gate-deny",
+        &mut intent,
+    );
 
     let no_token = ToolCallRequest {
         request_id: "req-quote-gate-deny".to_string(),
@@ -664,6 +694,7 @@ fn governed_mustprepay_quote_above_threshold_requires_approval() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let denied = kernel.evaluate_tool_call_blocking(&no_token).unwrap();
     assert_eq!(
@@ -678,7 +709,7 @@ fn governed_mustprepay_quote_above_threshold_requires_approval() {
     );
 
     let with_token =
-        mustprepay_tool_call("req-quote-gate-allow", &cap, &agent_kp, intent, &kernel);
+        mustprepay_tool_call("req-quote-gate-allow", &cap, &agent_kp, intent, &mut kernel);
     let allowed = kernel.evaluate_tool_call_blocking(&with_token).unwrap();
     assert_eq!(
         allowed.verdict,
@@ -713,6 +744,7 @@ fn mustprepay_request_without_token(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -731,8 +763,13 @@ fn governed_mustprepay_rejects_quote_above_grant_ceiling() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let mut intent =
-        make_mustprepay_intent("intent-charge-quote-gate", "cost-srv", "compute", 100, "USD");
+    let mut intent = make_mustprepay_intent(
+        "intent-charge-quote-gate",
+        "cost-srv",
+        "compute",
+        100,
+        "USD",
+    );
     intent.max_amount = None;
 
     let no_token =
@@ -928,9 +965,8 @@ fn settled_no_charge_mustprepay_ambiguous_dispatch_retains_payment() {
         )
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-settled-abort", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-settled-abort", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-settled-abort", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-settled-abort", &cap, &agent_kp, intent, &mut kernel);
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
@@ -966,14 +1002,23 @@ fn settled_no_charge_mustprepay_ambiguous_dispatch_retains_payment() {
 // execute a MustPrepay spend downstream with no payment ever occurring.
 #[test]
 fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment() {
-    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(75);
     let payment = UncapturablePaymentAdapter::default();
     kernel.set_payment_adapter(Box::new(payment.clone()));
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-deny", "cost-srv", "compute", 100, "USD");
-    let request =
-        mustprepay_tool_call("req-reserve-mustprepay-deny", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call(
+        "req-reserve-mustprepay-deny",
+        &cap,
+        &agent_kp,
+        intent,
+        &mut kernel,
+    );
 
     let response = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
@@ -1010,14 +1055,23 @@ fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment
 // the caller later executes has already been paid.
 #[test]
 fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() {
-    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(75);
     let payment = TrackingPaymentAdapter::new();
     kernel.set_payment_adapter(Box::new(payment.clone()));
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-allow", "cost-srv", "compute", 100, "USD");
-    let request =
-        mustprepay_tool_call("req-reserve-mustprepay-allow", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call(
+        "req-reserve-mustprepay-allow",
+        &cap,
+        &agent_kp,
+        intent,
+        &mut kernel,
+    );
 
     let response = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
@@ -1080,14 +1134,19 @@ fn reserving_mustprepay_stamp_failure_refunds_captured_prepayment() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent =
-        make_mustprepay_intent("intent-reserve-stamp-fail", "cost-srv", "compute", 100, "USD");
+    let intent = make_mustprepay_intent(
+        "intent-reserve-stamp-fail",
+        "cost-srv",
+        "compute",
+        100,
+        "USD",
+    );
     let request = mustprepay_tool_call(
         "req-reserve-mustprepay-stamp-fail",
         &cap,
         &agent_kp,
         intent,
-        &kernel,
+        &mut kernel,
     );
 
     // The reservation stamp fails after the prepayment is captured.
@@ -1134,7 +1193,7 @@ fn reserving_mustprepay_stamp_failure_refunds_captured_prepayment() {
         &cap,
         &agent_kp,
         intent_ok,
-        &kernel,
+        &mut kernel,
     );
     let reserved = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request_ok, None)
@@ -1213,8 +1272,7 @@ fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
     assert_eq!(reconciled.verdict, Verdict::Allow);
     let financial = expect_financial_meta(&reconciled);
     assert!(
-        financial.get("payment_reference").is_none()
-            || financial["payment_reference"].is_null(),
+        financial.get("payment_reference").is_none() || financial["payment_reference"].is_null(),
         "a non-MustPrepay reconcile must not carry a payment_reference: {financial}"
     );
 }
@@ -1284,13 +1342,22 @@ impl PaymentAdapter for DistinctCapturePaymentAdapter {
 // stamped reference is the capture transaction id, not the authorization hold id.
 #[test]
 fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
-    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let MustPrepayFixture {
+        mut kernel,
+        cap,
+        agent_kp,
+    } = build_mustprepay_fixture(75);
     kernel.set_payment_adapter(Box::new(DistinctCapturePaymentAdapter));
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-recon", "cost-srv", "compute", 100, "USD");
-    let request =
-        mustprepay_tool_call("req-reserve-mustprepay-recon", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call(
+        "req-reserve-mustprepay-recon",
+        &cap,
+        &agent_kp,
+        intent,
+        &mut kernel,
+    );
 
     let reserved = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
@@ -1465,7 +1532,7 @@ fn aborted_settled_mustprepay_charge_refunds_the_quoted_amount(
     authorize_provisional_hold(&kernel, &cap.id, 10)?;
 
     let intent = make_mustprepay_intent("intent-abort-refund", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-abort-refund", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call("req-abort-refund", &cap, &agent_kp, intent, &mut kernel);
 
     // Provisional per-invocation hold of 10 in a different currency accompanies
     // the 100 USD quote that actually funded the authorization.
@@ -1481,6 +1548,7 @@ fn aborted_settled_mustprepay_charge_refunds_the_quoted_amount(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(
@@ -1538,6 +1606,7 @@ fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let charge = make_provisional_charge(10, "USD");
     let authorization = PaymentAuthorization {
@@ -1551,6 +1620,7 @@ fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(
@@ -1589,9 +1659,8 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
         .unwrap();
     authorize_provisional_hold(&kernel, &cap.id, 10)?;
 
-    let intent =
-        make_mustprepay_intent("intent-abort-release", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-abort-release", &cap, &agent_kp, intent, &kernel);
+    let intent = make_mustprepay_intent("intent-abort-release", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-abort-release", &cap, &agent_kp, intent, &mut kernel);
     let charge = make_provisional_charge(10, "USD");
     let authorization = PaymentAuthorization {
         authorization_id: "auth-unsettled-abort".to_string(),
@@ -1604,6 +1673,7 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
         &cap,
         Some(&charge),
         Some(&authorization),
+        None,
     )?;
 
     assert_eq!(
@@ -1627,7 +1697,7 @@ fn make_provisional_charge(cost_charged: u64, currency: &str) -> BudgetChargeRes
         grant_index: 0,
         cost_charged,
         currency: currency.to_string(),
-        budget_total: 1000,
+        budget_total: Some(1000),
         new_committed_cost_units: cost_charged,
         budget_hold_id: "hold-provisional".to_string(),
         authorize_metadata: BudgetCommitMetadata {
@@ -1666,7 +1736,7 @@ fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
         .unwrap();
 
     let intent = make_mustprepay_intent("intent-charge-fund", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-charge-fund", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call("req-charge-fund", &cap, &agent_kp, intent, &mut kernel);
 
     // Provisional budget hold of 10 in a different currency accompanies the quote.
     let charge = make_provisional_charge(10, "EUR");
@@ -1701,8 +1771,7 @@ fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
 #[test]
 fn no_ceiling_mustprepay_authorizes_with_the_payment_journal_active() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel
-        .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -1711,7 +1780,7 @@ fn no_ceiling_mustprepay_authorizes_with_the_payment_journal_active() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
     let intent = make_mustprepay_intent("intent-no-ceiling", "cost-srv", "compute", 100, "USD");
-    let request = mustprepay_tool_call("req-no-ceiling", &cap, &agent_kp, intent, &kernel);
+    let request = mustprepay_tool_call("req-no-ceiling", &cap, &agent_kp, intent, &mut kernel);
 
     // `None` models the no-ceiling admission outcome: no monetary charge, hence no
     // HoldPlaced row. This must not deny; the prepayment is journal-free by design.
@@ -1760,6 +1829,7 @@ fn non_mustprepay_charge_authorizes_the_charged_amount() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let charge = make_provisional_charge(10, "USD");
 

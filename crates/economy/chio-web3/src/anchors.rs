@@ -149,7 +149,12 @@ pub(crate) fn expected_operator_key_hash(
             public_key.algorithm()
         )));
     }
-    Ok(Hash::from_bytes(*keccak256(public_key.as_bytes()).as_ref()))
+    Ok(Hash::from_bytes(
+        *keccak256(public_key.ed25519_bytes().map_err(|_| {
+            Web3ContractError::InvalidBinding("Ed25519 public key required".into())
+        })?)
+        .as_ref(),
+    ))
 }
 
 pub fn validate_oracle_conversion_evidence(

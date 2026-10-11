@@ -584,9 +584,11 @@ fn test_install_fails_with_missing_archive() {
         cmd_guard_install(&bogus_path, install_dir.path()),
         "install missing archive",
     );
-    assert_registry_error(&err, "urn:chio:error:cli:io", "cli");
-    let msg = err.to_string();
-    assert!(msg.contains("failed to inspect"), "{msg}");
+    assert!(matches!(
+        &err,
+        CliError::Io(source) if source.kind() == std::io::ErrorKind::NotFound
+    ));
+    assert_eq!(err.report().code, "CHIO-CLI-IO");
 }
 
 #[test]

@@ -5,7 +5,14 @@
   - crates/core/chio-core-types/src/receipt/body.rs
   - crates/core/chio-core-types/src/merkle.rs
   - crates/kernel/chio-kernel/src/checkpoint.rs
+  - crates/kernel/chio-kernel/src/checkpoint/builders.rs
   Enforced by the matching [[mirror]] entries in formal/proof-manifest.toml.
+  Checkpoint builders are abstraction anchors for sequence and Merkle root.
+  Issuance clocks, signing, predecessor validation and chain-frontier custody
+  remain outside the bounded checkpoint model below.
+  Receipt and checkpoint signature checks now use strict production verification.
+  The body/signature equality projection below does not prove cryptographic
+  verification, encoding rejection or refinement of that stricter acceptance set.
 -/
 
 import Chio.Json.Hash

@@ -186,7 +186,7 @@ fn map_signature_sidecar_write_error(error: WasmGuardError) -> CliError {
 
 fn map_signature_sidecar_load_error(error: WasmGuardError) -> CliError {
     match error {
-        WasmGuardError::ManifestLoad { .. } => {
+        WasmGuardError::InputFile { .. } => {
             CliError::cli_io_error(format!("failed to load signature sidecar: {error}"))
         }
         other => {

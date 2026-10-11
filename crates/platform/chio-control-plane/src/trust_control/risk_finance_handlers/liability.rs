@@ -9,8 +9,8 @@ pub(crate) async fn handle_issue_liability_provider(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -20,7 +20,7 @@ pub(crate) async fn handle_issue_liability_provider(
     };
 
     match issue_signed_liability_provider(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request.report,
@@ -43,7 +43,7 @@ pub(crate) async fn handle_query_liability_providers(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -62,7 +62,7 @@ pub(crate) async fn handle_resolve_liability_provider(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -81,8 +81,8 @@ pub(crate) async fn handle_issue_liability_quote_request(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -92,7 +92,7 @@ pub(crate) async fn handle_issue_liability_quote_request(
     };
 
     match issue_signed_liability_quote_request(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -112,8 +112,8 @@ pub(crate) async fn handle_issue_liability_quote_response(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -123,7 +123,7 @@ pub(crate) async fn handle_issue_liability_quote_response(
     };
 
     match issue_signed_liability_quote_response(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -143,8 +143,8 @@ pub(crate) async fn handle_issue_liability_placement(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -154,7 +154,7 @@ pub(crate) async fn handle_issue_liability_placement(
     };
 
     match issue_signed_liability_placement(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -174,8 +174,8 @@ pub(crate) async fn handle_issue_liability_pricing_authority(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -185,7 +185,7 @@ pub(crate) async fn handle_issue_liability_pricing_authority(
     };
 
     match issue_signed_liability_pricing_authority(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -205,8 +205,8 @@ pub(crate) async fn handle_issue_liability_bound_coverage(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -216,7 +216,7 @@ pub(crate) async fn handle_issue_liability_bound_coverage(
     };
 
     match issue_signed_liability_bound_coverage(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -236,8 +236,8 @@ pub(crate) async fn handle_issue_liability_auto_bind(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -247,7 +247,7 @@ pub(crate) async fn handle_issue_liability_auto_bind(
     };
 
     match issue_signed_liability_auto_bind(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -267,7 +267,7 @@ pub(crate) async fn handle_query_liability_market_workflows(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -286,8 +286,8 @@ pub(crate) async fn handle_issue_liability_claim_package(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -297,7 +297,7 @@ pub(crate) async fn handle_issue_liability_claim_package(
     };
 
     match issue_signed_liability_claim_package(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -317,8 +317,8 @@ pub(crate) async fn handle_issue_liability_claim_response(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -328,7 +328,7 @@ pub(crate) async fn handle_issue_liability_claim_response(
     };
 
     match issue_signed_liability_claim_response(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -348,8 +348,8 @@ pub(crate) async fn handle_issue_liability_claim_dispute(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -359,7 +359,7 @@ pub(crate) async fn handle_issue_liability_claim_dispute(
     };
 
     match issue_signed_liability_claim_dispute(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -389,8 +389,8 @@ pub(crate) async fn handle_issue_liability_claim_adjudication(
         }
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -400,7 +400,7 @@ pub(crate) async fn handle_issue_liability_claim_adjudication(
     };
 
     match issue_signed_liability_claim_adjudication(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -431,8 +431,8 @@ pub(crate) async fn handle_issue_liability_claim_payout_instruction(
         }
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -442,7 +442,7 @@ pub(crate) async fn handle_issue_liability_claim_payout_instruction(
     };
 
     match issue_signed_liability_claim_payout_instruction(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -463,8 +463,8 @@ pub(crate) async fn handle_issue_liability_claim_payout_receipt(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -474,7 +474,7 @@ pub(crate) async fn handle_issue_liability_claim_payout_receipt(
     };
 
     match issue_signed_liability_claim_payout_receipt(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -504,8 +504,8 @@ pub(crate) async fn handle_issue_liability_claim_settlement_instruction(
         }
     };
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -515,7 +515,7 @@ pub(crate) async fn handle_issue_liability_claim_settlement_instruction(
     };
 
     match issue_signed_liability_claim_settlement_instruction(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -536,8 +536,8 @@ pub(crate) async fn handle_issue_liability_claim_settlement_receipt(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -547,7 +547,7 @@ pub(crate) async fn handle_issue_liability_claim_settlement_receipt(
     };
 
     match issue_signed_liability_claim_settlement_receipt(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -567,7 +567,7 @@ pub(crate) async fn handle_query_liability_claim_workflows(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

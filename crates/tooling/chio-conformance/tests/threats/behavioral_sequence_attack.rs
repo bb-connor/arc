@@ -5,10 +5,15 @@
 //! transition.
 //!
 //! Revert-to-prove-it-fails recipe: flip the forbidden-transition deny
-//! branch in `crates/chio-guards/src/behavioral_sequence.rs` to return
+//! branch in `crates/guards/chio-guards/src/behavioral_sequence.rs` to return
 //! `Verdict::Allow` (or remove the predecessor lookup). The deny-arm
 //! assertion below fails when the production guard stops denying the
 //! configured forbidden transition.
+//!
+//! Targeted mutation recipe: replace the `last_tool == from` predicate in the
+//! forbidden-transition check with `last_tool != from`. The dangerous edge is
+//! then admitted and the deny assertion MUST fail. A different successor from
+//! the same predecessor MUST remain admitted.
 
 use std::sync::Arc;
 
@@ -56,6 +61,7 @@ fn request_for(tool_name: &str) -> (ToolCallRequest, ChioScope, String, String) 
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (request, scope, agent_id, server_id)
 }
@@ -66,13 +72,11 @@ fn guard_ctx<'a>(
     agent_id: &'a String,
     server_id: &'a String,
 ) -> GuardContext<'a> {
-    GuardContext {
-        request,
-        scope,
-        agent_id,
-        server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
+    {
+        let mut constructed_guard_context = GuardContext::new(request, scope);
+        constructed_guard_context.agent_id = agent_id;
+        constructed_guard_context.server_id = server_id;
+        constructed_guard_context
     }
 }
 
@@ -106,7 +110,23 @@ fn threat_behavioral_sequence_attack_is_covered() {
             ..SequencePolicy::default()
         },
     );
-    let (request, scope, agent_id, server_id) = request_for("write_file");
-    let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
-    assert_eq!(verdict(guard.evaluate(&ctx)), Verdict::Deny);
+    let (benign_request, benign_scope, benign_agent_id, benign_server_id) =
+        request_for("read_file");
+    let benign_ctx = guard_ctx(
+        &benign_request,
+        &benign_scope,
+        &benign_agent_id,
+        &benign_server_id,
+    );
+    assert_eq!(verdict(guard.evaluate(&benign_ctx)), Verdict::Allow);
+
+    let (dangerous_request, dangerous_scope, dangerous_agent_id, dangerous_server_id) =
+        request_for("write_file");
+    let dangerous_ctx = guard_ctx(
+        &dangerous_request,
+        &dangerous_scope,
+        &dangerous_agent_id,
+        &dangerous_server_id,
+    );
+    assert_eq!(verdict(guard.evaluate(&dangerous_ctx)), Verdict::Deny);
 }

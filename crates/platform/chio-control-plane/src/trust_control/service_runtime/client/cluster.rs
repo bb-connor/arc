@@ -1,15 +1,29 @@
 use super::super::*;
 
 impl TrustControlClient {
+    fn validate_authority_transport(&self) -> Result<(), CliError> {
+        if self.cluster_peer_auth.is_none() {
+            return Err(CliError::cli_other_error(
+                "authority snapshots require the non-redirecting cluster peer transport",
+            ));
+        }
+        for endpoint in self.endpoints.iter() {
+            super::super::super::report_validation::normalize_cluster_config_url(endpoint, true)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
         self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }
 
     pub(crate) fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
+        self.validate_authority_transport()?;
         self.get_internal_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH, None)
     }
 
     pub(crate) fn cluster_snapshot(&self) -> Result<ClusterStateSnapshotResponse, CliError> {
+        self.validate_authority_transport()?;
         self.get_internal_json(INTERNAL_CLUSTER_SNAPSHOT_PATH, None)
     }
 

@@ -14,14 +14,13 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 import pytest
-from chio_sdk.models import ChioScope, Operation, ToolGrant
-from chio_sdk.testing import MockChioClient, MockVerdict, allow_all, deny_all
-
 from chio_langgraph import (
     ChioGraphConfig,
     ChioLangGraphError,
     chio_node,
 )
+from chio_sdk.models import ChioScope, Decision, Operation, ToolGrant
+from chio_sdk.testing import MockChioClient, MockVerdict, allow_all, deny_all
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,13 +78,9 @@ class TestAllowInvokesBody:
             return {"value": f"searched:{state.get('value', '')}"}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="search", scope=_scope("search")
-        )
+        cfg = await _build_config(chio, node_name="search", scope=_scope("search"))
 
-        wrapped = chio_node(
-            search_node, scope=_scope("search"), config=cfg, name="search"
-        )
+        wrapped = chio_node(search_node, scope=_scope("search"), config=cfg, name="search")
 
         # LangGraph calls nodes with a config positional; we pass one
         # even though the body only takes ``state`` -- the wrapper must
@@ -105,9 +100,7 @@ class TestAllowInvokesBody:
             return {"value": f"async:{state.get('value', '')}"}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="async_node", scope=_scope("async_node")
-        )
+        cfg = await _build_config(chio, node_name="async_node", scope=_scope("async_node"))
         wrapped = chio_node(
             async_node,
             scope=_scope("async_node"),
@@ -126,9 +119,7 @@ class TestAllowInvokesBody:
             return {"value": "ok"}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="with_cfg", scope=_scope("with_cfg")
-        )
+        cfg = await _build_config(chio, node_name="with_cfg", scope=_scope("with_cfg"))
         wrapped = chio_node(
             node_with_cfg,
             scope=_scope("with_cfg"),
@@ -147,6 +138,48 @@ class TestAllowInvokesBody:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "decision",
+    [
+        {"verdict": "deny", "reason": "scope refused", "guard": "ScopeGuard"},
+        {"verdict": "cancelled", "reason": "caller cancelled"},
+        {"verdict": "incomplete", "reason": "delivery interrupted"},
+        None,
+    ],
+)
+async def test_non_authorizing_receipt_preserves_details_without_running_body(
+    decision, monkeypatch
+) -> None:
+    chio = allow_all()
+    cfg = await _build_config(chio, node_name="write", scope=_scope("write"))
+    receipt = await chio.evaluate_tool_call(
+        capability_id=cfg.token_for("write").id,
+        tool_server=SERVER_ID,
+        tool_name="write",
+        parameters={},
+    )
+    receipt.decision = Decision.model_validate(decision) if decision is not None else None
+
+    async def evaluate(**kwargs):
+        return receipt
+
+    monkeypatch.setattr(chio, "evaluate_tool_call", evaluate)
+    calls = []
+
+    def body(state):
+        calls.append(state)
+        return state
+
+    wrapped = chio_node(body, scope=_scope("write"), config=cfg, name="write")
+    with pytest.raises(ChioLangGraphError) as raised:
+        await wrapped({"value": "sensitive"})
+    assert calls == []
+    assert raised.value.receipt_id == receipt.id
+    assert raised.value.decision == (decision if decision is not None else {})
+    assert raised.value.reason == (decision["reason"] if decision is not None else None)
+    assert raised.value.guard == (decision.get("guard") if decision is not None else None)
+
+
 class TestDenyRaises:
     async def test_deny_from_403_raises_chio_langgraph_error(self) -> None:
         def forbidden_node(_state: State) -> dict[str, Any]:
@@ -154,9 +187,7 @@ class TestDenyRaises:
             return {}
 
         chio = deny_all(reason="out of scope", guard="ScopeGuard")
-        cfg = await _build_config(
-            chio, node_name="write", scope=_scope("write")
-        )
+        cfg = await _build_config(chio, node_name="write", scope=_scope("write"))
         wrapped = chio_node(
             forbidden_node,
             scope=_scope("write"),
@@ -183,12 +214,8 @@ class TestDenyRaises:
             guard="ScopeGuard",
             raise_on_deny=False,
         )
-        cfg = await _build_config(
-            chio, node_name="write", scope=_scope("write")
-        )
-        wrapped = chio_node(
-            node, scope=_scope("write"), config=cfg, name="write"
-        )
+        cfg = await _build_config(chio, node_name="write", scope=_scope("write"))
+        wrapped = chio_node(node, scope=_scope("write"), config=cfg, name="write")
 
         with pytest.raises(ChioLangGraphError) as exc_info:
             await wrapped({"value": "x"})
@@ -207,9 +234,7 @@ class TestDenyRaises:
             chio_client=chio,
             node_scopes={"write": _scope("write")},
         )
-        wrapped = chio_node(
-            node, scope=_scope("write"), config=cfg, name="write"
-        )
+        wrapped = chio_node(node, scope=_scope("write"), config=cfg, name="write")
 
         with pytest.raises(ChioLangGraphError) as exc_info:
             await wrapped({"value": "x"})
@@ -277,12 +302,8 @@ class TestPerNodeScope:
         def write_body(_state: State) -> dict[str, Any]:
             return {"value": "written"}
 
-        wrapped_search = chio_node(
-            search_body, scope=_scope("search"), config=cfg, name="search"
-        )
-        wrapped_write = chio_node(
-            write_body, scope=_scope("write"), config=cfg, name="write"
-        )
+        wrapped_search = chio_node(search_body, scope=_scope("search"), config=cfg, name="search")
+        wrapped_write = chio_node(write_body, scope=_scope("write"), config=cfg, name="write")
 
         # Happy path: each node runs under its own scope.
         assert (await wrapped_search({"value": "x"})) == {"value": "searched"}
@@ -294,9 +315,7 @@ class TestPerNodeScope:
         # narrower token down the graph.
         write_token = cfg.token_for("write")
         assert write_token is not None
-        runtime_cfg = {
-            "configurable": {"chio_capability_id": write_token.id}
-        }
+        runtime_cfg = {"configurable": {"chio_capability_id": write_token.id}}
         with pytest.raises(ChioLangGraphError) as exc_info:
             await wrapped_search({"value": "x"}, runtime_cfg)
         assert exc_info.value.guard == "ScopeGuard"

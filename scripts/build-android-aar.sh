@@ -30,7 +30,6 @@ require_tool() {
 
 require_tool cargo
 require_tool cargo-ndk
-require_tool uniffi-bindgen
 
 GRADLEW="${ROOT}/sdks/jvm/gradlew"
 if [[ ! -x "${GRADLEW}" ]]; then
@@ -39,6 +38,7 @@ if [[ ! -x "${GRADLEW}" ]]; then
 fi
 
 mkdir -p "${JNI_OUT}"
+cd "${ROOT}"
 
 cargo ndk \
   --target arm64-v8a \
@@ -46,9 +46,11 @@ cargo ndk \
   --target x86_64 \
   --target x86 \
   -o "${JNI_OUT}" \
-  build --release -p chio-kernel-mobile
+  build --locked --release -p chio-kernel-mobile
 
-uniffi-bindgen generate --language kotlin --out-dir "${KOTLIN_OUT}" "${UDL}"
+cargo run --locked -p chio-kernel-mobile --example bindgen -- \
+  generate --language kotlin --no-format \
+  --out-dir "${KOTLIN_OUT}" "${UDL}"
 
 (
   cd "${MODULE}"

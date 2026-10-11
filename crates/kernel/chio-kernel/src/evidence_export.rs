@@ -226,6 +226,8 @@ pub struct EvidenceExportBundle {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EvidenceExportError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("receipt store error: {0}")]
     ReceiptStore(#[from] ReceiptStoreError),
 
@@ -426,12 +428,16 @@ fn trusted_publication_anchor(
     match (shared_trust_anchor, requested_trust_anchor) {
         (Some(shared), Some(requested)) if shared == requested => Some(shared),
         (Some(_), Some(_)) => None,
-        (Some(shared), None) => Some(shared),
+        (Some(_), None) => None,
         (None, _) => None,
     }
 }
 
 #[must_use]
+#[allow(
+    clippy::as_conversions,
+    reason = "These conversions only widen collection lengths on the supported 32-bit and 64-bit targets."
+)]
 pub fn build_evidence_transparency_claims(
     bundle: &EvidenceExportBundle,
     transparency: &CheckpointTransparencySummary,
@@ -497,7 +503,10 @@ pub fn build_evidence_transparency_claims(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use crate::checkpoint::{
@@ -758,6 +767,12 @@ mod tests {
                 .expect("second anchored publication"),
         ];
 
+        let unpinned = build_evidence_transparency_claims(&bundle, &transparency, None);
+        assert_ne!(
+            unpinned.publication_state,
+            EvidencePublicationState::TrustAnchored
+        );
+        assert_eq!(unpinned.trust_anchor, None);
         let anchored_claims =
             build_evidence_transparency_claims(&bundle, &transparency, Some("witness-root"));
         assert_eq!(

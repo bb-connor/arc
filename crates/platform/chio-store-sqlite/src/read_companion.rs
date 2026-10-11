@@ -119,10 +119,10 @@ pub(crate) struct ReadCompanion<'a> {
 
 impl ReadCompanion<'_> {
     /// The leased connection.
-    pub(crate) fn connection(&mut self) -> &mut Connection {
-        self.connection
-            .as_mut()
-            .unwrap_or_else(|| unreachable!("a leased companion always holds its connection"))
+    pub(crate) fn connection(&mut self) -> Result<&mut Connection, SqliteServingOwnerError> {
+        self.connection.as_mut().ok_or_else(|| {
+            SqliteServingOwnerError::Invalid("read companion lease has no connection".into())
+        })
     }
 }
 
@@ -209,7 +209,11 @@ fn verify_database_identity(
 }
 
 #[cfg(all(test, unix))]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::os::unix::fs::MetadataExt as _;
     use std::sync::Arc;
@@ -241,6 +245,7 @@ mod tests {
         for companion in [&mut first, &mut second] {
             companion
                 .connection()
+                .expect("live companion lease")
                 .query_row("SELECT COUNT(*) FROM probe", [], |row| row.get::<_, i64>(0))
                 .expect("read through the lease");
         }
@@ -274,6 +279,7 @@ mod tests {
             let mut companion = waiting.lease().expect("lease after a return");
             companion
                 .connection()
+                .expect("live companion lease")
                 .query_row("SELECT COUNT(*) FROM probe", [], |row| row.get::<_, i64>(0))
                 .expect("read after waiting")
         });

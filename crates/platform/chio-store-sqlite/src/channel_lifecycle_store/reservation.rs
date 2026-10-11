@@ -77,7 +77,10 @@ struct ChannelReservationParticipantCommitment<'a> {
     ready_effect_head_digest: &'a str,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn channel_reservation_participant_digest(
     prepared: &ChannelPreparedAdmissionRecordV1,
     reservation_digest: &str,
@@ -108,7 +111,10 @@ pub(super) fn channel_reservation_participant_digest(
         .map_err(|error| invalid(error.to_string()))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn insert_pending_reservation_tx(
     transaction: &Transaction<'_>,
     prepared: &ChannelPreparedAdmissionRecordV1,
@@ -317,8 +323,13 @@ pub(super) fn load_channel_reservation_tx(
             "retained channel reservation authority pins differ from configuration",
         ));
     }
-    let reservation: SignedChannelReservationV1 = serde_json::from_slice(&stored.reservation_json)
-        .map_err(|error| invalid(error.to_string()))?;
+    let reservation: SignedChannelReservationV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            &stored.reservation_json,
+            MAX_CHANNEL_ARTIFACT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(ChannelLifecycleStoreError::from)?;
     if encode(
         &reservation,
         MAX_CHANNEL_ARTIFACT_BYTES,
@@ -515,6 +526,11 @@ pub(super) fn publish_live_lifecycle_tx(
         MAX_CHANNEL_ARTIFACT_BYTES,
         "live channel escrow reservation",
     )?;
+    // `channel_lifecycle_records_versioned` refuses any UPDATE that does not
+    // advance record_version, state_version and lifecycle_fence by exactly one
+    // each, and `channel_lifecycle_records_no_delete` refuses removal, so the
+    // exact prior state_version and lifecycle_fence pin the record version
+    // this plan observed.
     let changed = transaction
         .execute(
             r#"
@@ -534,7 +550,6 @@ pub(super) fn publish_live_lifecycle_tx(
               AND live_reservation_id IS NULL AND operation_id IS NULL
               AND channel_head_digest = ?22 AND escrow_head_digest = ?23
               AND checkpoint_sequence = ?24 AND checkpoint_digest = ?25
-              AND record_version = 1
             "#,
             params![
                 lifecycle_json,

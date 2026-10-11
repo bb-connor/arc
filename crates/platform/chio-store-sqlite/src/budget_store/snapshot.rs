@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{PublicKey, Signature};
@@ -166,7 +167,11 @@ impl SqliteBudgetStore {
             .optional()?
             .unwrap_or(0);
         transaction.rollback()?;
-        Ok(floor.max(0) as u64)
+        u64::try_from(floor).map_err(|_| {
+            BudgetStoreError::Invariant(
+                "persisted budget import floor must be nonnegative".to_owned(),
+            )
+        })
     }
 
     pub fn record_budget_import_floors(
@@ -180,6 +185,19 @@ impl SqliteBudgetStore {
             let Some(authority) = event.authority.as_ref() else {
                 continue;
             };
+            // Validate the event, not only its derived floor: subtracting one
+            // must not make an out-of-range sequence appear representable.
+            budget_u64_to_sqlite(event.event_seq, "event_seq")?;
+            if event.event_seq == 0 {
+                return Err(BudgetStoreError::Invariant(
+                    "budget import event sequence must be positive".to_owned(),
+                ));
+            }
+            if authority.authority_id.trim().is_empty() {
+                return Err(BudgetStoreError::Invariant(
+                    "budget import authority must be nonempty".to_owned(),
+                ));
+            }
             let entry = min_by_origin
                 .entry(authority.authority_id.as_str())
                 .or_insert(event.event_seq);
@@ -188,7 +206,9 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         for (origin, min_seq) in min_by_origin {
-            let floor = min_seq.saturating_sub(1);
+            let floor = min_seq.checked_sub(1).ok_or_else(|| {
+                BudgetStoreError::Invariant("budget import sequence must be positive".into())
+            })?;
             transaction.execute(
                 "INSERT INTO budget_import_floors (authority_id, floor_seq) VALUES (?1, ?2) \
                  ON CONFLICT(authority_id) DO UPDATE SET floor_seq = MAX(floor_seq, excluded.floor_seq)",
@@ -586,7 +606,10 @@ impl SqliteBudgetStore {
                 ],
             )?;
         }
-        raise_budget_replication_seq_floor(transaction, covered_head as u64)?;
+        raise_budget_replication_seq_floor(
+            transaction,
+            crate::integer::checked::<_, u64>(covered_head)?,
+        )?;
         Ok(())
     }
 
@@ -954,8 +977,18 @@ fn verify_local_anchor_provenance_continuity(
     let Some((local_sequence, local_digest)) = local else {
         return Ok(());
     };
-    let local_sequence = local_sequence.max(0) as u64;
-    let index = usize::try_from(local_sequence.saturating_sub(1)).map_err(|_| {
+    let local_sequence = u64::try_from(local_sequence)
+        .ok()
+        .filter(|value| *value > 0)
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "persisted budget snapshot anchor provenance sequence is invalid".to_string(),
+            )
+        })?;
+    let predecessor = local_sequence.checked_sub(1).ok_or_else(|| {
+        BudgetStoreError::Invariant("budget snapshot sequence must be positive".into())
+    })?;
+    let index = usize::try_from(predecessor).map_err(|_| {
         BudgetStoreError::Invariant(
             "persisted budget snapshot anchor provenance sequence is invalid".to_string(),
         )

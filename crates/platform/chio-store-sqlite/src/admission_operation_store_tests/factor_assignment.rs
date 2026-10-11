@@ -65,6 +65,9 @@ use rusqlite::params;
 
 use super::*;
 
+#[path = "factor_assignment_clock.rs"]
+mod clock;
+
 const SNAPSHOT_VERSION: u64 = 1;
 const RESOURCE_FENCE: u64 = 1;
 const CLAIM_KERNEL_SEED: u8 = 111;
@@ -768,7 +771,10 @@ fn persist_receivable(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn signed_receipt(
     suffix: &str,
     operation: &AdmissionOperationV1,
@@ -852,8 +858,8 @@ fn signed_receipt(
                 grant_index: 0,
                 cost_charged: amount.units,
                 currency: amount.currency.clone(),
-                budget_remaining: 0,
-                budget_total: amount.units,
+                budget_remaining: Some(0),
+                budget_total: Some(amount.units),
                 delegation_depth: 1,
                 root_budget_holder: debtor_id.clone(),
                 attempted_cost: None,
@@ -908,8 +914,8 @@ fn signed_receipt(
                     grant_index: 0,
                     cost_charged: amount.units,
                     currency: amount.currency.clone(),
-                    budget_remaining: 0,
-                    budget_total: amount.units,
+                    budget_remaining: Some(0),
+                    budget_total: Some(amount.units),
                     delegation_depth: 1,
                     root_budget_holder: debtor_id,
                     payment_reference: None,
@@ -1330,8 +1336,9 @@ fn assert_not_applied(
 
 #[test]
 fn assignment_commit_is_atomic_and_exact_replay_is_idempotent() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "atomic", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1409,7 +1416,7 @@ fn assignment_commit_is_atomic_and_exact_replay_is_idempotent() -> AnchoredTestR
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let factor_store = store.activate_factor_assignment_authorities(
@@ -1510,8 +1517,9 @@ fn assignment_commit_is_atomic_and_exact_replay_is_idempotent() -> AnchoredTestR
 
 #[test]
 fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "terminal-rollback", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1573,8 +1581,9 @@ fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTes
 
 #[test]
 fn stale_status_produces_durable_not_applied_without_advancing_the_head() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "stale", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1664,8 +1673,9 @@ fn expiry_reasons_are_distinct_and_durable() -> AnchoredTestResult {
             AssignmentNotAppliedReasonV1::OfferExpired,
         ),
     ] {
-        let fixture = fixture();
         let base = now_ms() + 100;
+        let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+        let fixture = fixture();
         let receivable = persist_receivable(&fixture, AUTHORITY_A, suffix, base)?;
         let factor_store = fixture.store.activate_factor_assignment_authorities(
             registry(&[AUTHORITY_A], &[])?,
@@ -1697,8 +1707,9 @@ fn expiry_reasons_are_distinct_and_durable() -> AnchoredTestResult {
 
 #[test]
 fn serving_owner_rotation_fences_stale_recovery_then_accepts_a_new_claim() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "owner-rotation", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1731,7 +1742,7 @@ fn serving_owner_rotation_fences_stale_recovery_then_accepts_a_new_claim() -> An
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let factor_store = store.activate_factor_assignment_authorities(
@@ -1754,8 +1765,9 @@ fn serving_owner_rotation_fences_stale_recovery_then_accepts_a_new_claim() -> An
 #[test]
 fn retained_configuration_replays_after_claim_trust_rotation_with_shared_coordinates(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "retained", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1801,8 +1813,9 @@ fn retained_configuration_replays_after_claim_trust_rotation_with_shared_coordin
 
 #[test]
 fn authority_generation_fences_stale_clone_across_aba_rotation() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "aba", base)?;
     let stale = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1850,8 +1863,9 @@ fn authority_generation_fences_stale_clone_across_aba_rotation() -> AnchoredTest
 
 #[test]
 fn stored_result_tampering_is_rejected_on_load_and_retry() -> AnchoredTestResult {
-    let fixture = fixture();
     let base = now_ms() + 100;
+    let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+    let fixture = fixture();
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "tamper", base)?;
     let factor_store = fixture.store.activate_factor_assignment_authorities(
         registry(&[AUTHORITY_A], &[])?,
@@ -1893,8 +1907,9 @@ fn stored_result_tampering_is_rejected_on_load_and_retry() -> AnchoredTestResult
 #[test]
 fn stored_claim_evidence_and_authority_configuration_tampering_is_rejected() -> AnchoredTestResult {
     for suffix in ["receipt", "iou", "configuration"] {
-        let fixture = fixture();
         let base = now_ms() + 100;
+        let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+        let fixture = fixture();
         let receivable = persist_receivable(&fixture, AUTHORITY_A, suffix, base)?;
         let factor_store = fixture.store.activate_factor_assignment_authorities(
             registry(&[AUTHORITY_A], &[])?,

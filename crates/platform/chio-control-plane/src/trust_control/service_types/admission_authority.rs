@@ -11,6 +11,14 @@ use chio_kernel::tool_outcome::{
 };
 use serde::{Deserialize, Serialize};
 
+#[path = "admission_authority/compacted_metadata.rs"]
+mod compacted_metadata;
+pub(crate) use compacted_metadata::CompactedRawMetadata;
+
+#[path = "admission_authority/recovery.rs"]
+mod recovery;
+pub(crate) use recovery::*;
+
 use super::structured_budget::{
     StructuredBudgetAuthorizeRequest, StructuredBudgetAuthorizeResponse,
     StructuredBudgetMutationResponse, StructuredBudgetReconcileRequest,
@@ -23,6 +31,7 @@ const ADMISSION_AUTHORITY_RESPONSE_SCHEMA: &str = "chio.admission-authority-resp
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AdmissionAuthorityAction {
     Status,
+    LoadBudgetHold,
     Begin,
     LoadByOperationId,
     LoadByReplayKey,
@@ -30,6 +39,10 @@ pub(crate) enum AdmissionAuthorityAction {
     ClaimRecovery,
     RevalidateRecoveryClaim,
     ListRecoverable,
+    RecoveryPage,
+    LoadRecoveryStatus,
+    DeferRecovery,
+    ClearRecoveryDeferral,
     LoadTerminalReplay,
     RecordToolReturned,
     LookupToolOutcome,
@@ -97,6 +110,8 @@ pub(crate) enum AdmissionAuthorityErrorCode {
 pub(crate) struct AdmissionAuthorityWireError {
     pub(crate) code: AdmissionAuthorityErrorCode,
     pub(crate) message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) compacted_raw: Option<CompactedRawMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -131,6 +146,7 @@ impl AdmissionAuthorityResponse {
             error: Some(AdmissionAuthorityWireError {
                 code,
                 message: message.into(),
+                compacted_raw: None,
             }),
         }
     }

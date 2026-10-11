@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller_dispatch_authorization.schema.json",
+  "title": "Chio signed caller dispatch authorization",
+  "description": "A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["authorization", "signature"],
+  "properties": {
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "kernel_public_key", "executor", "invocation", "committed", "not_before_unix_ms", "expires_at_unix_ms"],
+      "properties": {
+        "schema": {"const": "chio.caller-dispatch-authorization.v1"},
+        "kernel_public_key": {"$ref": "#/$defs/callerPublicKey"},
+        "executor": {"$ref": "#/$defs/callerExecutor"},
+        "invocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation_id", "request_id", "request_binding_hash", "capability_id", "capability_digest", "server_id", "tool_name", "parameters_digest"],
+          "properties": {
+            "operation_id": {"$ref": "#/$defs/callerDigest"},
+            "request_id": {"$ref": "#/$defs/callerIdentifier"},
+            "request_binding_hash": {"$ref": "#/$defs/callerDigest"},
+            "capability_id": {"$ref": "#/$defs/callerIdentifier"},
+            "capability_digest": {"$ref": "#/$defs/callerDigest"},
+            "server_id": {"$ref": "#/$defs/callerIdentifier"},
+            "tool_name": {"$ref": "#/$defs/callerIdentifier"},
+            "parameters_digest": {"$ref": "#/$defs/callerDigest"}
+          }
+        },
+        "committed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["execution_nonce_id", "budget_hold_id", "dispatch_commit", "frozen_context_digest"],
+          "properties": {
+            "execution_nonce_id": {"$ref": "#/$defs/callerIdentifier"},
+            "budget_hold_id": {"$ref": "#/$defs/callerIdentifier"},
+            "frozen_context_digest": {"$ref": "#/$defs/callerDigest"},
+            "dispatch_commit": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["committed_version", "coordinator_lease_id", "coordinator_lease_epoch", "store_fence", "provider_attempt"],
+              "properties": {
+                "committed_version": {"$ref": "#/$defs/callerPositiveInteger"},
+                "coordinator_lease_id": {"$ref": "#/$defs/callerIdentifier"},
+                "coordinator_lease_epoch": {"$ref": "#/$defs/callerPositiveInteger"},
+                "store_fence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["store_uuid", "lease_id", "owner_epoch"],
+                  "properties": {
+                    "store_uuid": {"$ref": "#/$defs/callerIdentifier"},
+                    "lease_id": {"$ref": "#/$defs/callerIdentifier"},
+                    "owner_epoch": {"$ref": "#/$defs/callerPositiveInteger"}
+                  }
+                },
+                "provider_attempt": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["operation_id", "attempt_id", "transport_id", "transport_key_epoch"],
+                  "properties": {
+                    "operation_id": {"$ref": "#/$defs/callerDigest"},
+                    "attempt_id": {"$ref": "#/$defs/callerIdentifier"},
+                    "transport_id": {"type": "string", "minLength": 15, "maxLength": 512, "pattern": "^(caller-report:|native-caller-report:v1:)"},
+                    "transport_key_epoch": {"$ref": "#/$defs/callerPositiveInteger"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "not_before_unix_ms": {"$ref": "#/$defs/callerPositiveInteger"},
+        "expires_at_unix_ms": {"$ref": "#/$defs/callerPositiveInteger"}
+      }
+    },
+    "signature": {"$ref": "#/$defs/callerSignature"}
+  },
+  "$defs": {
+    "callerSignature": {"type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"},
+    "callerIdentifier": {"type": "string", "minLength": 1, "maxLength": 512, "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace."},
+    "callerDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "callerPositiveInteger": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "callerPublicKey": {"type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"},
+    "callerExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor_id", "public_key", "key_epoch"],
+      "properties": {
+        "executor_id": {"$ref": "#/$defs/callerIdentifier"},
+        "public_key": {"$ref": "#/$defs/callerPublicKey"},
+        "key_epoch": {"$ref": "#/$defs/callerPositiveInteger"}
+      }
+    }
+  }
+}

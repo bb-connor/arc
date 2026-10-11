@@ -183,6 +183,10 @@ fn resource_caps() -> FindingResourceCaps {
     }
 }
 
+#[allow(
+    clippy::expect_used,
+    reason = "The fixed Ed25519 fixture must construct a valid checkpoint signer."
+)]
 fn profile_body() -> Result<FindingChallengeVerifierProfile, FindingError> {
     let mut profile = FindingChallengeVerifierProfile {
         schema: FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1.to_string(),
@@ -204,7 +208,8 @@ fn profile_body() -> Result<FindingChallengeVerifierProfile, FindingError> {
             },
         ],
         checkpoint_logs: vec![FindingCheckpointLogPolicy {
-            log_id: finding_checkpoint_log_id(&keypair(14).public_key()),
+            log_id: finding_checkpoint_log_id(&keypair(14).public_key())
+                .expect("Ed25519 checkpoint fixture"),
             signer: key_policy(14, "checkpoint"),
         }],
         bbs_projection_issuer: FindingBbsIssuerPolicy {

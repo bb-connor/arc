@@ -183,7 +183,8 @@ pub(crate) fn dispatch_cert(
             receipt_db: cert_receipt_db,
             budget_limit,
             output,
-        } => cert::cmd_cert_generate(
+            profile,
+        } if profile.is_none() => cert::cmd_cert_generate(
             &session_id,
             &cert_receipt_db,
             budget_limit,
@@ -191,18 +192,48 @@ pub(crate) fn dispatch_cert(
             authority_seed_file.as_deref(),
             json_output,
         ),
+        CertCommands::Generate {
+            session_id,
+            receipt_db: cert_receipt_db,
+            budget_limit,
+            output,
+            profile,
+        } => cert::cmd_cert_generate_with_profile(cert::CertificateGenerateOptions {
+            session_id: &session_id,
+            receipt_db: &cert_receipt_db,
+            budget_limit,
+            output: output.as_deref(),
+            authority_seed_file: authority_seed_file.as_deref(),
+            json_output,
+            profile_path: profile.as_deref(),
+        }),
         CertCommands::Verify {
             certificate,
             trusted_kernel_pubkey,
             full,
             receipt_db: cert_receipt_db,
-        } => cert::cmd_cert_verify(
+            profile,
+        } if profile.is_none() => cert::cmd_cert_verify(
             &certificate,
             full,
             cert_receipt_db.as_deref(),
             &trusted_kernel_pubkey,
             json_output,
         ),
+        CertCommands::Verify {
+            certificate,
+            trusted_kernel_pubkey,
+            full,
+            receipt_db: cert_receipt_db,
+            profile,
+        } => cert::cmd_cert_verify_with_profile(cert::CertificateVerifyOptions {
+            certificate_path: &certificate,
+            full,
+            receipt_db: cert_receipt_db.as_deref(),
+            trusted_kernel_pubkey: &trusted_kernel_pubkey,
+            json_output,
+            profile_path: profile.as_deref(),
+        }),
         CertCommands::Inspect { certificate } => cert::cmd_cert_inspect(&certificate, json_output),
     }
 }

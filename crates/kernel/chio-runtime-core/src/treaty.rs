@@ -17,36 +17,45 @@ pub use predicate::{
 pub fn governance_ladder_manifest_from_json(
     json: &str,
 ) -> Result<GovernanceLadderManifest, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 pub fn treaty_scope_from_json(json: &str) -> Result<TreatyScope, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 pub fn ladder_intersection_from_json(json: &str) -> Result<LadderIntersection, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 pub fn receipt_lineage_statement_from_json(
     json: &str,
 ) -> Result<ReceiptLineageStatement, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 pub fn receipt_lineage_bundle_from_json(
     json: &str,
 ) -> Result<ReceiptLineageBundle, ChioRuntimeError> {
-    serde_json::from_str(json).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)
 }
 pub fn ladder_intersection_json(
     intersection: &LadderIntersection,
 ) -> Result<String, ChioRuntimeError> {
     validate_ladder_intersection(intersection)?;
-    serde_json::to_string_pretty(intersection)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(intersection).map_err(ChioRuntimeError::Json)
 }
 pub fn cross_boundary_admission_report_json(
     report: &CrossBoundaryAdmissionReport,
 ) -> Result<String, ChioRuntimeError> {
     validate_cross_boundary_admission_report(report)?;
-    serde_json::to_string_pretty(report).map_err(|error| ChioRuntimeError::Json(error.to_string()))
+    serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 pub fn governance_ladder_manifest_sha256(
     manifest: &GovernanceLadderManifest,

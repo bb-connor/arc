@@ -15,7 +15,7 @@ pub(crate) fn cmd_passport_policy_create(
         control_url,
         control_token,
     } = args;
-    let now = unix_now();
+    let now = unix_now()?;
     let keypair = load_or_create_authority_keypair(signing_seed_file)?;
     let policy = load_passport_verifier_policy(policy_path)?;
     let document = create_signed_passport_verifier_policy(
@@ -31,9 +31,7 @@ pub(crate) fn cmd_passport_policy_create(
             .upsert_verifier_policy(policy_id, &document)?;
         Some(url.to_string())
     } else if let Some(path) = verifier_policies_file {
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        registry.upsert(document.clone())?;
-        registry.save(path)?;
+        VerifierPolicyRegistry::update(path, |registry| registry.upsert(document.clone()))?;
         Some(path.display().to_string())
     } else {
         None
@@ -67,7 +65,7 @@ pub(crate) fn cmd_passport_policy_verify(
     let document = load_signed_passport_verifier_policy(input)?;
     verify_signed_passport_verifier_policy(&document)
         .map_err(|error| CliError::policy_error(error.to_string()))?;
-    ensure_signed_passport_verifier_policy_active(&document, at.unwrap_or_else(unix_now))
+    ensure_signed_passport_verifier_policy_active(&document, crate::input::time::seconds_or(at)?)
         .map_err(|error| CliError::policy_error(error.to_string()))?;
 
     if json_output {
@@ -171,9 +169,7 @@ pub(crate) fn cmd_passport_policy_upsert(
             .upsert_verifier_policy(&document.body.policy_id, &document)?
     } else {
         let path = require_verifier_policy_registry_path(verifier_policies_file)?;
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        registry.upsert(document.clone())?;
-        registry.save(path)?;
+        VerifierPolicyRegistry::update(path, |registry| registry.upsert(document.clone()))?;
         document
     };
 
@@ -202,9 +198,9 @@ pub(crate) fn cmd_passport_policy_delete(
         (response.deleted, true)
     } else {
         let path = require_verifier_policy_registry_path(verifier_policies_file)?;
-        let mut registry = load_verifier_policy_registry_for_admin(path)?;
-        let deleted = registry.remove(policy_id);
-        registry.save(path)?;
+        let deleted = VerifierPolicyRegistry::update(path, |registry| {
+            Ok::<_, CliError>(registry.remove(policy_id))
+        })?;
         (deleted, true)
     };
 
@@ -242,7 +238,7 @@ pub(crate) fn cmd_passport_challenge_create(
         control_url,
         control_token,
     } = args;
-    let now = unix_now();
+    let now = unix_now()?;
     if policy_path.is_some() && policy_id.is_some() {
         return Err(CliError::cli_other_error(
             "challenge creation accepts either --policy or --policy-id, not both".to_string(),
@@ -289,7 +285,7 @@ pub(crate) fn cmd_passport_challenge_create(
                 challenge_id: Some(Keypair::generate().public_key().to_hex()),
                 nonce: Keypair::generate().public_key().to_hex(),
                 issued_at: now,
-                expires_at: now.saturating_add(ttl_secs),
+                expires_at: crate::input::time::deadline(now, ttl_secs)?,
                 options: PassportPresentationOptions {
                     issuer_allowlist: issuers.iter().cloned().collect::<BTreeSet<_>>(),
                     max_credentials,
@@ -358,10 +354,10 @@ pub(crate) fn cmd_passport_challenge_respond(
     at: Option<u64>,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let challenge: PassportPresentationChallenge =
         match (challenge_path, challenge_url) {
-            (Some(path), None) => serde_json::from_slice(&fs::read(path)?)?,
+            (Some(path), None) => crate::input::json(&crate::input::read(path)?)?,
             (None, Some(url)) => fetch_json_url(url)?,
             (Some(_), Some(_)) => {
                 return Err(CliError::policy_error(
@@ -379,7 +375,7 @@ pub(crate) fn cmd_passport_challenge_respond(
         &holder_keypair,
         &passport,
         &challenge,
-        at.unwrap_or_else(unix_now),
+        crate::input::time::seconds_or(at)?,
     )?;
 
     ensure_parent_dir(output)?;
@@ -411,7 +407,8 @@ pub(crate) fn cmd_passport_challenge_submit(
     submit_url: &str,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let presentation: PassportPresentationResponse = serde_json::from_slice(&fs::read(input)?)?;
+    let presentation: PassportPresentationResponse =
+        crate::input::json(&crate::input::read(input)?)?;
     let verification: chio_credentials::PassportPresentationVerification = post_json_url(
         submit_url,
         &VerifyPassportChallengeRequest {
@@ -448,13 +445,13 @@ pub(crate) fn cmd_passport_challenge_verify(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let response: PassportPresentationResponse = serde_json::from_slice(&fs::read(input)?)?;
+    let response: PassportPresentationResponse = crate::input::json(&crate::input::read(input)?)?;
     let expected_challenge = challenge_path
         .map(|path| -> Result<PassportPresentationChallenge, CliError> {
-            Ok(serde_json::from_slice(&fs::read(path)?)?)
+            Ok(crate::input::json(&crate::input::read(path)?)?)
         })
         .transpose()?;
-    let now = at.unwrap_or_else(unix_now);
+    let now = crate::input::time::seconds_or(at)?;
     let verification = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
         crate::trust_control::service_runtime::client::build_client(url, token)?
@@ -681,7 +678,7 @@ pub(crate) fn cmd_passport_oid4vp_respond(
     let request: Oid4vpRequestObject = verify_signed_oid4vp_request_object_with_any_key(
         &request_jwt,
         &verifier_public_keys,
-        at.unwrap_or_else(unix_now),
+        crate::input::time::seconds_or(at)?,
     )
     .map_err(|error| CliError::policy_error(error.to_string()))?;
     if request.request_uri != resolved_request_url {
@@ -701,7 +698,7 @@ pub(crate) fn cmd_passport_oid4vp_respond(
         &holder_keypair,
         &portable_credential,
         &request,
-        at.unwrap_or_else(unix_now),
+        crate::input::time::seconds_or(at)?,
     )
     .map_err(|error| CliError::policy_error(error.to_string()))?;
 
@@ -827,7 +824,7 @@ pub(crate) fn cmd_passport_status_publish(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let distribution = passport_status_distribution(resolve_urls, cache_ttl_secs);
     let record = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
@@ -838,10 +835,10 @@ pub(crate) fn cmd_passport_status_publish(
             })?
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
-        let mut registry = load_passport_status_registry_for_admin(path)?;
-        let record = registry.publish(&passport, unix_now(), distribution)?;
-        registry.save(path)?;
-        record
+        let published_at = unix_now()?;
+        PassportStatusRegistry::update(path, |registry| {
+            registry.publish(&passport, published_at, distribution)
+        })?
     };
 
     if json_output {
@@ -968,7 +965,7 @@ pub(crate) fn cmd_passport_status_resolve(
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
         let registry = load_passport_status_registry_for_admin(path)?;
-        let mut resolution = registry.resolve(passport_id);
+        let mut resolution = registry.resolve(passport_id)?;
         resolution.source = Some(format!("registry:{}", path.display()));
         resolution
     };
@@ -1021,10 +1018,9 @@ pub(crate) fn cmd_passport_status_revoke(
             )?
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
-        let mut registry = load_passport_status_registry_for_admin(path)?;
-        let record = registry.revoke(passport_id, reason, revoked_at)?;
-        registry.save(path)?;
-        record
+        PassportStatusRegistry::update(path, |registry| {
+            registry.revoke(passport_id, reason, revoked_at)
+        })?
     };
 
     if json_output {

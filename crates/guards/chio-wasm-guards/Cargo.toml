@@ -46,6 +46,7 @@ ed25519-dalek = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+libc = { workspace = true }
 serde_yml = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
@@ -92,8 +93,11 @@ path = "tests/escape/mod.rs"
 required-features = ["wasmtime-runtime"]
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(loom)"] }

@@ -1,0 +1,5 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -340 +340 @@
+-                    0 #(| (Self::#default as #repr))*;
++                    0 #(| { let flag: Self = Self::#default; flag as #repr })*;

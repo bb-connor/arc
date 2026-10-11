@@ -2,14 +2,15 @@ use super::*;
 
 pub fn issue_signed_portable_reputation_summary(
     config: &TrustServiceConfig,
+    receipt_store: Option<&SqliteReceiptStore>,
     request: &PortableReputationSummaryIssueRequest,
 ) -> Result<SignedPortableReputationSummary, CliError> {
-    if config.receipt_db_path.is_none() {
+    let Some(receipt_store) = receipt_store else {
         return Err(CliError::cli_other_error(
             "trust service is missing receipt_db_path for portable reputation summary issuance"
                 .to_string(),
         ));
-    }
+    };
     let signer_keypair = load_behavioral_feed_signing_keypair(
         config.authority_seed_path.as_deref(),
         config.authority_db_path.as_deref(),
@@ -18,9 +19,9 @@ pub fn issue_signed_portable_reputation_summary(
     let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
     let read_context = chio_kernel::ReceiptReadContext::admin_service();
     let trusted_kernel_keys = vec![signer_keypair.public_key().to_hex()];
-    let inspection = crate::issuance::inspect_local_reputation_with_read_context(
+    let inspection = crate::issuance::inspect_local_reputation_with_store(
         &request.subject_key,
-        config.receipt_db_path.as_deref(),
+        receipt_store,
         config.budget_db_path.as_deref(),
         request.since,
         request.until,
@@ -29,13 +30,8 @@ pub fn issue_signed_portable_reputation_summary(
         &read_context,
     )
     .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let Some(receipt_db_path) = config.receipt_db_path.as_deref() else {
-        return Err(CliError::cli_other_error(
-            "receipt db path is required for imported trust reporting".to_string(),
-        ));
-    };
     let imported_trust = crate::reputation::build_imported_trust_report(
-        receipt_db_path,
+        receipt_store,
         &inspection.subject_key,
         inspection.since,
         inspection.until,

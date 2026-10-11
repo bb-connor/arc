@@ -867,9 +867,10 @@ fn a_member_that_is_not_its_artifact_rejects() {
         let mut context = web.context();
         mutate(&mut context);
         web.rebind_admission(&mut context);
-        assert_eq!(
-            web.reject_context(&context),
-            PurchaseVerificationError::Member(member),
+        assert!(
+            matches!(web.reject_context(&context),
+            PurchaseVerificationError::MemberInput { member: actual, source }
+            if actual == member && source.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
             "member {member}"
         );
     }
@@ -898,9 +899,10 @@ fn a_member_that_is_not_its_artifact_rejects() {
         let web = base_web();
         let mut context = web.context();
         mutate(&mut context);
-        assert_eq!(
-            web.reject_context(&context),
-            PurchaseVerificationError::Member(member),
+        assert!(
+            matches!(web.reject_context(&context),
+            PurchaseVerificationError::MemberInput { member: actual, source }
+            if actual == member && source.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
             "member {member}"
         );
     }

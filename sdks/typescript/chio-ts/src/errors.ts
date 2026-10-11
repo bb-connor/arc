@@ -25,11 +25,13 @@ export class DpopSignError extends ChioError {
 
 export class QueryError extends ChioError {
   readonly status: number | undefined;
+  readonly serverCode: string | undefined;
 
-  constructor(message: string, status?: number, options?: ErrorOptions) {
+  constructor(message: string, status?: number, options?: ErrorOptions & { serverCode?: string }) {
     super("query_error", message, options);
     this.name = "QueryError";
     this.status = status;
+    this.serverCode = options?.serverCode;
   }
 }
 

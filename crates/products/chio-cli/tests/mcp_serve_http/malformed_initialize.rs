@@ -110,8 +110,8 @@ fn mcp_serve_http_rejects_malformed_jsonrpc_body() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let body: Value = response.json().expect("parse malformed request response");
     assert_eq!(body["error"]["code"], -32700);
-    assert!(body["error"]["message"]
-        .as_str()
-        .expect("parse error message")
-        .contains("invalid JSON"));
+    assert_eq!(
+        body["error"]["message"],
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
 }

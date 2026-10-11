@@ -109,7 +109,7 @@ lower, or streaming code.
 `tests/error_taxonomy_doctest.rs` parses the table below at test time: it
 requires every `ProviderError` variant except `Other` to appear, validates
 each envelope's shape against its class, and drives the real adapter path for
-the three adapter-internal classes (`BadToolArgs`, `Malformed`,
+the adapter-internal classes (`BadToolArgs`, `UntrustedInput`, `Malformed`,
 `VerdictBudgetExceeded`). Keep every envelope one valid inline JSON object.
 
 <!-- error-taxonomy:start -->
@@ -122,10 +122,13 @@ the three adapter-internal classes (`BadToolArgs`, `Malformed`,
 | `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.anthropic.com/v1/messages","elapsed_ms":30000}` | `urn:chio:error:provider:anthropic` (`CHIO-PROVIDER-ANTHROPIC`) + HTTP transport boundary | Anthropic provider adapter returned a normalized provider error. Classify local transport timeout separately from Anthropic 504 `timeout_error` envelopes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::VerdictBudgetExceeded` | `{"provider":"anthropic","event":"content_block_start","observed_ms":300,"budget_ms":250}` | `urn:chio:error:provider:anthropic` (`CHIO-PROVIDER-ANTHROPIC`) + current adapter path | Anthropic provider adapter returned a normalized provider error. Preserve the fabric verdict-budget error when the evaluator misses the 250ms gate. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
 | `ProviderError::Malformed` | `{"event":"content_block_delta","data":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}}` | `urn:chio:error:provider:anthropic` (`CHIO-PROVIDER-ANTHROPIC`) + current adapter path | Anthropic provider adapter returned a normalized provider error. Fail closed for impossible or out-of-order native SSE/message shapes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 `ProviderError::Other` is intentionally absent: a native Anthropic envelope
 must map to a concrete class above or fail closed as `Malformed`.
+The shared SSE reader returns `UntrustedInput` for invalid original JSON and
+`StreamCapacityExceeded` when a stream exceeds 16,384 frames.
 
 ## Testing
 

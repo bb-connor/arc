@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json",
+  "title": "Chio response plan receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["header", "response", "plan_created_at_unix_ms", "effects"],
+  "properties": {
+    "header": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+    "response": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/response" },
+    "plan_created_at_unix_ms": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/time" },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "effect-transition-receipt-body-v1.schema.json#/$defs/effect" }
+    }
+  }
+}

@@ -38,15 +38,16 @@ impl DefaultPolicy {
     ///
     /// If `x-chio-side-effects` is explicitly set, it overrides the method
     /// default: `true` forces deny-by-default, `false` forces session-allow.
-    /// If `x-chio-approval-required` is `true`, the result is always
-    /// deny-by-default regardless of other settings.
+    /// Approval-required, Sensitive and Restricted operations are always
+    /// deny-by-default regardless of other settings. This default policy
+    /// requires an explicit capability grant; it does not issue human approval.
     #[must_use]
     pub fn for_method_with_extensions(
         method: HttpMethod,
         extensions: &ChioExtensions,
     ) -> PolicyDecision {
         // Approval-required always forces deny.
-        if extensions.approval_required == Some(true) {
+        if extensions.requires_approval() {
             return PolicyDecision::DenyByDefault;
         }
 

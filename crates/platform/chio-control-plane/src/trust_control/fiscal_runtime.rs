@@ -36,6 +36,8 @@ pub(crate) struct TrustFiscalRuntime {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum TrustFiscalOperationError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("{0}")]
     Startup(String),
     #[error("invalid fiscal artifact: {0}")]
@@ -522,11 +524,16 @@ impl TrustFiscalRuntime {
         }
     }
 
-    pub(crate) fn bind_legacy_fee_schedule(
+    /// Binds `legacy` to its governed schedule only if `admit` accepts it
+    /// inside the binding write transaction, immediately before commit. A
+    /// refusal returns `Ok(Err(_))` with nothing persisted; fiscal failures
+    /// stay `Err(_)`.
+    pub(crate) fn bind_legacy_fee_schedule_admitted<E>(
         &self,
         fiscal_schedule_id: &str,
         legacy: &chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule,
-    ) -> Result<(), TrustFiscalOperationError> {
+        admit: impl FnOnce() -> Result<(), E>,
+    ) -> Result<Result<(), E>, TrustFiscalOperationError> {
         let startup = self
             .reconcile()
             .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
@@ -535,7 +542,7 @@ impl TrustFiscalRuntime {
             .load_verified_schedule(fiscal_schedule_id, &startup.charters)
             .map_err(TrustFiscalOperationError::Store)?;
         self.store
-            .bind_legacy_fee_schedule(legacy, &schedule, &self.fence)
+            .bind_legacy_fee_schedule_admitted(legacy, &schedule, &self.fence, admit)
             .map_err(TrustFiscalOperationError::Store)
     }
 
@@ -673,7 +680,10 @@ impl TrustFiscalRuntime {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn verify_consumed_activation(
     signed: SignedFiscalActivation,
     proposal: &VerifiedFiscalProposal,
@@ -773,10 +783,8 @@ fn next_authority(
 }
 
 fn trusted_now(startup: &FiscalRuntimeStartup) -> Result<u64, TrustFiscalOperationError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?
-        .as_secs();
+    use chio_security_types::clock::{Clock, SystemClock};
+    let now = SystemClock.unix_millis()?.as_secs();
     if now < startup.checkpoint.body().trusted_clock_high_water {
         return Err(TrustFiscalOperationError::Startup(
             "system clock is below the anchored fiscal high-water mark".to_owned(),
@@ -820,7 +828,7 @@ pub(crate) fn compose_trust_fiscal_runtime(
     compose_trust_fiscal_runtime_with_anchor(authority, config, anchor).map(Some)
 }
 
-fn compose_trust_fiscal_runtime_with_anchor(
+pub(crate) fn compose_trust_fiscal_runtime_with_anchor(
     authority: &SqliteAuthorityStore,
     config: &TrustFiscalRuntimeConfig,
     anchor: Arc<dyn FiscalStateAnchor>,
@@ -961,7 +969,7 @@ mod tests {
             &checkpoint,
             FiscalBootstrapState::CharterPinned,
         )?;
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");

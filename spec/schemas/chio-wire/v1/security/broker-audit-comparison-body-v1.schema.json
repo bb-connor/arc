@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-comparison-body-v1.schema.json",
+  "title": "Chio broker audit comparison body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "issuedAtUnixSeconds",
+    "capabilitySha256",
+    "proofSha256",
+    "canonicalRequestSha256",
+    "authorityContextSha256",
+    "auditIdSha256",
+    "governedAuditIntentSha256",
+    "auditAuthorizationSha256",
+    "runnerAuthorizationSha256",
+    "referenceSourceSha256",
+    "brokerOutboundProjectionCommitmentSha256",
+    "referenceOutboundProjectionCommitmentSha256",
+    "projectionsEqual",
+    "networkDispatchCount",
+    "accountingMutationCount",
+    "rawCredentialReturned"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-audit-comparison.v1" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "capabilitySha256": { "$ref": "#/$defs/digest" },
+    "proofSha256": { "$ref": "#/$defs/digest" },
+    "canonicalRequestSha256": { "$ref": "#/$defs/digest" },
+    "authorityContextSha256": { "$ref": "#/$defs/digest" },
+    "auditIdSha256": { "$ref": "#/$defs/digest" },
+    "governedAuditIntentSha256": { "$ref": "#/$defs/digest" },
+    "auditAuthorizationSha256": { "$ref": "#/$defs/digest" },
+    "runnerAuthorizationSha256": { "$ref": "#/$defs/digest" },
+    "referenceSourceSha256": { "$ref": "#/$defs/digest" },
+    "brokerOutboundProjectionCommitmentSha256": { "$ref": "#/$defs/digest" },
+    "referenceOutboundProjectionCommitmentSha256": { "$ref": "#/$defs/digest" },
+    "projectionsEqual": { "type": "boolean" },
+    "networkDispatchCount": { "const": 0 },
+    "accountingMutationCount": { "const": 0 },
+    "rawCredentialReturned": { "const": false }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

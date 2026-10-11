@@ -1,0 +1,328 @@
+{
+  "schema": "chio.security.failed-check-disposition.v1",
+  "published_head": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "source_basis": "e6384ebe44b162b16d830351b10aa58a9581156a",
+  "status": "all published failures retained; candidate acceptance open",
+  "checks": [
+    {
+      "check_id": 112904250430,
+      "check": "Live C++ conformance",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653970803/job/112904250430",
+      "published_conclusion": "failure",
+      "category": "C++ peer roots callback repair; harness acceptance open",
+      "actual_failure": "Live C++ harness failed tools-call-simple-text, resources-list, prompts-list with 10s HTTP request timeout; 2 tests passed, 1 failed, exit101. This is the same concrete failing harness in this distinct check run.",
+      "repair_commits": [
+        "13dfc2ebc9",
+        "05af50ab5e"
+      ],
+      "remaining_acceptance": "Peer now services carried server callbacks on every roots-declaring request stream. Source repair maps the observed stall, but current MCP library478 Green does not execute this C++ harness. Exact native C++/SDK owning replay remains required. Requires the owning enforcing Linux/x86_64 fixture and absolute CHIO_CAGE_INIT; a setup refusal is not an enforcement result.",
+      "owner": "Root C++ peer / Claude native fixture",
+      "cheapest_local_command": "cargo test --locked --offline -p chio-conformance --test mcp_core_cpp_live mcp_core_harness_runs_against_live_cpp_peer -- --exact --nocapture",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904290688,
+      "check": "dispatch isolated enterprise Linux capture",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653981563/job/112904290688",
+      "published_conclusion": "failure",
+      "category": "trusted tuple/controller pre-dispatch refusal",
+      "actual_failure": "Binding/authorization gate exited1 before dispatch under S=d049..., D=c009..., E=89d79..., main/base6573. Script logs its source with set-e but no executed-predicate trace; exact first failing test is not isolated from this log. Evidence-only descendant whitelist is visible, but not proved to be the first failure.",
+      "repair_commits": [
+        "de519d7776",
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Reviewed Source/main landing repairs are separate from active trusted D/S rotation. Claude reports old D=c009 lacks required landing scripts; final authorized tuple, controller dispatch and auditor/finalizer/live acceptance remain operationally open. No assertion-level repair inferred.",
+      "owner": "Root authority / Claude F073-F078 triage",
+      "cheapest_local_command": "python3 -B scripts/tests/trusted-ci-landing-regressions.test.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904313135,
+      "check": "Native PostgreSQL worker API and process ownership",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988340/job/112904313135",
+      "published_conclusion": "failure",
+      "category": "owned native composition failure",
+      "actual_failure": "PostgreSQL worker role/fence control passed with four refusals, then qualify.py renewal failed AssertionError(\"unexpected kernel denial\") at line170; native composition false, exit1.",
+      "repair_commits": [],
+      "remaining_acceptance": "Claude owns actual native/PG cause and current composed capture. Root now reports confirmed pthread parent-death SIGKILL from Tokio worker retirement, runner repair assigned; causal attribution of this specific old denial and separate call5 denial remains unproved here. Preserve partial control pass. This owning replay requires its existing database/binary/state/enforcing-host environment; do not run until the native owner clears setup.",
+      "owner": "Claude native / PG",
+      "cheapest_local_command": "python3 -B examples/postgres-job-swarm/qualify.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904313195,
+      "check": "chio-pheromone-relay-observability",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988493/job/112904313195",
+      "published_conclusion": "failure",
+      "category": "runner infrastructure",
+      "actual_failure": "Runner acquisition failed 5 attempts; job never started. Exact log retrieval is 404 BlobNotFound. No relay Source/test failure established.",
+      "repair_commits": [],
+      "remaining_acceptance": "Root must rerun on an available hosted runner; Source changes cannot satisfy a job that never started.",
+      "owner": "Root hosted rerun",
+      "cheapest_local_command": "gh api repos/bb-connor/arc/check-runs/112904313195/annotations",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904313473,
+      "check": "Cognition market PostgreSQL isolation",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988638/job/112904313473",
+      "published_conclusion": "failure",
+      "category": "documentation preflight repair",
+      "actual_failure": "git diff --check found new blank lines at EOF in three sqlite-and-ci-repair-checkpoint JSON documents. Exit2 occurred before PostgreSQL isolation qualification.",
+      "repair_commits": [
+        "226d4acac5"
+      ],
+      "remaining_acceptance": "The exact diff hygiene check now exits0. This provides no PostgreSQL isolation result; owning PG lane still needs execution.",
+      "owner": "Root docs / Claude PG",
+      "cheapest_local_command": "git --no-optional-locks diff --check 6573b8980a1e5331028b7e688169f033a39d0384...e6384ebe44",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904313927,
+      "check": "cargo-vet (locked supply-chain audit)",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988368/job/112904313927",
+      "published_conclusion": "failure",
+      "category": "runner infrastructure",
+      "actual_failure": "Runner acquisition failed 5 attempts; job never started. Exact log retrieval is 404 BlobNotFound. No hosted cargo-vet audit failure established.",
+      "repair_commits": [],
+      "remaining_acceptance": "A prior local locked audit receipt passed without audit/exemption changes; exact hosted cargo-vet job still requires an acquired runner. That receipt is not e638 exact-head audit qualification.",
+      "owner": "Root hosted rerun",
+      "cheapest_local_command": "bash scripts/check-supply-chain.sh",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904314724,
+      "check": "Live C++ conformance",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988689/job/112904314724",
+      "published_conclusion": "failure",
+      "category": "C++ peer roots callback repair; harness acceptance open",
+      "actual_failure": "Live C++ harness failed tools-call-simple-text, resources-list, prompts-list with 10s HTTP request timeout; 2 tests passed, 1 failed, exit101. This is the same concrete failing harness in this distinct check run.",
+      "repair_commits": [
+        "13dfc2ebc9",
+        "05af50ab5e"
+      ],
+      "remaining_acceptance": "Peer now services carried server callbacks on every roots-declaring request stream. Source repair maps the observed stall, but current MCP library478 Green does not execute this C++ harness. Exact native C++/SDK owning replay remains required. Requires the owning enforcing Linux/x86_64 fixture and absolute CHIO_CAGE_INIT; a setup refusal is not an enforcement result.",
+      "owner": "Root C++ peer / Claude native fixture",
+      "cheapest_local_command": "cargo test --locked --offline -p chio-conformance --test mcp_core_cpp_live mcp_core_harness_runs_against_live_cpp_peer -- --exact --nocapture",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904315254,
+      "check": "SDK parity contract lane",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988670/job/112904315254",
+      "published_conclusion": "failure",
+      "category": "C++ peer roots callback repair; harness acceptance open",
+      "actual_failure": "Live C++ harness failed tools-call-simple-text, resources-list, prompts-list with 10s HTTP request timeout; 2 tests passed, 1 failed, exit101. This is the same concrete failing harness in this distinct check run.",
+      "repair_commits": [
+        "13dfc2ebc9",
+        "05af50ab5e"
+      ],
+      "remaining_acceptance": "Peer now services carried server callbacks on every roots-declaring request stream. Source repair maps the observed stall, but current MCP library478 Green does not execute this C++ harness. Exact native C++/SDK owning replay remains required. Requires the owning enforcing Linux/x86_64 fixture and absolute CHIO_CAGE_INIT; a setup refusal is not an enforcement result.",
+      "owner": "Root C++ peer / Claude native fixture",
+      "cheapest_local_command": "cargo test --locked --offline -p chio-conformance --test mcp_core_cpp_live mcp_core_harness_runs_against_live_cpp_peer -- --exact --nocapture",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904319402,
+      "check": "Build, lint, test",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112904319402",
+      "published_conclusion": "failure",
+      "category": "reviewed source pin repair",
+      "actual_failure": "Three source-gate failures: threshold-crypto-floor hash mismatch; security CI mutation selftest reports unexpected rejection because that earlier mismatch masks its supply-chain mutation; FIPS contract selftest errors on the same pin. 107 gates, 3 failures. Negative liability-roster rejection text belongs to passing selftests, not another gate failure.",
+      "repair_commits": [
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Exact full Build/lint/test lane at final published SHA remains required; local pin checks do not qualify its Rust/native/other gates.",
+      "owner": "Root",
+      "cheapest_local_command": "python3 -B scripts/check-security-ci-contract.py; python3 -B scripts/tests/check-security-ci-contract.test.py; python3 -B scripts/tests/check-fips-ci-contract.test.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904319647,
+      "check": "MSRV build and test",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112904319647",
+      "published_conclusion": "failure",
+      "category": "Python peer roots callback repair; MSRV acceptance open",
+      "actual_failure": "MSRV compilation progressed to CLI tests; conformance_run_python_report_shape_is_stable expected5/5 but got1/5. Integration target3 passed,1 failed,exit101. No MSRV compiler incompatibility is shown by this failure.",
+      "repair_commits": [
+        "84f57efc62",
+        "05af50ab5e"
+      ],
+      "remaining_acceptance": "Python peer now answers carried callbacks on every roots-declaring stream. The exact CLI Python harness and complete Rust1.95.0 MSRV owning lane must run on qualified host; MCP library478 is insufficient. Requires the owning enforcing Linux/x86_64 fixture and absolute CHIO_CAGE_INIT; a setup refusal is not an enforcement result.",
+      "owner": "Root MCP / Claude native fixture",
+      "cheapest_local_command": "cargo +1.95.0 test --locked --offline -p chio-cli --test conformance_cli conformance_run_python_report_shape_is_stable -- --exact --nocapture",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112904319877,
+      "check": "nonce-fips-contract / Threshold approval crypto floor",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112904319877",
+      "published_conclusion": "failure",
+      "category": "obsolete negative-test expectation repair",
+      "actual_failure": "a_nonce_of_an_unreserved_operation_cannot_reconcile panicked on Err(DurableAdmission(\"original caller nonce reservation is absent\")); 32 passed, 1 failed, exit101. The store already refused the absent reservation; test expected obsolete success.",
+      "repair_commits": [
+        "028d76cc87"
+      ],
+      "remaining_acceptance": "Current test asserts typed refusal and retained Prepared state. Run this owning exact case/33-case lane at final candidate; unrelated financial29 is not its evidence.",
+      "owner": "Root",
+      "cheapest_local_command": "cargo test --locked --offline -p chio-store-sqlite --test execution_nonce_caller_execution a_nonce_of_an_unreserved_operation_cannot_reconcile -- --exact",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112921263659,
+      "check": "Native host and protocol tests",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988632/job/112921263659",
+      "published_conclusion": "failure",
+      "category": "mapped MCP repairs; native acceptance open",
+      "actual_failure": "Python conformance report test failed plus three HTTP cases: initialize with session header, GET notification stream, and roots after initialized. HTTP result 40 passed, 3 failed, 1 ignored; conformance and HTTP targets failed.",
+      "repair_commits": [
+        "05af50ab5e",
+        "6338947f98",
+        "84f57efc62",
+        "12dcfa8efd",
+        "f670c63002",
+        "2488df7f78"
+      ],
+      "remaining_acceptance": "478 MCP library passes cover library changes. Later CLI attempt exited101 during native fixture preflight (missing init/unsupported host). These four CLI cases still need actual qualified execution. Requires the owning enforcing Linux/x86_64 fixture and absolute CHIO_CAGE_INIT; a setup refusal is not an enforcement result.",
+      "owner": "Root MCP / Claude native fixture",
+      "cheapest_local_command": "cargo test --locked --offline -p chio-cli --test mcp_serve_http --test conformance_cli --no-fail-fast -- --nocapture --test-threads=1",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112925220886,
+      "check": "enterprise-security-contract / enterprise real Linux enforcement",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112925220886",
+      "published_conclusion": "failure",
+      "category": "trusted source payload preflight failure",
+      "actual_failure": "Trusted input preflight requires18 paths; authorized S=d049... lacks deploy/docker/security-evidence-seccomp-upstream.json (first failed test-f). Job exited1 before adversarial or real-Linux execution.",
+      "repair_commits": [
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Source/definition completeness repair adds the three existing upstream provenance inputs to the controller contract. Frozen Source contains required paths, but trusted S/D must be coherently authorized and captured. Native/effect/F075 acceptance remains Claude-owned; no workflow authority changed here.",
+      "owner": "Root trusted inputs / Claude evidence-F075",
+      "cheapest_local_command": "python3 -B scripts/check-security-ci-contract.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112925220900,
+      "check": "enterprise-security-contract / active defense security gates",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112925220900",
+      "published_conclusion": "failure",
+      "category": "exact compiled inventory repair",
+      "actual_failure": "Durable-flow exact inventory contained 33 selectors against real compiled/run44: two database_path_inputs selectors were renamed by module ownership, and eleven open_path cases were added. Exact set equality failed; no threshold changed.",
+      "repair_commits": [
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Staged retained real44 replay and178 removal/rename mutations passed, plus69 exact inventories selftest. Final owning flow/hosted lane remains necessary; inventory proves names, not all new runtime behavior.",
+      "owner": "Root",
+      "cheapest_local_command": "bash scripts/tests/check-flow-security.test.sh",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112925220903,
+      "check": "enterprise-security-contract / enterprise adversarial evidence",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112925220903",
+      "published_conclusion": "failure",
+      "category": "trusted source payload preflight failure",
+      "actual_failure": "Trusted input preflight requires18 paths; authorized S=d049... lacks deploy/docker/security-evidence-seccomp-upstream.json (first failed test-f). Job exited1 before adversarial or real-Linux execution.",
+      "repair_commits": [
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Source/definition completeness repair adds the three existing upstream provenance inputs to the controller contract. Frozen Source contains required paths, but trusted S/D must be coherently authorized and captured. Native/effect/F075 acceptance remains Claude-owned; no workflow authority changed here.",
+      "owner": "Root trusted inputs / Claude evidence-F075",
+      "cheapest_local_command": "python3 -B scripts/check-security-ci-contract.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112925221169,
+      "check": "enterprise-security-contract / enterprise portable contracts",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112925221169",
+      "published_conclusion": "failure",
+      "category": "reviewed source pin repair",
+      "actual_failure": "Portable contracts failed security CI mutation selftest because the changed threshold-crypto-floor contract pin caused an earlier rejection, masking the intended supply-chain audit-removed mutation.",
+      "repair_commits": [
+        "fa4476bf4c"
+      ],
+      "remaining_acceptance": "Exact source contract/selftests are the cheap acceptance; full portable lane at final head still required.",
+      "owner": "Root",
+      "cheapest_local_command": "python3 -B scripts/check-security-ci-contract.py; python3 -B scripts/tests/check-security-ci-contract.test.py; python3 -B scripts/tests/check-fips-ci-contract.test.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112931849460,
+      "check": "fuzz-corpus-smoke-pr (locked replay)",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988458/job/112931849460",
+      "published_conclusion": "failure",
+      "category": "production reader compile repair",
+      "actual_failure": "E0425: fuzz.rs called crate::runtime::framing::read_jsonrpc_frame, which exists only under cfg(test); library compile failed before corpus replay.",
+      "repair_commits": [
+        "3f3dc21b45"
+      ],
+      "remaining_acceptance": "Current fuzz uses production bounded stdio reader. Retained locked-workspace corpus/library receipt passed35 (10+25); exact hosted locked replay and optional ASAN/native campaign remain distinct.",
+      "owner": "Root",
+      "cheapest_local_command": "cd fuzz && cargo test --locked --offline",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112944249504,
+      "check": "changed-target-sampling",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988304/job/112944249504",
+      "published_conclusion": "failure",
+      "category": "package-download infrastructure",
+      "actual_failure": "Docker Ubuntu focal apt step could not fetch libllvm10/libgc1c2/libobjc4 from archive mirror HTTP80 (Connection failed); apt exit100, external project build failed. No sampling/fuzz semantic failure established.",
+      "repair_commits": [],
+      "remaining_acceptance": "Retry the unchanged owning container build on an available mirror/network, then sampling. Current locked fuzz35 passes do not repair or qualify this Docker package acquisition.",
+      "owner": "Root hosted infrastructure",
+      "cheapest_local_command": "gh run view 37653988304 --job 112944249504 --log-failed",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112951411272,
+      "check": "Installed native consumer recovery",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988632/job/112951411272",
+      "published_conclusion": "failure",
+      "category": "owned installed native consumer failure",
+      "actual_failure": "Baseline, known-effect, unknown-effect native profiles passed, then installed chio-mini-swe run in qualify_operator.py330 exited1. Earlier profile passes do not qualify the final installed recovery step.",
+      "repair_commits": [
+        "f41e8928d9"
+      ],
+      "remaining_acceptance": "f41e preserves attach-client diagnostics, not demonstrated closure of installed recovery. Claude now owns confirmed worker-retirement/PDEATHSIG runner defect and new capture; separate call5 denial still unknown. Exact installed-consumer recovery remains open. This owning replay requires its existing database/binary/state/enforcing-host environment; do not run until the native owner clears setup.",
+      "owner": "Claude native / installed consumer",
+      "cheapest_local_command": "python3 -B examples/mini-swe-recovery/qualify_operator.py",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112966460824,
+      "check": "MCP process host and enforced native recovery",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653988632/job/112966460824",
+      "published_conclusion": "failure",
+      "category": "dependent aggregate failure",
+      "actual_failure": "Required HOST_TESTS and CONSUMERS results were failure; BINARIES and WORKERS success. Aggregate exit1 adds no independent root cause.",
+      "repair_commits": [],
+      "remaining_acceptance": "Require genuinely successful qualified native host/protocol and installed-consumer jobs, then rerun aggregate. Library/static passes cannot substitute for its required parents.",
+      "owner": "Root aggregate / Claude native",
+      "cheapest_local_command": "gh run view 37653988632 --json jobs",
+      "hosted_requalified": false
+    },
+    {
+      "check_id": 112990630181,
+      "check": "Security contract",
+      "url": "https://github.com/bb-connor/arc/actions/runs/37653989710/job/112990630181",
+      "published_conclusion": "failure",
+      "category": "trusted evidence/required-parent aggregate refusal",
+      "actual_failure": "First executed aggregate assertion requires a 40-hex COMMITTED_LINUX_EVIDENCE_SHA; env value was empty, so exit1 preceded downstream required-parent tests. Other parent failures remain independently recorded.",
+      "repair_commits": [],
+      "remaining_acceptance": "Need authorized exact-M signed Linux evidence package, auditor/finalizer, published proof SHA and required-job success. Source changes/local Green alone cannot satisfy this authority/evidence gate; F077 live activation remains open.",
+      "owner": "Root authority / Claude landing triage",
+      "cheapest_local_command": "gh variable list --repo bb-connor/arc --json name,value",
+      "hosted_requalified": false
+    }
+  ],
+  "count": 21,
+  "limitations": [
+    "Two jobs never acquired a runner; no source or supply-chain failure is inferred.",
+    "Controller first executed failing predicate is not isolated in the retained log.",
+    "Native call-five timing investigation advanced after this frozen source matrix; see the subsequent native diagnostic checkpoint.",
+    "Commands listed are planned acceptance, not executions or Green claims."
+  ]
+}

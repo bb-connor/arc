@@ -219,3 +219,6 @@ pub fn underwriting_policy_input(data: &[u8]) {
         let _ = price_premium("fuzz-agent", "fuzz-scope", window, &inputs);
     }
 }
+
+mod frost_round2_envelope;
+pub use frost_round2_envelope::frost_round2_envelope;

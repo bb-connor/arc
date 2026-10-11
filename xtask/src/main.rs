@@ -104,6 +104,7 @@ mod formal_mirrors;
 mod launch_acceptance;
 mod proof_coverage;
 mod qualify;
+mod rust_packages;
 mod scenarios;
 mod snippets_subcommand;
 mod support;

@@ -25,7 +25,7 @@ fn profile_registration_raw(
 
 fn profile_registration_raw_from_profile_bytes(profile_raw: &str) -> Result<String, AnyError> {
     let profile: SignedFindingChallengeVerifierProfile = serde_json::from_str(profile_raw)?;
-    profile_registration_raw(&profile, unix_timestamp_now(), None)
+    profile_registration_raw(&profile, unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)
 }
 
 #[tokio::test]
@@ -42,7 +42,7 @@ async fn profile_not_signed_by_governance_rejects() -> TestResult {
         &stack.state,
         authed_post(
             "/v1/findings/profiles",
-            profile_registration_raw(&forged_profile, unix_timestamp_now(), None)?,
+            profile_registration_raw(&forged_profile, unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
         )?,
     )
     .await?;
@@ -60,7 +60,7 @@ async fn profile_registration_requires_live_unrevoked_governance() -> TestResult
     let stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
     let profile: SignedFindingChallengeVerifierProfile =
         serde_json::from_str(&stack.web.profile_raw)?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let mut expired_state = stack.state.clone();
     expired_state
@@ -180,7 +180,7 @@ async fn profile_registration_requires_live_unrevoked_governance() -> TestResult
 #[tokio::test]
 async fn collateral_registration_requires_live_unrevoked_authority() -> TestResult {
     let stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let mut expired_state = stack.state.clone();
     expired_state
@@ -241,7 +241,7 @@ async fn unsupported_profile_rejects_before_registration_or_activation() -> Test
         &stack.state,
         authed_post(
             "/v1/findings/profiles",
-            profile_registration_raw(&unsupported, unix_timestamp_now(), None)?,
+            profile_registration_raw(&unsupported, unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
         )?,
     )
     .await?;
@@ -252,9 +252,9 @@ async fn unsupported_profile_rejects_before_registration_or_activation() -> Test
     let error = match verify_profile_for_activation(
         &unsupported,
         &unsupported_digest,
-        &signed_governance_authority_status(unix_timestamp_now(), None)?,
+        &signed_governance_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
         &market_config(),
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     ) {
         Ok(_) => return Err("unsupported profile activated".into()),
         Err(error) => error,
@@ -279,7 +279,7 @@ async fn profile_body_authority_must_match_governance() -> TestResult {
         &stack.state,
         authed_post(
             "/v1/findings/profiles",
-            profile_registration_raw(&mismatched_profile, unix_timestamp_now(), None)?,
+            profile_registration_raw(&mismatched_profile, unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
         )?,
     )
     .await?;

@@ -956,7 +956,9 @@ fn decode_and_verify_root_inner(
         });
     }
     let signed: SignedEpochRoot =
-        serde_json::from_slice(bytes).map_err(|error| CatchupError::Codec(error.to_string()))?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 16 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| CatchupError::Codec(error.to_string()))?;
     // Authenticity: BLAKE3 gives integrity, not authenticity. Verify against the
     // pinned signer's verify-only key.
     signed

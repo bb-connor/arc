@@ -1,0 +1,155 @@
+{
+  "schema": "chio.security.required-ci-followup.v1",
+  "observed_utc": "2026-10-10T23:06:38.702447+00:00",
+  "published_predecessor": "4339c98366b5b5e5276e7777db0ebb149871346e",
+  "source_repair": "058888287f7a15b861c8fd55e17a96d5ee7b57f0",
+  "source_files": {
+    "crates/products/chio-cli/tests/trust_cluster.rs": "a50ffb76f020423c04baa47b6197c5defcf189a6b15463b81d6b5fcb819479f7",
+    "crates/products/chio-cli/tests/trust_cluster/health.rs": "61955bec804e9b075f4caf758aba2ea8ae15fd1c22d046b2b33a06074257009e",
+    ".github/workflows/ci.yml": "1e626650a54c4013c4e17d7f57e2f3dbbab2830047f8826fbcf9390add8c93ee",
+    "scripts/check-security-ci-contract.py": "766cb6211175098edeea0ee9f40f0fff375c2a2b35981709b55e1204650f3e1c",
+    "docs/formal/COVERAGE.md": "9dd3694d188ff6f75b9c1f8139554e44feed6bdbfbe54ad07d48950da1a84847"
+  },
+  "original_failure": {
+    "run": 38092396575,
+    "job": 114331335945,
+    "log_sha256": "4f33517db6bfcdbb611ab1e4c853daa9feeb1da093de78e7aeb16ddf2ce4677a",
+    "reason": "trust_cluster.rs3285lines exceeds unchanged3272cap",
+    "required_impact": "Build contains the same checker; no original required failure or pass fabricated while it remains queued"
+  },
+  "repairs": [
+    {
+      "id": "CI-CLUSTER-TEST-HYGIENE",
+      "requirement": "Retain every cluster test and assertion while respecting the existing test-file size cap.",
+      "change": "Move existing health helpers into a cohesive private test module; root3261lines, helper39; inverse extraction byte-identical to predecessor.",
+      "original": "Hosted and local hygiene exit1 on4339.",
+      "verification": "Unchanged cap check and all static checks pass; whole owning binary8passed0failed3pre-existingignored; strict owning test lint passes."
+    },
+    {
+      "id": "CI-COMPLETE-FAILURE-REPORTING",
+      "requirement": "Collect all failing workspace test targets in one hosted run while retaining failure exit status and the complete selection.",
+      "change": "Add --no-fail-fast to the Build and MSRV workspace test invocations, update exact checker strings. All exclusions, timeouts and environment controls unchanged.",
+      "original": "Original ddb7 Build stopped at trust_cluster and did not execute later workspace binaries.",
+      "verification": "Security CI checker and complete mutation suite pass; independent diff review accepts unchanged failure enforcement."
+    }
+  ],
+  "verification": [
+    {
+      "command_or_scope": "python3 scripts/check-rust-file-hygiene.py at4339",
+      "result": "exit1:3285lines exceeds3272cap",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/file-hygiene-original-4339.log",
+      "sha256": "1d5bcd6e9363e3ce3fca2048859b82c709f8342807d30f1284fc816b247274fb"
+    },
+    {
+      "command_or_scope": "Rust file hygiene",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/file-hygiene-green-final.log",
+      "sha256": "6b8d2cf0c9b7bcb80c47bffac33ee569074ec146c3042bd0bd748f2806a3fd13"
+    },
+    {
+      "command_or_scope": "workspace format",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command_or_scope": "Rust hardening",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-hardening.log",
+      "sha256": "3a9a4ad59aef182de12528fb4185656162b3448b731756cd45f5f98e49221454"
+    },
+    {
+      "command_or_scope": "negative assertions",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-negative-assertions.log",
+      "sha256": "80670f9100bb3c709e4d3cdf5b892da20bcd2bb9b64b6c7807fb3ec713ff3db4"
+    },
+    {
+      "command_or_scope": "lint parity",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-lint-parity.log",
+      "sha256": "66dd5f299bf358e58f406f404af52256951a346d64080ef1a307b01e9dda2256"
+    },
+    {
+      "command_or_scope": "stub surfaces",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-stub.log",
+      "sha256": "d651f5a28e2bf3536a001949955a2070a60392f9dc937ffb64e80011aa4e937c"
+    },
+    {
+      "command_or_scope": "hygiene regression suite",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-regressions.log",
+      "sha256": "2955d5003ebfbc337569ea0e71ca1c5454ec691961f250b21f70644109172ec3"
+    },
+    {
+      "command_or_scope": "generated metadata drift check;65rows179artifacts; no proof execution",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/cluster-hygiene-coverage-green.log",
+      "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+    },
+    {
+      "command_or_scope": "security CI contract",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/no-fail-fast-contract.log",
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "command_or_scope": "full security CI contract mutation suite",
+      "result": "exit0",
+      "artifact": "/tmp/pr1160-ci-batch-20261010/no-fail-fast-contract-mutations.log",
+      "sha256": "cce007ca6adbdc404330bc1277b002c5b03d9a0fc2aea70bd57378b2e842c9cc"
+    },
+    {
+      "command_or_scope": "cargo test --locked -p chio-cli --test trust_cluster -- --test-threads=1",
+      "result": "exit0:8passed,0failed,3pre-existingignored",
+      "artifact": "/home/connor/lanes/claude-pr1160-evidence/cluster-hygiene-review/03-binary.log",
+      "sha256": "ad6127c080ee23d8e4232b92da4b625bac156a18f768f253b4f4704aba5b2feb"
+    },
+    {
+      "command_or_scope": "cargo clippy --locked -p chio-cli --tests -- -D warnings",
+      "result": "exit0",
+      "artifact": "/home/connor/lanes/claude-pr1160-evidence/cluster-hygiene-review/04-clippy.log",
+      "sha256": "c26e69799b76aa04df0c12405557628e5eef6fc5e9e2435339f824d420447c07"
+    }
+  ],
+  "preservation": {
+    "base": "4339c98366b5b5e5276e7777db0ebb149871346e",
+    "extraction_inverse_byte_identical": true,
+    "original_assertions_retained": true,
+    "cap": 3272,
+    "new_parent_lines": 3261,
+    "new_helper_lines": 39,
+    "files": {
+      "crates/products/chio-cli/tests/trust_cluster.rs": "a50ffb76f020423c04baa47b6197c5defcf189a6b15463b81d6b5fcb819479f7",
+      "crates/products/chio-cli/tests/trust_cluster/health.rs": "61955bec804e9b075f4caf758aba2ea8ae15fd1c22d046b2b33a06074257009e",
+      ".github/workflows/ci.yml": "1e626650a54c4013c4e17d7f57e2f3dbbab2830047f8826fbcf9390add8c93ee",
+      "scripts/check-security-ci-contract.py": "766cb6211175098edeea0ee9f40f0fff375c2a2b35981709b55e1204650f3e1c"
+    }
+  },
+  "independent_review": {
+    "reviewer": "Claude",
+    "verdict": "LAND",
+    "timestamp": "2026-10-10T23:01:07Z",
+    "patch_sha256": "ccd4b8ce56ca7e7cf198a9dcf4ac8917d04e3c64f4f52c85f11ed9ed368201c3",
+    "scope": "Four source files reviewed and qualified. Fifth generated coverage file changes exactly two digests and passes its drift check."
+  },
+  "remaining_acceptance": [
+    "Four required checks green on the exact successor head; every other failure classified; review threads answered.",
+    "New explicit Connor merge go-ahead after reporting the exact check results."
+  ],
+  "ongoing_diagnostics": {
+    "remaining_libraries": "Active at4339 with --no-fail-fast; no full workspace pass claim. No library source changes in successor.",
+    "native_flow_full": "Local1200s supervisor timeout:101completed passes,39unfinished,0observed assertion failures; original raw failure remains retained."
+  },
+  "post_merge": [
+    "Stale controller and enterprise authorization to d0496c and older definition pin.",
+    "Missing CHIO_COMMITTED_LINUX_EVIDENCE_SHA.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED; no proof campaigns.",
+    "Cold-state readiness remains open."
+  ],
+  "native_recovery": "Classified unresolved dispatch capture deadline failure; diagnostic persistence is not a runtime repair.",
+  "hosted_qualified": false,
+  "merged": false,
+  "release_permitted": false
+}

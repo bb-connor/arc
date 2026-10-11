@@ -24,12 +24,25 @@ mod compliance;
 mod cost_attribution;
 #[path = "reports/economic.rs"]
 mod economic;
+#[path = "reports/read_boundary.rs"]
+pub(crate) mod read_boundary;
 #[path = "reports/reconciliation.rs"]
 mod reconciliation;
 #[path = "reports/settlement.rs"]
 mod settlement;
 #[path = "reports/shared_evidence.rs"]
 mod shared_evidence;
+
+/// Reported money is exact. Clamping would publish a successful undercount.
+pub(super) fn checked_report_sum(
+    total: u64,
+    amount: u64,
+    field: &str,
+) -> Result<u64, ReceiptStoreError> {
+    total.checked_add(amount).ok_or_else(|| {
+        ReceiptStoreError::ReadBoundary(format!("{field} exceeds the reportable u64 range"))
+    })
+}
 
 #[derive(Debug, Clone)]
 struct GovernedTransactionProjection {
@@ -199,15 +212,9 @@ fn require_admin_receipt_read_context(
     context: Option<&ReceiptReadContext>,
     surface: &str,
 ) -> Result<(), ReceiptStoreError> {
-    match context {
-        Some(ReceiptReadContext {
-            boundary: ReceiptReadBoundary::AdminAll,
-            ..
-        }) => Ok(()),
-        Some(ReceiptReadContext {
-            boundary: ReceiptReadBoundary::TenantScoped { .. },
-            ..
-        }) => Err(ReceiptStoreError::ReadBoundary(format!(
+    match context.map(ReceiptReadContext::boundary) {
+        Some(ReceiptReadBoundary::AdminAll) => Ok(()),
+        Some(ReceiptReadBoundary::TenantScoped { .. }) => Err(ReceiptStoreError::ReadBoundary(format!(
             "{surface} requires admin receipt read authority until tenant-scoped report filtering is implemented"
         ))),
         None => Err(ReceiptStoreError::ReadBoundary(format!(

@@ -25,19 +25,13 @@ use crate::{BridgeConfig, OpenApiMcpBridge};
 /// Drive arbitrary bytes through the OpenAPI-spec ingest trust boundary
 /// at [`crate::OpenApiMcpBridge::from_spec`].
 ///
-/// Bytes are first decoded as UTF-8 (non-UTF-8 inputs are silently dropped,
-/// mirroring the `serde_json` / `serde_yaml` contracts). The decoded text is
-/// then handed to `OpenApiMcpBridge::from_spec`, which auto-detects JSON vs
-/// YAML, parses the spec, generates an MCP tool manifest, populates route
-/// bindings, and validates the manifest end-to-end.
+/// Original bytes enter the production bound, UTF-8 validation, duplicate-aware
+/// JSON/YAML decoder and bounded YAML expansion before manifest projection.
 ///
 /// Every error variant is silently consumed: the trust-boundary contract
 /// guarantees the only outcomes are `Err(_)` (good), `Ok(OpenApiMcpBridge)`
 /// (good), or a panic / abort (which libFuzzer surfaces as a crash).
 pub fn fuzz_openapi_ingest(data: &[u8]) {
-    let Ok(text) = std::str::from_utf8(data) else {
-        return;
-    };
     let config = BridgeConfig {
         server_id: "fuzz-bridge".to_string(),
         server_name: "Fuzz Bridge".to_string(),
@@ -48,5 +42,5 @@ pub fn fuzz_openapi_ingest(data: &[u8]) {
         base_url: "https://fuzz.invalid".to_string(),
         egress_contract: None,
     };
-    let _ = OpenApiMcpBridge::from_spec(text, config);
+    let _ = OpenApiMcpBridge::from_spec(data, config);
 }

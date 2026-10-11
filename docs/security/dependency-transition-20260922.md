@@ -1,5 +1,7 @@
 # September 22 dependency transition
 
+Current landing authority: [security landing ledger](landing-ledger.md).
+
 The main-branch prerequisite for the security workflow transition repairs the
 inherited Rust and JavaScript dependency closure before introducing new capture
 authority. PR #1168 contains this prerequisite; PR #1167 contains the separate
@@ -114,3 +116,12 @@ hosted checks and independent review before integration. Then update the workflo
 definition change onto the repaired main branch. Source authorization, execution
 image publication and capture-policy rotation remain separate operations with
 their own exact identities and evidence.
+
+## Foundation integration boundary
+
+The foundation preserves additional reviewed path repairs and consumers from
+[the immutable pre-landing archive](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e). Its dependency manifests, locks,
+native builders and formal/source ratchets require composed qualification after
+the actual prerequisite merges. The prerequisite audit covers its named source
+and graphs; it does not certify the expanded foundation graph or its native
+security operation. See the landing ledger for per-requirement acceptance.

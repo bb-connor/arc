@@ -1,0 +1,35 @@
+{
+  "canonical_encoding": "RFC 8785",
+  "description": "Portable active-defense event, finding, response, effect, detector health, and transition receipt vectors.",
+  "negative": [
+    {"file": "mutations-v1.json", "id": "active_defense_mutations_v1"},
+    {"file": "receipt-body-mutations-v1.json", "id": "active_defense_receipt_body_mutations_v1"}
+  ],
+  "positive": [
+    {"file": "positive/security-event-body-v1.json", "id": "security_event_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/security-event-body-v1.schema.json"},
+    {"file": "positive/correlated-finding-v1.json", "id": "correlated_finding", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json"},
+    {"file": "positive/response-plan-v1.json", "id": "response_plan", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-v1.schema.json"},
+    {"file": "positive/response-effect-v1.json", "id": "response_effect", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-effect-v1.schema.json"},
+    {"file": "positive/response-state-transition-receipt-body-v1.json", "id": "response_state_transition_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json"},
+    {"file": "positive/response-state-transition-receipt-body-renewal-v1.json", "id": "response_state_transition_receipt_body_renewal", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-state-transition-receipt-body-v1.schema.json"},
+    {"file": "positive/effect-transition-receipt-body-v1.json", "id": "effect_transition_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json"},
+    {"file": "positive/effect-transition-receipt-body-legacy-v1.json", "id": "effect_transition_receipt_body_legacy", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json"},
+    {"file": "positive/flow-denial-receipt-body-v1.json", "id": "flow_denial_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json"},
+    {"file": "positive/declassification-consumption-receipt-body-v1.json", "id": "declassification_consumption_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json"},
+    {"file": "positive/declassification-outcome-receipt-body-v1.json", "id": "declassification_outcome_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json"},
+    {"file": "positive/tripwire-observation-receipt-body-v1.json", "id": "tripwire_observation_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json"},
+    {"file": "positive/correlated-finding-receipt-body-v1.json", "id": "correlated_finding_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/correlated-finding-receipt-body-v1.schema.json"},
+    {"file": "positive/response-plan-receipt-body-v1.json", "id": "response_plan_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json"},
+    {"file": "positive/response-plan-receipt-body-two-effects-v1.json", "id": "response_plan_receipt_body_two_effects", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json"},
+    {"file": "positive/response-completion-receipt-body-v1.json", "id": "response_completion_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json"},
+    {"file": "positive/response-completion-receipt-body-failed-before-effect-v1.json", "id": "response_completion_receipt_body_failed_before_effect", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json"},
+    {"file": "positive/response-completion-receipt-body-failed-v1.json", "id": "response_completion_receipt_body_failed", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json"},
+    {"file": "positive/lift-rollback-completion-receipt-body-v1.json", "id": "lift_rollback_completion_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json"},
+    {"file": "positive/lift-rollback-completion-receipt-body-nonreversible-v1.json", "id": "lift_rollback_completion_receipt_body_nonreversible", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json"},
+    {"file": "positive/scheduler-health-receipt-body-v1.json", "id": "scheduler_health_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/scheduler-health-receipt-body-v1.schema.json"},
+    {"file": "positive/detector-health-receipt-body-v1.json", "id": "detector_health_receipt_body", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json"},
+    {"file": "positive/detector-health-receipt-body-contradictory-v1.json", "id": "detector_health_receipt_body_contradictory", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json"},
+    {"file": "positive/detector-health-receipt-body-unknown-v1.json", "id": "detector_health_receipt_body_unknown", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/detector-health-receipt-body-v1.schema.json"}
+  ],
+  "schema": "chio.test-vector.active-defense.index.v1"
+}

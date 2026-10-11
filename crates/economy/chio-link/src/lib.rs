@@ -38,6 +38,9 @@ pub(crate) mod test_support {
     pub(crate) use chio_test_support::ctx::{TestUnwrap, TestUnwrapErr};
 }
 
+mod source;
+pub use source::OracleRequestError;
+
 use cache::PriceCache;
 #[cfg(feature = "web3")]
 use chainlink::ChainlinkFeedReader;
@@ -192,6 +195,12 @@ impl ExchangeRate {
 
 #[derive(Debug, thiserror::Error, Clone)]
 pub enum PriceOracleError {
+    #[error("oracle backend unavailable: {operation}")]
+    Request {
+        operation: &'static str,
+        #[source]
+        source: OracleRequestError,
+    },
     #[error("no feed configured for {base}/{quote}")]
     NoPairAvailable { base: String, quote: String },
     #[error("invalid price oracle configuration: {0}")]

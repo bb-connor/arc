@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json",
+  "title": "Chio broker audit runner authorization body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "auditId",
+    "deploymentId",
+    "brokerInstanceId",
+    "tenantScope",
+    "runnerId",
+    "referenceSource",
+    "referenceCommitmentSha256",
+    "capabilitySha256",
+    "proofSha256",
+    "canonicalRequestSha256",
+    "providerAdapterId",
+    "providerAdapterVersion",
+    "credentialProvider",
+    "revocationAuthorityDomain",
+    "issuedAtUnixSeconds",
+    "expiresAtUnixSeconds"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-audit-runner-authorization.v1" },
+    "auditId": { "$ref": "#/$defs/identifier" },
+    "deploymentId": { "$ref": "#/$defs/identifier" },
+    "brokerInstanceId": { "$ref": "#/$defs/identifier" },
+    "tenantScope": { "$ref": "#/$defs/identifier" },
+    "runnerId": { "$ref": "#/$defs/identifier" },
+    "referenceSource": { "$ref": "#/$defs/identifier" },
+    "referenceCommitmentSha256": { "$ref": "#/$defs/digest" },
+    "capabilitySha256": { "$ref": "#/$defs/digest" },
+    "proofSha256": { "$ref": "#/$defs/digest" },
+    "canonicalRequestSha256": { "$ref": "#/$defs/digest" },
+    "providerAdapterId": { "$ref": "#/$defs/identifier" },
+    "providerAdapterVersion": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+    "credentialProvider": { "$ref": "#/$defs/identifier" },
+    "revocationAuthorityDomain": { "$ref": "#/$defs/identifier" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "expiresAtUnixSeconds": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

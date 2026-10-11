@@ -1,0 +1,44 @@
+{
+  "schema": "chio.security.review3-intake.v1",
+  "observed_utc": "2026-10-11T02:26:17.240272+00:00",
+  "requirement_ids": [
+    "incoming-pr1160-review3-20261011:R3-001"
+  ],
+  "review": {
+    "path": "docs/reviews/2026-10-11-pr1160-repair-delta/findings.md",
+    "sha256": "6fb67cc79f5876e9ffa26cc02c9a5f2222eeb267773a70968f434603920374c4",
+    "before": "974f22914bd339a62933831650c3d55dbaf76987",
+    "after": "16c36036de95db2eaaee7d30654db4fb56c94782",
+    "new_p0": 0,
+    "new_p1": 0,
+    "new_p2": 1,
+    "scope": "Independent source review of repair delta and retained evidence. No new runtime or full-candidate qualification claim."
+  },
+  "finding": {
+    "id": "R3-001",
+    "priority": "P2",
+    "requirement": "Connection-capacity refusal must be retained in bounded capture evidence or latch a reserved sticky incomplete state, including after admitted handlers drain; never publish complete capture that silently omitted the refusal.",
+    "related_requirement": "incoming-pr1160-review2-20261011:R2-009",
+    "source_files": [
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay_limits.py",
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay.py",
+      "sdks/python/chio-hermes/tests/test_model_relay_limits.py"
+    ],
+    "source_repair": null,
+    "status": "repair-and-owner-qualification-pending",
+    "owner": "Claude C4; Root integration",
+    "required_controls": [
+      "Original must expose incorrect completeness after capacity refusal and drain.",
+      "Keep four-handler nonqueued limit, byte/count budgets and no paid admission.",
+      "Retained bounded refusal or sticky incomplete state must prevent completed publication.",
+      "Owning Python suite and strict lint; independent source review."
+    ]
+  },
+  "remaining_acceptance": [
+    "Complete the confirmed R3-001 repair and owning evidence before replacement publication.",
+    "Four required exact-head checks green, other failures classified, reviews answered.",
+    "Explicit Connor merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

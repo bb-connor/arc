@@ -1,10 +1,11 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use rusqlite::{params, OptionalExtension, Transaction};
 
 /// Upper bound for a supplemental authorization expiry, in seconds since the Unix
-/// epoch (2100-01-01T00:00:00Z). Capture compares the expiry against SQLite's
-/// `unixepoch()`, which is also seconds, so a millisecond-shaped value would never
-/// expire against that clock. Such values are rejected rather than accepted.
+/// epoch (2100-01-01T00:00:00Z). Capture converts the supplied authority clock
+/// to seconds, so a millisecond-shaped expiry would never expire against it.
+/// Such values are rejected rather than accepted.
 pub(super) const MAX_SUPPLEMENTAL_AUTHORIZATION_EXPIRES_AT_SECONDS: u64 = 4_102_444_800;
 
 #[derive(Clone)]
@@ -204,7 +205,10 @@ pub(super) fn load_usage_or_default(
             FROM capability_grant_budgets
             WHERE capability_id = ?1 AND grant_index = ?2
             "#,
-            params![capability_id, grant_index as i64],
+            params![
+                capability_id,
+                crate::integer::checked::<_, i64>(grant_index)?
+            ],
             |row| {
                 Ok((
                     budget_u32_from_row(row, 0, "invocation_count")?,
@@ -223,7 +227,7 @@ pub(super) fn load_usage_or_default(
             capability_id: capability_id.to_string(),
             grant_index,
             invocation_count: 0,
-            updated_at: unix_now(),
+            updated_at: 0, // No mutation exists for an absent usage row.
             seq: 0,
             total_cost_exposed: 0,
             total_cost_realized_spend: 0,
@@ -242,20 +246,39 @@ pub(super) fn load_usage_or_default(
 
 pub(super) fn write_usage(
     transaction: &Transaction<'_>,
+    before: &BudgetUsageRecord,
     usage: &BudgetUsageRecord,
 ) -> Result<(), BudgetStoreError> {
-    transaction.execute(
+    ExposureBalance::new(before.total_cost_exposed, before.total_cost_realized_spend)?;
+    ExposureBalance::new(usage.total_cost_exposed, usage.total_cost_realized_spend)?;
+    if before.capability_id != usage.capability_id
+        || before.grant_index != usage.grant_index
+        || usage.seq <= before.seq
+    {
+        return Err(BudgetStoreError::Invariant(
+            "invalid budget usage transition".into(),
+        ));
+    }
+    let changed = transaction.execute(
         r#"
         INSERT INTO capability_grant_budgets (
             capability_id, grant_index, invocation_count, updated_at, seq,
             total_cost_exposed, total_cost_realized_spend
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+          WHERE ?8 = 0 OR EXISTS (
+            SELECT 1 FROM capability_grant_budgets
+            WHERE capability_id = ?1 AND grant_index = ?2 AND seq = ?8
+          )
         ON CONFLICT(capability_id, grant_index) DO UPDATE SET
             invocation_count = excluded.invocation_count,
             updated_at = excluded.updated_at,
             seq = excluded.seq,
             total_cost_exposed = excluded.total_cost_exposed,
             total_cost_realized_spend = excluded.total_cost_realized_spend
+        WHERE capability_grant_budgets.seq = ?8
+          AND capability_grant_budgets.invocation_count = ?9
+          AND capability_grant_budgets.total_cost_exposed = ?10
+          AND capability_grant_budgets.total_cost_realized_spend = ?11
         "#,
         params![
             &usage.capability_id,
@@ -264,9 +287,18 @@ pub(super) fn write_usage(
             usage.updated_at,
             budget_u64_to_sqlite(usage.seq, "seq")?,
             budget_u64_to_sqlite(usage.total_cost_exposed, "total_cost_exposed")?,
-            budget_u64_to_sqlite(usage.total_cost_realized_spend, "total_cost_realized_spend",)?,
+            budget_u64_to_sqlite(usage.total_cost_realized_spend, "total_cost_realized_spend")?,
+            budget_u64_to_sqlite(before.seq, "previous_seq")?,
+            i64::from(before.invocation_count),
+            budget_u64_to_sqlite(before.total_cost_exposed, "previous_exposure")?,
+            budget_u64_to_sqlite(before.total_cost_realized_spend, "previous_spend")?,
         ],
     )?;
+    if changed != 1 {
+        return Err(BudgetStoreError::Invariant(
+            "budget usage compare-and-set failed".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -322,7 +354,10 @@ pub(super) fn legacy_grant_quota_limit(
         WHERE capability_id = ?1 AND grant_index = ?2
           AND projection_kind = 'legacy' AND max_invocations IS NOT NULL
         "#,
-        params![capability_id, grant_index as i64],
+        params![
+            capability_id,
+            crate::integer::checked::<_, i64>(grant_index)?
+        ],
         |row| {
             Ok((
                 row.get::<_, Option<i64>>(0)?,
@@ -351,6 +386,13 @@ pub(super) fn write_quota_state(
     transaction: &Transaction<'_>,
     state: &QuotaState,
 ) -> Result<(), BudgetStoreError> {
+    let used =
+        InvocationCount::new(state.reserved).try_add(InvocationCount::new(state.captured))?;
+    if used.get() > state.maximum || state.version == 0 {
+        return Err(BudgetStoreError::Invariant(
+            "invalid budget quota transition".into(),
+        ));
+    }
     let changed = transaction.execute(
         r#"
         INSERT INTO budget_invocation_quotas (
@@ -362,6 +404,10 @@ pub(super) fn write_quota_state(
             captured_invocations = excluded.captured_invocations,
             version = excluded.version
         WHERE budget_invocation_quotas.max_invocations = excluded.max_invocations
+          AND excluded.version > 0
+          AND budget_invocation_quotas.version = excluded.version - 1
+          AND excluded.captured_invocations <= excluded.max_invocations
+          AND excluded.reserved_invocations <= excluded.max_invocations - excluded.captured_invocations
         "#,
         params![
             state.quota.key.profile.as_str(),
@@ -479,6 +525,12 @@ pub(super) fn write_cumulative_account(
     transaction: &Transaction<'_>,
     account: &CumulativeAccount,
 ) -> Result<(), BudgetStoreError> {
+    ExposureUnits::new(account.reserved).try_add(ExposureUnits::new(account.captured))?;
+    if account.version == 0 {
+        return Err(BudgetStoreError::Invariant(
+            "invalid cumulative account version".into(),
+        ));
+    }
     let changed = transaction.execute(
         r#"
         INSERT INTO budget_cumulative_approval_accounts (
@@ -497,6 +549,7 @@ pub(super) fn write_cumulative_account(
           AND budget_cumulative_approval_accounts.root_binding_digest IS excluded.root_binding_digest
           AND budget_cumulative_approval_accounts.currency = excluded.currency
           AND budget_cumulative_approval_accounts.authority_threshold_units = excluded.authority_threshold_units
+          AND budget_cumulative_approval_accounts.version = excluded.version - 1
         "#,
         params![
             &account.key.authority_id,
@@ -640,7 +693,11 @@ pub(super) fn write_hold_admission_members(
                 hold_id, member_index, capability_id
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![hold_id, index as i64, capability_id],
+            params![
+                hold_id,
+                crate::integer::checked::<_, i64>(index)?,
+                capability_id
+            ],
         )?;
     }
     for (index, digest) in admission.authorization_artifact_digests.iter().enumerate() {
@@ -650,7 +707,7 @@ pub(super) fn write_hold_admission_members(
                 hold_id, artifact_index, artifact_digest
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![hold_id, index as i64, digest],
+            params![hold_id, crate::integer::checked::<_, i64>(index)?, digest],
         )?;
     }
     write_hold_revocation_commit(
@@ -742,7 +799,7 @@ fn revocation_commit_from_row(
 }
 
 fn load_hold_revocation_commit(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Option<RevocationCommitMetadata>, BudgetStoreError> {
     let commit = transaction
@@ -772,7 +829,7 @@ fn load_hold_revocation_commit(
 }
 
 pub(super) fn load_event_revocation_commit(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Option<RevocationCommitMetadata>, BudgetStoreError> {
     let commit = transaction
@@ -801,7 +858,10 @@ pub(super) fn load_event_revocation_commit(
     Ok(commit)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn write_authorization_event_projection(
     transaction: &Transaction<'_>,
     event_id: &str,
@@ -887,7 +947,11 @@ pub(super) fn write_authorization_event_projection(
                 event_id, member_index, capability_id
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, capability_id],
+            params![
+                event_id,
+                crate::integer::checked::<_, i64>(index)?,
+                capability_id
+            ],
         )?;
     }
     for (index, digest) in admission.authorization_artifact_digests.iter().enumerate() {
@@ -897,7 +961,7 @@ pub(super) fn write_authorization_event_projection(
                 event_id, artifact_index, artifact_digest
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, digest],
+            params![event_id, crate::integer::checked::<_, i64>(index)?, digest],
         )?;
     }
     write_event_revocation_commit(
@@ -1039,7 +1103,7 @@ pub(super) fn write_authorization_event_projection(
 }
 
 fn load_strings(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     sql: &str,
     id: &str,
 ) -> Result<Vec<String>, BudgetStoreError> {
@@ -1124,7 +1188,7 @@ fn projection_contract(
 }
 
 pub(super) fn load_event_projection_contract(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<ProjectionContract, BudgetStoreError> {
     let row = transaction.query_row(
@@ -1153,7 +1217,7 @@ pub(super) fn load_event_projection_contract(
 }
 
 fn load_hold_projection_contract(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<ProjectionContract, BudgetStoreError> {
     let row = transaction.query_row(
@@ -1196,7 +1260,7 @@ pub(super) fn require_expected_count(
 }
 
 pub(super) fn load_authorization_request(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event: &BudgetMutationRecord,
 ) -> Result<BudgetAuthorizeHoldRequest, BudgetStoreError> {
     if !matches!(
@@ -1339,7 +1403,7 @@ pub(super) fn load_authorization_request(
 }
 
 fn load_event_quotas(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Vec<BudgetInvocationQuota>, BudgetStoreError> {
     let mut statement = transaction.prepare(
@@ -1377,7 +1441,7 @@ fn load_event_quotas(
 }
 
 pub(super) fn load_event_cumulative_request(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     event_id: &str,
 ) -> Result<Option<BudgetCumulativeApprovalRequest>, BudgetStoreError> {
     type Row = (
@@ -1485,7 +1549,10 @@ pub(super) fn cumulative_usage(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn authorization_decision(
     store: &SqliteBudgetStore,
     request: BudgetAuthorizeHoldRequest,
@@ -1560,7 +1627,7 @@ pub(super) fn authorization_decision(
             }),
         ),
         BudgetAuthorizationOutcome::Authorized => Ok(BudgetAuthorizeHoldDecision::Authorized(
-            AuthorizedBudgetHold {
+            BudgetHoldAuthorizationRecord {
                 hold_id: request.hold_id,
                 admission_binding: request.admission_binding,
                 authorized_exposure_units: request.requested_exposure_units,
@@ -1737,7 +1804,7 @@ pub(super) fn latest_hold_event_seq(
 }
 
 pub(super) fn load_structured_hold(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Option<StructuredHold>, BudgetStoreError> {
     let row = transaction
@@ -1884,7 +1951,7 @@ pub(super) fn load_structured_hold(
 }
 
 fn load_hold_quotas(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<Vec<BudgetInvocationQuota>, BudgetStoreError> {
     let mut statement = transaction.prepare(

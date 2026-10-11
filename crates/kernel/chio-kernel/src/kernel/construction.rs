@@ -198,16 +198,23 @@ impl ChioKernel {
     }
 
     pub fn new(config: KernelConfig) -> Self {
+        Self::new_with_clock(config, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn new_with_clock(
+        config: KernelConfig,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Self {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
-        // Build the mpsc-backed signing-task handle. The handle clones the
-        // signing keypair so the receipt-signing critical path no longer borrows
-        // from `self.config.keypair` while the evaluate pipeline is mid-flight.
+        // Build the mpsc-backed signing-task handle with the same immutable
+        // authority used by inline receipts and threshold proposal issuance.
         // The tokio task is spawned LAZILY on first `signing_task.sign(_)` call
         // so `ChioKernel::new` remains constructible from sync contexts; by the
         // time any caller reaches `sign`, a tokio runtime is necessarily active.
-        let signing_keypair = config.keypair.clone();
+        let signing_authority =
+            super::signing_authority::KernelSigningAuthority::classical(&config.keypair);
         // WYSIWYS: the async signer admits exactly what the inline
         // signer admits, then bounds queue memory by an AGGREGATE byte budget.
         //
@@ -232,14 +239,13 @@ impl ChioKernel {
         } else {
             configured_stream_max
         };
-        let signing_task = std::sync::Arc::new(
-            signing_task::SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
-                signing_keypair,
+        let signing_task =
+            std::sync::Arc::new(signing_task::SigningTaskHandle::with_backend_and_limits(
+                Arc::clone(&signing_authority.backend),
                 signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
                 /* per-request cap */ 0,
                 signing_queued_budget,
-            ),
-        );
+            ));
         // Read the memory-budget-driven caps before `config` is moved into the
         // struct literal.
         let receipt_mirror_capacity = config.memory_budget_receipt_mirror_capacity();
@@ -254,16 +260,37 @@ impl ChioKernel {
         let federation_dual_receipts_gauge;
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
+            clock: clock.clone(),
+            clock_fence: Arc::new(Mutex::new(chio_security_types::clock::ClockFence::default())),
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
+            #[cfg(feature = "admission-test-support")]
+            durable_finalization_cutpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            caller_execution_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_egress_checkpoint_hook: None,
+            #[cfg(feature = "admission-test-support")]
+            native_capture_checkpoint_hook: None,
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
-            budget_store: Arc::new(InMemoryBudgetStore::new()),
+            budget_store: Arc::new(InMemoryBudgetStore::with_clock(clock.clone())),
             budget_store_lock: Mutex::new(()),
+            admission_operation_store: None,
+            approval_store: None,
+            dispatch_worker_count: 1,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
-            capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
+            capability_authority: Box::new(LocalCapabilityAuthority::new_with_clock(authority_keypair, clock.clone())),
+            capability_issuance_admission_authority: None,
+            active_response_requirement_resolver: None,
+            active_response_finding_authority: None,
+            active_response_submission_authority: None,
+            active_response_executor: None,
+            active_response_executor_generation_floor: 0,
+            governed_active_response_plans_enabled: false,
+            security_invocation_context_authority: None,
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
@@ -303,6 +330,10 @@ impl ChioKernel {
             finding_pool_mutation_receipt_flush_lock: Mutex::new(()),
             price_oracle: None,
             runtime_admission_hook: None,
+            caller_executor: None,
+            swarm_admission_required: false,
+            security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
+            security_pre_dispatch_hook: None,
             runtime_admission_readiness_timeout: Duration::from_millis(
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
@@ -316,13 +347,25 @@ impl ChioKernel {
             last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
+            dpop_authority: None,
             execution_nonce_config: None,
             execution_nonce_store: None,
+            governed_approval_authority: None,
+            governed_approvers: Vec::new(),
+            governed_approval_tenant: None,
             approval_replay_store: Some(Box::new(
-                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
+                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_default_capacity(
+                    clock.clone(),
+                ),
             )),
             threshold_approval_requirement_resolver: None,
+            signing_authority,
+            threshold_approval_policy_configured: false,
+            threshold_governed_approvals_enabled: false,
+            threshold_approval_policy_authorities: Vec::new(),
+            governed_security_runtime_generation: 0,
             supplemental_quota_verifier: None,
+            supplemental_admission_participant: None,
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
@@ -739,6 +782,13 @@ impl ChioKernel {
         self.durable_admission_mode
     }
 
+    /// Whether durable admission stores are installed, so strict execution
+    /// requests run as durable operations.
+    #[must_use]
+    pub fn has_durable_admission_store(&self) -> bool {
+        self.durable_admission_runtime.is_some()
+    }
+
     pub fn set_durable_admission_store(
         &mut self,
         store: Arc<dyn crate::receipt_store::QualifiedAdmissionProjectionStore>,
@@ -756,6 +806,8 @@ impl ChioKernel {
             outcome_store,
             fence,
             &self.config.keypair.public_key().to_hex(),
+            self.clock.clone(),
+            self.clock_fence.clone(),
         )?);
         Ok(())
     }
@@ -905,7 +957,7 @@ impl ChioKernel {
                 Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
                     Arc::clone(&receipt_store),
                     config,
-                ));
+                )?);
         }
         self.receipt_store = Some(receipt_store);
         Ok(())
@@ -1005,6 +1057,28 @@ impl ChioKernel {
         self.capability_authority = capability_authority;
     }
 
+    /// Install the fail-closed authority consulted for tenant-scoped issuance.
+    pub fn set_capability_issuance_admission_authority(
+        &mut self,
+        authority: Arc<dyn CapabilityIssuanceAdmissionAuthority>,
+    ) -> Result<(), KernelError> {
+        authority.ensure_ready().map_err(|error| {
+            KernelError::CapabilityIssuanceDenied(format!(
+                "capability issuance admission authority is not ready: {error}"
+            ))
+        })?;
+        self.capability_issuance_admission_authority = Some(authority);
+        Ok(())
+    }
+
+    /// Install the trusted host authority used by session-backed tool calls.
+    pub fn set_security_invocation_context_authority(
+        &mut self,
+        authority: Arc<dyn SecurityInvocationContextAuthority>,
+    ) {
+        self.security_invocation_context_authority = Some(authority);
+    }
+
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.set_budget_store_handle(Arc::from(budget_store));
     }
@@ -1025,6 +1099,32 @@ impl ChioKernel {
         hook: Box<dyn crate::post_invocation::PostInvocationHook>,
     ) {
         self.post_invocation_pipeline.add(hook);
+    }
+
+    /// Configure whether trusted security context and a final dispatch hook
+    /// are mandatory before entering a tool connector.
+    pub fn set_security_pre_dispatch_policy(&mut self, policy: SecurityPreDispatchPolicy) {
+        self.security_pre_dispatch_policy = policy;
+    }
+
+    #[must_use]
+    pub const fn security_pre_dispatch_policy(&self) -> SecurityPreDispatchPolicy {
+        self.security_pre_dispatch_policy
+    }
+
+    pub fn set_security_pre_dispatch_hook(&mut self, hook: Arc<dyn SecurityPreDispatchHook>) {
+        self.security_pre_dispatch_hook = Some(hook);
+    }
+
+    #[must_use]
+    pub fn security_pre_dispatch_hook_name(&self) -> Option<&str> {
+        self.security_pre_dispatch_hook
+            .as_ref()
+            .map(|hook| hook.name())
+    }
+
+    pub fn clear_security_pre_dispatch_hook(&mut self) {
+        self.security_pre_dispatch_hook = None;
     }
 
     /// Install a settlement hook with its durable outcome store and retry policy.
@@ -1247,6 +1347,10 @@ impl ChioKernel {
         }
         let mut local = chio_core::capability::features::CapabilityNegotiation::t1_default();
         local.features.insert(
+            chio_core::capability::features::GOVERNED_ACTIVE_RESPONSE_PLAN.to_string(),
+            self.governed_active_response_plans_enabled,
+        );
+        local.features.insert(
             chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
             true,
         );
@@ -1333,7 +1437,7 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral::DualSignedReceipt> {
-        let now = current_unix_timestamp();
+        let now = self.trusted_now_millis().ok()?.as_secs();
         {
             let mut cache = match self.federation_dual_receipts.lock() {
                 Ok(g) => g,
@@ -1366,7 +1470,7 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral_dsse::DsseEnvelope> {
-        let now = current_unix_timestamp();
+        let now = self.trusted_now_millis().ok()?.as_secs();
         {
             let mut cache = match self.federation_dsse_envelopes.lock() {
                 Ok(g) => g,
@@ -1489,7 +1593,7 @@ impl ChioKernel {
             cosigner.as_ref(),
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
-        let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
+        let timestamp_unix_ms = self.trusted_now_millis()?.get();
         let dsse_envelope =
             chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner(
                 receipt,
@@ -1518,7 +1622,7 @@ impl ChioKernel {
             store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
         }
-        let now = current_unix_timestamp();
+        let now = self.read_authority_time()?.as_secs();
         {
             let mut cache = match self.federation_dual_receipts.lock() {
                 Ok(g) => g,
@@ -1559,7 +1663,10 @@ impl ChioKernel {
     /// deny receipt with reason `"kernel emergency stop active"` before
     /// touching capability validation or the guard pipeline. The kernel
     /// remains running so orchestrators and health probes see a live
-    /// process; it is inert.
+    /// process; it is inert. The stop latches even if time acquisition fails;
+    /// the returned clock error reports missing timing metadata, and
+    /// `emergency_stopped_since()` then returns `None`. Clock recovery never
+    /// resumes execution; only `emergency_resume()` clears the stop.
     ///
     /// The active capability set is NOT purged from the revocation store:
     /// the current `RevocationStore` trait has no bulk revoke API and
@@ -1568,14 +1675,14 @@ impl ChioKernel {
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
-        let now_unix_ms = current_unix_timestamp_ms();
-        let now = now_unix_ms / 1000;
-        // Record the timestamp first so any concurrent reader that observes
-        // `emergency_stopped == true` sees a non-zero `since` value.
-        self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        // Revoking execution cannot depend on the clock that may have triggered
+        // this incident. Publish the stop before reading potentially faulty time.
+        self.emergency_stopped_since.store(0, Ordering::SeqCst);
         self.emergency_stop_reason
             .store(Arc::new(Some(reason.to_string())));
         self.emergency_stopped.store(true, Ordering::SeqCst);
+        let now = self.read_authority_time()?.as_secs();
+        self.emergency_stopped_since.store(now, Ordering::SeqCst);
 
         warn!(
             reason = %redacted!(reason),
@@ -1645,7 +1752,8 @@ impl ChioKernel {
     }
 
     /// Return the unix timestamp (seconds) at which the kill switch was
-    /// engaged, or `None` when the kernel is currently running normally.
+    /// engaged, or `None` when running normally or trusted timing metadata is
+    /// unavailable. Use `is_emergency_stopped()` to inspect the safety latch.
     #[must_use]
     pub fn emergency_stopped_since(&self) -> Option<u64> {
         if !self.is_emergency_stopped() {
@@ -1669,220 +1777,47 @@ impl ChioKernel {
         self.emergency_stop_reason.load_full().as_ref().clone()
     }
 
+    /// Install bounded volatile replay custody only when no store is configured.
+    /// This preserves existing history and does not activate durable replay authority.
+    pub fn install_default_dpop_store(&mut self) {
+        if self.dpop_nonce_store.is_none() {
+            self.dpop_nonce_store = Some(dpop::DpopNonceStore::defaults_with_clock(
+                self.clock.clone(),
+            ));
+            self.dpop_config = Some(dpop::DpopConfig::default());
+        }
+    }
+
     /// Install a DPoP nonce replay store and verification config.
     ///
     /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`
     /// must carry a valid `DpopProof` on the `ToolCallRequest`. Requests that lack a proof
     /// or whose proof fails verification are denied fail-closed.
-    pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
+    /// The store must be pristine so its clock can be bound to the kernel without
+    /// replacing an observed replay history or its time domain.
+    pub fn set_dpop_store(
+        &mut self,
+        mut nonce_store: dpop::DpopNonceStore,
+        config: dpop::DpopConfig,
+    ) -> Result<(), KernelError> {
+        nonce_store.bind_clock(self.clock.clone())?;
         self.dpop_nonce_store = Some(nonce_store);
         self.dpop_config = Some(config);
+        Ok(())
     }
 
-    /// Install an execution-nonce config and replay store.
-    ///
-    /// Once installed, every `Verdict::Allow` carries a short-lived signed
-    /// nonce on `ToolCallResponse::execution_nonce`. Tool servers re-present
-    /// that nonce via `ToolCallRequest::execution_nonce` and the kernel's
-    /// `verify_presented_execution_nonce` helper (or directly via the
-    /// free-standing `verify_execution_nonce` function) before executing.
-    ///
-    /// Set `config.require_nonce = true` to put the kernel into strict mode:
-    /// any call that reaches `require_presented_execution_nonce` without a
-    /// nonce is denied. When `require_nonce == false` the feature is opt-in
-    /// per tool server and non-nonce callers continue to work (backward
-    /// compatibility).
-    pub fn set_execution_nonce_store(
-        &mut self,
-        config: crate::execution_nonce::ExecutionNonceConfig,
-        store: Box<dyn crate::execution_nonce::ExecutionNonceStore>,
-    ) {
-        self.execution_nonce_config = Some(config);
-        self.execution_nonce_store = Some(store);
-    }
-
-    /// Returns `true` when execution-nonce strict mode is active.
-    ///
-    /// Strict mode requires every presented tool call to carry a fresh,
-    /// valid, single-use nonce. When `false` the kernel is either not
-    /// minting nonces at all (no config installed) or is in opt-in mode
-    /// where tool servers can verify presented nonces but non-nonce calls
-    /// are not outright rejected.
-    #[must_use]
-    pub fn execution_nonce_required(&self) -> bool {
-        self.execution_nonce_config
+    /// Access the actual configured volatile source for explicit retirement.
+    /// A preview is data only. Operators must pin its instance and quiesce
+    /// legacy consumers before sealing. This neither imports history nor
+    /// enables a restart-safe authority; replacing the store cannot verify
+    /// a previously pinned seal.
+    pub fn dpop_replay_source(
+        &self,
+    ) -> Result<&dyn dpop::replay_source::DpopReplaySourcePort, KernelError> {
+        self.dpop_nonce_store
             .as_ref()
-            .is_some_and(|cfg| cfg.require_nonce)
-    }
-
-    /// Mint a signed execution nonce for an allow verdict.
-    ///
-    /// Returns `Ok(None)` when no config is installed (nonces disabled) or
-    /// when this request already presented a nonce for execution. Otherwise
-    /// returns `Ok(Some(nonce))` once configured. The nonce binding is
-    /// derived from the capability subject, capability ID, target server/tool,
-    /// and the canonical parameter hash embedded in the just-signed allow
-    /// receipt so the verify-time check is always comparing apples to apples.
-    pub(crate) fn mint_execution_nonce_for_allow(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        receipt: &ChioReceipt,
-    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
-        self.mint_execution_nonce_for_allow_reserving(request, cap, receipt, None)
-    }
-
-    pub(crate) fn mint_execution_nonce_for_allow_reserving(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        receipt: &ChioReceipt,
-        reserved_hold_id: Option<&str>,
-    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
-        if request.execution_nonce.is_some() {
-            return Ok(None);
-        }
-        let Some(config) = self.execution_nonce_config.as_ref() else {
-            return Ok(None);
-        };
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        let binding = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: receipt.action.parameter_hash.clone(),
-        };
-        let reserving_request_id = reserved_hold_id.map(|_| request.request_id.clone());
-        let signed = crate::execution_nonce::mint_execution_nonce_with_reservation(
-            &self.config.keypair,
-            binding,
-            reserved_hold_id.map(str::to_string),
-            reserving_request_id,
-            config,
-            now,
-        )?;
-        Ok(Some(Box::new(signed)))
-    }
-
-    /// Verify a caller-presented execution nonce against the
-    /// expected binding, consuming it in the replay store on success.
-    ///
-    /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
-    /// by this kernel, and has not been consumed. Returns an error
-    /// wrapping `ExecutionNonceError` on any failure (expired, tampered,
-    /// replayed, binding mismatch, store unreachable).
-    pub fn verify_presented_execution_nonce(
-        &self,
-        presented: &crate::execution_nonce::SignedExecutionNonce,
-        expected: &crate::execution_nonce::NonceBinding,
-    ) -> Result<(), crate::execution_nonce::ExecutionNonceError> {
-        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            crate::execution_nonce::ExecutionNonceError::Store(
-                "execution nonce store is not installed".to_string(),
-            )
-        })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::verify_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            expected,
-            now,
-            store,
-        )
-    }
-
-    /// Execution-nonce dispatch gate.
-    ///
-    /// Denies fail-closed when strict mode is configured and the request
-    /// lacks a nonce. When strict mode is disabled, a request with no
-    /// nonce remains backward-compatible. Any presented nonce is still
-    /// verified and consumed so opt-in callers cannot bypass binding,
-    /// expiry, signature, or replay checks.
-    ///
-    /// Returns `Ok(())` when:
-    /// * no nonce is required and none was presented, OR
-    /// * a nonce is presented, signed by this kernel, correctly bound,
-    ///   non-expired, and has not been consumed.
-    ///
-    /// Returns `Err(KernelError::Internal(...))` fail-closed otherwise.
-    pub fn require_presented_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        self.validate_required_execution_nonce(request, cap)?;
-        self.reserve_presented_execution_nonce(request)
-    }
-
-    pub(crate) fn validate_required_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        let presented = request.execution_nonce.as_ref();
-        if !self.execution_nonce_required() && presented.is_none() {
-            return Ok(());
-        }
-        let presented = presented.ok_or_else(|| {
-            KernelError::Internal(
-                "execution nonce required but not presented on tool call".to_string(),
-            )
-        })?;
-        if self.execution_nonce_store.is_none() {
-            return Err(KernelError::Internal(
-                "execution nonce store is not installed".to_string(),
-            ));
-        }
-        let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
-            request.arguments.clone(),
-        )
-        .map_err(|e| KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}")))?
-        .parameter_hash;
-        let expected = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            request_id: request.request_id.clone(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash,
-        };
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::validate_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            &expected,
-            now,
-        )
-        .map_err(|e| KernelError::Internal(format!("{e}")))
-    }
-
-    pub(crate) fn reserve_presented_execution_nonce(
-        &self,
-        request: &ToolCallRequest,
-    ) -> Result<(), KernelError> {
-        let Some(presented) = request.execution_nonce.as_ref() else {
-            return Ok(());
-        };
-        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            KernelError::Internal("execution nonce store is not installed".to_string())
-        })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        crate::execution_nonce::reserve_execution_nonce(presented, store, now)
-            .map_err(|e| KernelError::Internal(format!("{e}")))
-    }
-
-    /// Strict-mode nonce issuance gate.
-    ///
-    /// In strict mode, a request that reaches evaluation without a presented
-    /// nonce is an authorization preflight. It may receive a freshly signed
-    /// nonce, but it must not execute the target tool. Actual execution
-    /// presents that nonce on a later request and consumes it immediately
-    /// before dispatch.
-    #[must_use]
-    pub(crate) fn execution_nonce_preflight_required(&self, request: &ToolCallRequest) -> bool {
-        self.execution_nonce_required() && request.execution_nonce.is_none()
+            .map(|store| -> &dyn dpop::replay_source::DpopReplaySourcePort { store })
+            .ok_or_else(|| KernelError::Dpop(crate::dpop::DpopError::MissingStore))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {
@@ -1933,6 +1868,22 @@ impl ChioKernel {
         self.runtime_admission_hook = Some(hook);
     }
 
+    /// Require verified swarm authority for every tool call on this kernel.
+    ///
+    /// This is a monotonic deployment policy, not a caller-controlled request
+    /// option. Missing context, a missing hook, or a hook without swarm support
+    /// denies dispatch. Install a swarm-verifying runtime hook before serving.
+    /// Replacing the hook cannot disable this requirement.
+    pub fn require_swarm_admission(&mut self) {
+        self.swarm_admission_required = true;
+    }
+
+    /// Whether this kernel requires swarm admission for every tool call.
+    #[must_use]
+    pub fn swarm_admission_required(&self) -> bool {
+        self.swarm_admission_required
+    }
+
     /// Set the maximum pre-dispatch wait for runtime-admission readiness.
     /// Values must be whole milliseconds, nonzero, and fit the monotonic clock.
     pub fn set_runtime_admission_readiness_timeout(
@@ -1964,13 +1915,6 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub fn set_threshold_approval_requirement_resolver(
-        &mut self,
-        resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
-    ) {
-        self.threshold_approval_requirement_resolver = Some(resolver);
-    }
-
     /// Install the sole trusted parser and verifier for opaque supplemental
     /// authorization artifacts.
     pub fn set_supplemental_quota_verifier(
@@ -1978,6 +1922,17 @@ impl ChioKernel {
         verifier: Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>,
         binding: crate::supplemental_quota::SupplementalQuotaVerifierBinding,
     ) -> Result<(), crate::supplemental_quota::SupplementalQuotaError> {
+        if self
+            .supplemental_admission_participant
+            .as_ref()
+            .is_some_and(|participant| !participant.binding.matches_verifier(&binding))
+        {
+            return Err(
+                crate::supplemental_quota::SupplementalQuotaError::ContextMismatch(
+                    "supplemental participant verifier selection",
+                ),
+            );
+        }
         self.supplemental_quota_verifier = Some(
             crate::supplemental_quota::SupplementalQuotaVerifierRuntime::new(verifier, binding)?,
         );

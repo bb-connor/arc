@@ -1,0 +1,62 @@
+{
+  "schema": "chio.foundation-landing-boundary.v1",
+  "observed_at": "2026-10-08T13:45:56.316239+00:00",
+  "source_before_definition_merge": "0884b8fe2c912ecfa64c82583717d0ecdb4a6bf3",
+  "definition_candidate": "8e689abfa7577100f06302fa78a3d938d305dc4a",
+  "definition_pr": 1195,
+  "definition_status": "published_unmerged_required_checks_pending",
+  "decision_source": {
+    "kind": "operator_ruling_relayed_by_claude",
+    "mailbox": "coord/pr1160:to-codex.md",
+    "entry_utc": "2026-10-08T13:26:46Z"
+  },
+  "merge_requirements": [
+    "Four required GitHub checks on the exact candidate: Build, lint, test; MSRV build and test; cargo-vet; cargo-deny.",
+    "Local qualification and accurate review-thread replies/dispositions, including confirmed exploitable foundation blockers.",
+    "Land #1195 first; prove chosen immutable definition candidate is an ancestor of refreshed main and trusted workflow blobs match before definition authorization or #1160 merge.",
+    "Preserve normal repository protections, histories, branches and all failed or incomplete evidence."
+  ],
+  "post_merge_pre_release_requirements": [
+    {
+      "id": "trusted-35-campaign-capture",
+      "status": "pending_no_valid_current_source_evidence",
+      "acceptance": "Run all 35 campaigns as the seven-shard trusted capture against frozen exact source; validate complete authenticated evidence."
+    },
+    {
+      "id": "per-pr-security-app-enforcement",
+      "status": "pending",
+      "acceptance": "Demonstrate dedicated App and per-PR enforcement, including isolated platform controls and protected configuration."
+    },
+    {
+      "id": "native-mini-swe-and-cold-platform-acceptance",
+      "status": "pending",
+      "acceptance": "Complete actual enforcing native trajectory and remaining cold/platform evidence; retain current OCI diagnostic as nonfinal."
+    }
+  ],
+  "release_permitted": false,
+  "scope": "HAMMER architecture/security trains remain sequential follow-up PRs; confirmed exploitable foundation blockers may interrupt this candidate. No obligation is reported passed by moving its acceptance boundary.",
+  "local_evidence": [
+    {
+      "kind": "whole-security-ci-contract-mutations",
+      "source": "05c990ad0d0091c4a4064005921f4262eca2eef7",
+      "exit_code": 0,
+      "log_sha256": "a6e0f97daafa98e7be22816520f699017f39ddfc7d92038c335642e6b58fd235",
+      "elapsed_seconds": 916.6936
+    },
+    {
+      "kind": "native-readiness-local-gates",
+      "source": "0884b8fe2c912ecfa64c82583717d0ecdb4a6bf3",
+      "gate_count": 7,
+      "all_exit_zero": true,
+      "cp_production_effects_passed": 30,
+      "issuance_passed": 25,
+      "strict_clippy_owners": 8,
+      "negative_assertion_baseline": 1248
+    }
+  ],
+  "nonfinal_native_package_sha256": "082c362342f17514e2086407631e4e697066be5726b12aa58775460291f61f8e",
+  "f013_current_disposition": {
+    "sse_content_type": "Source repaired by published commit0b5f1fd413; prior incoming-review residual is historical.",
+    "cohere_message_end": "Open separate HAMMER-MISC follow-up sub-ask."
+  }
+}

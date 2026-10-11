@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Bindings-friendly invariant helpers for multi-language Chio SDKs.
 //!
 //! This crate intentionally exposes a small surface over `chio-core`:

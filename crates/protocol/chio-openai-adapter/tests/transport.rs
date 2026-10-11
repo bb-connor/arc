@@ -325,10 +325,7 @@ async fn streaming_send_gates_buffered_sse_through_adapter() {
 #[tokio::test]
 async fn upstream_rate_limit_fails_closed_as_rate_limited() {
     let mock = Arc::new(MockHttpTransport::new("mock://openai"));
-    mock.push_error(HttpTransportError::Status {
-        code: 429,
-        body: "rate limit reached".to_string(),
-    });
+    mock.push_error(HttpTransportError::Status { code: 429 });
 
     let transport = OpenAiTransport::with_transport(mock, "org_mock");
     let error = transport
@@ -341,10 +338,7 @@ async fn upstream_rate_limit_fails_closed_as_rate_limited() {
 #[tokio::test]
 async fn upstream_5xx_fails_closed_as_upstream_5xx() {
     let mock = Arc::new(MockHttpTransport::new("mock://openai"));
-    mock.push_error(HttpTransportError::Status {
-        code: 503,
-        body: "service unavailable".to_string(),
-    });
+    mock.push_error(HttpTransportError::Status { code: 503 });
 
     let transport = OpenAiTransport::with_transport(mock, "org_mock");
     let error = transport
@@ -422,7 +416,10 @@ async fn malformed_upstream_body_fails_closed() {
         .send_chat_completions(b"{}")
         .await
         .expect_err("a non-JSON body must fail closed");
-    assert!(matches!(error, ProviderError::Malformed(_)));
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 }
 
 // ---- wiremock: real reqwest HttpTransport end to end ----

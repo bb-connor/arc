@@ -377,6 +377,14 @@ pub enum RuntimeAttestationAppraisalError {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum RuntimeAttestationVerificationError {
+    #[error("runtime attestation evidence is not authenticated by a pinned authority")]
+    UnauthenticatedEvidence,
+    #[error("runtime attestation signer does not match the pinned authority")]
+    UntrustedSigner,
+    #[error("runtime attestation authority signature is invalid")]
+    InvalidSignature,
+    #[error("runtime attestation authority signature verification failed: {0}")]
+    SignatureVerification(#[source] std::sync::Arc<crate::Error>),
     #[error("runtime attestation workload identity is invalid: {0}")]
     InvalidWorkloadIdentity(#[from] WorkloadIdentityError),
     #[error("runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})")]

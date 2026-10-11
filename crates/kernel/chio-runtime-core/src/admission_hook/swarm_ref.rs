@@ -2,18 +2,19 @@ use chio_kernel::ToolCallRequest;
 
 use crate::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(super) struct SwarmAuthorityReference {
     pub task_graph: SwarmEvidenceReference,
     pub continuation_token: SwarmEvidenceReference,
     pub route_plan_receipt: SwarmEvidenceReference,
     pub delegation_witness: SwarmEvidenceReference,
-    pub join_receipt: SwarmEvidenceReference,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub join_receipt: Option<SwarmEvidenceReference>,
     pub revocation_epoch: SwarmEvidenceReference,
     pub budget_pool: SwarmEvidenceReference,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(super) struct SwarmEvidenceReference {
     pub evidence_id: String,
     pub artifact_sha256: String,
@@ -79,12 +80,22 @@ pub(super) fn swarm_ref_from_request(
             "witnessSha256",
         ],
     )?;
-    let join_receipt = required_swarm_evidence_ref(
-        object,
-        &["joinReceipt"],
-        &["joinReceiptId"],
-        &["joinReceiptSha256"],
-    )?;
+    // A direct fan-out has no completed join yet. Presence of any supported
+    // field still requires a well-formed reference, including explicit nulls.
+    // The signed continuation, not caller omission, determines whether a join
+    // is required when binding this reference to verifier-owned authority.
+    let join_receipt = ["joinReceipt", "joinReceiptId", "joinReceiptSha256"]
+        .iter()
+        .any(|field| object.contains_key(*field))
+        .then(|| {
+            required_swarm_evidence_ref(
+                object,
+                &["joinReceipt"],
+                &["joinReceiptId"],
+                &["joinReceiptSha256"],
+            )
+        })
+        .transpose()?;
     let revocation_epoch = required_swarm_evidence_ref(
         object,
         &["revocationEpoch"],

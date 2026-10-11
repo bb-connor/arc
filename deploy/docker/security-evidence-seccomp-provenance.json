@@ -1,0 +1,32 @@
+{
+  "schema": "chio.security-evidence-seccomp.provenance.v1",
+  "upstream": {
+    "repository": "moby/profiles",
+    "commit": "6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef",
+    "path": "seccomp/default.json",
+    "git_blob": "6e5e47e242892aaa290f916ba1045f9213ef0b84",
+    "sha256": "6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6",
+    "url": "https://github.com/moby/profiles/blob/6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef/seccomp/default.json",
+    "license": {
+      "spdx_id": "Apache-2.0",
+      "git_blob": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "path": "LICENSE",
+      "url": "https://github.com/moby/profiles/blob/6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef/LICENSE"
+    }
+  },
+  "profile_sha256": "60eb492e39caacf8686d52f2ca6447045e85989b5aaa3739dbcd24b47f64ddfa",
+  "derivation": {
+    "architecture": "x86_64 only; no compat ABI or extra architecture grant",
+    "capabilities": "CAP_DROP_ALL followed only by CHOWN, SETGID and SETUID for supervisor setup; no upstream capability-dependent syscall allowance is retained.",
+    "deny": "remove all old explicit denylist calls and io_uring from any allow rules",
+    "clone": {
+      "namespace_mask": 2114060416,
+      "required_masked_value": 0
+    },
+    "clone3_errno": 38,
+    "personality": "preserve every upstream argument restriction",
+    "other_rules": "retain current upstream conditional constraints; no unlisted syscall is permitted"
+  },
+  "qualification_requirement": "Genuine designated Linux/X64 supervisor, helpers, exact tests/probes/mutants and cleanup; source tests establish policy only."
+}

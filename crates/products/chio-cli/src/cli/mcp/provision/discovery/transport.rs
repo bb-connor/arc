@@ -1,0 +1,233 @@
+use std::fs::File;
+use std::io::{Read, Write};
+use std::time::{Duration, Instant};
+
+use serde_json::{json, Value};
+
+const MAX_RESPONSE_LINE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_STDERR_BYTES: usize = 64 * 1024;
+
+pub(super) fn exchange_until(
+    mut stdin: File,
+    mut stdout: File,
+    mut stderr: File,
+    deadline: Instant,
+) -> Result<Value, String> {
+    for pipe in [&stdin, &stdout, &stderr] {
+        rustix::fs::fcntl_getfl(pipe)
+            .and_then(|flags| rustix::fs::fcntl_setfl(pipe, flags | rustix::fs::OFlags::NONBLOCK))
+            .map_err(|error| format!("could not make discovery I/O nonblocking: {error}"))?;
+    }
+    let requests = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params": {
+            "protocolVersion":"2025-11-25","capabilities":{},
+            "clientInfo":{"name":"chio-provisioner","version":env!("CARGO_PKG_VERSION")}
+        }}),
+        json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+        json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}),
+    ];
+    let mut request = serde_json::to_vec(&requests[0]).map_err(|error| error.to_string())?;
+    request.push(b'\n');
+    let mut after_initialize = Vec::new();
+    for message in &requests[1..] {
+        serde_json::to_writer(&mut after_initialize, message).map_err(|error| error.to_string())?;
+        after_initialize.push(b'\n');
+    }
+    let mut initialized = false;
+    let mut sent = 0;
+    let mut line = Vec::new();
+    let mut diagnostic = Vec::new();
+    let outcome = loop {
+        if Instant::now() >= deadline {
+            break Err(
+                "the target did not answer tools/list before the discovery deadline".to_string(),
+            );
+        }
+        if sent < request.len() {
+            match stdin.write(&request[sent..]) {
+                Ok(0) => {
+                    break Err("the target closed its input before the MCP handshake".to_string())
+                }
+                Ok(count) => sent += count,
+                Err(error) if retryable(&error) => {}
+                Err(error) => break Err(format!("MCP handshake write failed: {error}")),
+            }
+        }
+        let mut bytes = [0; 8192];
+        if let Ok(count) = stderr.read(&mut bytes) {
+            let retain = count.min(MAX_STDERR_BYTES.saturating_sub(diagnostic.len()));
+            diagnostic.extend_from_slice(&bytes[..retain]);
+        }
+        match stdout.read(&mut bytes) {
+            Ok(0) => {
+                break Err("the target closed its output before answering tools/list".to_string())
+            }
+            Ok(count) => {
+                let mut result = None;
+                for byte in &bytes[..count] {
+                    line.push(*byte);
+                    if line.len() > MAX_RESPONSE_LINE_BYTES {
+                        result = Some(Err("MCP response exceeds the size limit".to_string()));
+                        break;
+                    }
+                    if *byte == b'\n' {
+                        match parse_message(&line) {
+                            Ok(None) => line.clear(),
+                            Ok(Some(DiscoveryReply::Initialized)) if !initialized => {
+                                initialized = true;
+                                request.extend_from_slice(&after_initialize);
+                                line.clear();
+                            }
+                            Ok(Some(DiscoveryReply::Tools(tools))) if initialized => {
+                                result = Some(Ok(tools));
+                                break;
+                            }
+                            Ok(Some(_)) => {
+                                result =
+                                    Some(Err("out-of-order MCP discovery response".to_string()));
+                                break;
+                            }
+                            Err(error) => {
+                                result = Some(Err(error));
+                                break;
+                            }
+                        }
+                    }
+                }
+                if let Some(result) = result {
+                    break result;
+                }
+            }
+            Err(error) if retryable(&error) => {
+                // No reader thread can outlive the deadline, even if a demo
+                // descendant retains a pipe after its parent exits.
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            Err(error) => break Err(format!("MCP response read failed: {error}")),
+        }
+    };
+    outcome.map_err(|error| {
+        if diagnostic.is_empty() {
+            error
+        } else {
+            format!(
+                "{error}; target stderr: {}",
+                String::from_utf8_lossy(&diagnostic).trim()
+            )
+        }
+    })
+}
+
+fn retryable(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+    )
+}
+
+enum DiscoveryReply {
+    Initialized,
+    Tools(Value),
+}
+
+fn parse_message(line: &[u8]) -> Result<Option<DiscoveryReply>, String> {
+    if line.iter().all(u8::is_ascii_whitespace) {
+        return Ok(None);
+    }
+    let message: Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(line, MAX_RESPONSE_LINE_BYTES)
+            .and_then(|input| input.decode_document())
+            .map_err(|error| format!("the target sent invalid JSON-RPC: {error}"))?;
+    let id = message.get("id").and_then(Value::as_u64);
+    if !matches!(id, Some(1 | 2)) {
+        return Ok(None);
+    }
+    if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
+        || message.get("method").is_some()
+        || message.get("result").is_some() == message.get("error").is_some()
+    {
+        return Err("invalid JSON-RPC discovery response".to_string());
+    }
+    if message.get("error").is_some() {
+        return Err("the target rejected MCP discovery".to_string());
+    }
+    if id == Some(2) {
+        return message
+            .get("result")
+            .and_then(|result| result.get("tools"))
+            .filter(|tools| tools.is_array())
+            .cloned()
+            .map(|tools| Some(DiscoveryReply::Tools(tools)))
+            .ok_or_else(|| "the tools/list response carries no tools array".to_string());
+    }
+    if !message.get("result").is_some_and(Value::is_object) {
+        return Err("the initialize response carries no result".to_string());
+    }
+    Ok(Some(DiscoveryReply::Initialized))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+
+    #[test]
+    fn discovery_rejects_ambiguous_unversioned_and_conflicting_replies() {
+        for raw in [
+            r#"{"jsonrpc":"2.0","id":1,"id":2,"result":{"tools":[]}}"#,
+            r#"{"id":2,"result":{"tools":[]}}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"tools":[]},"error":null}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"tools":{}}}"#,
+        ] {
+            assert!(parse_message(raw.as_bytes()).is_err(), "{raw}");
+        }
+        assert!(matches!(
+            parse_message(br#"{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}"#),
+            Ok(Some(DiscoveryReply::Tools(_)))
+        ));
+    }
+
+    #[test]
+    fn blocked_handshake_and_open_descendant_pipes_respect_the_deadline() -> std::io::Result<()> {
+        let (mut stdin, _silent_target) = UnixStream::pair()?;
+        stdin.set_nonblocking(true)?;
+        while stdin.write(&[0; 8192]).is_ok() {}
+        let (stdout, _descendant_stdout) = UnixStream::pair()?;
+        let (stderr, _descendant_stderr) = UnixStream::pair()?;
+        let started = Instant::now();
+        let outcome = exchange_until(
+            File::from(OwnedFd::from(stdin)),
+            File::from(OwnedFd::from(stdout)),
+            File::from(OwnedFd::from(stderr)),
+            started + Duration::from_millis(20),
+        );
+        assert!(
+            matches!(outcome, Err(ref error) if error.contains("discovery deadline")),
+            "{outcome:?}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+        Ok(())
+    }
+    #[test]
+    fn expired_launch_deadline_is_not_reset_for_the_mcp_handshake() -> std::io::Result<()> {
+        let (stdin, _input) = UnixStream::pair()?;
+        let (stdout, _output) = UnixStream::pair()?;
+        let (stderr, _error) = UnixStream::pair()?;
+        let outcome = exchange_until(
+            File::from(OwnedFd::from(stdin)),
+            File::from(OwnedFd::from(stdout)),
+            File::from(OwnedFd::from(stderr)),
+            Instant::now(),
+        );
+        assert!(
+            matches!(outcome, Err(ref error) if error.contains("discovery deadline")),
+            "{outcome:?}"
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "transport/document_tests.rs"]
+mod document_tests;

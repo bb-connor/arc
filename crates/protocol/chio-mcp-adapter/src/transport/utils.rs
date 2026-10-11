@@ -1,14 +1,16 @@
-use std::io::{BufRead, Write};
+#[cfg(test)]
+use std::io::BufRead;
+use std::io::Write;
+#[cfg(test)]
 use std::process::Command;
 use std::time::Duration;
 
 use chio_core::session::CreateElicitationOperation;
 use chio_kernel::KernelError;
-use chrono::{SecondsFormat, Utc};
 use serde_json::json;
-use tracing::debug;
 
 use crate::edge::AdapterError;
+#[cfg(test)]
 use crate::framing::read_jsonrpc_frame;
 
 pub(super) const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
@@ -17,6 +19,46 @@ pub(super) const TASK_POLL_INTERVAL_MILLIS: u64 = 500;
 pub(super) const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
 pub(super) const MAX_STDIO_MCP_BUFFERED_MESSAGES: usize = 128;
 pub(super) const RELATED_TASK_META_KEY: &str = "io.modelcontextprotocol/related-task";
+/// `_meta` keys a `tools/call` carries when the kernel dispatches with an
+/// identity. `chioRequestId` is the key a Chio edge already treats as the
+/// caller's stable request identity, so a Chio-to-Chio hop deduplicates on
+/// the upstream operation id; the remaining keys name the attempt for
+/// servers that record provenance.
+pub(super) const DISPATCH_REQUEST_ID_META_KEY: &str = "chioRequestId";
+pub(super) const DISPATCH_OPERATION_ID_META_KEY: &str = "chioOperationId";
+pub(super) const DISPATCH_ATTEMPT_ID_META_KEY: &str = "chioAttemptId";
+pub(super) const DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: &str = "chioTransportKeyEpoch";
+/// Caller binding on the kernel-owned stdio pipe. This is not a wire credential.
+pub(super) const CALLER_CAPABILITY_META_KEY: &str = "chioCallerCapabilitySha256";
+
+/// The `tools/call` params for a tool, with the dispatch identity in `_meta`
+/// when the kernel provided one.
+pub(super) fn tool_call_params(
+    tool_name: &str,
+    arguments: serde_json::Value,
+    context: Option<&chio_kernel::ToolDispatchContext>,
+) -> serde_json::Value {
+    let mut params = json!({
+        "name": tool_name,
+        "arguments": arguments,
+    });
+    if let (Some(context), Some(object)) = (context, params.as_object_mut()) {
+        object.insert(
+            "_meta".to_string(),
+            json!({
+                DISPATCH_REQUEST_ID_META_KEY: context.idempotency_key(),
+                DISPATCH_OPERATION_ID_META_KEY: context.operation_id(),
+                DISPATCH_ATTEMPT_ID_META_KEY: context.attempt_id(),
+                DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: context.transport_key_epoch(),
+            }),
+        );
+        if let Some(caller) = context.caller_capability_sha256() {
+            object["_meta"][CALLER_CAPABILITY_META_KEY] = json!(caller);
+        }
+    }
+    params
+}
+#[cfg(test)]
 pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_AUTH_TOKEN",
     "CHIO_ADMIN_TOKEN",
@@ -24,8 +66,14 @@ pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_MCP_ADMIN_TOKEN",
     "CHIO_CONFORMANCE_AUTH_TOKEN",
     "CHIO_CONFORMANCE_ADMIN_TOKEN",
+    "CHIO_CONTROL_TOKEN",
+    "CHIO_SIDECAR_CONTROL_TOKEN",
+    "CHIO_API_PROTECT_CONTROL_TOKEN",
+    "CHIO_SIEM_WEBHOOK_BEARER_TOKEN",
+    "CHIO_TRUST_SERVICE_TOKEN",
 ];
 
+#[cfg(test)]
 pub(super) fn remove_chio_auth_env(command: &mut Command) {
     for key in CHIO_AUTH_ENV_VARS {
         command.env_remove(key);
@@ -71,14 +119,8 @@ pub(super) fn parse_create_elicitation_operation(
     }
 
     serde_json::from_value(normalized).map_err(|error| {
-        AdapterError::ParseError(format!(
-            "failed to parse elicitation/create params: {error}"
-        ))
+        AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
     })
-}
-
-pub(super) fn iso8601_now() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 pub(super) fn build_related_task_meta(
@@ -182,7 +224,6 @@ pub(super) fn send_line(
 ) -> Result<(), AdapterError> {
     let line = serde_json::to_string(value)
         .map_err(|e| AdapterError::ParseError(format!("failed to serialize JSON-RPC: {e}")))?;
-    debug!("-> {line}");
     writer
         .write_all(line.as_bytes())
         .map_err(|e| AdapterError::ConnectionFailed(format!("failed to write to stdin: {e}")))?;
@@ -223,7 +264,52 @@ pub(super) fn jsonrpc_request_id_label(request_id: &serde_json::Value) -> String
 }
 
 /// Read a single newline-terminated JSON line from the reader.
+#[cfg(test)]
 pub(super) fn read_line(reader: &mut impl BufRead) -> Result<serde_json::Value, AdapterError> {
     read_jsonrpc_frame(reader)?
         .ok_or_else(|| AdapterError::ConnectionFailed("MCP server closed stdout (EOF)".into()))
+}
+
+#[cfg(test)]
+mod dispatch_identity_tests {
+    use super::*;
+    use chio_core::provider_attempt::ProviderAttemptBindingV1;
+    use chio_kernel::ToolDispatchContext;
+
+    fn context() -> ToolDispatchContext {
+        ToolDispatchContext::new(
+            "request-7",
+            ProviderAttemptBindingV1 {
+                operation_id: "a".repeat(64),
+                attempt_id: format!("attempt:{}", "a".repeat(64)),
+                transport_id: "kernel-tool-server:mcp-fs".into(),
+                transport_key_epoch: 3,
+            },
+        )
+    }
+
+    #[test]
+    fn plain_calls_carry_no_metadata() {
+        let params = tool_call_params("read_file", json!({"path": "/tmp/x"}), None);
+        assert_eq!(
+            params,
+            json!({"name": "read_file", "arguments": {"path": "/tmp/x"}})
+        );
+    }
+
+    #[test]
+    fn dispatch_identity_rides_in_meta() {
+        let params = tool_call_params("read_file", json!({"path": "/tmp/x"}), Some(&context()));
+        assert_eq!(params["name"], "read_file");
+        assert_eq!(params["arguments"], json!({"path": "/tmp/x"}));
+        let meta = &params["_meta"];
+        assert_eq!(meta[DISPATCH_REQUEST_ID_META_KEY], "a".repeat(64));
+        assert_eq!(meta[DISPATCH_OPERATION_ID_META_KEY], "a".repeat(64));
+        assert_eq!(
+            meta[DISPATCH_ATTEMPT_ID_META_KEY],
+            format!("attempt:{}", "a".repeat(64))
+        );
+        assert_eq!(meta[DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY], 3);
+        assert_eq!(meta.as_object().map(|object| object.len()), Some(4));
+    }
 }

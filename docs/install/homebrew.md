@@ -1,12 +1,15 @@
 # Homebrew Formula For Chio
 
-Chio is pre-release and does not currently publish a Homebrew formula. Build
-from source until a tagged release includes a `chio.rb` release asset.
+Use Homebrew only after the exact accepted tag includes a `chio.rb` release
+asset. This page does not establish current formula publication or acceptance.
+The formula is not covered by the detached archive signature checks; use
+[VERIFY.md](VERIFY.md) to authenticate a native archive before installation.
 
 ## One-line Install After A Tagged Release
 
 ```bash
-curl -fsSL -o /tmp/chio.rb https://github.com/backbay-labs/chio/releases/latest/download/chio.rb
+TAG=v0.1.1-rc.1
+curl -fsSL -o /tmp/chio.rb "https://github.com/bb-connor/arc/releases/download/${TAG}/chio.rb"
 brew install --formula /tmp/chio.rb
 ```
 
@@ -20,7 +23,8 @@ archives when a release is cut.
 ## Upgrading After A Tagged Release
 
 ```bash
-curl -fsSL -o /tmp/chio.rb https://github.com/backbay-labs/chio/releases/latest/download/chio.rb
+TAG=v0.1.1-rc.1
+curl -fsSL -o /tmp/chio.rb "https://github.com/bb-connor/arc/releases/download/${TAG}/chio.rb"
 brew upgrade --formula /tmp/chio.rb
 ```
 

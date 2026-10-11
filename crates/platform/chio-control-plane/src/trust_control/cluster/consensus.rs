@@ -16,6 +16,7 @@ pub(crate) async fn handle_internal_cluster_status(
             "cluster replication is not configured",
         );
     };
+    let signing_custody = super::authority_evidence::refresh_signing_custody_on_lane(&state).await;
     let (consensus, authority_lease) = cluster_consensus_and_authority_lease_view(&state)
         .unwrap_or_else(|| {
             (
@@ -115,6 +116,7 @@ pub(crate) async fn handle_internal_cluster_status(
         quorum_size: consensus.quorum_size,
         reachable_nodes: consensus.reachable_nodes,
         election_term: consensus.election_term,
+        signing_custody,
         authority_lease,
         replication,
         peers,
@@ -123,9 +125,12 @@ pub(crate) async fn handle_internal_cluster_status(
     .into_response()
 }
 
+const UNPINNED_CLUSTER_AUTHORITY: &str = "clustered trust control requires an out-of-band pinned authority replication anchor in --authority-db; initialize it on the signing custodian with `chio federation authority replication-init` and pin it on every follower with `chio federation authority replication-pin` before starting";
+
 pub(crate) fn build_cluster_state(
     config: &TrustServiceConfig,
     local_addr: SocketAddr,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<Option<Arc<Mutex<ClusterRuntimeState>>>, CliError> {
     config.validate()?;
     if !config.peer_urls.is_empty() && config.authority_seed_path.is_some() {
@@ -159,7 +164,17 @@ pub(crate) fn build_cluster_state(
     let mut persisted_term = 0u64;
     let mut persisted_leader_url = None;
     if let Some(path) = config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
+        let authority = SqliteCapabilityAuthority::open_with_clock_and_replication_policy(
+            path,
+            clock,
+            config.authority_replication_clock_policy()?,
+        )?;
+        // Clustered authority replicates only as envelopes verified against an
+        // anchor provisioned out of band. Without one every authority sync is
+        // refused, so the node must not start.
+        if authority.pinned_replication_anchor()?.is_none() {
+            return Err(CliError::cli_other_error(UNPINNED_CLUSTER_AUTHORITY));
+        }
         let status = authority.status()?;
         let fence = authority.cluster_fence()?;
         if fence.authority_generation == status.generation
@@ -187,7 +202,13 @@ pub(crate) fn build_cluster_state(
         last_leader_url: persisted_leader_url,
         term_started_at: None,
         lease_expires_at: None,
-        lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
+        lease_ttl_ms: u64::try_from(authority_lease_ttl(config.cluster_sync_interval).as_millis())
+            .map_err(|_| {
+                CliError::cli_other_error(
+                    "authority lease duration exceeds milliseconds field".to_owned(),
+                )
+            })?,
+        signing_custody: false,
     }))))
 }
 
@@ -216,6 +237,7 @@ pub(crate) fn cluster_authority_lease_view_locked(
     cluster: &mut ClusterRuntimeState,
     consensus: &ClusterConsensusView,
 ) -> Option<ClusterAuthorityLeaseView> {
+    let clock_now = unix_timestamp_now().ok()?;
     let leader_url = consensus.leader_url.clone()?;
     let lease_epoch = consensus.election_term;
     let lease_id = format!("{leader_url}#term-{lease_epoch}");
@@ -231,7 +253,7 @@ pub(crate) fn cluster_authority_lease_view_locked(
         lease_valid: consensus.has_quorum
             && cluster
                 .lease_expires_at
-                .is_some_and(|expires_at| expires_at >= unix_timestamp_now()),
+                .is_some_and(|expires_at| expires_at >= clock_now),
     })
 }
 
@@ -311,6 +333,110 @@ pub(crate) fn cluster_consensus_view(state: &TrustServiceState) -> Option<Cluste
     cluster_consensus_and_authority_lease_view(state).map(|(consensus, _)| consensus)
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct ClusterAuthorityReadContext {
+    pub(crate) self_url: String,
+    pub(crate) leader_url: String,
+    pub(crate) election_term: u64,
+}
+
+#[derive(Clone)]
+pub(crate) enum ClusterAuthorityServingEvidence {
+    ElectedLeader {
+        quorum_size: usize,
+        agreements: Vec<AuthorityAgreementConfirmation>,
+    },
+    ConfirmedFollower {
+        envelope_digest: String,
+    },
+}
+
+#[derive(Clone)]
+pub(crate) struct ClusterAuthorityReadRole {
+    pub(crate) context: ClusterAuthorityReadContext,
+    pub(crate) evidence: ClusterAuthorityServingEvidence,
+    pub(crate) refused_history_commitments: Vec<String>,
+}
+
+pub(crate) fn cluster_authority_read_role(
+    state: &TrustServiceState,
+) -> Option<ClusterAuthorityReadRole> {
+    let cluster = state.cluster.as_ref()?;
+    let mut guard = cluster.lock().ok()?;
+    let view = compute_cluster_consensus_locked(&mut guard);
+    if !view.has_quorum {
+        return None;
+    }
+    let leader = view.leader_url?;
+    let context = ClusterAuthorityReadContext {
+        self_url: view.self_url.clone(),
+        leader_url: leader.clone(),
+        election_term: view.election_term,
+    };
+    if guard.peers.values().any(|peer| {
+        peer.authority_refused_history
+            .as_ref()
+            .is_some_and(AuthorityHistoryWitness::has_conflict)
+    }) {
+        return None;
+    }
+    let refused_history_commitments = guard
+        .peers
+        .values()
+        .filter_map(|peer| {
+            peer.authority_refused_history
+                .as_ref()
+                .map(|witness| witness.head().to_string())
+        })
+        .collect();
+    let evidence = if leader == view.self_url {
+        let lease_seconds = Duration::from_millis(guard.lease_ttl_ms).as_secs().max(1);
+        let observed_now = guard.lease_expires_at?.saturating_sub(lease_seconds);
+        let mut agreements = Vec::new();
+        for peer in guard.peers.values() {
+            let contact_is_fresh = peer
+                .last_contact_at
+                .is_some_and(|at| observed_now <= at.saturating_add(lease_seconds));
+            if peer.partitioned
+                || !peer.health.is_reachable()
+                || !contact_is_fresh
+                || peer.authority_error.is_some()
+            {
+                continue;
+            }
+            if let Some(agreement) = peer.authority_agreement_confirmation.as_ref() {
+                if agreement.leader_url == leader && agreement.election_term == view.election_term {
+                    agreements.push(agreement.clone());
+                }
+            }
+        }
+        if agreements.len().checked_add(1)? < view.quorum_size {
+            return None;
+        }
+        ClusterAuthorityServingEvidence::ElectedLeader {
+            quorum_size: view.quorum_size,
+            agreements,
+        }
+    } else {
+        let peer = guard.peers.get(&leader)?;
+        if peer.authority_error.is_some() || !peer.health.is_reachable() || peer.partitioned {
+            return None;
+        }
+        let confirmation = peer.authority_import_confirmation.as_ref()?;
+        if confirmation.leader_url != leader || confirmation.election_term != view.election_term {
+            return None;
+        }
+        ClusterAuthorityServingEvidence::ConfirmedFollower {
+            envelope_digest: confirmation.envelope_digest.clone(),
+        }
+    };
+    Some(ClusterAuthorityReadRole {
+        context,
+        evidence,
+        refused_history_commitments,
+    })
+}
+
 pub(crate) fn cluster_consensus_and_authority_lease_view(
     state: &TrustServiceState,
 ) -> Option<(ClusterConsensusView, Option<ClusterAuthorityLeaseView>)> {
@@ -333,23 +459,28 @@ pub(crate) fn cluster_consensus_and_authority_lease_view(
 pub(crate) fn compute_cluster_consensus_locked(
     cluster: &mut ClusterRuntimeState,
 ) -> ClusterConsensusView {
-    let now = unix_timestamp_now();
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(_) => return unavailable_cluster_consensus(cluster),
+    };
+    let now = clock_now;
     let lease_ttl_secs = Duration::from_millis(cluster.lease_ttl_ms).as_secs().max(1);
     let quorum_size = cluster.peers.len().div_ceil(2) + 1;
-    let mut candidates = vec![cluster.self_url.clone()];
+    // Signing custodians outrank lower URLs. Rank grants no serving authority.
+    let mut candidates = vec![(!cluster.signing_custody, cluster.self_url.clone())];
     for (peer_url, peer_state) in &cluster.peers {
         let contact_is_fresh = peer_state
             .last_contact_at
             .is_some_and(|last_contact_at| now <= last_contact_at.saturating_add(lease_ttl_secs));
         if peer_state.health.is_reachable() && !peer_state.partitioned && contact_is_fresh {
-            candidates.push(peer_url.clone());
+            candidates.push((!peer_state.signing_custody, peer_url.clone()));
         }
     }
     candidates.sort();
     let reachable_nodes = candidates.len();
     let has_quorum = reachable_nodes >= quorum_size;
     let leader_url = if has_quorum {
-        candidates.first().cloned()
+        candidates.into_iter().next().map(|(_, url)| url)
     } else {
         None
     };
@@ -380,6 +511,21 @@ pub(crate) fn compute_cluster_consensus_locked(
         has_quorum,
         quorum_size,
         reachable_nodes,
+        election_term: cluster.election_term,
+    }
+}
+
+fn unavailable_cluster_consensus(cluster: &mut ClusterRuntimeState) -> ClusterConsensusView {
+    cluster.lease_expires_at = None;
+    cluster.term_started_at = None;
+    cluster.last_leader_url = None;
+    ClusterConsensusView {
+        self_url: cluster.self_url.clone(),
+        leader_url: None,
+        role: "candidate",
+        has_quorum: false,
+        quorum_size: cluster.peers.len().div_ceil(2) + 1,
+        reachable_nodes: 1,
         election_term: cluster.election_term,
     }
 }

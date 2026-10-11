@@ -443,6 +443,30 @@ fn verified_rotation(
     .unwrap_or_else(|error| panic!("verify exact completed slot: {error}"));
     assert_eq!(completed.proof(), &proof);
 
+    let aliased = FrostAnchoredAuthorizationSlot {
+        checkpoint: anchored.checkpoint.clone(),
+        authorization_blob: Some(
+            serde_json::to_vec_pretty(&proof)
+                .unwrap_or_else(|error| panic!("pretty proof: {error}")),
+        ),
+    };
+    assert!(matches!(
+        verify_completed_frost_authorization_slot(
+            &proof.body,
+            &active,
+            &EpochAnchor(governance_checkpoint.clone()),
+            &aliased,
+            &trust_store(),
+            &bound_checkpoint_digest,
+            200,
+        ),
+        Err(
+            chio_federation::frost::FrostAuthorizationSlotTransitionError::Invalid(
+                "completed slot authorization bytes are not valid JSON"
+            )
+        )
+    ));
+
     let mut wrong_predecessor = slot.clone();
     wrong_predecessor.predecessor_digest = Some("ff".repeat(32));
     wrong_predecessor.anchor_signature = slot_authority()

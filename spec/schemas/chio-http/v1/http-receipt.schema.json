@@ -77,7 +77,8 @@
       "enum": [
         "caller_executed",
         "host_executed_provider_reported",
-        "host_executed_unmediated"
+        "host_executed_unmediated",
+        "chio_internal"
       ],
       "description": "Where the protected effect executes relative to Chio."
     },

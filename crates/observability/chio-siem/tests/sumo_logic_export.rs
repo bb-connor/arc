@@ -90,10 +90,7 @@ async fn sumo_json_posts_ndjson_with_sumo_headers() {
     assert_eq!(lines.len(), 2, "should be 2 NDJSON lines");
     let parsed: serde_json::Value = serde_json::from_str(lines[0]).expect("valid json");
     assert_eq!(
-        parsed
-            .get("receipt")
-            .and_then(|r| r.get("id"))
-            .and_then(|v| v.as_str()),
+        parsed.get("receipt_id").and_then(|v| v.as_str()),
         Some(first_id.as_str())
     );
 }

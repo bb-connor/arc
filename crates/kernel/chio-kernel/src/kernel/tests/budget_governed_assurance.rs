@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn governed_monetary_denial_without_required_runtime_assurance_consumes_no_budget() {
     let mut kernel = make_kernel(make_monetary_config());
@@ -13,13 +14,20 @@ fn governed_monetary_denial_without_required_runtime_assurance_consumes_no_budge
         .unwrap();
 
     let request_id = "req-governed-assurance-deny";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-assurance-deny",
         "cost-srv",
         "compute",
         "execute governed payout",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -44,6 +52,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_consumes_no_budge
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -89,6 +98,13 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
         "USD",
     );
     intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -113,6 +129,7 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -147,6 +164,13 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
         "USD",
     );
     intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -171,6 +195,7 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -235,6 +260,13 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             })),
         },
     );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1002" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -259,6 +291,7 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -273,76 +306,92 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
 }
 
 #[test]
-fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
-    let agent_kp = Keypair::generate();
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+fn governed_monetary_denies_unsigned_matching_attestation_without_effects() {
+    for attestation in [
+        make_trusted_azure_runtime_attestation(),
+        make_trusted_google_runtime_attestation(),
+        make_trusted_nitro_runtime_attestation(),
+    ] {
+        let mut kernel = make_kernel(make_monetary_config());
+        kernel.set_attestation_trust_policy(make_attestation_trust_policy());
+        let agent_kp = Keypair::generate();
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        kernel.register_tool_server(Box::new(CountingMonetaryServer {
+            id: "cost-srv".to_owned(),
+            invocations: invocations.clone(),
+        }));
 
-    let grant = with_minimum_runtime_assurance(
-        make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
-        RuntimeAssuranceTier::Verified,
-    );
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
+        let grant = with_minimum_runtime_assurance(
+            make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
+            RuntimeAssuranceTier::Verified,
+        );
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
 
-    let request_id = "req-governed-assurance-verified";
-    let mut intent = make_governed_intent(
-        "intent-governed-assurance-verified",
-        "cost-srv",
-        "compute",
-        "execute governed payout",
-        100,
-        "USD",
-    );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent_kp.public_key(),
-        &intent,
-        request_id,
-    );
+        let request_id = "req-governed-assurance-verified";
+        let mut intent = make_governed_intent(
+            "intent-governed-assurance-verified",
+            "cost-srv",
+            "compute",
+            "execute governed payout",
+            100,
+            "USD",
+        );
+        intent.runtime_attestation = Some(attestation);
+        bind_test_tool_approval(
+            &mut kernel,
+            &cap,
+            &serde_json::json!({ "invoice_id": "inv-1003" }),
+            request_id,
+            &mut intent,
+        );
+        let approval_token = make_governed_approval_token(
+            &kernel.config.keypair,
+            &agent_kp.public_key(),
+            &intent,
+            request_id,
+        );
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-1003" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
+        let response = kernel
+            .evaluate_tool_call_blocking(&ToolCallRequest {
+                request_id: request_id.to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({ "invoice_id": "inv-1003" }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: Some(intent),
+                approval_token: Some(approval_token),
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
+                supplemental_authorization: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+                declassification_grant: None,
+            })
+            .unwrap();
 
-    assert_eq!(response.verdict, Verdict::Allow);
-    let governed = response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("governed_transaction"))
-        .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
-    assert_eq!(governed["runtime_assurance"]["verifierFamily"], "azure_maa");
-    assert_eq!(
-        governed["runtime_assurance"]["verifier"],
-        "https://maa.contoso.test"
-    );
-    assert_eq!(
-        governed["runtime_assurance"]["workloadIdentity"]["trustDomain"],
-        "chio"
-    );
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
+        assert!(response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("authenticated")));
+        let tier = response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("governed_transaction"))
+            .and_then(|governed| governed.get("runtime_assurance"))
+            .and_then(|assurance| assurance.get("tier"))
+            .and_then(serde_json::Value::as_str);
+        assert_ne!(tier, Some("verified"));
+    }
 }
-
 #[test]
 fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured() {
     let mut kernel = make_kernel(make_monetary_config());
@@ -367,6 +416,13 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
     let mut attestation = make_trusted_azure_runtime_attestation();
     attestation.verifier = "https://maa.untrusted.test".to_string();
     intent.runtime_attestation = Some(attestation);
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1004" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -391,6 +447,7 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -404,145 +461,33 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
     );
 }
 
-#[test]
-fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
-    let agent_kp = Keypair::generate();
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-
-    let grant = with_minimum_runtime_assurance(
-        make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
-        RuntimeAssuranceTier::Verified,
-    );
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    let request_id = "req-governed-assurance-google-verified";
-    let mut intent = make_governed_intent(
-        "intent-governed-assurance-google-verified",
-        "cost-srv",
-        "compute",
-        "execute governed payout",
-        100,
-        "USD",
-    );
-    intent.runtime_attestation = Some(make_trusted_google_runtime_attestation());
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent_kp.public_key(),
-        &intent,
-        request_id,
-    );
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-1005" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
-
-    assert_eq!(response.verdict, Verdict::Allow);
-    let governed = response
-        .receipt
-        .metadata
+fn signed_record_for_autonomy_policy_unit_test(
+    kernel: &ChioKernel,
+    request: &ToolCallRequest,
+    now: u64,
+) -> chio_appraisal::VerifiedRuntimeAttestationRecord {
+    let authority = Keypair::generate();
+    let evidence = request
+        .governed_intent
         .as_ref()
-        .and_then(|metadata| metadata.get("governed_transaction"))
-        .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
-    assert_eq!(
-        governed["runtime_assurance"]["verifierFamily"],
-        "google_attestation"
-    );
+        .unwrap()
+        .runtime_attestation
+        .as_ref()
+        .unwrap();
+    let signed =
+        chio_core::receipt::lineage::SignedExportEnvelope::sign(evidence.clone(), &authority)
+            .unwrap();
+    chio_appraisal::verify_signed_runtime_attestation_record(
+        &signed,
+        &authority.public_key(),
+        kernel.attestation_trust_policy.as_ref(),
+        now,
+    )
+    .unwrap()
 }
 
 #[test]
-fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
-    let agent_kp = Keypair::generate();
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-
-    let grant = with_minimum_runtime_assurance(
-        make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
-        RuntimeAssuranceTier::Verified,
-    );
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    let request_id = "req-governed-assurance-nitro-verified";
-    let mut intent = make_governed_intent(
-        "intent-governed-assurance-nitro-verified",
-        "cost-srv",
-        "compute",
-        "execute governed payout",
-        100,
-        "USD",
-    );
-    intent.runtime_attestation = Some(make_trusted_nitro_runtime_attestation());
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent_kp.public_key(),
-        &intent,
-        request_id,
-    );
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-1006" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
-
-    assert_eq!(response.verdict, Verdict::Allow);
-    let governed = response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("governed_transaction"))
-        .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
-    assert_eq!(governed["runtime_assurance"]["verifierFamily"], "aws_nitro");
-    assert_eq!(
-        governed["runtime_assurance"]["verifier"],
-        "https://nitro.aws.example"
-    );
-    assert_eq!(
-        governed["runtime_assurance"]["evidenceSha256"],
-        "digest-nitro-attestation"
-    );
-}
-
-#[test]
-fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
+fn governed_autonomy_policy_denies_delegated_autonomy_without_bond_attachment() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
@@ -574,6 +519,13 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         GovernedAutonomyTier::Delegated,
         None,
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-bond-1" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -581,35 +533,59 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         request_id,
     );
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-bond-1" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
-
+    let request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice_id": "inv-bond-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response
         .reason
         .as_deref()
-        .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") }));
+        .is_some_and(|reason| reason.contains("authenticated")));
+    assert!(kernel
+        .budget_store
+        .get_usage(&request.capability.id, 0)
+        .unwrap()
+        .is_none());
+
+    // This pure policy check cannot authorize the public dispatch above. It
+    // preserves bond/tier validation coverage with an authenticated fixture.
+    let now = current_unix_timestamp();
+    let verified = signed_record_for_autonomy_policy_unit_test(&kernel, &request, now);
+    let validation = kernel.validate_governed_autonomy(
+        &request,
+        &request.capability,
+        request.governed_intent.as_ref().unwrap(),
+        Some(GovernedAutonomyTier::Delegated),
+        Some(&verified),
+        now,
+    );
+    let error = validation.unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("requires a delegation bond attachment"),
+        "{error}"
+    );
 }
 
 #[test]
-fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
+fn governed_autonomy_policy_denies_autonomous_tier_with_weak_runtime_assurance() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attested_attestation_trust_policy());
     let agent_kp = Keypair::generate();
@@ -641,6 +617,13 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
         GovernedAutonomyTier::Autonomous,
         Some("bond-required"),
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-bond-2" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -648,35 +631,57 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
         request_id,
     );
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-bond-2" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
-
+    let request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice_id": "inv-bond-2" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.reason.as_deref().is_some_and(|reason| {
-        reason.contains("runtime attestation tier 'Attested'")
-            && reason.contains("below required 'Verified'")
-    }));
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("authenticated")));
+    assert!(kernel
+        .budget_store
+        .get_usage(&request.capability.id, 0)
+        .unwrap()
+        .is_none());
+
+    // This pure policy check cannot authorize the public dispatch above. It
+    // preserves bond/tier validation coverage with an authenticated fixture.
+    let now = current_unix_timestamp();
+    let verified = signed_record_for_autonomy_policy_unit_test(&kernel, &request, now);
+    let validation = kernel.validate_governed_autonomy(
+        &request,
+        &request.capability,
+        request.governed_intent.as_ref().unwrap(),
+        Some(GovernedAutonomyTier::Autonomous),
+        Some(&verified),
+        now,
+    );
+    let error = validation.unwrap_err();
+    assert!(
+        error.to_string().contains("below required 'Verified'"),
+        "{error}"
+    );
 }
 
 #[test]
-fn governed_request_denies_delegated_autonomy_with_expired_bond() {
+fn governed_autonomy_policy_denies_delegated_autonomy_with_expired_bond() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
@@ -725,6 +730,13 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         GovernedAutonomyTier::Delegated,
         Some(&bond_id),
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-bond-3" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -732,35 +744,54 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         request_id,
     );
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-bond-3" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
-
+    let request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice_id": "inv-bond-3" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response
         .reason
         .as_deref()
-        .is_some_and(|reason| reason.contains("is expired")));
+        .is_some_and(|reason| reason.contains("authenticated")));
+    assert!(kernel
+        .budget_store
+        .get_usage(&request.capability.id, 0)
+        .unwrap()
+        .is_none());
+
+    // This pure policy check cannot authorize the public dispatch above. It
+    // preserves bond/tier validation coverage with an authenticated fixture.
+    let now = current_unix_timestamp();
+    let verified = signed_record_for_autonomy_policy_unit_test(&kernel, &request, now);
+    let validation = kernel.validate_governed_autonomy(
+        &request,
+        &request.capability,
+        request.governed_intent.as_ref().unwrap(),
+        Some(GovernedAutonomyTier::Delegated),
+        Some(&verified),
+        now,
+    );
+    let error = validation.unwrap_err();
+    assert!(error.to_string().contains("is expired"), "{error}");
 }
 
 #[test]
-fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metadata() {
+fn governed_autonomy_policy_accepts_signed_active_bond_while_unsigned_dispatch_denies() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
@@ -809,6 +840,13 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
         GovernedAutonomyTier::Delegated,
         Some(&bond_id),
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-bond-4" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -816,36 +854,49 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
         request_id,
     );
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "invoice_id": "inv-bond-4" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent),
-            approval_token: Some(approval_token),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })
-        .unwrap();
+    let request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice_id": "inv-bond-4" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("authenticated")));
+    assert!(kernel
+        .budget_store
+        .get_usage(&request.capability.id, 0)
+        .unwrap()
+        .is_none());
 
-    assert_eq!(response.verdict, Verdict::Allow);
-    let governed = response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("governed_transaction"))
-        .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["autonomy"]["tier"], "delegated");
-    assert_eq!(governed["autonomy"]["delegationBondId"], bond_id);
-    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
+    // This pure policy check cannot authorize the public dispatch above. It
+    // preserves bond/tier validation coverage with an authenticated fixture.
+    let now = current_unix_timestamp();
+    let verified = signed_record_for_autonomy_policy_unit_test(&kernel, &request, now);
+    let validation = kernel.validate_governed_autonomy(
+        &request,
+        &request.capability,
+        request.governed_intent.as_ref().unwrap(),
+        Some(GovernedAutonomyTier::Delegated),
+        Some(&verified),
+        now,
+    );
+    validation.unwrap();
 }
 
 #[test]
@@ -859,13 +910,21 @@ fn governed_monetary_denial_without_approval_consumes_no_budget_and_records_inte
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-deny",
         "cost-srv",
         "compute",
         "execute governed payout",
         100,
         "USD",
+    );
+
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        "req-governed-deny",
+        &mut intent,
     );
 
     let response = kernel
@@ -885,6 +944,7 @@ fn governed_monetary_denial_without_approval_consumes_no_budget_and_records_inte
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -937,13 +997,20 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
         .unwrap();
 
     let request_id = "req-governed-incomplete";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-incomplete",
         "stream",
         "stream_file",
         "stream governed artifact",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "path": "/tmp/governed.txt" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -969,6 +1036,7 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1042,13 +1110,20 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
         .unwrap();
 
     let request_id = "req-governed-x402";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-x402",
         "cost-srv",
         "compute",
         "purchase premium API result",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "sku": "dataset-pro" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -1077,6 +1152,7 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1159,13 +1235,20 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
         .unwrap();
 
     let request_id = "req-governed-x402-deny";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-x402-deny",
         "cost-srv",
         "compute",
         "purchase premium API result",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "sku": "dataset-pro" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -1191,6 +1274,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1268,7 +1352,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
         .unwrap();
 
     let request_id = "req-governed-acp";
-    let intent = make_governed_acp_intent(GovernedAcpIntentFixture {
+    let mut intent = make_governed_acp_intent(GovernedAcpIntentFixture {
         id: "intent-governed-acp",
         server: "commerce-srv",
         tool: "compute",
@@ -1279,6 +1363,13 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
         units: 100,
         currency: "USD",
     });
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "sku": "merchant-result-pro" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1303,6 +1394,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1321,9 +1413,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
     assert!(authorize_request.contains("\"payee\":\"merchant.example\""));
     assert!(authorize_request.contains("\"seller\":\"merchant.example\""));
     assert!(authorize_request.contains("\"sharedPaymentTokenId\":\"spt_live_governed\""));
-    assert!(
-        authorize_request.contains("\"settlementDestinationRef\":\"acct:merchant-primary\"")
-    );
+    assert!(authorize_request.contains("\"settlementDestinationRef\":\"acct:merchant-primary\""));
     let expected_payee_binding_digest =
         chio_credit::obligation::derive_obligation_payee_binding_digest(
             "merchant.example",
@@ -1444,7 +1534,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
         .unwrap();
 
     let request_id = "req-governed-acp-seller-mismatch";
-    let intent = make_governed_acp_intent(GovernedAcpIntentFixture {
+    let mut intent = make_governed_acp_intent(GovernedAcpIntentFixture {
         id: "intent-governed-acp-seller-mismatch",
         server: "commerce-srv",
         tool: "compute",
@@ -1455,6 +1545,13 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
         units: 100,
         currency: "USD",
     });
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "sku": "merchant-result-pro" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1479,6 +1576,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1558,7 +1656,7 @@ fn governed_acp_value_requires_signed_destination_authority() {
         let cap = kernel
             .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
             .unwrap();
-        let intent = make_governed_acp_intent(GovernedAcpIntentFixture {
+        let mut intent = make_governed_acp_intent(GovernedAcpIntentFixture {
             id: request_id,
             server: "commerce-srv",
             tool: "compute",
@@ -1569,6 +1667,13 @@ fn governed_acp_value_requires_signed_destination_authority() {
             units: 100,
             currency: "USD",
         });
+        bind_test_tool_approval(
+            &mut kernel,
+            &cap,
+            &serde_json::json!({ "sku": "merchant-result-pro" }),
+            request_id,
+            &mut intent,
+        );
         let approval_token = include_approval.then(|| {
             make_governed_approval_token(
                 &kernel.config.keypair,
@@ -1595,6 +1700,7 @@ fn governed_acp_value_requires_signed_destination_authority() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+                declassification_grant: None,
             })
             .unwrap();
 

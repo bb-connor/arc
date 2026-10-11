@@ -1,0 +1,40 @@
+{
+  "schema": "chio.final-review-document-reconciliation.v1",
+  "observed_utc": "2026-10-09T20:27:13.146194+00:00",
+  "source_review": "63ae9a4f5c7349f2248656dc1dc180625fbdc7d1",
+  "findings": [
+    "FINAL-F05",
+    "FINAL-F06",
+    "FINAL-F07",
+    "FINAL-F08"
+  ],
+  "host_alias_redactions": [
+    {
+      "path": "docs/security/audits/receipt-snapshot-capacity-20261009.json",
+      "prior_sha256": "85c38b8dfb095960392f34b37ec781cabe247b2e47fa710fa6fb0380c0fd1356",
+      "current_sha256": "90ec0ba6ef443c11b575e6c9b3a7aa928be353450581ff8b7947a363ee9c8aad",
+      "prior_source_commit": "8f3dfac6b66b79ae04b745475a1a410000dbe06a"
+    },
+    {
+      "path": "docs/security/audits/receipt-late-lineage-qualification-20261009.json",
+      "prior_sha256": "f399f1e753781693ebb79854b4751025194575565a1c5dd936f080415436a004",
+      "current_sha256": "234979f2cb126e551b12180d4ac60f5029ff78681a1f04e8aab553b9fadd0917",
+      "prior_source_commit": "8f3dfac6b66b79ae04b745475a1a410000dbe06a"
+    },
+    {
+      "path": "docs/reviews/2026-10-09-pr1160-landing-review.md",
+      "prior_sha256": "d96c51d8b3a4aa3b97cf3bd021ddacccfe63bf768771a5217cf50f5706bd358d",
+      "current_sha256": "7a78ff61ac075f7b6f582429d2cf5bd9d1bf9365194205c956a2cd9bb34e5265",
+      "prior_source_commit": "8f3dfac6b66b79ae04b745475a1a410000dbe06a"
+    }
+  ],
+  "historical_binding_rule": "Earlier evidence pins remain historical and can be recovered at prior_source_commit. The listed new hashes bind the redacted current copies. No runtime evidence was changed.",
+  "numbering_disposition": {
+    "V13": "duplicate consolidated into V10",
+    "V14": "duplicate consolidated into V11",
+    "V15": "duplicate consolidated into V12"
+  },
+  "proof_boundary": "Encoding noncollision remains UNPROVED, separate from ASSUME-SHA256. The retained domain uses P-256 fixtures and does not establish production Ed25519 kernel-key binding.",
+  "merged": false,
+  "hosted_qualified": false
+}

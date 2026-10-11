@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum RevocationStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 

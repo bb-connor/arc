@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 import respx
-from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
+from chio_sdk.client import ChioClient
 from chio_sdk.errors import ChioValidationError
 from chio_sdk.models_approvals import (
     ApprovalVerdict,
@@ -15,6 +15,46 @@ from chio_sdk.models_approvals import (
 )
 
 BASE = "http://127.0.0.1:9090"
+
+
+@pytest.mark.asyncio
+async def test_mock_rejects_id_only_approval_submission():
+    from chio_sdk.testing import MockChioClient
+
+    client = MockChioClient()
+    with pytest.raises(ChioValidationError, match="a full signed capability is required"):
+        await client.submit_for_approval(
+            capability_id="cap-1", tool_name="run_command", tool_args={}
+        )
+    assert await client.list_pending_approvals() == []
+
+
+@pytest.mark.asyncio
+async def test_mock_rejects_unsigned_approval_without_resolving_pending():
+    from chio_sdk.testing import MockChioClient
+
+    client = MockChioClient()
+    client._pending_approvals = {"ap-1": _pending_dict()}
+    with pytest.raises(ChioValidationError, match="an approver-signed token is required"):
+        await client.respond_approval("ap-1", "approve")
+    assert (await client.get_approval("ap-1")).pending is not None
+
+
+def _signed_vote(outcome: str = "approved") -> dict:
+    return {
+        "id": "vote-1", "approver": "aa" * 32, "subject": "bb" * 32,
+        "request_id": "ap-1", "governed_intent_hash": "cc" * 32,
+        "issued_at": 1, "expires_at": 301, "decision": outcome,
+        "signature": "dd" * 64,
+    }
+
+
+def _signed_capability() -> dict:
+    return {
+        "id": "cap-1", "subject": "bb" * 32, "issuer": "ee" * 32,
+        "issued_at": 1, "expires_at": 601, "scope": {"grants": []},
+        "signature": "ff" * 64,
+    }
 
 
 def _pending_dict(approval_id: str = "ap-1") -> dict:
@@ -95,7 +135,7 @@ async def test_get_approval_rejects_empty_id():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_respond_approval_posts_operator_endpoint_with_string_verdict():
+async def test_respond_approval_posts_signed_token_with_string_verdict():
     captured: dict = {}
 
     def _handler(request: httpx.Request) -> httpx.Response:
@@ -110,13 +150,14 @@ async def test_respond_approval_posts_operator_endpoint_with_string_verdict():
             },
         )
 
-    respx.post(f"{BASE}/approvals/ap-1/operator-respond").mock(side_effect=_handler)
+    respx.post(f"{BASE}/approvals/ap-1/respond").mock(side_effect=_handler)
     client = ChioClient(BASE)
-    response = await client.respond_approval("ap-1", "approve", reason="ok")
+    response = await client.respond_approval("ap-1", "approve", reason="ok", signed_token=_signed_vote())
     await client.close()
 
-    assert captured["url"].endswith("/approvals/ap-1/operator-respond")
-    assert captured["body"] == {"outcome": "approved", "reason": "ok"}
+    assert captured["url"].endswith("/approvals/ap-1/respond")
+    assert captured["body"] == {"outcome": "approved", "reason": "ok",
+                                 "approver": "aa" * 32, "token": _signed_vote()}
     assert response.outcome is ApprovalVerdict.APPROVED
     assert response.resolved_at == 4242
 
@@ -124,7 +165,7 @@ async def test_respond_approval_posts_operator_endpoint_with_string_verdict():
 @pytest.mark.asyncio
 @respx.mock
 async def test_respond_approval_accepts_enum_verdict():
-    respx.post(f"{BASE}/approvals/ap-1/operator-respond").mock(
+    respx.post(f"{BASE}/approvals/ap-1/respond").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -135,7 +176,7 @@ async def test_respond_approval_accepts_enum_verdict():
         )
     )
     client = ChioClient(BASE)
-    response = await client.respond_approval("ap-1", ApprovalVerdict.DENIED)
+    response = await client.respond_approval("ap-1", ApprovalVerdict.DENIED, signed_token=_signed_vote("denied"))
     await client.close()
     assert response.outcome is ApprovalVerdict.DENIED
 
@@ -150,7 +191,7 @@ async def test_respond_approval_rejects_unknown_verdict_string():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_submit_for_approval_hashes_args_and_returns_id():
+async def test_submit_for_approval_sends_full_arguments_and_signed_capability():
     captured: dict = {}
 
     def _handler(request: httpx.Request) -> httpx.Response:
@@ -168,9 +209,8 @@ async def test_submit_for_approval_hashes_args_and_returns_id():
     respx.post(f"{BASE}/approvals/submit").mock(side_effect=_handler)
     client = ChioClient(BASE)
     args = {"command": "rm -rf old_build"}
-    expected_hash = _sha256_hex(_canonical_json(args))
     approval_id = await client.submit_for_approval(
-        capability_id="cap-1",
+        capability=_signed_capability(),
         tool_name="run_command",
         tool_args=args,
         requested_by="bb" * 32,
@@ -181,10 +221,11 @@ async def test_submit_for_approval_hashes_args_and_returns_id():
 
     assert approval_id == "ap-new-1"
     body = captured["body"]
-    assert body["capability_id"] == "cap-1"
+    assert body["capability"] == _signed_capability()
     assert body["tool_server"] == "shell"
     assert body["tool_name"] == "run_command"
-    assert body["parameter_hash"] == expected_hash
+    assert body["parameters"] == {"command": "rm -rf old_build"}
+    assert "parameter_hash" not in body
     assert body["requested_by"] == "bb" * 32
     assert body["ttl_seconds"] == 600
     assert body["triggered_by"] == ["shell.requires_approval"]
@@ -222,3 +263,72 @@ def test_approval_verdict_from_action_normalisation():
     assert ApprovalVerdict.from_action("REJECT") is ApprovalVerdict.DENIED
     with pytest.raises(ValueError):
         ApprovalVerdict.from_action("something-else")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_ap23_submit_requires_full_signed_capability():
+    route = respx.post(f"{BASE}/approvals/submit").mock(
+        return_value=httpx.Response(201, json={
+            "approval_id": "ap-1", "expires_at": 3600, "created_at": 1,
+            "trusted_approvers": [],
+        })
+    )
+    async with ChioClient(BASE) as client:
+        with pytest.raises(ChioValidationError):
+            await client.submit_for_approval(
+                capability_id="cap-1", tool_name="effect", tool_args={"value": "A"},
+                requested_by="ab" * 32,
+            )
+    assert not route.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_ap23_respond_requires_approver_signed_token():
+    route = respx.post(f"{BASE}/approvals/ap-1/respond").mock(
+        return_value=httpx.Response(200, json={
+            "approval_id": "ap-1", "outcome": "approved", "resolved_at": 1,
+        })
+    )
+    async with ChioClient(BASE) as client:
+        with pytest.raises(ChioValidationError):
+            await client.respond_approval("ap-1", "approve")
+    assert not route.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_configured_control_bearer_authenticates_approval_workflow_only():
+    seen: dict[str, str | None] = {}
+
+    def record(payload):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen[request.url.path] = request.headers.get("authorization")
+            return httpx.Response(200, json=payload)
+        return handler
+
+    respx.get(f"{BASE}/approvals/pending").mock(side_effect=record({"approvals": []}))
+    respx.get(f"{BASE}/approvals/ap-1").mock(side_effect=record({"pending": _pending_dict()}))
+    respx.post(f"{BASE}/approvals/submit").mock(side_effect=record({
+        "approval_id": "ap-1", "created_at": 1, "expires_at": 301, "trusted_approvers": ["aa" * 32],
+    }))
+    respx.post(f"{BASE}/approvals/ap-1/respond").mock(side_effect=record({
+        "approval_id": "ap-1", "outcome": "approved", "resolved_at": 1,
+    }))
+    respx.post(f"{BASE}/v1/evaluate").mock(side_effect=record({"status": "deny"}))
+    async with ChioClient(BASE, control_token="approval-control") as client:
+        await client.list_pending_approvals()
+        await client.get_approval("ap-1")
+        await client.submit_for_approval(capability=_signed_capability(), requested_by="bb" * 32,
+                                         tool_name="run_command", tool_args={"command": "true"})
+        await client.respond_approval("ap-1", "approve", signed_token=_signed_vote())
+        await client.evaluate_tool_call_mediated(capability=_signed_capability(),
+                                                tool_server="shell", tool_name="run_command", parameters={})
+    assert seen == {
+        "/approvals/pending": "Bearer approval-control",
+        "/approvals/ap-1": "Bearer approval-control",
+        "/approvals/submit": "Bearer approval-control",
+        "/approvals/ap-1/respond": "Bearer approval-control",
+        "/v1/evaluate": None,
+    }

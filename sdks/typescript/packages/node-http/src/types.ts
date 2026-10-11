@@ -83,7 +83,7 @@ export interface HttpReceipt {
   receipt_kind: "mediated_decision" | "trace_observation" | "advisory_evaluation";
   boundary_class: "prevent" | "detect_only" | "advisory_only";
   observation_outcome?: "observed" | "evaluated" | "dropped" | undefined;
-  tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated";
+  tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated" | "chio_internal";
   redaction_mode: "none" | "summary" | "redacted";
   actor_chain?: Array<Record<string, unknown>> | undefined;
   evidence: GuardEvidence[];

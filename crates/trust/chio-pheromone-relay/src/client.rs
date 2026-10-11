@@ -59,7 +59,7 @@ impl PheromoneRelayClient {
             payload: batch,
             keypair: &self.keypair,
         })?;
-        let response = self
+        let mut response = self
             .client
             .post(url)
             .json(&request)
@@ -69,18 +69,26 @@ impl PheromoneRelayClient {
             .map_err(|error| PheromoneRelayError::TransportError(error.to_string()))?;
         if !response.status().is_success() {
             let status = response.status();
-            let detail = response
-                .text()
-                .await
-                .unwrap_or_else(|error| error.to_string());
             return Err(PheromoneRelayError::TransportError(format!(
-                "relay POST failed with {status}: {detail}"
+                "relay POST failed with {status}"
             )));
         }
-        response
-            .json::<PheromoneReceiveReport>()
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
             .await
-            .map_err(|error| PheromoneRelayError::Json(error.to_string()))
+            .map_err(|error| PheromoneRelayError::TransportError(error.without_url().to_string()))?
+        {
+            if chunk.len() > crate::input::MAX_DOCUMENT_BYTES.saturating_sub(bytes.len()) {
+                return Err(chio_core_types::canonical::UntrustedJsonError::TooLarge {
+                    bytes: bytes.len().saturating_add(chunk.len()),
+                    bound: crate::input::MAX_DOCUMENT_BYTES,
+                }
+                .into());
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        crate::decode_delivery_report(&bytes, batch, Some(sender_kernel_id))
     }
 
     #[must_use]

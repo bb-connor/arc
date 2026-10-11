@@ -28,7 +28,7 @@ struct A2aOAuthClientCredentials {
 struct A2aCachedBearerToken {
     cache_key: String,
     access_token: String,
-    expires_at: Option<SystemTime>,
+    deadline: AuthorityDeadline,
 }
 
 #[derive(Debug, Clone)]
@@ -61,10 +61,10 @@ struct A2aTransportConfig {
     egress_contract: Option<HttpEgressContract>,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct A2aAdapterConfig {
     agent_card_url: String,
+    clock: ClockSource,
     public_key: String,
     request_headers: Vec<A2aRequestHeader>,
     request_query_params: Vec<A2aRequestQueryParam>,
@@ -88,6 +88,7 @@ impl A2aAdapterConfig {
     pub fn new(agent_card_url: impl Into<String>, public_key: impl Into<String>) -> Self {
         Self {
             agent_card_url: agent_card_url.into(),
+            clock: ClockSource::default(),
             public_key: public_key.into(),
             request_headers: Vec::new(),
             request_query_params: Vec::new(),
@@ -104,6 +105,13 @@ impl A2aAdapterConfig {
             task_registry_path: None,
             egress_contract: None,
         }
+    }
+
+    /// Share the trusted clock with the authority owner before discovery.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = ClockSource(clock);
+        self
     }
 
     /// Set the typed [`HttpEgressContract`] that gates every outbound A2A
@@ -149,7 +157,12 @@ impl A2aAdapterConfig {
     ) -> Self {
         let header_name = header_name.into();
         let sensitive = is_sensitive_redirect_header(header_name.as_str());
-        upsert_request_header(&mut self.request_headers, header_name, value.into(), sensitive);
+        upsert_request_header(
+            &mut self.request_headers,
+            header_name,
+            value.into(),
+            sensitive,
+        );
         self
     }
 
@@ -159,7 +172,12 @@ impl A2aAdapterConfig {
         header_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        upsert_request_header(&mut self.request_headers, header_name.into(), value.into(), true);
+        upsert_request_header(
+            &mut self.request_headers,
+            header_name.into(),
+            value.into(),
+            true,
+        );
         self
     }
 
@@ -312,7 +330,10 @@ impl A2aAdapterConfig {
         }
         if let Some(credentials) = self.oauth_client_credentials.as_ref() {
             validate_oauth_client_credential("OAuth client id", &credentials.client_id)?;
-            validate_oauth_client_credential("OAuth client credential", &credentials.client_secret)?;
+            validate_oauth_client_credential(
+                "OAuth client credential",
+                &credentials.client_secret,
+            )?;
         }
         Ok(())
     }
@@ -385,9 +406,7 @@ fn validate_header_value(field: &str, value: &str) -> Result<(), AdapterError> {
 fn validate_url_component_name(field: &str, value: &str) -> Result<(), AdapterError> {
     if value.is_empty()
         || value.trim() != value
-        || value
-            .chars()
-            .any(|character| character.is_ascii_control())
+        || value.chars().any(|character| character.is_ascii_control())
     {
         return Err(AdapterError::AuthNegotiation(format!(
             "invalid A2A {field} in configuration"
@@ -399,9 +418,7 @@ fn validate_url_component_name(field: &str, value: &str) -> Result<(), AdapterEr
 fn validate_url_auth_value(field: &str, value: &str) -> Result<(), AdapterError> {
     if value.is_empty()
         || value.trim() != value
-        || value
-            .chars()
-            .any(|character| character.is_ascii_control())
+        || value.chars().any(|character| character.is_ascii_control())
     {
         return Err(AdapterError::AuthNegotiation(format!(
             "invalid A2A {field} in configuration"

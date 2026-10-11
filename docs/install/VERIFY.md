@@ -1,229 +1,192 @@
 # Verifying Chio Release Artifacts
 
-This document is the consumer-facing verification recipe for every Chio
-release artifact. Every distribution channel attaches Sigstore keyless
-signatures (`.sig` + `.pem`) produced by GitHub Actions OIDC; consumers
-verify those signatures against the upstream workflow identity.
+The release signer policy is **`bb-connor/arc`**, with the GitHub Actions OIDC
+issuer **`https://token.actions.githubusercontent.com`**. This repository and
+owner were confirmed through GitHub's repository API on 2026-10-02. A fork,
+renamed repository or future organization transfer requires a reviewed policy
+change. Consumers must not substitute an owner supplied by a download site.
 
-The signature scheme is identical across channels: a detached
-[cosign](https://github.com/sigstore/cosign) signature plus a Fulcio
-short-lived certificate. The Rust verification crate
-[`crates/trust/chio-attest-verify`](../../crates/trust/chio-attest-verify/README.md)
-consumes the same trust root and identity
-contract; CLI consumers can fall back to `cosign verify-blob` directly.
+The release workflows produce detached cosign signatures (`.sig`) and Fulcio
+certificates (`.pem`). These instructions describe the signed pipeline. They do
+not establish that any historical release ran through that pipeline, or that a
+candidate is published or accepted. An older release without both sidecars fails
+verification; do not install it by bypassing verification.
 
-## What you need
+## Exact signer policy
 
-Pin tooling versions to a known-good release before verifying a
-production artifact:
+Each artifact family uses one workflow and the **exact tag selected by the
+consumer**, including prerelease and build metadata when present:
 
-| Tool | Version | Source |
+| Artifact family | Workflow | Permitted tag shape |
 |---|---|---|
-| `cosign` | `v2.4.x` or newer | https://github.com/sigstore/cosign/releases |
-| `gh` (optional) | latest | https://github.com/cli/cli/releases |
+| Native archive or signed checksum index | `release-binaries.yml` | `v<semver>` |
+| PyPI wheel or sdist | `release-pypi.yml` | `py/v<semver>` or `py/<slug>-v<semver>` |
+| npm tarball | `release-npm.yml` | `ts/v<semver>` or `ts/<slug>-v<semver>` |
 
-Or, if you already have Chio installed, the `chio attest verify`
-subcommand wraps `chio_attest_verify::SigstoreVerifier` and avoids the
-external `cosign` install. See the crate
-[README](../../crates/trust/chio-attest-verify/README.md) for the trait
-surface (`verify_bundle`, `verify_blob`, `verify_bytes`).
+For example, the native tag `v0.1.1-rc.1` requires this literal certificate SAN:
 
-## OIDC identity contract
+```text
+https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1
+```
 
-Every `cosign verify-blob` invocation below pins the same two pieces of
-identity:
+A certificate for another tag, source commit, branch, owner, repository or
+workflow fails even if its signature is otherwise valid. Consumers must pin the
+full source commit independently of the downloaded artifact and certificate.
+Selecting a fleet tag does not authorize a
+package-specific tag, or the reverse. Registry trusted publisher settings are
+separate operator configuration; they do not replace this consumer policy.
 
-- `--certificate-oidc-issuer "https://token.actions.githubusercontent.com"`
-  asserts that the Fulcio certificate was issued to a GitHub Actions
-  workflow run.
-- `--certificate-identity-regexp "^https://github\.com/<owner>/chio/\.github/workflows/<workflow>\.yml@refs/tags/<tag-pattern>$"`
-  asserts that the workflow run was the release lane producing this
-  artifact, against a tag matching the release schema.
+## Executable verification command
 
-These two assertions together prove the artifact was built by the
-upstream Chio release workflow on a tag-triggered run, not by some
-other workflow or some other repository fork. The
-`chio-attest-verify` crate enforces the same regex contract for
-in-process verification.
+Use Python 3 and cosign **v2.4.1**, matching the workflows. Run from a trusted
+checkout of the reviewed source. The script is part of the verifier's trust
+boundary; do not fetch it from the artifact's untrusted download location.
 
-Replace `<owner>` with the GitHub org/user that hosts the release you
-are verifying (e.g. `backbay-industries`).
+[`scripts/verify-release-identity.py`](../../scripts/verify-release-identity.py)
+validates tag syntax, chooses the workflow from the artifact family and invokes
+`cosign verify-blob` with `--certificate-identity`,
+`--certificate-oidc-issuer` and `--certificate-github-workflow-sha`. Cosign compares
+the supplied source SHA with the signed GitHub workflow SHA certificate extension
+(`1.3.6.1.4.1.57264.1.3`). Identity and source commit are compared literally. The
+script has no repository override and leaves public Fulcio chain, SCT and Rekor
+checks enabled.
+See the [pinned cosign command reference](https://github.com/sigstore/cosign/blob/v2.4.1/doc/cosign_verify-blob.md)
+and [Sigstore verification guidance](https://docs.sigstore.dev/cosign/verifying/verify/).
 
-## Verifying a PyPI artifact
+Set `CHIO_CHECKOUT` to the trusted checkout, `CHANNEL` to `binaries`, `pypi` or
+`npm`, `TAG` to the exact tag, `SOURCE_SHA` to the full lowercase 40-character
+source commit from independently trusted release qualification, and `ARTIFACT`
+to the downloaded file. Obtain the expected SHA from the accepted source record
+or a reviewed, trusted checkout. A mutable tag lookup, artifact metadata or the
+certificate being verified cannot supply this expectation: a tag can be moved
+after an earlier run signs different source bytes. Place its
+nonempty `.sig` and `.pem` siblings in the same directory, then run:
 
-PyPI hosts the sdist and wheel; the corresponding `.sig` (cosign
-signature) and `.pem` (Fulcio leaf certificate) live on the GitHub
-Release attached to the same `py/...` tag.
+<!-- release-verification-command -->
+```bash
+python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
+```
+
+A nonzero exit denies use of the artifact. Missing, empty or corrupt signing
+material, a mismatched issuer, signer identity or source commit, a missing source
+certificate extension, and changed artifact bytes must fail. The source SHA is
+required; the verifier never infers it from the certificate. Do not add flags
+that skip certificate or transparency verification.
+
+To inspect the literal identity before verification:
 
 ```bash
-export OWNER="<owner>"            # e.g. backbay-industries
-export VERSION="<version>"        # e.g. 0.2.0
-export PKG="<distribution>"       # e.g. chio-crewai
-export PKG_FILE_VERSION="${PKG//-/_}-${VERSION}"
-
-# 1. Download the wheel from PyPI (or sdist via pip download --no-binary :all:)
-pip download --no-deps --dest . "${PKG}==${VERSION}"
-
-# 2. Download the matching cosign signature + cert from the GitHub
-# Release. The release tag is the meta tag (py/v<VERSION>) for full-fleet
-# releases or the slug-specific tag (py/<PKG>-v<VERSION>) for one-off
-# bumps. Adjust the tag below to match how the release was cut.
-gh release download "py/v${VERSION}" --repo "${OWNER}/chio" \
-    --pattern "${PKG_FILE_VERSION}-py3-none-any.whl.sig" \
-    --pattern "${PKG_FILE_VERSION}-py3-none-any.whl.pem"
-
-# 3. Verify the wheel signature against the release-pypi.yml workflow
-# identity. The regex anchors against either tag shape (meta or
-# slug-specific) on a semver-shaped version.
-cosign verify-blob \
-    --signature   "${PKG_FILE_VERSION}-py3-none-any.whl.sig" \
-    --certificate "${PKG_FILE_VERSION}-py3-none-any.whl.pem" \
-    --certificate-identity-regexp \
-        "^https://github\.com/${OWNER}/chio/\.github/workflows/release-pypi\.yml@refs/tags/py/(${PKG}-)?v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$" \
-    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    "${PKG_FILE_VERSION}-py3-none-any.whl"
+python3 scripts/verify-release-identity.py identity \
+  --channel binaries --tag v0.1.1-rc.1
 ```
 
-`cosign verify-blob` exits non-zero if any of the following fail:
+## Download examples
 
-- Signature does not match the artifact bytes.
-- Fulcio certificate does not chain to the embedded TUF trust root.
-- Certificate's SAN does not match the identity regex.
-- Issuer in the certificate does not match the OIDC issuer.
-- Rekor inclusion proof is absent or invalid (default mode contacts
-  the public-good Rekor instance; pass `--insecure-ignore-tlog` only in
-  tightly controlled offline scenarios).
+The versions below illustrate naming; they do not assert these signed releases
+exist. For unpublished drafts, downloading also requires maintainer access.
+Select the actual intended release tag and independently accepted source commit
+before fetching. Each example requires `SOURCE_SHA` to be set to that commit.
 
-To verify the sdist instead of the wheel, swap the `.whl` filename for
-`.tar.gz` in steps 1, 2, and 3.
-
-### Multi-package fleet releases
-
-A meta tag (`py/v<VERSION>`) signs every Chio Python distribution at
-the same `<VERSION>`. The cosign certificate carries the workflow run
-identity, not the package slug, so the same regex above matches every
-distribution under that tag.
-
-For a slug-specific tag (`py/<PKG>-v<VERSION>`), narrow the regex
-alternation to only the slug shape:
+### Native archive
 
 ```bash
---certificate-identity-regexp \
-    "^https://github\.com/${OWNER}/chio/\.github/workflows/release-pypi\.yml@refs/tags/py/${PKG}-v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$"
+CHIO_CHECKOUT="$PWD"
+CHANNEL=binaries
+TAG=v0.1.1-rc.1
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
+ARTIFACT=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
+
+gh release download "$TAG" --repo bb-connor/arc \
+  --pattern "$ARTIFACT" --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
+python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
-## Verifying an npm tarball
+Verify each target separately. A signed checksum index uses the same `binaries`
+channel and exact tag. Checksums alone provide no signer authentication.
 
-npm hosts the published tarball under the registry; a copy of the
-exact byte-for-byte tarball plus its `.sig` and `.pem` is attached to
-the GitHub Release for the `ts/...` tag. Verify against either copy.
+### PyPI wheel or sdist
 
 ```bash
-export OWNER="<owner>"            # e.g. backbay-industries
-export VERSION="<version>"        # e.g. 0.2.0
-export PKG="<slug>"               # e.g. express
-# The published distribution name is @chio-protocol/${PKG}; the npm
-# tarball naming convention drops the scope and uses a hyphen:
-#   @chio-protocol/express -> chio-protocol-express-${VERSION}.tgz
-export TARBALL="chio-protocol-${PKG}-${VERSION}.tgz"
+CHIO_CHECKOUT="$PWD"
+CHANNEL=pypi
+TAG=py/chio-crewai-v0.2.0
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
+ARTIFACT=chio_crewai-0.2.0-py3-none-any.whl
 
-# 1. Fetch the tarball + signature + cert from the GitHub Release.
-gh release download "ts/v${VERSION}" --repo "${OWNER}/chio" \
-    --pattern "${TARBALL}" \
-    --pattern "${TARBALL}.sig" \
-    --pattern "${TARBALL}.pem"
-
-# 2. Verify against the release-npm.yml workflow identity.
-cosign verify-blob \
-    --signature   "${TARBALL}.sig" \
-    --certificate "${TARBALL}.pem" \
-    --certificate-identity-regexp \
-        "^https://github\.com/${OWNER}/chio/\.github/workflows/release-npm\.yml@refs/tags/ts/(${PKG}-)?v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$" \
-    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    "${TARBALL}"
+pip download --no-deps --dest . 'chio-crewai==0.2.0'
+gh release download "$TAG" --repo bb-connor/arc \
+  --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
+python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
-The same exit-code semantics as the PyPI recipe apply.
+Use the actual wheel filename. An sdist uses its `.tar.gz` filename and sidecars.
+For a fleet release, set `TAG=py/v0.2.0` explicitly instead.
 
-### Verifying the npm registry copy
+### npm tarball
 
-npm publishes provenance attestations via `--provenance`. The cosign
-keyless signature is complementary, not redundant: provenance binds
-the published version to a workflow identity at the registry layer,
-while cosign binds the actual tarball bytes. To verify both, fetch the
-tarball directly from the registry (`npm pack @chio-protocol/<slug>`)
-and re-run step 2 with the registry copy in place of the GitHub
-Release copy. Bytes should match between the two sources; if they do
-not, the registry has been tampered with.
+```bash
+CHIO_CHECKOUT="$PWD"
+CHANNEL=npm
+TAG=ts/express-v0.2.0
+: "${SOURCE_SHA:?Set the independently accepted full source commit}"
+ARTIFACT=chio-protocol-express-0.2.0.tgz
 
-## In-process verification (Rust callers)
-
-Rust callers should consume the
-[`chio_attest_verify`](../../crates/trust/chio-attest-verify/README.md)
-crate rather than shelling out to `cosign`. The crate exposes a single
-`AttestVerifier` trait with three methods:
-
-- `verify_bundle` -- strongest assertion, full keyless flow against
-  the embedded Fulcio trust root including Rekor log-entry consistency.
-- `verify_blob` -- detached `(artifact, signature, leaf-cert)` triple.
-- `verify_bytes` -- in-memory variant of `verify_blob`.
-
-The `verify_blob` and `verify_bytes` paths perform certificate-chain
-validation against Fulcio, OIDC issuer match, identity SAN regex
-match, certificate validity-window check, and signature verification.
-They map directly onto the `cosign verify-blob` invocation above with
-the same `ExpectedIdentity` (issuer + identity regex).
-
-```rust
-use chio_attest_verify::{AttestVerifier, ExpectedIdentity, SigstoreVerifier};
-
-let verifier = SigstoreVerifier::with_embedded_root()?;
-let expected = ExpectedIdentity {
-    certificate_identity_regexp:
-        r"^https://github\.com/backbay-industries/chio/\.github/workflows/release-pypi\.yml@refs/tags/py/(chio-crewai-)?v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$"
-            .into(),
-    certificate_oidc_issuer:
-        "https://token.actions.githubusercontent.com".into(),
-};
-let claims = verifier.verify_blob(
-    artifact_path,
-    signature_bytes,
-    leaf_cert_bytes,
-    &expected,
-)?;
+gh release download "$TAG" --repo bb-connor/arc \
+  --pattern "$ARTIFACT" --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
+python3 "${CHIO_CHECKOUT}/scripts/verify-release-identity.py" verify \
+  --channel "$CHANNEL" --tag "$TAG" --source-sha "$SOURCE_SHA" --artifact "$ARTIFACT"
 ```
 
-The crate ships the Sigstore Public Good Instance trust root in tree
-under `crates/trust/chio-attest-verify/sigstore-root/` and refreshes it
-quarterly via the trust-root re-bake job.
+Use the actual `npm pack` filename. For a fleet release, set `TAG=ts/v0.2.0`
+explicitly. To verify registry bytes, fetch the exact package version with
+`npm pack @chio-protocol/express@0.2.0`, then run the same command on that tarball
+with the release sidecars. A byte mismatch fails; investigate the cause rather
+than accepting a different file. npm provenance is a separate registry check.
 
-## Failure mode (fail-closed)
+## Local executable documentation checks
 
-Every step above is fail-closed: a non-zero exit from `cosign
-verify-blob`, or a returned `AttestError` from `chio_attest_verify`,
-means the artifact does not satisfy the keyless attestation contract.
-Drop the artifact on the floor and re-fetch from a clean source. Do
-not retry verification after manually trimming the signature, the
-certificate, or the artifact bytes; any of those mutations make the
-verification meaningless.
+```bash
+python3 scripts/tests/release-identity.test.py
+```
 
-## Channel inventory (current scope)
+This test executes the marked command above through real cosign v2.4.1. It
+creates local EC signatures and CA-issued certificates carrying the expected SAN
+and OIDC issuer and source SHA extensions. The isolated test adapter supplies
+that local CA and disables SCT/Rekor checks because the fixtures have no public
+log entries. Those
+options exist only in the test adapter; the production verifier exposes no bypass.
+The test covers all three artifact families, wrong owner/repository/workflow/tag,
+a branch identity, wrong OIDC issuer, wrong/missing source SHA, invalid or omitted
+expected SHA, missing/empty/corrupt sidecars and altered bytes. It executes every
+active verification example in the installation docs against a wrong-source
+certificate. CI runs it in [`release-identity-check.yml`](../../.github/workflows/release-identity-check.yml).
 
-| Channel | Workflow | Tag schema | Sig location |
-|---|---|---|---|
-| PyPI sdist + wheel | `.github/workflows/release-pypi.yml` | `py/v<X.Y.Z>` or `py/<slug>-v<X.Y.Z>` | GitHub Release |
-| npm tarball | `.github/workflows/release-npm.yml` | `ts/v<X.Y.Z>` or `ts/<slug>-v<X.Y.Z>` | GitHub Release |
+**This proves local command behavior, not hosted keyless identity.** Hosted
+acceptance still requires an actual artifact signed by the exact tagged workflow,
+with production Fulcio, SCT and Rekor validation enabled. Account ownership,
+registry trusted publisher registration, protected environments, signed release
+publication and release acceptance remain operator gates.
 
-Native release archive (`release-binaries.yml`), sidecar OCI image
-(`sidecar-image.yml`), and SLSA L2 provenance (`slsa.yml`)
-verification recipes land alongside their respective signing wires.
-See `spec/PROTOCOL.md` for the supply-chain attestation contract.
+All three artifact build jobs run exact-source qualification before building or
+signing canonical artifacts. The native checksum signer repeats that gate before
+rendering the index. The gate requires the clean immutable event checkout, the
+matching tag and successful required main workflows for that same commit. SDK
+dispatch dry runs remain unsigned. Publication jobs repeat qualification before
+uploading release bytes; signature verification alone does not establish operator
+publication approval.
 
-## See also
+## Rust callers and other artifact types
 
-- `crates/trust/chio-attest-verify/README.md` -- trait surface, embedded
-  trust root, OIDC issuer regex contract, integration test inventory.
-- `docs/install/PUBLISHING.md` -- operator-facing release runbook for
-  PyPI and npm, including OIDC trusted publisher setup.
-- `spec/PROTOCOL.md` -- supply-chain attestation contract, including
-  the consumer-facing verification recipe for native release archives.
+[`chio-attest-verify`](../../crates/trust/chio-attest-verify/README.md) has an
+`ExpectedIdentity` API whose identity field accepts a regex. A Rust caller must
+construct an anchored regex from the **escaped full literal identity** returned
+by this policy (for example `format!("^{}$", regex::escape(&identity))`), and pin
+the issuer above. Broad owner/version alternatives do not implement this policy.
+These CLI fixture tests do not qualify that crate's verification behavior.
+
+OCI image and SLSA provenance verification are described in
+[PUBLISHING.md](PUBLISHING.md). Source qualification, provenance, per-platform
+runtime acceptance and publication approval are additional release gates.

@@ -1,0 +1,209 @@
+{
+  "schema": "chio.security.review-followup.v1",
+  "source_commit": "e32156896325d47a75ad0566720602cfd72f1976",
+  "reviews": [
+    {
+      "path": "docs/security/audits/review-followup-20261007/published-independent-review.json",
+      "sha256": "d42855b20c6cb9eed5ea98124704140491c16eae4df802f62f1b4b311a584cf2"
+    },
+    {
+      "path": "docs/security/audits/review-followup-20261007/published-independent-review.md",
+      "sha256": "4bc816f26d702413502b18f298b68b341cc31befc96dccc78d5deabc93ae23d7"
+    },
+    {
+      "path": "docs/security/audits/review-followup-20261007/reconcile-decimal-source-review.json",
+      "sha256": "935e39d9d9b8ed262d8b388f155d9c2001ccf2113003e979bd2cac2533725ae8"
+    }
+  ],
+  "records": [
+    {
+      "log": "docs/security/audits/review-followup-20261007/kernel-sqlite-owning.log.gz",
+      "raw_sha256": "18f6105e87d1b0e9bf0accc2a7f5b665c1f70f25c4de82c366e9b4d3c41e8200",
+      "compressed_sha256": "2cee4830376055d297d45660e46dad2aa3efbd374909fb09ada8cbf577961896",
+      "scope": "full durable SQLite owning38PASS on1267",
+      "counts": {
+        "passed": 38,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/kernel-lib-owning.log.gz",
+      "raw_sha256": "df0532729da7424c154f06174e0d5c6879a07221f5c559df4fef78bd77d82896",
+      "compressed_sha256": "e7e08edd648d8a18ffe620f468ec2ab08f11445a44ca36d1a4d32845e833bcb1",
+      "scope": "original1577PASS1FAIL private-directory fixture",
+      "counts": {
+        "passed": 1577,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/dispatch-refusal-private-fixture-green1.log.gz",
+      "raw_sha256": "f6acb32e83238a645b600b5f1bb31eb44fd88151d7b81dd797614a6fd9a4b819",
+      "compressed_sha256": "bb0e388904fc2bad8f1edab7ec515a8570fe4d6a4b3434da6bec0dc930def115",
+      "scope": "intermediate0PASS1FAIL disabled-runtime gate; not production mapping defect",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/dispatch-refusal-seam-green1.log.gz",
+      "raw_sha256": "130dd43d6f8e85adef2913788e18a69c2f6d0020aca268e62857939735bfc165",
+      "compressed_sha256": "f1bffe9ad4797b8d2526bfc72fc2461928d0334ff135c8b99a49efcd019fa84e",
+      "scope": "same typed dispatch seam1PASS after private unit setup",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/kernel-lib-owning-green.log.gz",
+      "raw_sha256": "eb43ab962477ba63aa397f4935d5925b61edfe1fa4c97999ef5710c8eef30f6c",
+      "compressed_sha256": "5726afcfac80c46cc383e36d8e6b56217ec7938f698ad3795bceaeb7c30d7b82",
+      "scope": "full kernel library1578PASS",
+      "counts": {
+        "passed": 1578,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/kernel-final-strict.log.gz",
+      "raw_sha256": "b9a88a97fbdc7a9e48bd679db385e2e4cd75123bf5bf410f9ac14d5dc489a8e1",
+      "compressed_sha256": "cc8bdbd534a10bf8479c19bef0a603b16f375f1299baab66e51aa3099939d909",
+      "scope": "kernel alltargets inclusive strictPASS"
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/terminal-tail-original1.log.gz",
+      "raw_sha256": "d5f52d0ce32b6d7583d4a02eb2b453154038685330a19f3ddafbaf01f33e2f79",
+      "compressed_sha256": "1d4b5118908c8877faa062a83ec65eff51f215ebc47b5ad12950ef1915f99750",
+      "scope": "combined draft0/1; draft preserved; not the final isolated case",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/terminal-tail-original-separate1.log.gz",
+      "raw_sha256": "fdc2ce6a2eb35a4c87df0f677b074d18e9f4c1fe377ef4baeccfb3db78245e53",
+      "compressed_sha256": "2b33889e6019f6ebf39e24c52d4c5464bbbd5050e78a9574f3822f695deae3cb",
+      "scope": "real committed terminal tail0/1; no signed-envelope claim",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/terminal-tail-green5.log.gz",
+      "raw_sha256": "caa58b0017085aa21039a351b97bd8c858a0731f5e229c9ad42ae20996dbb5f5",
+      "compressed_sha256": "48e924384e622f4d6ef9567dc17879b6649361db5e01d39ceea853b5d61a9d42",
+      "scope": "five pagination controlsPASS including terminal tail",
+      "counts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/reconcile-decimal-original1.log.gz",
+      "raw_sha256": "ae79d1ef947627f49912179264c367e607de1c90ef2c10e958808ceda9ba574d",
+      "compressed_sha256": "e7f914c6aa9b8e60071f114288249eefdb99aa41e3810665d0d9e9f734b9493b",
+      "scope": "real HTTP evaluate0.50 accepted;reconcile400vs200 genuineRED0/1",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/reconcile-decimal-green2.log.gz",
+      "raw_sha256": "e5bf217d2ec6587d91bb27dd7319e6347df2a9c28e02796b0ba4d334e110b1be",
+      "compressed_sha256": "761ea8be9f0c21ec75ad5a49d64dfca2170e4c64d935df4fc05c77e43b1153db",
+      "scope": "exact settlement/strictnegative controls2PASS",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/api-protect-owning-green.log.gz",
+      "raw_sha256": "5273597d298dfc8653f69d47bc6776227e8bacf5305bd861b9d3cb2524190a7d",
+      "compressed_sha256": "e78f456f6d28323cc5b5b1d32ba12eb9877bc5907fc4833e7fbe84b657cfc3a7",
+      "scope": "full API owning276PASS across2harnesses",
+      "counts": {
+        "passed": 276,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/latest-review-fixes-strict.log.gz",
+      "raw_sha256": "76f48b9945cb7cfe1a656b0d5b6063741e531c0609484c99a251aa12895af01e",
+      "compressed_sha256": "b44868370382242333f48ea3078f9eac11023b9dae16b7e7fbcd5877d69059bf",
+      "scope": "three affectedcrates alltargets dependency-inclusive strictPASS"
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/recovery-owning-terminal-tail-green.log.gz",
+      "raw_sha256": "11988e80e4e608dbc5cda00ef23300d806aed3e96f6e286fe3e7e8c15c33cb6e",
+      "compressed_sha256": "46b5c0c409ade34636f2fb2a3200e23f3e014e91da3948678a418a25dbb8e762",
+      "scope": "complete selectedrecovery family35PASS",
+      "counts": {
+        "passed": 35,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/final-review-negative.log.gz",
+      "raw_sha256": "897161cd4db645803bc8f94e7409695a5e18d5200539a8ad39682ab644f47997",
+      "compressed_sha256": "fcb5755e7b61fd4214906c02841e700527973bf3989df4f7cc6defbc1265eeb6",
+      "scope": "unchanged1249 baselinePASS"
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/final-review-hygiene.log.gz",
+      "raw_sha256": "c48278bb170fed8b344379b48eda0cd75a585dcc5aaea7ad9ef3bb91bdf8260a",
+      "compressed_sha256": "94ae8ae373e974d0fb67bcaa8c06c827f0309f010bca75bfe84c7895f104bc08",
+      "scope": "unchangedsource hygienePASS"
+    },
+    {
+      "log": "docs/security/audits/review-followup-20261007/final-review-format.log.gz",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressed_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "scope": "workspaceformatPASS"
+    }
+  ],
+  "review_obligations": [
+    {
+      "comment_id": 4207094540,
+      "priority": "P1",
+      "repair_commit": "1b05245e0d",
+      "finding": "Ineligible terminal tail wrongly exhausts legacy recovery capacity",
+      "verification": "isolatedOriginal0/1 ->Green5; owningrecovery35; strict0",
+      "remaining": "finalcandidate native/trusted/hosted and protectedlanding"
+    },
+    {
+      "comment_id": 4207159552,
+      "priority": "P2",
+      "repair_commit": "e321568963",
+      "finding": "Reconcile rejects original unsigned decimal arguments",
+      "verification": "HTTPOriginal400vs200 ->Green2; APIowning276; strict0",
+      "remaining": "finalcandidate qualification and protectedlanding"
+    }
+  ],
+  "kernel_fixture_commit": "b738c3571a",
+  "qualified_candidate": false,
+  "merged": false,
+  "remaining": [
+    "Complete remaining whole default/optional/PQ/platform and fullbenchmarks.",
+    "Exactfinal source review andnative/cold/trusted evidence.",
+    "Rotateauthorized source/definitions onlyafter qualification; currentcontrollerfailed beforedispatch witholdauthorizedd049.",
+    "Terminal exactsource hostedchecks andprotectedmain landing."
+  ]
+}

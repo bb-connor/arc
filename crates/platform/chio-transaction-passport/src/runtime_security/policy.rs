@@ -16,9 +16,7 @@ pub(super) struct RuntimeVerifierPolicy {
 pub(super) fn parse_policy(
     bytes: &[u8],
 ) -> Result<RuntimeVerifierPolicy, TransactionPassportError> {
-    let policy: RuntimeVerifierPolicy = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-    })?;
+    let policy: RuntimeVerifierPolicy = crate::decode_evidence_json(bytes)?;
     if policy.schema != TRANSACTION_VERIFIER_POLICY_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedVerifierPolicySchema(
             policy.schema,

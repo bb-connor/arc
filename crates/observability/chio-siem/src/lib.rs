@@ -29,6 +29,7 @@ pub mod metrics_sink;
 pub mod ocsf;
 pub mod ratelimit;
 mod redaction;
+pub mod sink_projection;
 
 pub use alerting::{
     derive_event_severity, derive_severity, Alert, AlertBackend, AlertSeverity, AlertingConfig,
@@ -54,3 +55,4 @@ pub use ocsf::{
     OCSF_PRODUCT_NAME, OCSF_PRODUCT_VENDOR, OCSF_SCHEMA_VERSION,
 };
 pub use ratelimit::{ExportRateLimiter, RateLimitConfig, RateLimitConfigError};
+pub use sink_projection::SiemSinkProjection;

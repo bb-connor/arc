@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Verification boundary for supplemental invocation quotas.
 //!
 //! The kernel treats supplemental authorization artifacts as opaque bytes. A
@@ -89,7 +90,7 @@ impl SupplementalQuotaVerifierBinding {
 /// This value is not admission authority by itself. The kernel accepts it only
 /// as the immediate result of its composition-installed verifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedSupplementalQuotaClaim {
+pub struct SupplementalQuotaVerificationRecord {
     pub profile: String,
     pub broker_capability_id: String,
     pub issuer: PublicKey,
@@ -223,7 +224,7 @@ pub trait SupplementalQuotaVerifier: Send + Sync {
         &self,
         signed_extension: &[u8],
         context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError>;
+    ) -> Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError>;
 }
 
 pub(crate) struct SupplementalQuotaVerifierRuntime {
@@ -331,8 +332,7 @@ fn domain_separated_digest<T: Serialize>(
 ) -> Result<String, SupplementalQuotaError> {
     let canonical = canonical_json_bytes(value)
         .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
-    let mut message = Vec::with_capacity(domain.len() + 1 + canonical.len());
-    message.extend_from_slice(domain.as_bytes());
+    let mut message = Vec::from(domain.as_bytes());
     message.push(0);
     message.extend_from_slice(&canonical);
     Ok(sha256_hex(&message))
@@ -508,7 +508,7 @@ fn ensure_context_bounds(
 }
 
 fn ensure_claim_bounds(
-    claim: &VerifiedSupplementalQuotaClaim,
+    claim: &SupplementalQuotaVerificationRecord,
 ) -> Result<(), SupplementalQuotaError> {
     for (name, value) in [
         ("broker_capability_id", claim.broker_capability_id.as_str()),
@@ -784,7 +784,7 @@ impl CanonicalRevocationSet {
             return Err(SupplementalQuotaError::EmptyRevocationId);
         }
         ids.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
-        if let Some(duplicate) = ids.windows(2).find(|pair| pair[0] == pair[1]) {
+        if let Some(duplicate) = ids.array_windows::<2>().find(|pair| pair[0] == pair[1]) {
             return Err(SupplementalQuotaError::DuplicateRevocationId(
                 duplicate[0].clone(),
             ));
@@ -870,7 +870,7 @@ fn validate_canonical_revocation_ids(ids: &[String]) -> Result<(), SupplementalQ
     if ids.iter().any(String::is_empty) {
         return Err(SupplementalQuotaError::EmptyRevocationId);
     }
-    for pair in ids.windows(2) {
+    for pair in ids.array_windows::<2>() {
         if pair[0] == pair[1] {
             return Err(SupplementalQuotaError::DuplicateRevocationId(
                 pair[0].clone(),

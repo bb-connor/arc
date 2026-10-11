@@ -248,6 +248,7 @@ fn dead_letter_error_to_route(error: DeadLetterStoreError) -> SettlementRouteErr
         DeadLetterStoreError::Backend(detail) => backend_error(detail),
         DeadLetterStoreError::Conflict(detail) => conflict(detail),
         DeadLetterStoreError::InvalidRecord(detail) => invalid_record(detail),
+        DeadLetterStoreError::UntrustedInput(cause) => invalid_record(cause.code()),
     }
 }
 

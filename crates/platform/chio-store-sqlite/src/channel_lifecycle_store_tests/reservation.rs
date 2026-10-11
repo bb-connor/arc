@@ -57,6 +57,7 @@ struct ReservationFlow {
     trust: ChannelOpenTrustV1,
     payee_key: Keypair,
     kernel_key: Keypair,
+    timeline: Timeline,
 }
 
 fn anchor_pins() -> EconomicStateAnchorPins {
@@ -490,6 +491,7 @@ fn available_view(
 fn signed_projection_batch(
     current: &VerifiedEconomicStateView,
     projection: &ChannelLifecycleProjectionV1,
+    issued_at: u64,
 ) -> TestResult<EconomicStateBatchV1> {
     let mut batch = EconomicStateBatchV1 {
         schema: CHIO_ECONOMIC_STATE_BATCH_SCHEMA.to_owned(),
@@ -505,7 +507,7 @@ fn signed_projection_batch(
         effect_slots: projection.effect_slots().to_vec(),
         request_replays: projection.request_replays().to_vec(),
         operation_id: projection.operation_id().map(str::to_owned),
-        issued_at: STAGE_AT,
+        issued_at,
         signer_key_id: current.view().signer_key_id.clone(),
         signer_key_epoch: current.view().signer_key_epoch,
         anchor_signature: String::new(),
@@ -551,6 +553,20 @@ fn committed_view(
     Ok(verify_economic_state_view(committed, &anchor_pins())?)
 }
 
+fn with_absent_reservation_keys(
+    retained: &VerifiedEconomicStateView,
+    effect_key: EconomicResourceKeyV1,
+    request: &EconomicRequestBindingV1,
+) -> TestResult<VerifiedEconomicStateView> {
+    let mut view = retained.view().clone();
+    view.absent_resource_keys.push(effect_key);
+    view.absent_resource_keys.sort();
+    view.absent_request_keys.push(request.key());
+    view.absent_request_keys.sort();
+    view.seal(&Keypair::from_seed(&[61; 32]))?;
+    Ok(verify_economic_state_view(view, &anchor_pins())?)
+}
+
 fn reservation_flow(fence: &StoreMutationFence, request_id: &str) -> TestResult<ReservationFlow> {
     reservation_flow_with_state_version(fence, request_id, 1)
 }
@@ -560,11 +576,79 @@ fn reservation_flow_with_state_version(
     request_id: &str,
     initial_state_version: u64,
 ) -> TestResult<ReservationFlow> {
-    let operation = prepared_operation(fence, request_id)?;
     let open = open_fixture()?;
     let prior = open.open.initial_state().clone();
+    let lifecycle = ChannelLifecycleViewV1 {
+        schema: chio_settle::channel::CHANNEL_LIFECYCLE_SCHEMA.to_owned(),
+        channel_id: open.open.artifact().body.channel_id.clone(),
+        status: ChannelLifecycleStatusV1::Open,
+        latest_state_digest: prior.digest()?,
+        latest_sequence: prior.body().seq,
+        state_version: initial_state_version,
+        lifecycle_fence: 2,
+        pending_close_body_digest: None,
+        admitted_dispute_digest: None,
+        live_reservation_id: None,
+        operation_id: None,
+    };
+    let escrow = ChannelEscrowReservationViewV1 {
+        schema: CHANNEL_ESCROW_RESERVATION_SCHEMA.to_owned(),
+        channel_id: lifecycle.channel_id.clone(),
+        open_digest: open.open.artifact().digest()?,
+        escrow_reference: open.open.intent().body.escrow_reference.clone(),
+        status: ChannelEscrowReservationStatusV1::Open,
+        version: 2,
+        lifecycle_fence: 2,
+        pending_close_body_digest: None,
+    };
+    let base = ReservationBase {
+        prior,
+        lifecycle,
+        escrow,
+        retained: None,
+    };
+    reservation_flow_from(fence, request_id, open, base, Timeline::OPEN)
+}
+
+/// Channel state a reservation is admitted against.
+struct ReservationBase {
+    prior: VerifiedChannelStateV1,
+    lifecycle: ChannelLifecycleViewV1,
+    escrow: ChannelEscrowReservationViewV1,
+    /// Anchored view already holding the channel heads; `None` anchors a fresh
+    /// view over `lifecycle` and `escrow`.
+    retained: Option<VerifiedEconomicStateView>,
+}
+
+/// Shifts every trusted time of one reservation flow by a fixed offset.
+#[derive(Clone, Copy)]
+struct Timeline(u64);
+
+impl Timeline {
+    const OPEN: Self = Self(0);
+
+    const fn at(self, unix_ms: u64) -> u64 {
+        self.0 + unix_ms
+    }
+}
+
+fn reservation_flow_from(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    open: OpenFixture,
+    base: ReservationBase,
+    timeline: Timeline,
+) -> TestResult<ReservationFlow> {
+    let ReservationBase {
+        prior,
+        lifecycle,
+        escrow,
+        retained,
+    } = base;
+    let operation = prepared_operation(fence, request_id)?;
     let open_digest = open.open.artifact().digest()?;
     let prior_digest = prior.digest()?;
+    let next_sequence = prior.body().seq + 1;
     let provider = ProviderAttemptBindingV1 {
         operation_id: operation.binding().operation_id().as_str().to_owned(),
         attempt_id: format!("attempt-{request_id}"),
@@ -611,7 +695,7 @@ fn reservation_flow_with_state_version(
         authority_id: "channel-authority".to_owned(),
         authority_key_epoch: 7,
         authority_key: reservation_authority_key.public_key(),
-        trusted_time_unix_ms: BEGIN_AT,
+        trusted_time_unix_ms: open.trust.trusted_time_unix_ms,
     };
     let trusted_kernel_key = Keypair::from_seed(&[36; 32]);
     let reservation_body = ChannelReservationBodyV1 {
@@ -620,15 +704,15 @@ fn reservation_flow_with_state_version(
             &open.open.artifact().body.channel_id,
             &open_digest,
             operation.binding().request_id().as_str(),
-            1,
+            next_sequence,
             &prior_digest,
         )?,
         channel_id: open.open.artifact().body.channel_id.clone(),
         open_digest: open_digest.clone(),
         request_id: operation.binding().request_id().as_str().to_owned(),
         operation_id: operation.binding().operation_id().as_str().to_owned(),
-        next_sequence: 1,
-        prior_state_digest: prior_digest.clone(),
+        next_sequence,
+        prior_state_digest: prior_digest,
         service_binding_digest: service.digest()?,
         receipt_authority_digest: derive_channel_receipt_authority_digest(
             &trusted_kernel_key.public_key(),
@@ -638,10 +722,10 @@ fn reservation_flow_with_state_version(
             currency: "USD".to_owned(),
         },
         maximum_token_base_units: "400000".to_owned(),
-        expires_at_unix_ms: RESERVATION_EXPIRES_AT,
+        expires_at_unix_ms: timeline.at(RESERVATION_EXPIRES_AT),
         disposition_expected_version: 1,
-        channel_state_expected_version: initial_state_version,
-        lifecycle_fence: 2,
+        channel_state_expected_version: lifecycle.state_version,
+        lifecycle_fence: lifecycle.lifecycle_fence,
     };
     let signed_reservation = SignedChannelReservationV1 {
         payer_signature: ChannelSignatureV1::sign(
@@ -658,41 +742,21 @@ fn reservation_flow_with_state_version(
         )?,
         body: reservation_body,
     };
-    let lifecycle = ChannelLifecycleViewV1 {
-        schema: chio_settle::channel::CHANNEL_LIFECYCLE_SCHEMA.to_owned(),
-        channel_id: open.open.artifact().body.channel_id.clone(),
-        status: ChannelLifecycleStatusV1::Open,
-        latest_state_digest: prior_digest,
-        latest_sequence: prior.body().seq,
-        state_version: initial_state_version,
-        lifecycle_fence: 2,
-        pending_close_body_digest: None,
-        admitted_dispute_digest: None,
-        live_reservation_id: None,
-        operation_id: None,
-    };
-    let escrow = ChannelEscrowReservationViewV1 {
-        schema: CHANNEL_ESCROW_RESERVATION_SCHEMA.to_owned(),
-        channel_id: lifecycle.channel_id.clone(),
-        open_digest,
-        escrow_reference: open.open.intent().body.escrow_reference.clone(),
-        status: ChannelEscrowReservationStatusV1::Open,
-        version: 2,
-        lifecycle_fence: 2,
-        pending_close_body_digest: None,
-    };
     let effect_key = anticipated_effect_key(
         &signed_reservation,
         &service,
         &open.trust.settlement_authority_scope_id,
     )?;
-    let current = available_view(
-        &lifecycle,
-        &escrow,
-        &open.trust.settlement_authority_scope_id,
-        effect_key,
-        &service.request,
-    )?;
+    let current = match retained {
+        Some(view) => with_absent_reservation_keys(&view, effect_key, &service.request)?,
+        None => available_view(
+            &lifecycle,
+            &escrow,
+            &open.trust.settlement_authority_scope_id,
+            effect_key,
+            &service.request,
+        )?,
+    };
     let admitted_open = verify_admitted_channel_open(&open.open, &current)?;
     let proposal = verify_channel_reservation_proposal(
         &signed_reservation,
@@ -717,8 +781,9 @@ fn reservation_flow_with_state_version(
         &service,
     )?;
     let context = ChannelReservationReplayContextV1::from_pre_anchor(&prepared, &proposal)?;
-    let projection = compose_channel_reservation_transition(&prepared, &proposal, STAGE_AT)?;
-    let batch = signed_projection_batch(&current, &projection)?;
+    let projection =
+        compose_channel_reservation_transition(&prepared, &proposal, timeline.at(STAGE_AT))?;
+    let batch = signed_projection_batch(&current, &projection, timeline.at(STAGE_AT))?;
     let authority_pins = ChannelTransitionReplayAuthorityPinsV1::new(
         open.trust.clone(),
         open.funding_authority.clone(),
@@ -757,6 +822,7 @@ fn reservation_flow_with_state_version(
         trust: open.trust,
         payee_key: open.payee_key,
         kernel_key: trusted_kernel_key,
+        timeline,
     })
 }
 
@@ -812,7 +878,7 @@ fn begin_and_authorize_budget(
         &flow.operation,
         &flow.prepared,
         &fixture.fence,
-        BEGIN_AT,
+        flow.timeline.at(BEGIN_AT),
     )?;
     let ChannelPreparedBeginResult::Created(record) = created else {
         return Err("channel prepared begin was not created".into());
@@ -825,8 +891,8 @@ fn begin_and_authorize_budget(
             fixture,
             &operation,
             "reservation-worker",
-            BEGIN_AT + 1,
-            1_550,
+            flow.timeline.at(BEGIN_AT + 1),
+            flow.timeline.at(1_550),
         )?,
         vec![AdmissionAttachment::BrokerAttempt(flow.provider.clone())],
         Some(AdmissionOperationState::BrokerAttemptRegistered),
@@ -836,12 +902,18 @@ fn begin_and_authorize_budget(
     operation = fixture
         .authority
         .admission_operation_store()
-        .compare_and_swap(&broker, BROKER_AT)?
+        .compare_and_swap(&broker, flow.timeline.at(BROKER_AT))?
         .into_operation();
     let budget = AdmissionOperationCommand::new(
         operation.binding().operation_id().clone(),
         operation.version(),
-        claim(fixture, &operation, "reservation-worker", 1_551, 1_600)?,
+        claim(
+            fixture,
+            &operation,
+            "reservation-worker",
+            flow.timeline.at(1_551),
+            flow.timeline.at(1_600),
+        )?,
         vec![AdmissionAttachment::BudgetHoldId(identifier(
             "budget_hold_id",
             "reservation-budget-hold",
@@ -853,7 +925,7 @@ fn begin_and_authorize_budget(
     Ok(fixture
         .authority
         .admission_operation_store()
-        .compare_and_swap(&budget, BUDGET_AT)?
+        .compare_and_swap(&budget, flow.timeline.at(BUDGET_AT))?
         .into_operation())
 }
 
@@ -867,7 +939,13 @@ fn stage_and_anchor_with_claimant(
     claimant: &str,
 ) -> TestResult<AdmissionOperationV1> {
     let operation = begin_and_authorize_budget(fixture, flow)?;
-    let stage_lease = claim(fixture, &operation, claimant, 1_601, 1_650)?;
+    let stage_lease = claim(
+        fixture,
+        &operation,
+        claimant,
+        flow.timeline.at(1_601),
+        flow.timeline.at(1_650),
+    )?;
     fixture.store.stage_channel_reservation(
         &flow.advance,
         &operation,
@@ -875,7 +953,7 @@ fn stage_and_anchor_with_claimant(
         &flow.replay_bytes,
         &flow.authority_pins,
         &fixture.fence,
-        STAGE_AT,
+        flow.timeline.at(STAGE_AT),
     )?;
     fixture.store.record_channel_anchor_advanced(
         operation.binding().operation_id(),
@@ -883,7 +961,7 @@ fn stage_and_anchor_with_claimant(
         &flow.committed,
         &flow.authority_pins,
         &fixture.fence,
-        ANCHOR_AT,
+        flow.timeline.at(ANCHOR_AT),
     )?;
     Ok(operation)
 }
@@ -897,25 +975,25 @@ fn finalize_after_expiry(
         fixture,
         &operation,
         "post-expiry-takeover",
-        TAKEOVER_AT,
-        2_600,
+        flow.timeline.at(TAKEOVER_AT),
+        flow.timeline.at(2_600),
     )?;
     Ok(fixture.store.finalize_channel_reservation(
         operation.binding().operation_id(),
         &takeover,
         &flow.authority_pins,
         &fixture.fence,
-        FINALIZE_AT,
+        flow.timeline.at(FINALIZE_AT),
     )?)
 }
 
 #[test]
 fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(1);
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "post-expiry-finalize")?;
     let operation = stage_and_anchor(&fixture, &flow)?;
+    let _later = chio_test_support::clock::scope_unix_secs(2);
     let historical_fence = fixture.fence.clone();
     let Fixture {
         _temp,
@@ -928,7 +1006,7 @@ fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> Te
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.channel_lifecycle_store();
     let fence = authority.mutation_fence();
     assert_eq!(fence.store_uuid, historical_fence.store_uuid);
@@ -977,8 +1055,7 @@ fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> Te
 
 #[test]
 fn live_replay_rejects_a_store_qualified_same_fence_claim_for_another_operation() -> TestResult {
-    let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+    let _runtime = chio_test_support::clock::scope_unix_secs(1);
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "live-replay-authority")?;
     let live = finalize_after_expiry(&fixture, &flow)?;

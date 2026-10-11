@@ -698,7 +698,7 @@ fn proof_verify_file_input_revalidates_sibling_manifest_before_denials_requireme
         "denials",
     ]);
 
-    assert_failure(&output, "proof room bundle");
+    assert_failure_exit_code(&output, "proof-room.schema-violation: manifest", 30);
 }
 
 #[test]

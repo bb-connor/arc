@@ -188,7 +188,7 @@ pub(crate) fn verify_rollback(
 }
 
 fn append_binding_part(material: &mut Vec<u8>, part: &[u8]) {
-    material.extend_from_slice(&(part.len() as u64).to_be_bytes());
+    material.extend_from_slice(&crate::integer::count(part.len()).to_be_bytes());
     material.extend_from_slice(part);
 }
 

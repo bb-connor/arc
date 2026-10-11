@@ -4,6 +4,9 @@ use dashmap::DashMap;
 
 use crate::{SessionAuthContext, VerifiedFederationTreatyMaterial};
 
+mod async_scope;
+pub(crate) use async_scope::scope_async_receipt_context;
+
 tokio::task_local! {
     pub(crate) static RECEIPT_EVALUATION_SCOPE_KEY: String;
 }
@@ -17,32 +20,54 @@ thread_local! {
 }
 
 /// Guard returned by [`scope_receipt_tenant_id`]. Restores the previously
-/// active tenant scope when dropped.
+/// active tenant scope when dropped. An async guard retains its own evaluation
+/// context, so dropping it never mutates another evaluation or executor thread.
 pub(crate) struct ScopedReceiptTenantId {
     previous: Option<String>,
+    evaluation: Option<Arc<async_scope::EvaluationReceiptContext>>,
 }
 
 impl Drop for ScopedReceiptTenantId {
     fn drop(&mut self) {
         let previous = self.previous.take();
-        RECEIPT_TENANT_ID_SCOPE.with(|slot| {
-            *slot.borrow_mut() = previous;
-        });
+        if let Some(context) = &self.evaluation {
+            context.tenant_id.store(previous.map(Arc::new));
+        } else {
+            RECEIPT_TENANT_ID_SCOPE.with(|slot| {
+                *slot.borrow_mut() = previous;
+            });
+        }
     }
 }
 
-/// Install `tenant_id` as the active scope for this thread until the
-/// returned guard is dropped. Passing `None` explicitly clears the scope
+/// Install `tenant_id` for the current evaluation, or for a synchronous caller's
+/// thread when no evaluation is active. Passing `None` explicitly clears the scope
 /// (so a child evaluate that lacks a session cannot inherit a parent's
 /// tenant tag by accident).
 pub(crate) fn scope_receipt_tenant_id(tenant_id: Option<String>) -> ScopedReceiptTenantId {
-    let previous = RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.replace(tenant_id));
-    ScopedReceiptTenantId { previous }
+    let evaluation = async_scope::current();
+    let previous = if let Some(context) = &evaluation {
+        context
+            .tenant_id
+            .swap(tenant_id.map(Arc::new))
+            .as_deref()
+            .cloned()
+    } else {
+        RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.replace(tenant_id))
+    };
+    ScopedReceiptTenantId {
+        previous,
+        evaluation,
+    }
 }
 
-/// Read the tenant_id currently in scope on this thread.
+/// An evaluation's explicit absence of a tenant suppresses ambient thread state.
 pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
-    RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
+    if let Some(context) = async_scope::current() {
+        context.tenant_id.load_full().as_deref().cloned()
+    } else {
+        RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
+    }
 }
 
 pub(crate) fn current_receipt_evaluation_scope_key() -> Option<String> {
@@ -76,29 +101,51 @@ pub(crate) struct ReceiptFederationAdmission {
 /// previously active admission snapshot when dropped.
 pub(crate) struct ScopedReceiptFederationAdmission {
     previous: Option<ReceiptFederationAdmission>,
+    evaluation: Option<Arc<async_scope::EvaluationReceiptContext>>,
 }
 
 impl Drop for ScopedReceiptFederationAdmission {
     fn drop(&mut self) {
         let previous = self.previous.take();
-        RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| {
-            *slot.borrow_mut() = previous;
-        });
+        if let Some(context) = &self.evaluation {
+            context.federation_admission.store(previous.map(Arc::new));
+        } else {
+            RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| {
+                *slot.borrow_mut() = previous;
+            });
+        }
     }
 }
 
 /// Install the receipt-version and peer-key decision made at admission time.
 /// Persistence and federation cosigning must use this snapshot rather than
 /// re-resolving freshness after the tool has already produced side effects.
+/// Async guards restore their original context even after migration or cancellation.
 pub(crate) fn scope_receipt_federation_admission(
     admission: Option<ReceiptFederationAdmission>,
 ) -> ScopedReceiptFederationAdmission {
-    let previous = RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.replace(admission));
-    ScopedReceiptFederationAdmission { previous }
+    let evaluation = async_scope::current();
+    let previous = if let Some(context) = &evaluation {
+        context
+            .federation_admission
+            .swap(admission.map(Arc::new))
+            .as_deref()
+            .cloned()
+    } else {
+        RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.replace(admission))
+    };
+    ScopedReceiptFederationAdmission {
+        previous,
+        evaluation,
+    }
 }
 
 pub(crate) fn current_scoped_receipt_federation_admission() -> Option<ReceiptFederationAdmission> {
-    RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.borrow().clone())
+    if let Some(context) = async_scope::current() {
+        context.federation_admission.load_full().as_deref().cloned()
+    } else {
+        RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.borrow().clone())
+    }
 }
 
 pub(crate) struct ScopedKernelReceiptFederationAdmission {

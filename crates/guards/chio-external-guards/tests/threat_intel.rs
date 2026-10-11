@@ -17,6 +17,9 @@ use serde_json::json;
 use wiremock::matchers::{any, header, method, path, path_regex, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "threat_intel/virustotal_outcomes.rs"]
+mod virustotal_outcomes;
+
 const KNOWN_BAD_HASH: &str = "44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f";
 
 fn fast_retry() -> RetryConfig {
@@ -152,7 +155,7 @@ async fn threat_intel_rechecks_runtime_endpoints_before_send() {
 }
 
 #[tokio::test]
-async fn virustotal_allows_on_404() {
+async fn virustotal_denies_unknown_404_result() {
     let server = MockServer::start().await;
 
     Mock::given(method("GET"))
@@ -173,7 +176,7 @@ async fn virustotal_allows_on_404() {
         adapter
             .evaluate(&make_ctx("w", json!({"hash": KNOWN_BAD_HASH})))
             .await,
-        Verdict::Allow
+        Verdict::Deny
     );
 }
 

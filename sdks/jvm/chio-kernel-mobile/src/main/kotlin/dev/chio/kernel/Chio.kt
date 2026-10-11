@@ -16,9 +16,10 @@ enum class TrustLevel {
 class ChioKernel {
     fun evaluate(requestJson: String): String = uniffi.chio_kernel_mobile.evaluate(requestJson)
 
-    fun signReceipt(bodyJson: String, signingSeedHex: String): String =
-        uniffi.chio_kernel_mobile.signReceipt(bodyJson, signingSeedHex)
+    fun signReceipt(bodyJson: String, canonicalContentHex: String, signingSeedHex: String): String =
+        uniffi.chio_kernel_mobile.signReceipt(bodyJson, canonicalContentHex, signingSeedHex)
 
-    fun verifyMobileReceipt(receiptJson: String, evidenceJson: String): String =
-        uniffi.chio_kernel_mobile.verifyMobileReceipt(receiptJson, evidenceJson)
+    /** Inspect shape only; this does not verify device integrity or authorize a call. */
+    fun inspectMobileReceiptEnvelopes(receiptJson: String, evidenceJson: String): String =
+        uniffi.chio_kernel_mobile.inspectMobileReceiptEnvelopes(receiptJson, evidenceJson)
 }

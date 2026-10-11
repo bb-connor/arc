@@ -1,5 +1,4 @@
 use super::*;
-use super::super::status_floor::FindingStatusCliFloorV1;
 
 fn authorization() -> chio_finding::FindingStatusOperatorAuthorization {
     chio_finding::FindingStatusOperatorAuthorization {
@@ -48,10 +47,12 @@ fn status_floor_rejects_rollback_and_same_epoch_equivocation() {
     let dir = tempfile::tempdir().unwrap();
     let floor_path = dir.path().join("status-floor.json");
     advance(&floor_path, &response("non_inclusion")).unwrap();
-    assert!(super::super::status_floor::require_trusted_time(&floor_path, 1_799_999_999)
-        .unwrap_err()
-        .to_string()
-        .contains("host clock rolled back"));
+    assert!(
+        super::super::status_floor::require_trusted_time(&floor_path, 1_799_999_999)
+            .unwrap_err()
+            .to_string()
+            .contains("host clock rolled back")
+    );
 
     let mut rollback = response("non_inclusion");
     rollback.map_epoch = 7;
@@ -74,8 +75,7 @@ fn status_floor_persists_trusted_time_before_any_verified_epoch() {
     let floor_path = dir.path().join("status-floor.json");
     let _lock = FindingStatusFloorLock::acquire(&floor_path).unwrap();
 
-    super::super::status_floor::advance_trusted_time_locked(&floor_path, 1_800_000_000)
-        .unwrap();
+    super::super::status_floor::advance_trusted_time_locked(&floor_path, 1_800_000_000).unwrap();
     assert!(read_status_floor(&floor_path).unwrap().is_none());
     assert!(
         super::super::status_floor::require_trusted_time(&floor_path, 1_799_999_999)
@@ -84,8 +84,7 @@ fn status_floor_persists_trusted_time_before_any_verified_epoch() {
             .contains("host clock rolled back")
     );
 
-    super::super::status_floor::advance_trusted_time_locked(&floor_path, 1_800_000_100)
-        .unwrap();
+    super::super::status_floor::advance_trusted_time_locked(&floor_path, 1_800_000_100).unwrap();
     assert!(
         super::super::status_floor::require_trusted_time(&floor_path, 1_800_000_099)
             .unwrap_err()
@@ -134,7 +133,7 @@ fn status_floor_accepts_same_key_authorization_refresh_and_rejects_key_equivocat
     )
     .unwrap();
     let floor = read_status_floor(&floor_path).unwrap().unwrap();
-    assert_eq!(floor.operator_key, Some(authorization.operator.key.clone()));
+    assert_eq!(floor.operator_key, authorization.operator.key.clone());
     assert_eq!(floor.operator_authorization_sha256, refreshed_sha256);
 
     authorization.operator.key = Keypair::from_seed(&[92_u8; 32]).public_key();
@@ -165,107 +164,41 @@ fn status_floor_keeps_retractions_sticky_per_finding() {
     let error = advance(&floor_path, &attempted_revival)
         .unwrap_err()
         .to_string();
-    assert!(error.contains("durably retracted"), "unexpected error: {error}");
-}
-
-#[test]
-fn status_floor_rejects_a_legacy_retraction_on_the_first_migration_read() {
-    let dir = tempfile::tempdir().unwrap();
-    let floor_path = dir.path().join("status-floor.json");
-    let authorization = authorization();
-    let authorization_sha256 = sha256_hex(&canonical_json_bytes(&authorization).unwrap());
-    let legacy = FindingStatusCliFloorV1 {
-        schema: "chio.finding.status-cli-floor.v1".to_owned(),
-        feed_id: authorization.feed_id.clone(),
-        operator_id: authorization.operator.authority_id.clone(),
-        rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
-        operator_key_epoch: authorization.operator.key_epoch,
-        operator_key: Some(authorization.operator.key.clone()),
-        operator_authorization_sha256: authorization_sha256.clone(),
-        key_domain_nonce: 3_318_287_169_837_494,
-        map_epoch: 8,
-        epoch_id: "1".repeat(64),
-        root_hash: "2".repeat(64),
-        retracted_finding_ids: std::iter::once(GOLDEN_FINDING_ID.to_owned()).collect(),
-    };
-    std::fs::write(&floor_path, canonical_json_bytes(&legacy).unwrap()).unwrap();
-
-    let mut attempted_revival = response("non_inclusion");
-    attempted_revival.map_epoch = 9;
-    attempted_revival.epoch_id = "3".repeat(64);
-    attempted_revival.root_hash = "4".repeat(64);
-    let error = advance_status_floor(
-        &floor_path,
-        &attempted_revival,
-        &authorization,
-        &authorization_sha256,
-        attempted_revival.checked_at,
-    )
-    .unwrap_err()
-    .to_string();
-    assert!(error.contains("durably retracted"), "unexpected error: {error}");
-}
-
-#[test]
-fn status_floor_migrates_v1_epoch_and_sticky_retractions() {
-    let dir = tempfile::tempdir().unwrap();
-    let floor_path = dir.path().join("status-floor.json");
-    let authorization = authorization();
-    let authorization_sha256 = sha256_hex(&canonical_json_bytes(&authorization).unwrap());
-    let legacy = FindingStatusCliFloorV1 {
-        schema: "chio.finding.status-cli-floor.v1".to_owned(),
-        feed_id: authorization.feed_id.clone(),
-        operator_id: authorization.operator.authority_id.clone(),
-        rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
-        operator_key_epoch: authorization.operator.key_epoch,
-        operator_key: Some(authorization.operator.key.clone()),
-        operator_authorization_sha256: authorization_sha256.clone(),
-        key_domain_nonce: 3_318_287_169_837_494,
-        map_epoch: 8,
-        epoch_id: "1".repeat(64),
-        root_hash: "2".repeat(64),
-        retracted_finding_ids: std::iter::once(GOLDEN_FINDING_ID.to_owned()).collect(),
-    };
-    std::fs::write(&floor_path, canonical_json_bytes(&legacy).unwrap()).unwrap();
-
-    let mut status = response("non_inclusion");
-    status.map_epoch = 9;
-    status.epoch_id = "3".repeat(64);
-    status.root_hash = "4".repeat(64);
-    status.finding_id = "f".repeat(64);
-    advance_status_floor(
-        &floor_path,
-        &status,
-        &authorization,
-        &authorization_sha256,
-        status.checked_at,
-    )
-    .unwrap();
-
-    let migrated = read_status_floor(&floor_path).unwrap().unwrap();
-    assert_eq!(migrated.schema, "chio.finding.status-cli-floor.v2");
-    assert_eq!(migrated.map_epoch, 9);
-    assert_eq!(
-        std::fs::read_dir(dir.path().join("status-floor.json.retractions"))
-            .unwrap()
-            .count(),
-        1
+    assert!(
+        error.contains("durably retracted"),
+        "unexpected error: {error}"
     );
+}
 
-    status.map_epoch = 10;
-    status.epoch_id = "7".repeat(64);
-    status.root_hash = "8".repeat(64);
-    status.finding_id = GOLDEN_FINDING_ID.to_owned();
-    assert!(advance_status_floor(
-        &floor_path,
-        &status,
-        &authorization,
-        &authorization_sha256,
-        status.checked_at,
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("durably retracted"));
+#[test]
+fn status_floor_rejects_obsolete_schema_without_mutating_retained_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let floor_path = dir.path().join("status-floor.json");
+    advance(&floor_path, &response("non_inclusion")).unwrap();
+    let mut floor: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&floor_path).unwrap()).unwrap();
+    floor["schema"] = serde_json::json!("chio.finding.status-cli-floor.v1");
+    let bytes = canonical_json_bytes(&floor).unwrap();
+    std::fs::write(&floor_path, &bytes).unwrap();
+    let error = advance(&floor_path, &response("non_inclusion")).unwrap_err();
+    assert!(
+        error.to_string().contains("schema is unsupported"),
+        "{error}"
+    );
+    assert_eq!(std::fs::read(&floor_path).unwrap(), bytes);
+}
+
+#[test]
+fn status_floor_requires_a_pinned_operator_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let floor_path = dir.path().join("status-floor.json");
+    advance(&floor_path, &response("non_inclusion")).unwrap();
+    let mut floor: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&floor_path).unwrap()).unwrap();
+    floor.as_object_mut().unwrap().remove("operator_key");
+    std::fs::write(&floor_path, canonical_json_bytes(&floor).unwrap()).unwrap();
+    let error = advance(&floor_path, &response("non_inclusion")).unwrap_err();
+    assert!(matches!(error, CliError::SignedJson(_)), "{error}");
 }
 
 #[test]
@@ -297,7 +230,10 @@ fn status_floor_partitions_retractions_without_growing_the_epoch_document() {
     let error = advance(&floor_path, &attempted_revival)
         .unwrap_err()
         .to_string();
-    assert!(error.contains("durably retracted"), "unexpected error: {error}");
+    assert!(
+        error.contains("durably retracted"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
@@ -316,8 +252,7 @@ fn status_floor_lock_recovers_from_stale_sidecar_and_excludes_live_writer() {
 fn status_rejects_oversized_encoded_proof_before_decoding() {
     let authorization = authorization();
     let max_encoded_proof =
-        (chio_finding::MAX_FINDING_STATUS_PROOF_BYTES.saturating_add(2) / 3)
-            .saturating_mul(4);
+        (chio_finding::MAX_FINDING_STATUS_PROOF_BYTES.saturating_add(2) / 3).saturating_mul(4);
     let mut status = response("non_inclusion");
     status.proof_input_b64 = "A".repeat(max_encoded_proof.saturating_add(1));
 
@@ -374,7 +309,10 @@ fn status_operator_authorization_is_loaded_out_of_band_and_feed_pinned() {
     let error = load_status_operator_authorization(&path, "status-feed/elsewhere")
         .unwrap_err()
         .to_string();
-    assert!(error.contains("different feed"), "unexpected error: {error}");
+    assert!(
+        error.contains("different feed"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]

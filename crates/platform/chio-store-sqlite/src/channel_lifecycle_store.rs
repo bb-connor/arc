@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -26,6 +26,7 @@ use rusqlite::{
 use serde::Serialize;
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 use crate::{
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
     EconomicStateStageRecord, EconomicStateStageStatus,
@@ -53,6 +54,8 @@ const MAX_CHANNEL_PREPARED_PLAN_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelLifecycleStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("channel lifecycle store is unavailable: {0}")]
     Unavailable(String),
     #[error("channel lifecycle store mutation was fenced")]
@@ -192,7 +195,7 @@ impl ChannelReservationStageRecordV1 {
 
 #[derive(Clone)]
 pub struct SqliteChannelLifecycleStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
@@ -240,7 +243,7 @@ struct StoredPreparedPlan {
 
 impl SqliteChannelLifecycleStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -313,7 +316,10 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_channel_reservation(
         &self,
         advance: &VerifiedEconomicStateBatchAdvance,
@@ -532,7 +538,10 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_channel_anchor_advanced(
         &self,
         operation_id: &AdmissionOperationId,
@@ -829,6 +838,7 @@ impl SqliteChannelLifecycleStore {
             &operation,
             fence,
             trusted_now_unix_ms,
+            &self.serving_owner,
         )
         .map_err(admission_error)?
         {
@@ -920,11 +930,9 @@ impl SqliteChannelLifecycleStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, ChannelLifecycleStoreError> {
-        self.connection.lock().map_err(|_| {
-            ChannelLifecycleStoreError::Unavailable(
-                "sqlite channel lifecycle lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| ChannelLifecycleStoreError::Unavailable(fenced.to_string()))
     }
 }
 

@@ -483,6 +483,7 @@ pub(in crate::runtime) fn parse_peer_capabilities(params: &Value) -> PeerCapabil
         .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
 
     PeerCapabilities {
+        authorization: None,
         supports_progress: true,
         supports_cancellation: true,
         supports_subscriptions: resources
@@ -510,4 +511,25 @@ pub(in crate::runtime) fn parse_peer_capabilities(params: &Value) -> PeerCapabil
         elicitation_form,
         elicitation_url,
     }
+}
+
+/// Validate shape before session mutation. Cryptographic and replay checks belong to the kernel.
+pub(in crate::runtime) fn parse_request_dpop_proof(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<Value>, Value> {
+    let Some(value) = params
+        .get("_meta")
+        .and_then(|meta| meta.get("chioDpopProof"))
+    else {
+        return Ok(None);
+    };
+    serde_json::from_value::<chio_kernel::dpop::DpopProof>(value.clone()).map_err(|_| {
+        jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "urn:chio:error:kernel:dpop-malformed",
+        )
+    })?;
+    Ok(Some(value.clone()))
 }

@@ -22,6 +22,8 @@ use crate::hook::IouEnvelope;
 /// match without taking a hard dep on a specific store crate.
 #[derive(Debug, Error)]
 pub enum IouEnvelopeStoreError {
+    #[error("IOU envelope integrity failure: {0}")]
+    Integrity(&'static str),
     /// The store rejected the envelope as malformed or as having
     /// already been inserted with conflicting bytes.
     #[error("conflict persisting iou envelope: {0}")]

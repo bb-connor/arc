@@ -30,6 +30,7 @@ pub(crate) fn build_certification_body(
     scenarios: Vec<ScenarioDescriptor>,
     results: Vec<ScenarioResult>,
 ) -> Result<(CertificationCheckBody, Vec<u8>), CliError> {
+    let clock_now = unix_now()?;
     if criteria_profile != CRITERIA_PROFILE_ALL_PASS_V1 {
         return Err(CliError::attest_error(format!(
             "unsupported certification criteria profile: {criteria_profile}"
@@ -60,7 +61,7 @@ pub(crate) fn build_certification_body(
     let body = CertificationCheckBody {
         schema: CERTIFICATION_SCHEMA.to_string(),
         criteria_profile: criteria_profile.to_string(),
-        checked_at: unix_now(),
+        checked_at: clock_now,
         target: CertificationTarget {
             tool_server_id: tool_server_id.to_string(),
             tool_server_name: tool_server_name.map(ToOwned::to_owned),

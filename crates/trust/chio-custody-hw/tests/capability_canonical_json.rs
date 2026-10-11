@@ -144,3 +144,25 @@ fn audience_pin_encoded_verbatim() {
     };
     assert!(s.contains("\"audience\":\"urn:chio:audience:kernel\""));
 }
+
+#[test]
+fn canonical_capability_rejects_alternate_spelling_and_oversize(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cap = fixture_capability();
+    let bytes = cap.to_canonical_json()?;
+    let mut padded = vec![b' '];
+    padded.extend_from_slice(&bytes);
+    assert!(matches!(
+        PasskeyCapability::from_canonical_json(&padded),
+        Err(chio_custody_hw::CustodyError::Input(
+            chio_core_types::canonical::UntrustedJsonError::NonCanonical
+        ))
+    ));
+    assert!(matches!(
+        PasskeyCapability::from_canonical_json(&vec![b' '; 64 * 1024 + 1]),
+        Err(chio_custody_hw::CustodyError::Input(
+            chio_core_types::canonical::UntrustedJsonError::TooLarge { .. }
+        ))
+    ));
+    Ok(())
+}

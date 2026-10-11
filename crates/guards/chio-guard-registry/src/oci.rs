@@ -51,6 +51,9 @@ pub type Result<T> = std::result::Result<T, GuardRegistryError>;
 /// Errors returned by the guard registry.
 #[derive(Debug, thiserror::Error)]
 pub enum GuardRegistryError {
+    /// Original registry JSON violated its bounded input contract.
+    #[error("guard registry input rejected: {0}")]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     /// The user provided a reference without the required `oci://` prefix.
     #[error("guard OCI reference must start with oci://")]
     MissingOciScheme,
@@ -416,8 +419,6 @@ pub struct GuardRegistryConfig {
     pub allow_http_registries: Vec<String>,
     /// Maximum concurrent uploads.
     pub max_concurrent_upload: usize,
-    /// Maximum concurrent downloads.
-    pub max_concurrent_download: usize,
 }
 
 impl Default for GuardRegistryConfig {
@@ -425,7 +426,6 @@ impl Default for GuardRegistryConfig {
         Self {
             allow_http_registries: Vec::new(),
             max_concurrent_upload: oci_distribution::client::DEFAULT_MAX_CONCURRENT_UPLOAD,
-            max_concurrent_download: oci_distribution::client::DEFAULT_MAX_CONCURRENT_DOWNLOAD,
         }
     }
 }
@@ -438,7 +438,7 @@ impl GuardRegistryConfig {
             ));
         }
 
-        if self.max_concurrent_upload == 0 || self.max_concurrent_download == 0 {
+        if self.max_concurrent_upload == 0 {
             return Err(GuardRegistryError::InvalidClientConfig(
                 "registry concurrency limits must be greater than zero",
             ));
@@ -459,7 +459,6 @@ impl GuardRegistryConfig {
             accept_invalid_certificates: false,
             platform_resolver: None,
             max_concurrent_upload: self.max_concurrent_upload,
-            max_concurrent_download: self.max_concurrent_download,
             ..ClientConfig::default()
         })
     }
@@ -489,20 +488,7 @@ impl GuardRegistryClient {
         reference: &GuardOciRef,
         credentials: &RegistryCredentials,
     ) -> Result<PulledGuardArtifact> {
-        let image = self
-            .client
-            .pull(
-                reference.as_oci_reference(),
-                &credentials.to_registry_auth(),
-                vec![
-                    GUARD_WIT_LAYER_MEDIA_TYPE,
-                    GUARD_MODULE_LAYER_MEDIA_TYPE,
-                    GUARD_MANIFEST_LAYER_MEDIA_TYPE,
-                ],
-            )
-            .await?;
-
-        PulledGuardArtifact::from_image_data(reference.clone(), image)
+        self.pull_bounded_artifact(reference, credentials).await
     }
 
     /// Discover and pull a Sigstore bundle attached with OCI 1.1 referrers.
@@ -518,28 +504,17 @@ impl GuardRegistryClient {
             return Ok(None);
         };
 
-        let manifest_reference = Reference::with_digest(
-            reference.registry().to_string(),
-            reference.repository().to_string(),
-            referrer.digest.clone(),
-        );
-        let (manifest_json, manifest_digest) = self
-            .client
-            .pull_manifest_raw(
-                &manifest_reference,
-                &credentials.to_registry_auth(),
-                &[
-                    OCI_ARTIFACT_MANIFEST_MEDIA_TYPE,
-                    oci_distribution::manifest::OCI_IMAGE_MEDIA_TYPE,
-                ],
+        let manifest_json = self
+            .pull_manifest_bytes(
+                reference,
+                credentials,
+                &referrer.digest,
+                &format!(
+                    "{OCI_ARTIFACT_MANIFEST_MEDIA_TYPE}, {}",
+                    oci_distribution::manifest::OCI_IMAGE_MEDIA_TYPE
+                ),
             )
             .await?;
-        if manifest_digest != referrer.digest {
-            return Err(GuardRegistryError::ManifestDigestMismatch {
-                expected: referrer.digest,
-                actual: manifest_digest,
-            });
-        }
         let bundle_descriptor =
             sigstore_bundle_descriptor_from_manifest(&manifest_json, reference.digest().as_str())?;
         self.pull_registry_blob(reference, credentials, &bundle_descriptor)
@@ -563,20 +538,19 @@ impl GuardRegistryClient {
             .registry_get(
                 reference,
                 credentials,
-                &url,
-                &[("artifactType", SIGSTORE_BUNDLE_MEDIA_TYPE)],
-                OCI_IMAGE_INDEX_MEDIA_TYPE,
-                RegistryNotFoundBehavior::Error,
+                RegistryRead {
+                    url: &url,
+                    query: &[("artifactType", SIGSTORE_BUNDLE_MEDIA_TYPE)],
+                    accept: OCI_IMAGE_INDEX_MEDIA_TYPE,
+                    max_bytes: REGISTRY_HTTP_MAX_RESPONSE_BYTES,
+                    not_found: RegistryNotFoundBehavior::Error,
+                },
             )
             .await?
         else {
             return Ok(None);
         };
-        let index: ReferrersIndex = serde_json::from_slice(&body).map_err(|source| {
-            GuardRegistryError::ReferrersMalformed {
-                message: format!("parse referrers index: {source}"),
-            }
-        })?;
+        let index: ReferrersIndex = crate::input::external(&body)?;
         let mut candidates = index
             .manifests
             .into_iter()
@@ -604,6 +578,12 @@ impl GuardRegistryClient {
                 actual: descriptor.media_type.clone(),
             });
         }
+        let _: Sha256Digest = descriptor.digest.parse()?;
+        if descriptor.size < 0 || descriptor.size > REGISTRY_HTTP_MAX_RESPONSE_BYTES as i64 {
+            return Err(GuardRegistryError::InvalidClientConfig(
+                "Sigstore bundle exceeds byte limit",
+            ));
+        }
         let url = format!(
             "{}://{}/v2/{}/blobs/{}",
             self.scheme_for(reference.registry()),
@@ -615,10 +595,15 @@ impl GuardRegistryClient {
             .registry_get(
                 reference,
                 credentials,
-                &url,
-                &[],
-                SIGSTORE_BUNDLE_MEDIA_TYPE,
-                RegistryNotFoundBehavior::ReturnNone,
+                RegistryRead {
+                    url: &url,
+                    query: &[],
+                    accept: SIGSTORE_BUNDLE_MEDIA_TYPE,
+                    max_bytes: u64::try_from(descriptor.size).map_err(|_| {
+                        GuardRegistryError::InvalidClientConfig("negative registry blob size")
+                    })?,
+                    not_found: RegistryNotFoundBehavior::ReturnNone,
+                },
             )
             .await?
         else {
@@ -647,16 +632,21 @@ impl GuardRegistryClient {
         Ok(body)
     }
 
-    async fn registry_get(
+    pub(crate) async fn registry_get(
         &self,
         reference: &GuardOciRef,
         credentials: &RegistryCredentials,
-        url: &str,
-        query: &[(&str, &str)],
-        accept: &str,
-        not_found_behavior: RegistryNotFoundBehavior,
+        read: RegistryRead<'_>,
     ) -> Result<Option<Vec<u8>>> {
-        let contract = self.registry_egress_contract_for_url(url)?;
+        let RegistryRead {
+            url,
+            query,
+            accept,
+            max_bytes,
+            not_found,
+        } = read;
+        let mut contract = self.registry_egress_contract_for_url(url)?;
+        contract.max_response_bytes = max_bytes.max(1);
         let client = self.registry_http_client(url, &contract)?;
         let mut request = client
             .get(url)
@@ -689,11 +679,11 @@ impl GuardRegistryClient {
                 let response = self
                     .send_registry_request(url, &contract, &client, response)
                     .await?;
-                return registry_response_body(url, response, not_found_behavior);
+                return registry_response_body(url, response, not_found);
             }
         }
 
-        registry_response_body(url, response, not_found_behavior)
+        registry_response_body(url, response, not_found)
     }
 
     async fn registry_bearer_token(
@@ -713,6 +703,14 @@ impl GuardRegistryClient {
             request = request.query(&[("service", service)]);
         }
         if let RegistryCredentials::Basic { username, password } = credentials {
+            let realm = reqwest::Url::parse(&challenge.realm).map_err(|_| {
+                GuardRegistryError::InvalidClientConfig("invalid registry token realm")
+            })?;
+            if normalized_reqwest_url_authority(&realm)? != reference.registry() {
+                return Err(GuardRegistryError::InvalidClientConfig(
+                    "cross-origin registry credential delegation is not configured",
+                ));
+            }
             request = request.basic_auth(username, Some(password));
         }
         let response = self
@@ -726,11 +724,7 @@ impl GuardRegistryClient {
         .ok_or_else(|| GuardRegistryError::ReferrersMalformed {
             message: "token response unexpectedly returned 404".to_string(),
         })?;
-        let token: RegistryTokenResponse = serde_json::from_slice(&body).map_err(|source| {
-            GuardRegistryError::ReferrersMalformed {
-                message: format!("parse registry token response: {source}"),
-            }
-        })?;
+        let token: RegistryTokenResponse = crate::input::external(&body)?;
         token
             .token
             .or(token.access_token)
@@ -739,7 +733,7 @@ impl GuardRegistryClient {
             })
     }
 
-    fn scheme_for(&self, registry: &str) -> &'static str {
+    pub(crate) fn scheme_for(&self, registry: &str) -> &'static str {
         if self
             .allow_http_registries
             .iter()
@@ -799,6 +793,7 @@ impl GuardRegistryClient {
         contract: &HttpEgressContract,
     ) -> Result<reqwest::Client> {
         client_builder_with_contract(contract)
+            .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|source| GuardRegistryError::ReferrersRequest {
                 url: url.to_string(),
@@ -828,8 +823,16 @@ impl GuardRegistryClient {
     }
 }
 
+pub(crate) struct RegistryRead<'a> {
+    pub url: &'a str,
+    pub query: &'a [(&'a str, &'a str)],
+    pub accept: &'a str,
+    pub max_bytes: u64,
+    pub not_found: RegistryNotFoundBehavior,
+}
+
 #[derive(Clone, Copy)]
-enum RegistryNotFoundBehavior {
+pub(crate) enum RegistryNotFoundBehavior {
     ReturnNone,
     Error,
 }
@@ -847,7 +850,7 @@ fn registry_response_body(
             RegistryNotFoundBehavior::Error => Err(GuardRegistryError::ReferrersStatus {
                 url: url.to_string(),
                 status,
-                body: String::from_utf8_lossy(body).chars().take(512).collect(),
+                body: "response body withheld".to_string(),
             }),
         };
     }
@@ -855,7 +858,7 @@ fn registry_response_body(
         return Err(GuardRegistryError::ReferrersStatus {
             url: url.to_string(),
             status,
-            body: String::from_utf8_lossy(body).chars().take(512).collect(),
+            body: "response body withheld".to_string(),
         });
     }
     Ok(Some(body.to_vec()))
@@ -900,12 +903,7 @@ fn sigstore_bundle_descriptor_from_manifest(
     manifest_json: &[u8],
     expected_subject_digest: &str,
 ) -> Result<ReferrerBlobDescriptor> {
-    let manifest: SigstoreArtifactManifest =
-        serde_json::from_slice(manifest_json).map_err(|source| {
-            GuardRegistryError::ReferrersMalformed {
-                message: format!("parse Sigstore artifact manifest: {source}"),
-            }
-        })?;
+    let manifest: SigstoreArtifactManifest = crate::input::external(manifest_json)?;
     if manifest.artifact_type.as_deref() != Some(SIGSTORE_BUNDLE_MEDIA_TYPE) {
         return Err(GuardRegistryError::ReferrersMalformed {
             message: "Sigstore artifact manifest did not carry the Sigstore bundle artifactType"
@@ -997,7 +995,7 @@ pub struct PulledGuardArtifact {
 }
 
 impl PulledGuardArtifact {
-    fn from_image_data(reference: GuardOciRef, image: ImageData) -> Result<Self> {
+    pub(crate) fn from_image_data(reference: GuardOciRef, image: ImageData) -> Result<Self> {
         validate_config(&image.config)?;
         let (wit, module, manifest) = normalize_layers(image.layers)?;
 
@@ -1143,7 +1141,6 @@ mod tests {
         assert!(!config.accept_invalid_certificates);
         assert!(config.platform_resolver.is_none());
         assert!(config.max_concurrent_upload > 0);
-        assert!(config.max_concurrent_download > 0);
     }
 
     #[test]

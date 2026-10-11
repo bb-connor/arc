@@ -669,12 +669,9 @@ where
     if strict.as_slice() != raw {
         return Err(FindingError::NonCanonicalBytes(field));
     }
-    let typed: T = serde_json::from_slice(raw).map_err(|_| FindingError::InvalidField(field))?;
-    let typed_canonical = chio_core_types::canonical_json_bytes(&typed)
-        .map_err(|_| FindingError::Canonicalization)?;
-    if typed_canonical.as_slice() != raw {
-        return Err(FindingError::NonCanonicalBytes(field));
-    }
+    let typed: T = chio_core_types::canonical::UntrustedJsonText::new(text)
+        .decode_canonical()
+        .map_err(|_| FindingError::InvalidField(field))?;
     Ok(typed)
 }
 

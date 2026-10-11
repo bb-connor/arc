@@ -73,7 +73,10 @@
 //! are not part of it, so a retry issued from a later clock replays rather
 //! than stranding the durable row it is retrying.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+mod input_validation;
+use input_validation::*;
+
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::PublicKey;
@@ -89,12 +92,12 @@ use chio_settle::ConfirmedFindingImpairmentReconciliation;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use thiserror::Error;
 
-use crate::admission_operation_store::verify_active_owner;
 use crate::finding_purchase_store::{
     block_new_slots_tx, highest_slot_ordinal_tx, lift_sales_block_tx,
     outstanding_exposure_total_tx, FindingPurchaseStoreError,
 };
 use crate::serving_owner::SqliteServingOwner;
+use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
 
 mod submission_retention;
 pub use submission_retention::*;
@@ -156,6 +159,8 @@ const MAX_LIST_ROWS: usize = 512;
 /// rejection denies the mutation and rolls the transaction back.
 #[derive(Debug, Error)]
 pub enum FindingChallengeStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("finding challenge store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding challenge store fence rejected the caller")]
@@ -633,13 +638,13 @@ pub struct FindingEffectRootBindingRecord {
 
 #[derive(Clone)]
 pub struct SqliteFindingChallengeStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingChallengeStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -655,11 +660,9 @@ impl SqliteFindingChallengeStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingChallengeStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingChallengeStoreError::Unavailable(
-                "sqlite finding challenge lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingChallengeStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -725,7 +728,13 @@ include!("finding_challenge_store/schema_migrations.rs");
 include!("finding_challenge_store/input_bounds.rs");
 include!("finding_challenge_store_root_refresh.rs");
 
+#[cfg(all(test, unix))]
+mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_challenge_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

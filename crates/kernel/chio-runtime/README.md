@@ -89,6 +89,15 @@ Owned in this crate:
 
 ## Usage
 
+The facade forwards `with_operation_owned_runtime_replay` to the core hook and
+preserves its strict source-verification and cleanup contracts. This opt-in
+profile requires explicit activation in the qualified SQLite admission
+authority after legacy invocations have been quiesced. The setter is not an
+activation operation; unsupported backends and fixed clock overrides reject.
+See [operation-owned replay custody](../chio-runtime-core/README.md#operation-owned-replay-custody)
+for the backend and lifecycle requirements. Broader launch qualification remains
+tracked in the security roadmap.
+
 ```rust
 use chio_runtime::{
     ChioRuntimeAdmissionHook, InMemoryRuntimeAdmissionStore, RuntimeAdmissionProfile,

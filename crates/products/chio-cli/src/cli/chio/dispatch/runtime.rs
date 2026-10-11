@@ -48,8 +48,8 @@ pub(crate) fn canonical_sha256_json<T: serde::Serialize>(
 mod chio_orchestration_cli_tests {
     use super::{
         canonical_sha256_json, cmd_chio_runtime_ops_status, cmd_chio_runtime_orchestrate_drift,
-        cmd_chio_runtime_orchestrate_resume, cmd_chio_runtime_orchestrate_run,
-        cmd_chio_runtime_orchestrate_status,
+        cmd_chio_runtime_orchestrate_plan, cmd_chio_runtime_orchestrate_resume,
+        cmd_chio_runtime_orchestrate_run, cmd_chio_runtime_orchestrate_status,
     };
     use serde::de::DeserializeOwned;
     use std::error::Error;
@@ -401,6 +401,129 @@ mod chio_orchestration_cli_tests {
     }
 
     #[test]
+    fn runtime_orchestrate_commands_cannot_borrow_another_owners_lease(
+    ) -> Result<(), Box<dyn Error>> {
+        let dir = TempDir::new()?;
+        let profile = orchestration_profile();
+        let profile_path = write_profile(dir.path(), &profile)?;
+        let contract = runtime_contract(&profile, "run-owned")?;
+        let contract_path = write_contract(dir.path(), &contract)?;
+        let store_path = dir.path().join("runtime.sqlite3");
+        let evidence_dir = dir.path().join("evidence");
+        let report_path = dir.path().join("report.json");
+        let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
+        store.register_run(&contract.run_id)?;
+        let held = store.acquire_current_run_lease(&contract.run_id, "other-owner", 60_000)?;
+        store.record_run_state(&held, "running", None)?;
+        let connection = rusqlite::Connection::open(&store_path)?;
+        let snapshot = || -> rusqlite::Result<(String, String, i64, i64, i64, i64)> {
+            connection.query_row(
+                "SELECT r.status, l.owner_id, l.fencing_token, l.heartbeat_at_unix_ms,
+                 (SELECT COUNT(*) FROM runtime_step_states),
+                 (SELECT COUNT(*) FROM runtime_evidence_artifacts)
+                 FROM runtime_runs r JOIN runtime_run_leases l USING (run_id)",
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+        };
+        let before = snapshot()?;
+        for result in [
+            cmd_chio_runtime_orchestrate_plan(
+                &profile_path,
+                &contract_path,
+                &store_path,
+                &evidence_dir,
+                NOW,
+                &report_path,
+            ),
+            cmd_chio_runtime_orchestrate_run(
+                &profile_path,
+                &contract_path,
+                &store_path,
+                &evidence_dir,
+                NOW,
+                &report_path,
+            ),
+        ] {
+            let error = result.expect_err("another owner must keep exclusive write authority");
+            assert!(
+                error.to_string().contains("runtime_run_lease_conflict"),
+                "{error}"
+            );
+        }
+        assert_eq!(snapshot()?, before);
+        assert!(!report_path.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_orchestrate_plan_and_run_acquire_and_release_distinct_fences(
+    ) -> Result<(), Box<dyn Error>> {
+        let dir = TempDir::new()?;
+        let profile = orchestration_profile();
+        let profile_path = write_profile(dir.path(), &profile)?;
+        let contract = runtime_contract(&profile, "run-current-owner")?;
+        let contract_path = write_contract(dir.path(), &contract)?;
+        let store_path = dir.path().join("runtime.sqlite3");
+        let evidence_dir = dir.path().join("evidence");
+        write_runtime_evidence(&evidence_dir, &contract.run_id, NOW, "fresh")?;
+        let plan_path = dir.path().join("plan.json");
+        cmd_chio_runtime_orchestrate_plan(
+            &profile_path,
+            &contract_path,
+            &store_path,
+            &evidence_dir,
+            NOW,
+            &plan_path,
+        )?;
+        let connection = rusqlite::Connection::open(&store_path)?;
+        let lease = || -> rusqlite::Result<(i64, String)> {
+            connection.query_row(
+                "SELECT fencing_token, state FROM runtime_run_leases",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+        };
+        assert_eq!(lease()?, (1, "released".to_owned()));
+        let plan: serde_json::Value = read_json(&plan_path)?;
+        assert_eq!(plan["accepted"], true);
+
+        let report_path = dir.path().join("run.json");
+        cmd_chio_runtime_orchestrate_run(
+            &profile_path,
+            &contract_path,
+            &store_path,
+            &evidence_dir,
+            NOW,
+            &report_path,
+        )?;
+        let report: chio_runtime::RuntimeOrchestrationRunReport = read_json(&report_path)?;
+        assert!(report.accepted, "{:?}", report.failure_code);
+        assert_eq!(report.status, "proof_accepted");
+        assert_eq!(lease()?, (2, "released".to_owned()));
+        let persisted: (String, String, i64) = connection.query_row(
+            "SELECT r.status, s.state, (SELECT COUNT(*) FROM runtime_evidence_artifacts)
+             FROM runtime_runs r JOIN runtime_step_states s USING (run_id)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        assert_eq!(
+            persisted,
+            ("proof_accepted".to_owned(), "proof_accepted".to_owned(), 1)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn runtime_orchestrate_run_rejects_stale_evidence() -> Result<(), Box<dyn Error>> {
         let dir = TempDir::new()?;
         let profile = orchestration_profile();
@@ -595,8 +718,11 @@ mod chio_orchestration_cli_tests {
         let profile_path = write_profile(dir.path(), &orchestration_profile())?;
         let store_path = dir.path().join("runtime.sqlite3");
         let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
-        store.record_run_state("run-good", "proof_accepted", None, NOW)?;
-        store.record_run_state("run-missing", "proof_accepted", None, NOW)?;
+        for run in ["run-good", "run-missing"] {
+            store.register_run(run)?;
+            let lease = store.acquire_current_run_lease(run, "fixture", 60_000)?;
+            store.complete_run_write(&lease, "proof_accepted", None, &[], &[])?;
+        }
         let evidence_root = dir.path().join("evidence");
         write_runtime_evidence(&evidence_root.join("run-good"), "run-good", NOW, "fresh")?;
         let report_path = dir.path().join("status-report.json");
@@ -623,7 +749,9 @@ mod chio_orchestration_cli_tests {
         let profile_path = write_supervisor_profile(dir.path(), &supervisor_profile())?;
         let store_path = dir.path().join("runtime.sqlite3");
         let store = chio_runtime::SqliteRuntimeOrchestrationStore::open(&store_path)?;
-        store.record_run_state("run-without-evidence", "planned", None, NOW)?;
+        store.register_run("run-without-evidence")?;
+        let lease = store.acquire_current_run_lease("run-without-evidence", "fixture", 60_000)?;
+        store.complete_run_write(&lease, "planned", None, &[], &[])?;
         let evidence_root = dir.path().join("evidence");
         fs::create_dir_all(&evidence_root)?;
         let report_path = dir.path().join("ops-status-report.json");

@@ -1,0 +1,696 @@
+{
+  "schema": "chio.kani-open-residual.v1",
+  "observed_at": "2026-10-09T19:29:37.559359+00:00",
+  "decision": {
+    "kind": "owner_ruling_relayed_by_planner",
+    "owner": "Connor",
+    "mailbox": "coord/pr1160:to-codex.md",
+    "entry_utc": "2026-10-09T19:16:57Z",
+    "retained_mailbox_commit": "40b313fa294156836d6cce6e9f31c306fd4d505e"
+  },
+  "requirement_id": "KANI-PROOF-QUAL",
+  "priority": "P1",
+  "status": "open-unproved",
+  "followup": "KANI-ATTEST-DECOMP",
+  "followup_location": "swarm store",
+  "followup_acceptance": "Review a feasible decomposition after merge; prove full domain, assertions and non-vacuity without narrowing or silently changing assumptions.",
+  "landing_acceptance": "Owner permits #1160 landing with this explicit open residual. This is an acceptance-boundary amendment, never a passing proof or a changed historical result.",
+  "unproved_properties": [
+    "Full-domain attestation-encoding noncollision remains unproved; SHA-256 collision resistance is the separately approved ASSUME-SHA256 assumption.",
+    "The full-domain concrete real-SHA determinism, zero upper-half padding and context-wrapper binding harness has no completed whole-harness assertion and completion-cover result."
+  ],
+  "domain": {
+    "key_seeds": 256,
+    "receipt_root_positions": 32,
+    "pairs": 8192,
+    "real_sha_calls": 3,
+    "source_preserved": true,
+    "assertions_preserved": true,
+    "completion_cover_preserved": true
+  },
+  "release_claim_prohibition": "No release claim, including D8 previews under ADR-0011, may state or rely on the unproved obligation. Existing tests and bounded evidence retain only their recorded scope.",
+  "release_permitted": false,
+  "new_proof_campaigns_for_pr1160": false,
+  "ci_reporting": {
+    "marker": "open_residual = \"KANI-ATTEST-DECOMP\"",
+    "harness": "chio-attest-verify::public_expect_report_data_determinism_and_binding",
+    "result": "OPEN/UNPROVED; not executed or counted as passed",
+    "other_enrollments": "unchanged enforcement; arbitrary or duplicate residuals refused"
+  },
+  "retained_prior_evidence": [
+    {
+      "path": "docs/security/audits/attestation-proof-resource-diagnostics-20261009.json",
+      "sha256": "b178807da83b59442d8c99095bb29a4a4176d352769a4cc9e6a8f6bddc7da6b4",
+      "status": "resource refusals and nonqualifying partial-domain timeout retained"
+    },
+    {
+      "path": "/tmp/pr1160-kani-scope-binding-20261009/RESULT.json",
+      "sha256": "660479443030ac8b1e505c738f214f309780f23ddc70d6c766559edb2d9edcdb",
+      "status": "12 genuine Original failures; 15 repaired domain/fixture test methods passed before composition"
+    }
+  ],
+  "composition": {
+    "before": "9d7b95de647aca3cdae08713de4e64b8a863b745",
+    "source_base": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+    "source_files": {
+      ".github/workflows/ci.yml": "3fd0555d896b276a020cc99acc6f3a949edd34bb87cd1a5f5dccf809c46e14b7",
+      ".github/workflows/formal-pr-smoke.yml": "d79a9f40ba865df7b7698f7fdfe4c296bb5e7b97e431236ea2111b3753a0c0d0",
+      ".kani/harnesses.toml": "33f58a9d58d4d42c4ed5439e5104ecabd894c5e7029489fa4c988e015652a0b7",
+      "Cargo.lock": "15d0f0e0d009460e3ee8cfc41a38dec9b5ec0716656a3bcb503eaa42aed1b99f",
+      "crates/core/chio-core-types/Cargo.toml": "9d5e6e87b3ed28734face45a3e08262fe0064812fb737b0abaa448ffe6114aae",
+      "crates/core/chio-core-types/src/crypto.rs": "8115ba692cda5d6cde797119f58b422f3df9526be6f83d388a96dcb43598b163",
+      "crates/core/chio-core-types/src/crypto/encoding.rs": "3157afb3cf0bed39ba0bd8732a48a5a63bc65649cd981fd8089a1f1f73fba281",
+      "crates/core/chio-core-types/tests/hex_wire_compatibility.rs": "da730a2d9cc84a099a226b01ad56d30f3329006c26fc35140a66c92abfb25b70",
+      "crates/kernel/chio-kernel-core/Cargo.toml": "fa82089212ed8b184d3f2cf63583179f287ab39bbe31a2aaf2e6572eb75fe9cf",
+      "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs": "5c70bc78d60f80c3a943cfc5871a76afa0832ac42a895ef8d9f18a1118a33af0",
+      "crates/kernel/chio-kernel-core/src/receipts.rs": "d252e31974170b183ad7e209637677ede8ae088c746c76a5468b7abef6a8c9e8",
+      "crates/trust/chio-attest-verify/Cargo.toml": "e33d647787542c07142de34d34772d4ee3cd47caee0a3cba13a7a81c132e920d",
+      "crates/trust/chio-attest-verify/src/kani_crypto_research.rs": "6c0d50525847f04946627c55e01fe3de61fd3b3c4d70868c32efa7bc135cbba4",
+      "crates/trust/chio-attest-verify/src/kani_public_harnesses.rs": "ac5332043d20f16d0ff41acaccc9cb35982e8941d20cd5d565521736774348b9",
+      "crates/trust/chio-attest-verify/src/lib.rs": "e2613a75f85a2c6e3de2dcc27119518432683abb394427cf21045f0335cb24d9",
+      "crates/trust/chio-attest-verify/src/quote.rs": "0bbea85232a6c3d5872a12c32bc4e1a8caf4cd06e673c2f56a01657de8c5fc8b",
+      "crates/trust/chio-attest-verify/tests/report_data_allocations.rs": "b2634a88254c977df614ffefd1c4509aa7dc3ce92cf3cf703a4c8572f11def57",
+      "crates/trust/chio-attest-verify/tests/report_data_symbolic_domain.rs": "2c5c553a4f32331c4c9ed9cbc7bfae8ff2ee9c5f8ef992d7ed617a9689a96253",
+      "crates/trust/chio-weights/Cargo.toml": "a8a7469c2335673e8f2ea36d1e499ecb3c9fec8792acf18b7df3fa4963fe2cba",
+      "crates/trust/chio-weights/src/card.rs": "0fa9bb361cb25c148c4b486bc7624e0fe192c09354217683d2c3fb3b606c000c",
+      "crates/trust/chio-weights/src/kani_crypto_research.rs": "3eb539056c14a99d199affd38d690d763997428c94e0ba1680dacb736d8420d8",
+      "crates/trust/chio-weights/src/kani_public_harnesses.rs": "955fcf9b793ea69b72a9b16f85bfb1361b2912792e45f745239a77349c64ba9d",
+      "crates/trust/chio-weights/src/lib.rs": "8b6693ab76115e2f5bd7f3017a23e7ebd4a2d02a9e8cc68be71069cae799088b",
+      "crates/trust/chio-weights/tests/hash_binding.rs": "5f086434fec5cda851de40ffe04db31d7ccbbaf6aae2d6ef01c2a5296bef90b8",
+      "deploy/docker/Dockerfile.security-evidence-runner": "9ab586b0049f2904ee8b617d5efe5e421234197f6598115e8c87535e62f47f15",
+      "docs/formal/COVERAGE.md": "dd6d7186eb7e0a40993399f38f7663cda3fc70e5e465d8073661b3182723d0f4",
+      "docs/formal/CRYPTO_PROOF_SCOPE.md": "9b39688d5d0944c5d997b021345d0e20bfa48e3a629b72bbf7690c398b4a16fe",
+      "formal/assumptions.toml": "2c0fce0268b0918a2c2a56d3e83cbcfdeb5b5d1b7b15deef6b54e71ec0703ec8",
+      "formal/rust-verification/crypto-proof-scope.toml": "a19a5fa15624c3341d4ab7ecf55a0d1784cc1084761082a440cede9060ed673d",
+      "formal/rust-verification/kani-public-harnesses.toml": "01a212534d4d2fe4ec041e1effc0708bb9cb2112523c890d7a0db09130c55d85",
+      "scripts/check-kani-cover.py": "01dbdca179b753c7bad8ea40026826701c17e133458f267b5e01d0cb45f9f68e",
+      "scripts/check-kani-crypto-scope.py": "4487a00eaf19b51d5d2e54abbc1b50866ebd21bfbae9fa3d0f002514147e9961",
+      "scripts/check-kani-function-bound.py": "c52f11bc772e9d2b5b8530dd297a47bf889ea950750ebf89501d83cf3f4cdc10",
+      "scripts/check-kani-public-core.sh": "56e005abe3c6e19adc356f9a764ccb2e20b37a543f1b38a0bd63248848b6de17",
+      "scripts/check-kani-public-harnesses.py": "9cfaa3445364e3199ff0b7e9a58187a992232f88864132e8c7fafd67b16a1927",
+      "scripts/check-rust-verification-gates.sh": "d924ed476a7dfe8dcb0f2b00a8752519410b3ed637b61fb485923db8316e2939",
+      "scripts/check-security-ci-contract.py": "87052eb401b2018e220aba14e0758c81eefb937713a32e2d4ea3e5ed956d3da8",
+      "scripts/run-kani-manifest.sh": "bfef87fcf8eebe1a59ea883bace0e96f2491f801bb45be6e6ea4c1052788ef7b",
+      "scripts/run-kani-with-cover.sh": "542a9469c6ec11eaa7b06fef2dcf5200bab3b46353e7813fddda6adad9838c65",
+      "scripts/tests/check-kani-crypto-scope.test.py": "e25ba6ed60967b9d60c650360f1571ca655edaedbab486d1e439790eae1eab80",
+      "scripts/tests/check-kani-public-harnesses.test.py": "170c5fc27a51c29e0b68aff00c3a2d23cdbf96e7258d52c0cef55194a6a737cc",
+      "scripts/tests/check-rust-verification-gates.test.sh": "a12b823104ab626522f81df1597a9be6f4b574e3a7c4e0edc25086e289da83ad",
+      "scripts/tests/run-kani-function-bound.test.py": "da09ac0f816a84fe855c70d0ed5ed7ddd77fce5815f4cd9de3f73a212efa74dd",
+      "scripts/tests/run-kani-reachability.test.py": "9cac5e372280224cc9b5c0b7dfc32075c3ef518c1bc740e6b8abdf9816efb7ce"
+    },
+    "patch_sha256": "1b3c916eb32ea51d57d204335d087844311df005cd4a57a87bada710f449d781",
+    "apply_exit": 0,
+    "shared_index_untouched": true
+  },
+  "qualification": {
+    "status": "local runtime, strict lint, static controls and generated reporting qualified; independent review and exact hosted checks pending",
+    "evidence_directory": "/tmp/pr1160-landing-residual-20261009",
+    "original_residual_tests": {
+      "test_methods": 7,
+      "failed": 4,
+      "passed": 3,
+      "log_sha256": "daf67f213cbcaecc8f33f002ce0b319a5ca69baa78da14dd16daa734347810c7"
+    },
+    "repaired_residual_tests": {
+      "test_methods": 8,
+      "failed": 0,
+      "passed": 8,
+      "log_sha256": "dab8ea4e1c61922951498728efe99a2834ca61f43bfadd8117c47ee40cc2c56f"
+    },
+    "runtime": [
+      {
+        "name": "runtime",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-core-types",
+          "-p",
+          "chio-attest-verify",
+          "-p",
+          "chio-weights",
+          "--all-targets"
+        ],
+        "exit": 0,
+        "seconds": 251.1780078560114,
+        "source_stable": true,
+        "summaries": [
+          [
+            50,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            18,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            423,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            23,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            15,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            17,
+            0,
+            0
+          ],
+          [
+            22,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            31,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "bc90a071af9039fc428f7f558d339daee4dd48a06b2082247ec99455527da5b9"
+      },
+      {
+        "name": "strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-core-types",
+          "-p",
+          "chio-attest-verify",
+          "-p",
+          "chio-weights",
+          "-p",
+          "chio-kernel-core",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 148.59040683694184,
+        "source_stable": true,
+        "summaries": [],
+        "log_sha256": "cf4ea0efd99f5e93aea6f66f5e262a22e533274ba68a85e302ee214d4cfd8ed5"
+      }
+    ],
+    "supply_chain": [
+      {
+        "label": "vet",
+        "command": [
+          "cargo",
+          "vet",
+          "--locked"
+        ],
+        "exit": 0,
+        "seconds": 2.4905643463134766
+      },
+      {
+        "label": "deny",
+        "command": [
+          "cargo",
+          "deny",
+          "--locked",
+          "check"
+        ],
+        "exit": 0,
+        "seconds": 4.399834871292114
+      }
+    ],
+    "passing_static_logs": {
+      "green-final.log": "dab8ea4e1c61922951498728efe99a2834ca61f43bfadd8117c47ee40cc2c56f",
+      "public-renewed.log": "ad4b2ef6bf7089ddd82fcfd646be23ccb716bfe3393c230928585e9053f21c6d",
+      "metadata-only.log": "c23e4b3e7f388169f09ebe03bcd59bf404d091bf9cb8444400f15e75cf34c40a",
+      "ci-contract-mode-fixed.log": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "workflows.log": "2f320204f85062c0f9c5edb4454214fb3c386eccbc82ae654e31559a9d4d7995",
+      "gates/00.log": "91ce21aafb6721357598abe82448908850c27a3629834120b003ac208de759bf",
+      "gates/01.log": "7badd9ce2004a7a783c7a51cc1f31584c5c4bb72174e86b2bd41164f6cb05966",
+      "gates/02.log": "ec9fdcc772a410197e3b95ffc93c9d4c2df871d269b0122c0079a6361f495b3f",
+      "gates/04.log": "0dbe60e1c9ff9faa7697154ac5cc50c17488b2418f26023c7cc7e53393e9c833",
+      "gates/05.log": "160cb6c8cf8144f137bd89f4fb33ad427ed55b126da42f70f90d5a0a742d6c48",
+      "gates/07.log": "0a3997395a782644319b3ef7186a1acb2b516d824fe1b1fc864c9c4c1b017bc1",
+      "gates/08.log": "25117f4f9006eaf3179946dd8da61e6b2b8f659299300238a063de0f0df6ac88",
+      "gates/09.log": "602a2391cb0a049dd86ee1df14e08b385aeba19ce8cd0ea309e20a396c379889",
+      "gates/11.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gates/12.log": "cdf74a258fd79acf1f6fd7e21c4396f403adad11b38fa027245251f705b53904",
+      "gates/13.log": "1b8cb4595e959b1197f98ed5a16a9fb1b7c4256d29613c52f7662dce6d30ae51",
+      "workflow-controls.log": "0a57315527cea47ac7c86fc175038ae75f2dda5edbedabdc4579c9a778ecdfae",
+      "final-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "preserved_nonpassing_attempts": {
+      "gates/03.log": "Residual validator redundantly fixed the unwind bound and rejected an existing coordinated fixture. Removed redundant bound check; existing source/profile checks stay enforced. Public enrollment and nested regressions then passed.",
+      "gates/06.log": "Interrupted strict verification wrapper invocation; metadata-only renewal passed, no new attestation proof.",
+      "gates/10.log": "Checkout mode 0664 instead of the exact 0644 custody inventory.",
+      "ci-contract-renewed.log": "Additional pre-existing mode mismatch; all 17 remaining custody-inventory paths normalized, then the CI contract passed.",
+      "coverage/check.log": "CLI invocation used an unsupported subcommand; no drift check ran. Correct cargo xtask gen proof-coverage --check then passed."
+    },
+    "coverage_original": {
+      "failed": 1,
+      "passed": 0,
+      "reason": "The retained artifact had no unproved status and still showed execution_lane=pr.",
+      "log_sha256": "2c331add6fd35a9840302e8af69e91e9d675958b0eaffc71ae258f12f6da8b37"
+    },
+    "final_static": [
+      {
+        "name": "negative",
+        "command": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "exit": 0,
+        "seconds": 1.3008618354797363,
+        "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6"
+      },
+      {
+        "name": "clocks",
+        "command": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "seconds": 28.507433891296387,
+        "log_sha256": "991b1dca3c052c9f8aa6cd38b6b145d42b371fc5c1394bc02d2a504224eb57ff"
+      },
+      {
+        "name": "hygiene",
+        "command": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "seconds": 4.225934743881226,
+        "log_sha256": "cdf74a258fd79acf1f6fd7e21c4396f403adad11b38fa027245251f705b53904"
+      },
+      {
+        "name": "shell",
+        "command": [
+          "shellcheck",
+          "scripts/run-kani-manifest.sh",
+          "scripts/check-rust-verification-gates.sh",
+          "scripts/run-kani-with-cover.sh",
+          "scripts/check-kani-public-core.sh"
+        ],
+        "exit": 0,
+        "seconds": 0.32961344718933105,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "coverage": [
+      {
+        "name": "green",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "xtask",
+          "proof_coverage::"
+        ],
+        "exit": 0,
+        "seconds": 18.5595988961868,
+        "log_sha256": "d6d0be013c2a6314b069a02d2fb75ae8be851847137efc471dbf8c206c660ec8"
+      },
+      {
+        "name": "strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "xtask",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 166.61774108698592,
+        "log_sha256": "dfbb91747e0229d5a3d031b53ecae25c681e9656a3b19facc4bc20a45da85f8c"
+      },
+      {
+        "name": "generate",
+        "command": [
+          "cargo",
+          "xtask",
+          "gen",
+          "proof-coverage"
+        ],
+        "exit": 0,
+        "seconds": 77.02099943580106,
+        "log_sha256": "b4e0a8eecb20a6332c0dec0105a17e1e100c39b0c21e136b3c02cb697f9bc724"
+      },
+      {
+        "name": "check",
+        "command": [
+          "cargo",
+          "xtask",
+          "check",
+          "proof-coverage"
+        ],
+        "exit": 2,
+        "seconds": 0.78216159529984,
+        "log_sha256": "bdf832f1b27c6a10012d3c9629222a2c40255d788c542956c8062f4ee1add7ff"
+      },
+      {
+        "name": "check-correct-command",
+        "command": [
+          "cargo",
+          "xtask",
+          "gen",
+          "proof-coverage",
+          "--check"
+        ],
+        "exit": 0,
+        "log_sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+      }
+    ],
+    "coverage_test_count": 37,
+    "runtime_test_count": 775,
+    "runtime_source_manifest_sha256": "eedd86565faade7fa0d85361cc564c6977244414f279d3ed50e13d01fd0c9542"
+  },
+  "preserved_execution_mistake": {
+    "status": "interrupted_not_qualified",
+    "description": "The generic Rust-verification wrapper was invoked without its metadata-only flag. It completed small smoke controls and began Creusot compilation before Root stopped its owned process tree. No new attestation proof ran; the interruption is retained and not counted as qualification. The explicit metadata-only renewal passed.",
+    "evidence": "/tmp/pr1160-landing-residual-20261009/unintended-proof-stop.json"
+  },
+  "foundation_boundary": "docs/security/audits/foundation-landing-boundary-20261008.json",
+  "unchanged_landing_requirements": [
+    "Independent review and accurate dispositions.",
+    "Four required exact-candidate protected GitHub checks.",
+    "Trusted-definition ancestry and workflow parity.",
+    "Normal protected merge; no bypass or release authorization."
+  ],
+  "candidate_qualified": false,
+  "merged": false,
+  "hosted_observation": {
+    "head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+    "success": 117,
+    "failure": 8,
+    "skipped": 16,
+    "threads": 65,
+    "unresolved_threads": 33,
+    "new_comments_since_october_9": 0,
+    "interpretation": "Historical published head; not evidence for this unpublished final composition."
+  },
+  "final_code_files": {
+    ".github/workflows/ci.yml": "cb7dde94e839e99a86d535fbbce47f0b06d918cdb3b41587039adac4664fe49d",
+    ".github/workflows/formal-pr-smoke.yml": "7a66047a2c4e7172f24f9e3eafcfa02e0570bc4578f26d54d6f314cde7bdad11",
+    ".kani/harnesses.toml": "f74e9187c0cd51bb12a43fe3d2571d22a7a1eab393888a97dc71216db342cd75",
+    "Cargo.lock": "15d0f0e0d009460e3ee8cfc41a38dec9b5ec0716656a3bcb503eaa42aed1b99f",
+    "crates/core/chio-core-types/Cargo.toml": "9d5e6e87b3ed28734face45a3e08262fe0064812fb737b0abaa448ffe6114aae",
+    "crates/core/chio-core-types/src/crypto.rs": "8115ba692cda5d6cde797119f58b422f3df9526be6f83d388a96dcb43598b163",
+    "crates/core/chio-core-types/src/crypto/encoding.rs": "3157afb3cf0bed39ba0bd8732a48a5a63bc65649cd981fd8089a1f1f73fba281",
+    "crates/core/chio-core-types/tests/hex_wire_compatibility.rs": "da730a2d9cc84a099a226b01ad56d30f3329006c26fc35140a66c92abfb25b70",
+    "crates/kernel/chio-kernel-core/Cargo.toml": "fa82089212ed8b184d3f2cf63583179f287ab39bbe31a2aaf2e6572eb75fe9cf",
+    "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs": "5c70bc78d60f80c3a943cfc5871a76afa0832ac42a895ef8d9f18a1118a33af0",
+    "crates/kernel/chio-kernel-core/src/receipts.rs": "d252e31974170b183ad7e209637677ede8ae088c746c76a5468b7abef6a8c9e8",
+    "crates/trust/chio-attest-verify/Cargo.toml": "e33d647787542c07142de34d34772d4ee3cd47caee0a3cba13a7a81c132e920d",
+    "crates/trust/chio-attest-verify/src/kani_crypto_research.rs": "6c0d50525847f04946627c55e01fe3de61fd3b3c4d70868c32efa7bc135cbba4",
+    "crates/trust/chio-attest-verify/src/kani_public_harnesses.rs": "ac5332043d20f16d0ff41acaccc9cb35982e8941d20cd5d565521736774348b9",
+    "crates/trust/chio-attest-verify/src/lib.rs": "e2613a75f85a2c6e3de2dcc27119518432683abb394427cf21045f0335cb24d9",
+    "crates/trust/chio-attest-verify/src/quote.rs": "0bbea85232a6c3d5872a12c32bc4e1a8caf4cd06e673c2f56a01657de8c5fc8b",
+    "crates/trust/chio-attest-verify/tests/report_data_allocations.rs": "b2634a88254c977df614ffefd1c4509aa7dc3ce92cf3cf703a4c8572f11def57",
+    "crates/trust/chio-attest-verify/tests/report_data_symbolic_domain.rs": "2c5c553a4f32331c4c9ed9cbc7bfae8ff2ee9c5f8ef992d7ed617a9689a96253",
+    "crates/trust/chio-weights/Cargo.toml": "a8a7469c2335673e8f2ea36d1e499ecb3c9fec8792acf18b7df3fa4963fe2cba",
+    "crates/trust/chio-weights/src/card.rs": "0fa9bb361cb25c148c4b486bc7624e0fe192c09354217683d2c3fb3b606c000c",
+    "crates/trust/chio-weights/src/kani_crypto_research.rs": "3eb539056c14a99d199affd38d690d763997428c94e0ba1680dacb736d8420d8",
+    "crates/trust/chio-weights/src/kani_public_harnesses.rs": "955fcf9b793ea69b72a9b16f85bfb1361b2912792e45f745239a77349c64ba9d",
+    "crates/trust/chio-weights/src/lib.rs": "8b6693ab76115e2f5bd7f3017a23e7ebd4a2d02a9e8cc68be71069cae799088b",
+    "crates/trust/chio-weights/tests/hash_binding.rs": "5f086434fec5cda851de40ffe04db31d7ccbbaf6aae2d6ef01c2a5296bef90b8",
+    "deploy/docker/Dockerfile.security-evidence-runner": "9ab586b0049f2904ee8b617d5efe5e421234197f6598115e8c87535e62f47f15",
+    "formal/assumptions.toml": "2c0fce0268b0918a2c2a56d3e83cbcfdeb5b5d1b7b15deef6b54e71ec0703ec8",
+    "formal/rust-verification/crypto-proof-scope.toml": "a19a5fa15624c3341d4ab7ecf55a0d1784cc1084761082a440cede9060ed673d",
+    "formal/rust-verification/kani-public-harnesses.toml": "01a212534d4d2fe4ec041e1effc0708bb9cb2112523c890d7a0db09130c55d85",
+    "scripts/check-kani-cover.py": "01dbdca179b753c7bad8ea40026826701c17e133458f267b5e01d0cb45f9f68e",
+    "scripts/check-kani-crypto-scope.py": "f39cbb0084c18c23c0f258553fcaaf23b2c94ecfa7b6a01ac2f2fc07b1cad04b",
+    "scripts/check-kani-function-bound.py": "c52f11bc772e9d2b5b8530dd297a47bf889ea950750ebf89501d83cf3f4cdc10",
+    "scripts/check-kani-public-core.sh": "56e005abe3c6e19adc356f9a764ccb2e20b37a543f1b38a0bd63248848b6de17",
+    "scripts/check-kani-public-harnesses.py": "ffd40c0d4e40c7695fc7817b1ecfcdff7d8d1d835b277e76863692f397544ad2",
+    "scripts/check-rust-verification-gates.sh": "902e210ef9ec0db013efc7d22d910119ee33398aebce2765424e276e13727723",
+    "scripts/check-security-ci-contract.py": "94886270368b8098d19b74abbd8d4f86e980aeb5eb42fde3500179936626a072",
+    "scripts/kani_open_residual.py": "f0a7c095cc4b6e0d7751e760af2479d430eac31723460d789e7379f68ccbd3e8",
+    "scripts/run-kani-manifest.sh": "6670f8034252c21ce0dffa85ce78902d18a7aa2985d02e2f9c1f7369d53555cb",
+    "scripts/run-kani-with-cover.sh": "542a9469c6ec11eaa7b06fef2dcf5200bab3b46353e7813fddda6adad9838c65",
+    "scripts/tests/check-kani-crypto-scope.test.py": "e25ba6ed60967b9d60c650360f1571ca655edaedbab486d1e439790eae1eab80",
+    "scripts/tests/check-kani-public-harnesses.test.py": "170c5fc27a51c29e0b68aff00c3a2d23cdbf96e7258d52c0cef55194a6a737cc",
+    "scripts/tests/check-rust-verification-gates.test.sh": "3d83c528e1de5f9aac67d267576e4aac90a80092a49e772e228b89112cf77a79",
+    "scripts/tests/kani-open-residual.test.py": "2d99e56b5d16e75661335545d8cea234985124ddd3afdc143b9720e39b72c55a",
+    "scripts/tests/run-kani-function-bound.test.py": "da09ac0f816a84fe855c70d0ed5ed7ddd77fce5815f4cd9de3f73a212efa74dd",
+    "scripts/tests/run-kani-reachability.test.py": "9cac5e372280224cc9b5c0b7dfc32075c3ef518c1bc740e6b8abdf9816efb7ce",
+    "xtask/src/proof_coverage.rs": "46ec8fb2f05be6282417743f02e4d55a0f0e8b0345489330a4e6ac7be1517a38",
+    "xtask/src/proof_coverage/refinement.rs": "1f6e35bdd0d49b1e6cbaada302d90417592578ef048825d7b24f743c408ef3c9",
+    "xtask/src/proof_coverage/tests/mod.rs": "c1b94f373ad99ebe5c9e43101957b16006cd7d4514614d2f2779491f51c38097",
+    "xtask/src/proof_coverage/tests/open_residual.rs": "988b690f761b340ce9962d49d57564b64ee4437a40682e7379cbab64634975c1"
+  }
+}

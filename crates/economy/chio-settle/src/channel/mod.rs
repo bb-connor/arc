@@ -36,6 +36,8 @@ mod tests;
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum ChannelError {
+    #[error("invalid channel input: {0}")]
+    Input(#[from] chio_core::canonical::SharedUntrustedJsonError),
     #[error("invalid channel field `{0}`")]
     InvalidField(&'static str),
     #[error("channel arithmetic overflow")]

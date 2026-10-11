@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     local_participant_id TEXT NOT NULL CHECK (local_participant_id <> ''),
     state TEXT NOT NULL CHECK (
-        state IN ('round1_ready', 'round2_ready', 'completed')
+        state IN ('round1_ready', 'round2_ready', 'completed', 'failed')
     ),
     state_version INTEGER NOT NULL CHECK (state_version > 0),
     custody_generation TEXT NOT NULL CHECK (custody_generation <> ''),
@@ -75,6 +75,13 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
          AND public_key_package IS NOT NULL AND group_public_key IS NOT NULL
          AND verification_shares_json IS NOT NULL
          AND completed_at_unix_ms IS NOT NULL)
+        OR
+        (state = 'failed' AND state_version IN (3, 4)
+         AND secret_kind IN ('round2', 'key_package')
+         AND output_nonce IS NULL AND output_ciphertext IS NULL
+         AND input_transcript_digest IS NOT NULL
+         AND public_key_package IS NULL AND group_public_key IS NULL
+         AND verification_shares_json IS NULL AND completed_at_unix_ms IS NULL)
     )
 );
 
@@ -83,6 +90,22 @@ ON frost_ceremonies(scope_id, key_epoch, state);
 
 CREATE UNIQUE INDEX IF NOT EXISTS frost_ceremonies_scope_epoch_participant
 ON frost_ceremonies(scope_id, key_epoch, local_participant_id);
+
+CREATE TABLE IF NOT EXISTS frost_round2_acceptances (
+    ceremony_id TEXT NOT NULL REFERENCES frost_ceremonies(ceremony_id),
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    round INTEGER NOT NULL CHECK (round = 2),
+    sender_participant_id TEXT NOT NULL CHECK (sender_participant_id <> ''),
+    recipient_participant_id TEXT NOT NULL CHECK (recipient_participant_id <> ''),
+    envelope_json BLOB NOT NULL CHECK (length(envelope_json) BETWEEN 1 AND 32768),
+    envelope_digest TEXT NOT NULL CHECK (length(envelope_digest) = 64 AND envelope_digest NOT GLOB '*[^0-9a-f]*'),
+    share_nonce BLOB NOT NULL CHECK (length(share_nonce) = 12),
+    share_ciphertext BLOB NOT NULL CHECK (length(share_ciphertext) > 16),
+    accepted_at_unix_ms INTEGER NOT NULL CHECK (accepted_at_unix_ms > 0),
+    record_digest TEXT NOT NULL CHECK (length(record_digest) = 64 AND record_digest NOT GLOB '*[^0-9a-f]*'),
+    PRIMARY KEY (ceremony_id, key_epoch, round, sender_participant_id, recipient_participant_id),
+    CHECK (sender_participant_id <> recipient_participant_id)
+);
 
 CREATE TABLE IF NOT EXISTS frost_roster_history (
     scope_id TEXT NOT NULL CHECK (scope_id <> ''),
@@ -405,7 +428,7 @@ CREATE TABLE IF NOT EXISTS frost_projection_commits (
     projection_key TEXT NOT NULL CHECK (projection_key <> ''),
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence > 0),
     projection_type TEXT NOT NULL CHECK (
-        projection_type IN ('ceremony', 'rotation', 'signer', 'coordinator')
+        projection_type IN ('ceremony', 'ceremony_inbox', 'rotation', 'signer', 'coordinator')
     ),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     record_digest TEXT NOT NULL CHECK (

@@ -21,15 +21,16 @@ where
             "cross-boundary request referenced treaty evidence that is not in the verifier-owned store",
         );
     };
-    if record.artifact_sha256 != reference.artifact_sha256 {
+    if record.artifact_sha256 != reference.artifact_sha256
+        || crate::hash::canonical_sha256(&record.raw_json)? != reference.artifact_sha256
+    {
         return rejected(
             mismatch_code,
             "cross-boundary request treaty evidence hash does not match verifier-owned store",
         );
     }
     let artifact_sha256 = record.artifact_sha256;
-    let artifact: T = serde_json::from_value(record.raw_json)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let artifact: T = serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)?;
     Ok((artifact, artifact_sha256))
 }
 
@@ -50,8 +51,8 @@ where
             "cross-boundary request referenced treaty evidence that is not in the verifier-owned store",
         );
     };
-    let invocation: BilateralInvocation = serde_json::from_value(record.raw_json)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let invocation: BilateralInvocation =
+        serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)?;
     let artifact_sha256 = bilateral_invocation_binding_sha256(&invocation)?;
     if artifact_sha256 != reference.artifact_sha256 {
         return rejected(

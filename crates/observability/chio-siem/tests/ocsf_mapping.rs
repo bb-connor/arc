@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel, metadata::GuardEvidence,
@@ -64,8 +64,8 @@ fn receipt_with(
         tool_origin: semantics.tool_origin,
         redaction_mode: semantics.redaction_mode,
         actor_chain: semantics.actor_chain,
-        content_hash: "content-hash".to_string(),
-        policy_hash: "policy-hash".to_string(),
+        content_hash: "0".repeat(64),
+        policy_hash: "1".repeat(64),
         evidence,
         metadata,
         trust_level,
@@ -149,10 +149,10 @@ fn deny_receipt_maps_to_failure_event() {
     assert_eq!(ev["status"], "Failure");
     assert_eq!(ev["severity_id"], 4, "Deny -> High");
     assert_eq!(ev["severity"], "High");
-    assert_eq!(ev["status_detail"], "forbidden path");
+    assert!(ev.get("status_detail").is_none());
     assert_eq!(
-        ev["unmapped"]["chio"]["decision.guard"],
-        "ForbiddenPathGuard"
+        ev["unmapped"]["chio"]["guard_sha256"],
+        sha256_hex(b"ForbiddenPathGuard")
     );
 }
 
@@ -227,7 +227,7 @@ fn receipt_observables_contain_tool_and_capability() {
         .iter()
         .find(|o| o["name"] == "chio.capability.id")
         .expect("capability observable");
-    assert_eq!(capability["value"], "cap-xyz");
+    assert_eq!(capability["value"], sha256_hex(b"cap-xyz"));
     assert_eq!(capability["type_id"], 10);
 }
 
@@ -239,7 +239,7 @@ fn deny_receipt_observables_include_guard() {
         .iter()
         .find(|o| o["name"] == "chio.guard")
         .expect("guard observable present on deny");
-    assert_eq!(guard["value"], "ForbiddenPathGuard");
+    assert_eq!(guard["value"], sha256_hex(b"ForbiddenPathGuard"));
 }
 
 #[test]
@@ -258,10 +258,13 @@ fn tenant_id_surfaces_only_from_top_level_receipt_field() {
     assert!(
         enrichments
             .iter()
-            .any(|e| e["name"] == "chio.tenant_id" && e["value"] == "tenant-42"),
+            .any(|e| e["name"] == "chio.tenant_id_sha256" && e["value"] == sha256_hex(b"tenant-42")),
         "expected tenant_id enrichment: {enrichments:?}",
     );
-    assert_eq!(ev["unmapped"]["chio"]["tenant_id"], "tenant-42");
+    assert_eq!(
+        ev["unmapped"]["chio"]["tenant_id_sha256"],
+        sha256_hex(b"tenant-42")
+    );
 }
 
 #[test]
@@ -278,39 +281,41 @@ fn metadata_tenant_id_is_not_authoritative() {
 
     let enrichments = ev["enrichments"].as_array().expect("enrichments array");
     assert!(
-        !enrichments.iter().any(|e| e["name"] == "chio.tenant_id"),
+        !enrichments
+            .iter()
+            .any(|e| e["name"] == "chio.tenant_id_sha256"),
         "metadata tenant_id must not create authoritative tenant enrichment: {enrichments:?}",
     );
-    assert!(ev["unmapped"]["chio"]["tenant_id"].is_null());
+    assert!(ev["unmapped"]["chio"]["tenant_id_sha256"].is_null());
 }
 
 #[test]
-fn guard_evidence_populates_enrichments() {
+fn guard_evidence_details_stay_out_of_enrichments() {
     let ev = receipt_to_ocsf(&deny_receipt());
     let enrichments = ev["enrichments"].as_array().expect("enrichments array");
-    let guard_enrichment = enrichments
+    assert!(!enrichments
         .iter()
-        .find(|e| e["name"] == "chio.guard.evidence.0")
-        .expect("guard evidence enrichment");
-    assert_eq!(guard_enrichment["value"], "ForbiddenPathGuard");
-    assert_eq!(guard_enrichment["data"]["verdict"], false);
-    assert_eq!(
-        guard_enrichment["data"]["details"],
-        "path matches deny-list"
-    );
+        .any(|e| e["name"] == "chio.guard.evidence.0"));
+    assert!(!serde_json::to_string(&ev)
+        .unwrap()
+        .contains("path matches deny-list"));
 }
 
 #[test]
-fn canonical_json_roundtrip_preserves_raw_data_field() {
+fn original_payload_requires_separate_authorized_retrieval() {
     let receipt = allow_receipt();
     let ev = receipt_to_ocsf(&receipt);
 
-    let raw = ev["raw_data"].as_str().expect("raw_data is a string");
-    let parsed: Value = serde_json::from_str(raw).expect("raw_data is valid JSON");
-    assert_eq!(parsed["id"], receipt.id);
-    assert_eq!(parsed["capability_id"], receipt.capability_id);
-    assert_eq!(parsed["tool_server"], receipt.tool_server);
-    assert_eq!(parsed["tool_name"], receipt.tool_name);
+    assert!(ev.get("raw_data").is_none());
+    assert!(ev["api"]["request"].get("data").is_none());
+    assert_eq!(ev["unmapped"]["chio"]["receipt_id"], receipt.id);
+    assert_eq!(
+        ev["unmapped"]["chio"]["parameter_hash"],
+        receipt.action.parameter_hash
+    );
+    assert_eq!(ev["unmapped"]["chio"]["payload_included"], false);
+    assert_eq!(ev["unmapped"]["chio"]["original_retrieval_required"], true);
+    assert_eq!(ev["unmapped"]["chio"]["projection_signed"], false);
 }
 
 #[test]

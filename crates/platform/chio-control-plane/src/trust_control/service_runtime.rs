@@ -29,4 +29,13 @@ mod tests;
 
 use super::*;
 
+#[cfg(test)]
+pub(crate) use init::open_service_receipt_store;
+#[cfg(test)]
+pub(crate) fn provision_service_authority(
+    config: &TrustServiceConfig,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<(), CliError> {
+    init::provision_service_authority(config, clock)
+}
 pub(crate) use init::serve_async;

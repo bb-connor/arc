@@ -11,7 +11,7 @@ pub(crate) async fn handle_capital_book_report(
         return response;
     }
 
-    let receipt_store = match open_receipt_store(&state.config) {
+    let receipt_store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
@@ -43,8 +43,8 @@ pub(crate) async fn handle_issue_capital_execution_instruction(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -54,7 +54,7 @@ pub(crate) async fn handle_issue_capital_execution_instruction(
     };
 
     match issue_signed_capital_execution_instruction_detailed(
-        receipt_db_path,
+        receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
@@ -73,8 +73,8 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
         return response;
     }
 
-    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
-        Some(path) => path,
+    let receipt_store = match state.receipt_store.as_deref() {
+        Some(store) => store,
         None => {
             return plain_http_error(
                 StatusCode::CONFLICT,
@@ -84,7 +84,7 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
     };
 
     match issue_signed_capital_allocation_decision_detailed(
-        receipt_db_path,
+        receipt_store,
         state.config.budget_db_path.as_deref(),
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),

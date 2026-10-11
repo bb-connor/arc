@@ -1,5 +1,7 @@
+use chio_security_types::clock::{Clock, SystemClock};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::Arc;
 
 use chio_core::capability::scope::ChioScope;
 use chio_core::crypto::PublicKey;
@@ -17,26 +19,30 @@ use super::scope::enforce_tier_scope;
 use super::types::{
     LocalReputationInspection, LocalReputationTierView, ProbationaryStatus, ReputationScoringSource,
 };
-use super::util::unix_now;
+pub(in crate::issuance) struct ReputationInspectionContext<'a> {
+    pub clock: Arc<dyn Clock>,
+    pub trusted_kernel_keys: &'a [String],
+    pub read_context: &'a ReceiptReadContext,
+}
 
 pub(in crate::issuance) fn enforce_reputation_policy(
     subject: &PublicKey,
     scope: &ChioScope,
     ttl_seconds: u64,
     policy: &ReputationIssuancePolicy,
-    receipt_db_path: Option<&Path>,
+    receipt_store: Option<&SqliteReceiptStore>,
     budget_db_path: Option<&Path>,
-    trusted_kernel_keys: &[String],
+    context: ReputationInspectionContext<'_>,
 ) -> Result<(), KernelError> {
     let subject_key = subject.to_hex();
-    let inspection = inspect_local_reputation(
+    let inspection = inspect_local_reputation_on_store(
         &subject_key,
-        receipt_db_path,
+        receipt_store,
         budget_db_path,
         None,
         None,
         Some(policy),
-        trusted_kernel_keys,
+        context,
     )?;
     let tier = inspection.resolved_tier.ok_or_else(|| {
         KernelError::CapabilityIssuanceFailed(
@@ -83,21 +89,94 @@ pub(crate) fn inspect_local_reputation_with_read_context(
     trusted_kernel_keys: &[String],
     read_context: &ReceiptReadContext,
 ) -> Result<LocalReputationInspection, KernelError> {
-    let corpus = build_local_reputation_corpus_with_read_context(
+    inspect_local_reputation_with_context(
         subject_key,
         receipt_db_path,
         budget_db_path,
         since,
         until,
-        read_context,
+        issuance_policy,
+        ReputationInspectionContext {
+            clock: Arc::new(SystemClock),
+            trusted_kernel_keys,
+            read_context,
+        },
+    )
+}
+
+fn inspect_local_reputation_with_context(
+    subject_key: &str,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    context: ReputationInspectionContext<'_>,
+) -> Result<LocalReputationInspection, KernelError> {
+    let receipt_store = open_reputation_receipt_store(receipt_db_path, &context.clock)?;
+    inspect_local_reputation_on_store(
+        subject_key,
+        receipt_store.as_ref(),
+        budget_db_path,
+        since,
+        until,
+        issuance_policy,
+        context,
+    )
+}
+
+/// Inspect reputation over a service's already open receipt store, using that
+/// store's clock so the inspection adds no other time owner.
+pub(crate) fn inspect_local_reputation_with_store(
+    subject_key: &str,
+    receipt_store: &SqliteReceiptStore,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    trusted_kernel_keys: &[String],
+    read_context: &ReceiptReadContext,
+) -> Result<LocalReputationInspection, KernelError> {
+    inspect_local_reputation_on_store(
+        subject_key,
+        Some(receipt_store),
+        budget_db_path,
+        since,
+        until,
+        issuance_policy,
+        ReputationInspectionContext {
+            clock: receipt_store.authority_clock(),
+            trusted_kernel_keys,
+            read_context,
+        },
+    )
+}
+
+fn inspect_local_reputation_on_store(
+    subject_key: &str,
+    receipt_store: Option<&SqliteReceiptStore>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuance_policy: Option<&ReputationIssuancePolicy>,
+    context: ReputationInspectionContext<'_>,
+) -> Result<LocalReputationInspection, KernelError> {
+    let corpus = build_local_reputation_corpus_on_store(
+        subject_key,
+        receipt_store,
+        budget_db_path,
+        since,
+        until,
+        context.read_context,
+        context.clock.clone(),
     )?;
     let (scoring_source, scoring, probationary_receipt_count, probationary_min_days, ceiling) =
-        scoring_context(issuance_policy, trusted_kernel_keys);
-    let now = unix_now();
+        scoring_context(issuance_policy, context.trusted_kernel_keys);
+    let now = context.clock.unix_millis()?.as_secs();
     let scorecard = compute_local_scorecard(subject_key, now, &corpus, &scoring);
     let probationary_status = ProbationaryStatus {
-        below_receipt_target: scorecard.history_depth.receipt_count
-            < probationary_receipt_count as usize,
+        below_receipt_target: crate::integer::count(scorecard.history_depth.receipt_count)
+            < probationary_receipt_count,
         below_day_target: scorecard.history_depth.span_days < probationary_min_days,
     };
     let probationary =
@@ -157,12 +236,61 @@ pub fn build_local_reputation_corpus_with_read_context(
     until: Option<u64>,
     read_context: &ReceiptReadContext,
 ) -> Result<LocalReputationCorpus, KernelError> {
+    build_local_reputation_corpus_with_clock(
+        subject_key,
+        receipt_db_path,
+        budget_db_path,
+        since,
+        until,
+        read_context,
+        Arc::new(SystemClock),
+    )
+}
+
+fn build_local_reputation_corpus_with_clock(
+    subject_key: &str,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    read_context: &ReceiptReadContext,
+    clock: Arc<dyn Clock>,
+) -> Result<LocalReputationCorpus, KernelError> {
+    let receipt_store = open_reputation_receipt_store(receipt_db_path, &clock)?;
+    build_local_reputation_corpus_on_store(
+        subject_key,
+        receipt_store.as_ref(),
+        budget_db_path,
+        since,
+        until,
+        read_context,
+        clock,
+    )
+}
+
+fn open_reputation_receipt_store(
+    receipt_db_path: Option<&Path>,
+    clock: &Arc<dyn Clock>,
+) -> Result<Option<SqliteReceiptStore>, KernelError> {
+    receipt_db_path
+        .map(|path| SqliteReceiptStore::open_with_clock(path, clock.clone()))
+        .transpose()
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+}
+
+fn build_local_reputation_corpus_on_store(
+    subject_key: &str,
+    receipt_store: Option<&SqliteReceiptStore>,
+    budget_db_path: Option<&Path>,
+    since: Option<u64>,
+    until: Option<u64>,
+    read_context: &ReceiptReadContext,
+    clock: Arc<dyn Clock>,
+) -> Result<LocalReputationCorpus, KernelError> {
     let mut receipts = Vec::new();
     let mut capabilities = BTreeMap::new();
 
-    if let Some(path) = receipt_db_path {
-        let store = SqliteReceiptStore::open(path)
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+    if let Some(store) = receipt_store {
         receipts = store
             .list_tool_receipts_for_subject_with_context(read_context, subject_key)
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
@@ -203,7 +331,7 @@ pub fn build_local_reputation_corpus_with_read_context(
 
     let mut budget_usage = Vec::new();
     if let Some(path) = budget_db_path {
-        let store = SqliteBudgetStore::open(path)
+        let store = SqliteBudgetStore::open_with_clock(path, clock)
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
         for capability in capabilities.values() {
             for grant_index in 0..capability.scope.grants.len() {

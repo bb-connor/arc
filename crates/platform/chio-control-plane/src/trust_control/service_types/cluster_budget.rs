@@ -11,6 +11,7 @@ pub(crate) struct ClusterStatusResponse {
     pub(crate) quorum_size: usize,
     pub(crate) reachable_nodes: usize,
     pub(crate) election_term: u64,
+    pub(crate) signing_custody: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
     pub(crate) replication: ClusterReplicationHeadsView,
@@ -280,22 +281,8 @@ pub(crate) struct BudgetMutationEventView {
     pub(crate) authority: Option<BudgetMutationAuthorityView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AuthoritySnapshotView {
-    pub(crate) public_key_hex: String,
-    pub(crate) generation: u64,
-    pub(crate) rotated_at: u64,
-    pub(crate) trusted_keys: Vec<AuthorityTrustedKeyView>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AuthorityTrustedKeyView {
-    pub(crate) public_key_hex: String,
-    pub(crate) generation: u64,
-    pub(crate) activated_at: u64,
-}
+pub(crate) type AuthoritySnapshotView =
+    chio_kernel::authority::replication::SignedAuthoritySnapshot;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

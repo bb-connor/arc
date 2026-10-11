@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller_delivery_report.schema.json",
+  "title": "Chio signed caller delivery report",
+  "description": "Executor-authenticated historical observation, never a new execution permit or provider attestation. Canonical encoding is bounded to 1048576 bytes. Raw output remains on the trusted executor-to-kernel path until finalization permits release.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report", "signature"],
+  "properties": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "authorization_digest", "executor", "claim_id", "execution_started_at_unix_ms", "completed_at_unix_ms", "output", "realized_cost"],
+      "properties": {
+        "schema": {"const": "chio.caller-delivery-report.v1"},
+        "authorization_digest": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerDigest"},
+        "executor": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerExecutor"},
+        "claim_id": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerIdentifier"},
+        "execution_started_at_unix_ms": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerPositiveInteger"},
+        "completed_at_unix_ms": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerPositiveInteger"},
+        "output": {},
+        "realized_cost": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["units", "currency"],
+              "properties": {
+                "units": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+                "currency": {"type": "string", "minLength": 1, "maxLength": 64}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "signature": {"$ref": "caller_dispatch_authorization.schema.json#/$defs/callerSignature"}
+  }
+}

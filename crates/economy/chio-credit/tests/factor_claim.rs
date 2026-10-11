@@ -315,7 +315,8 @@ fn sealed_claim_rejects_legacy_and_untrusted_evidence() -> SupportResult<()> {
             &evidence.trust,
             TRUSTED_NOW,
         ),
-        Err(FactorError::Canonicalization(_))
+        Err(FactorError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-invalid-shape"
     ));
     let wrong_issuer = IouEnvelopeIssuerTrustV2::new(
         IOU_ISSUER_ID.to_owned(),

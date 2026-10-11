@@ -8,6 +8,9 @@ pause/resume cycle to Chio's ``Verdict::PendingApproval`` path.
 Public surface
 --------------
 
+* :class:`ChioProcessToolNode` -- execute tools through an authenticated Chio
+  process using persisted graph identities and kernel recovery. Definitions
+  use :class:`ProcessTool`; errors stop the graph as :class:`ChioProcessToolError`.
 * :func:`chio_node` -- wrap a LangGraph node callable so each dispatch
   evaluates through the Chio sidecar before the wrapped body runs. A
   deny verdict raises :class:`ChioLangGraphError`.
@@ -33,6 +36,12 @@ from chio_langgraph.approval import (
 )
 from chio_langgraph.errors import ChioLangGraphConfigError, ChioLangGraphError
 from chio_langgraph.nodes import chio_node
+from chio_langgraph.process import (
+    ChioProcessToolError,
+    ChioProcessToolNode,
+    ProcessTool,
+    process_operation_key,
+)
 from chio_langgraph.scoping import ChioGraphConfig, enforce_subgraph_ceiling
 
 __all__ = [
@@ -44,6 +53,10 @@ __all__ = [
     "ChioGraphConfig",
     "ChioLangGraphConfigError",
     "ChioLangGraphError",
+    "ChioProcessToolError",
+    "ChioProcessToolNode",
+    "ProcessTool",
+    "process_operation_key",
     "chio_approval_node",
     "chio_node",
     "enforce_subgraph_ceiling",

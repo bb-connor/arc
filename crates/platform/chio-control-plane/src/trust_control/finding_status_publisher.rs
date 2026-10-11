@@ -178,7 +178,8 @@ impl FindingStatusEpochPublisher {
             operator_key: self.operator_signer.public_key(),
             operator_key_epoch: self.operator.authority.key_epoch,
             root_hash: hex::encode(map.root().root_hash),
-            tree_depth: FINDING_STATUS_SPARSE_DEPTH as u16,
+            tree_depth: u16::try_from(FINDING_STATUS_SPARSE_DEPTH)
+                .map_err(|_| "finding status tree depth exceeds wire field".to_owned())?,
             hash_algorithm: FINDING_STATUS_HASH_ALGORITHM.to_owned(),
             key_hash_domain: FINDING_STATUS_KEY_HASH_DOMAIN.to_owned(),
             empty_leaf_domain: FINDING_STATUS_EMPTY_LEAF_DOMAIN.to_owned(),

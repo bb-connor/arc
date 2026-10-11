@@ -1,0 +1,300 @@
+{
+  "schema": "chio.security.native-capture-checkpoint.v1",
+  "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+  "published_source": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "qualified": false,
+  "merged": false,
+  "integration_map": [
+    {
+      "original_commit": "2663d3fe4ca80f358ef4205b6ab885ec2ef8f6bf",
+      "integration_commit": "77bf592b16ed943f287e8eee63680faff2e4d64e",
+      "kind": "first custody Original; actual 0002 0/2 genuine failures"
+    },
+    {
+      "original_commit": "fc7ad814c4f5db6df946c89b1f527708e3582d2e",
+      "integration_commit": "ee14085d355233cb09b262bb7b5a454aa0b8ba2e",
+      "kind": "authority retention repair"
+    },
+    {
+      "original_commit": "49e40fdb0b72f9d02d1762efdbeacd5675b4c60b",
+      "integration_commit": "4da66cd45d57ff0baec3465ce18332b91818ddf8",
+      "kind": "kernel retention controls"
+    },
+    {
+      "original_commit": "01e47f6519f7bddd7e3afda6e5b16b117b890c85",
+      "integration_commit": "7ba2dfc0b5422d74bcf67d5cae2bd35b66a12459",
+      "kind": "control-plane retention controls"
+    },
+    {
+      "original_commit": "bc1e137996745eeb3fafcf7c63d9c7ec050a2c55",
+      "integration_commit": "1314c9deeacae1da63755a75ca0ce6689cdf4a11",
+      "kind": "direct retention Original only"
+    },
+    {
+      "original_commit": "974ca6a449788516c1ef301ca0b7a220f3b7dd0b",
+      "integration_commit": "5dd0ed870bd632565935380cc105f9f94d40d34e",
+      "kind": "direct retention readback repair after genuine 2-failure Original"
+    },
+    {
+      "original_commit": "b2062d2940b2adef3048bc44e31ce3c68140f96a",
+      "integration_commit": "49c7529af16735961979e516fde3c970f8009876",
+      "kind": "kernel direct retention controls"
+    },
+    {
+      "original_commit": "f522258bed349a49525c2b6618ceef041891a641",
+      "integration_commit": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "kind": "control-plane direct retention controls"
+    }
+  ],
+  "independent_review": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/nativecap-independent-review/REVIEW.md",
+    "sha256": "ce3b74fbe74dc4458474413d0b0f749e8492bbc2d1047a2a055a2b545ae0a788",
+    "scope": "Finite eight-commit native-capture source and evidence review; not full candidate or hosted acceptance."
+  },
+  "receipts": {
+    "nativecap-order-original": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-order-original-receipt.json",
+      "sha256": "5b04a5aec9587d7c31e8db9f53cdac9bfc370cf384943df6104aca39a94cd1d3",
+      "source": "77bf592b16ed943f287e8eee63680faff2e4d64e",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "security::adapters::tests::native_flow::support::declassification::capture_order",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "c6a69525f1a4c618bc705e6387960ae1690301c8c717faa511317445e9436ab2",
+      "scope": "selected owning cases; inspect each outcome and zero selections"
+    },
+    "nativecap-direct-original": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-direct-original-receipt.json",
+      "sha256": "6920242d6c82f9a994de4b7b2851add97ee304e5a0530e12e9f4794aa233385a",
+      "source": "1314c9deeacae1da63755a75ca0ce6689cdf4a11",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "security::adapters::tests::native_flow::support::declassification::capture_order",
+        "security::adapters::tests::native_flow::support::capture::direct_retention",
+        "kernel::tests::durable_admission::native_egress::capture_once",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "e194114cdd389e4a725c708305e4cea69c68a55175e62e6d7cbe2de5c5da6489",
+      "scope": "selected owning cases; inspect each outcome and zero selections"
+    },
+    "nativecap-composed-owning": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-composed-owning-receipt.json",
+      "sha256": "29cbee7bce47cc9e9ab5f3925f43d30439ea8de55eb8e19b907651938516c780",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--lib",
+        "--no-fail-fast",
+        "--",
+        "security::adapters::tests::native_flow",
+        "security::adapters::native_flow",
+        "kernel::tests::durable_admission::native_egress",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "umask": "0002",
+      "exit_code": 101,
+      "log_sha256": "c5ac17635ba7f2be682ed919ee5bf11b9aadb0e68ccd94188443ae7bf20793f1",
+      "scope": "selected owning cases; inspect each outcome and zero selections"
+    },
+    "nativecap-fast-current-binaries": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-fast-current-binaries-receipt.json",
+      "sha256": "20f95777ffaf716db326aa03651cd16bb6280a6c196a456b384479a95a3ed52b",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "umask": "0002",
+      "commands": [
+        {
+          "package": "chio-control-plane",
+          "binary": "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-336cb7a5e68d2938",
+          "binary_sha256": "cc4eccba57b35baf67e53be458d69463a413e9c43c72b6e1c9d73e990da286a1",
+          "argv": [
+            "/home/connor/lanes/integration/target/debug/deps/chio_control_plane-336cb7a5e68d2938",
+            "security::adapters::tests::native_flow::support::declassification::capture_order",
+            "security::adapters::tests::native_flow::support::capture::direct_retention",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "exit_code": 0
+        },
+        {
+          "package": "chio-kernel",
+          "binary": "/home/connor/lanes/integration/target/debug/deps/chio_kernel-99f5fa561d269932",
+          "binary_sha256": "531ad1ed767f5bcd700fed3ea01f32e42ddd4052f5e2b1ddc1f07215c4c3c867",
+          "argv": [
+            "/home/connor/lanes/integration/target/debug/deps/chio_kernel-99f5fa561d269932",
+            "kernel::tests::durable_admission::native_egress::capture_once",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "exit_code": 0
+        }
+      ],
+      "log_sha256": "78a954c4f1e9b1eac238e6024b5fb2d0907a54acc86e46560aa9c740833bdaee",
+      "scope": "Focused diagnostic reuse of the current owning-run binaries; no separate Cargo build or broad qualification"
+    },
+    "nativecap-five-owner-strict": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-five-owner-strict-receipt.json",
+      "sha256": "7a01a3ad254e4d5702aaf3c29ada9e22bc13e48163626572950e59bfddfd3c01",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-quarantine",
+        "--features",
+        "chio-kernel/admission-test-support,chio-security-types/std",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "umask": "0002",
+      "log_sha256": "3f556ab8b36feeb6152ae2eb24e9a1a60c26e82bd44c49f99d1bdf500d4a23d7"
+    },
+    "nativecap-fmt": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-fmt-receipt.json",
+      "sha256": "f2ad3a53ec0e65cc56b55fb7d851394de32d257a15c4a5532e4051c800cbf525",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "umask": "0002",
+      "log_sha256": "cfa5b2708b1e9e69f5f9dcc16c936cb3f5a7d0f564e1e978c58b46a94971b3ff"
+    },
+    "nativecap-trust": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-trust-receipt.json",
+      "sha256": "7df2fdcf5e1760937df594c4f2875ac91a0f0b5f9cdd71ab4df863b97b890655",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "3e7cd49c64e1d00bac3abb86362201ad479735d0a568d28eb47ee00fe65702e4",
+      "umask": "0002"
+    },
+    "nativecap-hygiene": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-hygiene-receipt.json",
+      "sha256": "0a122ade5c7074727625b5f55d92bc7814d58f4f092c3247a2f09c0de211184b",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "299f2fa60549a14e75b201f33dee8f1c3cbea7a8eb58f7d4abc5b3f88f1e3077",
+      "umask": "0002"
+    },
+    "nativecap-negative": {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nativecap-negative-receipt.json",
+      "sha256": "149bb24aaa4330c6ccde2508b1439c83203b67cf47eb8d1c8aa346eba5d8b003",
+      "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+      "argv": [
+        "python3",
+        "-B",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+      "umask": "0002"
+    }
+  },
+  "interpretation": {
+    "first_original": "0 passed / 2 genuine runtime failures at77bf592b16.",
+    "direct_original": "6 controls passed / 2 genuine runtime failures at1314c9deea after the first repair.",
+    "composed_focused": "7 control-plane and4 kernel tests passed using the exact current owning-build binaries; no separate Cargo build.",
+    "owning_kernel": "12 native-egress cases passed within the mixed owning invocation.",
+    "owning_control_plane": "Cancelled partway through164 selected native-flow tests to avoid duplicate long serial coverage. SIGINT and exit101 are retained; not Green. Shared candidate qualification owns the remaining complete module.",
+    "strict": "Five owning crates, stable admission-test-support/std feature union, all targets, -D warnings: exit0.",
+    "static": "Formatting, unchanged negative and file-hygiene gates, and trust inventory497/86/171 passed."
+  },
+  "cancelled_owning_receipt": {
+    "source": "b82c92262879b0929c729ff7e6a635eda74244ed",
+    "classification": "cancelled partial owning campaign, not Green",
+    "reason": "Focused exact-source11 tests passed; remaining full native module coverage moves to shared immutable train to avoid duplicate long serial execution. Owning acceptance remains open.",
+    "pid": 3746068,
+    "partial_log_sha256": "e85fc17906d6121f6456dcc3a5219fcf6af27783fee99a53081f33deb9d53dfc"
+  },
+  "remaining_acceptance": [
+    "Full combined-source control-plane/native owning and default/PQ matrix, conformance and required platform acceptance.",
+    "The native call-five performance defect and process lifetime repair are separate open obligations.",
+    "Credential expiry between retention preflight and later custody I/O is not newly qualified by these controls; final atomic capture still rechecks live authority.",
+    "Exact final independent review, complete cold/trusted/hosted evidence and protected landing."
+  ]
+}

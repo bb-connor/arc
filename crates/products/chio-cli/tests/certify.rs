@@ -36,6 +36,10 @@ use chio_store_sqlite::SqliteCapabilityAuthority;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
 
+#[path = "certify/fixture.rs"]
+mod fixture;
+use fixture::{private_authority_database, workspace_root};
+
 static UNIQUE_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
@@ -48,14 +52,6 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
         "{prefix}-{}-{nonce}-{sequence}{suffix}",
         std::process::id()
     ))
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
 }
 
 struct ServerGuard {
@@ -1935,7 +1931,7 @@ fn certify_public_generic_registry_namespace_and_listings_project_current_actor_
     let output_path = unique_path("chio-generic-registry-artifact", ".json");
     let seed_path = unique_path("chio-generic-registry-seed", ".txt");
     let receipt_db_path = unique_path("chio-generic-registry-receipts", ".sqlite");
-    let authority_db_path = unique_path("chio-generic-registry-authority", ".sqlite");
+    let (_authority_directory, authority_db_path) = private_authority_database();
     let registry_path = unique_path("chio-generic-registry-certifications", ".json");
     let tool_server_id = "demo-server-generic-listing";
     let provider_id = "carrier-generic";
@@ -2080,7 +2076,7 @@ fn certify_generic_registry_trust_activation_requires_explicit_local_activation_
     let output_path = unique_path("chio-generic-activation-artifact", ".json");
     let seed_path = unique_path("chio-generic-activation-seed", ".txt");
     let receipt_db_path = unique_path("chio-generic-activation-receipts", ".sqlite");
-    let authority_db_path = unique_path("chio-generic-activation-authority", ".sqlite");
+    let (_authority_directory, authority_db_path) = private_authority_database();
     let registry_path = unique_path("chio-generic-activation-certifications", ".json");
     let tool_server_id = "demo-server-generic-activation";
     let provider_id = "carrier-generic-activation";
@@ -2330,7 +2326,7 @@ fn certify_generic_registry_governance_charters_and_cases_enforce_bounded_open_g
     let output_path = unique_path("chio-generic-governance-artifact", ".json");
     let seed_path = unique_path("chio-generic-governance-seed", ".txt");
     let receipt_db_path = unique_path("chio-generic-governance-receipts", ".sqlite");
-    let authority_db_path = unique_path("chio-generic-governance-authority", ".sqlite");
+    let (_authority_directory, authority_db_path) = private_authority_database();
     let registry_path = unique_path("chio-generic-governance-certifications", ".json");
     let tool_server_id = "demo-server-generic-governance";
     let provider_id = "carrier-generic-governance";
@@ -2664,7 +2660,7 @@ fn certify_open_market_fee_schedules_and_slashing_require_explicit_bounded_autho
     let output_path = unique_path("chio-open-market-artifact", ".json");
     let seed_path = unique_path("chio-open-market-seed", ".txt");
     let receipt_db_path = unique_path("chio-open-market-receipts", ".sqlite");
-    let authority_db_path = unique_path("chio-open-market-authority", ".sqlite");
+    let (_authority_directory, authority_db_path) = private_authority_database();
     let registry_path = unique_path("chio-open-market-certifications", ".json");
     let tool_server_id = "demo-server-open-market";
     let provider_id = "carrier-open-market";
@@ -3077,7 +3073,7 @@ fn certify_adversarial_multi_operator_open_market_preserves_visibility_without_t
     let output_path = unique_path("chio-adversarial-open-market-artifact", ".json");
     let seed_path = unique_path("chio-adversarial-open-market-seed", ".txt");
     let receipt_db_path = unique_path("chio-adversarial-open-market-receipts", ".sqlite");
-    let authority_db_path = unique_path("chio-adversarial-open-market-authority", ".sqlite");
+    let (_authority_directory, authority_db_path) = private_authority_database();
     let registry_path = unique_path("chio-adversarial-open-market-certifications", ".json");
     let tool_server_id = "demo-server-adversarial-open-market";
     let provider_id = "carrier-adversarial-open-market";

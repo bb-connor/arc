@@ -526,8 +526,9 @@ pub(super) fn decode_exact<T: DeserializeOwned + Serialize>(
     bytes: &[u8],
     field: &'static str,
 ) -> Result<T, EconomicStateCacheError> {
-    let value = serde_json::from_slice::<T>(bytes)
-        .map_err(|error| invariant(format!("{field} decoding failed: {error}")))?;
+    let value = chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed::<T>())
+        .map_err(EconomicStateCacheError::from)?;
     let canonical = canonical_json_bytes(&value).map_err(canonical_error)?;
     if canonical != bytes {
         return Err(invariant(format!("{field} is not canonical JSON")));

@@ -29,6 +29,8 @@ pub const MAX_SIGNED_PARAMETRIC_POLICY_BYTES: usize = 1_048_576;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ParametricContractError {
+    #[error("invalid parametric input: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("parametric canonicalization failed: {0}")]
     Canonicalization(String),
     #[error("invalid parametric field: {0}")]
@@ -506,18 +508,14 @@ impl VerifiedParametricPolicy {
         bytes: &[u8],
         context: &ParametricPolicyVerificationContext<'_>,
     ) -> Result<Self, ParametricContractError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_PARAMETRIC_POLICY_BYTES {
-            return Err(ParametricContractError::InvalidField("signed_policy.size"));
-        }
-        let signed: SignedParametricPolicy = serde_json::from_slice(bytes)
-            .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))?;
-        let verified = Self::verify(signed, context)?;
-        if verified.canonical_bytes()?.as_slice() != bytes {
-            return Err(ParametricContractError::Canonicalization(
-                "signed parametric policy is not canonical".to_string(),
-            ));
-        }
-        Ok(verified)
+        let signed: SignedParametricPolicy =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                bytes,
+                MAX_SIGNED_PARAMETRIC_POLICY_BYTES,
+            )
+            .and_then(|input| input.decode_canonical())
+            .map_err(chio_core_types::canonical::SharedUntrustedJsonError::from)?;
+        Self::verify(signed, context)
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, ParametricContractError> {

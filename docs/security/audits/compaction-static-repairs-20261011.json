@@ -1,0 +1,192 @@
+{
+  "schema": "chio.pr1160.compaction-static-repairs.v1",
+  "observed_utc": "2026-10-11T13:28:50.741116+00:00",
+  "public_source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "qualified_source": "7f9273387b06d4404e60f2add1125402b144251f",
+  "compaction": {
+    "source_commits": [
+      "14d2f8c935d2c73a82adc9ce463a652ba2bc10af",
+      "4180df8fb71b309fa58138d60c5760852a60e07f"
+    ],
+    "repair": "Use safe scan-cursor progress rather than number of erased blobs when deciding whether replay byte deferral can return a committed page. Deferred owner stays after cursor.",
+    "budgets_or_verification_weakened": false,
+    "test": "tool_outcome_store::tests::compaction_cursor::compaction_retained_prefix_resumes_replay_verification_under_same_byte_cap",
+    "fixture": "Actual kernel-signed stream/value completions, fixed authority namespace through existing fixture port, fixed agent/capability identities and clock domains; no forged ownership or payload digest.",
+    "negative_control": "First raw owner with cap one byte below measured replay requirement still returns exact Unavailable and retains bytes.",
+    "final_original_scope": {
+      "head": "4180df8fb71b309fa58138d60c5760852a60e07f",
+      "production_origin": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "path": "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction.rs",
+      "production_sha256": "24057ea35f5eb21abef80836b027cba8690ccc508af8cdbb64c9f85fe4a44e6e",
+      "repair_sha256": "c870c221224c2bb1d6db14ae8db416addd0557291daba8101b0d50dedd7314ff"
+    },
+    "commands": {
+      "fixture_import_failure": {
+        "source": "fe149d88e6ef8c4383579260909e0e92ac36a092",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "tool_outcome_store_tests::compaction_cursor",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 154.32026958977804,
+        "log_sha256": "56f3b52cf42168bcce503945e4aedb3ab2da30ba6b5cd910933f50c2cbd90a11",
+        "source_stable": true
+      },
+      "zero_test_filter_non_evidence": {
+        "source": "aa4f89b5a9b6273df90591b7c701342d51d74790",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "tool_outcome_store_tests::compaction_cursor",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 109.23982441378757,
+        "log_sha256": "ae2ced28188ce251cfc83275e4a57dc9f796bbb8c0bbeddb0ed74e5a4b6fc84b",
+        "source_stable": true
+      },
+      "initial_original_failure": {
+        "source": "aa4f89b5a9b6273df90591b7c701342d51d74790",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "compaction_cursor::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 2.6740082292817533,
+        "log_sha256": "8bcb5e0e9fa9ddc9292735f5b1351af09858ac6128ea5ef09db6fd91c1b04dee",
+        "source_stable": true
+      },
+      "random_namespace_fixture_failure": {
+        "source": "14d2f8c935d2c73a82adc9ce463a652ba2bc10af",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "compaction",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 218.73496103612706,
+        "log_sha256": "96af38a352126fdbf338296302f68f864ebb42f51d29643636ce015199a46c54",
+        "source_stable": true
+      },
+      "final_original": {
+        "source": "4180df8fb71b309fa58138d60c5760852a60e07f",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "compaction_cursor::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 161.27085724892095,
+        "log_sha256": "1bd922e8319d30c5af5f143ed05f0bb8271011e3b334ce2c25547a05b573fa44",
+        "source_stable": true
+      },
+      "repaired_compaction": {
+        "source": "7f9273387b06d4404e60f2add1125402b144251f",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "compaction",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 213.70437789801508,
+        "log_sha256": "3d38109ca33dbf77bdf75cc4a9652fb8c23e1e181b7f87e08720ae694e61c378",
+        "source_stable": true
+      },
+      "strict_owner": {
+        "source": "7f9273387b06d4404e60f2add1125402b144251f",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 153.07503626914695,
+        "log_sha256": "988439481c08398cc3084240475a890d4c59c1ac0abc627685a297603f66b023",
+        "source_stable": true
+      }
+    },
+    "passed": 23,
+    "failed": 0,
+    "ignored": 0,
+    "scope": "Filtered owning compaction suite and strict all-target store lint; not full workspace or hosted qualification.",
+    "reviews": [
+      {
+        "source": "14d2f8c935",
+        "reviewer": "Claude",
+        "observed_utc": "2026-10-11T13:12:47Z",
+        "decision": "approve"
+      },
+      {
+        "source": "4180df8fb7",
+        "reviewer": "Claude",
+        "observed_utc": "2026-10-11T13:28:00Z",
+        "decision": "approve"
+      }
+    ],
+    "residual": "A first owner whose replay verification intrinsically exceeds the cap remains unavailable and retains bytes; the repair does not waive that limit."
+  },
+  "static_contract": {
+    "repair": "7f9273387b06d4404e60f2add1125402b144251f",
+    "jobs": [
+      114474338636,
+      114471421192
+    ],
+    "original_exit": 1,
+    "original_log_sha256": "4f6544aeb148ad8d8bcd473f03776fa3abeb3ebcf444f4d012b5ef2f5f84f87c",
+    "repaired_exit": 0,
+    "repaired_log_sha256": "523cb78090d956a1f7592bfa9c68b0fd42a7b257dd53e47240b02b1aad97d706",
+    "checks": 8,
+    "negative_mutations_refused": 3,
+    "negative_log_sha256": "55cea966a0c39e9b0a96bce10550a419f17510c34da9882d110af60c353dad8e",
+    "model_or_proof_domain_changed": false,
+    "proof_execution": false,
+    "reviewer": "Claude",
+    "review_decision": "approve",
+    "review_observed_utc": "2026-10-11T13:18:36Z",
+    "local_prepublication_gate": "python3 scripts/check-apalache-formal-slice.py"
+  },
+  "boundary": "Two source-scoped repairs qualified privately. Other three exact-head review obligations, final composition, hosted qualification and user merge approval remain open."
+}

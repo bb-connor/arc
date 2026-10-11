@@ -8,7 +8,7 @@ use chio_test_support::prelude::*;
 
 proptest! {
     #[test]
-    fn freshness_projection_calls_verified_boundary(
+    fn freshness_projection_refines_verified_boundary(
         now in any::<u64>(),
         issued_at in any::<u64>(),
         ttl_secs in any::<u64>(),
@@ -20,9 +20,14 @@ proptest! {
             nonce_store_capacity: 8,
         };
 
+        // The production reader adds representability to the verified
+        // saturating predicate. An unrepresentable deadline must deny.
+        let deadline_representable =
+            u128::from(issued_at) + u128::from(ttl_secs) <= u128::from(u64::MAX);
         prop_assert_eq!(
             dpop_freshness_admits(now, issued_at, &config),
-            dpop_freshness_valid(now, issued_at, ttl_secs, max_skew_secs),
+            deadline_representable
+                && dpop_freshness_valid(now, issued_at, ttl_secs, max_skew_secs),
         );
     }
 
@@ -69,7 +74,7 @@ proptest! {
 }
 
 #[test]
-fn freshness_saturates_ttl_and_skew_edges() {
+fn freshness_saturates_skew_but_rejects_deadline_overflow() {
     let saturated = DpopConfig {
         proof_ttl_secs: u64::MAX,
         max_clock_skew_secs: u64::MAX,
@@ -80,14 +85,22 @@ fn freshness_saturates_ttl_and_skew_edges() {
         max_clock_skew_secs: 0,
         nonce_store_capacity: 8,
     };
-    assert!(dpop_freshness_admits(u64::MAX, u64::MAX, &saturated));
-    assert!(dpop_freshness_admits(u64::MAX, 1, &saturated));
+    assert!(!dpop_freshness_admits(u64::MAX, u64::MAX, &saturated));
+    assert!(!dpop_freshness_admits(u64::MAX, 1, &saturated));
+    assert!(dpop_freshness_admits(u64::MAX, 0, &saturated));
+    let zero_ttl = DpopConfig {
+        proof_ttl_secs: 0,
+        ..saturated
+    };
+    assert!(dpop_freshness_admits(u64::MAX, u64::MAX, &zero_ttl));
+    assert!(dpop_freshness_admits(1, u64::MAX, &zero_ttl));
     assert!(!dpop_freshness_admits(0, u64::MAX, &no_skew));
 }
 
 #[test]
 fn nonce_store_matches_fresh_and_replayed_projections() {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60));
+    let store = DpopNonceStore::new(8, Duration::from_secs(60))
+        .test_expect("positive replay store test capacities");
 
     assert_eq!(
         store.check_and_insert("nonce", "cap").test_unwrap(),

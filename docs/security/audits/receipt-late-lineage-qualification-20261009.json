@@ -1,0 +1,527 @@
+{
+  "schema": "chio.receipt-late-lineage-qualification.v1",
+  "observed_at": "2026-10-09T17:41:03.409139+00:00",
+  "stage_head": "77d94e11dcce772a2e3d4f0ee2735ea0f19418e1",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "producer_commit": "fe4ef22b906130109170d2c3e86a2e9aab6df262",
+  "integration_review": {
+    "status": "PRODUCER_EVIDENCE_VERIFIED_COMPOSITION_PENDING",
+    "observed_at": "2026-10-09T17:31:13.222132+00:00",
+    "base": "b3a6b73339660c25b2850cc22ab916909124155d",
+    "producer": "fe4ef22b906130109170d2c3e86a2e9aab6df262",
+    "capacity_source": "873f1367f3e99d5da267f05c9ed5f2eacd5cf233",
+    "artifacts": [
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/commit.diff",
+        "sha256": "e8898d8358e9ce815abb6b872dcd36ea10738a2e9a382dab75e8986be3f7d13b"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/red-at-base.log",
+        "sha256": "e4e55d6814b71c6d4b837f35603773a2fcd70a91289aaf659616b1028d6ce30f",
+        "test_summaries": [
+          "test result: FAILED. 5 passed; 6 failed; 0 ignored; 0 measured; 2252 filtered out; finished in 31.33s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/red-at-base-accessor-shim.patch",
+        "sha256": "124843441b16bac31f935afb47dafa952662c2df76197b90c9f6724282f04461"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/green-late-lineage.log",
+        "sha256": "3fc55abadad08292ac9a8b73c77e3281d3abb24e82a533967077c0111e756e57",
+        "test_summaries": [
+          "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 2252 filtered out; finished in 148.37s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/green-families.log",
+        "sha256": "2feb90b59bfedc044196d8b8991518393ad97f66736a2c1686a8039d6bc5993d",
+        "test_summaries": [
+          "test result: ok. 213 passed; 0 failed; 6 ignored; 0 measured; 2044 filtered out; finished in 179.32s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/green-clippy.log",
+        "sha256": "8a8939dc90e12a09dca34a7daa0075a06f08a0fb619c7537229dbc7937e9f851",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/green-fmt.log",
+        "sha256": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/gate-check-negative-assertions.log",
+        "sha256": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/gate-check-rust-file-hygiene.log",
+        "sha256": "43a49e82b33f55b1c8024dd6bb5c01705e18e0dc9d763f16d0c09629696b38e6",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/gate-check-security-clocks.log",
+        "sha256": "e24a9224fa883a6ebc72fb1b7ac971c74ffbcfeb5fc5f93d8ea2a152ca7c4aa3",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/gate-check-trust-boundaries.log",
+        "sha256": "d8df73d96c8a847f4f23a77869a8a8060ecc5c84cc5b152381915564ec8e0b56",
+        "test_summaries": []
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/mutant-not-disjoint.log",
+        "sha256": "7736a713f15ffda07b630e966203b60c060c5bef7a231805092874915074034c",
+        "test_summaries": [
+          "test result: FAILED. 6 passed; 5 failed; 0 ignored; 0 measured; 2252 filtered out; finished in 80.50s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/mutant-not-disjoint.patch",
+        "sha256": "4854f7487811095e7f595c0b959417291def824dba1bb0c80614a882ede90c2d"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/mutant-first-chunk-only.log",
+        "sha256": "221bf1e37188fe89af9e3b30ebd3966e8a03c2a16f86c3ccdda666b087a212db",
+        "test_summaries": [
+          "test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 2252 filtered out; finished in 35.76s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/mutant-first-chunk-only.patch",
+        "sha256": "ce2a66eb7734e4f8d974c82f6d6d613d2e05e2743ed4c4400aa317fd8ff87ba3"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/late_lineage_sql_cost.rs",
+        "sha256": "2eedff92bf753ce0c4cfafbe3bdce241f2920a3481a3c0a6a2c49724035040ca"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/measure-fix.log",
+        "sha256": "2029979a414e98654251d533c4265ab1e36f0ed5a7f8e09d5913d4781aa6722f",
+        "test_summaries": [
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2262 filtered out; finished in 1038.95s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/archive-late-lineage/measure-fix-local.log",
+        "sha256": "c2d11ca8710df4c33d5b92697e6a54ab07e01f53d4dcbaf868c72700e17e01eb",
+        "test_summaries": [
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2262 filtered out; finished in 101.73s"
+        ]
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/covered-capacity/measured/run.log",
+        "sha256": "3deeb17ffd7c41e3f5d82be08a4ef4c36e0d87775133960085549f8597e1c2d7"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/covered-capacity/measured/load.log",
+        "sha256": "de7c18e3c0e23956b7bacd96de426ab09d71dbf2ab34379c4fe47bc59ddcb9d8"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/covered-capacity/measured/binary.txt",
+        "sha256": "affdbaedfa5e4fd8a23c5182583dbde869ef2a62b90e1fbe31edb5e850a20b56"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/vfix/v25/covered-capacity/measured/run.sh",
+        "sha256": "4df5aef3e2cda7bcb1f4ae65181203995de8e355c655351021ae705157055664"
+      }
+    ],
+    "review": [
+      "Narrow archive absence allowed only per unsigned field and no archived lineage; signed/present mismatches refuse.",
+      "Fallback sources only committed archive capabilities and canonical pinned live lineage; disjoint filters and checked totals; final signed tenant check.",
+      "Operator/export fallback has repeated archive scans per256 matching capabilities; no bounded-total-work claim. HTTP snapshot request budgets unchanged.",
+      "Test Original6FAIL5PASS,final11PASS; families213PASS6ignored; negative mutants detected. Root observer repair and whole composed checks remain to renew."
+    ]
+  },
+  "composed_qualification": {
+    "source_manifest": "/tmp/pr1160-v25-final-20261009/late-lineage-composed/source.json",
+    "source_manifest_sha256": "59fab4fcd27153ccf0c57bebe938b954618fe7eb50c8db9a7a7da48b3353a102",
+    "source_file_count": 6487,
+    "results": [
+      {
+        "name": "families",
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "--",
+          "retained",
+          "receipt_query",
+          "--show-output"
+        ],
+        "started_at": "2026-10-09T17:31:52.689657+00:00",
+        "terminal_at": "2026-10-09T17:36:34.885317+00:00",
+        "elapsed_seconds": 282.1956818611361,
+        "exit_code": 0,
+        "summaries": [
+          "test result: ok. 216 passed; 0 failed; 7 ignored; 0 measured; 2051 filtered out; finished in 140.50s"
+        ],
+        "missing_tests": [],
+        "log_sha256": "a02638cf2ff746bcaa70db0b08cf1feb84194c116952f216c7e781c46377ac5d",
+        "accepted": true
+      },
+      {
+        "name": "strict",
+        "command": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started_at": "2026-10-09T17:36:35.445820+00:00",
+        "terminal_at": "2026-10-09T17:38:16.581455+00:00",
+        "elapsed_seconds": 101.13565485877916,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "49ed2735b57095726348bef01748a52a951cc400a87a76198fd42f6f1e29e799",
+        "accepted": true
+      },
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "started_at": "2026-10-09T17:38:17.126977+00:00",
+        "terminal_at": "2026-10-09T17:38:44.772463+00:00",
+        "elapsed_seconds": 27.645504624117166,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "accepted": true
+      },
+      {
+        "name": "check-trust-boundaries",
+        "command": [
+          "python3",
+          "scripts/check-trust-boundaries.py"
+        ],
+        "started_at": "2026-10-09T17:38:45.337753+00:00",
+        "terminal_at": "2026-10-09T17:40:18.354270+00:00",
+        "elapsed_seconds": 93.01653536828235,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "1b8cb4595e959b1197f98ed5a16a9fb1b7c4256d29613c52f7662dce6d30ae51",
+        "accepted": true
+      },
+      {
+        "name": "check-security-clocks",
+        "command": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "started_at": "2026-10-09T17:40:18.913937+00:00",
+        "terminal_at": "2026-10-09T17:40:47.161606+00:00",
+        "elapsed_seconds": 28.24768654210493,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "991b1dca3c052c9f8aa6cd38b6b145d42b371fc5c1394bc02d2a504224eb57ff",
+        "accepted": true
+      },
+      {
+        "name": "check-rust-file-hygiene",
+        "command": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "started_at": "2026-10-09T17:40:47.724539+00:00",
+        "terminal_at": "2026-10-09T17:40:52.527248+00:00",
+        "elapsed_seconds": 4.802729881834239,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "4b63d8df95425295755ee3e9a185c4c0bcc480d2e992639f84aebba2c31dca63",
+        "accepted": true
+      },
+      {
+        "name": "check-negative-assertions",
+        "command": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "started_at": "2026-10-09T17:40:53.097237+00:00",
+        "terminal_at": "2026-10-09T17:40:54.379213+00:00",
+        "elapsed_seconds": 1.281996876001358,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_tests": [],
+        "log_sha256": "49516e4ccc9c034cbb5fd748bdcae89b35f56d06d12a4c5e01ea61c0e17c45a6",
+        "accepted": true
+      }
+    ]
+  },
+  "covered_range_capacity": {
+    "source": "873f1367f3e99d5da267f05c9ed5f2eacd5cf233",
+    "test_source_repair": "b3a6b73339660c25b2850cc22ab916909124155d",
+    "binary_sha256": "0d88b4f20414cccb88036df60920ce06bbedd5839c535f851a9feaa71597f215",
+    "measurement": {
+      "append_seconds": 96.227,
+      "cancellation": {
+        "gate": "Publication",
+        "gate_skipped_publication_steps": 4,
+        "range_entries": 10000,
+        "shutdown_ms": 14.738,
+        "state": "stopped"
+      },
+      "claimed": true,
+      "config": {
+        "hold_sql_steps": 5000000,
+        "insert_rows": 256,
+        "quota_bytes": 2147483648,
+        "step_bytes": 16777216,
+        "step_rows": 1024
+      },
+      "covered_entries": 100000,
+      "divisor": 1,
+      "host": {
+        "cpus": 48,
+        "hostname": "isolated-build-host",
+        "mem_total_kib": 131879976
+      },
+      "label": "linux-file",
+      "memory": {
+        "after": {
+          "vm_hwm_kib": 434252,
+          "vm_peak_kib": 2808436,
+          "vm_rss_kib": 347360,
+          "vm_size_kib": 2743420
+        },
+        "before": {
+          "vm_hwm_kib": 435640,
+          "vm_peak_kib": 2808412,
+          "vm_rss_kib": 435640,
+          "vm_size_kib": 2808412
+        },
+        "peak": {
+          "vm_hwm_kib": 434252,
+          "vm_peak_kib": 2808436,
+          "vm_rss_kib": 438764,
+          "vm_size_kib": 2808424
+        },
+        "peak_reset": true
+      },
+      "n": 111000,
+      "prefix_entries": 1000,
+      "publication": {
+        "max_settled_per_hold": 256,
+        "per_call_parity": {
+          "admin": {
+            "total_count": 101000
+          },
+          "tenant_a": {
+            "total_count": 50500
+          }
+        },
+        "seconds_after_release": 25.85,
+        "served_total": 101000,
+        "settle": {
+          "accepted_after_ms": 22302.431,
+          "checkpoint_seq": 2,
+          "reads_refused": {
+            "receipt_query_snapshot_stale": 10
+          },
+          "reads_served": 1030,
+          "rotation": {
+            "archived": 101000,
+            "attempts": 1,
+            "refusals": 0,
+            "seconds": 25.849
+          },
+          "slowest_read_ms": 2110.848
+        },
+        "used_bytes_after": 56573952
+      },
+      "staging": {
+        "max_leaves_per_hold": 256,
+        "seconds": 9.919,
+        "served_total_while_staged": null,
+        "used_bytes_before": 622592,
+        "used_bytes_staged": 4935680
+      },
+      "test": "linux_file_large_covered_range_staging"
+    },
+    "elapsed_seconds": 220.63,
+    "relevant_identical_files": [
+      "crates/platform/chio-store-sqlite/src/receipt_query/read.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query/tests/agent_subject.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query/tests/filters.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query/tests/pagination.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query/tests/support.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/db/storage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/pass.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/project.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/query.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/build.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/capacity/linux_file.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/late_lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/memory.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/publication.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/query.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/service.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/support.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/append.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/federated.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/listing.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/qualification.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/chaos_test_hooks.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/liability_claims.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/liability_market.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/query_snapshot_access.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics/integrity.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics/work_budget.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests/attempted_cost.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests/integrity.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests/read_bounds.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/authorization.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/billing.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/compliance.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/read_boundary.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/read_boundary/lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/read_boundary/projection.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/read_boundary/text.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/settlement.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/retained_projection.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/strict_append.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_read.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_schema.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/metadata.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/query_matching.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/validation.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/retention_watermark.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/security_evidence.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/test_hooks.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/accounting_boundaries.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/attempted_cost.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoint_races.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoints.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/bootstrap.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/canonical_readback.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/checkpoint.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/errors.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/federated_lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/fixtures/checkpoint_projection_v6.sql",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/head_property.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/indexed_retention.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/injected_clock.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/insert.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/liability.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/lineage.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/qualified_finding_pool.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/query.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/receipt_batch.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retained_commitments.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention/delete_races.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention/repair_idempotence.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention/state_machine.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention_liveness.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/scale_proof.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/scale_recovery.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/schema_archive.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/settlement.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/signed_readback.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/single_writer.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/support/evidence.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/underwriting_credit.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/verified_head.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/writer_checkpoint_boundaries.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/writer_accounting.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/writer_liveness_classifier_tests.rs"
+    ],
+    "other_crate_differences": [
+      "crates/platform/chio-store-sqlite/src/authority.rs",
+      "crates/platform/chio-store-sqlite/src/authority/custody.rs",
+      "crates/platform/chio-store-sqlite/src/authority/custody/filesystem.rs",
+      "crates/platform/chio-store-sqlite/src/authority/lifecycle.rs",
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs",
+      "crates/platform/chio-store-sqlite/src/authority/read_only_tests.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/count_parity_sequence.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/generation_observer.rs"
+    ],
+    "scope": "Actual100k unpublished checkpoint-covered staging, root validation, archived reread and publication. Relevant receipt paths match except test-only observer repair; authority/custody paths were separately qualified. Not exact whole-candidate capacity qualification.",
+    "memory_reporting": "50ms proc sampler and /usr/bin/time/VmHWM are separate observations and retained verbatim; no normalization or performance comparison.",
+    "prior_1M_10M": "Preserved predecessor evidence; not renewed by this campaign."
+  },
+  "accepted_contract": [
+    "Unsigned archived subject/issuer may be absent only if that field is unsigned and no archived lineage row exists. Present/signed mismatches refuse.",
+    "Current attribution derives from canonical lineage on the pinned live snapshot. Archived fallback is disjoint and capability bindings are chunked256, candidate pages bounded, totals checked and served tenants verified.",
+    "Unsigned archive attribution stripping becomes answer-neutral instead of corruption refusal; explicit negative/positive controls verify the boundary."
+  ],
+  "remaining_limitations": [
+    "Subject-filtered operator/export fallback has an archive DISTINCT scan and repeated full scans per256 matching late capabilities. Total work is not bounded independently of history. HTTP snapshot request budgets are unaffected; indexing is a follow-up optimization.",
+    "Original6FAIL/5PASS, failed mutants, prior whole-store draft evidence and failed full-control-plane run are preserved as their own outcomes."
+  ],
+  "remaining_acceptance": [
+    "Complete the mandatory proof batch and its reproducible tool enrollment; component and diagnostic results are not proof acceptance.",
+    "Final candidate review dispositions, Source promotion, four exact protected hosted checks and protected merge."
+  ],
+  "candidate_qualified": false,
+  "merged": false,
+  "release_permitted": false
+}

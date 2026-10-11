@@ -15,7 +15,7 @@
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
-    scope::{ChioScope, Operation, ToolGrant},
+    scope::{ChioScope, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core_types::crypto::Keypair;
@@ -27,9 +27,9 @@ use chio_kernel_core::passport_verify::{
     PortablePassportBody, PortablePassportEnvelope, PORTABLE_PASSPORT_SCHEMA,
 };
 use chio_kernel_mobile::{
-    attest_app_attest, attest_play_integrity, evaluate, sign_receipt,
-    sign_receipt_relaying_trusted_body, verify_app_attest_evidence, verify_capability,
-    verify_capability_with_context, verify_mobile_receipt, verify_passport,
+    attest_app_attest, attest_play_integrity, evaluate, inspect_mobile_receipt_envelopes,
+    sign_receipt, sign_receipt_relaying_trusted_body, verify_app_attest_evidence,
+    verify_capability, verify_capability_with_context, verify_passport,
     verify_play_integrity_evidence, ChioMobileError,
 };
 
@@ -37,18 +37,30 @@ const ISSUED_AT: u64 = 1_700_000_000;
 const EXPIRES_AT: u64 = 1_700_100_000;
 const EVAL_TIME: u64 = 1_700_000_100;
 
+fn echo_grant() -> ToolGrant {
+    ToolGrant {
+        server_id: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    }
+}
+
 fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    make_capability_with_grant(subject, issuer, echo_grant())
+}
+
+fn make_capability_with_grant(
+    subject: &Keypair,
+    issuer: &Keypair,
+    grant: ToolGrant,
+) -> CapabilityToken {
     let scope = ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "srv-a".to_string(),
-            tool_name: "echo".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: vec![],
-            max_invocations: None,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
+        grants: vec![grant],
         resource_grants: vec![],
         prompt_grants: vec![],
     };
@@ -166,6 +178,60 @@ fn evaluate_allow_roundtrip() {
     assert_eq!(response["verdict"], "allow");
     assert_eq!(response["matched_grant_index"], 0);
     assert!(response.get("reason").is_none());
+}
+
+#[test]
+fn evaluate_denies_grant_requiring_mediated_authorization() {
+    let usd = |units| MonetaryAmount {
+        units,
+        currency: "USD".to_string(),
+    };
+    let grants = [
+        ToolGrant {
+            dpop_required: Some(true),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_invocations: Some(3),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_cost_per_invocation: Some(usd(5)),
+            ..echo_grant()
+        },
+        ToolGrant {
+            max_total_cost: Some(usd(50)),
+            ..echo_grant()
+        },
+    ];
+
+    for grant in grants {
+        let subject = Keypair::generate();
+        let issuer = Keypair::generate();
+        let capability = make_capability_with_grant(&subject, &issuer, grant);
+        let request_json = serde_json::json!({
+            "capability": capability,
+            "trusted_issuers": [issuer.public_key().to_hex()],
+            "request": {
+                "request_id": "req-mediated",
+                "tool_name": "echo",
+                "server_id": "srv-a",
+                "agent_id": subject.public_key().to_hex(),
+                "arguments": {"msg": "hello"},
+            },
+            "now_secs": EVAL_TIME as i64,
+        })
+        .to_string();
+
+        let response_json = evaluate(request_json).expect("evaluate mediated deny");
+        let response: serde_json::Value = serde_json::from_str(&response_json).unwrap();
+        assert_eq!(response["verdict"], "deny");
+        assert_eq!(
+            response["reason"],
+            "grant requires mediated authorization (DPoP/usage accounting) unavailable to the offline mobile gate"
+        );
+        assert_eq!(response["matched_grant_index"], 0);
+    }
 }
 
 #[test]
@@ -346,6 +412,40 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
         ChioMobileError::InvalidCapability { message }
             if message.contains("cannot authenticate governed approvals")
     ));
+}
+
+#[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let envelope = serde_json::json!({
+        "capability":make_capability(&subject, &issuer), "trusted_issuers":[issuer.public_key().to_hex()],
+        "request":{"request_id":"portable-positive", "tool_name":"echo", "server_id":"srv-a",
+            "agent_id":subject.public_key().to_hex(), "arguments":{}}, "now_secs":EVAL_TIME as i64
+    });
+    let positive: serde_json::Value =
+        serde_json::from_str(&evaluate(envelope.to_string()).unwrap()).unwrap();
+    assert_eq!(positive["verdict"], "allow");
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut changed = envelope.clone();
+        changed["request"][field] = if field == "approval_tokens" {
+            serde_json::json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            serde_json::json!({"artifact":field})
+        };
+        let error = evaluate(changed.to_string()).unwrap_err();
+        assert!(
+            matches!(error, ChioMobileError::InvalidCapability { message }
+            if message.contains("cannot authenticate governed approvals")),
+            "{field}"
+        );
+    }
 }
 
 #[test]
@@ -779,18 +879,14 @@ fn verify_play_integrity_evidence_rejects_bad_jws_fail_closed() {
 }
 
 #[test]
-fn verify_mobile_receipt_rejects_bad_json() {
-    let err = verify_mobile_receipt("not-json".to_string(), "{}".to_string()).unwrap_err();
-    match err {
-        ChioMobileError::InvalidJson { message } => {
-            assert!(message.contains("mobile receipt"));
-        }
-        other => panic!("expected InvalidJson, got {other:?}"),
-    }
+fn inspect_mobile_receipt_envelopes_rejects_bad_json() {
+    let err =
+        inspect_mobile_receipt_envelopes("not-json".to_string(), "{}".to_string()).unwrap_err();
+    assert!(matches!(err, ChioMobileError::AttestationRejected { .. }));
 }
 
 #[test]
-fn verify_mobile_receipt_accepts_known_attestation_platform_shape() {
+fn inspect_mobile_receipt_envelopes_accepts_known_attestation_platform_shape() {
     let receipt_json = serde_json::json!({
         "schema": "chio.mobile.receipt.v1",
         "receipt_id": "mobile-receipt-1"
@@ -802,9 +898,9 @@ fn verify_mobile_receipt_accepts_known_attestation_platform_shape() {
     })
     .to_string();
 
-    let raw = verify_mobile_receipt(receipt_json, evidence_json).unwrap();
+    let raw = inspect_mobile_receipt_envelopes(receipt_json, evidence_json).unwrap();
     let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
-    assert_eq!(value["schema"], "chio.mobile.receipt-verification.v1");
+    assert_eq!(value["schema"], "chio.mobile.receipt-inspection.v1");
     assert_eq!(value["status"], "shape_only");
     assert_eq!(value["receipt_kind"], "trace_observation");
     assert_eq!(value["boundary_class"], "detect_only");

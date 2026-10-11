@@ -3,6 +3,10 @@ name: permissive
 description: Permissive rules for development (use with caution)
 
 rules:
+  tool_access:
+    enabled: true
+    default: allow
+
   egress:
     allow:
       - "*"

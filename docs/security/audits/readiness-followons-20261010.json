@@ -1,0 +1,593 @@
+{
+  "schema": "chio.security.review-followons.v1",
+  "observed_utc": "2026-10-10T00:29:36.371953+00:00",
+  "source_stage_head": "28cffb822eb9da0f5a3b3d8fdb2929d9b388985e",
+  "source_repairs": {
+    "F03-REFIX-CONTRACT": {
+      "producer_commit": "a4cc72bcadee5600db7f29a44c0bc819185e6cc1",
+      "integration_commit": "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+      "files": {
+        "crates/kernel/chio-kernel/src/receipt_query.rs": "ceeb0885177ff914425fdec6d6aed38cf7dff453e1b8d42717c5509aa7175448",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/evidence_snapshot_export_tests.rs": "c7c17db3fd058254bc90ad662b1b87704acb5cf1c09acef03530200a526d6388",
+        "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs": "ed23364647c7c350be2fc725004f9bbd87dbcf4e9a207a015624741790f454e0",
+        "crates/platform/chio-store-sqlite/src/evidence_export/tests/snapshot_tests.rs": "467d6722218617a079ead1320806e72374c3674b25c0feb962221f5ccb2a4b9b",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": "2c9f64720adcb3fd9c742aade7f5d45765d5bbfa55c9732823b4f0ef8f35157b",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/tests.rs": "ef30cf7aecfca8502b10a4b151c50af9b1aabcd80ad8147ee07cc6eb5e96880b",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/tests/query.rs": "b6eefc6747a6f33f45a9098c61998b6968c449dd3ac3622f138c27a3e51746cb",
+        "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/walk.rs": "8d1f4cf88e43639245db2178824b3df5c9965a2e04534428810b1977e96552fa",
+        "docs/reference/RECEIPT_QUERY_API.md": "2c9a3d6d1ca5709dc0f026750aa1656dc578b662dfcd51a4bcf79e48af33389f",
+        "docs/security/receipt-http-evidence-export.md": "6a753f8f21890f807cde54b79ae46b93ea9b000d76b6d7890d48d7b3a1d77733"
+      },
+      "evidence": [
+        {
+          "path": "/tmp/pr1160-export-contract-final-20261009/qualification.json",
+          "sha256": "b80109616b22a7fd27d3aa5b6e0ab205983f63df934e688cb317119d012de75e",
+          "scope": "Genuine Original HTTP0PASS1FAIL; subsequent HTTP4/kernel2PASS; first repaired store22PASS1oracleFAIL retained; corrected35PASS; strict owning andfmtPASS."
+        }
+      ],
+      "status": "prior-six-items-reviewed-new-attribution-ordering-open"
+    },
+    "F13-ADJACENT-ATOMICITY": {
+      "producer_commit": "40219859c47c53df5d385991eb603d306e4d1f93",
+      "integration_commit": "66bc596efe2a8bbcc93d814c94b297f07be2cc16",
+      "evidence": {
+        "path": "/tmp/pr1160-adjacent-registries-20261009/qualification.json",
+        "sha256": "3e347e1157a4a2f9bf33f9bda073ab47c9f459a3ef3bbed4afdad783314542c1"
+      },
+      "status": "locally-verified-final-composition-pending"
+    },
+    "F11-SYNC-GUARD": {
+      "producer_commit": "c1be78700531199c2a434e30f5aa6ff1d5234871",
+      "integration_commit": "6f0c46f2e910804926a1f36b6cb4cbef390820a4",
+      "evidence": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/sync-inspection-qualification.json",
+        "sha256": "d8908b592ed2520bb1a4dbdeee97cee822bbb6c1dcc66f5b65fbb69329329dba"
+      },
+      "status": "locally-verified-final-composition-pending"
+    },
+    "F11-COMMIT-WORKER": {
+      "producer_commit": "5b9eaca17e16ab0d2849b41f66c6ad85e6d0a3a2",
+      "integration_commit": "28cffb822eb9da0f5a3b3d8fdb2929d9b388985e",
+      "evidence": {
+        "path": "/tmp/pr1160-authority-evidence-repair-20261009/authority-commit-qualification.json",
+        "sha256": "cc392b708d3f06c0245bdc1b606c31dfeed4f952829408f608ca57b23d761ebd"
+      },
+      "status": "locally-verified-final-composition-pending"
+    }
+  },
+  "new_findings": [
+    {
+      "label": "F11-FEE-BINDING-REFUSAL",
+      "priority": "P1",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "source_commit": "aa10c68ac7debdd73747641900130bbc9461107d",
+      "requirement": "An authority refusal must not leave a governed fee-schedule binding or projection commit persisted. Successful durable commit must not be followed by an authority check that reports a definitive refusal.",
+      "state": "source-confirmed-original-and-guarded-bind-repair-open",
+      "owner": "claude; codex integrates",
+      "remaining_acceptance": [
+        "Genuine expected-safe Original with503 plus persisted binding at governance candidate, disclosing fixture visibility-only seam.",
+        "Guard both new-row and idempotent branches inside existing fiscal transaction; no compensation of append-only history.",
+        "Final authority guard checks actual signer, exact live head and stable cluster/admitted view before commit; authorization observation and durable commit are distinct, not cross-database atomic.",
+        "Rollback/no projection commit on refusal; healthy bound-envelope200 and identical retry; existing storage outcome-unknown and cancellation meanings retained.",
+        "Composed owning verification and independent final candidate review."
+      ]
+    },
+    {
+      "label": "F047-WALLET-INGRESS-WORKER",
+      "priority": "P2",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "source_commit": "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+      "requirement": "Early wallet credential entitlement checks must preserve authentication before body reads without blocking async workers or allowing unbounded blocking tasks.",
+      "state": "current-source-original-confirmed-preserved-repair-port-open",
+      "owner": "codex",
+      "remaining_acceptance": [
+        "Current-source real-router progress Original with production unchanged.",
+        "Port preserved f2539e4579 and b266e1ba0d without unrelated public-route or long-body-decode scope.",
+        "Bounded nonwaiting4-permit check and cancellation custody; missing bearer401 before admission, capacity503 before file/body reads, healthy entitlement and handler recheck preserved.",
+        "Owning runtime/strict checks and audited ingress digest regeneration; source-composed review."
+      ],
+      "original": {
+        "path": "/tmp/pr1160-wallet-ingress-final-20261010/original-router.json",
+        "sha256": "89eccff05d13d857cd81bb92914c7b6dafa46a224b331a6011e068d2e9675f9f",
+        "source": {
+          "head": "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "dirty": {
+            "crates/platform/chio-control-plane/src/trust_control/service_runtime/ingress_tests/wallet_credentials.rs": "0b33c3f821481292d794f0f005b81322776d16c0ebaea389a8b151c93a439037",
+            "crates/platform/chio-control-plane/src/trust_control/service_runtime/ingress_tests/wallet_ingress.rs": "62e028f98d35d2f569fa4cd7420a3e662c7c8860c1ce4160bf0cc06fc406377e"
+          }
+        },
+        "log_sha256": "7c96980354ca3d0b3df2020fa997f364d4954a3e028cb449c61f42da05483abc",
+        "result": "0 passed / 1 failed: async worker blocked until registry IO ended"
+      }
+    },
+    {
+      "label": "F03-ATTRIBUTION-ORDER",
+      "priority": "P2",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "state": "source-and-observation-confirmed-safe-original-open",
+      "requirement": "Compare captured unsigned attribution before any lineage validity refusal and invalidate on mismatch.",
+      "remaining_acceptance": [
+        "Genuine expected-safe legacy and signed subject-only tamper controls, exact Invalid outcome and state.",
+        "Preserve valid unsupported lineage request-only refusal and cross-tenant behavior.",
+        "All four lower-priority review observations explicitly retained and repaired or dispositioned."
+      ],
+      "review": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-export-contract-final-review.md",
+        "sha256": "68798aaab0f21c46811b88ee4f94aa2918ae4e2bd0af1b094592c7f84d52717a"
+      }
+    },
+    {
+      "label": "F03-REFOLLOW-P3-A",
+      "priority": "P3",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "state": "review-confirmed-repair-open",
+      "requirement": "Invalid nonattribution lineage metadata must produce the typed request-only refusal rather than an untyped SQL conversion error.",
+      "remaining_acceptance": [
+        "Perform explicit domain validation after captured-attribution comparison; preserve resource errors.",
+        "Real HTTP malformed signed-row refusal and healthy other-tenant controls."
+      ],
+      "review": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-export-contract-final-review.md",
+        "sha256": "68798aaab0f21c46811b88ee4f94aa2918ae4e2bd0af1b094592c7f84d52717a"
+      }
+    },
+    {
+      "label": "F03-REFOLLOW-P3-B",
+      "priority": "P3",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "state": "review-confirmed-repair-open",
+      "requirement": "Publication enrichment must preserve SQLite resource and busy failures as operational failures.",
+      "remaining_acceptance": [
+        "Map SQLite faults through the existing read-outcome classifier, never to semantic422.",
+        "Focused classifier controls for busy and IO plus semantic refusal."
+      ],
+      "review": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-export-contract-final-review.md",
+        "sha256": "68798aaab0f21c46811b88ee4f94aa2918ae4e2bd0af1b094592c7f84d52717a"
+      }
+    },
+    {
+      "label": "F03-REFOLLOW-P3-C",
+      "priority": "P3",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "state": "review-confirmed-repair-open",
+      "requirement": "Normative wire protocol and complete response table must include authenticated snapshot export and its typed refusal.",
+      "remaining_acceptance": [
+        "Update WIRE_PROTOCOL error row and export source contract.",
+        "Add ExportRefused to complete HTTP mapping table and document legacy-table refusal."
+      ],
+      "review": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-export-contract-final-review.md",
+        "sha256": "68798aaab0f21c46811b88ee4f94aa2918ae4e2bd0af1b094592c7f84d52717a"
+      }
+    },
+    {
+      "label": "F03-REFOLLOW-P3-D",
+      "priority": "P3",
+      "scope": "now",
+      "introduced_or_rewritten": true,
+      "state": "review-confirmed-repair-open",
+      "requirement": "Export qualification must wait on service notifications and test exact integrity transitions.",
+      "remaining_acceptance": [
+        "Replace remaining ten-second polling readiness assumption with notified watermark progress.",
+        "Forced rebuild after divergent publication enrichment must become Invalid.",
+        "Missing owned prefix must assert exact invalid reason."
+      ],
+      "review": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/hammer/root-export-contract-final-review.md",
+        "sha256": "68798aaab0f21c46811b88ee4f94aa2918ae4e2bd0af1b094592c7f84d52717a"
+      }
+    }
+  ],
+  "inherited_observations": [
+    {
+      "label": "GOVERNANCE-CASE-TRUST",
+      "state": "review-observation-not-runtime-confirmed",
+      "scope": "preserved-follow-up",
+      "source_comparison": {
+        "label": "GOVERNANCE-CASE-TRUST",
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+        "function": "evaluate_generic_governance_case_request",
+        "base_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "current_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "byte_identical": true,
+        "status": "source review observation; no runtime Original reproduced"
+      },
+      "requirement": "Determine whether self-signature-only governance-case evaluation needs trusted-authority binding for its actual consumers; add expected-safe controls before changing semantics.",
+      "priority": "P2",
+      "remaining_acceptance": [
+        "Validate actual consumer semantics before declaring a vulnerability; genuine expected-safe Original and scoped repair if confirmed."
+      ]
+    },
+    {
+      "label": "OID4VP-SIGNER-CUSTODY",
+      "priority": "P1",
+      "scope": "preserved-follow-up",
+      "state": "inherited-first-after-landing",
+      "requirement": "Bind durable OID4VP request signing and subsequent retrieval to admitted authority and actual signer custody.",
+      "source_comparison": {
+        "origin_main": "2b1d467e17",
+        "producer_base": "fa733a051796b3392102656a357d52716cc029d1",
+        "function": "handle_create_oid4vp_request",
+        "path": "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+        "origin_main_function_sha256": "9acec0dc834c6915bedfa2df4334a1080353201efada46245bc460b8ed318317",
+        "producer_function_sha256": "e6ffc97033d6f743761f0a43160744ea45400a20e9655a7e5a3724a19b0678fc",
+        "byte_identical": false,
+        "origin_main_line": 737,
+        "producer_line": 868,
+        "observed_gap": "Untouched authenticated request creation forwards to current leader, then selects resolve_oid4vp_verifier_signing_key(config) without state admission or exact live-head signer binding. That config-only helper opens writable/native-clock SQLite or creates a seed. No runtime repro was expanded for this pre-existing surface."
+      },
+      "remaining_acceptance": [
+        "Genuine expected-safe Original for the inherited signing/publication/retrieval boundary.",
+        "Admission and custody checks must cover durable publication and retrieval without postcommit definitive refusal.",
+        "First-after-landing repair and full owning verification."
+      ],
+      "planner_ruling": "2026-10-10T00:24:14Z to-codex: clock handling does not rewrite signer selection, JWT persistence or retrieval; rule2 inherited P1."
+    }
+  ],
+  "not_qualified": [
+    "Exact final candidate independent review",
+    "Exact protected hosted checks",
+    "Merge/main ancestry"
+  ],
+  "excluded_proof_work": "KANI-PROOF-QUAL remains OPEN/UNPROVED; no proof campaign executed.",
+  "adjacent_scope_evidence": {
+    "base": "2b1d467e17dbb172bbd3080188ff6476192c59f8",
+    "review_source": "aa10c68ac7debdd73747641900130bbc9461107d",
+    "findings": [
+      {
+        "label": "GOVERNANCE-CASE-TRUST",
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+        "function": "evaluate_generic_governance_case_request",
+        "base_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "current_sha256": "ea66b83a17ef7be71ad03948efaa545d4621c9885747f2c9b1d2f8ab870c4349",
+        "byte_identical": true,
+        "status": "source review observation; no runtime Original reproduced"
+      },
+      {
+        "label": "FEDERATION-RAW-SIGNER",
+        "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/issuance.rs",
+        "function": "evaluate_federation_policy_request",
+        "base_sha256": "ac322877e868ca9412c106281781cde45d2e58c089d7768e493b52e4d98e153f",
+        "current_sha256": "3a7a31811e407cf72c0299fb49af3fc3706f9a4eaa2c129182a84607d239c3c3",
+        "byte_identical": false,
+        "status": "source review observation; no runtime Original reproduced"
+      }
+    ]
+  },
+  "component_integration": {
+    "source": "66bc596efe2a8bbcc93d814c94b297f07be2cc16",
+    "native_renewal": [
+      {
+        "check": "native-correction-five",
+        "source": {
+          "head": "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "dirty_files": {
+            "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+          }
+        },
+        "log_sha256": "83fa3a49478bb61c8e0695c3a7d1a159169875b543ed4768e0c772692bd2bd7f",
+        "tests": [
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2326 filtered out; finished in 130.36s"
+        ]
+      },
+      {
+        "check": "native-contracts",
+        "source": {
+          "head": "ca642eb18aa6cbaebffa7da11bfaf33edc943535",
+          "dirty_files": {
+            "docs/formal/COVERAGE.md": "2d90d526b48b3f4f3481271bd692d88dd553429afb41cb9e08528506f1bec7cd"
+          }
+        },
+        "log_sha256": "0a85b2fa6b57d6b93529560c36d07753d6b49e55358a841175a1cd5e4b439270",
+        "tests": [
+          "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.70s",
+          "test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.27s",
+          "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s"
+        ]
+      }
+    ],
+    "registry_all10_files_exact": [
+      "crates/platform/chio-control-plane/src/passport_verifier.rs",
+      "crates/platform/chio-control-plane/src/passport_verifier/tests/adjacent_registry_transactions.rs",
+      "crates/platform/chio-control-plane/src/signed_input.rs",
+      "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+      "crates/platform/chio-control-plane/src/trust_control/registry_write_lane.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/adjacent_registry_races.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/public_authority_reads.rs",
+      "crates/products/chio-cli/src/passport.rs",
+      "crates/products/chio-cli/src/passport/verifier.rs",
+      "crates/products/chio-cli/tests/adjacent_registry_writes.rs"
+    ],
+    "governance_composition_different_files": [
+      "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs"
+    ],
+    "limits": [
+      "Native renewal is5affected+75integration tests, not re-running historical205test suite",
+      "Governance fee-binding residual remains open",
+      "Authority core and passport signer follow-ons pending"
+    ],
+    "bounded_native_acceptance": "80 renewed affected/contract passes; earlier full202PASS3FAIL and producer campaigns retained separately. Not a full205 rerun. SEC-1160-COLDSTATE OPEN P1 gates G5."
+  },
+  "registry_census": {
+    "source": "6f0c46f2e9",
+    "path": "docs/security/trust-boundary-inventory.json",
+    "before_sha256": "fcc265e1f5a75eb2045e596c0c634f004a23fcbf428fb6f1190025d9a8c9f4aa",
+    "after_sha256": "1208cb75411a181d2c0909b293cd658dc85fa3c004fe51654a42029175f78018",
+    "change": "Only passport_verifier existing update_registry caller owner ordinal update -> update#2 due to additive prior VerifierPolicyRegistry::update",
+    "review": "All6 existing bounded decode calls unchanged; new generic load callback invokes same Self::load readers while stable writer lock is held. No new raw decoder, removed obligation, size cap or count allowance.",
+    "gate": {
+      "path": "/tmp/pr1160-final-review-20261009/registry-governance-trust.log",
+      "sha256": "c628712fe748ea911c9c54686a531283f34645391d0322c6321ebe4f513dcf69",
+      "exit": 0,
+      "scope": "498 constructors,88 tenant tables,181 SQL contracts; owner ordinal only, no waiver"
+    }
+  },
+  "governance_integration": {
+    "producer": "aa10c68ac7debdd73747641900130bbc9461107d",
+    "integration": "e24ee3351466cf94ec1defae453413f80d452da4",
+    "verified_packet": {
+      "commit": "aa10c68ac7debdd73747641900130bbc9461107d",
+      "manifest_sha256": "0b21a9908d39f57cde1c0966c699a3e927d584c2c125e5eb600b57ab3ca3f9cd",
+      "verified_files": 37,
+      "logs": {
+        "base-gates/check-negative-assertions.log": {
+          "sha256": "06b90c43b1eb3f8d32d0da12b41af793a64089ef46b794fe48bf7119ceb02831",
+          "summaries": [],
+          "tail": [
+            "- crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs:614 new weak negative assertion in `final_f11_known_stale_follower_refuses_authority_reads_and_reports_health`: assert!(sync_peer(&pair.importer, &pair.exporter.url).is_err()); assert the variant that rejected",
+            "Weak negative assertions: 1271 across 257 files, baseline 1248 assertions at 1167 sites across 254 files, expires 2027-01-31",
+            "rc=1"
+          ]
+        },
+        "base-gates/check-rust-file-hygiene.log": {
+          "sha256": "c5af00078354b8e9a76459a2dee8b1087433aaf5ca64849048ce11e62210dba1",
+          "summaries": [],
+          "tail": [
+            "allowlisted: formal/rust-verification/creusot-core/src/lib.rs: Creusot core verification surface assembled from include! fragments; capped until the fragments become modules; expires 2026-10-31; max_lines uncapped; max_fragments 1",
+            "allowlisted: xtask/src/fixtures.rs: xtask fixture handlers assembled from include! fragments; capped until the fragments become modules; expires 2027-01-31; max_lines 7153; max_fragments 6",
+            "rc=1"
+          ]
+        },
+        "base-gates/check-security-clocks.log": {
+          "sha256": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+          "summaries": [],
+          "tail": [
+            "Security clocks: 413 remaining debt observations (including fixtures), 40 pinned native compositions; no additions",
+            "rc=0"
+          ]
+        },
+        "base-gates/check-trust-boundaries.log": {
+          "sha256": "735510639706f276ecac8991d7bc4da196b7cf4b66dab7f1db94be7cfec0e6ca",
+          "summaries": [],
+          "tail": [
+            "framework/format/shared-reader census changed; classify each new input consumer",
+            "unscoped tenant SQL changed; tenant predicate or explicit principal review required",
+            "rc=1"
+          ]
+        },
+        "dep-gates/check-negative-assertions.log": {
+          "sha256": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+          "summaries": [],
+          "tail": [
+            "",
+            "Weak negative assertion check passed",
+            "rc=0"
+          ]
+        },
+        "dep-gates/check-rust-file-hygiene.log": {
+          "sha256": "d301dc898c6752f642b1c980f23a7f11dcdb270996a9335842b401052256e656",
+          "summaries": [],
+          "tail": [
+            "",
+            "Rust file hygiene check passed",
+            "rc=0"
+          ]
+        },
+        "dep-gates/check-security-clocks.log": {
+          "sha256": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+          "summaries": [],
+          "tail": [
+            "Security clocks: 413 remaining debt observations (including fixtures), 40 pinned native compositions; no additions",
+            "rc=0"
+          ]
+        },
+        "dep-gates/check-trust-boundaries.log": {
+          "sha256": "735510639706f276ecac8991d7bc4da196b7cf4b66dab7f1db94be7cfec0e6ca",
+          "summaries": [],
+          "tail": [
+            "framework/format/shared-reader census changed; classify each new input consumer",
+            "unscoped tenant SQL changed; tenant predicate or explicit principal review required",
+            "rc=1"
+          ]
+        },
+        "green/check-1.log": {
+          "sha256": "31f51360d4641b71926b31b85d623b9d62928e6ddefb1f167b6182d89dfbf406",
+          "summaries": [],
+          "tail": [
+            "    Checking chio-control-plane v0.1.0 (/home/ubuntu/lanes/claude-src/claude-f11-governance/crates/platform/chio-control-plane)",
+            "    Finished `dev` profile [unoptimized] target(s) in 2m 10s",
+            "rc=0"
+          ]
+        },
+        "green/cli-certify-adversarial-ignored-at-aa10c68ac7.log": {
+          "sha256": "d6c5e31c5fb454e337a0ec897c3cf111665b9a7c2490b0730937f7ad27059fe8",
+          "summaries": [
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.89s"
+          ],
+          "tail": [
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.89s",
+            "",
+            "rc=0"
+          ]
+        },
+        "green/cli-certify-governance-at-aa10c68ac7.log": {
+          "sha256": "541568186cfb06e57dfe104a21a07b38dd0b9684b58f08c1a0deeb8a9db501dc",
+          "summaries": [
+            "test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 10 filtered out; finished in 0.81s"
+          ],
+          "tail": [
+            "test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 10 filtered out; finished in 0.81s",
+            "",
+            "rc=0"
+          ]
+        },
+        "green/clippy-1.log": {
+          "sha256": "9a6c4f58cb0c9c567bbfb20bac0d57ed67c63c22e43b93b03c8c7b92628197c6",
+          "summaries": [],
+          "tail": [
+            "    Checking chio-control-plane v0.1.0 (/home/ubuntu/lanes/claude-src/claude-f11-governance/crates/platform/chio-control-plane)",
+            "    Finished `dev` profile [unoptimized] target(s) in 2m 58s",
+            "rc=0"
+          ]
+        },
+        "green/fmt-check.log": {
+          "sha256": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+          "summaries": [],
+          "tail": [
+            "rc=0"
+          ]
+        },
+        "green/gates/check-negative-assertions.log": {
+          "sha256": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+          "summaries": [],
+          "tail": [
+            "",
+            "Weak negative assertion check passed",
+            "rc=0"
+          ]
+        },
+        "green/gates/check-rust-file-hygiene.log": {
+          "sha256": "d301dc898c6752f642b1c980f23a7f11dcdb270996a9335842b401052256e656",
+          "summaries": [],
+          "tail": [
+            "",
+            "Rust file hygiene check passed",
+            "rc=0"
+          ]
+        },
+        "green/gates/check-security-clocks.log": {
+          "sha256": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+          "summaries": [],
+          "tail": [
+            "Security clocks: 413 remaining debt observations (including fixtures), 40 pinned native compositions; no additions",
+            "rc=0"
+          ]
+        },
+        "green/gates/check-trust-boundaries.log": {
+          "sha256": "735510639706f276ecac8991d7bc4da196b7cf4b66dab7f1db94be7cfec0e6ca",
+          "summaries": [],
+          "tail": [
+            "framework/format/shared-reader census changed; classify each new input consumer",
+            "unscoped tenant SQL changed; tenant predicate or explicit principal review required",
+            "rc=1"
+          ]
+        },
+        "green/governance_authority-1.log": {
+          "sha256": "55ddff34bce6474187e6857a8f379ccc9e3300adc82d00159218f7d73a770d77",
+          "summaries": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 1.46s"
+          ],
+          "tail": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 1.46s",
+            "",
+            "rc=0"
+          ]
+        },
+        "green/governance_authority-at-aa10c68ac7.log": {
+          "sha256": "94a7bbf0c5d03942014dc5d2324248e51dc79d18406328d157abe2d6738b6ae6",
+          "summaries": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 1.45s"
+          ],
+          "tail": [
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1635 filtered out; finished in 1.45s",
+            "",
+            "rc=0"
+          ]
+        },
+        "green/owning-filters-1.log": {
+          "sha256": "aa671a7171111eeb1279f638accf1b7059165b33ee1cf5dea560f4e02c2aad66",
+          "summaries": [
+            "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 1542 filtered out; finished in 138.47s"
+          ],
+          "tail": [
+            "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 1542 filtered out; finished in 138.47s",
+            "",
+            "rc=0"
+          ]
+        },
+        "original-red/red-at-base-799b33d666.log": {
+          "sha256": "f052ef8cf432cc05a70198486740771c1da0f14629de77ef95bfe899ecf04892",
+          "summaries": [
+            "test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 1631 filtered out; finished in 0.76s"
+          ],
+          "tail": [
+            "",
+            "error: test failed, to rerun pass `-p chio-control-plane --lib`",
+            "rc=101"
+          ]
+        },
+        "original-red/red2-no-bootstrap-at-base-799b33d666.log": {
+          "sha256": "360eba4f49d20e032faa45a067c54d98dc863a270dd3e2514e2fe5b3febcaa84",
+          "summaries": [
+            "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 1638 filtered out; finished in 0.15s"
+          ],
+          "tail": [
+            "",
+            "error: test failed, to rerun pass `-p chio-control-plane --lib`",
+            "rc=101"
+          ]
+        },
+        "original-red/red2a-no-bootstrap-at-base-799b33d666.log": {
+          "sha256": "66f069b7f9be91f95405e3c561cd024a6dc4adeeddbe34e2de83ed858ae254a8",
+          "summaries": [
+            "test result: FAILED. 0 passed; 9 failed; 0 ignored; 0 measured; 1631 filtered out; finished in 0.80s"
+          ],
+          "tail": [
+            "",
+            "error: test failed, to rerun pass `-p chio-control-plane --lib`",
+            "rc=101"
+          ]
+        },
+        "prelim-gates/check-negative-assertions.log": {
+          "sha256": "6bc22e7d81d70e7717792077f43958d3be23f977bebcaa454e3e3b5aef767916",
+          "summaries": [],
+          "tail": [
+            "",
+            "Weak negative assertion check passed",
+            "rc=0"
+          ]
+        },
+        "prelim-gates/check-security-clocks.log": {
+          "sha256": "19a18210ea527cf5811791d2345a869b7da3c2abd6c8b144e3a0c71238fe21b5",
+          "summaries": [],
+          "tail": [
+            "Security clocks: 413 remaining debt observations (including fixtures), 40 pinned native compositions; no additions",
+            "rc=0"
+          ]
+        },
+        "prelim-gates/check-trust-boundaries.log": {
+          "sha256": "735510639706f276ecac8991d7bc4da196b7cf4b66dab7f1db94be7cfec0e6ca",
+          "summaries": [],
+          "tail": [
+            "framework/format/shared-reader census changed; classify each new input consumer",
+            "unscoped tenant SQL changed; tenant predicate or explicit principal review required",
+            "rc=1"
+          ]
+        }
+      },
+      "remaining": [
+        "fee-binding persistence after refused authority post-check requires follow-on",
+        "composed candidate qualification not yet run",
+        "fiscal forwarding and live keyring fixture limits preserved"
+      ]
+    },
+    "remaining": "F11-FEE-BINDING-REFUSAL remains required; core authority repair and final composition pending"
+  }
+}

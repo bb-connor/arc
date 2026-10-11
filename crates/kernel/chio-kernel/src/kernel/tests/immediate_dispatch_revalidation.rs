@@ -1,3 +1,4 @@
+use super::*;
 struct ImmediateReadyMutationHook {
     mutable_state: std::sync::Arc<AtomicBool>,
     revalidations: std::sync::Arc<AtomicU64>,
@@ -293,14 +294,8 @@ fn guard_dispatch_revalidation_is_opt_in_and_opted_in_errors_fail_closed() {
         hook_revalidations,
         false,
     );
-    let context = GuardContext {
-        request: &request,
-        scope: &request.capability.scope,
-        agent_id: &request.agent_id,
-        server_id: &request.server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: Some(0),
-    };
+    let context =
+        GuardContext::new(&request, &request.capability.scope).with_matched_grant_index(Some(0));
 
     let legacy = LegacyDefaultGuard;
     assert!(!legacy.requires_dispatch_revalidation());
@@ -344,6 +339,7 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
     let nested_interaction_observed = AtomicBool::new(false);
     {
         let mut bridge = SessionNestedFlowBridge {
+            clock: kernel.authority_clock(),
             sessions: &kernel.sessions,
             child_receipts: &mut child_receipts,
             nested_interaction_observed: &nested_interaction_observed,

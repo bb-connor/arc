@@ -370,8 +370,8 @@ fn select_governance_receipt_id<'a>(
         )));
     }
 
-    if package_receipt_ids.len() == 1 {
-        return Ok(package_receipt_ids[0].to_string());
+    if let [only] = package_receipt_ids.as_slice() {
+        return Ok(only.to_string());
     }
 
     Err(RuntimeLoopbackError::message(

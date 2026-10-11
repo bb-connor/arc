@@ -1,3 +1,9 @@
+mod evidence;
+mod siem_pins;
+#[cfg(test)]
+use crate::commands::evidence::create_chio_wall_receipt_db;
+use crate::commands::evidence::write_chio_evidence_package;
+
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::fs;
@@ -441,81 +447,6 @@ fn chio_wall_receipt(
         kernel_keypair,
     )
     .map_err(CliError::from)
-}
-
-fn create_chio_wall_receipt_db(
-    receipt_db_path: &Path,
-    authorization_context: &ChioWallAuthorizationContext,
-    guard_outcome: &ChioWallGuardOutcome,
-    denied_access_record: &ChioWallDeniedAccessRecord,
-    policy_snapshot: &ChioWallPolicySnapshot,
-) -> Result<(), CliError> {
-    let store = SqliteReceiptStore::open(receipt_db_path)?;
-    let issuer = Keypair::generate();
-    let subject = Keypair::generate();
-    let kernel = Keypair::generate();
-    let capability = chio_wall_capability_with_id("cap-chio-wall-1", &subject, &issuer)?;
-    let receipt = chio_wall_receipt(
-        authorization_context,
-        guard_outcome,
-        denied_access_record,
-        policy_snapshot,
-        &capability.body().id,
-        &kernel,
-    )?;
-    let seq = store.append_chio_receipt_returning_seq(&receipt)?;
-    let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
-    let checkpoint = build_checkpoint(
-        1,
-        seq,
-        seq,
-        &canonical
-            .into_iter()
-            .map(|(_, bytes)| bytes)
-            .collect::<Vec<_>>(),
-        &kernel,
-    )?;
-    store.store_checkpoint(&checkpoint)?;
-    Ok(())
-}
-
-fn write_chio_evidence_package(
-    output: &Path,
-    authorization_context: &ChioWallAuthorizationContext,
-    guard_outcome: &ChioWallGuardOutcome,
-    denied_access_record: &ChioWallDeniedAccessRecord,
-    policy_snapshot: &ChioWallPolicySnapshot,
-) -> Result<(), CliError> {
-    let receipt_staging = tempfile::tempdir()?;
-    let receipt_db_path = receipt_staging.path().join("chio-wall-receipts.sqlite3");
-    let chio_evidence_dir = output.join("chio-evidence");
-
-    create_chio_wall_receipt_db(
-        &receipt_db_path,
-        authorization_context,
-        guard_outcome,
-        denied_access_record,
-        policy_snapshot,
-    )?;
-
-    evidence_export::cmd_evidence_export(
-        &chio_evidence_dir,
-        None,
-        None,
-        None,
-        None,
-        None,
-        true,
-        None,
-        None,
-        false,
-        Some(&receipt_db_path),
-        None,
-        None,
-    )?;
-
-    let _ = fs::remove_file(receipt_db_path);
-    Ok(())
 }
 
 fn expected_artifact_path(kind: ChioWallArtifactKind) -> &'static str {
@@ -1002,11 +933,13 @@ pub fn cmd_chio_wall_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<
 }
 
 async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), CliError> {
-    let config = chio_siem::SiemConfig {
-        db_path: receipt_db.to_path_buf(),
-        cursor_db_path: Some(cursor_db.to_path_buf()),
-        ..chio_siem::SiemConfig::default()
-    };
+    let alert_backends = configured_alert_backends()?;
+    let (config, trusted_kernel_keys) = siem_pins::configuration(
+        receipt_db,
+        cursor_db,
+        !alert_backends.is_empty(),
+        std::env::var(siem_pins::ENV),
+    )?;
     let metrics_sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
         std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
     let mut manager = chio_siem::ExporterManager::new(config)
@@ -1033,9 +966,8 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     // per-poll dispatch loop drives those metrics. Alerting is a notification
     // overlay, so it runs ALONGSIDE a SOC sink and never satisfies the gate on
     // its own.
-    let alert_backends = configured_alert_backends()?;
     if let Some((alerting, routes)) =
-        build_serve_alerting_exporter(alert_backends, metrics_sink.clone())
+        build_serve_alerting_exporter(alert_backends, metrics_sink.clone(), trusted_kernel_keys)
     {
         // Alerting is registered with the manager so its per-poll dispatch loop
         // runs, but it is NOT added to `registered_exporters` (the SOC-export
@@ -1236,6 +1168,7 @@ fn non_empty_env(key: &str) -> Option<String> {
 fn build_serve_alerting_exporter(
     backends: Vec<Box<dyn chio_siem::AlertBackend>>,
     metrics_sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink>,
+    trusted_kernel_keys: Vec<chio_core::crypto::PublicKey>,
 ) -> Option<(chio_siem::AlertingExporter, Vec<String>)> {
     if backends.is_empty() {
         return None;
@@ -1245,6 +1178,7 @@ fn build_serve_alerting_exporter(
         .map(|backend| backend.name().to_string())
         .collect();
     let mut builder = chio_siem::AlertingExporter::builder(chio_siem::AlertingConfig::default())
+        .with_trusted_kernel_keys(trusted_kernel_keys)
         .with_metrics_sink(metrics_sink);
     for backend in backends {
         builder = builder.with_backend(backend);
@@ -1741,11 +1675,11 @@ mod tests {
         }
     }
 
-    fn serve_deny_event(guard: &str) -> SiemEvent {
+    pub(super) fn serve_deny_event(guard: &str) -> SiemEvent {
         use chio_core::receipt::kinds;
         use chio_core::receipt::metadata::GuardEvidence;
 
-        let keypair = Keypair::generate();
+        let keypair = Keypair::from_seed(&[43; 32]);
         let action = ToolCallAction::from_parameters(serde_json::json!({}))
             .expect("hash receipt parameters");
         let receipt = ChioReceipt::sign(
@@ -1800,8 +1734,12 @@ mod tests {
             route: route.to_string(),
         });
 
-        let (exporter, routes) = build_serve_alerting_exporter(vec![backend], sink)
-            .expect("a configured backend yields an alerting exporter");
+        let (exporter, routes) = build_serve_alerting_exporter(
+            vec![backend],
+            sink,
+            vec![Keypair::from_seed(&[43; 32]).public_key()],
+        )
+        .expect("a configured backend yields an alerting exporter");
         assert_eq!(routes, vec![route.to_string()]);
 
         // ForbiddenPathGuard derives High severity, meeting the default alerting
@@ -1904,7 +1842,7 @@ mod tests {
     fn serve_alerting_disabled_builds_no_exporter() {
         let sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
             std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
-        assert!(build_serve_alerting_exporter(Vec::new(), sink).is_none());
+        assert!(build_serve_alerting_exporter(Vec::new(), sink, Vec::new()).is_none());
     }
 
     /// The serve mode must fail closed when no consumer is configured, rather

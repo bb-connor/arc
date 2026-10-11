@@ -17,23 +17,26 @@ fn snapshot_from_row_with_boundary(
     row: &Row<'_>,
     allow_legacy: bool,
 ) -> rusqlite::Result<CapabilitySnapshot> {
-    validate_snapshot_from_row(
-        CapabilitySnapshot {
-            capability_id: row.get::<_, String>(0)?,
-            subject_key: row.get::<_, String>(1)?,
-            issuer_key: row.get::<_, String>(2)?,
-            issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
-            expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
-            grants_json: row.get::<_, String>(5)?,
-            delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
-            parent_capability_id: row.get::<_, Option<String>>(7)?,
-            federated_parent_capability_id: row.get::<_, Option<String>>(8)?,
-            provenance: provenance_from_row(row, 9)?,
-            signed_capability: signed_capability_from_row(row, 10)?,
-        },
-        10,
-        allow_legacy,
-    )
+    validate_snapshot_from_row(snapshot_columns_from_row(row)?, 10, allow_legacy)
+}
+
+/// Decode stored columns without validating the resulting lineage. The caller
+/// must validate before use; export first compares captured subject attribution
+/// so a malformed token cannot mask an authenticated-attribution mismatch.
+pub(crate) fn snapshot_columns_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+    Ok(CapabilitySnapshot {
+        capability_id: row.get::<_, String>(0)?,
+        subject_key: row.get::<_, String>(1)?,
+        issuer_key: row.get::<_, String>(2)?,
+        issued_at: non_negative_u64_from_column(row, 3, "issued_at")?,
+        expires_at: non_negative_u64_from_column(row, 4, "expires_at")?,
+        grants_json: row.get::<_, String>(5)?,
+        delegation_depth: non_negative_u64_from_column(row, 6, "delegation_depth")?,
+        parent_capability_id: row.get::<_, Option<String>>(7)?,
+        federated_parent_capability_id: row.get::<_, Option<String>>(8)?,
+        provenance: provenance_from_row(row, 9)?,
+        signed_capability: signed_capability_from_row(row, 10)?,
+    })
 }
 
 pub(crate) fn validate_snapshot_from_row(
@@ -78,9 +81,11 @@ pub(crate) fn signed_capability_from_row(
 ) -> rusqlite::Result<Option<CapabilityToken>> {
     row.get::<_, Option<String>>(column)?
         .map(|json| {
-            serde_json::from_str(&json).map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
-            })
+            chio_core::canonical::UntrustedJsonText::from_wire(json.as_bytes(), 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
+                })
         })
         .transpose()
 }
@@ -95,8 +100,16 @@ pub(crate) fn ensure_snapshots_compatible(
     existing: &CapabilitySnapshot,
     incoming: &CapabilitySnapshot,
 ) -> Result<(), chio_kernel::ReceiptStoreError> {
-    let existing_scope: serde_json::Value = serde_json::from_str(&existing.grants_json)?;
-    let incoming_scope: serde_json::Value = serde_json::from_str(&incoming.grants_json)?;
+    let existing_scope: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        existing.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
+    let incoming_scope: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        incoming.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
     let scalar_fields_match = existing.capability_id == incoming.capability_id
         && existing.subject_key == incoming.subject_key
         && existing.issuer_key == incoming.issuer_key
@@ -261,7 +274,7 @@ pub(crate) fn non_negative_u64_from_column(
     if value < 0 {
         return Err(negative_lineage_integer_error(column, field_name, value));
     }
-    Ok(value as u64)
+    Ok(crate::integer::checked::<_, u64>(value)?)
 }
 
 fn negative_lineage_integer_error(
@@ -330,7 +343,7 @@ impl SqliteReceiptStore {
             issued_at,
             expires_at,
             grants_json: grants_json.clone(),
-            delegation_depth: token.delegation_chain.len() as u64,
+            delegation_depth: crate::integer::count(token.delegation_chain.len()),
             parent_capability_id: token
                 .delegation_chain
                 .last()
@@ -355,7 +368,11 @@ impl SqliteReceiptStore {
                     )
                     .optional()?;
 
-                parent_depth.map(|d| d.saturating_add(1)).unwrap_or(1)
+                parent_depth.unwrap_or(0).checked_add(1).ok_or_else(|| {
+                    chio_kernel::ReceiptStoreError::ReadBoundary(
+                        "capability delegation depth overflow".into(),
+                    )
+                })?
             } else {
                 0
             };
@@ -391,7 +408,7 @@ impl SqliteReceiptStore {
     /// This is used by cluster replication so followers can converge on the
     /// leader's lineage table without reconstructing full signed tokens.
     pub fn upsert_capability_snapshot(
-        &mut self,
+        &self,
         snapshot: &CapabilitySnapshot,
     ) -> Result<(), CapabilityLineageError> {
         validate_snapshot_for_transport(snapshot)?;
@@ -413,8 +430,14 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
-        let row = self
-            .connection()?
+        Self::get_lineage_on_connection(&*self.connection()?, capability_id)
+    }
+
+    pub(crate) fn get_lineage_on_connection(
+        connection: &rusqlite::Connection,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
+        let row = connection
             .query_row(
                 r#"
                 SELECT
@@ -668,6 +691,10 @@ impl SqliteReceiptStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "capability_lineage_tests.rs"]
 mod tests;

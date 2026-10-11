@@ -80,7 +80,7 @@ fn share_import(share_id: &str, snapshot: CapabilitySnapshot) -> FederatedEviden
 #[test]
 fn federation_bridge_is_immutable_and_preserves_signed_parent() {
     let path = unique_db_path("federated-bridge-immutable");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let child = signed_token("bridge-child", &Keypair::generate(), &issuer);
     let parent = signed_token("bridge-parent", &Keypair::generate(), &issuer);
@@ -130,7 +130,7 @@ fn federation_bridge_is_immutable_and_preserves_signed_parent() {
 #[test]
 fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
     let path = unique_db_path("federated-chain-integrity");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let missing_parent = signed_snapshot(
         &signed_token("missing-parent-child", &Keypair::generate(), &issuer),
@@ -164,7 +164,7 @@ fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
 #[test]
 fn federated_import_rejects_legacy_and_cross_share_divergence() {
     let path = unique_db_path("federated-cross-share-conflict");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let token = signed_token("shared-capability", &Keypair::generate(), &issuer);
     let snapshot = signed_snapshot(&token, None);
@@ -229,7 +229,7 @@ fn federated_import_rejects_legacy_and_cross_share_divergence() {
 #[test]
 fn federated_reimport_upgrades_only_the_matching_legacy_share_row() {
     let path = unique_db_path("federated-legacy-reimport");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let token = signed_token(
         "legacy-reimport-capability",
         &Keypair::generate(),
@@ -287,7 +287,7 @@ fn federated_reimport_upgrades_only_the_matching_legacy_share_row() {
 #[test]
 fn federated_row_decode_rejects_negative_synthetic_timestamp() {
     let path = unique_db_path("federated-negative-timestamp");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let anchor = synthetic_anchor("negative-timestamp", None);
     store
         .import_federated_evidence_share(&share_import("share-negative", anchor.clone()))
@@ -324,7 +324,7 @@ fn atomic_federated_lineage_is_idempotent_and_concurrent() {
     let child = signed_snapshot(&child_token, Some(anchor.capability_id.clone()));
     let barrier = Arc::new(std::sync::Barrier::new(3));
     let mut workers = Vec::new();
-    for mut store in [store_a, store_b] {
+    for store in [store_a, store_b] {
         let barrier = Arc::clone(&barrier);
         let anchor = anchor.clone();
         let child = child.clone();
@@ -338,7 +338,7 @@ fn atomic_federated_lineage_is_idempotent_and_concurrent() {
         worker.join().test_unwrap().test_unwrap();
     }
 
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     store
         .persist_federated_delegation_lineage(&anchor, None, &child)
         .test_unwrap();
@@ -372,7 +372,7 @@ fn atomic_federated_lineage_is_idempotent_and_concurrent() {
 #[test]
 fn atomic_federated_lineage_rolls_back_on_child_conflict() {
     let path = unique_db_path("federated-lineage-rollback");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let existing = signed_token(
         "conflicting-federated-child",
         &Keypair::generate(),
@@ -414,7 +414,7 @@ fn atomic_federated_lineage_rolls_back_on_child_conflict() {
 #[test]
 fn atomic_federated_lineage_rolls_back_on_sqlite_integer_overflow() {
     let path = unique_db_path("federated-lineage-overflow");
-    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
     let anchor = synthetic_anchor("overflow", None);
     let issuer = Keypair::generate();
     let child_token = CapabilityToken::sign(

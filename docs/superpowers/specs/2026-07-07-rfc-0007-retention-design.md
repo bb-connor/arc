@@ -112,3 +112,12 @@ migration last.
   (idempotent copy completes before any delete; delete confined to `main`).
 - Inclusion proofs for archived receipts are served from the archive file,
   not the live store (intended trade).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. One finding against this design's deployment:
+
+- **EV5, Medium.** No shipped binary configures retention or calls archival; `chio-config`'s
+  `to_kernel_config` is unused; every read and export path reads only the live store, so an enabled
+  90-day default would be the exportable window, below the EU AI Act six-month minimum. Wiring must
+  land with SR1 and SR6.

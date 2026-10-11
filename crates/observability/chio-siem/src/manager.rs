@@ -519,9 +519,10 @@ impl ExporterManager {
                                 &exporter_name,
                                 crate::metrics_sink::ExportOutcome::Dlq,
                             );
-                            let event_json = serde_json::to_string(event).unwrap_or_else(|_| {
-                                format!("{{\"serialize_error\": \"receipt {}\"}}", event.receipt.id)
-                            });
+                            let event_json = serde_json::to_string(&event.sink_projection())
+                                .unwrap_or_else(|_| {
+                                    "{\"serialize_error\":true,\"payload_included\":false,\"original_retrieval_required\":true,\"projection_signed\":false}".to_string()
+                                });
                             self.dlq.push(FailedEvent {
                                 event_json,
                                 error: e.to_string(),
@@ -686,7 +687,7 @@ fn retry_backoff_ms(base_backoff_ms: u64, attempt: u32) -> u64 {
 }
 
 fn validate_admin_read_context(read_context: &ReceiptReadContext) -> Result<(), SiemError> {
-    if matches!(read_context.boundary, ReceiptReadBoundary::AdminAll) {
+    if matches!(read_context.boundary(), ReceiptReadBoundary::AdminAll) {
         Ok(())
     } else {
         Err(SiemError::ConfigError(
@@ -751,6 +752,70 @@ mod tests {
     #[test]
     fn retry_backoff_ms_saturates_overflowing_base_delay() {
         assert_eq!(retry_backoff_ms(u64::MAX, 2), MAX_RETRY_BACKOFF_MS);
+    }
+
+    #[tokio::test]
+    async fn retry_dlq_retains_only_unsigned_sink_projection() -> TestResult {
+        use chio_core::crypto::Keypair;
+        use chio_core::receipt::{body::ChioReceipt, decision::Decision, decision::ToolCallAction};
+        use wiremock::{matchers::method, Mock, MockServer, ResponseTemplate};
+
+        const SECRET: &str = "siem-dlq-payload-canary-8080";
+        let dir = tempfile::tempdir()?;
+        let db = dir.path().join("receipts.sqlite");
+        seed_valid_receipt_db(&db, 0)?;
+        let key = Keypair::generate();
+        let mut body = sample_receipt("dlq-canary")?.body();
+        body.action = ToolCallAction::from_parameters(serde_json::json!({"token":SECRET}))?;
+        body.decision = Some(Decision::Deny {
+            guard: "SecretLeakGuard".into(),
+            reason: SECRET.into(),
+        });
+        body.metadata = Some(serde_json::json!({"private":SECRET}));
+        body.kernel_key = key.public_key();
+        let receipt = ChioReceipt::sign(body, &key)?;
+        let raw = serde_json::to_string(&receipt)?;
+        let conn = rusqlite::Connection::open(&db)?;
+        conn.execute("INSERT INTO chio_tool_receipts(receipt_id,timestamp,capability_id,tool_server,tool_name,decision_kind,policy_hash,content_hash,raw_json) VALUES (?1,1,'c','s','t','deny','p','h',?2)", rusqlite::params![receipt.id,raw])?;
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let webhook = crate::WebhookExporter::new_plaintext_for_tests(crate::WebhookConfig {
+            url: server.uri(),
+            retry: crate::WebhookRetry {
+                max_retries: 0,
+                ..crate::WebhookRetry::default()
+            },
+            ..crate::WebhookConfig::default()
+        })?;
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: db,
+            max_retries: 1,
+            base_backoff_ms: 1,
+            ..SiemConfig::default()
+        })?;
+        manager.add_exporter(Box::new(webhook));
+        manager.poll_once().await?;
+        let failed = manager.dlq.drain();
+        assert_eq!(failed.len(), 1);
+        assert!(!failed[0].event_json.contains(SECRET));
+        let projection: serde_json::Value = serde_json::from_str(&failed[0].event_json)?;
+        assert_eq!(projection["receipt_id"], receipt.id);
+        assert_eq!(projection["parameter_hash"], receipt.action.parameter_hash);
+        assert_eq!(projection["payload_included"], false);
+        assert_eq!(projection["original_retrieval_required"], true);
+        assert_eq!(projection["projection_signed"], false);
+        for request in server
+            .received_requests()
+            .await
+            .ok_or("requests unavailable")?
+        {
+            assert!(!String::from_utf8(request.body)?.contains(SECRET));
+        }
+        Ok(())
     }
 
     #[test]

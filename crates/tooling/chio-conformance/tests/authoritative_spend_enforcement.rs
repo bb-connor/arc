@@ -40,6 +40,7 @@ fn mediated_receipt_is_authoritative_advisory_is_not() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     let nonce = response

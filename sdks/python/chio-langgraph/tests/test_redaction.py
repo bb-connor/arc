@@ -5,15 +5,14 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 from chio_adapter_base.redact import RedactionPolicy
-from chio_sdk.models import ChioScope, Operation, ToolGrant
-from chio_sdk.testing import MockChioClient, allow_all
-
 from chio_langgraph import (
     ApprovalResolution,
     ChioGraphConfig,
     chio_approval_node,
     chio_node,
 )
+from chio_sdk.models import ChioScope, Operation, ToolGrant
+from chio_sdk.testing import MockChioClient, allow_all
 
 SERVER_ID = "demo-srv"
 
@@ -98,9 +97,7 @@ class TestChioNodeDefaultPolicy:
             return {"path": state.get("path", "")}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="chio_file_edit", scope=_scope("chio_file_edit")
-        )
+        cfg = await _build_config(chio, node_name="chio_file_edit", scope=_scope("chio_file_edit"))
         wrapped = chio_node(
             edit_body,
             scope=_scope("chio_file_edit"),
@@ -122,9 +119,7 @@ class TestChioNodeDefaultPolicy:
             return {"query": "ok"}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="search", scope=_scope("search")
-        )
+        cfg = await _build_config(chio, node_name="search", scope=_scope("search"))
         wrapped = chio_node(
             search_body,
             scope=_scope("search"),
@@ -168,9 +163,7 @@ class TestChioNodeCustomPolicy:
             return {}
 
         chio = allow_all()
-        cfg = await _build_config(
-            chio, node_name="my_tool", scope=_scope("my_tool")
-        )
+        cfg = await _build_config(chio, node_name="my_tool", scope=_scope("my_tool"))
         wrapped = chio_node(
             my_body,
             scope=_scope("my_tool"),
@@ -254,14 +247,10 @@ class TestChioApprovalNodeRedacts:
             ran.append(dict(state))
             return {"path": state.get("path", "")}
 
-        async def policy(
-            _state: Any, _runtime_config: Any
-        ) -> bool:
+        async def policy(_state: Any, _runtime_config: Any) -> bool:
             return True
 
-        fake_interrupt = _FakeInterrupt(
-            ApprovalResolution(outcome="approved", approval_id="ap-1")
-        )
+        fake_interrupt = _FakeInterrupt(ApprovalResolution(outcome="approved", approval_id="ap-1"))
 
         chio = allow_all()
         cfg = await _build_config(
@@ -276,18 +265,14 @@ class TestChioApprovalNodeRedacts:
             interrupt_fn=fake_interrupt,
         )
 
-        await wrapped(
-            {"path": "/tmp/x", "content": "PROD_SECRET=abc123"}
-        )
+        await wrapped({"path": "/tmp/x", "content": "PROD_SECRET=abc123"})
 
         forwarded = _last_eval(chio).parameters
         assert forwarded["content"] == {
             "omitted": True,
             "byte_count": len(b"PROD_SECRET=abc123"),
         }
-        assert ran == [
-            {"path": "/tmp/x", "content": "PROD_SECRET=abc123"}
-        ]
+        assert ran == [{"path": "/tmp/x", "content": "PROD_SECRET=abc123"}]
         assert len(fake_interrupt.payloads) == 1
         payload = fake_interrupt.payloads[0]
         # Raw secret must never appear in the HITL approval prompt.
@@ -306,9 +291,7 @@ class TestChioApprovalNodeRedacts:
         async def policy(_state: Any, _rc: Any) -> bool:
             return True
 
-        fake_interrupt = _FakeInterrupt(
-            ApprovalResolution(outcome="approved", approval_id="ap-1")
-        )
+        fake_interrupt = _FakeInterrupt(ApprovalResolution(outcome="approved", approval_id="ap-1"))
 
         chio = allow_all()
         cfg = await _build_config(

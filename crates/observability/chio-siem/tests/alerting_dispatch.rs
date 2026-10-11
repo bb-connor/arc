@@ -24,6 +24,12 @@ use chio_siem::Exporter;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "alerting_dispatch/payload_minimization.rs"]
+mod payload_minimization;
+
+#[path = "alerting_dispatch/authentication.rs"]
+mod authentication;
+
 fn test_server_authority(server: &MockServer) -> String {
     let url = url::Url::parse(&server.uri()).expect("wiremock uri parses");
     let host = url.host_str().unwrap_or("127.0.0.1").to_string();
@@ -34,7 +40,7 @@ fn test_server_authority(server: &MockServer) -> String {
 }
 
 fn allow_receipt(id: &str) -> ChioReceipt {
-    let keypair = Keypair::generate();
+    let keypair = Keypair::from_seed(&[42; 32]);
     ChioReceipt::sign(
         ChioReceiptBody {
             id: id.to_string(),
@@ -66,7 +72,7 @@ fn allow_receipt(id: &str) -> ChioReceipt {
 }
 
 fn deny_receipt(id: &str, guard: &str) -> ChioReceipt {
-    let keypair = Keypair::generate();
+    let keypair = Keypair::from_seed(&[42; 32]);
     ChioReceipt::sign(
         ChioReceiptBody {
             id: id.to_string(),
@@ -164,6 +170,7 @@ async fn dispatch_records_route_and_outcome() {
     let (backend, _recorded) = RecordingBackend::new("pagerduty");
     let sink = Arc::new(RecordingMetricsSink::default());
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .with_metrics_sink(Arc::clone(&sink) as Arc<dyn chio_siem::SiemMetricsSink>)
         .build();
@@ -185,6 +192,7 @@ async fn dispatch_records_route_and_outcome() {
 async fn high_severity_deny_dispatches_to_backend() {
     let (backend, recorded) = RecordingBackend::new("test-backend");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -201,13 +209,18 @@ async fn high_severity_deny_dispatches_to_backend() {
     assert_eq!(recorded.len(), 1, "only the deny should be alerted on");
     assert_eq!(recorded[0].receipt_id, expected_receipt_id);
     assert_eq!(recorded[0].severity, AlertSeverity::High);
-    assert_eq!(recorded[0].guard, "ForbiddenPathGuard");
+    assert_eq!(
+        recorded[0].guard,
+        "sha256:02f1334fbed0c44fea2662ed9cb24bce875387ee0402da9519d71c6a8ea58a8e"
+    );
+    assert!(!recorded[0].summary.contains("ForbiddenPathGuard"));
 }
 
 #[tokio::test]
 async fn medium_severity_deny_does_not_fire_by_default() {
     let (backend, recorded) = RecordingBackend::new("test-backend");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -225,7 +238,9 @@ async fn medium_severity_deny_does_not_fire_by_default() {
 
 #[tokio::test]
 async fn alerting_without_backends_is_a_no_op() {
-    let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+    let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
+        .build();
     assert_eq!(exporter.backend_count(), 0);
 
     let events = vec![SiemEvent::from_receipt(deny_receipt(
@@ -245,6 +260,7 @@ async fn lowering_min_severity_catches_medium_denials() {
         include_guards: Vec::new(),
     };
     let exporter = AlertingExporter::builder(cfg)
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -279,6 +295,7 @@ async fn pagerduty_backend_posts_to_v2_enqueue() {
     )
     .expect("PagerDutyBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -308,6 +325,7 @@ async fn pagerduty_backend_propagates_http_error() {
     )
     .expect("PagerDutyBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -340,6 +358,7 @@ async fn opsgenie_backend_posts_to_v2_alerts() {
     )
     .expect("OpsGenieBackend builds in tests");
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(backend))
         .build();
 
@@ -377,6 +396,7 @@ async fn partial_failure_across_two_backends_surfaces_partial_failure_error() {
     let failing = Failing("bad", failing_calls.clone());
 
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![Keypair::from_seed(&[42; 32]).public_key()])
         .with_backend(Box::new(ok_backend))
         .with_backend(Box::new(failing))
         .build();

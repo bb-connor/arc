@@ -1021,7 +1021,7 @@ impl EconomicStateBatchV1 {
         }
         if !self
             .transitions
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0].resource_key < pair[1].resource_key)
         {
             return Err(invalid(
@@ -1040,7 +1040,7 @@ impl EconomicStateBatchV1 {
         }
         if !self
             .effect_slots
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0].slot_id < pair[1].slot_id)
         {
             return Err(invalid(
@@ -1061,7 +1061,7 @@ impl EconomicStateBatchV1 {
                 ));
             }
         }
-        if !self.request_replays.windows(2).all(|pair| {
+        if !self.request_replays.array_windows::<2>().all(|pair| {
             (
                 &pair[0].request.request_namespace_digest,
                 &pair[0].request.request_id,
@@ -1269,9 +1269,7 @@ impl EconomicStateBatchV1 {
                 .iter()
                 .filter(|replay| replay.effect_slot_ids.binary_search(&slot.slot_id).is_ok())
                 .collect::<Vec<_>>();
-            if replays.len() != 1
-                || replays[0].request != slot.request
-                || replays[0].operation_id != slot.operation_id
+            if !matches!(replays.as_slice(), [replay] if replay.request == slot.request && replay.operation_id == slot.operation_id)
             {
                 return Err(EconomicContinuityError::BindingMismatch(
                     "effect_slot_request_replay",
@@ -1446,7 +1444,7 @@ fn validate_sorted_unique_digests(
     field: &'static str,
     values: &[String],
 ) -> Result<(), EconomicContinuityError> {
-    if !values.windows(2).all(|pair| pair[0] < pair[1]) {
+    if !values.array_windows::<2>().all(|pair| pair[0] < pair[1]) {
         return Err(invalid(field, "must be sorted and unique"));
     }
     for value in values {

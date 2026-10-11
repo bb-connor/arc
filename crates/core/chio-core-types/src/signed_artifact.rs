@@ -37,6 +37,7 @@ pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
     "chio.frost.authorization-slot-checkpoint.v1";
 pub const CHIO_FROST_AUTHORIZATION_V1_SCHEMA: &str = "chio.frost.authorization.v1";
 pub const CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA: &str = "chio.frost.epoch-checkpoint.v1";
+pub const CHIO_FROST_DKG_ROUND2_SEALED_V1_SCHEMA: &str = "chio.frost.dkg-round2-sealed.v1";
 pub const CHIO_FROST_ROSTER_V1_SCHEMA: &str = "chio.frost.roster.v1";
 pub const CHIO_CLEARING_PARTICIPANT_SNAPSHOT_V1_SCHEMA: &str =
     "chio.clearing.participant-snapshot.v1";
@@ -309,6 +310,7 @@ pub const CHIO_SWARM_BUDGET_POOL_V1_SCHEMA: &str = "chio.swarm.budget-pool.v1";
 pub const CHIO_SWARM_REVOCATION_EPOCH_V1_SCHEMA: &str = "chio.swarm.revocation-epoch.v1";
 pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
+pub const CHIO_TOOL_MANIFEST_V2_SCHEMA: &str = "chio.manifest.v2";
 
 type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static str)>);
 
@@ -389,6 +391,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA,
         Some(("frost_epoch_checkpoint", "frost-quorum-substrate-v1")),
+    ),
+    (
+        CHIO_FROST_DKG_ROUND2_SEALED_V1_SCHEMA,
+        Some(("frost_dkg_round2_sealed", "frost-sealed-ceremony-v1")),
     ),
     (
         CHIO_FROST_ROSTER_V1_SCHEMA,
@@ -1199,12 +1205,20 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA,
         Some(("swarm_authority_verifier_report", "swarm-authority-v1")),
     ),
+    (
+        CHIO_TOOL_MANIFEST_V2_SCHEMA,
+        Some(("tool_manifest", "manifest-v2")),
+    ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),
     (GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA, None),
     (ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, None),
 ];
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both fixed arrays have SIGNED_ARTIFACT_SCHEMA_SPECS.len() elements and the loop checks the index against that length."
+)]
 const fn known_signed_artifact_schemas() -> [&'static str; SIGNED_ARTIFACT_SCHEMA_SPECS.len()] {
     let mut schemas = [""; SIGNED_ARTIFACT_SCHEMA_SPECS.len()];
     let mut index = 0;

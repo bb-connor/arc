@@ -1,5 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum ChioPackageError {
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("canonical JSON failed: {0}")]
     Canonical(String),
     #[error("package schema is unsupported: {0}")]

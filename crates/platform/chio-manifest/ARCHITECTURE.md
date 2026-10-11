@@ -2,14 +2,15 @@
 
 ## Overview
 
-`chio-manifest` defines `chio.manifest.v1`, the signed discovery-and-trust
+`chio-manifest` defines `chio.manifest.v2`, the signed discovery-and-trust
 artifact a Chio tool server uses to declare its tools before the kernel admits
-it. The crate is pure data, validation, and signing: no I/O, no runtime state,
-`#![forbid(unsafe_code)]`. Structural validation (`validate_manifest`) is
+it. The crate provides data, validation, signing, verified admission and an
+existing-file loader, with `#![forbid(unsafe_code)]`.
+Structural validation (`validate_manifest`) is
 deliberately independent of signer material, so a manifest's shape can be
 checked before a keypair is available; `sign_manifest` and `verify_manifest`
 layer the Ed25519 trust check on top. Tool-definition synthesis from a wire
-protocol, kernel admission state, capability issuance, and guard execution are
+protocol, kernel execution state, capability issuance, and guard execution are
 deliberately absent from this crate; they live in the protocol adapters,
 `chio-kernel`, and the guard crates.
 
@@ -19,6 +20,8 @@ deliberately absent from this crate; they live in the protocol adapters,
 |------|----------------|
 | `src/lib.rs` | Manifest schema types (`ToolManifest`, `ToolDefinition`, `ToolPricing`, `PricingModel`, `RequiredPermissions`, `LatencyHint`, `ServerTool`, `SignedManifest`, `ManifestError`) and `sign_manifest`/`verify_manifest`. |
 | `src/validation.rs` | Structural validation (`validate_manifest` and its field-level helpers). Private module; only `validate_manifest` is re-exported. |
+| `src/admission.rs` | Registered-key, policy and runtime-topology admission; atomic registry composition; bounded existing-file loading. |
+| `src/input_schema.rs` | Compiled invocation schemas with external retrieval disabled and the trusted provider-native tool catalog. |
 
 ## Signing and verification lifecycle
 
@@ -39,7 +42,7 @@ deliberately absent from this crate; they live in the protocol adapters,
 
 ## Invariants and failure modes
 
-- `schema` must equal `TOOL_MANIFEST_SCHEMA` (`"chio.manifest.v1"`); any other
+- `schema` must equal `TOOL_MANIFEST_SCHEMA` (`"chio.manifest.v2"`); any other
   value is `UnsupportedSchema`.
 - `validate_manifest` never inspects `public_key` material; it is a pure
   structural gate usable before a signer exists.
@@ -64,6 +67,22 @@ deliberately absent from this crate; they live in the protocol adapters,
 - `sign_manifest` and `verify_manifest` fail closed with `VerificationFailed`
   on an unparseable or mismatched embedded `public_key`, a signer-key
   mismatch, or an invalid signature.
+- Tool definitions share the core `ToolAnnotations` and `ToolFlowDeclaration`
+  types. Permissions bind explicit network ports and a closed native syscall
+  profile. Flow admission combines the signed declaration with independent
+  policy and the actual runtime topology.
+- The signed-file loader rejects symbolic links, non-regular files and inputs
+  over 1 MiB. Its signed JSON boundary rejects duplicate fields and numeric
+  aliases before deserialization. The embedded key cannot select its own trust
+  root.
+
+## Earlier manifests
+
+The v1 parser/migration API is no longer present. Existing v1 signatures cannot
+authorize v2 manifests or cage launches. Operators must explicitly review the
+new fields, re-sign and re-admit the resulting v2 document. Archived v1 source
+and evidence remain historical records; their former migration tests are not
+tests of the current public API.
 
 ## Dependencies
 
@@ -72,4 +91,7 @@ deliberately absent from this crate; they live in the protocol adapters,
   `PublicKey::from_hex` decoder) and `MonetaryAmount` (also used for
   capability budget scoping in `chio-core-types::capability::scope`).
 - `serde`, `serde_json` - manifest (de)serialization and JSON Schema values.
+- `chio-cage-plan`, `chio-security-types` - native launch and information-flow
+  contracts.
+- `jsonschema` - invocation schema validation without external retrieval.
 - `thiserror` - `ManifestError`.

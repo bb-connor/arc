@@ -18,6 +18,18 @@ MATCH_RE = re.compile(
     r"\bstubs?\b|\bplaceholders?\b)|\bXXX\b"
 )
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+LINT_SELECTOR = r"(?:clippy::)?[a-z_][a-z_0-9]*"
+DENYING_LINT_LIST = (
+    rf"(?:deny|forbid)\s*\(\s*{LINT_SELECTOR}"
+    rf"(?:\s*,\s*{LINT_SELECTOR})*\s*,?\s*\)"
+)
+DENYING_LINT_ATTRIBUTE_RE = re.compile(
+    rf"^[ \t]*#!?\[\s*(?:{DENYING_LINT_LIST}|"
+    rf"cfg_attr\s*\(\s*not\s*\(\s*test\s*\)\s*,\s*"
+    rf"{DENYING_LINT_LIST}\s*,?\s*\))\s*\][ \t]*$",
+    re.MULTILINE,
+)
+CLIPPY_TODO_SELECTOR_RE = re.compile(r"\bclippy::todo\b")
 
 
 @dataclass(frozen=True)
@@ -37,6 +49,88 @@ def allow(reason: str, expires: str) -> AllowlistEntry:
 
 
 ALLOWLIST: dict[str, AllowlistEntry] = {
+    ".config/miri-crates.toml": allow(
+        "reviewed unsupported Miri syscall reason, not an incomplete product implementation",
+        "2026-12-31",
+    ),
+    # Exact reviewed vendored text. These entries do not waive source audits
+    # or permit new incomplete executable implementations in these files.
+    "third_party/cmpv2-chio/Cargo.toml.orig": allow(
+        "upstream original manifest path-dependency maintenance note",
+        "2026-12-31",
+    ),
+    "third_party/cmpv2-chio/src/body.rs": allow(
+        "upstream unsupported nested CMP variant remains explicitly absent",
+        "2026-12-31",
+    ),
+    "third_party/crmf-chio/src/pop.rs": allow(
+        "upstream ASN.1 tag and manually implemented CHOICE maintenance notes",
+        "2026-12-31",
+    ),
+    "third_party/ignore-chio/src/gitignore.rs": allow(
+        "upstream infallible builder return-type cleanup for a future semver release",
+        "2026-12-31",
+    ),
+    "third_party/ignore-chio/src/overrides.rs": allow(
+        "upstream infallible builder return-type cleanup for a future semver release",
+        "2026-12-31",
+    ),
+    "third_party/ignore-chio/src/walk.rs": allow(
+        "upstream non-Unix non-Windows fallback explicitly returns unsupported-platform error",
+        "2026-12-31",
+    ),
+    "third_party/nono-upstream-chio/schema/capability-manifest.schema.json": allow(
+        "upstream credential substitution syntax descriptions",
+        "2026-12-31",
+    ),
+    "third_party/nono-upstream-chio/src/manifest_convert.rs": allow(
+        "upstream proxy port sentinel; direct network stays blocked",
+        "2026-12-31",
+    ),
+    "third_party/nono-upstream-chio/src/state.rs": allow(
+        "upstream cfg(test) Unix socket fixture file description",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/regress_dfa_plan.txt": allow(
+        "upstream packaged design note, not executable source",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/api.rs": allow(
+        "upstream documented unsupported flag semantics",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/bytesearch.rs": allow(
+        "upstream optimization notes beside working linear search and bitmap implementation",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/classicalbacktrack.rs": allow(
+        "upstream allocation and parameter-passing optimization notes",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/cursor.rs": allow(
+        "upstream assertion rejects non-byte input to the byte cursor",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/optimizer.rs": allow(
+        "upstream optimization and code-organization notes beside implemented passes",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/position.rs": allow(
+        "upstream pointer-position lifetime maintenance note; source audit owns this residual",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/startpredicate.rs": allow(
+        "upstream optional prefix-search optimizations retain conservative arbitrary predicates",
+        "2026-12-31",
+    ),
+    "third_party/regress-chio/src/unicode.rs": allow(
+        "upstream ASCII and Unicode search optimization notes",
+        "2026-12-31",
+    ),
+    "third_party/seccompiler-chio/src/frontend/json.rs": allow(
+        "upstream JSON comment type validates and discards comment strings",
+        "2026-12-31",
+    ),
     # Exact upstream comments only. New code and comments remain checked;
     # supply-chain audits separately cover this pinned cryptographic source.
     "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": allow(
@@ -167,6 +261,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "reviewed fail-closed comments around non-Ed25519 byte conversions",
         "2026-12-31",
     ),
+    "crates/core/chio-response-model/src/simulation.rs": allow(
+        "local simulation fence is model data and never creates live port authority",
+        "2026-12-31",
+    ),
     "crates/core/chio-core-types/src/plan.rs": allow(
         "planned dependency edges are recorded as audit metadata in v1",
         "2026-12-31",
@@ -203,10 +301,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/platform/chio-http-core/src/routes.rs": allow(
         "route-template placeholder terminology",
-        "2026-12-31",
-    ),
-    "crates/kernel/chio-kernel-browser/src/clock.rs": allow(
-        "cfg(not wasm32) host-target test stub returns fail-closed time",
         "2026-12-31",
     ),
     "crates/kernel/chio-kernel-browser/src/rng.rs": allow(
@@ -249,7 +343,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "reviewed threat-model test-stub generator, expected to fail closed until populated",
         "2026-12-31",
     ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": allow(
+    "crates/platform/chio-store-sqlite/src/receipt_query/read.rs": allow(
         "SQL bind placeholder terminology, not an unfinished stub surface",
         "2026-12-31",
     ),
@@ -292,6 +386,79 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
 }
 
 ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
+    ".config/miri-crates.toml": (
+        r'^reason = "syscall: memfd_create \(aarch64 number 279\) is not implemented by Miri"$',
+    ),
+    "third_party/cmpv2-chio/Cargo.toml.orig": (
+        "^const-oid = \\{ version = \"0\\.9\", features = \\[\"db\"\\] \\} # TODO: path = \"\\.\\./const-oid\"$",
+    ),
+    "third_party/cmpv2-chio/src/body.rs": (
+        "^// TODO address recursion error$",
+    ),
+    "third_party/crmf-chio/src/pop.rs": (
+        "^//todo review EXPLICIT tag here \\(does not compile as IMPLICIT\\)$",
+        "^// TODO address requirement for fixed tag for CHOICE$",
+    ),
+    "third_party/ignore-chio/src/gitignore.rs": (
+        "^// TODO: This should not return a `Result`\\. Fix this in the next semver$",
+    ),
+    "third_party/ignore-chio/src/overrides.rs": (
+        "^// TODO: This should not return a `Result`\\. Fix this in the next semver$",
+    ),
+    "third_party/ignore-chio/src/walk.rs": (
+        "^// Placeholder implementation to allow compiling on non-standard platforms$",
+    ),
+    "third_party/nono-upstream-chio/schema/capability-manifest.schema.json": (
+        "^\"description\": \"Format string for the credential value, using \\{\\} as placeholder\\. Only used when mode is 'header'\\.\",$",
+        "^\"description\": \"Pattern to match in incoming URL path, using \\{\\} as placeholder for the phantom token\\. Required when mode is 'url_path'\\.\"$",
+        "^\"description\": \"Pattern for outgoing URL path, using \\{\\} as placeholder for the real credential\\. Defaults to path_pattern if not specified\\. Only used when mode is 'url_path'\\.\"$",
+    ),
+    "third_party/nono-upstream-chio/src/manifest_convert.rs": (
+        "^// Port 0 is a placeholder \u2014 the CLI fills in the actual proxy port\\.$",
+    ),
+    "third_party/nono-upstream-chio/src/state.rs": (
+        "^std::fs::write\\(&sock, b\"\"\\)\\.expect\\(\"stub\"\\);$",
+    ),
+    "third_party/regress-chio/regress_dfa_plan.txt": (
+        "^Want me to turn Milestones 1\u20133 into concrete Rust stubs and tests so the scaffold is ready\\? Or pick a different slice to start with \\(e\\.g\\., 6\u20137: closure \\+ determinization core\\)\\.$",
+    ),
+    "third_party/regress-chio/src/api.rs": (
+        "^/// Other flags are not implemented and are ignored\\.$",
+    ),
+    "third_party/regress-chio/src/bytesearch.rs": (
+        "^// TODO\\.$",
+        "^// TODO: the codegen here is pretty horrible; LLVM is emitting a sequence of$",
+    ),
+    "third_party/regress-chio/src/classicalbacktrack.rs": (
+        "^// TODO: consider retaining storage here\\?$",
+        "^// TODO: consider using a stack-allocated array\\.$",
+        "^// TODO: we are inconsistent about passing Input by reference or value\\.$",
+        "^// TODO: avoid allocating so much\\.$",
+    ),
+    "third_party/regress-chio/src/cursor.rs": (
+        "^\"Not implemented for non-byte input\"$",
+    ),
+    "third_party/regress-chio/src/optimizer.rs": (
+        "^/// TODO: evaluate unfolding performance and consider a cache within the optimizer\\.$",
+        "^// TODO: consider ignoring loops with nested sub-loops\\?$",
+        "^/// TODO: this seems to do too much; consider breaking this up\\.$",
+        "^// TODO: does this ever help anything\\?$",
+    ),
+    "third_party/regress-chio/src/position.rs": (
+        "^/// TODO: thread lifetimes through this\\.$",
+    ),
+    "third_party/regress-chio/src/startpredicate.rs": (
+        "^// TODO: we could support icase through bitmap of de-folded first bytes\\.$",
+        "^// TODO: can probably exploit some of these\\.$",
+        "^// TODO: we could try to join two predicates if the loop were optional\\.$",
+    ),
+    "third_party/regress-chio/src/unicode.rs": (
+        "^// TODO: optimize ASCII case\\.$",
+        "^// TODO: this can be optimized\\.$",
+    ),
+    "third_party/seccompiler-chio/src/frontend/json.rs": (
+        "^/// Dummy placeholder type for a JSON comment\\. Holds no value\\.$",
+    ),
     "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": (
         r'^" // TODO: Uncomment when MSRV >= 1\.64\\n",$',
     ),
@@ -398,8 +565,10 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"not a placeholder",
     ),
     "crates/core/chio-core-types/src/crypto.rs": (
-        r"32-byte placeholder",
         r"all-zero placeholder",
+    ),
+    "crates/core/chio-response-model/src/simulation.rs": (
+        r"^// A local model placeholder, never installed or passed to a port\.$",
     ),
     "crates/core/chio-core-types/src/plan.rs": (
         r"Advisory only in v1",
@@ -428,10 +597,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/platform/chio-http-core/src/routes.rs": (
         r"`\{id\}` placeholder",
-    ),
-    "crates/kernel/chio-kernel-browser/src/clock.rs": (
-        r"stub so `cargo test -p chio-kernel-browser`",
-        r"stub intentionally returns `0`",
     ),
     "crates/kernel/chio-kernel-browser/src/rng.rs": (
         r"Host-target stub",
@@ -490,8 +655,8 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r"let stub",
         r"contains_live_unimplemented_marker",
     ),
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs": (
-        r"bind placeholders",
+    "crates/platform/chio-store-sqlite/src/receipt_query/read.rs": (
+        r"^// but must still bind placeholders if we reuse `params!`;$",
     ),
     "crates/trust/chio-tee/src/tap.rs": (
         r"Stub `TrafficTap` implementation",
@@ -612,6 +777,7 @@ def classify(path: str) -> str:
         return "examples"
     if (
         path.startswith("tests/")
+        or path.startswith("fuzz/corpus/")
         or "/src/test/" in f"/{path}/"
         or "/tests/" in f"/{path}/"
         or name == "tests.rs"
@@ -632,6 +798,21 @@ def read_text(path: Path) -> str | None:
         return None
 
 
+def mask_denied_lint_selectors(path: str, text: str) -> str:
+    """Mask one metadata token in complete Rust denying attributes only."""
+    if Path(path).suffix != ".rs":
+        return text
+    # Recognize only direct denying attributes and the production-only form
+    # used by this workspace. Do not mask comments, expressions, permissive
+    # lint levels or any other text that happens to mention the same selector.
+    return DENYING_LINT_ATTRIBUTE_RE.sub(
+        lambda attribute: CLIPPY_TODO_SELECTOR_RE.sub(
+            " " * len("clippy::todo"), attribute.group()
+        ),
+        text,
+    )
+
+
 def collect_hits(root: Path, paths: list[str]) -> list[Hit]:
     hits: list[Hit] = []
     for path in paths:
@@ -641,8 +822,11 @@ def collect_hits(root: Path, paths: list[str]) -> list[Hit]:
         category = classify(path)
         allowlist = ALLOWLIST.get(path)
         denylist = DENYLIST.get(path)
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            if not MATCH_RE.search(line):
+        scan_lines = mask_denied_lint_selectors(path, text).splitlines()
+        for line_number, (line, scan_line) in enumerate(
+            zip(text.splitlines(), scan_lines), start=1
+        ):
+            if not MATCH_RE.search(scan_line):
                 continue
             hits.append(
                 Hit(

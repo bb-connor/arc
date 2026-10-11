@@ -116,7 +116,7 @@ struct ReplayRun {
 fn run_replay_json(log_path: &Path) -> ReplayRun {
     let keypair = Keypair::from_seed(&FIXTURE_SEED);
     let trusted_key = tempfile::NamedTempFile::new().expect("trusted key tempfile");
-    std::fs::write(trusted_key.path(), keypair.public_key().as_bytes()).expect("write trusted key");
+    std::fs::write(trusted_key.path(), keypair.public_key_bytes()).expect("write trusted key");
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
         .arg("replay")
         .arg(log_path)

@@ -267,6 +267,8 @@ pub struct RevocationListResponse {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptListResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<chio_kernel::receipt_query::ReceiptSnapshotWatermark>,
     pub configured: bool,
     pub backend: String,
     pub kind: String,
@@ -382,4 +384,10 @@ pub struct BudgetListResponse {
     pub capability_id: Option<String>,
     pub count: usize,
     pub usages: Vec<BudgetUsageView>,
+}
+
+impl From<chio_security_types::clock::ClockError> for TrustHttpError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::new(StatusCode::SERVICE_UNAVAILABLE, error.code())
+    }
 }

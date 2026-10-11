@@ -12,7 +12,6 @@ paths:
   /process-task:
     post:
       operationId: process_task
-      x-chio-tool-name: process_task
       requestBody:
         required: true
         content:

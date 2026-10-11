@@ -26,8 +26,17 @@ path = "src/lib.rs"
 
 [patch.crates-io]
 aws-lc-rs = { path = "../third_party/aws-lc-rs-chio" }
+enumflags2_derive = { path = "../third_party/enumflags2-derive-chio" }
+seccompiler = { path = "../third_party/seccompiler-chio" }
+
+[features]
+response_authority_protocol = ["dep:chio-control-plane"]
+response_lifecycle = ["dep:chio-quarantine"]
 
 [dependencies]
+zeroize = "1.8"
+chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }
+chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"], optional = true }
 chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["fuzz"] }
 chio-acp-edge = { path = "../crates/protocol/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/economy/chio-anchor", features = ["fuzz"] }
@@ -40,6 +49,7 @@ chio-core = { path = "../crates/core/chio-core" }
 chio-core-types = { path = "../crates/core/chio-core-types" }
 chio-data-guards = { path = "../crates/guards/chio-data-guards" }
 chio-eval-receipt = { path = "../crates/sdk/chio-eval-receipt" }
+chio-federation-authority = { path = "../crates/trust/chio-federation-authority" }
 chio-federation = { path = "../crates/trust/chio-federation" }
 chio-finding-worker = { path = "../crates/platform/chio-finding-worker" }
 chio-guards = { path = "../crates/guards/chio-guards" }
@@ -52,6 +62,8 @@ chio-kernel-core = { path = "../crates/kernel/chio-kernel-core", features = ["fu
 chio-mcp-adapter = { path = "../crates/protocol/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/protocol/chio-mcp-edge", features = ["fuzz"] }
 chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge", features = ["fuzz"] }
+chio-store-sqlite = { path = "../crates/platform/chio-store-sqlite", features = ["fuzz"] }
+chio-conformance = { path = "../crates/tooling/chio-conformance", default-features = false, features = ["fuzz"] }
 chio-policy = { path = "../crates/guards/chio-policy" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
@@ -266,8 +278,45 @@ doc = false
 bench = false
 
 [[bin]]
+name = "rollback_anchor_slots"
+path = "fuzz_targets/rollback_anchor_slots.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "peers_lock_decode"
+path = "fuzz_targets/peers_lock_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "fuzz_tool_action"
 path = "fuzz_targets/tool_action.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "response_authority_protocol"
+required-features = ["response_authority_protocol"]
+path = "fuzz_targets/response_authority_protocol.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "response_lifecycle"
+required-features = ["response_lifecycle"]
+path = "fuzz_targets/response_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frost_round2_envelope"
+path = "fuzz_targets/frost_round2_envelope.rs"
 test = false
 doc = false
 bench = false

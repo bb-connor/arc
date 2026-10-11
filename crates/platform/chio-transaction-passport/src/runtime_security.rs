@@ -83,6 +83,15 @@ pub fn verify_runtime_security_claims_with_trust(
     bundle: &RuntimeSecurityBundle,
     trust: &RuntimeSecurityTrust,
 ) -> Result<RuntimeSecurityReport, TransactionPassportError> {
+    crate::validate_evidence_budget(
+        [
+            bundle.evidence_graph_bytes.as_slice(),
+            bundle.verifier_policy_bytes.as_slice(),
+        ]
+        .into_iter()
+        .chain(bundle.root_evidence_graph_bytes.as_deref())
+        .chain(bundle.artifacts.values().map(Vec::as_slice)),
+    )?;
     let graph_artifacts = runtime_graph_artifacts(bundle);
     let root_evidence_graph_bytes = bundle
         .root_evidence_graph_bytes

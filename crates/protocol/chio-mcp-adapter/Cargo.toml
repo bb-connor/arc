@@ -20,7 +20,9 @@ async-trait = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-mcp-edge = { workspace = true }
 chio-kernel = { workspace = true }
+chio-cage = { workspace = true }
 chio-manifest = { workspace = true }
+chio-security-types = { workspace = true }
 chrono = { version = "0.4", features = ["clock"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

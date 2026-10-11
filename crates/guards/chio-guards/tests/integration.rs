@@ -88,6 +88,7 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -462,6 +463,7 @@ async fn filesystem_tool_session_roots_allow_in_root_path() {
         progress_token: None,
     };
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
@@ -529,6 +531,7 @@ async fn filesystem_tool_session_roots_deny_out_of_root_path() {
         progress_token: None,
     };
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
@@ -587,6 +590,7 @@ async fn filesystem_tool_session_roots_fail_closed_when_missing() {
         progress_token: None,
     };
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),

@@ -396,10 +396,10 @@ impl SqlitePheromoneRuntimeStore {
         let conn = self.conn.lock()?;
         let mut stmt =
             conn.prepare("SELECT json FROM chio_pheromone_passport_admissions ORDER BY kernel_id, passport_key_hash")?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let rows = stmt.query_map([], |row| crate::input::row_decode(row, 0))?;
         let mut passports = Vec::new();
         for row in rows {
-            passports.push(serde_json::from_str(&row?)?);
+            passports.push(row??);
         }
         Ok(passports)
     }
@@ -466,11 +466,11 @@ impl SqlitePheromoneRuntimeStore {
         )?;
         let rows = stmt.query_map(
             params![batch_sha256, authenticated_sender_kernel_id],
-            |row| row.get::<_, String>(0),
+            |row| crate::input::row_decode(row, 0),
         )?;
         let mut most_recent: Option<PheromoneReceiveReport> = None;
         for row in rows {
-            let report: PheromoneReceiveReport = serde_json::from_str(&row?)?;
+            let report: PheromoneReceiveReport = row??;
             if report.batch_outcome != PheromoneBatchOutcome::Rejected {
                 return Ok(Some(report));
             }
@@ -609,7 +609,7 @@ fn admit_deposit_scoped_tx(
         )?;
     }
 
-    let passport_json = serde_json::to_string(&passport)?;
+    let passport_json = crate::input::encode(&passport)?;
     tx.execute(
         r#"
         INSERT INTO chio_pheromone_passport_admissions
@@ -625,7 +625,7 @@ fn admit_deposit_scoped_tx(
         ],
     )?;
 
-    let json = serde_json::to_string(deposit)?;
+    let json = crate::input::encode(deposit)?;
     tx.execute(
         r#"
         INSERT INTO chio_pheromone_deposits
@@ -767,10 +767,10 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
         let conn = self.conn.lock()?;
         let mut stmt =
             conn.prepare("SELECT json FROM chio_pheromone_deposits ORDER BY deposit_sha256")?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let rows = stmt.query_map([], |row| crate::input::row_decode(row, 0))?;
         let mut deposits = Vec::new();
         for row in rows {
-            let deposit: PheromoneDeposit = serde_json::from_str(&row?)?;
+            let deposit: PheromoneDeposit = row??;
             if subject_class
                 .map(|value| value == deposit.body.subject_class)
                 .unwrap_or(true)
@@ -870,10 +870,10 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
         let mut stmt = conn.prepare(
             "SELECT json FROM chio_pheromone_receive_reports ORDER BY received_at_unix_ms",
         )?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let rows = stmt.query_map([], |row| crate::input::row_decode(row, 0))?;
         let mut reports = Vec::new();
         for row in rows {
-            reports.push(serde_json::from_str(&row?)?);
+            reports.push(row??);
         }
         Ok(reports)
     }
@@ -1038,7 +1038,7 @@ fn record_receive_report_tx(
     tx: &rusqlite::Transaction<'_>,
     report: &PheromoneReceiveReport,
 ) -> Result<(), PheromoneRuntimeError> {
-    let json = serde_json::to_string(report)?;
+    let json = crate::input::encode(report)?;
     tx.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports
@@ -1060,7 +1060,7 @@ fn record_receive_report_connection(
     conn: &Connection,
     report: &PheromoneReceiveReport,
 ) -> Result<(), PheromoneRuntimeError> {
-    let json = serde_json::to_string(report)?;
+    let json = crate::input::encode(report)?;
     conn.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports

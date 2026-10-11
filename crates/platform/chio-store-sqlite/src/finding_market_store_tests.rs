@@ -40,7 +40,7 @@ fn fixture() -> Fixture {
     secure_temp_directory(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let store = authority.finding_market_store();
     Fixture {
         _temp: temp,
@@ -558,7 +558,7 @@ fn retained_recipe_dependency_survives_restart_and_rejects_deletion() {
     let digest = chio_core::sha256_hex(&dependency);
     {
         let authority =
-            SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+            crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
         authority
             .finding_market_store()
             .put_recipe_blob(&digest, &dependency, NOW)
@@ -577,7 +577,7 @@ fn retained_recipe_dependency_survives_restart_and_rejects_deletion() {
     drop(raw);
 
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("reopen authority");
     assert_eq!(
         authority
             .finding_market_store()
@@ -1710,7 +1710,7 @@ fn schema_v2_upgrade_adds_expired_activation_recovery_without_replaying_admissio
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let admission_id = {
         let authority =
-            SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+            crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
         let store = authority.finding_market_store();
         let finding_id = hex64('c');
         let artifact = publish_finding(
@@ -1781,7 +1781,7 @@ fn schema_v2_upgrade_adds_expired_activation_recovery_without_replaying_admissio
         .expect("stamp prior market schema");
     drop(connection);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
         .expect("upgrade prior schema revision");
     let store = authority.finding_market_store();
     assert_eq!(
@@ -1912,7 +1912,7 @@ fn corrupted_content_is_caught_on_the_serve_path_and_by_the_explicit_sweep() {
     let finding_id = hex64('a');
     {
         let authority =
-            SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+            crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
         let store = authority.finding_market_store();
         publish_finding(
             &store,
@@ -1949,8 +1949,8 @@ fn corrupted_content_is_caught_on_the_serve_path_and_by_the_explicit_sweep() {
 
     // The schema shape is intact, so the open succeeds: content digests
     // are not swept on the open path.
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open with intact schema");
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
+        .expect("open with intact schema");
     let store = authority.finding_market_store();
 
     // Serving the corrupted row rejects, which is the guarantee that
@@ -1975,3 +1975,7 @@ fn corrupted_content_is_caught_on_the_serve_path_and_by_the_explicit_sweep() {
 
 #[path = "finding_market_store_companion_tests.rs"]
 mod companion;
+
+#[path = "finding_market_store_tests/connection_recovery.rs"]
+#[cfg(unix)]
+mod connection_recovery;

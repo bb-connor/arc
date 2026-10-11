@@ -1,14 +1,18 @@
 {
-  "caught": 0,
-  "needs_real_run": true,
-  "note": "Bootstrap placeholder. The conformance test at crates/chio-conformance/tests/threats/weights_hash_spoof.rs exercises this threat row against production code, but no cargo-mutants command transcript or run timestamp is committed in this evidence set. This file is consumed by scripts/check-threat-coverage-mutants.sh, so it must remain needs_real_run=true with caught=0 until a real cargo-mutants run catches at least one mutant and records timestamp_kind=cargo-mutants-run.",
-  "ran_at": "1970-01-01T00:00:00Z",
+  "caught": 1,
+  "needs_real_run": false,
+  "status": "partial",
+  "closure_scope": "kernel-loaded-weights-digest-equality-and-unavailable-refusal",
+  "deferred_follow_up": "Kernel loaded-weights digest equality and unavailable-provider refusal have real mutation evidence, but end-to-end model supply-chain integrity remains DEFERRED-FOLLOW-UP. The conformance test recomputes a digest from local loaded bytes, accepts the matching model card, rejects a spoofed digest, and rejects a provider that cannot expose loaded bytes. This run does not prove signed model-card bundle trust, artifact retrieval integrity, activation of the verified bytes, all provider-adapter implementations, or production deployment policy. Follow-up work must bind verified bundle identity and artifact retrieval to the exact activated model bytes, qualify each provider surface, and test rollback and mixed-version deployment behavior.",
+  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/weights_hash_spoof.rs recomputes a SHA-256 digest from loaded bytes, accepts the matching model card, rejects a spoofed loaded digest with CardMismatch, and rejects unavailable loaded weights with SchemaRejected. A targeted cargo-mutants run inverted the kernel comparison from != to == at weights_binding.rs:83; the matching control and spoofed-digest assertions caught the corrupted binding. PARTIAL: signed-bundle trust, retrieval-to-activation linkage, provider parity, and deployment qualification remain deferred.",
+  "ran_at": "2026-09-04T22:23:43Z",
   "survivors": [],
   "test_path": "crates/chio-conformance/tests/threats/weights_hash_spoof.rs",
-  "timestamp_kind": "bootstrap-placeholder",
-  "timestamp_note": "The epoch sentinel is required while needs_real_run is true; replace it with the real cargo-mutants run timestamp only when mutation evidence lands.",
-  "reproduction_command": "cargo test -p chio-conformance --test threats weights_hash_spoof",
-  "evidence_status": "conformance-only",
-  "mutation_evidence_status": "not-run",
-  "promotion_status": "not-promoted"
+  "evidence_status": "cargo-mutants-run",
+  "mutation_evidence_status": "complete",
+  "promotion_status": "promoted",
+  "timestamp_kind": "cargo-mutants-run",
+  "timestamp_note": "ran_at was captured immediately after the targeted one-mutant cargo-mutants run completed.",
+  "baseline_command": "cargo test -p chio-conformance --test threats -- weights_hash_spoof",
+  "reproduction_command": "cargo mutants -p chio-kernel --no-config -F 'weights_binding.rs:83:26: replace != with == in evaluate_weights_binding' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- weights_hash_spoof"
 }

@@ -28,9 +28,10 @@ export async function evaluate(requestJson: JsonString): Promise<JsonString> {
 
 export async function signReceipt(
   bodyJson: JsonString,
+  canonicalContentHex: HexString,
   signingSeedHex: HexString,
 ): Promise<JsonString> {
-  return (await nativeChio()).signReceipt(bodyJson, signingSeedHex);
+  return (await nativeChio()).signReceipt(bodyJson, canonicalContentHex, signingSeedHex);
 }
 
 export async function verifyCapability(
@@ -66,11 +67,12 @@ export async function attestPlayIntegrity(nonceHex: HexString): Promise<JsonStri
   return (await nativeChio()).attestPlayIntegrity(nonceHex);
 }
 
-export async function verifyMobileReceipt(
+/** Inspect envelope shape only; this does not verify device integrity or authorize a call. */
+export async function inspectMobileReceiptEnvelopes(
   receiptJson: JsonString,
   evidenceJson: JsonString,
 ): Promise<JsonString> {
-  return (await nativeChio()).verifyMobileReceipt(receiptJson, evidenceJson);
+  return (await nativeChio()).inspectMobileReceiptEnvelopes(receiptJson, evidenceJson);
 }
 
 export type { ChioNativeModule } from './NativeChio.js';

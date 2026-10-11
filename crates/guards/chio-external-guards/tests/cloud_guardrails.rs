@@ -208,6 +208,8 @@ async fn azure_denies_when_severity_above_threshold() {
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "categoriesAnalysis": [
                 {"category": "Hate", "severity": 6},
+                {"category": "Sexual", "severity": 0},
+                {"category": "SelfHarm", "severity": 0},
                 {"category": "Violence", "severity": 0}
             ]
         })))
@@ -238,7 +240,10 @@ async fn azure_allows_when_severity_below_threshold() {
         .and(path("/contentsafety/text:analyze"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "categoriesAnalysis": [
-                {"category": "Hate", "severity": 2}
+                {"category": "Hate", "severity": 2},
+                {"category": "Sexual", "severity": 0},
+                {"category": "SelfHarm", "severity": 0},
+                {"category": "Violence", "severity": 0}
             ]
         })))
         .mount(&server)

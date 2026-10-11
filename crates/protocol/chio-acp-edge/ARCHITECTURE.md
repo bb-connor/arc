@@ -22,9 +22,9 @@ visibility resolves as if the fragments were written inline.
 | `src/config.rs` | `AcpEdgeConfig`: permission default and fallback ACP category. |
 | `src/types.rs` | ACP wire types (`AcpCapability`, `AcpCategory`, `PermissionRequest`/`PermissionDecision`, `AcpInvocationResult`, `AcpInvocationTask`/`AcpTaskStatus`, `AcpJsonRpcResponse`) and `AcpKernelExecutionContext`. |
 | `src/bridge.rs` | `AcpCapabilityBridge` (the `CapabilityBridge` impl), ACP category inference, `BridgeFidelity` evaluation, the authoritative target registry, and orchestrated-request execution. |
-| `src/conversion.rs` | Kernel-output-to-`Value` projection and every `chio` metadata envelope (authoritative, compatibility, permission-preview, pending/cancelled task). |
-| `src/edge.rs` | `ChioAcpEdge`: capability publication, permission evaluation, invocation, and deferred-task lifecycle. `ChioAcpEdgeCompatibility`, its passthrough wrapper. |
-| `src/jsonrpc.rs` | JSON-RPC envelope parsing and parameter extraction shared by the authoritative and passthrough dispatchers. |
+| `src/conversion.rs` | Kernel-output-to-`Value` projection and every `chio` metadata envelope (authoritative, permission-preview, pending/cancelled task). |
+| `src/edge.rs` | `ChioAcpEdge`: capability publication, permission evaluation, invocation, and deferred-task lifecycle. |
+| `src/jsonrpc.rs` | Bounded original-byte JSON-RPC parsing, parameter extraction and typed local rejection causes. |
 | `src/metrics.rs` | This crate's `ReceiptWriteCounters` instance and Prometheus rendering, built on `chio-edge-metrics`. |
 | `src/fuzz.rs` | `fuzz` feature only: a deterministic kernel/edge/capability fixture plus `fuzz_acp_envelope_decode`, the libFuzzer entry point. |
 | `src/tests/all.rs`, `src/tests/nonce_preflight.rs` | Unit tests, merged into the crate root under `#[cfg(test)]` (`include!` and `#[path]` respectively). |
@@ -68,12 +68,6 @@ visibility resolves as if the fragments were written inline.
   marks a still-working task cancelled without ever dispatching it, and is
   idempotent once cancelled. Every lifecycle call is owner-checked against
   `AcpKernelExecutionContext.agent_id`.
-- **Compatibility passthrough** (`compatibility()`,
-  `cfg(any(test, feature = "compatibility-surface"))`): calls a raw
-  `ToolServerConnection` directly through
-  `chio_cross_protocol::sync_bridge_shared::block_on_tool_server_invoke`,
-  bypassing the kernel. Metadata always marks these responses
-  `compatibilityOnly: true` / `authoritative: false`.
 
 ## Invariants and failure modes
 
@@ -87,27 +81,25 @@ visibility resolves as if the fragments were written inline.
 - A JSON-RPC request for a known method with non-object `params` fails
   `-32602` before dispatch; an unknown method returns `-32601`.
 - Every deferred kernel request executes at most once. The
-  `MAX_DEFERRED_ACP_TASKS` (1024) capacity gate counts only tasks still in
-  `Working` status after TTL pruning (`DEFERRED_ACP_TASK_TTL_MILLIS`, 5
-  minutes); completed, failed, and cancelled tasks are retained but exempt
-  from the cap, so terminal-task retention is bounded by the TTL sweep, not
-  by count.
+  `MAX_DEFERRED_ACP_TASKS` capacity gate counts all retained tasks, including
+  completed and cancelled tasks. Kernel clock deadlines bound their lifetime;
+  clock failures retain task custody and deny the lifecycle operation.
+- The public JSON-RPC entry point bounds original bytes to 8 MiB and rejects
+  duplicate keys before projection. Notifications retain a local typed cause
+  while suppressing the wire reply.
 - Permission preview and kernel invoke agree on DPoP policy (TTL, skew, store
   presence) without preview consuming a nonce invoke will later spend.
-- Authoritative-path metadata is always `authoritative: true`; compatibility-
-  path metadata is always `authoritative: false`. The two are never conflated
-  in one response.
+- Invocation metadata identifies kernel authority and signed receipt evidence.
 - `#![forbid(unsafe_code)]` at the crate root.
 
 ## Dependencies
 
 `chio-cross-protocol` supplies the `CapabilityBridge` trait,
 `CrossProtocolOrchestrator`, `TargetProtocolRegistry`, `BridgeFidelity`,
-`DiscoveryProtocol`, the runtime-lifecycle contract, and the
-`sync_bridge_shared` passthrough helper shared with `chio-a2a-edge`.
+`DiscoveryProtocol` and the runtime-lifecycle contract shared with `chio-a2a-edge`.
 `chio-kernel` is the dispatch and DPoP-preview authority (`ChioKernel`,
 `ToolServerConnection`, `dpop`). `chio-manifest` supplies
-`ToolDefinition`/`ToolManifest`/`validate_manifest`. `chio-mcp-edge` supplies
+`ToolDefinition`/`ToolManifest`/`VerifiedManifestRegistry`. `chio-mcp-edge` supplies
 `McpTargetExecutor`, registered alongside `OpenAiTargetExecutor` as the two
 non-native target executors. `chio-edge-metrics` backs the receipt-write
 counters. The `chio-core` dependency is aliased to `chio-core-types`

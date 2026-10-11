@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn protocol_malformed_json_rpc_missing_jsonrpc_field() {
     // A JSON-RPC message that is missing the required "jsonrpc" field

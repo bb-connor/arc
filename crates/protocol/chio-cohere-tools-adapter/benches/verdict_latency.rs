@@ -5,7 +5,13 @@ use std::time::{Duration, Instant};
 use chio_cohere_tools_adapter::{
     transport, CohereAdapter, CohereAdapterConfig, COHERE_API_VERSION,
 };
+use chio_core::{canonical::canonical_json_bytes, Keypair};
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ReceiptId, VerdictResult};
+use serde_json::json;
 
 const COLD_INIT_P99_BUDGET: Duration = Duration::from_millis(500);
 const P99_SAMPLE_COUNT: usize = 128;
@@ -15,15 +21,52 @@ fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
     Ok(frame.to_vec())
 }
 
-fn cold_adapter() -> CohereAdapter {
+fn cold_adapter() -> Result<CohereAdapter, ProviderError> {
+    let signer = Keypair::from_seed(&[79; 32]);
     let config = CohereAdapterConfig::new(
         "cohere-latency",
         "Cohere Latency",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "org_chio_latency",
     );
-    CohereAdapter::new(config, Arc::new(transport::MockTransport::new()))
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "lookup_policy".to_string(),
+            description: "Read the benchmark policy".to_string(),
+            input_schema: json!({"type":"object","required":["policy_id"],
+                "properties":{"policy_id":{"type":"string"}},"additionalProperties":false}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: config.public_key.clone(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).map_err(|error| {
+        ProviderError::Malformed(format!("benchmark manifest signing: {error}"))
+    })?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| {
+            ProviderError::Malformed(format!("benchmark registry admission: {error}"))
+        })?;
+    CohereAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .map_err(|error| ProviderError::Malformed(format!("benchmark adapter admission: {error}")))
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -34,9 +77,25 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn run_cold_verdict_path() -> Result<(), ProviderError> {
-    let adapter = cold_adapter();
+    let adapter = cold_adapter()?;
     let stream = stream_bytes()?;
+    let expected_flow = canonical_json_bytes(&ToolFlowDeclaration::public_egress())
+        .map_err(|error| ProviderError::Malformed(format!("benchmark flow encoding: {error}")))?;
     let gated = adapter.gate_sse_stream(&stream, |invocation| {
+        let security = invocation.bridge_security.as_ref().ok_or_else(|| {
+            ProviderError::Malformed("benchmark invocation lacked admitted sidecar".into())
+        })?;
+        let flow = security.flow().ok_or_else(|| {
+            ProviderError::Malformed("benchmark invocation lacked admitted flow".into())
+        })?;
+        let actual_flow = canonical_json_bytes(flow).map_err(|error| {
+            ProviderError::Malformed(format!("benchmark flow encoding: {error}"))
+        })?;
+        if !security.has_registry_coordinates() || actual_flow != expected_flow {
+            return Err(ProviderError::Malformed(
+                "benchmark invocation did not retain the admitted registry flow".into(),
+            ));
+        }
         black_box(invocation);
         Ok(allow_verdict())
     })?;

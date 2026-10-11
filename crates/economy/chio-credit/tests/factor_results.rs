@@ -563,7 +563,8 @@ fn acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority() ->
     noncanonical.extend_from_slice(&canonical);
     assert!(matches!(
         verify_acknowledgement(&fixture, &noncanonical),
-        Err(FactorError::Canonicalization(_))
+        Err(FactorError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
     assert_eq!(
         require_factor_error(verify_acknowledgement(
@@ -736,7 +737,8 @@ fn not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority() -> Tes
             SNAPSHOT_VERSION + 1,
             RESOURCE_FENCE,
         ),
-        Err(FactorError::Canonicalization(_))
+        Err(FactorError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
     assert_eq!(
         require_factor_error(verify_not_applied(

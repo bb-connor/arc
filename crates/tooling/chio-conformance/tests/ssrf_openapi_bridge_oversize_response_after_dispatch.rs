@@ -53,7 +53,7 @@ fn bridge_rejects_oversize_dispatcher_response_via_enforce_attempt() {
         base_url: "http://127.0.0.1:18080".to_string(),
         egress_contract: Some(tight_response_size_contract()),
     };
-    let mut bridge = OpenApiMcpBridge::from_spec(MINIMAL_OPENAPI_SPEC, cfg)
+    let mut bridge = OpenApiMcpBridge::from_spec(MINIMAL_OPENAPI_SPEC.as_bytes(), cfg)
         .expect("bridge builds with allow-listed authority");
     bridge.set_dispatcher(Box::new(|_method, _url, _args| {
         // Body larger than the contract's 64-byte ceiling once

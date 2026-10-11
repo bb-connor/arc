@@ -1,0 +1,99 @@
+{
+  "schema": "chio.security.review4-followup.v1",
+  "observed_utc": "2026-10-11T05:21:24.287389+00:00",
+  "source_stage_head": "0c66d0ccfc3df05f490957fb8306c793c5e55dec",
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "new_requirement_ids": [
+    "incoming-pr1160-review4-followup-20261011:CI-AUTHORITY-RELAY-FIXTURE",
+    "incoming-pr1160-review4-followup-20261011:ISSUER-POOL-REFUSAL-PROVENANCE"
+  ],
+  "review4_updates": {
+    "R4-001": {
+      "producer": "66f60d853dd0bc024dc7aea127b31b0b06c46202",
+      "integration": "00b23066f11aeafd1b1d96ddc8539d14f3086725",
+      "state": "source-reviewed-and-integrated-runtime-pending",
+      "review": "Claude and Root approve minimal registry-before-clock ordering. The deterministic clock observes mutex ownership when sampled; it models the expired-after-lock boundary without claiming an actual concurrent wait. Exact expiry refusal and no insertion remain asserted.",
+      "remaining": [
+        "Genuine unchanged-production Original, repaired focused controls and strict/clock qualification."
+      ]
+    },
+    "R4-002": {
+      "integration": "8781b9b17606429bf58db6806e6cfebcaf103e01",
+      "state": "locally-verified-and-source-reviewed",
+      "review": "Claude source/evidence approval 2026-10-11T04:45:30Z. Genuine exact-inventory Original failure plus repaired focused and full parent selftests retained.",
+      "remaining": [
+        "Exact-head hosted qualification."
+      ]
+    },
+    "R4-004": {
+      "integration": "9d07df2675a5b33a4df763981752a4849fc3bb54",
+      "state": "source-reviewed-test-repair-validation-pending",
+      "review": "Claude source approval 2026-10-11T04:48:45Z. Valid five-row shape isolates identity/outbox duplicate rejection.",
+      "remaining": [
+        "Removed-duplicate-guard discrimination, restored cold26 and strict owning lint."
+      ]
+    }
+  },
+  "relay_fixture": {
+    "integration": "0c66d0ccfc3df05f490957fb8306c793c5e55dec",
+    "file": "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs",
+    "original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/authority-relay-original-e4bc/result.json",
+      "sha256": "5162c8d6d20229b746887e88d74917a92dc3dc1077dfe805767711ed6ea24cf4"
+    },
+    "original_log": {
+      "path": "/tmp/pr1160-ci-batch-20261010/authority-relay-original-e4bc/output.log",
+      "sha256": "5114a8df3bb36e05a7d6c1fe928558588f7b05f62e10ad8dd29648fe022527f7"
+    },
+    "cause": "Custody-aware election makes the old importing custodian the leader. A nonleader consistent prefix now gives valid agreement, not import; both assertions expected replay refusal but received Ok. Existing nonleader relay tests preserve the healthy agreement behavior.",
+    "repair": "Real exporter custody and an importer already holding its newer genuine envelope, with the existing response seam serving the older genuine signed envelope. Every exact refusal, revocation and finalization assertion remains. Production is unchanged.",
+    "review": "Claude source approval 2026-10-11T05:12:37Z.",
+    "remaining": [
+      "Renew both failures and owning authority/custody controls, then strict lint and hosted candidate."
+    ]
+  },
+  "control_plane_owner": {
+    "source": "e4bc85e479cf41d2b1c2b3ce7199b172e4ec4491",
+    "result": {
+      "path": "/tmp/pr1160-ci-batch-20261010/composed-store-control-e4bc/03-chio-control-plane-owning/result.json",
+      "sha256": "60376050a0a4ccca6c8c961668908e6af15679c2eafa4ad7fed46829f5ee2872"
+    },
+    "passed": 1968,
+    "failed": 3,
+    "ignored": 1,
+    "classification": "Two relay fixture failures and the issuer FIFO drain race; repairs staged separately. Native cadence and custody-election controls pass. This entire campaign remains failed, not qualified."
+  },
+  "cached_serial_native": {
+    "compiled_source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+    "runtime_checkout": "e4bc85e479cf41d2b1c2b3ce7199b172e4ec4491",
+    "summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/native-process-serial-cached-cf46/summary.json",
+      "sha256": "5534a90fb81703994fc7abe934f2f9fa1842e46cbab74581634338a68fdbc141"
+    },
+    "passed": 12,
+    "failed": 0,
+    "scope": "Four exact cases, three serial repeats, unchanged binary and umask022, no compile or source edits. Child helpers use that same binary. This is not final-candidate native or actual portable-gate qualification; original eight-thread failures and their unresolved trace remain separate."
+  },
+  "unchanged_static_controls": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review4-hygiene-0967/result.json",
+    "sha256": "e87839650e92536ab08fac615d816a69897b6d58af7f9371d3a992ba19142334"
+  },
+  "post_merge_diagnostic_followup": {
+    "id": "ISSUER-POOL-REFUSAL-PROVENANCE",
+    "priority": "P3",
+    "state": "preserved-followup",
+    "requirement": "Distinguish DeadlineExceeded, AtCapacity and WorkerUnavailable and map both portable-fetch and receipt-writer diagnostics accurately. Preserve fixed worker/queue bounds and fail-closed refusal.",
+    "ruling": "Current DeadlinePassed documents both timeout and capacity refusal. Root 2026-10-11T04:29:28Z kept production behavior for this landing; Claude acknowledged. Existing sequential follow-up wave, no new active PR.",
+    "source_repair": null
+  },
+  "remaining_acceptance": [
+    "Finish pending Original, runtime, mutation and strict evidence for the replacement source.",
+    "Explain the native eight-thread callback failures and qualify the actual serial portable gate.",
+    "Resolve the intermittent runtime-proof package/report hash mismatch.",
+    "Publish one replacement and obtain all four exact-head required checks green, classified other failures and answered review threads.",
+    "Root reports landing readiness; merge requires explicit Connor authorization."
+  ],
+  "hosted_qualified": false,
+  "merged": false,
+  "production_ready": false
+}

@@ -4,6 +4,7 @@ package reconciler
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -33,6 +34,9 @@ const (
 	// LabelGoverned marks a Job as requiring Chio capability governance.
 	// Only Jobs with this label set to "true" are reconciled.
 	LabelGoverned = "chio.world/governed"
+
+	// AnnotationSubjectPublicKey is the workload-owned Ed25519 public key.
+	AnnotationSubjectPublicKey = "chio.world/subject-public-key"
 
 	// AnnotationScopes is a comma-separated list of scopes the Job wants.
 	AnnotationScopes = "chio.world/scopes"
@@ -227,6 +231,13 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
+	// Invalid public identities must not create a grant or mutate Job authority state.
+	if job.Annotations[AnnotationCapabilityID] == "" {
+		if _, err := subjectPublicKey(&job); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Ensure we own a finalizer so we can release the grant even if the Job
 	// is deleted before completing.
 	if controllerutil.AddFinalizer(&job, FinalizerName) {
@@ -258,9 +269,13 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 // result on the Job via annotations. On sidecar-unreachable it records an
 // event and requeues.
 func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *batchv1.Job) (ctrl.Result, error) {
+	subject, err := subjectPublicKey(job)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	scopes := parseScopes(job.Annotations[AnnotationScopes])
 	req := chioapi.MintRequest{
-		Subject: fmt.Sprintf("job/%s/%s", job.Namespace, job.Name),
+		Subject: subject,
 		Scopes:  scopes,
 		Labels:  job.Labels,
 		JobUID:  string(job.UID),
@@ -616,3 +631,16 @@ func isOwnedByJob(pod *corev1.Pod, job *batchv1.Job) bool {
 var _ interface {
 	Reconcile(context.Context, ctrl.Request) (ctrl.Result, error)
 } = (*JobReconciler)(nil)
+
+// Validate the controller's documented Ed25519 wire format before contacting
+// the sidecar. Curve-point and weak-key validation remain the sidecar's job.
+func subjectPublicKey(job *batchv1.Job) (string, error) {
+	subject := job.Annotations[AnnotationSubjectPublicKey]
+	if len(subject) != 64 {
+		return "", fmt.Errorf("%s must contain a 64-character hex Ed25519 public key", AnnotationSubjectPublicKey)
+	}
+	if _, err := hex.DecodeString(subject); err != nil {
+		return "", fmt.Errorf("%s must contain a hex Ed25519 public key", AnnotationSubjectPublicKey)
+	}
+	return subject, nil
+}

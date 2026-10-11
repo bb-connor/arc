@@ -458,7 +458,8 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
         return Ok(evaluate_finding_purchase_scenario(scenario));
     }
 
-    let mut kernel = ChioKernel::new(kernel_config());
+    let _clock = chio_test_support::clock::scope_unix_secs(1_700_000_000);
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     configure_replay_store(&mut kernel, scenario);
     configure_redaction_hooks(&mut kernel, scenario);
     kernel.register_tool_server(Box::new(MatrixToolServer::new()));
@@ -492,6 +493,7 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     if scenario.category == ScenarioCategory::Replay {
@@ -641,12 +643,17 @@ fn configure_replay_store(kernel: &mut ChioKernel, scenario: &VerdictScenario) {
 
     let mut config = ExecutionNonceConfig::default();
     if scenario.script.replay_nonce_status == ReplayNonceStatus::Stale {
-        config.nonce_ttl_secs = 0;
+        // Issue a valid nonce, then move the owned clock to its exact expiry.
+        // A zero-length window is correctly refused at issuance.
+        config.nonce_ttl_secs = 1;
     }
     if scenario.script.replay_nonce_status == ReplayNonceStatus::TraceMissing {
         config.require_nonce = true;
     }
-    let store = InMemoryExecutionNonceStore::from_config(&config);
+    let store = InMemoryExecutionNonceStore::with_clock(
+        config.nonce_store_capacity,
+        kernel.authority_clock(),
+    );
     kernel.set_execution_nonce_store(config, Box::new(store));
 }
 
@@ -838,12 +845,21 @@ fn verify_stale_nonce(
         .as_deref()
         .ok_or_else(|| "kernel allow response did not include an execution nonce".to_string())?;
     let binding = nonce_binding(request, capability, response);
+    kernel
+        .verify_presented_execution_nonce(nonce, &binding)
+        .map_err(|error| format!("fresh nonce positive control failed: {error}"))?;
+    let expiry = u64::try_from(nonce.nonce.expires_at)
+        .map_err(|_| "nonce expiry precedes the Unix epoch".to_string())?;
+    let _expired = chio_test_support::clock::scope_unix_secs(expiry);
     match kernel.verify_presented_execution_nonce(nonce, &binding) {
         Ok(()) => Err("stale execution nonce was accepted".to_string()),
-        Err(error) => Ok(tuple(
+        Err(error @ ExecutionNonceError::Expired { .. }) => Ok(tuple(
             Verdict::Deny,
             replay_reason_code(&error),
             scope_set.to_vec(),
+        )),
+        Err(error) => Err(format!(
+            "stale nonce failed outside the expiry gate: {error}"
         )),
     }
 }
@@ -866,6 +882,9 @@ fn nonce_binding(
 fn replay_reason_code(error: &ExecutionNonceError) -> &'static str {
     match error {
         ExecutionNonceError::Expired { .. }
+        | ExecutionNonceError::InvalidWindow
+        | ExecutionNonceError::NotYetValid
+        | ExecutionNonceError::Clock(_)
         | ExecutionNonceError::Replayed
         | ExecutionNonceError::BindingMismatch { .. }
         | ExecutionNonceError::InvalidSignature

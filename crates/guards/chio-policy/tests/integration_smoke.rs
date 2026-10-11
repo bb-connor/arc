@@ -17,6 +17,7 @@ fn tool_access_spec(
         merge_strategy: None,
         rules: Some(Rules {
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: allow.iter().map(|value| (*value).to_string()).collect(),
                 block: block.iter().map(|value| (*value).to_string()).collect(),

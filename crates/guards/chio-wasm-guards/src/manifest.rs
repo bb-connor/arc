@@ -127,14 +127,17 @@ pub fn load_manifest(wasm_path: &str) -> Result<GuardManifest, WasmGuardError> {
     })?;
 
     let manifest_path = parent.join(MANIFEST_FILENAME);
-    let contents =
-        std::fs::read_to_string(&manifest_path).map_err(|e| WasmGuardError::ManifestLoad {
-            path: manifest_path.display().to_string(),
-            reason: e.to_string(),
+    let contents = crate::input::read_file(&manifest_path, crate::input::MAX_DOCUMENT_BYTES)
+        .map_err(|source| WasmGuardError::InputFile {
+            path: manifest_path,
+            source,
         })?;
-
-    let manifest = serde_yml::from_str::<GuardManifest>(&contents)
-        .map_err(|e| WasmGuardError::ManifestParse(e.to_string()))?;
+    // Value's Mapping decoder rejects duplicate keys, including config and
+    // ignored fields, before the typed manifest can project the document.
+    let value: serde_yml::Value =
+        serde_yml::from_slice(&contents).map_err(crate::ManifestYamlError::from)?;
+    let manifest: GuardManifest =
+        serde_yml::from_value(value).map_err(crate::ManifestYamlError::from)?;
     verify_wit_world(manifest.wit_world.as_deref())?;
     Ok(manifest)
 }
@@ -230,15 +233,17 @@ pub fn signature_sidecar_path(wasm_path: &str) -> PathBuf {
 /// exist (so callers can distinguish "missing" from "corrupt").
 pub fn load_signature_sidecar(wasm_path: &str) -> Result<Option<SignedWasmModule>, WasmGuardError> {
     let sidecar = signature_sidecar_path(wasm_path);
-    if !sidecar.exists() {
-        return Ok(None);
-    }
-    let contents = std::fs::read_to_string(&sidecar).map_err(|e| WasmGuardError::ManifestLoad {
-        path: sidecar.display().to_string(),
-        reason: e.to_string(),
-    })?;
-    let signed: SignedWasmModule = serde_json::from_str(&contents)
-        .map_err(|e| WasmGuardError::ManifestParse(e.to_string()))?;
+    let contents = match crate::input::read_file(&sidecar, crate::input::MAX_DOCUMENT_BYTES) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(WasmGuardError::InputFile {
+                path: sidecar,
+                source,
+            })
+        }
+    };
+    let signed: SignedWasmModule = crate::input::decode(&contents)?;
     Ok(Some(signed))
 }
 
@@ -604,14 +609,15 @@ config:
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            WasmGuardError::ManifestLoad { path, reason } => {
+            WasmGuardError::InputFile { path, source } => {
                 assert!(
-                    path.contains("guard-manifest.yaml"),
-                    "path should contain manifest filename, got: {path}"
+                    path.ends_with("guard-manifest.yaml"),
+                    "path should contain manifest filename, got: {}",
+                    path.display()
                 );
-                assert!(!reason.is_empty());
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
             }
-            other => panic!("expected ManifestLoad, got: {other:?}"),
+            other => panic!("expected InputFile, got: {other:?}"),
         }
     }
 

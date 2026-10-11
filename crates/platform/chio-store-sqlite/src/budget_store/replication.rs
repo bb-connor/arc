@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 /// Quorum-witness identity of a stored budget mutation event: its `event_seq`,
@@ -34,6 +35,8 @@ pub(super) fn initialize_budget_replication_seq(
         .collect::<Result<Vec<_>, _>>()?;
     drop(statement);
     for rowid in pending {
+        // The preceding value fits i64; the checked SQLite conversion below
+        // rejects exhaustion before another iteration, so u64 cannot clamp.
         next_seq = next_seq.saturating_add(1);
         transaction.execute(
             "UPDATE capability_grant_budgets SET seq = ?1 WHERE rowid = ?2",
@@ -60,6 +63,7 @@ pub(super) fn initialize_budget_replication_seq(
         drop(statement);
         let mut event_seq = 0u64;
         for rowid in pending {
+            // Reject at the i64 storage limit below, before u64 saturation.
             event_seq = event_seq.saturating_add(1);
             transaction.execute(
                 "UPDATE budget_mutation_events SET event_seq = ?1 WHERE rowid = ?2",
@@ -81,6 +85,7 @@ pub(super) fn initialize_budget_replication_seq(
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         for rowid in pending {
+            // Reject at the i64 storage limit below, before u64 saturation.
             next_seq = next_seq.saturating_add(1);
             transaction.execute(
                 "UPDATE budget_mutation_events SET event_seq = ?1 WHERE rowid = ?2",
@@ -99,6 +104,8 @@ pub(super) fn allocate_budget_replication_seq(
     let current = current_budget_replication_seq(transaction)?
         .max(max_budget_usage_seq(transaction)?)
         .max(max_budget_mutation_event_seq(transaction)?);
+    // current is decoded from a nonnegative i64. Persisting i64::MAX + 1
+    // fails the checked conversion in set_budget_replication_seq.
     let next_seq = current.saturating_add(1);
     set_budget_replication_seq(transaction, next_seq)?;
     Ok(next_seq)
@@ -445,15 +452,8 @@ impl SqliteBudgetStore {
                 "#,
                 rusqlite::params![start, end],
             )?;
-            previous_end = end as u64;
+            previous_end = crate::integer::checked::<_, u64>(end)?;
         }
         Ok(())
     }
-}
-
-pub(super) fn unix_now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
 }

@@ -19,35 +19,56 @@ use serde_json::Value;
 /// envelope field that is neither an object nor a decodable string fails closed
 /// as [`ProviderError::Malformed`], labelled with `provider_label`.
 pub fn response_body(value: Value, provider_label: &str) -> Result<Value, ProviderError> {
-    for field in ["body", "response", "payload"] {
-        if let Some(nested) = value.get(field) {
-            return nested_response_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "{provider_label} envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
+    let mut nested = ["body", "response", "payload"]
+        .into_iter()
+        .filter_map(|field| value.get(field).map(|value| (field, value)));
+    match (nested.next(), nested.next()) {
+        (Some(_), Some(_)) => Err(ProviderError::Malformed(format!(
+            "{provider_label} supplied multiple response envelopes"
+        ))),
+        (Some((field, body)), None) => {
+            if !body.is_object() && !body.is_string() {
+                return Err(ProviderError::Malformed(format!(
+                    "{provider_label} envelope field `{field}` must contain an object"
+                )));
+            }
+            nested_response_body(body)
         }
+        (None, _) if value.is_object() => Ok(value),
+        _ => Err(ProviderError::Malformed(
+            "provider response must be an object".into(),
+        )),
     }
-    Ok(value)
 }
 
 /// Unwrap a single envelope field value into a response body.
 ///
 /// Objects are returned directly; JSON-encoded strings are parsed; any other
-/// shape returns [`None`] so the caller can fail closed.
-pub fn nested_response_body(value: &Value) -> Option<Value> {
-    match value {
-        Value::Object(_) => Some(value.clone()),
-        Value::String(body) => serde_json::from_str(body).ok(),
-        _ => None,
+/// shape fails closed with its typed cause retained.
+pub fn nested_response_body(value: &Value) -> Result<Value, ProviderError> {
+    let value = match value {
+        Value::Object(_) => value.clone(),
+        Value::String(body) => crate::input::text(body)?,
+        _ => {
+            return Err(ProviderError::Malformed(
+                "response envelope must contain an object".into(),
+            ))
+        }
+    };
+    if !value.is_object() {
+        return Err(ProviderError::Malformed(
+            "response body must be an object".into(),
+        ));
     }
+    Ok(value)
 }
 
 /// Decode an OpenAI-compatible `tool_calls[]` entry of shape
 /// `{ id, type: "function", function: { name, arguments } }` into a normalized
 /// call built by `build`.
 ///
-/// Non-function tool-call kinds are skipped (returning [`None`]). The
+/// Any other tool-call kind (for example `custom`) is rejected: skipping it
+/// would hand the client a call the kernel never evaluated. The
 /// `build` constructor receives the decoded `(id, name, arguments)` so each
 /// adapter can produce its own native call struct without duplicating the
 /// decode logic. `provider_label` only varies the fail-closed error text.
@@ -55,13 +76,15 @@ pub fn openai_tool_call_to_function_call<T>(
     entry: &Value,
     provider_label: &str,
     build: impl FnOnce(String, String, Value) -> T,
-) -> Result<Option<T>, ProviderError> {
+) -> Result<T, ProviderError> {
     let kind = entry
         .get("type")
         .and_then(Value::as_str)
         .unwrap_or("function");
     if kind != "function" {
-        return Ok(None);
+        return Err(ProviderError::Malformed(format!(
+            "{provider_label} tool_calls[] type {kind} is not supported by the gate"
+        )));
     }
     let id = entry
         .get("id")
@@ -90,15 +113,42 @@ pub fn openai_tool_call_to_function_call<T>(
         })?
         .to_string();
     let args_value = match function.get("arguments") {
-        Some(Value::String(arguments)) => {
-            serde_json::from_str::<Value>(arguments).map_err(|error| {
-                ProviderError::Malformed(format!(
-                    "{provider_label} tool_calls[].function.arguments was not valid JSON: {error}"
-                ))
-            })?
+        Some(Value::String(arguments)) => crate::input::arguments(arguments)?,
+        Some(other) => crate::input::argument_object(other.clone())?,
+        None => {
+            return Err(ProviderError::BadToolArgs(
+                "tool call is missing arguments".into(),
+            ))
         }
-        Some(other) => other.clone(),
-        None => Value::Object(serde_json::Map::new()),
     };
-    Ok(Some(build(id, name, args_value)))
+    for identity in [&id, &name] {
+        if identity.is_empty()
+            || identity.len() > 4096
+            || identity.trim() != identity
+            || identity.chars().any(char::is_control)
+        {
+            return Err(ProviderError::Malformed(
+                "tool call identity is invalid".into(),
+            ));
+        }
+    }
+
+    Ok(build(id, name, args_value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn non_function_tool_call_entry_is_rejected_not_skipped() {
+        let entry = serde_json::json!({
+            "id": "call_custom_1",
+            "type": "custom",
+            "custom": {"name": "apply_patch", "input": "*** Begin Patch"}
+        });
+        let decoded =
+            openai_tool_call_to_function_call(&entry, "Test", |id, name, args| (id, name, args));
+        assert!(matches!(decoded, Err(ProviderError::Malformed(_))));
+    }
 }

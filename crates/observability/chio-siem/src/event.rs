@@ -2,17 +2,24 @@
 
 use std::collections::BTreeSet;
 
+use chio_core::crypto::PublicKey;
 use chio_core::receipt::body::chio_receipt_id;
 use chio_core::receipt::{body::ChioReceipt, economics::FinancialReceiptMetadata};
 use serde::{Deserialize, Serialize};
 
+use crate::sink_projection::SiemSinkProjection;
+
 /// A SIEM event wrapping a ChioReceipt with optionally extracted financial metadata.
 ///
-/// The `receipt` field contains the full receipt (including raw metadata) for
-/// forwarding to SIEM backends. The `financial` field is extracted for
-/// structured filtering without requiring JSON path traversal on the export side.
+/// The `receipt` retains the untouched original for authorized evidence work.
+/// Ordinary sinks use `sink_projection()`. Public verification annotations and
+/// extracted financial metadata are descriptive caches, never export authority.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SiemEvent {
+    // Independent operator trust accepted at construction. A wire event cannot
+    // mint this pin, and changing its original receipt cannot change this key.
+    #[serde(skip)]
+    trusted_kernel_key: Option<PublicKey>,
     /// The full ChioReceipt as stored in the kernel receipt database.
     pub receipt: ChioReceipt,
     /// Semantic receipt class used to prevent trace/advisory observations from
@@ -56,18 +63,18 @@ impl SiemEvent {
         let semantics = receipt.semantic_fields();
         let receipt_kind = semantics.receipt_kind.as_str().to_string();
         let boundary_class = semantics.boundary_class.as_str().to_string();
-        let receipt_id_valid = match chio_receipt_id(&receipt.body()) {
-            Ok(expected) => expected == receipt.id,
-            Err(_) => false,
-        };
-        let signature_valid = receipt.verify_signature().unwrap_or(false);
-        let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
-        let authoritative = receipt_id_valid && signature_valid && parameter_hash_valid;
-        let signer_trusted = trusted_kernel_keys
+        let trusted_kernel_key = trusted_kernel_keys
             .map(|trusted| trusted.contains(&receipt.kernel_key.to_hex()))
-            .unwrap_or(false);
-        let authorized =
-            authoritative && signer_trusted && semantics.is_authorized(receipt.decision.as_ref());
+            .unwrap_or(false)
+            .then(|| receipt.kernel_key.clone());
+        let SourceVerification {
+            authoritative,
+            signature_valid,
+            receipt_id_valid,
+            parameter_hash_valid,
+            signer_trusted,
+            authorized,
+        } = SourceVerification::new(&receipt, trusted_kernel_key.as_ref());
         let result = if authorized {
             "Authorized"
         } else if matches!(
@@ -87,6 +94,7 @@ impl SiemEvent {
             .and_then(|val| serde_json::from_value::<FinancialReceiptMetadata>(val.clone()).ok());
 
         Self {
+            trusted_kernel_key,
             receipt,
             receipt_kind,
             boundary_class,
@@ -104,7 +112,48 @@ impl SiemEvent {
     /// True only for authoritative Chio-mediated allow receipts at a prevent boundary.
     #[must_use]
     pub fn is_authorized(&self) -> bool {
-        self.authorized
+        SourceVerification::new(&self.receipt, self.trusted_kernel_key.as_ref()).authorized
+    }
+
+    /// Build the closed ordinary sink view from the current original receipt
+    /// and the independently accepted signer pin, ignoring cached annotations.
+    #[must_use]
+    pub fn sink_projection(&self) -> SiemSinkProjection {
+        SiemSinkProjection::from_receipt(&self.receipt, self.trusted_kernel_key.as_ref())
+    }
+}
+
+pub(crate) struct SourceVerification {
+    pub(crate) authoritative: bool,
+    pub(crate) signature_valid: bool,
+    pub(crate) receipt_id_valid: bool,
+    pub(crate) parameter_hash_valid: bool,
+    pub(crate) signer_trusted: bool,
+    pub(crate) authorized: bool,
+}
+
+impl SourceVerification {
+    pub(crate) fn new(receipt: &ChioReceipt, trusted_pin: Option<&PublicKey>) -> Self {
+        let receipt_id_valid = chio_receipt_id(&receipt.body())
+            .map(|expected| expected == receipt.id)
+            .unwrap_or(false);
+        let signature_valid = receipt.verify_signature().unwrap_or(false);
+        let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
+        let authoritative = receipt_id_valid && signature_valid && parameter_hash_valid;
+        let signer_trusted = trusted_pin == Some(&receipt.kernel_key);
+        let authorized = authoritative
+            && signer_trusted
+            && receipt
+                .semantic_fields()
+                .is_authorized(receipt.decision.as_ref());
+        Self {
+            authoritative,
+            signature_valid,
+            receipt_id_valid,
+            parameter_hash_valid,
+            signer_trusted,
+            authorized,
+        }
     }
 }
 

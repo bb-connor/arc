@@ -184,6 +184,7 @@ mod tests {
             tool_name: "search_web".to_string(),
             arguments: br#"{"query":"chio"}"#.to_vec(),
             provenance: sample_stamp(),
+            bridge_security: None,
         };
         let json = serde_json::to_string(&invocation).unwrap();
         let back: ToolInvocation = serde_json::from_str(&json).unwrap();

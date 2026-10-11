@@ -1,8 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::io::{BufRead, Write};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
+use crate::ingress::{
+    mcp_inbox, AccountedMessage, ClientInbound, InboxAdmission, McpInboxReceiver,
+};
 use crate::{AdapterError, McpTransport};
 use chio_core::capability::{
     governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
@@ -23,8 +26,9 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_cross_protocol::discovery::DiscoveryProtocol;
 use chio_cross_protocol::error::BridgeError;
 use chio_cross_protocol::execution::{
-    kernel_tool_call_request, metadata_with_source_receipt_context, CrossProtocolTargetExecution,
-    CrossProtocolTargetRequest, TargetExecutionHop, TargetProtocolExecutor,
+    evaluate_bound_kernel_request, metadata_with_source_receipt_context,
+    CrossProtocolTargetExecution, CrossProtocolTargetRequest, TargetExecutionHop,
+    TargetProtocolExecutor,
 };
 use chio_cross_protocol::routing::route_selection_metadata;
 use chio_kernel::{
@@ -35,10 +39,14 @@ use chio_kernel::{
 use chio_manifest::ToolManifest;
 #[cfg(test)]
 use chio_manifest::{LatencyHint, ToolDefinition};
-use chrono::{SecondsFormat, Utc};
+use chrono::SecondsFormat;
 use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
+
+#[path = "runtime/client_wait.rs"]
+mod client_wait;
+use client_wait::{borrowed_reader_refusal, ClientReplyDeadline};
 
 #[path = "runtime/discovery.rs"]
 mod discovery;
@@ -54,6 +62,9 @@ mod nested_flow;
 mod protocol;
 #[path = "runtime/receipts.rs"]
 mod receipts;
+#[path = "runtime/refusals.rs"]
+mod refusals;
+use refusals::{attach_refusal_evidence, persist_host_refusal};
 #[path = "runtime/requests.rs"]
 mod requests;
 #[path = "runtime/runtime_flow.rs"]
@@ -70,7 +81,7 @@ use discovery::{build_exposed_tool_bindings, ExposedToolBinding};
 use jsonrpc::negotiate_protocol_version;
 use nested_flow::*;
 use protocol::*;
-use state::{EdgeAction, EdgeState, LogLevel};
+use state::{EdgeAction, EdgeState, LogLevel, PendingActionRoute};
 use tasks::{EdgeTask, EdgeTaskFinalOutcome, EdgeTaskStatus, ToolCallEdgeOutcome};
 #[cfg(test)]
 use tool_calls::{
@@ -133,6 +144,7 @@ impl Default for McpEdgeConfig {
 pub struct ChioMcpEdge {
     config: McpEdgeConfig,
     kernel: ChioKernel,
+    manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
     agent_id: String,
     session_auth_context: SessionAuthContext,
     capabilities: Vec<CapabilityToken>,
@@ -144,8 +156,11 @@ pub struct ChioMcpEdge {
     state: EdgeState,
     minimum_log_level: LogLevel,
     pending_actions: Vec<EdgeAction>,
+    pending_action_route: PendingActionRoute,
     pending_notifications: Vec<Value>,
-    deferred_client_messages: Vec<Value>,
+    deferred_client_messages: VecDeque<AccountedMessage>,
+    inbox_admission: InboxAdmission,
+    active_protocol_request_digest: Option<chio_kernel::ProtocolRequestDigest>,
     task_counter: u64,
     tasks: BTreeMap<String, EdgeTask>,
     pending_background_tasks: Vec<String>,
@@ -160,11 +175,63 @@ impl ChioMcpEdge {
         capabilities: Vec<CapabilityToken>,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, AdapterError> {
-        let (tools, tool_index) = build_exposed_tool_bindings(manifests)?;
+        Self::new_internal(config, kernel, agent_id, capabilities, manifests, None)
+    }
+
+    /// Construct an edge exclusively from publisher-signed manifests admitted
+    /// by the verified registry.
+    pub fn new_with_manifest_registry(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry_arc(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            Arc::new(registry.clone()),
+        )
+    }
+
+    /// Construct an edge while retaining the caller's live admitted registry.
+    pub fn new_with_manifest_registry_arc(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AdapterError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            Some(registry),
+        )
+    }
+
+    fn new_internal(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        manifests: Vec<ToolManifest>,
+        registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+    ) -> Result<Self, AdapterError> {
+        let (tools, tool_index) = build_exposed_tool_bindings(manifests, registry.as_deref())?;
 
         Ok(Self {
             config,
             kernel,
+            manifest_registry: registry,
             agent_id,
             session_auth_context: SessionAuthContext::stdio_anonymous(),
             capabilities,
@@ -176,8 +243,11 @@ impl ChioMcpEdge {
             state: EdgeState::Uninitialized,
             minimum_log_level: LogLevel::Info,
             pending_actions: Vec::new(),
+            pending_action_route: PendingActionRoute::Immediate,
             pending_notifications: Vec::new(),
-            deferred_client_messages: Vec::new(),
+            deferred_client_messages: VecDeque::new(),
+            inbox_admission: InboxAdmission::new(),
+            active_protocol_request_digest: None,
             task_counter: 0,
             tasks: BTreeMap::new(),
             pending_background_tasks: Vec::new(),
@@ -212,6 +282,18 @@ impl ChioMcpEdge {
             return Err(AdapterError::ParseError(
                 "restore_ready_session requires an uninitialized MCP edge".to_string(),
             ));
+        }
+
+        if let Some(profile) = peer_capabilities.authorization.as_ref() {
+            let supported = crate::authorization::authorization_capabilities()
+                .negotiated_with(profile)
+                .map_err(|error| AdapterError::ParseError(error.to_string()))?;
+            if &supported != profile {
+                return Err(AdapterError::ParseError(
+                    "restored MCP authorization profile exceeds this host's supported features"
+                        .to_string(),
+                ));
+            }
         }
 
         let restored_session_id = self
@@ -255,6 +337,23 @@ impl ChioMcpEdge {
     }
 
     pub fn handle_jsonrpc(&mut self, message: Value) -> Option<Value> {
+        let digest = match chio_kernel::ProtocolRequestDigest::from_decoded_json(&message) {
+            Ok(digest) => digest,
+            Err(_) => {
+                return Some(jsonrpc_error(
+                    Value::Null,
+                    JSONRPC_INVALID_REQUEST,
+                    "urn:chio:error:transport:stream-capacity-exceeded",
+                ))
+            }
+        };
+        let previous = self.active_protocol_request_digest.replace(digest);
+        let response = self.handle_jsonrpc_inner(message);
+        self.active_protocol_request_digest = previous;
+        response
+    }
+
+    fn handle_jsonrpc_inner(&mut self, message: Value) -> Option<Value> {
         let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
             Ok(envelope) => envelope,
             Err(response) => return Some(response),
@@ -280,34 +379,11 @@ impl ChioMcpEdge {
         Ok(self.take_pending_notifications())
     }
 
-    // Reader/writer transport variant: used by the blocking `send_client_request`
-    // loop that drives nested client requests over an owned reader/writer pair.
-    fn handle_jsonrpc_with_transport<R: BufRead + Send, W: Write + Send>(
+    fn handle_jsonrpc_with_transport_channel<W: Write + Send>(
         &mut self,
         message: Value,
-        reader: &mut R,
-        writer: &mut W,
-    ) -> Option<Value> {
-        let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
-            Ok(envelope) => envelope,
-            Err(response) => return Some(response),
-        };
-        match id {
-            Some(id) => {
-                if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
-                    return Some(response);
-                }
-                Some(self.handle_request_with_transport(id, &method, params, reader, writer))
-            }
-            None => self.handle_known_notification(&method, params),
-        }
-    }
-
-    fn handle_jsonrpc_with_transport_channel<W: Write>(
-        &mut self,
-        message: Value,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Option<Value> {
         let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
@@ -327,34 +403,134 @@ impl ChioMcpEdge {
         }
     }
 
-    pub fn serve_stdio<R: BufRead + Send + 'static, W: Write>(
+    pub fn serve_stdio<R: BufRead + Send + 'static, W: Write + Send>(
         &mut self,
         reader: R,
         mut writer: W,
     ) -> Result<(), AdapterError> {
-        let (client_tx, client_rx) = mpsc::channel();
-        let (cancel_tx, cancel_rx) = mpsc::channel();
-        std::thread::spawn(move || pump_client_messages(reader, client_tx, cancel_tx));
-
-        self.serve_inbound_loop(&client_rx, &cancel_rx, &mut writer)
+        let (sender, receiver) = mcp_inbox();
+        std::thread::spawn(move || {
+            let mut reader = reader;
+            loop {
+                let line = match crate::ingress::framing::read_bounded_line(
+                    &mut reader,
+                    framing::MAX_STDIO_MCP_FRAME_BYTES,
+                ) {
+                    Ok(Some(line)) => line,
+                    Ok(None) => return,
+                    Err(error) => {
+                        sender.error(error);
+                        return;
+                    }
+                };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let message =
+                    match sender.decode(line.as_bytes(), framing::MAX_STDIO_MCP_FRAME_BYTES) {
+                        Ok(message) => message,
+                        Err(error) => {
+                            sender.error(error);
+                            return;
+                        }
+                    };
+                if sender.send(message).is_err() {
+                    return;
+                }
+            }
+        });
+        self.serve_inbox_on_route(receiver, &mut writer, PendingActionRoute::Immediate)
     }
 
-    pub fn serve_message_channels<W: Write>(
+    /// Compatibility with an already-decoded caller-owned channel. The caller's
+    /// upstream queue is outside this contract; shipped remote ingress uses
+    /// `serve_inbox` so admission occurs before authoritative DOM allocation.
+    pub fn serve_message_channels<W: Write + Send>(
         &mut self,
         client_rx: mpsc::Receiver<Value>,
-        mut writer: W,
+        writer: W,
     ) -> Result<(), AdapterError> {
-        let (inbound_tx, inbound_rx) = mpsc::channel();
-        let (cancel_tx, cancel_rx) = mpsc::channel();
-        std::thread::spawn(move || pump_channel_messages(client_rx, inbound_tx, cancel_tx));
-
-        self.serve_inbound_loop(&inbound_rx, &cancel_rx, &mut writer)
+        let (sender, receiver) = mcp_inbox();
+        std::thread::spawn(move || {
+            while let Ok(value) = client_rx.recv() {
+                let message = match sender.account(value) {
+                    Ok(message) => message,
+                    Err(error) => {
+                        sender.error(error);
+                        return;
+                    }
+                };
+                if sender.send(message).is_err() {
+                    return;
+                }
+            }
+        });
+        self.serve_inbox_on_route(receiver, writer, PendingActionRoute::Immediate)
     }
 
-    fn serve_inbound_loop<W: Write>(
+    /// Serve original-byte-admitted messages while retaining their reservations
+    /// through handling and deferred storage. Control delivery shares the same
+    /// aggregate budget and only recognizes the currently active identities.
+    /// Writes reach the client only on a client request's own response stream,
+    /// so a queued client request rides the next client request.
+    pub fn serve_inbox<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        inbox: McpInboxReceiver,
+        writer: W,
+    ) -> Result<(), AdapterError> {
+        self.serve_inbox_on_route(inbox, writer, PendingActionRoute::NextClientRequest)
+    }
+
+    fn serve_inbox_on_route<W: Write + Send>(
+        &mut self,
+        mut inbox: McpInboxReceiver,
+        mut writer: W,
+        route: PendingActionRoute,
+    ) -> Result<(), AdapterError> {
+        if self
+            .deferred_client_messages
+            .iter()
+            .any(|message| !inbox.admission.owns(message))
+        {
+            return Err(AdapterError::IngressCapacity);
+        }
+        self.inbox_admission = inbox.admission.clone();
+        self.pending_action_route = route;
+        let (_cancel_tx, mut cancel_rx) = mpsc::channel();
+        self.serve_inbound_loop(&mut inbox.receiver, &mut cancel_rx, &mut writer)
+    }
+
+    /// Handle one client message. On the next-request route, actions queued
+    /// for the next client request are serviced on this request's stream
+    /// first; a request the client cancels meanwhile is answered and never
+    /// dispatched.
+    fn handle_inbound_with_channel<W: Write + Send>(
+        &mut self,
+        message: Value,
+        digest: Option<chio_kernel::ProtocolRequestDigest>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
+        writer: &mut W,
+    ) -> Result<Option<Value>, AdapterError> {
+        if let Some(cancelled) =
+            self.service_pending_actions_before_request(&message, client_rx, writer)?
+        {
+            return Ok(Some(cancelled));
+        }
+        self.active_protocol_request_digest = digest;
+        let response =
+            self.handle_jsonrpc_with_transport_channel(message, client_rx, cancel_rx, writer);
+        self.active_protocol_request_digest = None;
+        if self.pending_action_route == PendingActionRoute::Immediate {
+            self.process_pending_actions_with_channel(client_rx, writer)?;
+        }
+        Ok(response)
+    }
+
+    fn serve_inbound_loop<W: Write + Send>(
+        &mut self,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
         loop {
@@ -362,30 +538,51 @@ impl ChioMcpEdge {
             self.flush_pending_notifications(writer)?;
 
             if let Some(message) = self.take_deferred_client_message() {
-                let response = self
-                    .handle_jsonrpc_with_transport_channel(message, client_rx, cancel_rx, writer);
-                self.process_pending_actions_with_channel(client_rx, writer)?;
+                let (message, reservation) = message.into_parts();
+                let response_scope = self.inbox_admission.enter_response_scope(&reservation)?;
+                let response = self.handle_inbound_with_channel(
+                    message,
+                    reservation.request_digest().cloned(),
+                    client_rx,
+                    cancel_rx,
+                    writer,
+                )?;
                 self.forward_runtime_events();
                 self.flush_pending_notifications(writer)?;
                 if let Some(response) = response {
                     write_jsonrpc_line(writer, &response)?;
                 }
+                drop(response_scope);
                 self.service_background_runtime_with_channel(client_rx, cancel_rx, writer)?;
                 continue;
             }
 
             match client_rx.recv_timeout(CLIENT_IDLE_POLL_INTERVAL) {
-                Ok(ClientInbound::Message(message)) => {
-                    let response = self.handle_jsonrpc_with_transport_channel(
-                        message, client_rx, cancel_rx, writer,
-                    );
-                    self.process_pending_actions_with_channel(client_rx, writer)?;
+                Ok(ClientInbound::Accounted(message)) => {
+                    let (message, reservation) = message.into_parts();
+                    let response_scope = self.inbox_admission.enter_response_scope(&reservation)?;
+                    let response = self.handle_inbound_with_channel(
+                        message,
+                        reservation.request_digest().cloned(),
+                        client_rx,
+                        cancel_rx,
+                        writer,
+                    )?;
                     self.forward_runtime_events();
                     self.flush_pending_notifications(writer)?;
                     if let Some(response) = response {
                         write_jsonrpc_line(writer, &response)?;
                     }
+                    drop(response_scope);
                     self.service_background_runtime_with_channel(client_rx, cancel_rx, writer)?;
+                }
+                Ok(ClientInbound::HostProtocolRefusal(command)) => {
+                    self.handle_host_protocol_refusal(command)
+                }
+                #[cfg(test)]
+                Ok(ClientInbound::Message(value)) => {
+                    self.deferred_client_messages
+                        .push_back(self.inbox_admission.admit_value(value)?);
                 }
                 Ok(ClientInbound::ParseError(error)) => {
                     write_jsonrpc_line(
@@ -394,11 +591,13 @@ impl ChioMcpEdge {
                     )?;
                     self.service_background_runtime_with_channel(client_rx, cancel_rx, writer)?;
                 }
+                #[cfg(test)]
                 Ok(ClientInbound::ReadError(error)) => {
                     return Err(AdapterError::ConnectionFailed(format!(
                         "failed to read MCP edge request: {error}"
                     )));
                 }
+                #[cfg(test)]
                 Ok(ClientInbound::Closed) => {
                     self.forward_runtime_events();
                     self.flush_pending_notifications(writer)?;

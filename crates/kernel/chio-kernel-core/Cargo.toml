@@ -3,8 +3,7 @@ name = "chio-kernel-core"
 description = "Portable (no_std + alloc) Chio kernel core: pure verdict evaluation, capability verification, and receipt signing"
 version.workspace = true
 edition.workspace = true
-# Kani 0.67 uses Rust 1.93; this formal-proof crate remains compatible.
-rust-version = "1.93"
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
@@ -20,11 +19,12 @@ name = "chio_kernel_core"
 # the host and for `wasm32-unknown-unknown` with `--no-default-features`.
 # See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
 [dependencies]
+chio-security-types = { workspace = true }
 # Depend on `chio-core-types` with `default-features = false` and forward the
 # `std` feature through our own feature flag so downstream consumers can
 # select between the hosted `std` build and the portable `no_std + alloc`
 # build used by the scripted host + wasm proof.
-chio-core-types = { path = "../../core/chio-core-types", default-features = false }
+chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
@@ -49,7 +49,9 @@ dudect-bencher = { version = "0.7", optional = true }
 
 [features]
 default = ["std", "revocation-view"]
-std = ["chio-core-types/std", "serde/std", "serde_json/std"]
+# Model-checking opt-in for the real portable hash backend, including on x86.
+kani = ["chio-core-types/kani"]
+std = ["chio-security-types/std", "chio-core-types/std", "serde/std", "serde_json/std"]
 # Enables the `revocation_view` module: an arc-swap-backed read-only
 # snapshot of the revocation oracle's most recent signed epoch root that
 # dispatch consults on every call. Implies `std` because `arc-swap`
@@ -93,8 +95,11 @@ harness = false
 required-features = ["dudect"]
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(chio_creusot_contracts)"] }

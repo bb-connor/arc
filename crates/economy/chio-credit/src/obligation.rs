@@ -51,6 +51,8 @@ pub fn derive_obligation_payee_binding_digest(
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ObligationError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("invalid obligation field `{0}`")]
     InvalidField(&'static str),
     #[error("illegal obligation disposition transition")]

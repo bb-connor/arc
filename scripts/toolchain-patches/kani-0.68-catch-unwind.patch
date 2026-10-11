@@ -1,0 +1,13 @@
+diff --git a/kani-compiler/src/intrinsics.rs b/kani-compiler/src/intrinsics.rs
+index 5ce02ff..204c46f 100644
+--- a/kani-compiler/src/intrinsics.rs
++++ b/kani-compiler/src/intrinsics.rs
+@@ -240,7 +240,7 @@ pub fn from_instance(intrinsic_instance: &Instance) -> Self {
+                 }
+             }
+             "catch_unwind" => {
+-                assert_sig_matches!(sig, RigidTy::FnPtr(_), RigidTy::RawPtr(_, Mutability::Mut), RigidTy::FnPtr(_) => RigidTy::Int(IntTy::I32));
++                assert_sig_matches!(sig, RigidTy::FnPtr(_), RigidTy::RawPtr(_, Mutability::Mut), RigidTy::FnPtr(_) => RigidTy::Bool);
+                 Self::Unimplemented {
+                     name: intrinsic_str,
+                     issue_link: "https://github.com/model-checking/kani/issues/267".into(),

@@ -32,7 +32,10 @@ fn finding_challenge_a_confirmed_impairment_settles_without_dispatching_again() 
     case.mark_status_eligible(&chain_hash(0x77), SETTLEMENT_NOW)?;
     case.publish_status(SETTLEMENT_NOW + 1)?;
 
-    let resumed = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 2)?;
+    let resumed = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 2),
+    )?;
     assert_eq!(resumed, FindingFinalization::AlreadyConfirmed);
     let settled = case.head()?;
     assert_eq!(
@@ -66,7 +69,10 @@ fn finding_challenge_confirmed_impairment_waits_for_retraction_before_settlement
     let case = finalizing_liability_pending_retraction()?;
     case.confirm_impairment(SETTLEMENT_NOW)?;
 
-    let waiting = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 1)?;
+    let waiting = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 1),
+    )?;
     assert_eq!(waiting, FindingFinalization::AwaitingStatusPublication);
     let pending = case.head()?;
     assert_eq!(pending.state, FindingLiabilityState::Finalizing);
@@ -85,7 +91,10 @@ fn finding_challenge_confirmed_impairment_waits_for_retraction_before_settlement
     }
     case.mark_status_eligible(&chain_hash(0x77), SETTLEMENT_NOW + 2)?;
     case.publish_status(SETTLEMENT_NOW + 3)?;
-    let settled = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 4)?;
+    let settled = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 4),
+    )?;
     assert_eq!(settled, FindingFinalization::AlreadyConfirmed);
     let head = case.head()?;
     assert_eq!(head.state, FindingLiabilityState::Settled);
@@ -116,12 +125,18 @@ fn finding_challenge_finalization_reuses_pending_voluntary_retraction() -> TestR
     case.confirm_impairment(SETTLEMENT_NOW)?;
 
     assert_eq!(
-        case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 1)?,
+        case.finalize(
+            &UnreachablePublisher,
+            fixture_commit_time(SETTLEMENT_NOW + 1)
+        )?,
         FindingFinalization::AwaitingStatusPublication
     );
     case.publish_status(SETTLEMENT_NOW + 2)?;
     assert_eq!(
-        case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 3)?,
+        case.finalize(
+            &UnreachablePublisher,
+            fixture_commit_time(SETTLEMENT_NOW + 3)
+        )?,
         FindingFinalization::AlreadyConfirmed
     );
     let settled = case.head()?;
@@ -150,7 +165,7 @@ fn finding_challenge_confirmed_impairment_settles_after_snapshot_expiry() -> Tes
 
     let stale_at = OBSERVED_AT + MAX_SNAPSHOT_AGE_SECS + 1;
     assert_eq!(
-        case.finalize(&UnreachablePublisher, stale_at)?,
+        case.finalize(&UnreachablePublisher, fixture_commit_time(stale_at))?,
         FindingFinalization::AwaitingStatusPublication,
         "a landed impairment waits on signed status without revalidating its old snapshot"
     );
@@ -167,7 +182,7 @@ fn finding_challenge_confirmed_impairment_settles_after_snapshot_expiry() -> Tes
     case.mark_status_eligible(&chain_hash(0x77), stale_at + 1)?;
     case.publish_status(stale_at + 2)?;
     assert_eq!(
-        case.finalize(&UnreachablePublisher, stale_at + 3)?,
+        case.finalize(&UnreachablePublisher, fixture_commit_time(stale_at + 3))?,
         FindingFinalization::AlreadyConfirmed
     );
     assert_eq!(case.head()?.state, FindingLiabilityState::Settled);
@@ -179,7 +194,10 @@ fn finding_challenge_published_retraction_reconciles_after_status_bond_expiry() 
     case.confirm_impairment(SETTLEMENT_NOW)?;
 
     assert_eq!(
-        case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 1)?,
+        case.finalize(
+            &UnreachablePublisher,
+            fixture_commit_time(SETTLEMENT_NOW + 1)
+        )?,
         FindingFinalization::AwaitingStatusPublication
     );
     case.publish_status(SETTLEMENT_NOW + 2)?;
@@ -191,7 +209,10 @@ fn finding_challenge_published_retraction_reconciles_after_status_bond_expiry() 
         FindingDisputeLockDisposition::Forfeited,
     )?;
     assert_eq!(
-        case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 3)?,
+        case.finalize(
+            &UnreachablePublisher,
+            fixture_commit_time(SETTLEMENT_NOW + 3)
+        )?,
         FindingFinalization::AlreadyConfirmed,
         "a published retraction reconciles from retained evidence without a new SLA"
     );
@@ -436,7 +457,7 @@ fn finding_challenge_snapshot_seller_must_match_the_durable_liability() -> TestR
             &enforcement_anchor_proof(&enforcement)?,
             &ScriptedObservations::qualified(),
             &UnreachablePublisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )
         .expect_err("an observer cannot substitute the liability's admitted seller");
     assert!(matches!(
@@ -477,7 +498,7 @@ fn finding_challenge_confirmed_impairment_recovers_across_observer_and_operator_
 
     // The first attempt broadcasts and comes back unmined, which leaves
     // the intent dispatchable.
-    case.finalize(&publisher, SETTLEMENT_NOW)?;
+    case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(case.intent_state()?, FindingEffectIntentState::Failed);
 
     // The transaction then mines and finalizes, but the operator identity
@@ -544,7 +565,7 @@ fn finding_challenge_confirmed_impairment_recovers_across_observer_and_operator_
         &enforcement_anchor_proof(&case.enforcement)?,
         &ScriptedObservations::then_qualified(vec![still_rotated]),
         &UnreachablePublisher,
-        SETTLEMENT_NOW + 120,
+        fixture_commit_time(SETTLEMENT_NOW + 120),
     )?;
     assert_eq!(recovered, FindingFinalization::AwaitingStatusPublication);
     let reconciled = case.head()?;
@@ -552,7 +573,10 @@ fn finding_challenge_confirmed_impairment_recovers_across_observer_and_operator_
     assert!(!reconciled.quarantined);
 
     case.publish_status(SETTLEMENT_NOW + 181)?;
-    let completed = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 182)?;
+    let completed = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 182),
+    )?;
     assert_eq!(completed, FindingFinalization::AlreadyConfirmed);
     let settled = case.head()?;
     assert_eq!(settled.state, FindingLiabilityState::Settled);
@@ -592,7 +616,7 @@ fn finding_challenge_enforcement_recovers_across_finalization_authority_rotation
             &enforcement_anchor_proof(&case.enforcement)?,
             &ScriptedObservations::qualified(),
             &publisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )?)
     };
 
@@ -639,7 +663,7 @@ fn finding_challenge_penalty_recovers_across_penalty_authority_rotation() -> Tes
             &enforcement_anchor_proof(&case.enforcement)?,
             &ScriptedObservations::qualified(),
             &publisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )?)
     };
 
@@ -679,7 +703,7 @@ fn finding_challenge_finalization_requires_the_retained_enforcement_envelope() -
             &enforcement_anchor_proof(&substituted)?,
             &ScriptedObservations::qualified(),
             &UnreachablePublisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )
         .expect_err("a newly signed payout envelope cannot replace retained authorization");
     let ChallengeCoordinatorError::Settlement(detail) = refused else {
@@ -725,7 +749,7 @@ fn finding_challenge_an_enforcement_naming_another_vault_never_reaches_the_publi
             &enforcement_anchor_proof(&enforcement)?,
             &ScriptedObservations::qualified(),
             &UnreachablePublisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )
         .expect_err("one liability may only impair the vault it was opened against");
     assert!(matches!(
@@ -758,7 +782,7 @@ fn finding_challenge_a_snapshot_from_an_expired_observer_key_authorizes_nothing(
             &enforcement_anchor_proof(&case.enforcement)?,
             &ScriptedObservations::qualified(),
             &UnreachablePublisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )
         .expect_err("an expired observer key cannot authorize impairment");
     assert!(matches!(
@@ -789,7 +813,7 @@ fn finding_challenge_a_snapshot_from_an_expired_observer_key_authorizes_nothing(
         &anchor_proof()?,
         &ScriptedObservations::qualified(),
         &UnreachablePublisher,
-        SETTLEMENT_NOW,
+        fixture_commit_time(SETTLEMENT_NOW),
     );
     assert!(matches!(
         refused,
@@ -819,7 +843,7 @@ fn finding_challenge_revoked_status_operator_blocks_impairment_dispatch() -> Tes
             &enforcement_anchor_proof(&case.enforcement)?,
             &ScriptedObservations::qualified(),
             &UnreachablePublisher,
-            SETTLEMENT_NOW,
+            fixture_commit_time(SETTLEMENT_NOW),
         )
         .expect_err("a revoked status operator cannot precede impairment dispatch");
     assert!(matches!(

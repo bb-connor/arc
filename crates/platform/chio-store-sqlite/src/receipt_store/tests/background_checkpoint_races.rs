@@ -209,6 +209,7 @@ fn panicked_checkpoint_commits_restored_guards_but_not_candidate(
             &mut connection,
             &mut head,
             &signer(&keypair, max_batch),
+            &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
         )
     }));
     test_hooks::PANIC_DURING_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -438,6 +439,7 @@ fn cache_miss_holds_insert_lock_across_interior_projection_audit(
         &mut connection,
         &mut head,
         &signer(&keypair, 2),
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
         |_| {
             let error = peer
                 .execute(
@@ -545,7 +547,13 @@ fn cache_miss_uses_locked_legacy_replacement_frontier_when_no_build_is_due(
     );
 
     head.chain_frontier = None;
-    let advanced = maybe_build_checkpoint(&mut connection, &mut head, &signer(&keypair, 1), None)?;
+    let advanced = maybe_build_checkpoint(
+        &mut connection,
+        &mut head,
+        &signer(&keypair, 1),
+        None,
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
+    )?;
     assert!(advanced, "the locked audit must adopt checkpoint B");
     assert_eq!(head.latest_checkpoint.as_ref(), Some(&checkpoint_b));
     let adopted_frontier = head
@@ -693,6 +701,7 @@ fn cache_miss_adopts_valid_different_batch_winner_frontier(
         &mut connection,
         &mut head,
         &signer(&keypair, 2),
+        &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
         |tx| {
             let inserted = insert_checkpoint_incremental_tx(tx, Some(&checkpoint_one), &winner)?;
             if inserted != winner {

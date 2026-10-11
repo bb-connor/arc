@@ -25,6 +25,9 @@ pub const URN_PLAY_INTEGRITY_DEVICE_REJECTED: &str =
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum AttestationError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("app attest: invalid CBOR: {0}")]
     InvalidCbor(String),
     #[error("app attest: invalid pinned Apple root: {0}")]
@@ -45,6 +48,8 @@ pub enum AttestationError {
     MissingField(&'static str),
     #[error("app attest: unsupported format {0}")]
     UnsupportedFormat(String),
+    #[error("play integrity: token verification failed")]
+    PlayIntegrityVerification(#[source] PlayIntegrityTokenError),
     #[error("play integrity: invalid token: {0}")]
     PlayIntegrityInvalidToken(String),
     #[error("play integrity: nonce mismatch")]
@@ -61,6 +66,7 @@ impl AttestationError {
     #[must_use]
     pub fn urn(&self) -> &'static str {
         match self {
+            Self::Input(error) => error.code(),
             Self::InvalidCbor(_) | Self::MissingField(_) | Self::UnsupportedFormat(_) => {
                 URN_APP_ATTEST_INVALID_CBOR
             }
@@ -71,12 +77,50 @@ impl AttestationError {
             Self::CredentialKeyMismatch => URN_APP_ATTEST_CREDENTIAL_KEY_MISMATCH,
             Self::CounterRollback => URN_APP_ATTEST_COUNTER_ROLLBACK,
             Self::CertificateChainInvalid(_) => URN_APP_ATTEST_CERT_CHAIN_INVALID,
-            Self::PlayIntegrityInvalidToken(_) => URN_PLAY_INTEGRITY_INVALID_TOKEN,
+            Self::PlayIntegrityInvalidToken(_) | Self::PlayIntegrityVerification(_) => {
+                URN_PLAY_INTEGRITY_INVALID_TOKEN
+            }
             Self::PlayIntegrityNonceMismatch => URN_PLAY_INTEGRITY_NONCE_MISMATCH,
             Self::PlayIntegrityAppRejected | Self::PlayIntegrityPackageMismatch => {
                 URN_PLAY_INTEGRITY_APP_REJECTED
             }
             Self::PlayIntegrityDeviceRejected => URN_PLAY_INTEGRITY_DEVICE_REJECTED,
         }
+    }
+}
+
+impl From<chio_core_types::canonical::UntrustedJsonError> for AttestationError {
+    fn from(error: chio_core_types::canonical::UntrustedJsonError) -> Self {
+        Self::Input(error.into())
+    }
+}
+
+/// Cloneable local JWT cause. Public formatting never renders rejected claims.
+#[derive(Clone)]
+pub struct PlayIntegrityTokenError(std::sync::Arc<jsonwebtoken::errors::Error>);
+impl std::fmt::Display for PlayIntegrityTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(URN_PLAY_INTEGRITY_INVALID_TOKEN)
+    }
+}
+impl std::fmt::Debug for PlayIntegrityTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+impl std::error::Error for PlayIntegrityTokenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+impl PartialEq for PlayIntegrityTokenError {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for PlayIntegrityTokenError {}
+impl From<jsonwebtoken::errors::Error> for AttestationError {
+    fn from(error: jsonwebtoken::errors::Error) -> Self {
+        Self::PlayIntegrityVerification(PlayIntegrityTokenError(std::sync::Arc::new(error)))
     }
 }

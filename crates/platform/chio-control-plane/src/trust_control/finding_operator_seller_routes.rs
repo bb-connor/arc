@@ -452,8 +452,10 @@ fn parse_submission(raw: &[u8]) -> Result<FindingVerifiedFixSubmissionRequest, S
     if strict != raw {
         return Err("verified-fix submission is not strict canonical JSON".to_owned());
     }
-    let request: FindingVerifiedFixSubmissionRequest = serde_json::from_slice(raw)
-        .map_err(|_| "verified-fix submission has an unsupported shape".to_owned())?;
+    let request: FindingVerifiedFixSubmissionRequest =
+        chio_core::canonical::UntrustedJsonText::from_wire(raw, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| error.code().to_owned())?;
     let typed = chio_core::canonical_json_bytes(&request)
         .map_err(|_| "verified-fix submission cannot be canonicalized".to_owned())?;
     if typed != strict {
@@ -473,8 +475,9 @@ where
     if strict != raw {
         return Err("request is not strict canonical JSON".to_owned());
     }
-    let request: T =
-        serde_json::from_slice(raw).map_err(|_| "request has an unsupported shape".to_owned())?;
+    let request: T = chio_core::canonical::UntrustedJsonText::from_wire(raw, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| error.code().to_owned())?;
     if chio_core::canonical_json_bytes(&request)
         .map_err(|_| "request cannot be canonicalized".to_owned())?
         != strict

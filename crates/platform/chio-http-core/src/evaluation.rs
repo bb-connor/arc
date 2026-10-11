@@ -50,17 +50,8 @@ impl VerifyReceiptResponse {
         let signature_valid = receipt.verify_signature().unwrap_or(false);
         let receipt_id_valid = receipt.receipt_id_valid().unwrap_or(false);
         let parameter_hash_valid = is_lower_hex_64(&receipt.content_hash);
-        let semantic_valid = receipt.receipt_kind
-            == chio_core_types::receipt::kinds::ReceiptKind::MediatedDecision
-            && receipt.boundary_class == chio_core_types::receipt::kinds::BoundaryClass::Prevent
-            && receipt.observation_outcome.is_none()
-            && receipt.trust_level == chio_core_types::receipt::kinds::TrustLevel::Mediated;
-        let ok = signature_valid
-            && signer_trusted
-            && receipt_id_valid
-            && parameter_hash_valid
-            && semantic_valid;
-        let authorized = ok && receipt.verdict.is_allowed();
+        let ok = signature_valid && signer_trusted && receipt_id_valid && parameter_hash_valid;
+        let authorized = ok && receipt.is_authorized();
 
         Self {
             signature_valid,
@@ -70,7 +61,13 @@ impl VerifyReceiptResponse {
             receipt_kind: receipt.receipt_kind.as_str().to_string(),
             boundary_class: receipt.boundary_class.as_str().to_string(),
             trust_level: receipt.trust_level.as_str().to_string(),
-            result: verdict_result(&receipt.verdict).to_string(),
+            result: if receipt.receipt_kind
+                == chio_core_types::receipt::kinds::ReceiptKind::AdvisoryEvaluation
+            {
+                "observed".to_owned()
+            } else {
+                verdict_result(&receipt.verdict).to_owned()
+            },
             authorized,
             signer_key_hex: receipt.kernel_key.to_hex(),
             ok,

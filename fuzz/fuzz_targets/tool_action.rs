@@ -267,14 +267,14 @@ fn with_guard_context(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: Some(0),
+    let ctx = {
+        let mut constructed_guard_context =
+            GuardContext::new(&request, &scope).with_matched_grant_index(Some(0));
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     f(&ctx);
 }

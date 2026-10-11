@@ -1,0 +1,811 @@
+{
+  "schema": "chio.security.current-source-reconciliation.v1",
+  "observed_utc": "2026-10-08T12:09:16.863441+00:00",
+  "source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+  "source_tree": "8f408d4e1949e220c33d53a17a38bfebe37bf972",
+  "qualified": false,
+  "merged": false,
+  "scope": "Finite current-view accounting only:24mapped existing keys,2existing effect aliases and1new NRB001 row. All1793existing canonical records and all historical/evidence fields are preserved.",
+  "input_ledger_sha256": "4f46ef62604cf116dcc08887f1001b87e6781bb138b7edc1edb5991afb4e3337",
+  "input_mapping": {
+    "path": "/tmp/pr1160-current-board-reconciliation-20261008/RECONCILIATION.json",
+    "bytes": 29929,
+    "sha256": "c9df2c6150e32d7f3e79c631347393cc02eb5e0e9b96b10a40fa5b24d845bd16"
+  },
+  "requirements_before": 1793,
+  "requirements_after": 1794,
+  "existing_canonical_records_sha256": "c01d9369fa43de3a04eba53748635c2f4ce93e7f69091d065d8bb06c10c0a127",
+  "canonical_hash_encoding": "UTF-8 compact JSON with recursively sorted object keys; deterministic record-preservation witness, not receipt signing.",
+  "current_view_updates": [
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F002",
+      "label": "F002",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      },
+      "retained_evidence_scope": "Accepted money/financial source mapping; financial29 at11647 and39fcc default1638/support1646/PQ1674;41 payment and12FX controls. Original failures retained.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      ],
+      "previous_current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "35028fa26f9d5777ccb73cafd78f2c0edbd8e350c57ce0212378e6b78e3cec62"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F005",
+      "label": "F005",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "300a5854cc33522999ba4805ac3e64976099ef8d"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      },
+      "retained_evidence_scope": "Accepted money/financial source mapping; financial29 at11647 and39fcc default1638/support1646/PQ1674;41 payment and12FX controls. Original failures retained.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      ],
+      "previous_current_state": "source-integrated-current-financial29-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "35028fa26f9d5777ccb73cafd78f2c0edbd8e350c57ce0212378e6b78e3cec62"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F003",
+      "label": "F003",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "e518ef3256861175f17a665dc6caffa677482ce4",
+          "a0062b0e0ae2d1edd9d732b1be4f6e89d3fb9dc1",
+          "f23efdf43ad15d981e7a3e20d78a5b73f59acb39",
+          "1225dc4893cf8b8e90b362a67774b1cc9c4b4078",
+          "9d1dc8fcc9b1c6ebc226107d866a95e5f18fcf45"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Linear history cost disclosed; global clock/store/history faults remain fatal."
+      },
+      "retained_evidence_scope": "Native12+paid-clock6 plus revoked-caller3/global5 scoped GREEN. Original chronology/clock RED preserved; initial strict failure separate.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Linear history cost disclosed; global clock/store/history faults remain fatal."
+      ],
+      "previous_current_state": "source-integrated-native-chronology-and-revoked-caller-isolation-scoped-green",
+      "previous_source_repair_sha256": "112725cf6dc96b1c75fcf7d2b0318db5e76f6d06ed8bba4a9b3db75ec7a35a99"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F004",
+      "label": "F004",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "8efb4178461cf112a9ce8ed7d5e784a78b98d9e5"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Panic-unwind/new-owner reopen does not prove SIGKILL, power-loss or external rails.",
+        "integration_aliases": [
+          {
+            "original": "75127f0a2f",
+            "integrated_alias": "8efb417846",
+            "original_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+            "integrated_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+            "equal": true
+          }
+        ]
+      },
+      "retained_evidence_scope": "75127 original test aliases exactly8efb by patch ID.77b9 default/support cutpoints;39fcc SQLite38/0 and support2/0.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Panic-unwind/new-owner reopen does not prove SIGKILL, power-loss or external rails."
+      ],
+      "previous_current_state": "source-integrated-persisted-disposition-restart-coverage-scoped-green",
+      "previous_source_repair_sha256": "dc50d531066f2011f60e1cf5721a1f054d3ef89bb9566a98a2ac3955c91af93c"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F018",
+      "label": "F018",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "c28fd9797d7b3fc8ae175c692e8b38a7f87f9f95"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Real native lost-ack/partial-write capture acceptance remains open.",
+        "preservation_dependency_commits": [
+          "b82c92262879b0929c729ff7e6a635eda74244ed"
+        ],
+        "integration_aliases": [
+          {
+            "original": "2fb5bcfe4b",
+            "integrated_alias": "c28fd9797d",
+            "original_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+            "integrated_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+            "equal": true
+          }
+        ]
+      },
+      "retained_evidence_scope": "2fb5 aliases exactlyc28f; default1/support2 capture lifecycle controls; NF-CAP focused11 and kernel12 preserve single-use.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Real native lost-ack/partial-write capture acceptance remains open."
+      ],
+      "previous_current_state": "source-integrated-single-use-capture-coverage-scoped-green",
+      "previous_source_repair_sha256": "bd83c7dcf6b063efe0b57473fbf02df1df652d331a59a726c53a93a26264c2c5"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F026",
+      "label": "F026",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "b318b50caf11c59ea918df69b9a31ae2c7f28ac6",
+          "fed577591f6fba0c48ce208b6a4c255e7f7fecbe",
+          "f19dfbdb4e4388357f8996187f85cfb5a6af8058",
+          "280133b31209d1d15661a83e4e7e273b13c39884"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. No guarantee beyond the accepted threshold-claim/cancellation contract."
+      },
+      "retained_evidence_scope": "Both session/pre-dispatch cancellation producers and Originals integrated;39fcc includes6 session +3 pre-dispatch cancellation nodes and monetary controls.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. No guarantee beyond the accepted threshold-claim/cancellation contract."
+      ],
+      "previous_current_state": "source-integrated-current-monetary-cancel-controls-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "35028fa26f9d5777ccb73cafd78f2c0edbd8e350c57ce0212378e6b78e3cec62"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F022",
+      "label": "F022",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "576f7d4d2f077ea83384ec0ccfdd4e315e7144c8"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      },
+      "retained_evidence_scope": "Corrected exact settled+release/no-effect compensation oracle integrated;39fcc default/support/PQ owning PASS includes it; earlier RED preserved.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification."
+      ],
+      "previous_current_state": "source-integrated-F022-onefile-oracle-SourceAccepted-external-bounded-red-green-currentkernel-owning-strict-pending",
+      "previous_source_repair_sha256": "0f81bb4579b2dfc72971d3f088d20e7ff799434b96fab886bc6286b70e78921a"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F023",
+      "label": "F023",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "cd0d2dcb4a1bbecec842c1bcc3f3d629bcb1a9c6"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Backend/native return-recording acceptance remains separate.",
+        "integration_aliases": [
+          {
+            "original": "b83529a504",
+            "integrated_alias": "cd0d2dcb4a",
+            "original_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+            "integrated_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+            "equal": true
+          }
+        ]
+      },
+      "retained_evidence_scope": "b835 aliases exactlycd0d; ordinary/nested no-output guard controls and accepting case;39fcc all3 included.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Backend/native return-recording acceptance remains separate."
+      ],
+      "previous_current_state": "source-integrated-return-guard-denial-coverage-scoped-green",
+      "previous_source_repair_sha256": "f4e4c459e01f1214df6445b6e04096c9a87841b0481c0f47197fe1ce10ae0b8f"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F030",
+      "label": "F030",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "63defbe6dc0535c3b9401aebe3a5bd93bc00c496",
+          "c35c1779ac7b1f3dc22acf27c55a7184cb8b73e5",
+          "0736d99bacbb2b3791f9a76a32a0105fed2b1cfa",
+          "4c1f1feb5b422d8b2f154346fffa71ca2b3136f1"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Public retry trigger observed plan expiry; no pure capability-expiry or fresh-effect guarantee."
+      },
+      "retained_evidence_scope": "Current cancellation/retry8 scoped GREEN; literal child extraction1990 under unchanged2046 cap; strict/hygiene pass.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Public retry trigger observed plan expiry; no pure capability-expiry or fresh-effect guarantee."
+      ],
+      "previous_current_state": "source-integrated-cancel-and-expired-plan-retry-reconciliation-scoped-green",
+      "previous_source_repair_sha256": "f42e8a367e8c3ee63d178880925aea3fc7f6e1ebbcccc8b05a74ac65ec6331bb"
+    },
+    {
+      "requirement_id": "production-native-return:NDR001",
+      "label": "NDR001",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "d57fa1c713280b8822f18c60e9ab7e8977192853",
+          "b8f061ca578beb9c9a94accde304962a42f7a5c2"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Signed restart/physical substitution and pre-fix raw-row handling remain bounded acceptance gaps; do not claim existing stuck historical rows repaired."
+      },
+      "retained_evidence_scope": "Original ID/hash/raw/ledger binding retained in de519; native-v3 lifecycle7 at92959; exact real broker daemon/MCP/upstream3 atcac4; b8 broker312/0 with4 unavailable and74af strict scoped.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Signed restart/physical substitution and pre-fix raw-row handling remain bounded acceptance gaps; do not claim existing stuck historical rows repaired."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "a58fe4cd6a5683266dbf80eca665809ba165c300b9929c173bdd29ec45adce29"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F011R1",
+      "label": "F011R1",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "21ebd9d3bc6b12aa5a157a489dc824caf8592f24"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Keep CR001 write-path tenant/cause invariants and fatal InvalidReference/Sqlite; no resolve/read race closure claimed."
+      },
+      "retained_evidence_scope": "Genuine store4/2 +broker6/4 Original; exactly one retained store6/broker10 GREEN16 packet13dfacef, source/evidence digest checked; duplicate overwrite disclosure preserved.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Keep CR001 write-path tenant/cause invariants and fatal InvalidReference/Sqlite; no resolve/read race closure claimed."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "1c378123f6f47d8932da6a3970b16868e0361ca2b2b557cedd4c0602e007ac2f"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261008:reconciliation:EF-FINALITY",
+      "label": "EF-FINALITY",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },
+      "retained_evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],
+      "previous_current_state": "source-integrated-focused-and-compatibility-green-final-qualification-pending",
+      "previous_source_repair_sha256": "5e9df6d976bc5608aa9e0c16425cc773f7c7a483bf0560416cc3da47c31e8c2d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261008:reconciliation:EF-FREEZE",
+      "label": "EF-FREEZE",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },
+      "retained_evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],
+      "previous_current_state": "source-integrated-focused-and-compatibility-green-final-qualification-pending",
+      "previous_source_repair_sha256": "5e9df6d976bc5608aa9e0c16425cc773f7c7a483bf0560416cc3da47c31e8c2d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261008:reconciliation:EF-REPLAY",
+      "label": "EF-REPLAY",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb",
+          "9bb8b676e43ad1837e5f5f01a11083e3fd638a36",
+          "68d14089c24ae898296d6806b6e1b13be7669e75"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      },
+      "retained_evidence_scope": "Exact finality/import audit39fcc: CP30/0,issuance25/0 atf2bb; genuine old04f6-owner import1/0 at52d after separately retained setup failure; strict8.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Genuine historical-query RED and no-Remove integrity control retained."
+      ],
+      "previous_current_state": "source-integrated-focused-and-compatibility-green-final-qualification-pending",
+      "previous_source_repair_sha256": "5e9df6d976bc5608aa9e0c16425cc773f7c7a483bf0560416cc3da47c31e8c2d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F039",
+      "label": "F039",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "37ec10c205bc7d24c0676c504d3a4944c873dade",
+          "e47f4de5c7983228184e221215b5aa013736e593",
+          "5ec396fd53bb451ff46c974154abaec5ed06b57b"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Actual enforcing native eight-receipt trajectory under unchanged10000ms fence and image cost remain open."
+      },
+      "retained_evidence_scope": "Authenticated compaction-read reuse and kernel maintenance integrated; N16 history1/0 at98d with unchanged custody.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Actual enforcing native eight-receipt trajectory under unchanged10000ms fence and image cost remain open."
+      ],
+      "previous_current_state": "source-integrated-requirement-focused-acceptance-pending",
+      "previous_source_repair_sha256": "cf9007845436ab264a686b08790c2e108474dbbc0a01bde365bc368fd5f91a67"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F043",
+      "label": "F043",
+      "source_state": "now-mutex-source-integrated-history-audit-redesign-later-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "c9c846cfbe51b5e737c972e65bebe262f0d8b009",
+          "1c6222f7952d7817b8f3c30fcdbacb872ad49c45"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "now mutex source-integrated; history audit redesign later",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Complete-history audit architecture explicitly stays later."
+      },
+      "retained_evidence_scope": "Pipeline Original-first record; reached composed host/mutex36/0 at e638 plus owning/strict scopes.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Complete-history audit architecture explicitly stays later."
+      ],
+      "previous_current_state": "mutex-source-integrated-focused-green-complete-history-audit-split-later",
+      "previous_source_repair_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F073",
+      "label": "F073",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      },
+      "retained_evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "e02453195ed0c033877d928616f3dfe23aad59ccbe5bf68e890239108d12230d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F074",
+      "label": "F074",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      },
+      "retained_evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "e02453195ed0c033877d928616f3dfe23aad59ccbe5bf68e890239108d12230d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F078",
+      "label": "F078",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "92959e125407f1f4d652b8a64db9e99e220d5ff5"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; operational acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      },
+      "retained_evidence_scope": "Protected prerequisite1176 definition/main ancestry receipt and local contract evidence retained. F074 critical non-success tombstones are intentional accepted behavior.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. App/ruleset enforcement and protected per-PR landing experiment remain open; source/doc disclaimers do not enforce protections."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "e02453195ed0c033877d928616f3dfe23aad59ccbe5bf68e890239108d12230d"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F076",
+      "label": "F076",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; real workload acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Required designated Linux/X64 image/syscall/workload proof remains pending. No permissions inferred from candidate traces."
+      },
+      "retained_evidence_scope": "Pinned default-profile derivation and canonical runner/provenance source proof accepted.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Required designated Linux/X64 image/syscall/workload proof remains pending. No permissions inferred from candidate traces."
+      ],
+      "previous_current_state": "source-integrated-scoped-source-acceptance-final-pending",
+      "previous_source_repair_sha256": "d2df2f1adf56d71ae4a75f2507f68d92a9c1cf97aa01e38e1f94c75ed9d9ffb8"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F079",
+      "label": "F079",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "de519d7776d8c9ea101d1aec271fd0be54dca632",
+          "a0062b0e0ae2d1edd9d732b1be4f6e89d3fb9dc1",
+          "840a71adaafababc9ad8f61a8682994a2342d3a4"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Valuable fork archives stay preserved; whole graph unchanged remains false."
+      },
+      "retained_evidence_scope": "Unused-lock/fork gates and generator proof integrated;39fcc current0e6 canonical Vet0 and Deny four categories0;580 full/9 partial/729 existing exemptions unchanged.",
+      "remaining_acceptance": [
+        "Current composed owning/default/PQ/platform/cold, exact native/trusted/hosted evidence, final reviews and protected landing. Historical component PASS is not final qualification. Valuable fork archives stay preserved; whole graph unchanged remains false."
+      ],
+      "previous_current_state": "source-integrated-dormant9-gate-generators-VetDeny-and-SOURCEpin2-scoped-accepted-final-pending",
+      "previous_source_repair_sha256": "822a8bea948d7ff82e0b045ae4fdf287158279cec87b0bc8aa7432317c498006"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F075",
+      "label": "F075",
+      "source_state": "bounded-r1-source-integrated-durable-unit-later-local-unpublished-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "bdc8f63ea2a30b7f487ef859a27cd808d414311b"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "bounded r1 source-integrated; durable unit remains later local/unpublished",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Durable binary/source/recipe/notices unit is inseparable and LOCAL/UNPUBLISHED. Exact checker/self-test pin requirement and accepted source-coverage/reconstruction findings remain later review/integration work. Any defect only in that unpublished unit is not a new foundation blocker. Final native image/trusted acceptance remains open."
+      },
+      "retained_evidence_scope": "Actual measured two-package zlib/zlib-dev r1 lock +Docker/checker pins integrated; original lock failures and203 APK measurements preserved.",
+      "remaining_acceptance": [
+        "Durable binary/source/recipe/notices unit is inseparable and LOCAL/UNPUBLISHED. Exact checker/self-test pin requirement and accepted source-coverage/reconstruction findings remain later review/integration work. Any defect only in that unpublished unit is not a new foundation blocker. Final native image/trusted acceptance remains open."
+      ],
+      "previous_current_state": "bounded-r1-source-integrated-offline-closure-local-review-pending",
+      "previous_source_repair_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY",
+      "label": "MINISW-NATIVE-DENY",
+      "source_state": "diagnostics-and-bounded-journal-source-integrated-native-refusal-acceptance-open",
+      "source_repair": {
+        "commits": [
+          "dab61de13859d8396b50e76a4c492d064b06ba60",
+          "5ec396fd53bb451ff46c974154abaec5ed06b57b"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "diagnostic and bounded journal source integrated; actual native acceptance open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass."
+      },
+      "retained_evidence_scope": "Private fixed-stage diagnostics and N16 bounded-history GREEN preserved. Separate preparation helper owns current trace.",
+      "remaining_acceptance": [
+        "Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass."
+      ],
+      "previous_current_state": "diagnostics-and-bounded-journal-green-production-native-refusal-acceptance-open",
+      "previous_source_repair_sha256": "ec507c191cd68a7ccd2999ec3b210b3776bd9b236565156fa4f798d1c23c0e5b"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261006:F077",
+      "label": "F077",
+      "source_state": "D-P4-P6-P5-H-and-identity-revocation-ports-source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "95f0aea957043edf2bf98b94c3157364411a7c64",
+          "18268d160e89b931be066fa5c42354f359f044e4",
+          "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+          "07c5628a22f2549e7a3e7eda73ec2944db12fcb8",
+          "a7f3bcc5c1b5263f20cea16115cefae27e0fb239",
+          "8010adbdcfee20b317cae797a2768b8c552177fb",
+          "35848a4fa919cdcc7edd1ce750840bae4c74d2d0",
+          "fa6943194c48fc5ca02fc9ee12ca2d8a10408260",
+          "3764d4ac48dd88792f62de4de6d4fba319e547e0"
+        ],
+        "observed_source_head": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+        "observed_source_tree": "8f408d4e1949e220c33d53a17a38bfebe37bf972",
+        "application": "D/P4/P6/P5/H and identity/revocation fixture ports source-integrated; final acceptance pending",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Capture the exact final integrated F077 combined Original, preservation, identity, currency, dual-census, attempt-ceiling and revocation suites, plus complete checker/mutation/strict gates. Preserve prior genuine RED, setup/fixture-selector and unsuccessful outcomes separately. Complete the outstanding check-security-definitions.test.py fixture port and its trusted-definition prerequisite counterpart, then qualify the dedicated App/ruleset publisher and per-PR protected landing boundary. Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, terminal exact-source hosted checks, final independent review and protected #1160 landing. Source integration and earlier scoped/private GREEN are not full qualification."
+      },
+      "retained_evidence_scope": "P5/H integrated at 07c5628a22; identity ports a7f3bcc5c1/8010adbdcf/35848a4fa9 and revocation ports fa6943194c/3764d4ac48 integrated. Final combined suite, old-definition fixture port, trusted-definition prerequisite, native/trusted/hosted and protected landing remain pending.",
+      "remaining_acceptance": [
+        "Capture the exact final integrated F077 combined Original, preservation, identity, currency, dual-census, attempt-ceiling and revocation suites, plus complete checker/mutation/strict gates. Preserve prior genuine RED, setup/fixture-selector and unsuccessful outcomes separately.",
+        "Complete the outstanding check-security-definitions.test.py fixture port and its trusted-definition prerequisite counterpart, then qualify the dedicated App/ruleset publisher and per-PR protected landing boundary.",
+        "Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, terminal exact-source hosted checks, final independent review and protected #1160 landing. Source integration and earlier scoped/private GREEN are not full qualification."
+      ],
+      "previous_current_state": "source-integrated-focused-green-final-acceptance-pending",
+      "previous_source_repair_sha256": "e02453195ed0c033877d928616f3dfe23aad59ccbe5bf68e890239108d12230d",
+      "followup_previous_current_state": "D-P4-P6-source-integrated-P5-H-and-fixture-ports-pending-integration-and-final-acceptance"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261007:effects:trusted-clock",
+      "label": "EF-COMP/trusted-clock",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "4cd60463f8995a03db300ac82109a58189302f66"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; exact scoped evidence retained; final acceptance pending",
+        "basis": "The original effects:trusted-clock obligation aliases the accepted effect-port clock composition repair. Production alert and issuance backends receive the owner clock; other EF-COMP changes and its scoped controls remain separately mapped."
+      },
+      "alias_basis": "The original effects:trusted-clock obligation aliases the accepted effect-port clock composition repair. Production alert and issuance backends receive the owner clock; other EF-COMP changes and its scoped controls remain separately mapped.",
+      "remaining_acceptance": [
+        "Complete exact combined-source owning/default/PQ/platform/cold and immutable native/trusted/hosted qualification plus final independent review and protected landing. Scoped EF controls do not qualify the entire operational contract."
+      ],
+      "previous_current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "previous_source_repair_sha256": "11c9e24786e5fbe99c39a78693fee550764056d7a2bb6d5bbf4adbeab987e241"
+    },
+    {
+      "requirement_id": "incoming-pr1160-review-20261007:effects:shared-freeze-fence",
+      "label": "EF-COMP/shared-freeze-fence",
+      "source_state": "source-integrated-final-acceptance-pending",
+      "source_repair": {
+        "commits": [
+          "5d4d50f2bbd5907980cb108b9a8410f4771d7c61",
+          "2ebf718dccc4f08ebc749610ae74e88b4eacbde5",
+          "a8fdeb457c7e8f919222b616dc50e5015aeaacdb"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "source-integrated; exact scoped evidence retained; final acceptance pending",
+        "basis": "The original repeated-FreezeIssuance obligation maps to the one-freeze-per-plan refusal and the independently accepted same-lineage contribution/removal finality repairs. The latter preserve other live plans when one contribution is lifted; maintenance/TTL/native acceptance remains separate."
+      },
+      "alias_basis": "The original repeated-FreezeIssuance obligation maps to the one-freeze-per-plan refusal and the independently accepted same-lineage contribution/removal finality repairs. The latter preserve other live plans when one contribution is lifted; maintenance/TTL/native acceptance remains separate.",
+      "remaining_acceptance": [
+        "Complete exact combined-source owning/default/PQ/platform/cold and immutable native/trusted/hosted qualification plus final independent review and protected landing. Scoped EF controls do not qualify the entire operational contract."
+      ],
+      "previous_current_state": "confirmed-review-obligation-pending-integration-and-final-acceptance",
+      "previous_source_repair_sha256": "11c9e24786e5fbe99c39a78693fee550764056d7a2bb6d5bbf4adbeab987e241"
+    }
+  ],
+  "integration_aliases": [
+    {
+      "original": "c472f5c79e",
+      "integrated_alias": "8fb315b9dd",
+      "original_patch_id": "63c829c9062702dcd457e35d78acb6a639d182e9",
+      "integrated_patch_id": "63c829c9062702dcd457e35d78acb6a639d182e9",
+      "equal": true
+    },
+    {
+      "original": "75127f0a2f",
+      "integrated_alias": "8efb417846",
+      "original_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+      "integrated_patch_id": "ff007625463c0a51e3d726b725bcf3361d7cbde9",
+      "equal": true
+    },
+    {
+      "original": "2fb5bcfe4b",
+      "integrated_alias": "c28fd9797d",
+      "original_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+      "integrated_patch_id": "8ef9f92d90f01e5af65fd79c6d906f65084efb14",
+      "equal": true
+    },
+    {
+      "original": "b83529a504",
+      "integrated_alias": "cd0d2dcb4a",
+      "original_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+      "integrated_patch_id": "413c5639438cc134af534f606bc93cd2b1b144f2",
+      "equal": true
+    }
+  ],
+  "effect_composition_alias": {
+    "board_id": "EF-COMP",
+    "canonical_row_added": false,
+    "source_train": [
+      "4cd60463f8995a03db300ac82109a58189302f66",
+      "10e4fc1bd3ff7a33c21741b007eaf7499c8b01a5",
+      "60c4e895424925d579c02d91a611959978aefbe4",
+      "125ae37d5f984dd1612a0b136dec1f2c539f8880",
+      "f268ee5d951bdd0cdb7dce0ccba3f962f4b4ff88",
+      "c2275b364e1e65edd8056f8846d8b14da355acc5",
+      "ba6e6fd8224b148d0c91ac6cb98e6d9eda59f513",
+      "8fb315b9dd8d341b51299c9eca09156ab53c51bf"
+    ],
+    "evidence": "Accepted source train and retained per-kind Original evidence; no extra duplicate EF-COMP requirement."
+  },
+  "new_requirement": {
+    "requirement_id": "incoming-pr1160-review-20261008:native:NRB001",
+    "source_repair": {
+      "commits": [
+        "41939f1094f06a0483d604a0d6be697a2f2075d7",
+        "7d115b70564e3f936c418b50d90e0445e8a6170b",
+        "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+        "a13d10b58dba99d4442500de7b62fb54a56be197",
+        "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+      ],
+      "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+      "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/budget_custody.rs",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite/preflight.rs"
+      ],
+      "application": "Authenticated parent selection and full typed authorization-artifact vector refusal integrated; final acceptance pending.",
+      "origin_to_integration": {
+        "b5a44916d76c0448779f350729b21046872a3ca4": "41939f1094f06a0483d604a0d6be697a2f2075d7",
+        "322e0897a32b56aa34607f03273d77ae325fec72": "7d115b70564e3f936c418b50d90e0445e8a6170b",
+        "fd9b1c6192bbdeb7a200f1926d4b155a1ba5ba86": "27c426c96628a952fb9ebe3fcc15fa84efeabc7b",
+        "71c2000999f6b7df75201e525310d193401afbb0": "a13d10b58dba99d4442500de7b62fb54a56be197"
+      },
+      "scope": "Read-only owned store authentication. Native EOF causation and unprivileged storage-write reachability are not established."
+    },
+    "evidence": [
+      {
+        "path": "/tmp/pr1160-broker-readback-triage-20261008/original-runtime/nrb001-original-test-receipt.json",
+        "sha256": "2d97b1b8ef7853d4ee038623b5128e66bb12012832436d959e68d68a4c4527f7",
+        "result": "Genuine owning Original:2failed/2passed; source42ee. Earlier fixture setup failures remain separate.",
+        "scope": "Direct owning SQLite selector Original; not native EOF causation."
+      },
+      {
+        "path": "/tmp/pr1160-broker-readback-triage-20261008/repair-runtime/nrb001-repair-test-receipt.json",
+        "sha256": "d24b98c181608e81faa5c87df03b45b089f44bca12da1c0a513ac34087679978",
+        "result": "Primary isolated selector repair has5passing owning cases atb5a449.",
+        "scope": "Owned nonce aliases versus real supplemental parents; physical event/global-commit authentication."
+      },
+      {
+        "path": "/tmp/pr1160-nrb001-followup/root-original-runtime/nrb001-member-original-test-receipt.json",
+        "sha256": "a5609d559ef329570bd06657163f74d095e63381c2dc62fe30e9ab34f52cf739",
+        "result": "Additional physical other-member Original:5passed/1genuine failed Ok(None) at322e.",
+        "scope": "Full authorization-artifact vector must match the authenticated original; no unprivileged storage injection claim."
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_store_sqlite-runtime.json",
+        "sha256": "7a610d8718862072950395e4ad427ad24fb02461b59a0361bb6b90dc06b678b3",
+        "result": "Selected88SQLite execution-nonce cases passed.",
+        "scope": "Actual a13d Source/binary/log-bound module scope, not all SQLite/native qualification.",
+        "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/chio_control_plane-runtime.json",
+        "sha256": "076ad6a260e1342453a98f57d9b389459ef8cb26bed536157301978d92822d9a",
+        "result": "Exact broker-authority case passed1/0.",
+        "scope": "Actual a13d Source/binary/log-bound owning control, not full native trajectory.",
+        "source": "a13d10b58dba99d4442500de7b62fb54a56be197"
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-receipt.json",
+        "sha256": "6eaabafb6f07994360f6402aca359c32e31751c0b3e76874f452a98486cd90e2",
+        "result": "Initial strict run exited101on test-only useless_vec.",
+        "scope": "Retained unsuccessful lint capture; no production source fault attributed."
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-clippy-array-receipt.json",
+        "sha256": "2cd60b1014d589556fb9e400409a7fb32b83ca09c4e20a7ddd1d550b9f4a5dd2",
+        "result": "Both owners all-target strict Clippy exited0after array-only correction.",
+        "scope": "a13d plus exact dirtyc679828f, subsequently committed asa594; no ignored warnings or waived gates."
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/nrb001-source-array-tests-receipt.json",
+        "sha256": "af504472531cc7e832a654043c8e7b2b49acd209f00de490fcd8df649e284672",
+        "result": "SQLite selectors6passed; control-plane selection0filtered is not a runtime PASS.",
+        "scope": "Exact array-only correction captured before commita594; all selector corruption/no-effect assertions unchanged."
+      },
+      {
+        "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/pipeline-compose/nrb001-source/array-commit.json",
+        "sha256": "ec00191b652f64a5b66709aee00ebd31929cdfc7786626f4a29fa9c58ed77ebb",
+        "result": "Array-only followup commit links strict0, selectors6/0, format0and diff hygiene0.",
+        "scope": "One test-fixture container change; no production mutation.",
+        "source": "a5942b8ca6a30ed69a6f8c2cb73464a3cf059f77"
+      },
+      {
+        "path": "/tmp/pr1160-nrb001-independent-review/P2-SOURCE-CLOSURE.json",
+        "sha256": "bd42a16defe430bd943d06aa5832baf14dc19bde17b2607eb5663768fe07a7cd",
+        "result": "Finite independent source closure accepted; original and earlier-message mismatch retained.",
+        "scope": "Owned full vector equality; no new API/SQL/schema/serialization and no whole-broker causal claim."
+      }
+    ],
+    "remaining_acceptance": [
+      "Keep primary owning Original42ee2RED/2PASS and secondary322e5PASS/1RED, the first5/1refusal-location mismatch and initial strict101as separate historical outcomes. The migrated typed refusal and array correction do not weaken the corruption/no-effect oracles.",
+      "Actual a13d owner SQLite88/0and broker1/0plus the array-followup selectors6/0and both-owner strict0are bounded component acceptance. Native EOF causal attribution remains unproven.",
+      "Complete immutable final-source owning/default/PQ/platform/cold, native, trusted, hosted, final review and protected #1160 landing; source integration is not full qualification."
+    ]
+  },
+  "current_boundaries": {
+    "F077": "P5/H integrated at 07c5628a22; identity ports a7f3bcc5c1/8010adbdcf/35848a4fa9 and revocation ports fa6943194c/3764d4ac48 integrated. Final combined suite, old-definition fixture port, trusted-definition prerequisite, native/trusted/hosted and protected landing remain pending.",
+    "F075": "Measured r1prerequisite integrated; durable APK/binary/source/recipe/notices unit remains later, local and unpublished under Root ruling.",
+    "native": "Actual eight-receipt enforcing trajectory with unchanged10000ms fence and exact current artifacts is pending. NRB EOFcausation unproven.",
+    "final_acceptance": "Native/cold/trusted/hosted/independent-review/protected-landing acceptance remains open. No source/definition authorization rotated."
+  },
+  "staging_only": true,
+  "runtime_rerun": false,
+  "source_or_coord_mutation": false,
+  "historical_preservation": "Current source_repair cells are retained verbatim in the same current row as previous observations before replacement. Every preexisting verification_evidence and historical field is byte-preserved. Older root metadata/checkpoints remain dated history; this finite checkpoint supersedes only named current views.",
+  "baseline_source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+  "baseline_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+  "F077_followup": {
+    "source_checkpoint": "3764d4ac48dd88792f62de4de6d4fba319e547e0",
+    "semantic_current_key_updated": "incoming-pr1160-review-20261006:F077",
+    "integrated_commits": [
+      "07c5628a22f2549e7a3e7eda73ec2944db12fcb8",
+      "a7f3bcc5c1b5263f20cea16115cefae27e0fb239",
+      "8010adbdcfee20b317cae797a2768b8c552177fb",
+      "35848a4fa919cdcc7edd1ce750840bae4c74d2d0",
+      "fa6943194c48fc5ca02fc9ee12ca2d8a10408260",
+      "3764d4ac48dd88792f62de4de6d4fba319e547e0"
+    ],
+    "all_other_requirement_facts_preserved_at": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+    "original_stage_audit_sha256": "af86fd26f63f0b2a8f6be9587c4691053721dfc29789fd6739cf0f9d1d44b7a8",
+    "runtime_rerun": false,
+    "qualified": false,
+    "merged": false
+  }
+}

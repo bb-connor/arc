@@ -13,14 +13,13 @@
 //
 // Scope of this partial row: only verifier-side floor enforcement is
 // exercised (`verify_capability_with_floor` -> `CapabilityToken::
-// verify_signature_with_floor`). The hybrid-PQ wire-format SIGNING
-// path (kernel minting hybrid-prefix signatures with ML-DSA-65 alongside
-// Ed25519) is not wired, so the row "verifiers MUST dispatch from the
-// signature prefix" is structural-only and that signing path is out of
-// scope here. This conformance test pins the verifier's REJECTION of a
-// downgrade attempt under `pq_required` -- the front line of defense
-// that prevents an attacker from getting a classical-only token
-// admitted on a PQ-required kernel.
+// verify_signature_with_floor`). Hybrid ML-DSA-65 signing and verification
+// are available behind the `pq` feature and have dedicated integration
+// tests, but this default conformance target does not enable that feature.
+// It therefore does not prove stripped or corrupted PQ components across
+// capability, receipt, and compliance-certificate artifact families. This
+// row pins rejection of the classical substitution that reaches a
+// PQ-required capability verifier.
 //
 // Three sub-vectors:
 //
@@ -39,13 +38,13 @@
 //      configured strings into this enum.
 //
 // Production call sites:
-//   `crates/chio-kernel-core/src/capability_verify.rs:148`
+//   `crates/kernel/chio-kernel-core/src/capability_verify.rs:147`
 //     (`verify_capability_with_floor`).
-//   `crates/chio-core-types/src/capability.rs` (`CapabilityCryptoFloor`,
-//     `CapabilityToken::verify_signature_with_floor`).
+//   `crates/core/chio-core-types/src/capability/token.rs:936`
+//     (`CapabilityToken::verify_signature_with_floor`).
 //
 // Revert-to-prove-it-fails recipe:
-// In `crates/chio-kernel-core/src/capability_verify.rs`, locate the
+// In `crates/kernel/chio-kernel-core/src/capability_verify.rs`, locate the
 // `match token.verify_signature_with_floor(crypto_floor) { ... }`
 // block inside `verify_capability_with_floor` (around line 162).
 // Replace the

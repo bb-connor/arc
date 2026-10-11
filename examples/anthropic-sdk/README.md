@@ -36,6 +36,8 @@ The script defaults to the Docker quickstart endpoints:
 - `CHIO_BASE_URL=http://127.0.0.1:8931`
 - `CHIO_CONTROL_URL=http://127.0.0.1:8940`
 - `CHIO_AUTH_TOKEN=demo-token`
+- `CHIO_ADMIN_TOKEN=demo-admin-token`
+- `CHIO_CONTROL_TOKEN=demo-control-token`
 
 `--dry-run` exercises the Chio SDK path only. It initializes the hosted session,
 lists tools, performs a governed `echo_text` call, and resolves the resulting
@@ -56,7 +58,9 @@ Optional environment variables:
 - `ANTHROPIC_MODEL`: defaults to `claude-sonnet-4-20250514`
 - `CHIO_BASE_URL`: hosted edge base URL
 - `CHIO_CONTROL_URL`: trust service base URL
-- `CHIO_AUTH_TOKEN`: bearer token accepted by both services
+- `CHIO_AUTH_TOKEN`: session bearer token the hosted edge accepts
+- `CHIO_ADMIN_TOKEN`: admin bearer token for the edge's session trust route
+- `CHIO_CONTROL_TOKEN`: control bearer token the trust service accepts for receipt queries
 
 See also:
 

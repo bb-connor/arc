@@ -32,6 +32,9 @@ use chio_kernel::admission_operation::{
 
 use super::*;
 
+mod authority_set;
+mod decision_time;
+
 const FACTOR_AUTHORITY_CONFIG_DIGEST_DOMAIN: &[u8] =
     b"chio.factor.assignment-authority-config.digest.v1\0";
 const FACTOR_ACTIVE_AUTHORITY_SET_DIGEST_DOMAIN: &[u8] =
@@ -642,120 +645,6 @@ struct FactorAssignmentParticipantPreimageV1<'a> {
     resulting_resource_fence: u64,
 }
 
-impl SqliteAdmissionOperationStore {
-    pub fn factor_assignment_authority_set_head(
-        &self,
-    ) -> Result<Option<FactorAssignmentAuthoritySetHeadV1>, AdmissionOperationStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let head = transaction
-            .query_row(
-                r#"
-                SELECT generation, active_set_digest
-                FROM factor_assignment_authority_sets
-                ORDER BY generation DESC
-                LIMIT 1
-                "#,
-                [],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()
-            .map_err(sqlite_error)?
-            .map(|(generation, digest)| {
-                Ok::<_, AdmissionOperationStoreError>(FactorAssignmentAuthoritySetHeadV1 {
-                    generation: stored_u64(generation, "factor_authority_set_generation")?,
-                    digest,
-                })
-            })
-            .transpose()?;
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(head)
-    }
-
-    pub fn activate_factor_assignment_authorities(
-        &self,
-        authorities: FactorAssignmentAuthorityRegistryV1,
-        expected_generation: u64,
-        active_fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
-    ) -> Result<SqliteFactorAssignmentStore, AdmissionOperationStoreError> {
-        let active_set_digest = authorities.active_set_digest().to_owned();
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, Some(active_fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
-        let current = transaction
-            .query_row(
-                r#"
-                SELECT generation, active_set_digest
-                FROM factor_assignment_authority_sets
-                ORDER BY generation DESC
-                LIMIT 1
-                "#,
-                [],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()
-            .map_err(sqlite_error)?;
-        let current_generation = current
-            .as_ref()
-            .map(|(generation, _)| stored_u64(*generation, "factor_authority_set_generation"))
-            .transpose()?
-            .unwrap_or(0);
-        if current_generation != expected_generation {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        let generation = if current
-            .as_ref()
-            .is_some_and(|(_, digest)| digest == &active_set_digest)
-        {
-            current_generation
-        } else {
-            let generation = current_generation
-                .checked_add(1)
-                .ok_or_else(|| invariant("factor authority set generation overflow"))?;
-            let previous_digest = current.as_ref().map(|(_, digest)| digest.as_str());
-            transaction
-                .execute(
-                    r#"
-                    INSERT INTO factor_assignment_authority_sets (
-                        generation, active_set_digest, previous_active_set_digest,
-                        activated_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
-                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                    "#,
-                    params![
-                        sqlite_i64(generation, "factor_authority_set_generation")?,
-                        &active_set_digest,
-                        previous_digest,
-                        sqlite_i64(trusted_now_unix_ms, "factor_authority_set_activated_at")?,
-                        &active_fence.store_uuid,
-                        &active_fence.lease_id,
-                        sqlite_i64(active_fence.owner_epoch, "factor_authority_set_owner_epoch")?,
-                    ],
-                )
-                .map_err(factor_sqlite_error)?;
-            self.serving_owner
-                .append_global_commit(
-                    &transaction,
-                    "factor_assignment_authority_set",
-                    "factor_assignment_authority_set",
-                    "active",
-                    generation,
-                )
-                .map_err(map_owner_error)?;
-            generation
-        };
-        self.commit_write(transaction)?;
-        if generation != current_generation {
-            self.sync_after_write(&connection)?;
-        }
-        Ok(SqliteFactorAssignmentStore {
-            store: self.clone(),
-            authorities: Arc::new(authorities),
-            authority_set_generation: generation,
-        })
-    }
-}
-
 impl SqliteFactorAssignmentStore {
     pub fn commit_factor_assignment(
         &self,
@@ -790,7 +679,11 @@ impl SqliteFactorAssignmentStore {
                 "factor assignment signer is not the active verification authority",
             ));
         }
-        verify_trusted_time(&transaction, commit.trusted_now_unix_ms)?;
+        verify_trusted_time(
+            &transaction,
+            commit.trusted_now_unix_ms,
+            &self.store.serving_owner,
+        )?;
         verify_participant_recovery_tx(
             &transaction,
             &self.store.serving_owner,
@@ -809,12 +702,12 @@ impl SqliteFactorAssignmentStore {
                 "factor assignment targets a different obligation atom",
             ));
         }
-        let reason = classify_not_applied(
+        let reason = decision_time::classify_live(
+            &transaction,
             &current,
             &submission,
-            commit.request,
-            commit.offer,
-            commit.trusted_now_unix_ms,
+            &commit,
+            &self.store.serving_owner,
         )?;
         let (result, successor) = match reason {
             Some(reason) => (
@@ -1471,7 +1364,10 @@ fn load_factor_assignment_result_tx(
     }))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn insert_factor_assignment_result(
     transaction: &Transaction<'_>,
     commit: &FactorAssignmentCommitV1<'_>,
@@ -1589,7 +1485,10 @@ fn insert_factor_assignment_result(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn participant_digest(
     authority_set_generation: u64,
     authority_set_digest: &str,
@@ -1635,7 +1534,10 @@ fn participant_digest(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn participant_digest_from_parts(
     operation_id: &str,
     authority_set_generation: u64,
@@ -1668,7 +1570,10 @@ fn participant_digest_from_parts(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn digest_participant_preimage(
     operation_id: &str,
     authority_set_generation: u64,
@@ -1779,14 +1684,9 @@ fn decode_factor_json<T>(bytes: &[u8], label: &str) -> Result<T, AdmissionOperat
 where
     T: for<'de> Deserialize<'de> + Serialize,
 {
-    let value: T = serde_json::from_slice(bytes)
-        .map_err(|error| invariant(format!("factor {label} is invalid: {error}")))?;
-    let canonical = canonical_json_bytes(&value)
-        .map_err(|error| invariant(format!("factor {label} encoding failed: {error}")))?;
-    if canonical != bytes {
-        return Err(invariant(format!("factor {label} is not canonical")));
-    }
-    Ok(value)
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| invariant(format!("factor {label} is invalid: {error}")))
 }
 
 fn factor_sqlite_error(error: rusqlite::Error) -> AdmissionOperationStoreError {
@@ -2010,37 +1910,6 @@ fn load_status_head(
     .ok_or_else(|| invariant("factor assignment status head is not durable"))
 }
 
-fn classify_not_applied(
-    current: &DurableObligationV1,
-    submission: &VerifiedFactorAssignmentSubmission,
-    request: &NormalizedAssignmentRequestV1,
-    offer: &AssignmentOfferV1,
-    trusted_now_unix_ms: u64,
-) -> Result<Option<AssignmentNotAppliedReasonV1>, AdmissionOperationStoreError> {
-    if trusted_now_unix_ms < submission.status_proof.body().issued_at_unix_ms()
-        || trusted_now_unix_ms < submission.authorization.body().issued_at_unix_ms()
-        || trusted_now_unix_ms < offer.issued_at_unix_ms()
-        || trusted_now_unix_ms < request.effective_at_unix_ms()
-    {
-        return Err(invariant(
-            "factor assignment artifacts are not yet effective",
-        ));
-    }
-    classify_assignment_not_applied(&AssignmentNotAppliedClassificationV1 {
-        atom: current.atom(),
-        request,
-        offer,
-        authorization: &submission.authorization,
-        status_proof: &submission.status_proof,
-        observed_disposition: current.disposition(),
-        observed_settlement_lifecycle: current.settlement_lifecycle(),
-        observed_snapshot_version: current.snapshot_version(),
-        observed_resource_fence: current.resource_fence(),
-        decided_at_unix_ms: trusted_now_unix_ms,
-    })
-    .map_err(factor_error)
-}
-
 fn assignment_successor(
     operation: &AdmissionOperationV1,
     request: &NormalizedAssignmentRequestV1,
@@ -2093,149 +1962,9 @@ fn assignment_successor(
         .map_err(obligation_error)
 }
 
-fn build_acknowledgement(
-    commit: &FactorAssignmentCommitV1<'_>,
-    authority: &FactorAssignmentVerificationAuthorityV1,
-    submission: &VerifiedFactorAssignmentSubmission,
-    current: &DurableObligationV1,
-    successor: &ObligationDispositionRecordV1,
-) -> Result<VerifiedAssignmentAcknowledgementV1, AdmissionOperationStoreError> {
-    let agreement = submission.authorization.agreement();
-    let body = AssignmentAcknowledgementBodyV1::new(AssignmentAcknowledgementInputV1 {
-        operation_id: commit
-            .operation
-            .binding()
-            .operation_id()
-            .as_str()
-            .to_owned(),
-        normalized_request_digest: commit.request.digest().map_err(factor_error)?,
-        agreement_id: agreement.body().agreement_id().to_owned(),
-        agreement_body_digest: agreement.body_digest().to_owned(),
-        obligation_id: current.atom().obligation_id().to_owned(),
-        obligation_atom_digest: current.atom().digest().map_err(obligation_error)?,
-        buyer_id: commit.request.buyer_id().to_owned(),
-        buyer_settlement_destination_ref: commit
-            .request
-            .buyer_settlement_destination_ref()
-            .to_owned(),
-        assignment_authorization_set_digest: submission.authorization.digest().to_owned(),
-        status_proof_digest: submission.status_proof.envelope_digest().to_owned(),
-        prior_disposition_version: current.disposition().version(),
-        prior_disposition_lifecycle_fence: current.disposition().lifecycle_fence(),
-        prior_disposition_digest: current
-            .disposition()
-            .digest(current.atom())
-            .map_err(obligation_error)?,
-        resulting_disposition_version: successor.version(),
-        resulting_disposition_lifecycle_fence: successor.lifecycle_fence(),
-        resulting_disposition_digest: successor.digest(current.atom()).map_err(obligation_error)?,
-        expected_snapshot_version: current.snapshot_version(),
-        resulting_snapshot_version: current
-            .snapshot_version()
-            .checked_add(1)
-            .ok_or_else(|| invariant("factor assignment snapshot version overflow"))?,
-        expected_resource_fence: current.resource_fence(),
-        resulting_resource_fence: current
-            .resource_fence()
-            .checked_add(1)
-            .ok_or_else(|| invariant("factor assignment resource fence overflow"))?,
-        authority_id: authority.result_authority_id.clone(),
-        authority_key_epoch: authority.result_authority_key_epoch,
-        effective_at_unix_ms: commit.request.effective_at_unix_ms(),
-        due_at_unix_ms: current.atom().due_at_unix_ms(),
-        acknowledged_at_unix_ms: commit.trusted_now_unix_ms,
-    })
-    .map_err(factor_error)?;
-    let signed = SignedAssignmentAcknowledgementV1::sign(body, &commit.signing_authority.signer)
-        .map_err(factor_error)?;
-    verify_assignment_acknowledgement(
-        &signed.canonical_bytes().map_err(factor_error)?,
-        &AssignmentAcknowledgementVerificationV1 {
-            atom: current.atom(),
-            request: commit.request,
-            claim: &submission.claim,
-            offer: commit.offer,
-            authorization: &submission.authorization,
-            status_proof: &submission.status_proof,
-            resulting_disposition: successor,
-            trust: &authority.result_trust,
-        },
-    )
-    .map_err(factor_error)
-}
-
-fn build_not_applied(
-    commit: &FactorAssignmentCommitV1<'_>,
-    authority: &FactorAssignmentVerificationAuthorityV1,
-    submission: &VerifiedFactorAssignmentSubmission,
-    current: &DurableObligationV1,
-    reason: AssignmentNotAppliedReasonV1,
-) -> Result<VerifiedAssignmentNotAppliedV1, AdmissionOperationStoreError> {
-    let agreement = submission.authorization.agreement();
-    let body = AssignmentNotAppliedBodyV1::new(AssignmentNotAppliedInputV1 {
-        operation_id: commit
-            .operation
-            .binding()
-            .operation_id()
-            .as_str()
-            .to_owned(),
-        normalized_request_digest: commit.request.digest().map_err(factor_error)?,
-        agreement_id: agreement.body().agreement_id().to_owned(),
-        agreement_body_digest: agreement.body_digest().to_owned(),
-        obligation_id: current.atom().obligation_id().to_owned(),
-        obligation_atom_digest: current.atom().digest().map_err(obligation_error)?,
-        assignment_authorization_set_digest: submission.authorization.digest().to_owned(),
-        status_proof_digest: submission.status_proof.envelope_digest().to_owned(),
-        expected_disposition_version: commit.request.expected_disposition_version(),
-        expected_disposition_lifecycle_fence: commit.request.expected_disposition_lifecycle_fence(),
-        expected_settlement_lifecycle_version: commit
-            .request
-            .expected_settlement_lifecycle_version(),
-        expected_settlement_lifecycle_fence: commit.request.expected_settlement_lifecycle_fence(),
-        expected_snapshot_version: submission.status_proof.body().snapshot_version(),
-        expected_resource_fence: submission.status_proof.body().resource_fence(),
-        observed_disposition_version: current.disposition().version(),
-        observed_disposition_lifecycle_fence: current.disposition().lifecycle_fence(),
-        observed_disposition_digest: current
-            .disposition()
-            .digest(current.atom())
-            .map_err(obligation_error)?,
-        observed_settlement_lifecycle_version: current.settlement_lifecycle().version(),
-        observed_settlement_lifecycle_fence: current.settlement_lifecycle().lifecycle_fence(),
-        observed_settlement_lifecycle_digest: current
-            .settlement_lifecycle()
-            .digest(current.atom())
-            .map_err(obligation_error)?,
-        observed_snapshot_version: current.snapshot_version(),
-        resource_fence: current.resource_fence(),
-        reason,
-        no_mutation_proof_digest: current.head_digest().to_owned(),
-        authority_id: authority.result_authority_id.clone(),
-        authority_key_epoch: authority.result_authority_key_epoch,
-        decided_at_unix_ms: commit.trusted_now_unix_ms,
-    })
-    .map_err(factor_error)?;
-    let signed = SignedAssignmentNotAppliedV1::sign(body, &commit.signing_authority.signer)
-        .map_err(factor_error)?;
-    verify_assignment_not_applied(
-        &signed.canonical_bytes().map_err(factor_error)?,
-        &AssignmentNotAppliedVerificationV1 {
-            atom: current.atom(),
-            request: commit.request,
-            claim: &submission.claim,
-            offer: commit.offer,
-            authorization: &submission.authorization,
-            status_proof: &submission.status_proof,
-            observed_disposition: current.disposition(),
-            observed_settlement_lifecycle: current.settlement_lifecycle(),
-            observed_snapshot_version: current.snapshot_version(),
-            observed_resource_fence: current.resource_fence(),
-            no_mutation_proof_digest: current.head_digest(),
-            trust: &authority.result_trust,
-        },
-    )
-    .map_err(factor_error)
-}
+#[path = "factor_assignment/results.rs"]
+mod results;
+use results::{build_acknowledgement, build_not_applied};
 
 fn factor_error(error: FactorError) -> AdmissionOperationStoreError {
     invariant(format!("invalid factor assignment: {error}"))

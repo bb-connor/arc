@@ -161,7 +161,7 @@ impl VerifiedQuote {
 #[must_use]
 pub fn expect_report_data(kernel_pk: &PublicKey, receipt_root: &[u8; 32]) -> [u8; 64] {
     let mut hasher = Sha256::new();
-    hasher.update(kernel_public_key_canonical_bytes(kernel_pk));
+    kernel_pk.with_hex_bytes(|bytes| hasher.update(bytes));
     hasher.update(receipt_root);
 
     let digest = hasher.finalize();
@@ -169,8 +169,4 @@ pub fn expect_report_data(kernel_pk: &PublicKey, receipt_root: &[u8; 32]) -> [u8
     let mut report_data = [0u8; 64];
     report_data[..32].copy_from_slice(&digest);
     report_data
-}
-
-fn kernel_public_key_canonical_bytes(kernel_pk: &PublicKey) -> Vec<u8> {
-    kernel_pk.to_hex().into_bytes()
 }

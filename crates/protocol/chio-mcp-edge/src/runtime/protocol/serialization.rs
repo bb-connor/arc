@@ -52,7 +52,7 @@ pub(in crate::runtime) fn paginate_named_response(
     }
 
     let page_size = page_size.max(1);
-    let end = (start + page_size).min(values.len());
+    let end = start + page_size.min(values.len() - start);
     let next_cursor = (end < values.len()).then(|| end.to_string());
 
     let mut result = serde_json::Map::new();

@@ -176,7 +176,10 @@ fn expected_signed_id(body: &ChioReceiptBody) -> String {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
     let keypair = make_keypair();
-    let kernel = Arc::new(ChioKernel::new(make_config(keypair.clone())));
+    let kernel = Arc::new(ChioKernel::new_with_clock(
+        make_config(keypair.clone()),
+        chio_test_support::clock::clock(),
+    ));
     let public_key = keypair.public_key();
 
     const N: usize = 32;
@@ -280,7 +283,10 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn mpsc_signing_path_applies_backpressure_at_capacity() {
     let keypair = make_keypair();
-    let kernel = Arc::new(ChioKernel::new(make_config(keypair.clone())));
+    let kernel = Arc::new(ChioKernel::new_with_clock(
+        make_config(keypair.clone()),
+        chio_test_support::clock::clock(),
+    ));
 
     // Sanity: the documented default capacity is at least 16 so the
     // saturation check below is meaningful (smaller defaults would let
@@ -391,7 +397,10 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn shutdown_drains_in_flight_signing_requests() {
     let keypair = make_keypair();
-    let kernel = Arc::new(ChioKernel::new(make_config(keypair.clone())));
+    let kernel = Arc::new(ChioKernel::new_with_clock(
+        make_config(keypair.clone()),
+        chio_test_support::clock::clock(),
+    ));
 
     // Phase A: N producers complete BEFORE shutdown starts. This
     // proves shutdown returns promptly when the queue is empty and

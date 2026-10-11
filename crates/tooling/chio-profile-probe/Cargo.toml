@@ -1,0 +1,16 @@
+[package]
+name = "chio-profile-probe"
+description = "Release-profile arithmetic probe: reports whether the build it was compiled by checks integer overflow"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "chio-profile-probe"
+path = "src/main.rs"
+
+[lints]
+workspace = true

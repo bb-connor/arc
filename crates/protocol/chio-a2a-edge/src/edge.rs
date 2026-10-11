@@ -1,12 +1,12 @@
 // The A2A edge server, its deferred-task state, and the explicit
-// compatibility-only passthrough wrapper.
+// kernel-mediated dispatch.
 
 #[derive(Debug, Clone)]
 struct DeferredA2aTask {
     owner_agent_id: String,
     request: CrossProtocolExecutionRequest,
     response: TaskResponse,
-    expires_at_ms: u64,
+    deadline: AuthorityDeadline,
 }
 
 /// The A2A edge server.
@@ -14,6 +14,7 @@ struct DeferredA2aTask {
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
 pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
+    manifest_registry: Option<VerifiedManifestRegistry>,
     skills: Vec<A2aSkillEntry>,
     skill_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps skill ID to authoritative target binding metadata.
@@ -24,16 +25,10 @@ pub struct ChioA2aEdge {
     tasks: BTreeMap<String, DeferredA2aTask>,
 }
 
-/// Explicit compatibility-only surface for direct A2A passthrough behavior.
-///
-/// This wrapper exists so non-authoritative flows are opt-in and visually
-/// distinct from the default receipt-bearing kernel path.
-#[cfg(any(test, feature = "compatibility-surface"))]
-pub struct ChioA2aEdgeCompatibility<'a> {
-    edge: &'a mut ChioA2aEdge,
-}
-
-fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(), A2aEdgeError> {
+fn validate_execution_context(
+    execution: &A2aKernelExecutionContext,
+    peer: &chio_core::capability::features::CapabilityNegotiation,
+) -> Result<(), A2aEdgeError> {
     validate_execution_agent_id(&execution.agent_id)?;
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(A2aEdgeError::InvalidRequest(
@@ -53,6 +48,14 @@ fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(
             "A2A threshold approval tokens and proposal must be supplied together".to_string(),
         ));
     }
+    peer.validate_invocation_features(
+        &execution.capability,
+        &execution.approval_tokens,
+        execution.threshold_approval_proposal.as_ref(),
+        execution.governed_intent.as_ref(),
+        execution.supplemental_authorization.as_ref(),
+    )
+    .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
     Ok(())
 }
 
@@ -92,9 +95,71 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     ))
 }
 
+#[cfg(test)]
+fn test_registry_from_unverified_manifests(
+    manifests: &[ToolManifest],
+) -> Result<VerifiedManifestRegistry, A2aEdgeError> {
+    let mut registry = VerifiedManifestRegistry::default();
+    for manifest in manifests {
+        let signer = (0..=u8::MAX)
+            .map(|seed| chio_core::crypto::Keypair::from_seed(&[seed; 32]))
+            .find(|candidate| candidate.public_key().to_hex() == manifest.public_key)
+            .ok_or_else(|| {
+                A2aEdgeError::InvalidRequest(format!(
+                    "unit-test manifest signer is unavailable for {}",
+                    manifest.server_id
+                ))
+            })?;
+        let signed = chio_manifest::sign_manifest(manifest, &signer)?;
+        registry
+            .register_public_only(
+                signed,
+                &signer.public_key(),
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    }
+    Ok(registry)
+}
+
 impl ChioA2aEdge {
-    /// Create a new A2A edge from Chio tool manifests.
-    pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    #[cfg(not(test))]
+    pub fn new(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        Self::new_with_registry(config, registry)
+    }
+
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    pub fn new_with_registry(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry.clone()))
+    }
+
+    /// Build unit-test fixtures without exposing unverified
+    /// manifests to production authoritative execution.
+    #[cfg(test)]
+    pub(crate) fn new(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+    ) -> Result<Self, A2aEdgeError> {
+        let test_registry = test_registry_from_unverified_manifests(&manifests).ok();
+        Self::new_internal(config, manifests, test_registry)
+    }
+
+    fn new_internal(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+        manifest_registry: Option<VerifiedManifestRegistry>,
+    ) -> Result<Self, A2aEdgeError> {
         config.validate_for_agent_card()?;
 
         let mut skills = Vec::new();
@@ -116,10 +181,15 @@ impl ChioA2aEdge {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                let security = manifest_registry
+                    .as_ref()
+                    .and_then(|registry| registry.bridge_security(&manifest.server_id, &tool.name))
+                    .unwrap_or_else(|| BridgeSecurityMetadata::from_tool(tool));
                 let mut skill_candidate = build_skill_candidate(
                     manifest,
                     tool,
                     tool_name_counts.get(&tool.name).copied().unwrap_or(0) > 1,
+                    security,
                 )?;
 
                 let published_id_count = published_id_counts
@@ -191,12 +261,21 @@ impl ChioA2aEdge {
 
         Ok(Self {
             config,
+            manifest_registry,
             skills,
             skill_fidelity,
             skill_bindings,
             ambiguous_skill_ids,
             task_counter: 0,
             tasks: BTreeMap::new(),
+        })
+    }
+
+    fn manifest_registry(&self) -> Result<&VerifiedManifestRegistry, A2aEdgeError> {
+        self.manifest_registry.as_ref().ok_or_else(|| {
+            A2aEdgeError::InvalidRequest(
+                "authoritative A2A execution requires a verified manifest registry".to_string(),
+            )
         })
     }
 
@@ -215,27 +294,20 @@ impl ChioA2aEdge {
         Err(A2aEdgeError::ToolNotFound(skill_id.to_string()))
     }
 
-    #[cfg(any(test, feature = "compatibility-surface"))]
-    fn jsonrpc_stream_not_supported(&self, id: Value) -> Value {
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": -32601,
-                "message": "message/stream is not supported on the compatibility A2A surface"
-            }
-        })
-    }
-
-    fn jsonrpc_error_response(id: Value, error: A2aEdgeError) -> Value {
-        let (code, message) = match error {
+    fn jsonrpc_error_response(id: Value, error: A2aEdgeError) -> A2aJsonRpcResponse {
+        let (code, message) = match &error {
+            A2aEdgeError::UntrustedInput(error) => (-32602, error.code().to_string()),
+            A2aEdgeError::TaskCapacity => (
+                -32602,
+                "urn:chio:error:transport:task-capacity-exceeded".to_string(),
+            ),
             A2aEdgeError::ToolNotFound(message) | A2aEdgeError::InvalidRequest(message) => {
-                (-32602, message)
+                (-32602, message.clone())
             }
             other => (-32603, other.to_string()),
         };
 
-        Self::jsonrpc_error_payload(id, code, &message)
+        A2aJsonRpcResponse::with_error(Self::jsonrpc_error_payload(id, code, &message), error)
     }
 
     fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {
@@ -293,34 +365,34 @@ impl ChioA2aEdge {
         self.skill_fidelity.get(id)
     }
 
-    /// Access the explicit compatibility-only passthrough surface.
-    #[cfg(any(test, feature = "compatibility-surface"))]
-    pub fn compatibility(&mut self) -> ChioA2aEdgeCompatibility<'_> {
-        ChioA2aEdgeCompatibility { edge: self }
-    }
-
     /// Allocate a new task ID.
-    fn next_task_id(&mut self) -> String {
-        self.task_counter += 1;
-        format!("a2a-task-{}", self.task_counter)
+    fn next_task_id(&mut self) -> Result<String, A2aEdgeError> {
+        self.task_counter = self
+            .task_counter
+            .checked_add(1)
+            .ok_or(A2aEdgeError::TaskCapacity)?;
+        Ok(format!("a2a-task-{}", self.task_counter))
     }
 
-    fn prune_deferred_tasks(&mut self) {
-        let now = unix_now_millis();
-        self.tasks.retain(|_, task| task.expires_at_ms > now);
+    fn prune_deferred_tasks(&mut self, now: ClockReading) -> Result<(), ClockError> {
+        let mut expired = Vec::new();
+        for (id, task) in &mut self.tasks {
+            match task.deadline.remaining(now) {
+                Ok(_) => {}
+                Err(ClockError::Expired) => expired.push(id.clone()),
+                Err(error) => return Err(error),
+            }
+        }
+        for id in expired {
+            self.tasks.remove(&id);
+        }
+        Ok(())
     }
 
-    fn ensure_deferred_task_capacity(&mut self) -> Result<(), A2aEdgeError> {
-        self.prune_deferred_tasks();
-        let active_count = self
-            .tasks
-            .values()
-            .filter(|task| !task.response.status.is_terminal())
-            .count();
-        if active_count >= MAX_DEFERRED_A2A_TASKS {
-            return Err(A2aEdgeError::InvalidRequest(
-                "too many deferred tasks are retained".to_string(),
-            ));
+    fn ensure_deferred_task_capacity(&mut self, now: ClockReading) -> Result<(), A2aEdgeError> {
+        self.prune_deferred_tasks(now)?;
+        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
+            return Err(A2aEdgeError::TaskCapacity);
         }
         Ok(())
     }
@@ -353,6 +425,9 @@ impl ChioA2aEdge {
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
+            authenticated_session_id: None,
+            security_context: None,
+            bridge_security: binding.security,
         })
     }
 
@@ -368,12 +443,12 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
-        let task_id = self.next_task_id();
+        let task_id = self.next_task_id()?;
         let request = Self::build_execution_request(
             binding,
             skill_id,
@@ -383,7 +458,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -401,11 +481,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
-        let task_id = self.next_task_id();
+        let task_id = self.next_task_id()?;
         let execution_request = Self::build_execution_request(
             binding,
             skill_id,
@@ -415,7 +495,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             request_id.to_string(),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, execution_request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            execution_request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -433,11 +518,11 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
-        let task_id = self.next_task_id();
+        let task_id = self.next_task_id()?;
         let request = Self::build_execution_request(
             binding,
             skill_id,
@@ -447,7 +532,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let mut orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let mut orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -461,11 +551,14 @@ impl ChioA2aEdge {
         &mut self,
         skill_id: &str,
         request: &SendMessageRequest,
+        kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
-        self.handle_stream_message_with_optional_request_id(skill_id, request, execution, None)
+        self.handle_stream_message_with_optional_request_id(
+            skill_id, request, kernel, execution, None,
+        )
     }
 
     /// Start an authoritative deferred task under the caller's stable request ID.
@@ -474,12 +567,14 @@ impl ChioA2aEdge {
         request_id: &str,
         skill_id: &str,
         request: &SendMessageRequest,
+        kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.handle_stream_message_with_optional_request_id(
             skill_id,
             request,
+            kernel,
             execution,
             Some(request_id),
         )
@@ -489,13 +584,15 @@ impl ChioA2aEdge {
         &mut self,
         skill_id: &str,
         request: &SendMessageRequest,
+        kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
         request_id: Option<&str>,
     ) -> Result<TaskResponse, A2aEdgeError> {
         let binding = self.resolve_skill_binding(skill_id)?;
-        self.ensure_deferred_task_capacity()?;
-        let task_id = self.next_task_id();
-        let expires_at_ms = unix_now_millis().saturating_add(DEFERRED_A2A_TASK_TTL_MILLIS);
+        let now = kernel.authority_clock_reading()?;
+        let deadline = AuthorityDeadline::for_timeout_ms(now, DEFERRED_A2A_TASK_TTL_MILLIS)?;
+        self.ensure_deferred_task_capacity(now)?;
+        let task_id = self.next_task_id()?;
         let kernel_request_id =
             request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
         let orchestrated_request = Self::build_execution_request(
@@ -524,88 +621,27 @@ impl ChioA2aEdge {
                 owner_agent_id: execution.agent_id.clone(),
                 request: orchestrated_request,
                 response: response.clone(),
-                expires_at_ms,
+                deadline,
             },
         );
         Ok(response)
-    }
-
-    /// Handle a SendMessage request through the explicit direct passthrough path.
-    ///
-    /// This compatibility helper does not invoke the Chio kernel. It returns
-    /// explicit passthrough metadata so callers do not mistake it for the
-    /// signed-receipt authority path.
-    #[cfg(any(test, feature = "compatibility-surface"))]
-    fn handle_send_message_passthrough(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        server: &dyn ToolServerConnection,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        let tool_name = {
-            let binding = self.resolve_skill_binding(skill_id)?;
-            binding.tool_name
-        };
-
-        let arguments = extract_arguments_from_message(&request.message)?;
-        let task_id = self.next_task_id();
-
-        let invoke_result =
-            match crate::block_on_tool_server_invoke(server.invoke(&tool_name, arguments, None)) {
-                Ok(inner) => inner,
-                Err(bridge_err) => {
-                    // Fail-closed mirror of the kernel sync-bridge gate:
-                    // current-thread runtime detected, refuse to deadlock.
-                    let msg = bridge_err.to_string();
-                    return Ok(TaskResponse {
-                        id: task_id,
-                        status: TaskStatus::Failed,
-                        status_message: Some(msg.clone()),
-                        message: None,
-                        metadata: Some(passthrough_metadata(Some(&msg))),
-                    });
-                }
-            };
-        match invoke_result {
-            Ok(result) => {
-                let response_parts = result_to_parts(&result);
-                Ok(TaskResponse {
-                    id: task_id,
-                    status: TaskStatus::Completed,
-                    status_message: None,
-                    message: Some(A2aMessage {
-                        role: "agent".to_string(),
-                        parts: response_parts,
-                        metadata: None,
-                    }),
-                    metadata: Some(passthrough_metadata(None)),
-                })
-            }
-            Err(error) => Ok(TaskResponse {
-                id: task_id,
-                status: TaskStatus::Failed,
-                status_message: Some(error.to_string()),
-                message: None,
-                metadata: Some(passthrough_metadata(Some(&error.to_string()))),
-            }),
-        }
     }
 
     /// Handle a JSON-RPC A2A request through the Chio kernel.
     ///
     /// This is the receipt-bearing path for production deployments that have
     /// already authenticated the caller and resolved a capability token.
-    pub fn handle_jsonrpc(
+    fn handle_jsonrpc_value(
         &mut self,
         message: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -619,83 +655,22 @@ impl ChioA2aEdge {
 
         let response = match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message(id, params, kernel, execution),
-            "message/stream" => self.handle_jsonrpc_stream_message(id, params, execution),
+            "message/stream" => self.handle_jsonrpc_stream_message(id, params, kernel, execution),
             "task/get" => self.handle_jsonrpc_task_get(id, params, kernel, execution),
-            "task/cancel" => self.handle_jsonrpc_task_cancel(id, params, execution),
-            _ => json!({
+            "task/cancel" => self.handle_jsonrpc_task_cancel(id, params, kernel, execution),
+            _ => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "error": {
                     "code": -32601,
                     "message": "method not found"
                 }
-            }),
+            })),
         };
-        A2aJsonRpcResponse::from_optional(should_respond.then_some(response))
-    }
-
-    /// Handle a JSON-RPC A2A request through the direct passthrough path.
-    ///
-    /// This compatibility helper does not invoke the Chio kernel. Its result
-    /// payload carries explicit passthrough metadata so it is not confused with
-    /// the signed-receipt authority path.
-    #[cfg(any(test, feature = "compatibility-surface"))]
-    fn handle_jsonrpc_passthrough(
-        &mut self,
-        message: Value,
-        server: &dyn ToolServerConnection,
-    ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
-        let should_respond = id.is_some();
-        let id = id.unwrap_or(Value::Null);
-        if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
-            &id,
-            &method,
-            &params,
-            &["message/send", "message/stream"],
-        ) {
-            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
-        }
-
-        let response = match method.as_str() {
-            "message/send" => self.handle_jsonrpc_send_message_passthrough(id, params, server),
-            "message/stream" => self.jsonrpc_stream_not_supported(id),
-            _ => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32601,
-                    "message": "method not found"
-                }
-            }),
-        };
-        A2aJsonRpcResponse::from_optional(should_respond.then_some(response))
-    }
-
-    #[cfg(any(test, feature = "compatibility-surface"))]
-    fn handle_jsonrpc_send_message_passthrough(
-        &mut self,
-        id: Value,
-        params: Value,
-        server: &dyn ToolServerConnection,
-    ) -> Value {
-        let (skill_id, request) =
-            match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
-                Ok(parsed) => parsed,
-                Err(error) => return Self::jsonrpc_error_response(id, error),
-            };
-
-        match self.handle_send_message_passthrough(&skill_id, &request, server) {
-            Ok(response) => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
-            Err(error) => Self::jsonrpc_error_response(id, error),
+        if should_respond {
+            response
+        } else {
+            response.suppress_wire_response()
         }
     }
 
@@ -705,7 +680,7 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let (skill_id, request) =
             match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
                 Ok(parsed) => parsed,
@@ -713,11 +688,11 @@ impl ChioA2aEdge {
             };
 
         match self.handle_send_message(&skill_id, &request, kernel, execution) {
-            Ok(response) => json!({
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -726,20 +701,21 @@ impl ChioA2aEdge {
         &mut self,
         id: Value,
         params: Value,
+        kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let (skill_id, request) =
             match self.parse_jsonrpc_send_message_params(params, "SendStreamingMessage") {
                 Ok(parsed) => parsed,
                 Err(error) => return Self::jsonrpc_error_response(id, error),
             };
 
-        match self.handle_stream_message(&skill_id, &request, execution) {
-            Ok(response) => json!({
+        match self.handle_stream_message(&skill_id, &request, kernel, execution) {
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -750,22 +726,28 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
-        self.prune_deferred_tasks();
+    ) -> A2aJsonRpcResponse {
+        let now = match kernel.authority_clock_reading() {
+            Ok(now) => now,
+            Err(error) => return Self::jsonrpc_error_response(id, error.into()),
+        };
+        if let Err(error) = self.prune_deferred_tasks(now) {
+            return Self::jsonrpc_error_response(id, error.into());
+        }
         let task_id = match Self::parse_jsonrpc_task_id_params(&params, "task/get") {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
         match self.resolve_task(&task_id, execution) {
-            Ok(response) => json!({
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(A2aEdgeError::InvalidRequest(_)) if self.tasks.contains_key(&task_id) => {
                 self.complete_task(&task_id, kernel, execution, id)
             }
@@ -779,11 +761,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
         id: Value,
-    ) -> Value {
-        if let Err(error) = validate_execution_context(execution) {
+    ) -> A2aJsonRpcResponse {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
-        let Some(task) = self.tasks.get(task_id).cloned() else {
+        let Some(task) = self.tasks.get_mut(task_id) else {
             return Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
@@ -796,14 +778,32 @@ impl ChioA2aEdge {
             );
         }
         if task.response.status != TaskStatus::Working {
-            return json!({
+            return A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            });
+            }));
         }
 
-        let orchestrated = match execute_orchestrated_a2a_request(kernel, task.request) {
+        if let Err(error) = kernel
+            .authority_clock_reading()
+            .and_then(|now| task.deadline.remaining(now))
+        {
+            if error == ClockError::Expired {
+                self.tasks.remove(task_id);
+            }
+            return Self::jsonrpc_error_response(id, error.into());
+        }
+        let request = task.request.clone();
+        let orchestrated = match execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            match self.manifest_registry() {
+                Ok(registry) => registry,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            },
+            request,
+        ) {
             Ok(orchestrated) => orchestrated,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
@@ -821,25 +821,32 @@ impl ChioA2aEdge {
                 );
             }
         };
-        json!({
+        A2aJsonRpcResponse::response(json!({
             "jsonrpc": "2.0",
             "id": id,
             "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-        })
+        }))
     }
 
     fn handle_jsonrpc_task_cancel(
         &mut self,
         id: Value,
         params: Value,
+        kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
-        self.prune_deferred_tasks();
+    ) -> A2aJsonRpcResponse {
+        let now = match kernel.authority_clock_reading() {
+            Ok(now) => now,
+            Err(error) => return Self::jsonrpc_error_response(id, error.into()),
+        };
+        if let Err(error) = self.prune_deferred_tasks(now) {
+            return Self::jsonrpc_error_response(id, error.into());
+        }
         let task_id = match Self::parse_jsonrpc_task_id_params(&params, "task/cancel") {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
@@ -864,17 +871,17 @@ impl ChioA2aEdge {
                     "deferred_task_poll",
                 ));
                 let response = task.response.clone();
-                json!({
+                A2aJsonRpcResponse::response(json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-                })
+                }))
             }
-            TaskStatus::Cancelled => json!({
+            TaskStatus::Cancelled => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            }),
+            })),
             status => Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::InvalidRequest(format!(
@@ -905,36 +912,4 @@ impl ChioA2aEdge {
             _ => Ok(task.response.clone()),
         }
     }
-}
-
-#[cfg(any(test, feature = "compatibility-surface"))]
-impl ChioA2aEdgeCompatibility<'_> {
-    /// Handle a SendMessage request through the explicit direct passthrough path.
-    ///
-    /// This compatibility helper does not invoke the Chio kernel. It returns
-    /// explicit passthrough metadata so callers do not mistake it for the
-    /// signed-receipt authority path.
-    pub fn handle_send_message_compatibility(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        server: &dyn ToolServerConnection,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        self.edge
-            .handle_send_message_passthrough(skill_id, request, server)
-    }
-
-    /// Handle a JSON-RPC A2A request through the direct passthrough path.
-    ///
-    /// This compatibility helper does not invoke the Chio kernel. Its result
-    /// payload carries explicit passthrough metadata so it is not confused with
-    /// the signed-receipt authority path.
-    pub fn handle_jsonrpc_compatibility(
-        &mut self,
-        message: Value,
-        server: &dyn ToolServerConnection,
-    ) -> A2aJsonRpcResponse {
-        self.edge.handle_jsonrpc_passthrough(message, server)
-    }
-
 }

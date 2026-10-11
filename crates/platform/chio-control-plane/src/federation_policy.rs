@@ -125,7 +125,9 @@ impl FederationAdmissionPolicyRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
         match fs::read(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let mut registry: Self =
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                        .and_then(|input| input.decode_signed())?;
                 if registry.version != FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION {
                     return Err(CliError::cli_other_error(format!(
                         "unsupported federation admission policy registry version: {}",

@@ -16,9 +16,11 @@ name = "chio_api_protect"
 public_entrypoint = true
 
 [dependencies]
+chio-security-types = { workspace = true }
 async-trait = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core-types = { workspace = true }
+chio-guards = { workspace = true }
 chio-http-core = { workspace = true, features = ["reqwest-egress"] }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
@@ -26,7 +28,7 @@ chio-metrics-spec = { workspace = true }
 chio-openapi = { workspace = true }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 tokio = { workspace = true }
 reqwest = { workspace = true }
 thiserror = { workspace = true }
@@ -36,11 +38,13 @@ hex = { workspace = true }
 uuid = { workspace = true, features = ["v7"] }
 tracing = { workspace = true }
 url = { workspace = true }
+percent-encoding = "2.3"
 axum = "0.8"
 rusqlite = { workspace = true }
 subtle = "2.6"
 
 [dev-dependencies]
+rcgen = "0.13.2"
 chio-test-support = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }

@@ -339,6 +339,6 @@ mod tests {
             &expected,
             fixed_now(),
         );
-        assert!(matches!(res, Err(WeightsError::Encoding(_))));
+        assert!(matches!(res, Err(WeightsError::Input(_))));
     }
 }

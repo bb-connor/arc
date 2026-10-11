@@ -24,9 +24,9 @@ struct ClientOptions {
   std::string protocol_version = "2025-11-25";
   std::string client_capabilities_json = "{}";
   std::chrono::milliseconds timeout{30000};
-  RetryPolicy retry_policy;
-  TokenProviderPtr token_provider;
-  InitializeMessageHandler initialize_message_handler;
+  RetryPolicy retry_policy{};
+  TokenProviderPtr token_provider{};
+  InitializeMessageHandler initialize_message_handler{};
 };
 
 class Client {

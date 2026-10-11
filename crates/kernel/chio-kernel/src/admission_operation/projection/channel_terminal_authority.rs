@@ -227,7 +227,10 @@ pub(crate) fn prepare_channel_terminal_projection(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn commit_prepared_channel_terminal_projection(
     authority: &dyn QualifiedChannelTerminalAuthority,
     operation: &AdmissionOperationV1,

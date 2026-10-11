@@ -33,6 +33,7 @@ pub use chio_core_types::message;
 #[cfg(feature = "pq")]
 pub use chio_core_types::pq;
 pub use chio_core_types::receipt;
+pub use chio_core_types::security_event;
 pub use chio_core_types::session;
 pub use chio_core_types::signed_artifact;
 pub use chio_listing as listing;
@@ -200,7 +201,7 @@ pub use governance::generic::{
     SignedGenericGovernanceCase, SignedGenericGovernanceCharter,
     GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA, GENERIC_GOVERNANCE_CHARTER_ARTIFACT_SCHEMA,
 };
-pub use hashing::{sha256, Hash};
+pub use hashing::{sha256, Hash, Sha256State};
 pub use identity_network::{
     validate_identity_interop_qualification_matrix, validate_public_identity_profile,
     validate_public_wallet_directory_entry, validate_public_wallet_routing_manifest,
@@ -237,7 +238,10 @@ pub use listing::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
     MAX_GENERIC_LISTING_LIMIT,
 };
-pub use manifest::{ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody};
+pub use manifest::{
+    LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    ToolManifestBody,
+};
 pub use market::{
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
     LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,

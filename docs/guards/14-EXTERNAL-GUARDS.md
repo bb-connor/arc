@@ -44,6 +44,21 @@ All six are fail-closed by default: a downstream error produces
 `Verdict::Deny`. Advisory mode (return `Allow` on degraded states) is
 opt-in per adapter and must be enabled explicitly.
 
+### VirusTotal unseen policy
+
+VirusTotal's documented HTTP 404 `NotFoundError` means the URL or hash is
+unseen. The adapter returns a successful guard decision for this outcome;
+`VirusTotalConfig::unseen_policy` defaults to `VirusTotalUnseenPolicy::Deny`.
+Call `with_unseen_policy(VirusTotalUnseenPolicy::Allow)` only when unknown
+reputation is acceptable to the application's policy. Both decisions are
+cached under the normal TTL and do not count as provider failures.
+
+The response must be bounded JSON with the documented error code and a string
+message. An arbitrary 404, duplicate fields, malformed JSON, missing statistics
+on a 200 response, authentication failures and transport errors retain the
+error path. Circuit-open and rate-limit policy remain separate settings.
+See the [VirusTotal error contract](https://docs.virustotal.com/reference/errors).
+
 ---
 
 ## 2. Adapter Architecture
@@ -68,8 +83,9 @@ Key invariants (see `crates/guards/chio-guards/src/external/mod.rs`):
 - Rate-limited calls do **not** count as circuit-breaker failures. Only
   real attempts at the external service do.
 - Permanent errors (4xx, malformed request) short-circuit the retry
-  loop. Only `Timeout` and `Transient` errors retry and count against
-  the breaker.
+  loop. Only `Timeout` and `Transient` errors retry. Every final provider
+  error counts against the breaker; successful Allow and Deny decisions
+  do not.
 - The final fallback on any uncaught error path is `Verdict::Deny` with
   a `tracing::warn!` record.
 

@@ -1,8 +1,10 @@
+mod support;
+
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use chio_anthropic_tools_adapter::transport::MockTransport;
-use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+use chio_anthropic_tools_adapter::AnthropicAdapter;
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
 use serde_json::{json, Value};
 
@@ -15,14 +17,7 @@ struct TaxonomyRow {
 }
 
 fn adapter() -> AnthropicAdapter {
-    let config = AnthropicAdapterConfig::new(
-        "anthropic-1",
-        "Anthropic Messages",
-        "0.1.0",
-        "deadbeef",
-        "wks_chio_demo",
-    );
-    AnthropicAdapter::new(config, Arc::new(MockTransport::new()))
+    support::adapter(Arc::new(MockTransport::new()))
 }
 
 fn raw(value: Value) -> Result<ProviderRequest, String> {
@@ -39,7 +34,10 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn tool_use_stream() -> Vec<u8> {
-    br#"event: content_block_start
+    br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_weather_1","name":"get_weather","input":{}}}
 
 event: content_block_stop
@@ -53,7 +51,10 @@ data: {"type":"message_stop"}
 }
 
 fn malformed_delta_stream() -> Vec<u8> {
-    br#"event: content_block_delta
+    br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}
 
 "#
@@ -143,6 +144,9 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
             "Malformed" => {
                 require_body_string(&row, "/event", "content_block_delta")?;
             }
+            "UntrustedInput" => {
+                require_body_string(&row, "/data", "not-json")?;
+            }
             other => {
                 return Err(format!(
                     "unexpected ProviderError class documented: {other}"
@@ -157,7 +161,12 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in [
+        "BadToolArgs",
+        "Malformed",
+        "UntrustedInput",
+        "VerdictBudgetExceeded",
+    ] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -181,6 +190,11 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let malformed =
         adapter.gate_sse_stream(&malformed_delta_stream(), |_invocation| Ok(allow_verdict()));
     require_provider_error(malformed, "Malformed")?;
+
+    let invalid_json = adapter.gate_sse_stream(b"event: message\ndata: not-json\n\n", |_| {
+        Ok(allow_verdict())
+    });
+    require_provider_error(invalid_json, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&tool_use_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -337,6 +351,11 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

@@ -20,5 +20,10 @@ chio-weights = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+[dev-dependencies]
+chio-store-sqlite = { workspace = true }
+chio-test-support = { workspace = true }
+tempfile = { workspace = true }
+
 [lints]
 workspace = true

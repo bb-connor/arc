@@ -1,0 +1,569 @@
+//! Review regressions against original durable operation and effect boundaries.
+use super::*;
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+struct CommittedApproval {
+    legacy: crate::approval::InMemoryApprovalStore,
+    original: crate::approval::ApprovalReservation,
+}
+
+impl CommittedApproval {
+    fn new(
+        operation_id: &str,
+        approval_set: crate::approval::ApprovalSetReservationInput,
+    ) -> TestResult<Self> {
+        Ok(Self {
+            legacy: crate::approval::InMemoryApprovalStore::new(),
+            original: crate::approval::ApprovalReservation::from_persisted_parts(
+                operation_id.into(),
+                approval_set,
+                crate::security_admission_operation::ReplayReservationState::Committed,
+            )?,
+        })
+    }
+}
+
+impl crate::approval::ApprovalStore for CommittedApproval {
+    fn store_pending(
+        &self,
+        request: &crate::approval::ApprovalRequest,
+    ) -> Result<(), crate::approval::ApprovalStoreError> {
+        self.legacy.store_pending(request)
+    }
+    fn get_pending(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::approval::ApprovalRequest>, crate::approval::ApprovalStoreError> {
+        self.legacy.get_pending(id)
+    }
+    fn list_pending(
+        &self,
+        filter: &crate::approval::ApprovalFilter,
+    ) -> Result<Vec<crate::approval::ApprovalRequest>, crate::approval::ApprovalStoreError> {
+        self.legacy.list_pending(filter)
+    }
+    fn resolve(
+        &self,
+        id: &str,
+        decision: &crate::approval::ApprovalDecision,
+    ) -> Result<(), crate::approval::ApprovalStoreError> {
+        self.legacy.resolve(id, decision)
+    }
+    fn count_approved(
+        &self,
+        subject: &str,
+        policy: &str,
+    ) -> Result<u64, crate::approval::ApprovalStoreError> {
+        self.legacy.count_approved(subject, policy)
+    }
+    fn record_consumed(
+        &self,
+        token: &str,
+        parameters: &str,
+        now: u64,
+    ) -> Result<(), crate::approval::ApprovalStoreError> {
+        self.legacy.record_consumed(token, parameters, now)
+    }
+    fn is_consumed(
+        &self,
+        token: &str,
+        parameters: &str,
+    ) -> Result<bool, crate::approval::ApprovalStoreError> {
+        self.legacy.is_consumed(token, parameters)
+    }
+    fn get_resolution(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::approval::ResolvedApproval>, crate::approval::ApprovalStoreError>
+    {
+        self.legacy.get_resolution(id)
+    }
+    fn get_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<crate::approval::ApprovalReservation>, crate::approval::ApprovalStoreError>
+    {
+        Ok((operation_id == self.original.operation_id()).then(|| self.original.clone()))
+    }
+    fn commit_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<crate::approval::ApprovalReservation, crate::approval::ApprovalStoreError> {
+        self.get_approval_reservation(operation_id)?
+            .ok_or_else(|| crate::approval::ApprovalStoreError::NotFound(operation_id.into()))
+    }
+}
+
+struct FailOnceClock {
+    inner: Arc<dyn chio_security_types::clock::Clock>,
+    unavailable: std::sync::atomic::AtomicBool,
+}
+
+impl chio_security_types::clock::Clock for FailOnceClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        if self.unavailable.swap(false, Ordering::SeqCst) {
+            Err(chio_security_types::clock::ClockError::Unavailable)
+        } else {
+            self.inner.read()
+        }
+    }
+}
+
+struct FailApprovalCommitAndClock {
+    original: InMemoryGovernedApprovalReplayStore,
+    clock: Arc<FailOnceClock>,
+    commits: AtomicU64,
+}
+
+impl GovernedApprovalReplayStore for FailApprovalCommitAndClock {
+    fn reserve_for_dispatch(
+        &self,
+        subject: &str,
+        request: &str,
+        intent: &str,
+        expiry: u64,
+        owner: &str,
+    ) -> Result<bool, KernelError> {
+        self.original
+            .reserve_for_dispatch(subject, request, intent, expiry, owner)
+    }
+    fn commit_dispatch_reservation(
+        &self,
+        subject: &str,
+        request: &str,
+        intent: &str,
+        owner: &str,
+    ) -> Result<bool, KernelError> {
+        if self.commits.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.clock.unavailable.store(true, Ordering::SeqCst);
+            return Err(KernelError::GovernedTransactionDenied(
+                "injected approval commit rejection".into(),
+            ));
+        }
+        self.original
+            .commit_dispatch_reservation(subject, request, intent, owner)
+    }
+    fn rollback_dispatch_reservation(
+        &self,
+        subject: &str,
+        request: &str,
+        intent: &str,
+        owner: &str,
+    ) -> Result<bool, KernelError> {
+        self.original
+            .rollback_dispatch_reservation(subject, request, intent, owner)
+    }
+}
+
+#[test]
+fn pre_dispatch_cleanup_runs_when_its_deny_timestamp_clock_sample_fails() -> TestResult {
+    for nested in [false, true] {
+        let mut grant = make_grant("durable-server", "mutate");
+        grant.max_invocations = Some(1);
+        grant.max_cost_per_invocation = Some(MonetaryAmount {
+            units: 10,
+            currency: "USD".into(),
+        });
+        grant.max_total_cost = Some(MonetaryAmount {
+            units: 100,
+            currency: "USD".into(),
+        });
+        let (mut kernel, mut request, store, invocations) =
+            durable_admission_fixture_with_grants("review-clock-cleanup", vec![grant]);
+        let clock = Arc::new(FailOnceClock {
+            inner: chio_test_support::clock::clock(),
+            unavailable: std::sync::atomic::AtomicBool::new(false),
+        });
+        kernel.clock = clock.clone();
+        kernel.set_governed_approval_replay_store(Box::new(FailApprovalCommitAndClock {
+            original: InMemoryGovernedApprovalReplayStore::new(8)?,
+            clock,
+            commits: AtomicU64::new(0),
+        }));
+        let settlements = Arc::new(std::sync::Mutex::new(Vec::new()));
+        kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+            authorization_references: Arc::new(std::sync::Mutex::new(Vec::new())),
+            settlement_actions: settlements.clone(),
+            settlement_references: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }));
+        let mut intent = make_governed_intent(
+            "review-clock-intent",
+            "durable-server",
+            "mutate",
+            "review cleanup",
+            10,
+            "USD",
+        );
+        bind_test_tool_approval(
+            &mut kernel,
+            &request.capability,
+            &request.arguments,
+            &request.request_id,
+            &mut intent,
+        );
+        request.approval_token = Some(make_governed_approval_token(
+            &kernel.config.keypair,
+            &request.capability.subject,
+            &intent,
+            &request.request_id,
+        ));
+        request.governed_intent = Some(intent);
+        let result = if nested {
+            let session = kernel.open_session("review-clock-parent".into(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent = make_operation_context(
+                &session,
+                "review-clock-parent-request",
+                "review-clock-parent",
+            );
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )
+        } else {
+            kernel.evaluate_tool_call_blocking(&request)
+        };
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            settlements
+                .lock()
+                .map_err(|_| "settlement lock")?
+                .as_slice(),
+            ["release"],
+            "{result:?}"
+        );
+        let denied = result?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert!(denied.output.is_none());
+        assert!(denied.receipt.verify_signature()?);
+        let journal = store.payment_journal().ok_or("payment journal")?;
+        assert_eq!(journal.state, PaymentJournalState::Settled);
+        assert_eq!(
+            journal.settle_action,
+            Some(crate::payment::PaymentSettleAction::Release)
+        );
+        assert!(journal.is_compensated_before_dispatch(), "{journal:?}");
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+    }
+    Ok(())
+}
+
+struct ClockOutageRuntimeDenial(Arc<FailOnceClock>);
+
+impl RuntimeAdmissionHook for ClockOutageRuntimeDenial {
+    fn name(&self) -> &str {
+        "clock-outage-runtime-denial"
+    }
+
+    fn evaluate(
+        &self,
+        _: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        self.0.unavailable.store(true, Ordering::SeqCst);
+        Ok(RuntimeAdmissionDecision::deny(
+            "runtime admission refused the call",
+            None,
+        ))
+    }
+}
+
+#[test]
+fn pre_dispatch_compensation_runs_when_its_kernel_clock_sample_fails() -> TestResult {
+    for nested in [false, true] {
+        let (mut kernel, request, store, invocations) =
+            durable_admission_fixture("review-compensation-clock");
+        let clock = Arc::new(FailOnceClock {
+            inner: chio_test_support::clock::clock(),
+            unavailable: std::sync::atomic::AtomicBool::new(false),
+        });
+        kernel.clock = clock.clone();
+        kernel.set_runtime_admission_hook(Arc::new(ClockOutageRuntimeDenial(clock)));
+        let result = if nested {
+            let session = kernel.open_session(request.agent_id.clone(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent =
+                make_operation_context(&session, "review-compensation-parent", &request.agent_id);
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )
+        } else {
+            kernel.evaluate_tool_call_blocking(&request)
+        };
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            "{result:?}"
+        );
+        let denied = result?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert_eq!(
+            denied.reason.as_deref(),
+            Some("runtime admission refused the call")
+        );
+        assert!(denied.receipt.verify_signature()?);
+    }
+    Ok(())
+}
+
+/// One clock for the kernel and its durable runtime, as in production.
+struct SharedOutageClock {
+    inner: Arc<dyn chio_security_types::clock::Clock>,
+    down: std::sync::atomic::AtomicBool,
+}
+
+impl chio_security_types::clock::Clock for SharedOutageClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        if self.down.load(Ordering::SeqCst) {
+            Err(chio_security_types::clock::ClockError::Unavailable)
+        } else {
+            self.inner.read()
+        }
+    }
+}
+
+#[test]
+fn pre_dispatch_compensation_refuses_when_kernel_and_runtime_clocks_both_fail() -> TestResult {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("review-compensation-no-clock");
+    let clock = Arc::new(SharedOutageClock {
+        inner: chio_test_support::clock::clock(),
+        down: std::sync::atomic::AtomicBool::new(false),
+    });
+    kernel.clock = clock.clone();
+    kernel.set_durable_admission_store(store.clone(), store.clone(), admission_test_fence())?;
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )?;
+    let _admission = kernel
+        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())?
+        .ok_or("durable admission")?;
+    let original = store.operation();
+    assert!(!original.state().is_terminal());
+
+    clock.down.store(true, Ordering::SeqCst);
+    let refused =
+        kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None);
+    assert!(
+        matches!(
+            refused,
+            Err(KernelError::Clock(
+                chio_security_types::clock::ClockError::Unavailable
+            ))
+        ),
+        "{refused:?}"
+    );
+    // A zero floor authorizes nothing: no lease, projection or state change.
+    assert_eq!(store.operation(), original);
+
+    // The operation stays on its recovery path once trusted time returns.
+    clock.down.store(false, Ordering::SeqCst);
+    kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None)?;
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+fn prepared_active_response(
+    kernel: &ChioKernel,
+    authority: &str,
+    request_id: &str,
+    approval_set_hash: Option<String>,
+) -> TestResult<crate::security_admission_operation::AdmissionOperation> {
+    Ok(crate::security_admission_operation::AdmissionOperation::prepared(
+        crate::security_admission_operation::PreparedAdmissionOperation {
+            kind: crate::security_admission_operation::AdmissionOperationKind::GovernedActiveResponse,
+            coordinator_authority_id: authority.into(), request_id: request_id.into(),
+            capability_id: "original-operator".into(),
+            authorization_capability_hash: sha256_hex(b"original-operator"),
+            request_binding_hash: sha256_hex(request_id.as_bytes()),
+            policy_hash: kernel.config.policy_hash.clone(), broker_attempt_id: None,
+            budget_hold_id: None, approval_set_hash, execution_nonce_id: None,
+            coordinator_lease_epoch: 1,
+        },
+    )?)
+}
+
+fn active_response_kernel() -> ChioKernel {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"review-active-response-recovery");
+    make_kernel(config)
+}
+
+#[test]
+fn active_response_recovery_processes_more_than_one_bounded_page() -> TestResult {
+    use crate::security_admission_operation::{AdmissionOperationState, AdmissionOperationStore};
+    let kernel = active_response_kernel();
+    let store = crate::security_admission_operation::InMemoryAdmissionOperationStore::new();
+    let authority = sha256_hex(b"active-response-recovery-authority");
+    let mut originals = Vec::new();
+    for index in 0..4_097 {
+        let operation =
+            prepared_active_response(&kernel, &authority, &format!("pending-{index}"), None)?;
+        store.create_prepared(operation.clone())?;
+        originals.push(operation);
+    }
+    assert_eq!(
+        kernel.recover_nonterminal_active_response_operations_with_authorities(
+            &store, None, &authority,
+        )?,
+        originals.len()
+    );
+    for original in originals {
+        assert_eq!(
+            store
+                .load(original.operation_id())?
+                .ok_or("original operation")?
+                .state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn active_response_recovery_defers_wrong_authority_after_processing_other_operations() -> TestResult
+{
+    use crate::security_admission_operation::{AdmissionOperationState, AdmissionOperationStore};
+    let kernel = active_response_kernel();
+    let store = crate::security_admission_operation::InMemoryAdmissionOperationStore::new();
+    let authority = sha256_hex(b"active-response-recovery-authority");
+    let poison = prepared_active_response(&kernel, &sha256_hex(b"wrong-executor"), "poison", None)?;
+    let original = (0..10_000)
+        .find_map(|index| {
+            let operation =
+                prepared_active_response(&kernel, &authority, &format!("later-{index}"), None)
+                    .ok()?;
+            (operation.operation_id() > poison.operation_id()).then_some(operation)
+        })
+        .ok_or("later recovery candidate")?;
+    store.create_prepared(poison.clone())?;
+    store.create_prepared(original.clone())?;
+    let error = kernel
+        .recover_nonterminal_active_response_operations_with_authorities(&store, None, &authority)
+        .err()
+        .ok_or("wrong executor authority was recovered")?;
+    assert!(matches!(error, KernelError::Internal(detail)
+        if detail == format!("governed active-response operation {} belongs to a different executor authority", poison.operation_id())));
+    assert_eq!(
+        store
+            .load(poison.operation_id())?
+            .ok_or("refused original")?,
+        poison
+    );
+    assert_eq!(
+        store
+            .load(original.operation_id())?
+            .ok_or("processed original")?
+            .state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    Ok(())
+}
+
+#[test]
+fn active_response_recovery_reconciles_committed_approval_before_compensation() -> TestResult {
+    use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStore};
+    use crate::security_admission_operation::{
+        AdmissionDispatchState, AdmissionOperationCompareAndSwap, AdmissionOperationState,
+        AdmissionOperationStore, ReplayReservationState,
+    };
+    let mut kernel = active_response_kernel();
+    let store =
+        Arc::new(crate::security_admission_operation::InMemoryAdmissionOperationStore::new());
+    kernel.admission_operation_store = Some(store.clone());
+    let authority = sha256_hex(b"active-response-recovery-authority");
+    let approval_set = ApprovalSetReservationInput::new(
+        sha256_hex(b"original-approval-set"),
+        vec![ApprovalReservationMember::new(
+            "original-token".into(),
+            sha256_hex(b"original-token"),
+        )?],
+        current_unix_timestamp() + 300,
+    )?;
+    let prepared = prepared_active_response(
+        &kernel,
+        &authority,
+        "approval-committed-crash-window",
+        Some(approval_set.approval_set_hash().into()),
+    )?;
+    store.create_prepared(prepared.clone())?;
+    let anchor = crate::kernel::active_response_operation_binding::ActiveResponseOperationAnchor {
+        plan_hash: sha256_hex(b"original-plan"),
+        executor_authority_id: authority.clone(),
+        executor_authority_generation: 1,
+        authorized_at_unix_ms: current_unix_timestamp_ms(),
+        authorization_capability_hash: prepared.authorization_capability_hash().into(),
+        governed_intent_hash: sha256_hex(b"original-governed-intent"),
+        policy_decision_hash: sha256_hex(b"original-policy-decision"),
+        admission_artifact_fingerprint: None,
+        approval_set_hash: approval_set.approval_set_hash().into(),
+    };
+    kernel
+        .journal_active_response_operation_anchor(&prepared, anchor, &approval_set)
+        .map_err(|_| "original anchor journal")?;
+    store.compare_and_swap(AdmissionOperationCompareAndSwap {
+        operation_id: prepared.operation_id(),
+        expected_version: prepared.version(),
+        coordinator_lease_epoch: 1,
+        next_state: AdmissionOperationState::ApprovalReserved,
+        next_dispatch_state: AdmissionDispatchState::NotStarted,
+        next_coordinator_lease_epoch: 1,
+        last_error: None,
+    })?;
+    let approvals = CommittedApproval::new(prepared.operation_id(), approval_set)?;
+    kernel.recover_nonterminal_active_response_operations_with_authorities(
+        store.as_ref(),
+        Some(&approvals),
+        &authority,
+    )?;
+    let recovered = store
+        .load(prepared.operation_id())?
+        .ok_or("reconciled original")?;
+    assert_eq!(
+        recovered.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert_eq!(
+        recovered.dispatch_state(),
+        AdmissionDispatchState::Committed
+    );
+    assert_eq!(
+        approvals
+            .get_approval_reservation(prepared.operation_id())?
+            .ok_or("original approval reservation")?
+            .state(),
+        ReplayReservationState::Committed
+    );
+    assert!(!store.load_cleanup_actions(prepared.operation_id())?.iter().any(|action| {
+        action.kind() == crate::security_admission_operation::AdmissionCleanupActionKind::TerminalReceipt
+    }), "committed approvals cannot yield a compensated receipt");
+    Ok(())
+}
+
+#[path = "review_boundaries/publication_cleanup_progress.rs"]
+mod publication_cleanup_progress;

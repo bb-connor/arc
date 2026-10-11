@@ -38,20 +38,17 @@ pub(super) fn public_settlement_runtime_hashes(
 }
 
 fn find_chio_web3_contract_package(bundle: &Path) -> Result<PathBuf, CliError> {
-    let workspace_package = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../")
-        .join(CHIO_WEB3_CONTRACT_PACKAGE_PATH);
+    let checkout_package = chio_conformance::peers::checkout_root()
+        .map(|root| root.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH));
     let cwd_packages = std::env::current_dir()
         .ok()
         .into_iter()
         .map(|cwd| cwd.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH));
-    let candidates = cwd_packages
-        .chain(std::iter::once(workspace_package))
-        .chain(
-            bundle
-                .ancestors()
-                .map(|ancestor| ancestor.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH)),
-        );
+    let candidates = cwd_packages.chain(checkout_package).chain(
+        bundle
+            .ancestors()
+            .map(|ancestor| ancestor.join(CHIO_WEB3_CONTRACT_PACKAGE_PATH)),
+    );
     for candidate in candidates {
         if candidate.is_file() {
             return Ok(candidate);

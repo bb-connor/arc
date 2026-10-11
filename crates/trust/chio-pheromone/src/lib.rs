@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA;
 use std::sync::PoisonError;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -41,7 +42,7 @@ pub const PHEROMONE_SCARCITY_POLICY_SCHEMA: &str = "chio.pheromone-scarcity-poli
 pub const PHEROMONE_SCARCITY_WINDOW_ID_SCHEMA: &str = "chio.pheromone-scarcity-window-id.v1";
 pub const OBSERVATION_COST_UNIT: &str = "chio.observation.microunit.v1";
 pub const OBSERVATION_COST_TELEMETRY_ALGORITHM: &str = "rfc6962-sha256-v1";
-pub const RUNTIME_TRUST_FLOOR_STATE_SCHEMA: &str = "chio.runtime.trust-floor-state.v1";
+
 pub const DEFAULT_NEWCOMER_DISCOUNT_HORIZON_EPOCHS: u64 = 8;
 
 #[derive(Debug, thiserror::Error)]
@@ -315,7 +316,7 @@ pub struct PheromoneRuntimeTrustFloorState {
 impl Default for PheromoneRuntimeTrustFloorState {
     fn default() -> Self {
         Self {
-            schema: RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string(),
+            schema: CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string(),
             entries: Vec::new(),
         }
     }
@@ -728,18 +729,18 @@ pub fn default_newcomer_discount_horizon_epochs() -> u64 {
 #[must_use]
 pub fn agent_passport_key_hash(public_key: &PublicKey) -> String {
     let mut hasher = Sha256::new();
-    match public_key.algorithm() {
-        SigningAlgorithm::Ed25519 => hasher.update(public_key.as_bytes()),
-        _ => hasher.update(public_key.to_hex().as_bytes()),
+    match public_key.ed25519_bytes() {
+        Ok(bytes) => hasher.update(bytes),
+        Err(_) => hasher.update(public_key.to_hex().as_bytes()),
     }
     hex::encode(hasher.finalize())
 }
 
 #[must_use]
 pub fn agent_passport_jwk_thumbprint(public_key: &PublicKey) -> String {
-    let x = match public_key.algorithm() {
-        SigningAlgorithm::Ed25519 => URL_SAFE_NO_PAD.encode(public_key.as_bytes()),
-        _ => URL_SAFE_NO_PAD.encode(public_key.to_hex().as_bytes()),
+    let x = match public_key.ed25519_bytes() {
+        Ok(bytes) => URL_SAFE_NO_PAD.encode(bytes),
+        Err(_) => URL_SAFE_NO_PAD.encode(public_key.to_hex().as_bytes()),
     };
     let jwk = serde_json::json!({
         "crv": "Ed25519",

@@ -5,6 +5,7 @@ This project was scaffolded by `chio init`.
 ## What You Get
 
 - `policy.yaml`: a minimal Chio policy that grants one governed tool call
+- `tools.json`: the reviewed MCP tool surface bound into the signed manifest
 - `src/bin/hello_server.rs`: a tiny MCP tool server stub
 - `src/bin/demo.rs`: a smoke runner that launches `chio mcp serve`, calls the
   governed tool, and prints the resulting receipt line
@@ -17,14 +18,24 @@ This project was scaffolded by `chio init`.
    cargo build
    ```
 
-2. Point the demo at a `chio` binary if it is not already on your `PATH`:
+2. On a supported Linux enforcement host, install the host architecture's
+   `*-unknown-linux-musl` Rust target. Configure the canonical static cage helper
+   and a private receipt anchor directory on a separate persistent filesystem:
 
    ```bash
-   CHIO_BIN=/path/to/chio cargo run --quiet --bin demo
+   CHIO_BIN=/path/to/chio \
+   CHIO_CAGE_INIT=/path/to/chio-cage-init \
+   CHIO_RECEIPT_ANCHOR_ROOT=/persistent-anchor/hello \
+   cargo run --quiet --bin demo
    ```
 
-3. The demo writes the durable admission authority and receipt store under
-   `.chio/` and prints the latest receipt after the governed tool call succeeds.
+3. The demo builds a static server, provisions signed manifest and enforced
+   launch artifacts for that exact executable, and writes the durable admission
+   state and receipts under `.chio/`. It prints the latest receipt after the
+   governed tool call succeeds. Host or cage enforcement failure refuses launch.
+
+The disabled preparation command produces offline artifacts only. Runtime
+launch requires enforced migration state and persisted cage evidence.
 
 ## Prove The Loop
 
@@ -56,6 +67,7 @@ chio --receipt-db ./.chio/receipts.db receipt verify <receipt-id>
 ## Customize It
 
 - Rename `hello_world` in `src/bin/hello_server.rs` to your first tool
+- Update `tools.json` to the exact reviewed tool schema before reprovisioning
 - Tighten `policy.yaml` to the exact server, tool, and budget envelope you need
 - Extend `demo.rs` into your own client or replace it with a framework SDK in
   later phases

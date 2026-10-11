@@ -50,7 +50,12 @@ fn ledger_transition_oracle(
         return (state, false);
     }
 
-    let reserved = state.reserved - amount;
+    let reserved = match crate::accounting::ExposureUnits::new(state.reserved)
+        .try_sub(crate::accounting::ExposureUnits::new(amount))
+    {
+        Ok(reserved) => reserved.get(),
+        Err(_) => return (state, false),
+    };
     match op {
         1 => match state.committed.checked_add(amount) {
             Some(committed) => (

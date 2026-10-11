@@ -1,31 +1,7 @@
-//! Cross-platform mobile receipt-chain validation shell.
+//! Bounded structural parsing of mobile receipt and attestation envelopes.
 //!
-//! # Trust contract
-//!
-//! This module is a shape-only verifier for mobile attestation receipts.
-//! It is intentionally a "permissive shell": the surface is kept narrow so
-//! deployments do not accidentally treat
-//! receipt-chain acceptance as proof of device integrity. The function is
-//! reachable through the `chio_custody_hw::verify_mobile_receipt_chain`
-//! re-export but does not feed any production capability-mint path; the
-//! issuer surface in [`crate::issuer`] consults the typed attestation
-//! verifiers in [`super::app_attest`] and [`super::play_integrity`]
-//! directly, never the receipt-chain shell.
-//!
-//! Fail-closed checks performed here:
-//!
-//! - Both envelopes must parse as JSON objects with a `schema` field.
-//! - The receipt and evidence `schema` strings must both be non-empty.
-//! - The evidence `platform` must be either `app_attest` or
-//!   `play_integrity`. Any other platform string is rejected.
-//!
-//! The shell intentionally does NOT cross-check the `schema` field
-//! against the `platform` field: schema is the JSON envelope version,
-//! platform selects the concrete attestation verifier downstream. Real
-//! attestation acceptance happens in
-//! [`super::app_attest::verify_app_attest`] and
-//! [`super::play_integrity::verify_play_integrity`]; a successful return
-//! from this function is NOT proof of device integrity.
+//! These values carry no verification or authorization claim. Device evidence
+//! must pass the platform verifier with trusted pins and issuer challenge binding.
 
 use serde::Deserialize;
 
@@ -35,7 +11,7 @@ const PLATFORM_APP_ATTEST: &str = "app_attest";
 const PLATFORM_PLAY_INTEGRITY: &str = "play_integrity";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedMobileReceiptChain {
+pub struct ParsedMobileReceiptEnvelopes {
     pub receipt_schema: String,
     pub evidence_schema: String,
     pub platform: String,
@@ -52,14 +28,20 @@ struct EvidenceEnvelope {
     platform: String,
 }
 
-pub fn verify_mobile_receipt_chain(
+pub fn parse_mobile_receipt_envelopes(
     receipt_json: &str,
     evidence_json: &str,
-) -> Result<VerifiedMobileReceiptChain, AttestationError> {
-    let receipt: ReceiptEnvelope = serde_json::from_str(receipt_json)
-        .map_err(|error| AttestationError::InvalidCbor(format!("receipt JSON: {error}")))?;
-    let evidence: EvidenceEnvelope = serde_json::from_str(evidence_json)
-        .map_err(|error| AttestationError::InvalidCbor(format!("evidence JSON: {error}")))?;
+) -> Result<ParsedMobileReceiptEnvelopes, AttestationError> {
+    let receipt: ReceiptEnvelope = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        receipt_json.as_bytes(),
+        1024 * 1024,
+    )?
+    .decode_signed()?;
+    let evidence: EvidenceEnvelope = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        evidence_json.as_bytes(),
+        1024 * 1024,
+    )?
+    .decode_signed()?;
     if receipt.schema.is_empty() {
         return Err(AttestationError::InvalidCbor(
             "receipt schema must be a non-empty string".to_string(),
@@ -73,9 +55,22 @@ pub fn verify_mobile_receipt_chain(
     if evidence.platform != PLATFORM_APP_ATTEST && evidence.platform != PLATFORM_PLAY_INTEGRITY {
         return Err(AttestationError::UnsupportedFormat(evidence.platform));
     }
-    Ok(VerifiedMobileReceiptChain {
+    Ok(ParsedMobileReceiptEnvelopes {
         receipt_schema: receipt.schema,
         evidence_schema: evidence.schema,
         platform: evidence.platform,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn envelope_parse_rejects_duplicate_ignored_evidence_fields() {
+        let result = parse_mobile_receipt_envelopes(
+            r#"{"schema":"receipt"}"#,
+            r#"{"schema":"evidence","platform":"app_attest","extra":{"x":1,"x":2}}"#,
+        );
+        assert!(matches!(result, Err(AttestationError::Input(_))));
+    }
 }

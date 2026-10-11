@@ -1,0 +1,122 @@
+{
+  "schema": "chio.recovery-rpc-shutdown-qualification.v1",
+  "observed_at": "2026-10-09T16:28:19.116715+00:00",
+  "source_head": "3b0760cfe7c8bdd286fac137663872ab6ebc1e1d",
+  "published_head": "fd8bfdc947bbaf070b39457a9190f032a018e55a",
+  "stage_head": "135801e303d3317bc54995ef8f4eeee558c72665",
+  "producer_commit": "41545ff19c38788e6a5ff2557c036cf59c746136",
+  "source_repair": "135801e303d3317bc54995ef8f4eeee558c72665",
+  "scope": "Linux-only test fixture; graceful listener shutdown joins accepted connections before transport refusal assertion.",
+  "producer_evidence": {
+    "reviewed_at": "2026-10-09T16:13:54.574453+00:00",
+    "producer_commit": "41545ff19c38788e6a5ff2557c036cf59c746136",
+    "files": [
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/recovery_rpc_tests.rs"
+    ],
+    "verified_artifacts": {
+      "red.log": "8c4a6048c9fd78e38c6e5b75596df6a862e74ef0b134e1855ab031862292c99b",
+      "red-tree.diff": "b6743b55e4705eee89f6121d4c3306cdf49f810e399686e5086b6361853ed79f",
+      "red-probe-idle-keepalive.log": "2b3496dc9ceddfa407eb9b160425650e82aef1f929abf69cee9473c7dceb790f",
+      "green-focused.log": "abe316cfcc860ff3126a4642b4f48cf4aab85c85309891c956e1cfde1fd0420e",
+      "clippy.log": "ffc1ab6543b51e4adcd7c65967f302ca1d1c736e14886cab14eff3bcce8e0be5",
+      "fmt.log": "93ff7811a209e2a8479230bbb9b6bc19f7f311d3af383ec350c1db2a7e7d5494",
+      "green-tree.diff": "12913b624a5accfcc25284c3a71cd614d5ba3f03d86aaf0aff3adc5c7e9b90e6",
+      "commit.diff": "12913b624a5accfcc25284c3a71cd614d5ba3f03d86aaf0aff3adc5c7e9b90e6"
+    },
+    "genuine_original": {
+      "passed": 13,
+      "failed": 1,
+      "diagnostic_ignores": 2
+    },
+    "producer_focused": {
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0
+    },
+    "verdict": "accepted_no_blocking_finding",
+    "basis": [
+      "Server owns a shutdown sender and join handle; stop releases the test hold, signals graceful shutdown and waits for all accepted tasks through axum completion.",
+      "Parked request establishes the existing keepalive connection and requires completion before stop returns.",
+      "Native Transport source and typed Unavailable assertions remain unchanged. Bound non-listening socket avoids accidental port reassignment.",
+      "Changes are confined to the existing Linux-only test module; no production behavior, sleeps or retries."
+    ],
+    "limits": [
+      "A same-uid process deliberately sharing SO_REUSEPORT can interfere with a fixture; no adversarial host isolation claim.",
+      "Full predecessor suite remains failed; final composed focused renewal pending."
+    ]
+  },
+  "composed_evidence": {
+    "path": "/tmp/pr1160-v25-final-20261009/recovery-rpc-composed",
+    "results": [
+      {
+        "label": "focused",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "trust_control::service_runtime::router::tests::recovery_rpc_tests::",
+          "--show-output"
+        ],
+        "started_at": "2026-10-09T16:15:16.240445+00:00",
+        "terminal_at": "2026-10-09T16:21:26.251375+00:00",
+        "elapsed_seconds": 370.0109515613876,
+        "exit_code": 0,
+        "summaries": [
+          [
+            14,
+            0,
+            0
+          ]
+        ],
+        "missing_expected_tests": [],
+        "log_sha256": "829e7c06d1c48d27c271296db8b828664458185b5b515308d884a59f24652d22",
+        "accepted": true
+      },
+      {
+        "label": "strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started_at": "2026-10-09T16:21:26.722003+00:00",
+        "terminal_at": "2026-10-09T16:25:13.237234+00:00",
+        "elapsed_seconds": 226.51525419391692,
+        "exit_code": 0,
+        "summaries": [],
+        "missing_expected_tests": [],
+        "log_sha256": "bf8f7d4407ce9b1b5962099c30b348b4af38e5b89eeb933213642d5a1378c7db",
+        "accepted": true
+      }
+    ],
+    "source_manifest_sha256": "fa643f35fd3760482fe4e51bdf926bee8b3ab20189eb6bc6cc94137ae0add2aa",
+    "verified_source_file_count": 6486,
+    "source_stable_before_and_after": true
+  },
+  "predecessor_full_suite": {
+    "source": "0fd8aa21ffb39805c1e742c763146ea5d28ba8fe",
+    "status": "FAILED",
+    "passed": 1573,
+    "failed": 1,
+    "ignored": 1,
+    "log_sha256": "f57941525b53b6a1ae1266e308479f8877be644519ef25c55e978b1a9e149580",
+    "later_focused_repair_does_not_relabel_this_run": true
+  },
+  "remaining_acceptance": [
+    "Final candidate local qualification and review dispositions.",
+    "Source promotion, four exact protected checks and protected merge."
+  ],
+  "candidate_qualified": false,
+  "merged": false,
+  "release_permitted": false
+}

@@ -30,6 +30,9 @@ pub const THRESHOLD_GOVERNED_APPROVALS: &str = "threshold_governed_approvals";
 /// Peers can verify protocol-owned active-response plan intents.
 pub const GOVERNED_ACTIVE_RESPONSE_PLAN: &str = "governed_active_response_plan";
 
+/// Peers preserve opaque authorization artifacts for an installed verifier.
+pub const OPAQUE_SUPPLEMENTAL_AUTHORIZATION: &str = "opaque_supplemental_authorization";
+
 fn capabilities_schema() -> String {
     CHIO_CAPABILITIES_SCHEMA.to_string()
 }
@@ -93,6 +96,54 @@ impl CapabilityNegotiation {
     #[must_use]
     pub fn supports(&self, feature: &str) -> bool {
         self.features.get(feature).copied().unwrap_or(false)
+    }
+
+    /// Check semantic compatibility before an invocation crosses an adapter.
+    ///
+    /// The profile must come from the host's peer negotiation, never invocation
+    /// metadata. Success only establishes compatibility. It does not verify a
+    /// signature, reserve a budget, approve an operation or authorize execution.
+    pub fn validate_invocation_features(
+        &self,
+        capability: &super::token::CapabilityToken,
+        approvals: &[super::governance::GovernedApprovalToken],
+        proposal: Option<&super::governance::ThresholdApprovalProposal>,
+        intent: Option<&super::governance::GovernedTransactionIntent>,
+        supplemental: Option<&super::supplemental_authorization::OpaqueSupplementalAuthorization>,
+    ) -> Result<()> {
+        self.validate()?;
+        let requirements = [
+            (
+                AGGREGATE_INVOCATION_BUDGET,
+                capability.aggregate_invocation_budget.is_some(),
+            ),
+            (
+                CUMULATIVE_APPROVAL_BUDGET,
+                capability.scope.has_cumulative_approval(),
+            ),
+            (
+                THRESHOLD_GOVERNED_APPROVALS,
+                !approvals.is_empty() || proposal.is_some(),
+            ),
+            (
+                GOVERNED_ACTIVE_RESPONSE_PLAN,
+                intent.is_some_and(|intent| {
+                    matches!(
+                        intent.body,
+                        super::governance::GovernedTransactionIntentBody::ActiveResponsePlan(_)
+                    )
+                }),
+            ),
+            (OPAQUE_SUPPLEMENTAL_AUTHORIZATION, supplemental.is_some()),
+        ];
+        for (feature, required) in requirements {
+            if required && !self.supports(feature) {
+                return Err(Error::CanonicalJson(format!(
+                    "invocation feature {feature} was not negotiated"
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Validate schema and feature-name shape before negotiation.

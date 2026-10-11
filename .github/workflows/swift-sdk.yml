@@ -5,10 +5,26 @@ on:
     paths:
       - ".github/workflows/swift-sdk.yml"
       - "sdks/swift/**"
+      - "scripts/build-ios-framework.sh"
+      - "scripts/test-swift-sdk.sh"
+      - "crates/**"
+      - "third_party/**"
+      - ".cargo/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
   pull_request:
     paths:
       - ".github/workflows/swift-sdk.yml"
       - "sdks/swift/**"
+      - "scripts/build-ios-framework.sh"
+      - "scripts/test-swift-sdk.sh"
+      - "crates/**"
+      - "third_party/**"
+      - ".cargo/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
 
 permissions:
   contents: read
@@ -21,66 +37,40 @@ jobs:
   xcodebuild-test:
     name: Swift SDK (iOS Simulator xcodebuild test)
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: sdks/swift
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           lfs: true
 
-      - name: Select Xcode and show toolchain
-        run: |
-          sudo xcode-select -p
-          xcodebuild -version
-          swift --version
+      - name: Test the committed SDK and require executed native calls
+        run: bash scripts/test-swift-sdk.sh
 
-      - name: Resolve test-inclusive scheme
-        id: scheme
-        run: |
-          SCHEMES=$(xcodebuild -list -json 2>/dev/null \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); top=d.get('workspace',d.get('project',{})); print('\n'.join(top.get('schemes',[])))")
-          SCHEME=""
-          for candidate in "Chio-Package" "Chio"; do
-            if echo "$SCHEMES" | grep -qx "$candidate"; then
-              SCHEME="$candidate"
-              break
-            fi
-          done
-          if [ -z "$SCHEME" ]; then
-            echo "::error::no recognized scheme found; available: $(echo "$SCHEMES" | tr '\n' ' ')"
-            exit 1
-          fi
-          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
-          echo "Resolved scheme: $SCHEME"
-
-      - name: Pin an available iOS Simulator destination
-        id: sim
-        run: |
-          RUNTIME=$(xcrun simctl list runtimes --json \
-            | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
-          if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
-          DEVICE=$(xcrun simctl list devices --json \
-            | RUNTIME="$RUNTIME" python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
-          if [ -z "$DEVICE" ]; then echo "::error::no available iPhone simulator for $RUNTIME"; exit 1; fi
-          OSVER=$(echo "$RUNTIME" | sed -E 's/.*iOS-([0-9]+)-([0-9]+).*/\1.\2/')
-          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
-          echo "osver=$OSVER" >> "$GITHUB_OUTPUT"
-          echo "Pinned destination: platform=iOS Simulator,name=$DEVICE,OS=$OSVER"
-
-      - name: xcodebuild test
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -scheme "${{ steps.scheme.outputs.name }}" \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }},OS=${{ steps.sim.outputs.osver }}" \
-            -resultBundlePath "$RUNNER_TEMP/ChioTests.xcresult" \
-            | tee "$RUNNER_TEMP/xcodebuild.log"
-
-      - name: Assert nonzero executed-test count
-        run: |
-          xcrun xcresulttool get test-results summary \
-            --path "$RUNNER_TEMP/ChioTests.xcresult" \
-            --format json \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('totalTestCount',0); print(f'totalTestCount={n}'); exit(0 if n>=1 else 1)" \
-            || { echo "::error::xcresult reports zero tests executed"; exit 1; }
+  rebuild-framework:
+    name: Rebuild and test locked iOS framework
+    # Produce one source-bound artifact from the pushed commit. The PR job
+    # independently tests the committed package at its merge candidate.
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "3"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          lfs: true
+      - name: Install pinned Rust and Apple targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          workspaces: ". -> target/mobile-ios"
+      - name: Rebuild framework and generated Swift together
+        run: bash scripts/build-ios-framework.sh --install
+      - name: Test the rebuilt SDK and require executed native calls
+        run: bash scripts/test-swift-sdk.sh
+      - name: Retain the tested framework and source provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chio-ios-framework-${{ github.sha }}
+          path: target/release-qualification/mobile-kernel/ios
+          if-no-files-found: error

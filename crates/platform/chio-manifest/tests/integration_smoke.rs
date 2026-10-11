@@ -1,7 +1,7 @@
 use chio_core::Keypair;
 use chio_manifest::{
-    sign_manifest, validate_manifest, verify_manifest, LatencyHint, ToolDefinition, ToolManifest,
-    TOOL_MANIFEST_SCHEMA,
+    sign_manifest, validate_manifest, verify_manifest, LatencyHint, ToolAnnotations,
+    ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
 };
 
 #[test]
@@ -19,8 +19,14 @@ fn manifest_sign_and_verify_roundtrip_uses_public_api() -> Result<(), Box<dyn st
             input_schema: serde_json::json!({"type": "object"}),
             output_schema: Some(serde_json::json!({"type": "object"})),
             pricing: None,
-            has_side_effects: false,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
             latency_hint: Some(LatencyHint::Instant),
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,

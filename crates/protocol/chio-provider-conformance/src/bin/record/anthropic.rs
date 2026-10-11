@@ -3,11 +3,8 @@ use serde_json::Value;
 
 use crate::cli::ScenarioSeed;
 use crate::fixture::RecordPlan;
-use crate::http::curl_json_post;
-use crate::invoke::{
-    anthropic_invocation_from_stream_record, captured_invocations, extract_anthropic_invocations,
-    CapturedInvocation,
-};
+use crate::http::post_json_capture;
+use crate::invoke::{captured_invocations, extract_anthropic_invocations, CapturedInvocation};
 use crate::record::{
     anthropic_version, capture_record, live_request_record, request_body, stamp_anthropic_headers,
 };
@@ -29,7 +26,7 @@ pub(crate) fn record_anthropic(
         .and_then(Value::as_bool)
         .unwrap_or(false);
 
-    let response_text = curl_json_post(
+    let response_text = post_json_capture(
         "anthropic",
         ANTHROPIC_MESSAGES_URL,
         &[
@@ -48,7 +45,7 @@ pub(crate) fn record_anthropic(
             invocations,
         })
     } else {
-        let response_payload = serde_json::from_str::<Value>(&response_text)?;
+        let response_payload = chio_provider_conformance::input::text::<Value>(&response_text)?;
         let response_record =
             capture_record(&seed, CaptureDirection::UpstreamResponse, response_payload);
         let invocations =
@@ -82,18 +79,11 @@ fn anthropic_stream_invocations(
     workspace_id: &str,
     records: &[CaptureRecord],
 ) -> Result<Vec<CapturedInvocation>, RecordError> {
-    let mut invocations = Vec::new();
-    for record in records {
-        if let Some(invocation) =
-            anthropic_invocation_from_stream_record(seed, workspace_id, record)?
-        {
-            invocations.push(invocation);
-        }
-    }
+    let invocations = crate::invoke::anthropic_stream_invocations(seed, workspace_id, records)?;
     if invocations.is_empty() && seed.expected_invocations > 0 {
         return Err(RecordError::CaptureShape {
             provider: "anthropic",
-            message: "stream did not include tool_use start events".to_string(),
+            message: "stream did not include complete tool_use blocks".to_string(),
         });
     }
     Ok(captured_invocations(seed, invocations))

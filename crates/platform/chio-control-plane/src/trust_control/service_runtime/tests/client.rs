@@ -15,11 +15,11 @@ fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
     };
     assert!(error.to_string().contains("control URL must not be empty"));
 
-    let client = build_client(" http://one/ , http://two// ,,", "secret")
+    let client = build_client(" https://one/ , https://two// ,,", "secret")
         .test_expect("build client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.endpoint_order(), vec![0, 1]);
 
@@ -43,11 +43,11 @@ fn build_client_rejects_blank_or_padded_control_token() {
 
 #[test]
 fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoint_validation() {
-    let client = build_public_client(" http://one/ , http://two// ,,")
+    let client = build_public_client(" https://one/ , https://two// ,,")
         .test_expect("build public client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.token.as_ref(), "");
 
@@ -878,7 +878,7 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
     use std::sync::{Arc, Condvar, Mutex, PoisonError};
 
     const WORKERS: usize = 2;
-    let writer = super::super::remote_stores::BoundedReceiptWriter::new(WORKERS, WORKERS);
+    let writer = crate::bounded_worker_pool::BoundedWorkerPool::new(WORKERS, WORKERS);
 
     let concurrent = Arc::new(AtomicU64::new(0));
     let peak = Arc::new(AtomicU64::new(0));
@@ -892,7 +892,8 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
         let peak = Arc::clone(&peak);
         let worker_threads = Arc::clone(&worker_threads);
         let release = Arc::clone(&release);
-        let result = writer.run_within_budget::<_, ()>(budget, "stalled write", move || {
+        let deadline = std::time::Instant::now().checked_add(budget).test_unwrap();
+        let result = writer.run_until(deadline, move || {
             worker_threads
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -905,10 +906,9 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
                 released = cvar.wait(released).unwrap_or_else(PoisonError::into_inner);
             }
             concurrent.fetch_sub(1, Ordering::SeqCst);
-            Ok(())
         });
         assert!(
-            matches!(result, Err(chio_kernel::ReceiptStoreError::Timeout { .. })),
+            result == Err(crate::bounded_worker_pool::DeadlinePassed),
             "a write parked on a stalled control plane must fail closed at the budget, got {result:?}"
         );
     }
@@ -931,6 +931,40 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
     let (lock, cvar) = &*release;
     *lock.lock().unwrap_or_else(PoisonError::into_inner) = true;
     cvar.notify_all();
+}
+
+#[test]
+fn queued_remote_receipt_write_is_skipped_after_its_budget() {
+    use crate::bounded_worker_pool::tests::{drain, park_the_worker, single_worker_pool};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let writer = Arc::new(single_worker_pool());
+    let (release, caller) = park_the_worker(&writer);
+    let wrote = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&wrote);
+
+    let result = super::super::remote_stores::run_receipt_write(
+        &writer,
+        std::time::Duration::from_millis(250),
+        "queued write",
+        move || {
+            observed.store(true, Ordering::SeqCst);
+            Ok(())
+        },
+    );
+    assert!(
+        matches!(result, Err(chio_kernel::ReceiptStoreError::Timeout { .. })),
+        "a queued write must fail closed at its budget, got {result:?}"
+    );
+
+    release.send(()).test_unwrap();
+    caller.join().test_unwrap();
+    drain(&writer);
+    assert!(
+        !wrote.load(Ordering::SeqCst),
+        "a write dequeued after its budget must not reach the control plane"
+    );
 }
 
 fn sample_capability_token() -> chio_core::capability::token::CapabilityToken {
@@ -1009,6 +1043,7 @@ fn sample_child_receipt(id: &str) -> ChildRequestReceipt {
 
 fn receipt_list_response_body(kind: &str, receipts: Vec<serde_json::Value>) -> String {
     serde_json::to_string(&ReceiptListResponse {
+        snapshot: None,
         configured: true,
         backend: "sqlite".to_string(),
         kind: kind.to_string(),

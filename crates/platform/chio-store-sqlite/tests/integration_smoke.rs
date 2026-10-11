@@ -15,6 +15,16 @@ fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
 }
 
+/// Authority custody accepts only a parent directory owned by the effective
+/// user with mode 0700, so each authority database gets its own private
+/// directory, removed when the returned guard drops.
+fn private_authority_path(name: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let directory =
+        chio_test_support::private_tempdir().test_expect("create private authority directory");
+    let path = directory.path().join(name);
+    (directory, path)
+}
+
 fn cleanup_sqlite_files(path: &std::path::Path) {
     let _ = fs::remove_file(path);
     let _ = fs::remove_file(format!("{}-wal", path.display()));
@@ -31,8 +41,8 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
 
 #[test]
 fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
-    let primary_path = unique_db_path("chio-authority-primary");
-    let replica_path = unique_db_path("chio-authority-replica");
+    let (_primary_directory, primary_path) = private_authority_path("primary.sqlite3");
+    let (_replica_directory, replica_path) = private_authority_path("replica.sqlite3");
     let primary =
         SqliteCapabilityAuthority::open(&primary_path).test_expect("open primary authority");
     let replica =
@@ -42,17 +52,26 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
         .test_expect("read primary local signing key")
         .public_key();
 
+    let anchor = replica
+        .initialize_replication("smoke-authority")
+        .test_unwrap();
+    primary.pin_replication_anchor(&anchor).test_unwrap();
     let rotated = replica.rotate().test_expect("rotate replica authority");
-    let snapshot = replica.snapshot().test_expect("snapshot replica authority");
+    let snapshot = replica
+        .signed_snapshot()
+        .test_expect("snapshot replica authority");
     let replaced = primary
-        .apply_snapshot(&snapshot)
+        .apply_signed_snapshot(&snapshot)
         .test_expect("apply newer replica snapshot");
     let status = primary.status().test_expect("read primary status");
 
     assert!(replaced);
-    assert_eq!(snapshot.public_key_hex, rotated.public_key.to_hex());
+    assert_eq!(
+        snapshot.snapshot.public_key_hex,
+        rotated.public_key.to_hex()
+    );
     assert_eq!(status.generation, rotated.generation);
-    assert_eq!(status.public_key.to_hex(), snapshot.public_key_hex);
+    assert_eq!(status.public_key.to_hex(), snapshot.snapshot.public_key_hex);
     assert_eq!(
         primary
             .local_keypair()
@@ -70,15 +89,12 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
     assert!(status
         .trusted_public_keys
         .iter()
-        .any(|key| key.to_hex() == snapshot.public_key_hex));
-
-    cleanup_sqlite_files(&primary_path);
-    cleanup_sqlite_files(&replica_path);
+        .any(|key| key.to_hex() == snapshot.snapshot.public_key_hex));
 }
 
 #[test]
 fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
-    let path = unique_db_path("chio-authority-invalid-snapshot");
+    let (_directory, path) = private_authority_path("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&path).test_expect("open authority");
     let mut snapshot = authority.snapshot().test_expect("snapshot authority");
     snapshot.public_key_hex = "deadbeef".to_string();
@@ -86,9 +102,7 @@ fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
     let error = authority
         .apply_snapshot(&snapshot)
         .test_expect_err("invalid public key should fail closed");
-    assert!(error.to_string().contains("invalid public key"));
-
-    cleanup_sqlite_files(&path);
+    assert!(error.to_string().contains("unsigned authority snapshot"));
 }
 
 #[test]

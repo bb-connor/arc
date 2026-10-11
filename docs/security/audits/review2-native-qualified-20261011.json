@@ -1,0 +1,553 @@
+{
+  "schema": "chio.security.review2-native-qualification.v1",
+  "observed_utc": "2026-10-11T01:39:26.874887+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-001",
+    "incoming-pr1160-review2-20261011:R2-013",
+    "incoming-pr1160-review2-20261011:R2-026",
+    "incoming-pr1160-review2-20261011:CI-MACOS-RUSTIX"
+  ],
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "private_stage": "fa9cb164e081779974739d7c4b9a7a44153dab65",
+  "source_repair": {
+    "checkpoint": "fa9cb164e081779974739d7c4b9a7a44153dab65",
+    "commits": [
+      "60149a9eb266b70b21c0f7204b92e1d7b6f542e5",
+      "18d4af20dfb0dd2c22f937e98de64016c14aed9a",
+      "86eb0f906158c116fd8fe1f67f5035c428590a7f",
+      "5b6990a4641f2bfe69cea7180d3491ebd2ded3e2",
+      "3bc800d7699cb6035ac0ea896bc3eabebc3ea868",
+      "6f88095f1b831a252f16057be471629681c78260",
+      "38dcd88dbf064a7d67ff164206b17c70c2a68219",
+      "f5096583895557a0ba2c8af9243368321b9618b1",
+      "d93b06d3b7baaeedc22e22acbd30396d090bb423",
+      "5646992745d2e2af861c531f59fb1f4cd0b43825",
+      "6f241e2937795ba74c4e6bbe6a63cfd983d7ff0a",
+      "fa08fc2f96054e701a564250b93a17c22013785d",
+      "b8b1d33084493471d10bb73c4c6d1798d3486bda"
+    ],
+    "files": [
+      "crates/products/chio-cli/src/supervise/credentials.rs",
+      "crates/products/chio-cli/src/supervise/descriptor_credentials.rs",
+      "crates/products/chio-cli/src/supervise/credentials/darwin_tests.rs",
+      "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+      "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite/darwin_tests.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume_darwin_tests.rs",
+      "crates/platform/chio-sqlite-file-identity/src/darwin_acl.rs"
+    ],
+    "contract": "All three credential/resume/custody consumers use the shared descriptor-bound Darwin ACL authority check; authority grants and inspection errors refuse, deny-only ACLs and existing Linux descriptor custody remain valid."
+  },
+  "source_sha256": {
+    "crates/products/chio-cli/src/supervise/credentials.rs": "f457551f865fa03dd68633d1d024edb772a3086a5937a9d588eba9fbcc1c585f",
+    "crates/products/chio-cli/src/supervise/descriptor_credentials.rs": "da8ea812a04ebec6319845b3619edefe3a1b5365bce45b354fd36c449e14e732",
+    "crates/products/chio-cli/src/supervise/credentials/darwin_tests.rs": "42a43fd54b797e2da577040bb3789bd1cbdec42c34b074c69f9e71f1e6c8ecd7",
+    "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs": "2f74b6ff762d653258f718fe8443cd74662dc18f421b9c069cbf1c1098cad504",
+    "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite/darwin_tests.rs": "eb003551eb0a23abc4f29d198f0b4248d07ee511bf1575bbecd5bf2a6a91615a",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": "a32807a739a5eaea28ba12bbe816f1ce39598157bb04dcdcee3c86f46ae2dde0",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume_darwin_tests.rs": "b20df9e1509be1dec55490ebdc3e9eb1e6727726db5490e30faba2845cf9c0cd",
+    "crates/platform/chio-sqlite-file-identity/src/darwin_acl.rs": "20f933dcb0ec560c29504c1cf48bfa9724b35c1e3befb76642122161c0a1f8c4"
+  },
+  "original": [
+    {
+      "result": "2 passed; 4 failed",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/03-darwin-original-unblocked.log",
+        "sha256": "b093a811349655a5e68b2724eb0fb03fd801341e5a645ea0ba9fe435f0070ea1"
+      }
+    },
+    {
+      "result": "2 passed; 4 failed",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/05-mobile-challenge-original.log",
+        "sha256": "05c4dae1daa2e40b7ec7341e212ae3808810570b92d561648ef432657c11f049"
+      }
+    },
+    {
+      "result": "2 passed; 2 failed",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/04-session-resume-original.log",
+        "sha256": "5dc8c7aa2bafd665b96a429c7379e4c867e61d469c88ede8a4381a89988861a6"
+      }
+    }
+  ],
+  "native_darwin": {
+    "host": "macOS 26.4 arm64, rustc 1.95.0",
+    "environment": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/00-env.txt",
+      "sha256": "64dd42b0750a7dd090beccb17b436467dccd138a234eb449353d099975205a4f"
+    },
+    "source_overlays": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/OVERLAY-MANIFEST.md",
+      "sha256": "33d9db96ce4c7be83a7908b5367f605af59db9ce14f4ae1e565d2c5f00076677"
+    },
+    "artifact_manifest": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/ALL-SHA256SUMS",
+      "sha256": "841490f5c3fe4694db82ac8436b307967ea24538063b11a1645f4bc2501095fa"
+    },
+    "verified_artifacts": 37,
+    "runtime_source": "989e1f85c33b9787e447f0fa4135babab90cc7e6 plus b89a71caec and a5c199ab14 as recorded in the overlay manifest",
+    "focused": [
+      {
+        "result": "6 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/10-cli-001.log",
+          "sha256": "ebcd805c0a879b870cd740154499a9ae6e2a5535cf0a1f5b67acd1f1cdc95be1"
+        }
+      },
+      {
+        "result": "6 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/11-custody-013.log",
+          "sha256": "c07eed556c9bee4c21227f3851f345acdad71891c74c331fe60e136a43877bb0"
+        }
+      },
+      {
+        "result": "4 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/12-mcp-026.log",
+          "sha256": "386e8a1852c4accbaeb3859e4a120c7f74453880c033e40d1114685aeb35734b"
+        }
+      },
+      {
+        "result": "3 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/13-keyring-native.log",
+          "sha256": "cbef9884c80d2a15a29a7549eaf844b678bedcb0e51d9a63359d749652659080"
+        }
+      },
+      {
+        "result": "6 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/14-identity-acl.log",
+          "sha256": "fde42bdbb8e4636c0caff7b07d1302ad3d05b360f7c66bc035c2e1ee6fc283a7"
+        }
+      },
+      {
+        "result": "24 passed, zero failures/ignored",
+        "evidence": {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/15-cli-supervise.log",
+          "sha256": "c5c867f03df4b6f2c83d44a0a701d644bc56f36fe31afe0280d8f5861395f39b"
+        }
+      }
+    ],
+    "strict": {
+      "source": "fa08fc2f96054e701a564250b93a17c22013785d",
+      "result": "Eight owning crates --lib --bins -- -D warnings passed",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/fa08/10-clippy-strict.log",
+        "sha256": "b7d3f6ec706941efef51002b7c48d0faad78644b1acfd2895372a73086b028b2"
+      }
+    },
+    "broker_compile_repair": {
+      "original_evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/16-broker-lib.log",
+        "sha256": "38b4ff2185aaa6b2bbd3fc15ca8ba0f53453123b3555438bef5fe0417c410bf2"
+      },
+      "producer": "6e0e7ad233e73142a30f1d7c669600b25af0fd75",
+      "integration": "b8b1d33084493471d10bb73c4c6d1798d3486bda",
+      "result": "179 passed, zero failures/ignored on fa08 plus working repair; final commit differs only by import formatting as recorded in overlay manifest.",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/fa08/20-broker-lib-fixed.log",
+        "sha256": "43fd4cebde6db8bbe38fd4247a5fad6f4719cdc149a0591f4dea5602a9411db9"
+      }
+    },
+    "retained_failures": [
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/01-darwin-original.log",
+        "sha256": "ef5fd71cf318f3ff86aefb96b2827f0d5bb71b6d4fc4bd9f8cc41d86e8ffb384"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/f788/16-clippy-strict.log",
+        "sha256": "588c13ce29b60d9a98e3efee663fd61751d8c4192daa1562875d15479df279d4"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/989e/17-clippy-strict.log",
+        "sha256": "b2ae7230788959af4503c5fe79f60042de7363c46de649673ab919d6817ec9f6"
+      },
+      {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/fa08/21-fmt-broker.log",
+        "sha256": "5b0093ddc0edad2f17d8232b763bacc934a2cdad0525d3a7a863c5961d14a869"
+      }
+    ]
+  },
+  "linux": {
+    "summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/summary.json",
+      "sha256": "7f3cbaed40611a643858919c921454aea0468947c8320603599c8afb14e19624"
+    },
+    "source": "1e8b6b7adaa6d9c57b5d4c94cae7b5c244dc8fc1",
+    "all_six_commands_passed": true,
+    "commands": [
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-keyring",
+          "-p",
+          "chio-sqlite-file-identity",
+          "-p",
+          "chio-custody-hw",
+          "-p",
+          "chio-mcp-remote",
+          "-p",
+          "chio-secret-broker",
+          "--lib",
+          "--no-fail-fast",
+          "--",
+          "--test-threads=4"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/001-owners",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "owners",
+        "log_sha256": "d0af127363447e53a2e0edd1e611b6be906367ea9d2ace59355a7bd9dfdae17a",
+        "seconds": 427.53149467287585,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:08:16.637982+00:00",
+        "test_summaries": [
+          "test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s",
+          "test result: ok. 192 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 58.32s",
+          "test result: ok. 246 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.84s",
+          "test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-keyring",
+          "-p",
+          "chio-sqlite-file-identity",
+          "-p",
+          "chio-custody-hw",
+          "-p",
+          "chio-mcp-remote",
+          "-p",
+          "chio-secret-broker",
+          "--lib",
+          "--no-fail-fast",
+          "--",
+          "--test-threads=4"
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--bin",
+          "chio",
+          "supervise::",
+          "--",
+          "--test-threads=4"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/002-supervise",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "supervise",
+        "log_sha256": "d342525e5e1c2d5e0d1de3fe36a16d14e29dd45c6564660e810a19ccec59b9e0",
+        "seconds": 383.23099229019135,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:15:24.180300+00:00",
+        "test_summaries": [
+          "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 757 filtered out; finished in 1.13s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--bin",
+          "chio",
+          "supervise::",
+          "--",
+          "--test-threads=4"
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-keyring",
+          "-p",
+          "chio-sqlite-file-identity",
+          "-p",
+          "chio-custody-hw",
+          "-p",
+          "chio-mcp-remote",
+          "-p",
+          "chio-secret-broker",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/003-strict-owners",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "strict-owners",
+        "log_sha256": "d7edf0e152d70a7609d3e21c017eb57dd4f1e2c6316c4bf8bf2be5fab02c2dcd",
+        "seconds": 211.64072472183034,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:21:47.417016+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-keyring",
+          "-p",
+          "chio-sqlite-file-identity",
+          "-p",
+          "chio-custody-hw",
+          "-p",
+          "chio-mcp-remote",
+          "-p",
+          "chio-secret-broker",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--bin",
+          "chio",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/004-strict-cli",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "strict-cli",
+        "log_sha256": "de291c905b97b187b145dacda994273c8379e346b984aa5bee560b21ca62fa81",
+        "seconds": 236.185148187913,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:25:19.068152+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--bin",
+          "chio",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "chio-custody-hw",
+          "--no-default-features"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/005-mobile-no-default",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "mobile-no-default",
+        "log_sha256": "0055e9e1c9c7346c20d7e04f5b01ccff49f5dee07447e9752bfe638413908965",
+        "seconds": 34.46432490833104,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:29:15.260170+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "chio-custody-hw",
+          "--no-default-features"
+        ]
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.93.0",
+          "test",
+          "--locked",
+          "-p",
+          "chio-sqlite-file-identity",
+          "--lib"
+        ],
+        "command_ok": true,
+        "cwd": "/home/connor/lanes/pr1160-tripwire-input",
+        "directory": "/tmp/pr1160-ci-batch-20261010/review2-native-linux/006-identity-msrv",
+        "environment": {
+          "CARGO_BUILD_JOBS": "2",
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_PROFILE_DEV_DEBUG": "0",
+          "CARGO_PROFILE_TEST_DEBUG": "0",
+          "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+          "CARGO_TERM_COLOR": "never",
+          "CHIO_CAPACITY_DIVISOR": "1",
+          "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+          "RUST_TEST_THREADS": "8"
+        },
+        "exit": 0,
+        "inputs_stable": true,
+        "label": "identity-msrv",
+        "log_sha256": "0e760463d0e3d21d1c48efa0f26808b467ff18ca9ff9c838b725b0bf0318d612",
+        "seconds": 73.32384356111288,
+        "source_stable": true,
+        "started_at": "2026-10-11T01:29:49.730346+00:00",
+        "test_summaries": [
+          "test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.05s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 1800,
+        "wrapped_argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "+1.93.0",
+          "test",
+          "--locked",
+          "-p",
+          "chio-sqlite-file-identity",
+          "--lib"
+        ]
+      }
+    ],
+    "scope": "563 owner tests, 20 supervise controls, 14 Rust 1.93 identity tests, strict owner/CLI lint and custody no-default check. The ignored transaction_lock_probe is executed by its parent subprocess test."
+  },
+  "review": "Root reviewed final integration and independently verified all 37 copied native artifact hashes. Eight affected native source files remain byte-identical to the recorded runtime source.",
+  "qualification_limits": [
+    "Native evidence is component-scoped on the recorded source/overlays, not full final-candidate hosted qualification.",
+    "Darwin all-target/fuzz strict lint is not established by the eight-owner --lib --bins run.",
+    "Unrelated later Rust changes still require combined candidate qualification. Earlier compilation, lint and formatting failures remain preserved."
+  ],
+  "remaining_acceptance": [
+    "Complete remaining confirmed repairs and final combined local gates.",
+    "Pass four required checks on the published replacement, classify other failures and answer reviews.",
+    "Obtain explicit Connor merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

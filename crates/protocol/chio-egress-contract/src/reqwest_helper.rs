@@ -43,8 +43,11 @@ impl ContractResponse {
         String::from_utf8(self.body)
     }
 
-    pub async fn json<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
-        serde_json::from_slice(&self.body)
+    pub async fn json<T: DeserializeOwned>(
+        self,
+    ) -> Result<T, chio_core::canonical::UntrustedJsonError> {
+        chio_core::canonical::UntrustedJsonText::from_wire(&self.body, self.body.len())?
+            .decode_document()
     }
 }
 
@@ -89,16 +92,8 @@ pub async fn send_with_contract(
                         max: prepared.max_redirect_chain(),
                     });
                 }
-                let location = location.to_str().map_err(|error| {
-                    HttpEgressError::InvalidUrl(format!(
-                        "invalid redirect Location header from {request_url}: {error}"
-                    ))
-                })?;
-                let next_url = request_url.join(location).map_err(|error| {
-                    HttpEgressError::InvalidUrl(format!(
-                        "invalid redirect target `{location}` from {request_url}: {error}"
-                    ))
-                })?;
+                let location = location.to_str().map_err(RequestFailure::new)?;
+                let next_url = request_url.join(location).map_err(RequestFailure::new)?;
                 let next_chain_len = redirect_chain_len.saturating_add(1);
                 prepared.enforce_url_with_dns(next_url.as_str(), next_chain_len)?;
                 let cross_origin = !same_origin(&request_url, &next_url);
@@ -155,6 +150,7 @@ impl ContractClientBuilder {
 pub fn client_builder_with_contract(contract: &HttpEgressContract) -> ContractClientBuilder {
     ContractClientBuilder {
         inner: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .dns_resolver(Arc::new(ContractDnsResolver::new(contract.clone()))),
@@ -232,7 +228,7 @@ fn build_redirect_request(
 ) -> Result<reqwest::Request, HttpEgressError> {
     if cross_origin && (original.has_body || !is_idempotent_method(&original.method)) {
         return Err(HttpEgressError::InvalidUrl(format!(
-            "cross-origin redirect method/body denied for {} {status} to {next_url}",
+            "cross-origin redirect method/body denied for {} {status}",
             original.method
         )));
     }
@@ -331,19 +327,65 @@ async fn collect_capped_response(
     })
 }
 
-fn map_reqwest_error(err: reqwest::Error) -> HttpEgressError {
-    let kind = if err.is_timeout() {
-        "timeout"
-    } else if err.is_connect() {
-        "connect error"
-    } else if err.is_request() {
-        "request error"
-    } else if err.is_body() {
-        "body error"
-    } else if err.is_decode() {
-        "decode error"
-    } else {
-        "transport error"
-    };
-    HttpEgressError::InvalidUrl(format!("dispatch failed ({kind}): {err}"))
+/// Cloneable local source. Public formatting never exposes request URLs or bodies.
+#[derive(Clone)]
+pub struct RequestFailure(Arc<dyn Error + Send + Sync>);
+impl RequestFailure {
+    fn new(error: impl Error + Send + Sync + 'static) -> Self {
+        Self(Arc::new(error))
+    }
+}
+impl std::fmt::Display for RequestFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("urn:chio:error:transport:http-failed")
+    }
+}
+impl std::fmt::Debug for RequestFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+impl Error for RequestFailure {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+impl PartialEq for RequestFailure {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for RequestFailure {}
+fn map_reqwest_error(error: reqwest::Error) -> HttpEgressError {
+    RequestFailure::new(error.without_url()).into()
+}
+
+#[cfg(test)]
+mod producer_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn ordinary_response_numbers_survive_and_duplicates_refuse() -> Result<(), Box<dyn Error>>
+    {
+        let response = |body: &[u8]| -> Result<ContractResponse, url::ParseError> {
+            Ok(ContractResponse {
+                status: StatusCode::OK,
+                url: Url::parse("https://example.test/")?,
+                headers: HeaderMap::new(),
+                body: body.to_vec(),
+            })
+        };
+        let value: serde_json::Value =
+            response(br#"{"n":21.0,"small":1e-05,"id":9007199254740993}"#)?
+                .json()
+                .await?;
+        assert_eq!(value["n"].as_f64(), Some(21.0));
+        assert_eq!(value["small"].as_f64(), Some(0.00001));
+        assert_eq!(value["id"].as_u64(), Some(9007199254740993));
+        assert!(response(br#"{"n":1,"n":2}"#)?
+            .json::<serde_json::Value>()
+            .await
+            .is_err());
+        Ok(())
+    }
 }

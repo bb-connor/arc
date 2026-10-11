@@ -375,6 +375,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -399,13 +400,11 @@ mod tests {
         agent_id: &'a String,
         server_id: &'a String,
     ) -> chio_kernel::GuardContext<'a> {
-        chio_kernel::GuardContext {
-            request,
-            scope,
-            agent_id,
-            server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(request, scope);
+            constructed_guard_context.agent_id = agent_id;
+            constructed_guard_context.server_id = server_id;
+            constructed_guard_context
         }
     }
 

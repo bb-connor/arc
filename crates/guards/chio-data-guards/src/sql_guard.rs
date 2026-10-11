@@ -404,18 +404,17 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let scope = ChioScope::default();
         let agent_id = String::from("agent");
         let server_id = String::from("srv");
         let verdict = guard
-            .evaluate(&GuardContext {
-                request: &request,
-                scope: &scope,
-                agent_id: &agent_id,
-                server_id: &server_id,
-                session_filesystem_roots: None,
-                matched_grant_index: None,
+            .evaluate(&{
+                let mut constructed_guard_context = GuardContext::new(&request, &scope);
+                constructed_guard_context.agent_id = &agent_id;
+                constructed_guard_context.server_id = &server_id;
+                constructed_guard_context
             })
             .unwrap();
         assert_eq!(verdict.verdict, Verdict::Deny);

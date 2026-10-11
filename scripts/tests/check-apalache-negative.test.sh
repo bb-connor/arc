@@ -261,11 +261,11 @@ EOF
 
 pass_log="${tmp_dir}/pass.log"
 run_gate pass "${pass_log}"
-grep -Fq "check-apalache-negative: 16 counterexamples reproduced" "${pass_log}"
+grep -Fq "check-apalache-negative: 18 counterexamples reproduced" "${pass_log}"
 
 cargo_target_log="${tmp_dir}/cargo-target.log"
 run_gate pass "${cargo_target_log}" "${cargo_output_dir}"
-grep -Fq "check-apalache-negative: 16 counterexamples reproduced" \
+grep -Fq "check-apalache-negative: 18 counterexamples reproduced" \
   "${cargo_target_log}"
 
 expect_gate_failure receipt-noerror \

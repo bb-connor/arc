@@ -18,3 +18,7 @@ chio_guard_sdk_workspace = { package = "chio-guard-sdk", path = "../../../crates
 # workspace so `cargo build --manifest-path ...` works without the root
 # workspace trying to adopt it.
 [workspace]
+
+# This independent shipping workspace does not inherit the root profiles.
+[profile.release]
+overflow-checks = true

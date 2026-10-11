@@ -344,10 +344,12 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
                 grant_index: 0,
                 cost_charged,
                 currency: actual_charge.currency.clone(),
-                budget_remaining: 150_u64
-                    .checked_sub(cost_charged)
-                    .ok_or(ChannelError::ArithmeticOverflow)?,
-                budget_total: 150,
+                budget_remaining: Some(
+                    150_u64
+                        .checked_sub(cost_charged)
+                        .ok_or(ChannelError::ArithmeticOverflow)?,
+                ),
+                budget_total: Some(150),
                 delegation_depth: 0,
                 root_budget_holder: trust.payer_id.clone(),
                 payment_reference: None,

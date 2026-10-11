@@ -168,6 +168,7 @@ def make_configured_runtime(
     handle = RuntimeHandle(
         chio_client=client,
         capability_id=capability_id,
+        signed_capability=sample_capability(capability_id),
         cwd=workspace,
         policy=pol,
         receipts=ReceiptBuffer(),
@@ -179,6 +180,26 @@ def make_configured_runtime(
         cwd=workspace,
     )
     return handle
+
+
+def sample_capability(capability_id: str = "cap-test-12345678") -> dict[str, Any]:
+    """Wire-shape fixture only. This token has no cryptographic authority."""
+    return {
+        "id": capability_id, "subject": "bb" * 32, "issuer": "cc" * 32,
+        "issued_at": 1, "expires_at": 4_000_000_000,
+        "scope": {"grants": []}, "signature": "dd" * 64,
+    }
+
+
+def sample_decision(pending: Any, decision: str = "approved") -> dict[str, Any]:
+    """Wire-shape fixture; the contract mock does not verify signatures."""
+    return {
+        "id": "fixture-vote", "approver": "ee" * 32,
+        "subject": pending.subject_id, "request_id": pending.approval_id,
+        "governed_intent_hash": pending.parameter_hash, "issued_at": 1,
+        "expires_at": pending.expires_at, "decision": decision,
+        "signature": "ff" * 64,
+    }
 
 
 class SyncFakePluginContext(FakePluginContext):

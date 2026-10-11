@@ -2,76 +2,130 @@
 //! presentation and wallet exchange, passport status lifecycle, verifier
 //! policies, presentation challenges, and federated issuance.
 
-use super::report_rendering::forward_post_to_leader;
+use super::report_rendering::{
+    forward_post_to_leader, forward_public_passport_challenge_to_leader,
+};
 use super::report_validation::{
     bearer_token_from_headers, load_capability_authority,
     load_capability_authority_with_deferred_lineage, validate_service_auth,
 };
 use super::*;
 
+#[path = "passport_handlers/public_authority_trust.rs"]
+mod public_authority_trust;
+use public_authority_trust::{public_oid4vp_trusted_keys, run_public_authority_trust_read};
+
 pub(crate) async fn handle_passport_issuer_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => Json(metadata).into_response(),
-        Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match public_passport_credential_issuer_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(metadata) => Json(metadata).into_response(),
+            Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_issuer_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_issuer_discovery(&state.config) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match build_public_issuer_discovery_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_verifier_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_verifier_discovery(&state.config) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        match build_public_verifier_discovery_with_status(
+            &state.config,
+            &state.finding_challenge_clock,
+            status,
+        ) {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_public_passport_discovery_transparency(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_public_discovery_transparency(&state.config) {
-        Ok(document) => Json(document).into_response(),
-        Err(error) => public_discovery_error_response(&error),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        let document = match status {
+            Some(status) => build_public_discovery_transparency_with_status(
+                &state.config,
+                &state.finding_challenge_clock,
+                Some(status),
+            ),
+            None => {
+                build_public_discovery_transparency(&state.config, &state.finding_challenge_clock)
+            }
+        };
+        match document {
+            Ok(document) => Json(document).into_response(),
+            Err(error) => public_discovery_error_response(&error),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_oid4vp_verifier_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_metadata(&state.config) {
-        Ok(metadata) => Json(metadata).into_response(),
-        Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    }
+    run_public_authority_trust_read(&state, |state, status| {
+        let metadata = match status {
+            Some(status) => build_oid4vp_verifier_metadata_from_status(&state.config, status),
+            None => build_oid4vp_verifier_metadata(&state.config, &state.finding_challenge_clock),
+        };
+        match metadata {
+            Ok(metadata) => Json(metadata).into_response(),
+            Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        }
+    })
+    .await
 }
 
 pub(crate) async fn handle_passport_issuer_jwks(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_oid4vp_verifier_jwks(&state.config) {
-        Ok(jwks) => Json(jwks).into_response(),
-        Err(error) => {
-            let message = error.to_string();
-            let status = if message.contains("configured authority")
-                || message.contains("did not publish any signing keys")
-                || message.contains("--authority-seed-file or --authority-db")
-            {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::CONFLICT
-            };
-            plain_http_error(status, &message)
+    run_public_authority_trust_read(&state, |state, status| {
+        let jwks = match status {
+            Some(status) => build_oid4vp_verifier_jwks_from_status(&state.config, status),
+            None => build_oid4vp_verifier_jwks(&state.config, &state.finding_challenge_clock),
+        };
+        match jwks {
+            Ok(jwks) => Json(jwks).into_response(),
+            Err(error) => {
+                let message = error.to_string();
+                let status = if message.contains("configured authority")
+                    || message.contains("did not publish any signing keys")
+                    || message.contains("--authority-seed-file or --authority-db")
+                {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::CONFLICT
+                };
+                plain_http_error(status, &message)
+            }
         }
-    }
+    })
+    .await
 }
 
 pub(crate) fn public_discovery_error_response(error: &CliError) -> Response {
@@ -143,60 +197,72 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    if state.config.passport_statuses_file.is_some() {
-        if let Err(error) = portable_passport_status_reference_for_service(
-            &state.config,
-            &payload.passport,
-            unix_timestamp_now(),
-        ) {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-        }
-    }
-    let record = match registry.issue_offer(
-        &metadata,
-        payload.passport,
-        payload.credential_configuration_id.as_deref(),
-        payload.ttl_seconds,
-        unix_timestamp_now(),
-    ) {
-        Ok(record) => record,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        PassportIssuanceOfferRegistry::update_for_issuance(&path, |registry| {
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                if state.config.passport_statuses_file.is_some() {
+                    let clock_now =
+                        super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                            .map_err(RegistryOperationError::authority)?;
+                    portable_passport_status_reference_for_service(
+                        &state.config,
+                        &payload.passport,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::bad_request)?;
+                }
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
+                registry
+                    .issue_offer(
+                        &metadata,
+                        payload.passport,
+                        payload.credential_configuration_id.as_deref(),
+                        payload.ttl_seconds,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::bad_request)
+            })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_redeem_passport_issuance_token(
     State(state): State<TrustServiceState>,
     Json(payload): Json<Oid4vciTokenRequest>,
 ) -> Response {
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    let response =
-        match registry.redeem_pre_authorized_code(&metadata, &payload, unix_timestamp_now(), 300) {
-            Ok(response) => response,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-        };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    if let Err(error) = payload.validate() {
+        return plain_http_error(StatusCode::BAD_REQUEST, &CliError::from(error).to_string());
     }
-    Json(response).into_response()
+    let lane = state.public_passport_issuance_lane.clone();
+    run_registry_transaction(&lane, move || {
+        PassportIssuanceOfferRegistry::update(&path, |registry| {
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
+                let response = registry
+                    .redeem_pre_authorized_code(&metadata, &payload, clock_now, 300)
+                    .map_err(RegistryOperationError::bad_request)?;
+                registry.prune_dead(clock_now);
+                Ok(response)
+            })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_redeem_passport_issuance_credential(
@@ -208,48 +274,64 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         Ok(token) => token,
         Err(response) => return response,
     };
-    let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{run_registry_transaction, RegistryOperationError};
+    let Some(path) = state.config.passport_issuance_offers_file.clone() else {
+        return plain_http_error(StatusCode::CONFLICT,
+            "passport issuance requires --passport-issuance-offers-file on the trust-control service");
     };
-    let metadata = match configured_passport_credential_issuer(&state.config) {
-        Ok(metadata) => metadata,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    let portable_signing_keypair =
-        if state.config.authority_seed_path.is_some() || state.config.authority_db_path.is_some() {
-            match resolve_oid4vp_verifier_signing_key(&state.config) {
-                Ok(keypair) => Some(keypair),
-                Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-            }
-        } else {
-            None
-        };
-    let portable_status_registry = match state.config.passport_statuses_file.as_deref() {
-        Some(path) => match PassportStatusRegistry::load(path) {
-            Ok(registry) => Some(registry),
-            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-        },
-        None => None,
-    };
-    let response = match registry.redeem_credential(
-        &metadata,
-        &access_token,
-        &payload,
-        unix_timestamp_now(),
-        portable_signing_keypair.as_ref(),
-        portable_status_registry.as_ref(),
-    ) {
-        Ok(response) => response,
-        Err(error) if error.to_string().contains("access token") => {
-            return plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(response).into_response()
+    let lane = state.public_passport_issuance_lane.clone();
+    run_registry_transaction(&lane, move || {
+        PassportIssuanceOfferRegistry::update(&path, |registry| {
+            let issuer = state.config.advertise_url.as_deref().ok_or_else(|| {
+                RegistryOperationError::Configuration(
+                    "passport issuance requires --advertise-url on the trust-control service"
+                        .to_string(),
+                )
+            })?;
+            let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                .map_err(RegistryOperationError::authority)?;
+            // An upload can outlive its entitlement. Check the fresh locked
+            // state before metadata resolution can create signing material.
+            registry
+                .validate_credential_entitlement(issuer, &access_token, clock_now)
+                .map_err(RegistryOperationError::invalid_entitlement)?;
+            issuer_authority::run(&state, |state, signer| {
+                let metadata = issuer_authority::metadata(&state.config, signer)?;
+                let portable_status_registry = state
+                    .config
+                    .passport_statuses_file
+                    .as_deref()
+                    .map(PassportStatusRegistry::load)
+                    .transpose()
+                    .map_err(RegistryOperationError::configuration)?;
+                // Signing custody and status reads can outlive the first
+                // entitlement check. Recheck at current owner time before the
+                // final redemption; request/profile failures remain 400.
+                let clock_now = super::json_ingress::wallet_time(&state.finding_challenge_clock)
+                    .map_err(RegistryOperationError::authority)?;
+                registry
+                    .validate_credential_entitlement(
+                        &metadata.credential_issuer,
+                        &access_token,
+                        clock_now,
+                    )
+                    .map_err(RegistryOperationError::invalid_entitlement)?;
+                let response = registry
+                    .redeem_credential(
+                        &metadata,
+                        &access_token,
+                        &payload,
+                        clock_now,
+                        signer,
+                        portable_status_registry.as_ref(),
+                    )
+                    .map_err(RegistryOperationError::bad_request)?;
+                registry.prune_dead(clock_now);
+                Ok(response)
+            })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_list_passport_statuses(
@@ -296,28 +378,32 @@ pub(crate) async fn handle_publish_passport_status(
     headers: HeaderMap,
     Json(mut request): Json<PublishPassportStatusRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_passport_status_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.passport_statuses_file.as_deref(),
+        "--passport-statuses-file",
+        "passport lifecycle",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
     if request.distribution.resolve_urls.is_empty() {
         request.distribution = default_passport_status_distribution(&state.config);
     }
-    let record = match registry.publish(
-        &request.passport,
-        unix_timestamp_now(),
-        request.distribution,
-    ) {
-        Ok(record) => record,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
+        PassportStatusRegistry::update(&path, |registry| {
+            registry.publish(&request.passport, clock_now, request.distribution)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_resolve_passport_status(
@@ -325,6 +411,10 @@ pub(crate) async fn handle_resolve_passport_status(
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -332,7 +422,7 @@ pub(crate) async fn handle_resolve_passport_status(
         Ok((_, registry)) => registry,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let mut resolution = registry.resolve_at(&passport_id, unix_timestamp_now());
+    let mut resolution = registry.resolve_at(&passport_id, clock_now);
     resolution.source = Some("registry:trust-control".to_string());
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
@@ -344,11 +434,15 @@ pub(crate) async fn handle_public_resolve_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let registry = match load_passport_status_registry_for_admin(&state.config) {
         Ok((_, registry)) => registry,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let mut resolution = registry.resolve_at(&passport_id, unix_timestamp_now());
+    let mut resolution = registry.resolve_at(&passport_id, clock_now);
     resolution.source = Some("registry:trust-control".to_string());
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
@@ -362,25 +456,25 @@ pub(crate) async fn handle_revoke_passport_status(
     headers: HeaderMap,
     Json(request): Json<PassportStatusRevocationRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_passport_status_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.passport_statuses_file.as_deref(),
+        "--passport-statuses-file",
+        "passport lifecycle",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let record = match registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
-    {
-        Ok(record) => record,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(record).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
+        PassportStatusRegistry::update(&path, |registry| {
+            registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_list_verifier_policies(
@@ -431,21 +525,30 @@ pub(crate) async fn handle_upsert_verifier_policy(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_verifier_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    document.body.policy_id = policy_id.clone();
-    if let Err(error) = verify_signed_passport_verifier_policy(&document) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    if let Err(error) = registry.upsert(document.clone()) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(document).into_response()
+    let path = match configured_registry_file(
+        state.config.verifier_policies_file.as_deref(),
+        "--verifier-policies-file",
+        "verifier policy",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
+    };
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        VerifierPolicyRegistry::update(&path, |registry| {
+            document.body.policy_id = policy_id;
+            verify_signed_passport_verifier_policy(&document)
+                .map_err(RegistryOperationError::bad_request)?;
+            registry
+                .upsert(document.clone())
+                .map_err(RegistryOperationError::bad_request)?;
+            Ok(document)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_delete_verifier_policy(
@@ -456,15 +559,25 @@ pub(crate) async fn handle_delete_verifier_policy(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_verifier_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    let deleted = registry.remove(&policy_id);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(VerifierPolicyDeleteResponse { policy_id, deleted }).into_response()
+    let path = match configured_registry_file(
+        state.config.verifier_policies_file.as_deref(),
+        "--verifier-policies-file",
+        "verifier policy",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
+    };
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        VerifierPolicyRegistry::update(&path, |registry| {
+            let deleted = registry.remove(&policy_id);
+            Ok::<_, RegistryOperationError>(VerifierPolicyDeleteResponse { policy_id, deleted })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_create_passport_challenge(
@@ -472,6 +585,10 @@ pub(crate) async fn handle_create_passport_challenge(
     headers: HeaderMap,
     Json(payload): Json<CreatePassportChallengeRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -490,7 +607,7 @@ pub(crate) async fn handle_create_passport_challenge(
             "challenge creation accepts either policy_id or policy, not both",
         );
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let (policy_ref, policy) = if let Some(policy_id) = payload.policy_id.as_deref() {
         let Some(registry) = state.verifier_policy_registry() else {
             return plain_http_error(
@@ -559,10 +676,12 @@ fn verify_passport_challenge_payload(
     expected_challenge: Option<&PassportPresentationChallenge>,
     consume: bool,
 ) -> Result<PassportPresentationVerification, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     if let Err(error) = configured_verifier_challenge_db_path(&state.config) {
         return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()));
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let challenge = expected_challenge.unwrap_or(&payload.presentation.challenge);
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
         state.verifier_policy_registry(),
@@ -661,6 +780,10 @@ pub(crate) async fn handle_public_get_passport_challenge(
     State(state): State<TrustServiceState>,
     AxumPath(challenge_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let challenge_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -669,7 +792,7 @@ pub(crate) async fn handle_public_get_passport_challenge(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    match store.fetch_active(&challenge_id, unix_timestamp_now()) {
+    match store.fetch_active(&challenge_id, clock_now) {
         Ok(challenge) => Json(challenge).into_response(),
         Err(error) if error.to_string().contains("not registered") => {
             plain_http_error(StatusCode::NOT_FOUND, &error.to_string())
@@ -682,11 +805,59 @@ pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
 ) -> Response {
-    match forward_post_to_leader(&state, PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH, &payload).await {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    match forward_public_passport_challenge_to_leader(&state, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
+    let lane = Arc::clone(&state.public_passport_challenge_lane);
+    verify_public_passport_challenge_in_lane(&lane, state, payload, clock_now).await
+}
+
+/// Verifies one public holder submission on the blocking pool under a permit
+/// from `lane`.
+///
+/// Admission never waits: without a free permit the submission is refused at
+/// once with 503. The permit moves into the blocking closure and is released
+/// only after the response is built, so a submission dropped mid-verification
+/// keeps its permit until that work has ended.
+pub(super) async fn verify_public_passport_challenge_in_lane(
+    lane: &Arc<tokio::sync::Semaphore>,
+    state: TrustServiceState,
+    payload: VerifyPassportChallengeRequest,
+    clock_now: u64,
+) -> Response {
+    let Ok(permit) = Arc::clone(lane).try_acquire_owned() else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "public passport challenge verification is at capacity",
+        );
+    };
+    tokio::task::spawn_blocking(move || {
+        let response = verify_public_passport_challenge(&state, &payload, clock_now);
+        drop(permit);
+        response
+    })
+    .await
+    .unwrap_or_else(|_| {
+        plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "public passport challenge verification did not complete",
+        )
+    })
+}
+
+/// Checks one public holder submission against its stored challenge and
+/// builds the response.
+fn verify_public_passport_challenge(
+    state: &TrustServiceState,
+    payload: &VerifyPassportChallengeRequest,
+    clock_now: u64,
+) -> Response {
     let challenge_id = match payload
         .presentation
         .challenge
@@ -711,7 +882,7 @@ pub(crate) async fn handle_public_verify_passport_challenge(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let stored_challenge = match store.fetch_active(&challenge_id, unix_timestamp_now()) {
+    let stored_challenge = match store.fetch_active(&challenge_id, clock_now) {
         Ok(challenge) => challenge,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -728,7 +899,7 @@ pub(crate) async fn handle_public_verify_passport_challenge(
             );
         }
     }
-    match verify_passport_challenge_payload(&state, &payload, Some(&stored_challenge), true) {
+    match verify_passport_challenge_payload(state, payload, Some(&stored_challenge), true) {
         Ok(verification) => Json(verification).into_response(),
         Err(response) => response,
     }
@@ -739,6 +910,10 @@ pub(crate) async fn handle_create_oid4vp_request(
     headers: HeaderMap,
     Json(payload): Json<CreateOid4vpRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -751,7 +926,7 @@ pub(crate) async fn handle_create_oid4vp_request(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let request = match build_oid4vp_request_for_service(&state.config, &payload, now) {
         Ok(request) => request,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -807,6 +982,10 @@ pub(crate) async fn handle_public_get_wallet_exchange(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -815,7 +994,7 @@ pub(crate) async fn handle_public_get_wallet_exchange(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let snapshot = match store.snapshot(&request_id, unix_timestamp_now()) {
+    let snapshot = match store.snapshot(&request_id, clock_now) {
         Ok(snapshot) => snapshot,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -850,6 +1029,21 @@ pub(crate) async fn handle_public_get_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    run_public_authority_trust_read(&state, move |state, status| {
+        get_public_oid4vp_request(state, request_id, status)
+    })
+    .await
+}
+
+fn get_public_oid4vp_request(
+    state: &TrustServiceState,
+    request_id: String,
+    admitted_status: Option<&TrustAuthorityStatus>,
+) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -858,21 +1052,28 @@ pub(crate) async fn handle_public_get_oid4vp_request(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, request_jwt) = match store.fetch_active(&request_id, unix_timestamp_now()) {
+    let (request, request_jwt) = match store.fetch_active(&request_id, clock_now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let trusted_public_keys = match resolve_oid4vp_verifier_trusted_public_keys(&state.config) {
+    let keys = match admitted_status {
+        Some(status) => trusted_public_keys_from_status(status),
+        None => resolve_public_oid4vp_verifier_trusted_public_keys(
+            &state.config,
+            &state.finding_challenge_clock,
+        ),
+    };
+    let trusted_public_keys = match keys {
         Ok(keys) => keys,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
     if let Err(error) = verify_signed_oid4vp_request_object_with_any_key(
         &request_jwt,
         &trusted_public_keys,
-        unix_timestamp_now(),
+        clock_now,
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
@@ -894,6 +1095,10 @@ pub(crate) async fn handle_public_launch_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -902,7 +1107,7 @@ pub(crate) async fn handle_public_launch_oid4vp_request(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, _) = match store.fetch_active(&request_id, unix_timestamp_now()) {
+    let (request, _) = match store.fetch_active(&request_id, clock_now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -916,6 +1121,15 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     State(state): State<TrustServiceState>,
     Form(payload): Form<Oid4vpDirectPostForm>,
 ) -> Response {
+    // Acceptance time comes from the request-handling state clock, sampled both
+    // before and after the untrusted remote waits. A slow issuer or lifecycle
+    // response therefore cannot carry acceptance past the request's expiry under
+    // a stale timestamp. A clock failure fails closed.
+    let clock = state.finding_challenge_clock.as_ref();
+    let clock_now = match clock_unix_secs(clock) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let unverified_response = match inspect_oid4vp_direct_post_response(&payload.response) {
         Ok(response) => response,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -935,7 +1149,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let (request, request_jwt) = match store.fetch_active(&request_id, now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
@@ -948,26 +1162,79 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(credential) => credential,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
+    let requested_issuer_allowlist = request
+        .dcql_query
+        .credentials
+        .first()
+        .map(|credential| credential.issuer_allowlist.iter().cloned().collect())
+        .unwrap_or_default();
+    // Trust is decided before any network I/O: our own advertised issuer uses
+    // local keys, every other issuer must be in the verifier request's signed
+    // issuer allowlist, and an empty allowlist trusts only the local issuer.
     let issuer_public_keys =
-        match resolve_portable_issuer_public_keys(&state.config, &credential.issuer) {
-            Ok(keys) => keys,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        if state.config.advertise_url.as_deref() == Some(credential.issuer.as_str()) {
+            match public_oid4vp_trusted_keys(&state).await {
+                Ok(keys) => keys,
+                Err(response) => return response,
+            }
+        } else {
+            match plan_portable_issuer_keys(
+                &state.config,
+                &credential.issuer,
+                &requested_issuer_allowlist,
+                &state.finding_challenge_clock,
+            ) {
+                Ok(PortableIssuerResolution::Local(keys)) => keys,
+                Ok(PortableIssuerResolution::Untrusted) => {
+                    return plain_http_error(
+                        StatusCode::FORBIDDEN,
+                        "portable credential issuer is not trusted by the verifier request",
+                    );
+                }
+                Ok(PortableIssuerResolution::Remote(fetch)) => {
+                    match run_portable_issuer_fetch(move || fetch.resolve()).await {
+                        Ok(Ok(keys)) => keys,
+                        Ok(Err(error)) => {
+                            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+                        }
+                        Err(refusal) => return refusal.into_response(plain_http_error),
+                    }
+                }
+                Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+            }
         };
-    let mut verification = match verify_oid4vp_direct_post_response_with_any_issuer_key(
+    // Refresh trusted time after the issuer-key wait and verify the signed
+    // response against it. This yields the passport identity used to plan the
+    // lifecycle resolution; it runs before the signed lifecycle URL is fetched.
+    let verify_now = match clock_unix_secs(clock) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let verified = match verify_oid4vp_direct_post_response_with_any_issuer_key(
         &payload.response,
         &request,
         &issuer_public_keys,
-        now,
+        verify_now,
     ) {
         Ok(verification) => verification,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     };
-    let lifecycle = match resolve_oid4vp_passport_lifecycle(
+    let lifecycle = match plan_oid4vp_passport_lifecycle(
         &state.config,
-        &verification.passport_id,
-        verification.passport_status.as_ref(),
+        &verified.passport_id,
+        verified.passport_status.as_ref(),
+        verify_now,
     ) {
-        Ok(lifecycle) => lifecycle,
+        Ok(PassportLifecyclePlan::Resolved(lifecycle)) => lifecycle,
+        Ok(PassportLifecyclePlan::Remote(fetch)) => {
+            match run_portable_issuer_fetch(move || fetch.resolve()).await {
+                Ok(Ok(lifecycle)) => Some(lifecycle),
+                Ok(Err(error)) => {
+                    return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+                }
+                Err(refusal) => return refusal.into_response(plain_http_error),
+            }
+        }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
     if let Some(lifecycle) = lifecycle.as_ref() {
@@ -975,7 +1242,25 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
             return plain_http_error(StatusCode::FORBIDDEN, &passport_lifecycle_reason(lifecycle));
         }
     }
-    if let Err(error) = store.consume(&request, &request_jwt, now) {
+    // Refresh trusted time after the lifecycle wait and revalidate the signed
+    // response at that final acceptance time, so a credential or holder proof
+    // that expired during either remote wait is refused even while the verifier
+    // request is still live. The atomic consume then enforces request expiry
+    // against the same time and records it as the consumption instant.
+    let accept_now = match clock_unix_secs(clock) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let mut verification = match verify_oid4vp_direct_post_response_with_any_issuer_key(
+        &payload.response,
+        &request,
+        &issuer_public_keys,
+        accept_now,
+    ) {
+        Ok(verification) => verification,
+        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    };
+    if let Err(error) = store.consume(&request, &request_jwt, accept_now) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
     verification.exchange_transaction = Some(WalletExchangeTransactionState::consumed(
@@ -983,7 +1268,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         &request.jti,
         request.iat,
         request.exp,
-        now,
+        accept_now,
     ));
     verification.identity_assertion = request.identity_assertion.clone();
     Json(verification).into_response()
@@ -994,6 +1279,10 @@ pub(crate) async fn handle_federated_issue(
     headers: HeaderMap,
     Json(payload): Json<FederatedIssueRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -1010,7 +1299,7 @@ pub(crate) async fn handle_federated_issue(
             );
         }
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     if let Some(policy) = payload.delegation_policy.as_ref() {
         if let Err(error) = verify_federated_delegation_policy(policy)
             .and_then(|_| ensure_federated_delegation_policy_active(policy, now))
@@ -1257,7 +1546,7 @@ pub(crate) async fn handle_federated_issue(
     }
     let mut store =
         if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
-            match open_receipt_store(&state.config) {
+            match state.receipt_store() {
                 Ok(store) => Some(store),
                 Err(response) => return response,
             }
@@ -1306,9 +1595,9 @@ pub(crate) async fn handle_federated_issue(
         None
     };
     let authority = if payload.delegation_policy.is_some() {
-        load_capability_authority_with_deferred_lineage(&state.config)
+        load_capability_authority_with_deferred_lineage(&state)
     } else {
-        load_capability_authority(&state.config)
+        load_capability_authority(&state)
     };
     match authority {
         Ok(authority) => {
@@ -1373,7 +1662,7 @@ pub(crate) async fn handle_federated_issue(
                             .map(|link| link.capability_id.clone());
                         let mut child_snapshot = match build_capability_snapshot(
                             &capability,
-                            capability.delegation_chain.len() as u64,
+                            crate::integer::count(capability.delegation_chain.len()),
                             signed_parent_capability_id,
                         ) {
                             Ok(snapshot) => snapshot,
@@ -1431,3 +1720,13 @@ pub(crate) async fn handle_federated_issue(
         Err(response) => response,
     }
 }
+
+#[cfg(test)]
+#[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
+mod oid4vp_issuer_fetch_tests;
+
+#[path = "passport_handlers/issuer_authority.rs"]
+mod issuer_authority;
+
+#[cfg(test)]
+pub(crate) use issuer_authority::provisional_test_observer::observe_provisional_issuer_once;

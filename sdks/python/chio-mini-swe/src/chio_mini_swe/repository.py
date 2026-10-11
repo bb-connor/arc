@@ -1,0 +1,300 @@
+"""Installed repository execution service and review artifact commands."""
+
+import argparse
+import json
+import os
+import signal
+import sys
+
+from chio_mini_swe.operator import private_directory, write
+from chio_mini_swe.provider_config import reject_constant, unique_object
+from chio_mini_swe.repository_archive import contents, digest, patch
+from chio_mini_swe.repository_proof import verify
+from chio_mini_swe.repository_store import Workspace, atomic_bytes, configuration_digest, initialize
+from chio_mini_swe.repository_wire import (
+    MAX_COMMAND_BYTES,
+    MAX_TOOL_CALL_ID_BYTES,
+    command_text,
+    error_frame,
+    read_request_frame,
+    request_id,
+    response_frame,
+    tool_result,
+)
+
+
+def tool(config):
+    config_digest = configuration_digest(config)
+    scope = (
+        " Selected source paths: " + json.dumps(config["source_paths"]) + "."
+        if "source_paths" in config
+        else ""
+    )
+    return {
+        "name": "execute",
+        "description": (
+            f"Execute one bash command in repository workspace {config['id']} "
+            f"at source commit {config['source_commit']}. Configuration SHA-256: {config_digest}."
+            + scope
+        ),
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["command"],
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_COMMAND_BYTES,
+                    "description": "Non-NUL command limited to 65,536 UTF-8 bytes.",
+                },
+                "tool_call_id": {
+                    "type": "string",
+                    "maxLength": MAX_TOOL_CALL_ID_BYTES,
+                    "description": "Optional tool call ID limited to 1,024 UTF-8 bytes.",
+                },
+            },
+        },
+        "annotations": {
+            "readOnlyHint": False,
+            "idempotentHint": False,
+            "destructiveHint": True,
+            "openWorldHint": False,
+        },
+    }
+
+
+def serve(workspace, incoming=None, outgoing=None):
+    incoming = sys.stdin.buffer if incoming is None else incoming
+    outgoing = sys.stdout if outgoing is None else outgoing
+    workspace.recover()
+    while True:
+        try:
+            line = read_request_frame(incoming)
+        except ValueError:
+            print(
+                error_frame(None, -32600, "Invalid repository MCP frame"), file=outgoing, flush=True
+            )
+            continue
+        if not line:
+            return
+        try:
+            message = json.loads(
+                line.decode("utf-8"),
+                object_pairs_hook=unique_object,
+                parse_constant=reject_constant,
+            )
+        except (ValueError, RecursionError):
+            print(
+                error_frame(None, -32700, "Invalid repository MCP JSON"), file=outgoing, flush=True
+            )
+            continue
+        identifier = None
+        try:
+            if not isinstance(message, dict):
+                raise ValueError("Invalid repository MCP request")
+            if "id" not in message:
+                continue
+            identifier = request_id(message["id"])
+            method = message["method"]
+            if method == "initialize":
+                result = {
+                    "protocolVersion": message["params"]["protocolVersion"],
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "chio-mini-swe-repository", "version": "1"},
+                }
+            elif method == "tools/list":
+                result = {"tools": [tool(workspace.config)]}
+            elif method == "tools/call":
+                try:
+                    arguments = message["params"]["arguments"]
+                    if (
+                        message["params"]["name"] != "execute"
+                        or not isinstance(arguments, dict)
+                        or not {"command"} <= set(arguments) <= {"command", "tool_call_id"}
+                    ):
+                        raise ValueError("Invalid repository tool call")
+                    if "tool_call_id" in arguments and (
+                        not isinstance(arguments["tool_call_id"], str)
+                        or len(arguments["tool_call_id"].encode("utf-8")) > MAX_TOOL_CALL_ID_BYTES
+                    ):
+                        raise ValueError("Invalid repository tool call ID")
+                    value = workspace.execute(command_text(arguments["command"]))
+                    result = tool_result(value)
+                except Exception:
+                    result = {
+                        "isError": True,
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Repository execution stopped. "
+                                    "Inspect the retained operator workspace before continuing."
+                                ),
+                            }
+                        ],
+                    }
+            else:
+                print(
+                    error_frame(identifier, -32601, "Unsupported repository MCP method"),
+                    file=outgoing,
+                    flush=True,
+                )
+                continue
+            encoded = response_frame(identifier, result)
+        except Exception:
+            encoded = error_frame(identifier, -32600, "Invalid repository MCP request")
+        print(encoded, file=outgoing, flush=True)
+
+
+def export(workspace, output):
+    status = workspace.status()
+    if any(row["status"] == "pending" for row in status["commands"]):
+        raise ValueError("Recover pending repository containers before exporting retained state")
+    before = contents(workspace.snapshot(workspace.config["baseline"]))
+    after = contents(workspace.snapshot(status["snapshot"]))
+    difference = patch(before, after)
+    output = private_directory(output, create=True)
+    for name, data in [
+        ("baseline.tar", before),
+        ("workspace.tar", after),
+        ("changes.patch", difference),
+    ]:
+        atomic_bytes(output / name, data)
+    commands = [
+        dict(row)
+        for row in workspace.db.execute(
+            "SELECT sequence,command,status,before_sha256,after_sha256,result "
+            "FROM commands ORDER BY sequence"
+        )
+    ]
+    for row in commands:
+        if row["result"] is not None:
+            row["result"] = json.loads(row["result"])
+    write(output / "commands.json", commands)
+    manifest = {
+        "schema": "chio.repository.export.v1",
+        **status,
+        "baseline": workspace.config["baseline"],
+        "patch_sha256": digest(difference),
+        "baseline_contents_sha256": digest(before),
+        "contents_sha256": digest(after),
+        "image": workspace.config["image"],
+        "helper_image": workspace.config["helper_image"],
+    }
+    manifest["schema"] = "chio.repository.export.v1"
+    write(output / "manifest.json", manifest)
+    write(output / "configuration.json", workspace.config)
+    return {
+        "output": str(output),
+        "revision": status["revision"],
+        "interrupted": status["interrupted"],
+        "patch_sha256": digest(difference),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run repository commands through a private Chio execution service"
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+    setup = commands.add_parser("init")
+    setup.add_argument("--repository", required=True)
+    setup.add_argument("--revision", default="HEAD")
+    setup.add_argument("--image", required=True)
+    setup.add_argument("--helper-image", required=True)
+    setup.add_argument("--timeout-seconds", type=int, default=60)
+    setup.add_argument("--source-path", action="append", help="Literal committed path to include")
+    for command in [
+        setup,
+        *(
+            commands.add_parser(name)
+            for name in ("serve", "adapter", "status", "recover", "export", "verify")
+        ),
+    ]:
+        command.add_argument("--state", required=True)
+        if command.prog.endswith(" adapter"):
+            command.add_argument("--configuration-sha256", required=True)
+        if command.prog.endswith((" export", " verify")):
+            command.add_argument("--out", required=True)
+        if command.prog.endswith(" verify"):
+            command.add_argument("--chio", required=True)
+            command.add_argument("--receipts", required=True)
+            command.add_argument("--command-outputs", required=True)
+            command.add_argument("--kernel-key", required=True)
+            command.add_argument("--server-id", required=True)
+    review = commands.add_parser("verify-export")
+    review.add_argument("--bundle", required=True)
+    review.add_argument("--repository", required=True)
+    review.add_argument("--revision", required=True)
+    review.add_argument("--chio", required=True)
+    review.add_argument("--kernel-key", required=True)
+    review.add_argument("--server-id", required=True)
+    review.add_argument(
+        "--source-path", action="append", help="Independently selected literal source path"
+    )
+    args = parser.parse_args()
+    os.umask(0o077)
+
+    def stop(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    signal.signal(signal.SIGTERM, stop)
+    if args.command == "verify-export":
+        from chio_mini_swe.repository_review import verify_export
+
+        value = verify_export(
+            args.bundle,
+            binary=args.chio,
+            repository=args.repository,
+            revision=args.revision,
+            key_path=args.kernel_key,
+            server_id=args.server_id,
+            source_paths=args.source_path,
+        )
+    elif args.command == "init":
+        value = initialize(
+            args.repository,
+            args.revision,
+            args.image,
+            args.helper_image,
+            args.state,
+            args.timeout_seconds,
+            source_paths=args.source_path,
+        )
+    elif args.command == "adapter":
+        from chio_mini_swe.repository_adapter import serve as serve_adapter
+
+        serve_adapter(lambda: Workspace(args.state), args.configuration_sha256)
+        return 0
+    else:
+        with Workspace(args.state) as workspace:
+            if args.command == "serve":
+                serve(workspace)
+                return 0
+            if args.command == "recover":
+                workspace.recover()
+            if args.command == "verify":
+                proof, receipts, key = verify(
+                    workspace,
+                    binary=args.chio,
+                    receipts_path=args.receipts,
+                    key_path=args.kernel_key,
+                    server_id=args.server_id,
+                    command_outputs_path=args.command_outputs,
+                )
+                value = export(workspace, args.out)
+                atomic_bytes(private_directory(args.out) / "receipts.ndjson", receipts)
+                atomic_bytes(private_directory(args.out) / "kernel.pub", key)
+                write(private_directory(args.out) / "receipt-binding.json", proof)
+                value["verified_transitions"] = len(proof["transitions"])
+            else:
+                value = (
+                    export(workspace, args.out) if args.command == "export" else workspace.status()
+                )
+    print(json.dumps(value, ensure_ascii=False, allow_nan=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

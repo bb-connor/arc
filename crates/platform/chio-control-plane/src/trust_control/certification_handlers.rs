@@ -3,7 +3,9 @@
 //! trust-activation, governance, and open-market artifact endpoints.
 
 use super::report_rendering::forward_post_to_leader;
-use super::report_validation::validate_service_auth;
+use super::report_validation::{
+    inspect_authority_state, run_authority_commit, validate_service_auth,
+};
 use super::*;
 
 pub(crate) async fn handle_list_certifications(
@@ -50,21 +52,23 @@ pub(crate) async fn handle_publish_certification(
     headers: HeaderMap,
     Json(artifact): Json<SignedCertificationCheck>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.publish(artifact) {
-        Ok(entry) => entry,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(entry).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
+        CertificationRegistry::update(&path, |registry| registry.publish(artifact))
+    })
+    .await
 }
 
 pub(crate) async fn handle_resolve_certification(
@@ -114,7 +118,8 @@ pub(crate) async fn handle_public_search_certifications(
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(registry.search_public(&metadata.publisher, metadata.expires_at, &query)).into_response()
+    certification_result(registry.search_public(&metadata.publisher, metadata.expires_at, &query))
+        .into_response()
 }
 
 pub(crate) async fn handle_public_certification_transparency(
@@ -129,13 +134,13 @@ pub(crate) async fn handle_public_certification_transparency(
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(registry.transparency(&metadata.publisher, &query)).into_response()
+    certification_result(registry.transparency(&metadata.publisher, &query)).into_response()
 }
 
 pub(crate) async fn handle_public_generic_namespace(
     State(state): State<TrustServiceState>,
 ) -> Response {
-    match build_signed_generic_namespace(&state.config) {
+    match build_signed_generic_namespace(&state.config, &state.finding_challenge_clock) {
         Ok(namespace) => Json(namespace).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -145,7 +150,12 @@ pub(crate) async fn handle_public_generic_listings(
     State(state): State<TrustServiceState>,
     Query(query): Query<GenericListingQuery>,
 ) -> Response {
-    match build_public_generic_listing_report(&state.config, &query) {
+    match build_public_generic_listing_report(
+        &state.config,
+        state.receipt_store.as_deref(),
+        &query,
+        &state.finding_challenge_clock,
+    ) {
         Ok(report) => Json(report).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
@@ -159,10 +169,13 @@ pub(crate) async fn handle_issue_generic_trust_activation(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_trust_activation(&state.config, &request)
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_trust_activation(state, &request)
+    })
+    .await
     {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -174,12 +187,13 @@ pub(crate) async fn handle_evaluate_generic_trust_activation(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::evaluate_generic_trust_activation_request(
-        &state.config,
-        &request,
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::evaluate_generic_trust_activation_request(state, &request)
+    })
+    .await
+    {
         Ok(report) => Json(report).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -191,12 +205,13 @@ pub(crate) async fn handle_issue_generic_governance_charter(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_governance_charter(
-        &state.config,
-        &request,
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_governance_charter(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -208,9 +223,13 @@ pub(crate) async fn handle_issue_generic_governance_case(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::issue_signed_generic_governance_case(&state.config, &request) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_generic_governance_case(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -246,13 +265,27 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
             Err(response) => return response,
         }
     }
-    match service_runtime::issuance::issue_signed_open_market_fee_schedule(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    let prepared = match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::prepare_open_market_fee_schedule(state, &request)
+    })
+    .await
+    {
+        Ok(prepared) => prepared,
+        Err(response) => return response,
+    };
+    let prepared = match prepared.into_unbound() {
+        Ok(artifact) => return Json(artifact).into_response(),
+        Err(prepared) => prepared,
+    };
+    // The binding observes the admitted authority inside its own commit
+    // transaction, so nothing after that commit may refuse it.
+    match run_authority_commit(&state, move |state| {
+        service_runtime::issuance::bind_governed_fee_schedule(state, prepared)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -274,13 +307,13 @@ pub(crate) async fn handle_issue_open_market_penalty(
             Err(response) => return response,
         }
     }
-    match service_runtime::issuance::issue_signed_open_market_penalty(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::issue_signed_open_market_penalty(state, &request)
+    })
+    .await
+    {
         Ok(artifact) => Json(artifact).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -292,13 +325,13 @@ pub(crate) async fn handle_evaluate_open_market_penalty(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match service_runtime::issuance::evaluate_open_market_penalty_request(
-        &state.config,
-        &request,
-        state.fiscal_runtime.as_deref(),
-    ) {
+    match inspect_authority_state(&state, move |state| {
+        service_runtime::issuance::evaluate_open_market_penalty_request(state, &request)
+    })
+    .await
+    {
         Ok(report) => Json(report).into_response(),
-        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(response) => response,
     }
 }
 
@@ -338,7 +371,7 @@ pub(crate) async fn handle_discover_certification(
     };
     let response =
         crate::certify::network::discover_certifications_across_network(&network, &tool_server_id);
-    Json(response).into_response()
+    certification_result(response).into_response()
 }
 
 pub(crate) async fn handle_search_certification_marketplace(
@@ -353,8 +386,10 @@ pub(crate) async fn handle_search_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(crate::certify::network::search_public_certifications_across_network(&network, &query))
-        .into_response()
+    certification_result(
+        crate::certify::network::search_public_certifications_across_network(&network, &query),
+    )
+    .into_response()
 }
 
 pub(crate) async fn handle_transparency_certification_marketplace(
@@ -369,7 +404,7 @@ pub(crate) async fn handle_transparency_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(
+    certification_result(
         crate::certify::network::transparency_public_certifications_across_network(
             &network, &query,
         ),
@@ -389,8 +424,10 @@ pub(crate) async fn handle_consume_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(crate::certify::network::consume_public_certification_across_network(&network, &request))
-        .into_response()
+    certification_result(
+        crate::certify::network::consume_public_certification_across_network(&network, &request),
+    )
+    .into_response()
 }
 
 pub(crate) async fn handle_revoke_certification(
@@ -399,24 +436,25 @@ pub(crate) async fn handle_revoke_certification(
     headers: HeaderMap,
     Json(request): Json<CertificationRevocationRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.revoke(&artifact_id, request.reason.as_deref(), request.revoked_at) {
-        Ok(entry) => entry,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(entry).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
+        CertificationRegistry::update(&path, |registry| {
+            registry.revoke(&artifact_id, request.reason.as_deref(), request.revoked_at)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_dispute_certification(
@@ -425,22 +463,28 @@ pub(crate) async fn handle_dispute_certification(
     headers: HeaderMap,
     Json(request): Json<CertificationDisputeRequest>,
 ) -> Response {
+    use super::registry_write_lane::{configured_registry_file, run_registry_update};
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_certification_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    let path = match configured_registry_file(
+        state.config.certification_registry_file.as_deref(),
+        "--certification-registry-file",
+        "certification registry",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    let entry = match registry.dispute(&artifact_id, &request) {
-        Ok(entry) => entry,
-        Err(error) if error.to_string().contains("was not found") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_update(&lane, move || {
+        CertificationRegistry::update(&path, |registry| registry.dispute(&artifact_id, &request))
+    })
+    .await
+}
+
+fn certification_result<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
+    match result {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     }
-    Json(entry).into_response()
 }

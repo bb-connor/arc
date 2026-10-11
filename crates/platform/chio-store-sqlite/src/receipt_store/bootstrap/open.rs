@@ -1,3 +1,5 @@
+// tenant-read-contract: chio_authorization_receipt_consumptions; class=administrative; principal=kernel-admission
+// Contracts: docs/security/trust-boundary-inventory.json
 use super::*;
 
 use std::path::PathBuf;
@@ -252,7 +254,7 @@ fn anchored_receipt_sink_binding(file_sink_binding: &str, anchor_instance_id: &s
 }
 
 fn append_receipt_sink_binding_part(material: &mut Vec<u8>, part: &[u8]) {
-    material.extend_from_slice(&(part.len() as u64).to_be_bytes());
+    material.extend_from_slice(&crate::integer::count(part.len()).to_be_bytes());
     material.extend_from_slice(part);
 }
 
@@ -306,7 +308,25 @@ fn settlement_schema_manifest(
 
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config(path, crate::SqlitePoolConfig::default())
+        Self::open_with_clock(path, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_options_and_clock(path, crate::SqliteStoreOptions::default(), clock)
+    }
+
+    pub fn open_existing_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_existing_with_options_and_clock(
+            path,
+            crate::SqliteStoreOptions::default(),
+            clock,
+        )
     }
 
     /// Wait until the commit actor has seeded its durable head before a host
@@ -317,14 +337,57 @@ impl SqliteReceiptStore {
         if !self.writer_serving_closed() {
             return Ok(());
         }
+        Err(self.writer_startup_failure())
+    }
+
+    /// Wait up to `wait` for the writer's seed. `Ok(true)`: the seed verified
+    /// the history and the writer is serving. `Ok(false)`: the single writer is
+    /// still verifying a large history and serves queued commands in order once
+    /// it finishes. A poisoned seed or a failed writer thread is an error.
+    pub fn wait_for_writer_seed(&self, wait: Duration) -> Result<bool, ReceiptStoreError> {
+        let settled = self.receipt_commit_actor.health.wait_seed_settled(wait);
+        let thread_failed = self
+            .receipt_commit_actor
+            .worker
+            .health()
+            .is_none_or(chio_supervisor::HealthFlag::is_serving_closed);
+        if thread_failed || (settled && self.writer_serving_closed()) {
+            return Err(self.writer_startup_failure());
+        }
+        Ok(settled)
+    }
+
+    /// The authority clock this store's history is written against.
+    pub fn authority_clock(&self) -> Arc<dyn chio_security_types::clock::Clock> {
+        Arc::new(self.clock.clone())
+    }
+
+    /// Join this store's writer on a dedicated reaper thread when the store is
+    /// released, never on the releasing thread. A shared service store can be
+    /// released last by an async task, which must not block on that join.
+    pub fn join_writer_on_reaper(&self) {
+        if let Some(writer) = self.receipt_commit_actor.worker.join.as_ref() {
+            writer.join_on_reaper.store(true, Ordering::SeqCst);
+        }
+    }
+
+    pub fn writer_joins_on_reaper(&self) -> bool {
+        self.receipt_commit_actor
+            .worker
+            .join
+            .as_ref()
+            .is_some_and(|writer| writer.join_on_reaper.load(Ordering::SeqCst))
+    }
+
+    fn writer_startup_failure(&self) -> ReceiptStoreError {
         let detail = self
             .receipt_commit_actor
             .writer_counters()
             .last_error
             .unwrap_or_else(|| "durable receipt head is unavailable".to_string());
-        Err(ReceiptStoreError::Conflict(format!(
+        ReceiptStoreError::Conflict(format!(
             "receipt commit writer failed startup readiness: {detail}"
-        )))
+        ))
     }
 
     pub fn open_existing(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
@@ -361,14 +424,38 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, true, None)
+        Self::open_with_options_and_clock(
+            path,
+            options,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_options_and_clock(
+        path: impl AsRef<Path>,
+        options: crate::SqliteStoreOptions,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config_and_flags(path, options, true, None, clock)
     }
 
     pub fn open_existing_with_options(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, false, None)
+        Self::open_existing_with_options_and_clock(
+            path,
+            options,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_existing_with_options_and_clock(
+        path: impl AsRef<Path>,
+        options: crate::SqliteStoreOptions,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config_and_flags(path, options, false, None, clock)
     }
 
     /// Open a receipt store that may be bound to a qualified finding-pool
@@ -378,11 +465,24 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         rollback_anchor_root: impl AsRef<Path>,
     ) -> Result<Self, ReceiptStoreError> {
+        Self::open_for_finding_pool_with_clock(
+            path,
+            rollback_anchor_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_for_finding_pool_with_clock(
+        path: impl AsRef<Path>,
+        rollback_anchor_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config_and_flags(
             path,
             crate::SqliteStoreOptions::default(),
             true,
             Some(rollback_anchor_root.as_ref()),
+            clock,
         )
     }
 
@@ -393,11 +493,24 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         rollback_anchor_root: impl AsRef<Path>,
     ) -> Result<Self, ReceiptStoreError> {
+        Self::open_existing_for_finding_pool_with_clock(
+            path,
+            rollback_anchor_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_existing_for_finding_pool_with_clock(
+        path: impl AsRef<Path>,
+        rollback_anchor_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config_and_flags(
             path,
             crate::SqliteStoreOptions::default(),
             false,
             Some(rollback_anchor_root.as_ref()),
+            clock,
         )
     }
 
@@ -406,7 +519,9 @@ impl SqliteReceiptStore {
         options: crate::SqliteStoreOptions,
         create_if_missing: bool,
         rollback_anchor_root: Option<&Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, ReceiptStoreError> {
+        let clock = crate::store_clock::StoreClock::new(clock);
         let path = path.as_ref();
         if rollback_anchor_root.is_some() {
             let Some(path_text) = path.to_str() else {
@@ -510,8 +625,10 @@ impl SqliteReceiptStore {
             )?;
 
             return Ok(Self {
+                clock: clock.clone(),
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
+                    clock.clone(),
                     options.incremental_verification,
                     rollback_anchor.clone(),
                     receipt_sink_qualification.clone(),
@@ -521,7 +638,6 @@ impl SqliteReceiptStore {
                 settlement_store_binding,
                 durable_sink_id,
                 receipt_sink_qualification,
-                strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
             });
         }
@@ -573,6 +689,11 @@ impl SqliteReceiptStore {
                         typeof(cost_charged_be) = 'blob' AND
                         length(cost_charged_be) = 8
                     )
+                ),
+                attempted_cost_be BLOB CHECK (
+                    attempted_cost_be IS NULL OR (
+                        typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+                    )
                 )
             );
 
@@ -588,6 +709,23 @@ impl SqliteReceiptStore {
                 ON chio_tool_receipts(tool_server, tool_name);
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
+
+            CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
+                evidence_id TEXT NOT NULL PRIMARY KEY,
+                receipt_id TEXT NOT NULL UNIQUE
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
+            BEFORE UPDATE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_delete
+            BEFORE DELETE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
 
             CREATE TABLE IF NOT EXISTS chio_authorization_receipt_consumptions (
                 authorization_receipt_id TEXT PRIMARY KEY REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT,
@@ -1235,9 +1373,6 @@ impl SqliteReceiptStore {
             );
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_request
                 ON receipt_lineage_statements(session_id, request_id);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
-                ON receipt_lineage_statements(statement_id)
-                WHERE statement_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_request
                 ON receipt_lineage_statements(session_id, parent_request_id);
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_receipt
@@ -1249,144 +1384,10 @@ impl SqliteReceiptStore {
                 WHERE session_id IS NOT NULL
                   AND request_id IS NOT NULL;
 
-            CREATE TABLE IF NOT EXISTS kernel_checkpoints (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                checkpoint_seq INTEGER NOT NULL UNIQUE,
-                batch_start_seq INTEGER NOT NULL,
-                batch_end_seq INTEGER NOT NULL,
-                tree_size INTEGER NOT NULL,
-                merkle_root TEXT NOT NULL,
-                issued_at INTEGER NOT NULL,
-                statement_json TEXT NOT NULL,
-                signature TEXT NOT NULL,
-                kernel_key TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_kernel_checkpoints_batch_end
-                ON kernel_checkpoints(batch_end_seq);
-
-            CREATE TABLE IF NOT EXISTS checkpoint_tree_heads (
-                checkpoint_seq INTEGER PRIMARY KEY
-                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
-                batch_start_seq INTEGER NOT NULL,
-                batch_end_seq INTEGER NOT NULL,
-                tree_size INTEGER NOT NULL,
-                merkle_root TEXT NOT NULL,
-                issued_at INTEGER NOT NULL,
-                kernel_key TEXT NOT NULL,
-                previous_checkpoint_sha256 TEXT,
-                statement_json TEXT NOT NULL,
-                signature TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_tree_heads_tree_size
-                ON checkpoint_tree_heads(tree_size);
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_tree_heads_previous
-                ON checkpoint_tree_heads(previous_checkpoint_sha256);
-
-            CREATE TABLE IF NOT EXISTS checkpoint_predecessor_witnesses (
-                predecessor_checkpoint_seq INTEGER NOT NULL
-                    REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
-                witness_checkpoint_seq INTEGER PRIMARY KEY
-                    REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
-                previous_checkpoint_sha256 TEXT NOT NULL,
-                witnessed_at INTEGER NOT NULL,
-                witness_statement_json TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_predecessor_witnesses_predecessor
-                ON checkpoint_predecessor_witnesses(predecessor_checkpoint_seq);
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_predecessor_witnesses_previous
-                ON checkpoint_predecessor_witnesses(previous_checkpoint_sha256);
-
-            CREATE TABLE IF NOT EXISTS checkpoint_publication_metadata (
-                checkpoint_seq INTEGER PRIMARY KEY
-                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
-                publication_schema TEXT NOT NULL,
-                merkle_root TEXT NOT NULL,
-                published_at INTEGER NOT NULL,
-                kernel_key TEXT NOT NULL,
-                log_tree_size INTEGER NOT NULL,
-                entry_start_seq INTEGER NOT NULL,
-                entry_end_seq INTEGER NOT NULL,
-                previous_checkpoint_sha256 TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_published_at
-                ON checkpoint_publication_metadata(published_at);
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_log_tree_size
-                ON checkpoint_publication_metadata(log_tree_size);
-            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_previous
-                ON checkpoint_publication_metadata(previous_checkpoint_sha256);
-
-            CREATE TABLE IF NOT EXISTS checkpoint_publication_trust_anchor_bindings (
-                checkpoint_seq INTEGER PRIMARY KEY
-                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
-                binding_json TEXT NOT NULL
-            );
-
-            DROP TRIGGER IF EXISTS kernel_checkpoints_project_tree_head;
-            CREATE TRIGGER kernel_checkpoints_project_tree_head
-            AFTER INSERT ON kernel_checkpoints
-            BEGIN
-                INSERT INTO checkpoint_tree_heads (
-                    checkpoint_seq,
-                    batch_start_seq,
-                    batch_end_seq,
-                    tree_size,
-                    merkle_root,
-                    issued_at,
-                    kernel_key,
-                    previous_checkpoint_sha256,
-                    statement_json,
-                    signature
-                ) VALUES (
-                    NEW.checkpoint_seq,
-                    NEW.batch_start_seq,
-                    NEW.batch_end_seq,
-                    NEW.tree_size,
-                    NEW.merkle_root,
-                    NEW.issued_at,
-                    NEW.kernel_key,
-                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT),
-                    NEW.statement_json,
-                    NEW.signature
-                );
-
-                INSERT INTO checkpoint_predecessor_witnesses (
-                    predecessor_checkpoint_seq,
-                    witness_checkpoint_seq,
-                    previous_checkpoint_sha256,
-                    witnessed_at,
-                    witness_statement_json
-                )
-                SELECT
-                    NEW.checkpoint_seq - 1,
-                    NEW.checkpoint_seq,
-                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT),
-                    NEW.issued_at,
-                    NEW.statement_json
-                WHERE json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') IS NOT NULL;
-
-                INSERT INTO checkpoint_publication_metadata (
-                    checkpoint_seq,
-                    publication_schema,
-                    merkle_root,
-                    published_at,
-                    kernel_key,
-                    log_tree_size,
-                    entry_start_seq,
-                    entry_end_seq,
-                    previous_checkpoint_sha256
-                ) VALUES (
-                    NEW.checkpoint_seq,
-                    'chio.checkpoint_publication.v1',
-                    NEW.merkle_root,
-                    NEW.issued_at,
-                    NEW.kernel_key,
-                    NEW.batch_end_seq,
-                    NEW.batch_start_seq,
-                    NEW.batch_end_seq,
-                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT)
-                );
-            END;
-
+            "#,
+        )?;
+        super::support::ensure_checkpoint_schema(&schema_migration)?;
+        schema_migration.execute_batch(r#"
             CREATE TABLE IF NOT EXISTS capability_lineage (
                 capability_id        TEXT PRIMARY KEY,
                 subject_key          TEXT NOT NULL,
@@ -1480,55 +1481,40 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
-        schema_migration.commit()?;
-        connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
-        connection.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-        connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
-        ensure_tool_receipt_attribution_columns(&connection)?;
-        super::support::ensure_receipt_lineage_statement_columns(&connection)?;
-        super::support::drop_transparency_projection_guards(&connection)?;
-        let backfill_result = (|| -> Result<(), ReceiptStoreError> {
-            super::support::ensure_receipt_retention_watermark_table(&connection)?;
-            super::support::ensure_receipt_retention_tombstones(&connection)?;
-            backfill_tool_receipt_attribution_columns(&connection)?;
-            let projection_backfill =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            super::support::backfill_provenance_lineage_tables(&projection_backfill)?;
-            super::support::backfill_claim_receipt_log_entries(&projection_backfill)?;
-            super::support::backfill_checkpoint_transparency_projections(&projection_backfill)?;
-            projection_backfill.commit()?;
-            if on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-                let migration = connection
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-                migrate_receipt_cost_projection(&migration)?;
-                migration.commit()?;
-            }
-            Ok(())
-        })();
-        let guard_result = super::support::ensure_transparency_projection_guards(&connection);
-        match (backfill_result, guard_result) {
-            (Ok(()), Ok(())) => {}
-            (Err(error), Ok(())) => return Err(error),
-            (Ok(()), Err(error)) => return Err(error),
-            (Err(backfill_error), Err(guard_error)) => {
-                return Err(ReceiptStoreError::Canonical(format!(
-                    "receipt projection backfill failed ({backfill_error}); restoring immutability guards also failed ({guard_error})"
-                )));
-            }
+        // Keep schema changes, projection backfills and the temporary removal
+        // of immutability guards in one transaction. A failed or interrupted
+        // open must leave the original schema and guards intact; another
+        // connection must never observe an unguarded intermediate state.
+        schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
+        schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
+        schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+        ensure_tool_receipt_attribution_columns(&schema_migration)?;
+        super::support::migrate_indexed_security_evidence_schema(&schema_migration)?;
+        super::support::ensure_receipt_lineage_statement_columns(&schema_migration)?;
+        super::support::drop_transparency_projection_guards(&schema_migration)?;
+        super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;
+        super::support::ensure_receipt_retention_tombstones(&schema_migration)?;
+        backfill_tool_receipt_attribution_columns(&schema_migration)?;
+        super::support::backfill_provenance_lineage_tables(&schema_migration)?;
+        super::support::backfill_claim_receipt_log_entries(&schema_migration)?;
+        super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
+        if on_disk_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+            migrate_receipt_cost_projection(
+                &schema_migration,
+                on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
+            )?;
         }
-        verify_receipt_cost_projection(&connection)?;
-
-        let migration =
-            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        ensure_capability_lineage_provenance_columns(&migration)?;
-        let internal_sink_id = ensure_receipt_sink_identity(&migration)?;
+        super::support::ensure_transparency_projection_guards(&schema_migration)?;
+        verify_receipt_cost_projection(&schema_migration)?;
+        ensure_capability_lineage_provenance_columns(&schema_migration)?;
+        let internal_sink_id = ensure_receipt_sink_identity(&schema_migration)?;
         crate::stamp_schema_version(
-            &migration,
+            &schema_migration,
             RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        migration.commit()?;
+        schema_migration.commit()?;
 
         let QualifiedReceiptSink {
             durable_sink_id,
@@ -1558,8 +1544,10 @@ impl SqliteReceiptStore {
         )?;
 
         Ok(Self {
+            clock: clock.clone(),
             receipt_commit_actor: ReceiptCommitActor::start(
                 writer_pool,
+                clock.clone(),
                 options.incremental_verification,
                 rollback_anchor.clone(),
                 receipt_sink_qualification.clone(),
@@ -1569,7 +1557,6 @@ impl SqliteReceiptStore {
             settlement_store_binding,
             durable_sink_id,
             receipt_sink_qualification,
-            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
         })
     }

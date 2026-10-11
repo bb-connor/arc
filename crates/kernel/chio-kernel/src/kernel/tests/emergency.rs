@@ -1,17 +1,9 @@
+use super::*;
 // Emergency kill-switch tests.
 //
-// Included by `src/kernel/tests.rs`, which already imported `super::*`
-// and all helper items from `tests/all.rs`. The helpers used here
-// (`make_config`, `make_scope`, `make_grant`, `make_keypair`,
-// `make_capability`, `make_request`, `EchoServer`) are all defined in
-// `tests/all.rs` and visible via the surrounding `tests` module.
+// Shared fixtures are imported from the parent test module.
 
-// `thread` and `ChioScope` are already in scope from `tests/all.rs` via
-// the surrounding `tests.rs` `include!`s. Only pull in items that are not
 // already imported.
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
-use std::time::Duration;
 
 fn kernel_with_echo() -> (ChioKernel, Keypair, ChioScope) {
     let mut kernel = make_kernel(make_config());
@@ -186,3 +178,6 @@ fn emergency_stop_receipt_records_deny_decision() {
         other => panic!("expected deny decision, got {other:?}"),
     }
 }
+
+#[path = "emergency/clock.rs"]
+mod clock;

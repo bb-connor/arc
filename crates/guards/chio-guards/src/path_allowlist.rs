@@ -274,15 +274,15 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }));
 
-        chio_kernel::GuardContext {
-            request,
-            scope,
-            agent_id,
-            server_id,
-            session_filesystem_roots: session_roots,
-            matched_grant_index: None,
+        {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(request, scope)
+                .with_session_filesystem_roots(session_roots);
+            constructed_guard_context.agent_id = agent_id;
+            constructed_guard_context.server_id = server_id;
+            constructed_guard_context
         }
     }
 
@@ -448,15 +448,14 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
-        let ctx = chio_kernel::GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
@@ -509,15 +508,14 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
-        let ctx = chio_kernel::GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
+        let ctx = {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");

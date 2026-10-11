@@ -14,7 +14,7 @@ fn rule(yaml: &str) -> HushSpec {
 }
 
 #[test]
-fn human_in_loop_parses_full_shape() {
+fn human_in_loop_parses_supported_shape() {
     let spec = rule(
         r#"
 hushspec: "0.1.0"
@@ -25,9 +25,6 @@ rules:
       - "write_*"
       - "shell_*"
     approve_above: 15000
-    approve_above_currency: "USD"
-    timeout_seconds: 900
-    on_timeout: deny
 "#,
     );
     let hil = spec
@@ -38,8 +35,8 @@ rules:
     assert!(hil.enabled);
     assert_eq!(hil.require_confirmation, vec!["write_*", "shell_*"]);
     assert_eq!(hil.approve_above, Some(15000));
-    assert_eq!(hil.approve_above_currency.as_deref(), Some("USD"));
-    assert_eq!(hil.timeout_seconds, Some(900));
+    assert_eq!(hil.approve_above_currency, None);
+    assert_eq!(hil.timeout_seconds, None);
     assert_eq!(hil.on_timeout, HumanInLoopTimeoutAction::Deny);
 }
 
@@ -64,22 +61,19 @@ rules:
 }
 
 #[test]
-fn human_in_loop_defer_timeout_parses() {
-    let spec = rule(
-        r#"
-hushspec: "0.1.0"
-rules:
-  human_in_loop:
-    approve_above: 100
-    on_timeout: defer
-"#,
+fn human_in_loop_rejects_timeout_behavior_without_enforcement() {
+    let parsed =
+        HushSpec::parse("hushspec: '0.1.0'\nrules:\n  human_in_loop:\n    on_timeout: defer\n");
+    let error = match parsed {
+        Ok(_) => panic!("unenforced timeout behavior loaded"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("unsupported approval policy field"),
+        "{error}"
     );
-    let hil = spec
-        .rules
-        .as_ref()
-        .and_then(|r| r.human_in_loop.as_ref())
-        .expect("human_in_loop rule");
-    assert_eq!(hil.on_timeout, HumanInLoopTimeoutAction::Defer);
 }
 
 #[test]
@@ -112,7 +106,6 @@ rules:
   human_in_loop:
     enabled: true
     approve_above: 15000
-    approve_above_currency: "USD"
 "#,
     );
     let compiled = compile_policy(&spec).expect("compile should succeed");

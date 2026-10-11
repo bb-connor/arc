@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn permission_mapper_all_four_kinds() {
     let mapper = PermissionMapper::new(7200);

@@ -1,8 +1,11 @@
+use super::*;
+
 #[test]
 fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
     let signer = Keypair::generate();
     let now = now_secs();
     let config = ComplianceConfig {
+        authorized_tool_targets: Vec::new(),
         budget_limit: 4,
         required_guards: vec!["fs_guard".to_string()],
         authorized_scopes: vec!["fs/".to_string()],
@@ -10,7 +13,13 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
         trusted_kernel_keys: std::collections::BTreeSet::from([signer.public_key().to_hex()]),
     };
 
-    let empty = generate_compliance_certificate("session-empty", &[], &config, &signer);
+    let empty = generate_compliance_certificate(
+        "session-empty",
+        &[],
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         empty,
         Err(ComplianceCertificateError::EmptySession(ref id)) if id == "session-empty"
@@ -33,9 +42,15 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
     let invalid_entries = vec![ComplianceReceiptEntry {
         receipt: invalid_receipt,
         seq: 0,
+        entry_seq: None,
     }];
-    let invalid =
-        generate_compliance_certificate("session-invalid", &invalid_entries, &config, &signer);
+    let invalid = generate_compliance_certificate(
+        "session-invalid",
+        &invalid_entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         invalid,
         Err(ComplianceCertificateError::InvalidReceiptSignature { .. })
@@ -56,7 +71,8 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
                     details: None,
                 }],
             ),
-            seq: 0,
+            seq: 2,
+            entry_seq: None,
         },
         ComplianceReceiptEntry {
             receipt: make_receipt_for_session(
@@ -72,15 +88,22 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
                     details: None,
                 }],
             ),
-            seq: 2,
+            seq: 0,
+            entry_seq: None,
         },
     ];
-    let gap = generate_compliance_certificate("session-gap", &gap_entries, &config, &signer);
+    let gap = generate_compliance_certificate(
+        "session-gap",
+        &gap_entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         gap,
         Err(ComplianceCertificateError::ChainDiscontinuity {
-            expected: 1,
-            found: 2
+            expected: 3,
+            found: 0
         })
     ));
 
@@ -99,9 +122,15 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
             }],
         ),
         seq: 0,
+        entry_seq: None,
     }];
-    let scope =
-        generate_compliance_certificate("session-scope", &scope_entries, &config, &signer);
+    let scope = generate_compliance_certificate(
+        "session-scope",
+        &scope_entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         scope,
         Err(ComplianceCertificateError::ScopeViolation { .. })
@@ -113,7 +142,7 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
                 &signer,
                 "session-budget",
                 &format!("receipt-budget-{idx}"),
-                now + idx,
+                now - 5 + idx,
                 "fs/read_text_file",
                 Decision::Allow,
                 vec![GuardEvidence {
@@ -123,10 +152,16 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
                 }],
             ),
             seq: idx,
+            entry_seq: None,
         })
         .collect::<Vec<_>>();
-    let budget =
-        generate_compliance_certificate("session-budget", &budget_entries, &config, &signer);
+    let budget = generate_compliance_certificate(
+        "session-budget",
+        &budget_entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         budget,
         Err(ComplianceCertificateError::BudgetExceeded { used: 5, limit: 4 })
@@ -143,9 +178,15 @@ fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
             Vec::new(),
         ),
         seq: 0,
+        entry_seq: None,
     }];
-    let guard =
-        generate_compliance_certificate("session-guard", &guard_entries, &config, &signer);
+    let guard = generate_compliance_certificate(
+        "session-guard",
+        &guard_entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    );
     assert!(matches!(
         guard,
         Err(ComplianceCertificateError::GuardBypass { .. })
@@ -177,6 +218,7 @@ fn compliance_certificate_rejects_mixed_kernel_keys() {
                 Vec::new(),
             ),
             seq: 0,
+            entry_seq: None,
         },
         ComplianceReceiptEntry {
             receipt: make_receipt_for_session(
@@ -189,11 +231,17 @@ fn compliance_certificate_rejects_mixed_kernel_keys() {
                 Vec::new(),
             ),
             seq: 1,
+            entry_seq: None,
         },
     ];
     let expected_receipt_id = entries[1].receipt.id.clone();
-    let result =
-        generate_compliance_certificate("session-mixed-keys", &entries, &config, &signer_a);
+    let result = generate_compliance_certificate(
+        "session-mixed-keys",
+        &entries,
+        &config,
+        &signer_a,
+        &AcpClock::default(),
+    );
     assert!(
         matches!(
             result,
@@ -208,7 +256,7 @@ fn compliance_certificate_rejects_mixed_kernel_keys() {
 #[test]
 fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
     let signer = Keypair::generate();
-    let now = now_secs();
+    let now = now_secs() - 2;
     let receipts = vec![
         ComplianceReceiptEntry {
             receipt: make_receipt_for_session(
@@ -225,6 +273,7 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
                 }],
             ),
             seq: 0,
+            entry_seq: None,
         },
         ComplianceReceiptEntry {
             receipt: make_receipt_for_session(
@@ -241,9 +290,11 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
                 }],
             ),
             seq: 1,
+            entry_seq: None,
         },
     ];
     let config = ComplianceConfig {
+        authorized_tool_targets: Vec::new(),
         budget_limit: 2,
         required_guards: vec!["fs_guard".to_string()],
         authorized_scopes: vec!["fs/".to_string()],
@@ -251,19 +302,27 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
         trusted_kernel_keys: std::collections::BTreeSet::from([signer.public_key().to_hex()]),
     };
 
-    let cert = generate_compliance_certificate("session-good", &receipts, &config, &signer)
-        .expect("certificate should generate");
+    let cert = generate_compliance_certificate(
+        "session-good",
+        &receipts,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect("certificate should generate");
 
-    let lightweight =
-        verify_compliance_certificate(
-            &cert,
-            VerificationMode::Lightweight,
-            Some(&receipts),
-            &config,
-        );
+    let lightweight = verify_compliance_certificate(
+        &cert,
+        VerificationMode::Lightweight,
+        Some(&receipts),
+        &config,
+    );
     assert!(lightweight.passed);
     assert!(lightweight.certificate_signature_valid);
-    assert_eq!(lightweight.summary, "lightweight verification passed");
+    assert!(lightweight
+        .summary
+        .contains("signature/body verification passed"));
+    assert!(lightweight.summary.contains("not reverified"));
 
     let untrusted_config = ComplianceConfig {
         trusted_kernel_keys: std::collections::BTreeSet::new(),
@@ -276,15 +335,16 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
         &untrusted_config,
     );
     assert!(!untrusted.passed);
-    assert!(untrusted.summary.contains("certificate signer is not trusted"));
+    assert!(untrusted
+        .summary
+        .contains("certificate signer is not trusted"));
 
-    let full_bundle =
-        verify_compliance_certificate(
-            &cert,
-            VerificationMode::FullBundle,
-            Some(&receipts),
-            &config,
-        );
+    let full_bundle = verify_compliance_certificate(
+        &cert,
+        VerificationMode::FullBundle,
+        Some(&receipts),
+        &config,
+    );
     assert!(full_bundle.passed);
     assert_eq!(full_bundle.receipts_reverified, 2);
     assert_eq!(full_bundle.receipt_failures, 0);
@@ -312,13 +372,12 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
     let body_bytes = chio_core::canonical::canonical_json_bytes(&inconsistent_cert.body)
         .expect("certificate body should serialize");
     inconsistent_cert.signature = signer.sign(&body_bytes);
-    let inconsistent =
-        verify_compliance_certificate(
-            &inconsistent_cert,
-            VerificationMode::Lightweight,
-            None,
-            &config,
-        );
+    let inconsistent = verify_compliance_certificate(
+        &inconsistent_cert,
+        VerificationMode::Lightweight,
+        None,
+        &config,
+    );
     assert!(!inconsistent.passed);
     assert!(inconsistent.certificate_signature_valid);
     assert!(!inconsistent.body_consistent);
@@ -344,8 +403,10 @@ fn compliance_verification_signer_mismatch_omits_redundant_body_reason() {
             }],
         ),
         seq: 0,
+        entry_seq: None,
     }];
     let config = ComplianceConfig {
+        authorized_tool_targets: Vec::new(),
         budget_limit: 1,
         required_guards: vec!["fs_guard".to_string()],
         authorized_scopes: vec!["fs/".to_string()],
@@ -361,6 +422,7 @@ fn compliance_verification_signer_mismatch_omits_redundant_body_reason() {
         &receipts,
         &config,
         &receipt_signer,
+        &AcpClock::default(),
     )
     .expect("certificate should generate");
     let body_bytes = chio_core::canonical::canonical_json_bytes(&cert.body)
@@ -368,12 +430,7 @@ fn compliance_verification_signer_mismatch_omits_redundant_body_reason() {
     cert.signer_key = certificate_signer.public_key();
     cert.signature = certificate_signer.sign(&body_bytes);
 
-    let result = verify_compliance_certificate(
-        &cert,
-        VerificationMode::Lightweight,
-        None,
-        &config,
-    );
+    let result = verify_compliance_certificate(&cert, VerificationMode::Lightweight, None, &config);
     assert!(!result.passed);
     assert!(result.certificate_signature_valid);
     assert!(!result.body_consistent);
@@ -410,8 +467,10 @@ fn compliance_certificate_serializes_snake_case() {
             }],
         ),
         seq: 0,
+        entry_seq: None,
     }];
     let config = ComplianceConfig {
+        authorized_tool_targets: Vec::new(),
         budget_limit: 1,
         required_guards: vec!["fs_guard".to_string()],
         authorized_scopes: vec!["fs/".to_string()],
@@ -419,8 +478,14 @@ fn compliance_certificate_serializes_snake_case() {
         trusted_kernel_keys: std::collections::BTreeSet::from([signer.public_key().to_hex()]),
     };
 
-    let cert = generate_compliance_certificate("session-snake", &receipts, &config, &signer)
-        .expect("certificate should generate");
+    let cert = generate_compliance_certificate(
+        "session-snake",
+        &receipts,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect("certificate should generate");
 
     let json = serde_json::to_value(&cert).expect("certificate should serialize");
     assert!(json.get("signer_key").is_some());
@@ -433,4 +498,81 @@ fn compliance_certificate_serializes_snake_case() {
     assert!(body.get("receipt_count").is_some());
     assert!(body.get("kernel_key").is_some());
     assert!(body.get("sessionId").is_none());
+}
+
+#[test]
+fn compliance_diagnostic_categories_match_actual_refusals() {
+    let signer = Keypair::from_seed(&[87; 32]);
+    let config = ComplianceConfig {
+        budget_limit: 1,
+        trusted_kernel_keys: std::collections::BTreeSet::from([signer.public_key().to_hex()]),
+        ..ComplianceConfig::default()
+    };
+    let empty = generate_compliance_certificate(
+        "private-session",
+        &[],
+        &config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect_err("empty session must refuse");
+    assert_eq!(
+        empty.to_string(),
+        "urn:chio:error:attest:provenance-missing"
+    );
+    let entries = (0..2)
+        .map(|seq| ComplianceReceiptEntry {
+            receipt: make_receipt_for_session(
+                &signer,
+                "private-session",
+                &format!("receipt-{seq}"),
+                now_secs(),
+                "fs/read",
+                Decision::Allow,
+                vec![],
+            ),
+            seq,
+            entry_seq: None,
+        })
+        .collect::<Vec<_>>();
+    let budget = generate_compliance_certificate(
+        "private-session",
+        &entries,
+        &config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect_err("budget must refuse");
+    assert_eq!(budget.to_string(), "urn:chio:error:kernel:budget-exhausted");
+    let scope_config = ComplianceConfig {
+        budget_limit: 0,
+        authorized_scopes: vec!["network/".into()],
+        ..config
+    };
+    let scope = generate_compliance_certificate(
+        "private-session",
+        &entries,
+        &scope_config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect_err("scope must refuse");
+    assert_eq!(scope.to_string(), "urn:chio:error:policy:decision-denied");
+    let guard_config = ComplianceConfig {
+        authorized_scopes: vec![],
+        required_guards: vec!["private-guard".into()],
+        ..scope_config
+    };
+    let guard = generate_compliance_certificate(
+        "private-session",
+        &entries,
+        &guard_config,
+        &signer,
+        &AcpClock::default(),
+    )
+    .expect_err("missing guard must refuse");
+    assert_eq!(guard.to_string(), "urn:chio:error:guard:denied");
+    for error in [empty, budget, scope, guard] {
+        assert!(!format!("{error} {error:?}").contains("private"));
+    }
 }

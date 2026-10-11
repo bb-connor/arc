@@ -1,0 +1,1745 @@
+{
+  "schema": "chio.process-security-review-dispositions.v1",
+  "candidate": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+  "process_parent": "2e84f121273df7f205cc218739b86e93c91bdc37",
+  "security_parent": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+  "scope": "109 original inherited review threads. Checkpoint means a verified ancestor containing the cited source or repair, not necessarily its introducing commit. Local source disposition is not remote thread resolution, hosted qualification, merge approval or launch authorization.",
+  "records": [
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1154#discussion_r3992275572",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_response_verify.rs",
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "evidence": "Attempts two/three bind the signed four-element request identity; wrong request/attempt/out-of-range values refuse.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_response_verify.rs",
+          "name": "retained_later_attempts_require_the_exact_signed_identity_and_bounded_attempt"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1154#discussion_r3992275578",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_response_verify.rs",
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "evidence": "CLI uses the kernel's public MAX_DISPATCH_ATTEMPTS instead of a second literal authority.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_response_verify.rs",
+          "name": "retained_later_attempts_require_the_exact_signed_identity_and_bounded_attempt"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1154#discussion_r3992275583",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "sdks/python/chio-process/README.md",
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "evidence": "Documentation distinguishes Python reserialization from direct retained wire JSON verification; original receipt bytes remain available.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_response_verify.rs",
+          "name": "ordinary_json_spelling_is_supported_but_duplicate_keys_and_number_rounding_are_rejected"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1152#discussion_r3992205988",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        "scripts/check-process-dependencies.py"
+      ],
+      "evidence": "Reproduced and repaired. Malformed suffix after valid required Cargo packages returned success; pure parser and CLI fixtures now refuse it",
+      "test_files": [
+        "scripts/tests/check-process-dependencies.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1152#discussion_r3992205994",
+      "group": "4d",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/cflite_pr.yml"
+      ],
+      "evidence": "Fixed with inherited source evidence; regression strengthened. Existing fix `348b7ae4c221e59cd4c867dd4a3a77c718dd7003`; actual nested manifest fallback emits complete 30-target inventory",
+      "test_files": [
+        "scripts/tests/check-fuzz-manifest-selection.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result.",
+      "related_commits": [
+        "348b7ae4c221e59cd4c867dd4a3a77c718dd7003"
+      ]
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1151#discussion_r3992197834",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/MAILBOXES.md"
+      ],
+      "evidence": "Documentation repaired: `process/MAILBOXES.md` lists five mandatory tools plus optional renewal and its distinct grant; manifest remains opt-in in `src/mailboxes/mod.rs`. `mailboxes::renewal_opt_in_preserves_legacy_configuration_and_manifest`; full mailbox suite.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/mailboxes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1149#discussion_r3992193263",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/PROCESS_RUNNER.md"
+      ],
+      "evidence": "Coverage and documentation repaired, no state-machine change: `cli/src/cli/process_host/lifecycle.rs::dispatch` records the failed-child wait_children join; runner journal resolves dependency failure. `PROCESS_RUNNER.md` now describes live parent denial followed by exit75. `tests/process_host/failures.py::live_parent_failed_child`: real committed child failure, denial, one parent suspension, dependency_failed, no relaunch and unchanged terminal replay.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/failures.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1148#discussion_r3992136372",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "docs/README.md"
+      ],
+      "evidence": "Single adoption-index entry describes experimental source-built Linux profiles.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1145#discussion_r3992112711",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-mini-swe/src/chio_mini_swe/repository_store.py"
+      ],
+      "evidence": "Reproduced and repaired. Existing legacy, v2 storage-failure and scoped compatibility tests now assert actual status schema. Export behavior remains covered.",
+      "test_files": [
+        "sdks/python/chio-mini-swe/tests/test_repository.py",
+        "sdks/python/chio-mini-swe/tests/test_repository_scope.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1143#discussion_r3992106237",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "e9390910b0d7e3163a16d51eeb441f811f15d3c7",
+      "files": [
+        "examples/mini-swe-recovery/compare_upstream.py"
+      ],
+      "evidence": "Shared ownership_path normalizes config/output before record and cleanup checks; live exact-owner fixtures within final 371-case covering.",
+      "test_files": [
+        "examples/mini-swe-recovery/test_comparison_cleanup.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1142#discussion_r3992068069",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/socket.rs"
+      ],
+      "evidence": "Reproduced and repaired: `cli/src/cli/process_host/runner/socket.rs::reconcile` validates abandoned names and positively observes absence inside a journal write transaction before deleting only those intent rows. `absent_intents_clear_and_abandoned_history_is_bounded`; `abandoned_invalid_names_and_lookup_errors_retain_journal_rows`; foreign symlink remains, lookup failure preserves rows, cap remains eight present abandoned intents.",
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/socket.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1141#discussion_r3992073789",
+      "group": "4 final",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "xtask/src/support.rs"
+      ],
+      "evidence": "Overlapping PR ancestry is not duplicate runtime code. The integration retains one xtask/src/support.rs; PR 1140 head 90914a3e is not an ancestor. Do not replay that branch over the already integrated implementation.",
+      "regressions": [],
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1141#discussion_r3992073800",
+      "group": "4 final",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "examples/repository-review/adaptive/configuration.py"
+      ],
+      "evidence": "Native server request_timeout_seconds is materialized as 60, explicit configured overrides survive, and the resolved configuration is not mutated. Six focused default/override/round-trip cases passed.",
+      "regressions": [
+        {
+          "path": "examples/repository-review/test_adaptive.py",
+          "name": "test_host_timeout_default_does_not_mutate_pinned_run_metadata"
+        }
+      ],
+      "test_files": [
+        "examples/repository-review/test_adaptive.py"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1141#discussion_r3994436978",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "e9390910b0d7e3163a16d51eeb441f811f15d3c7",
+      "files": [
+        "sdks/python/chio-mini-swe/src/chio_mini_swe/session.py"
+      ],
+      "evidence": "Normalize only ancestors before protected-parent policy, retaining final lstat refusal.",
+      "test_files": [
+        "sdks/python/chio-mini-swe/tests/test_repository_scope.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1137#discussion_r3992089900",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/state_reader.rs"
+      ],
+      "evidence": "Coverage added to existing fail-closed public state reader, no permission weakening: `process/src/state_reader.rs::open`. `state_blobs::state_reader_rejects_broad_modes_symlinks_and_nonregular_journals`, 0640 file, 0750 parent, symlink and directory; restored valid read.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/state_blobs.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1137#discussion_r3992089913",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/process-workers.yml"
+      ],
+      "evidence": "Reproduced and repaired. Owning process workflow inventory red; process_state strict Clippy target added",
+      "test_files": [
+        "scripts/tests/check-process-ci-inventory.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1137#discussion_r3992089926",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-mini-swe/src/chio_mini_swe/provider.py"
+      ],
+      "evidence": "Reproduced and repaired. IPv6 constructor tests cover absent and explicit ports under both schemes; the loopback HTTP opt-in is retained.",
+      "test_files": [
+        "sdks/python/chio-mini-swe/tests/test_provider.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1137#discussion_r3994667012",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/state_reader.rs"
+      ],
+      "evidence": "Reproduced and repaired: `process/src/state_reader.rs::open` normalizes empty parent to `.`. `state_blobs::reader_opens_basename_in_private_cwd`, private cwd in a separate OS process, existing real journal and checkpoint.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/state_blobs.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1135#discussion_r3991676396",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "sdks/python/chio-mini-swe/src/chio_mini_swe/model.py",
+        "sdks/python/chio-mini-swe/tests/test_model_worker.py"
+      ],
+      "evidence": "Classify typed unknown Deny before ordinary policy denial; retain raw receipt and stable operation key without provider replay.",
+      "regressions": [
+        {
+          "path": "sdks/python/chio-mini-swe/tests/test_model_worker.py",
+          "name": "test_unknown_model_outcome_stops_every_attempt_without_commands_or_regeneration"
+        }
+      ],
+      "test_files": [
+        "sdks/python/chio-mini-swe/tests/test_model_worker.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1134#discussion_r3991701833",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "evidence": "Only a positively observed owned, started worker exit is completion; created-zero and malformed start times refuse.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "name": "observed_container_states"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1134#discussion_r3991701839",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "evidence": "Persist observed completion before cleanup; unresolved ownership survives restart and blocks replacement/export.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "name": "completion_survives_cleanup_debt_and_restart"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1134#discussion_r3991701845",
+      "group": "2",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/plan.rs",
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "evidence": "Plan preflight coverage preserves immutable image, executable and working-directory refusal before reservations.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_host/lifecycle.py",
+          "name": "test_unstartable_plan_precedes_journal"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1134#discussion_r3994654488",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "evidence": "Only exact positive missing-image rejection plus authoritative absence retires a create intent. Transport loss remains uncertain and preserves the original wait reason.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs",
+          "name": "create_rejection_requires_positive_empty_inventory"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/container_tests.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1133#discussion_r3991685121",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "4606cf0eeaac4cfc0d77d975762dc8ca4ea10911",
+      "files": [
+        "examples/mini-swe-recovery/probe_worker.py"
+      ],
+      "evidence": "Real ungranted invocation passed final-binary zero-row/zero-sequence and signed-denial oracle; parser evidence separately named.",
+      "test_files": [
+        "examples/mini-swe-recovery/check_authorization.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1133#discussion_r3991685126",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "sdks/python/chio-process/tests/test_container.py"
+      ],
+      "evidence": "Bounded real subprocess collection and exact-owner removal reply controls are covered; no live Docker qualification claimed.",
+      "regressions": [
+        {
+          "path": "sdks/python/chio-process/tests/test_container.py",
+          "name": "test_collect_timeout_and_output_bound"
+        }
+      ],
+      "test_files": [
+        "sdks/python/chio-process/tests/test_container.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1133#discussion_r3991685135",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-process/src/chio_process/container.py"
+      ],
+      "evidence": "Reproduced and repaired. Missing socket used to raise KeyError; missing and explicit None now uniformly raise ValueError before engine access.",
+      "test_files": [
+        "sdks/python/chio-process/tests/test_container.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1133#discussion_r3991685139",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-process/src/chio_process/container.py"
+      ],
+      "evidence": "Reproduced and repaired. Generic create arguments formerly injected MSWEA variables. Tests prove absence for unrelated callers, bounded explicit environment handling, and integration-owned forwarding of mini-SWE values.",
+      "test_files": [
+        "sdks/python/chio-process/tests/test_container.py",
+        "sdks/python/chio-mini-swe/tests/test_repository_container.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1133#discussion_r3994434006",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "sdks/python/chio-process/src/chio_process/container.py",
+        "sdks/python/chio-process/tests/test_container.py"
+      ],
+      "evidence": "Failed start cannot become exit zero; known exit survives diagnostic/cleanup failure.",
+      "regressions": [
+        {
+          "path": "sdks/python/chio-process/tests/test_container.py",
+          "name": "test_observed_worker_state_and_cleanup"
+        }
+      ],
+      "test_files": [
+        "sdks/python/chio-process/tests/test_container.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1132#discussion_r3991619239",
+      "group": "4c",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "163c2e2ea898adddf87c0edad8d9fb0a843a615f",
+      "files": [
+        "sdks/python/chio-mini-swe/tests/test_recovery.py"
+      ],
+      "evidence": "JsonSnapshot delegates segmented bounded storage; existing 10-method shared snapshot suite retained, no duplicate tests.",
+      "test_files": [
+        "sdks/python/chio-process/tests/test_snapshot.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1132#discussion_r3991619255",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-mini-swe/src/chio_mini_swe/environment.py"
+      ],
+      "evidence": "Reproduced and repaired. mini-SWE pending approval no longer labels itself denied; unknown vocabulary is invalid_response. Agent loop stops across resume with unchanged durable operation map and no new model query.",
+      "test_files": [
+        "sdks/python/chio-mini-swe/tests/test_recovery.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1130#discussion_r3992317718",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-control-plane/src/durable_admission.rs"
+      ],
+      "evidence": "Reproduced and repaired: `control/src/durable_admission.rs::import_relocation` validates regular path and fully loads private existing signing seed before creating import locks or re-anchoring. Public APIs retained; unchecked docs explicitly disclaim external seal authentication. F1 adds the phase-aware checked facade without removing the original checked API. `unchecked_relocation_validates_seed_before_any_import_mutation`: missing/directory/symlink/broad/malformed seed and missing/directory/symlink database, unchanged authority and absent new lock root; valid import/retry/open control. Final control-plane and owning relocation covering retain these boundaries.",
+      "test_files": [
+        "crates/platform/chio-control-plane/src/durable_admission.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1130#discussion_r3992317724",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs"
+      ],
+      "evidence": "Reproduced and repaired: `sqlite/src/serving_owner/relocation.rs::finish_export` validates the original database inode for both initial and resumed finalization. `resumed_export_finalization_refuses_a_replaced_database_inode`; full lower relocation suite.",
+      "test_files": [
+        "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1129#discussion_r3992311124",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "592acf141020c6dfd4c2fabe57635eaebb1f65b2",
+      "files": [
+        "crates/tooling/chio-conformance/src/peers.rs"
+      ],
+      "evidence": "Reproduced and repaired. Relocated executable returned None despite explicit valid root; validated runtime anchor and actual fixture read now covered",
+      "test_files": [
+        "crates/tooling/chio-conformance/src/peers.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1129#discussion_r3992311128",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "docs/release-evidence.md"
+      ],
+      "evidence": "Historical manual digest explicitly lacks retained clean-archive run artifact.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1128#discussion_r3994441489",
+      "group": "4a",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/mailboxes/mod.rs"
+      ],
+      "evidence": "Technically inapplicable as an additive-manifest repair: current `cli/src/cli/process_host/state.rs` requires ABI v2 and retains canonical manifest equality. Historic v1 state must drain using its original compatible binary. No additive compatibility policy introduced. `tests/process_host/recovery.py` v0/v1 refusal and unchanged authority; `runner.py::relocation_failures` manifest-content refusal; direct current mailbox manifest test.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/recovery.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1127#discussion_r3992292274",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "crates/products/chio-cli/tests/process_host/adaptive.py"
+      ],
+      "evidence": "Removed unsynchronized first-two-parent expectation; final-binary native harness passes retained every-launch fairness invariant.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/adaptive.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1127#discussion_r3992292279",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs"
+      ],
+      "evidence": "ready_indices uses active JoinSet slots; instrumented saturation and available-capacity positive oracle.",
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1126#discussion_r3992265664",
+      "group": "4a",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/mailboxes/mod.rs"
+      ],
+      "evidence": "CLI historical upgrade expectation inapplicable at ABI v2; direct-embedder migration explicitly supported, documented and tested without assigning historical ownership. `process/src/mailboxes/store.rs` existing ALTER TABLE migrations retained. `pre_sender_and_claim_schema_migrates_without_assigning_historical_ownership` starts from genuine old tables, migrates, claims generation1, completes and reopens.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/mailboxes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1125#discussion_r3992272920",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs",
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "evidence": "Actual ENOSYS preflight refuses before consuming attempts; post-spawn failures preserve uncertainty.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_host/lifecycle.py",
+          "name": "test_pidfd_support_and_post_spawn_failure_identity"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1125#discussion_r3994441318",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/child.rs"
+      ],
+      "evidence": "Pinned proc-directory ownership prevents charging a reused numeric process identity.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/child.rs",
+          "name": "resident_reader_never_follows_reused_identity"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/child.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1124#discussion_r3992258391",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Already repaired: `cli/src/cli/process_host/relocation.rs::export` validates recorded ABI before checkpoint/retirement and writes that ABI into the manifest. Existing `tests/process_host/recovery.py` rejects unsupported ABI export with unchanged authority.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/recovery.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1124#discussion_r3992258397",
+      "group": "4a",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/state.rs"
+      ],
+      "evidence": "Existing missing-host ABI default retained; missing-manifest ABI and null writer coverage added. Original v1 acceptance expectation is inapplicable under current v2. `state.rs::first_abi` and `relocation.rs::Manifest` default missing ABI to v1, not current. `administration.py::relocation_files`: absent manifest ABI refuses unchanged authority; null written_by status retained on incompatible v1 host. Existing recovery.py missing-host default.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1124#discussion_r3994441142",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Already repaired, direct coverage added: `relocation.rs::import` checks both manifest and host ABI before authority mutation, even with a matching host-file digest. `administration.py::relocation_files` accepted v2 manifest over hashed incompatible v1 host refuses unchanged authority.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1123#discussion_r3992284331",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs"
+      ],
+      "evidence": "Task 1 production repair preserved; supplemental boundary coverage added. `sqlite/src/admission_operation_store/store.rs::claim_in_transaction` qualifies authority time before any lease callback. `claimed_joint_budget_transactions_are_one_durable_write_each`, stale-time expired authorization/capture refuse, all durable tables and anchor unchanged, callbacks not run; live controls still one commit each.",
+      "test_files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/budget_atomicity.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1123#discussion_r3992284339",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs"
+      ],
+      "evidence": "Already repaired: `sqlite/src/tool_outcome_store.rs` anchors renewed-claim post-return replay. No new production edit. Existing `replayed_post_return_begin_anchors_a_renewed_claim_before_the_next_stage`, passed in full tool-outcome module.",
+      "test_files": [
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1122#discussion_r3992259460",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs"
+      ],
+      "evidence": "Coverage added to preserved active-claim expiry; `sqlite/src/admission_operation_store/store.rs` returns the persisted active lease. `fused_active_claim_noop_preserves_expiry_commit_head_and_anchor`: later requested expiry does not extend active lease; true no-op unchanged; command-write and claim-only-write each advance commit head/anchor once.",
+      "test_files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1122#discussion_r3992259468",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs"
+      ],
+      "evidence": "Reproduced and repaired: same store retains Active/Written classification and uses plain commit only for active claim plus idempotent command. All actual writes retain commit_write/sync and uncertainty poisoning. `fused_noop_commit_refusal_is_not_an_uncertain_write`: real SQLite COMMIT authorizer refusal, no-op ordinary error and usable owner versus actual write OutcomeUnknown.",
+      "test_files": [
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1121#discussion_r3992229913",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/journal.rs"
+      ],
+      "evidence": "Coverage added to unchanged runner migration/reconciliation: `cli/src/cli/process_host/runner/journal.rs` adds suspensions default0 and preserves historical uncertain work. `administration.py::legacy_suspensions`: real completed journal with column removed and historical running row; reopened zero suspensions, host_interrupted, unchanged launch markers and other terminal reports.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1120#discussion_r3992232130",
+      "group": "4c",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "deb9b8a85623f7eb4bebd65eeb608af76f11d125",
+      "files": [
+        "docs/formal/COVERAGE.md"
+      ],
+      "evidence": "Current target-map SHA256 matches generated COVERAGE metadata; rollback and peers mappings present.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1120#discussion_r3992232141",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/BENCHMARK.md"
+      ],
+      "evidence": "Eleven omitted fsync calls explicitly unattributed in both columns.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1119#discussion_r3992210003",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/tests/crash_recovery.rs"
+      ],
+      "evidence": "Owning kernel matching-grant classification excludes monetary/stateful calls; original hold and dispatch identity persist.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+          "name": "unknown_monetary_read_retains_one_original_payment_hold"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-process/tests/crash_recovery.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1119#discussion_r3992210008",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/error.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_regressions.rs"
+      ],
+      "evidence": "Typed retained metadata is a historical observation with current trusted time, not a new recovery lease or terminal transition authority.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_regressions.rs",
+          "name": "durable_server_url_elicitation_terminalizes_as_outcome_unknown"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_regressions.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1119#discussion_r3992210018",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-process/tests/crash_recovery.rs"
+      ],
+      "evidence": "Actual crash recovery enforces attempt cap; the direct per-artifact eligibility matrix excludes original request-bound authority.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+          "name": "repeatedly_unknown_reads_stop_at_the_third_dispatch"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-process/tests/crash_recovery.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1119#discussion_r3994431629",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/tests/retry_eligibility.rs"
+      ],
+      "evidence": "Finding recovery/delivery, cumulative, quota and other selected stateful grants exclude redispatch; unrelated grants retain compatibility.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-process/tests/retry_eligibility.rs",
+          "name": "matching_stateful_grants_exclude_retry_but_unrelated_grants_do_not"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-process/tests/retry_eligibility.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1118#discussion_r3992202107",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Existing resumable same-seal export preserved; F1 repairs preflight of orphan sidecars before retirement in `relocation.rs::digests`, requiring a matching regular database before any checkpoint. `administration.py::orphan_sidecar` absent optional runner database plus planted WAL refuses with unchanged authority/anchor/foreign bytes, then valid export; existing `runner.py::relocation_failures` preserves manifest-write failure/repeated export/lost-manifest recovery.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1118#discussion_r3992202115",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Reconstructible copied lock paths and pre-commit retry preserved. F1 repairs live-WAL post-commit retry using owning `import_relocated_checked_with_phase`; Committed is qualified by the same seal/location/inode/lock/anchor and invariants before file verification or recovery writes. `administration.py::committed_import_wal` holds a real exported snapshot across import commit and proves same identity on retry; foreign-location WAL and changed application file refuse unchanged main/WAL/anchor. Lower `refused_wal_backed_import_does_not_checkpoint_foreign_state_on_close` and `verified_import_retries_after_lock_artifact_io_refusal` cover refusal teardown and post-qualification retry; existing runner relocation cases retained.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1118#discussion_r3992202118",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Existing busy-check repair preserved; coverage added. `relocation.rs::checkpoint` refuses nonzero TRUNCATE busy status. `administration.py::busy_reader`: held read transaction pins real WAL, export refuses unchanged authority; reader release permits export.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1118#discussion_r3994431235",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/relocation.rs"
+      ],
+      "evidence": "Exact authoritative file set retained. F1 resolves the controller-ruled conflict: unverified Exported/orphan WALs still refuse before mutation; only an owning-store-qualified Committed retry permits its authority WAL. Other application WALs remain refused; known reconstructible SHM/empty WAL remain permitted with a matching regular database. No unverified sidecar deletion/checkpoint cleanup. `administration.py::relocation_files` extra, extra.tmp, receipts.db-wal, malformed authority.db-wal and unknown.db-wal refuse with byte preservation; `orphan_sidecar`, `committed_import_wal` and lower wrong-seal/foreign-location/callback-refusal controls establish the distinction.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1116#discussion_r3992185519",
+      "group": "4c",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "fuzz/target-map.toml"
+      ],
+      "evidence": "Relocation source exists and current trigger selects it; no historical reorder attempted. Current checkpoint is not the original source creation: relocation.rs first appears at 7599eb9d1eb14a60d9d128a24f588f449458dd73 and its target-map trigger at 92e6acc8058ae36634498b304e9067135fe3f80a.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed.",
+      "related_commits": [
+        "7599eb9d1eb14a60d9d128a24f588f449458dd73",
+        "92e6acc8058ae36634498b304e9067135fe3f80a"
+      ]
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1115#discussion_r3992172332",
+      "group": "4a",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/mailboxes/store.rs"
+      ],
+      "evidence": "Coverage added to actual pre-sender/pre-claim schema migration, not a current-schema fixture. `process/tests/mailboxes.rs::pre_sender_and_claim_schema_migrates_without_assigning_historical_ownership`; old rows migrated/read/claimed/completed/reopened.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/mailboxes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1115#discussion_r3992172339",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/mailboxes/store.rs"
+      ],
+      "evidence": "Explicit legacy drain/migration contract documented; no ownership widening. Historical sender remains NULL even after completion; old producer replay works only through the unattested direct embedder. Same migration test: unattested same-key replay succeeds, attested same-key replay refuses before and after drain; persisted NULL tombstone retained.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/mailboxes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1115#discussion_r3992172347",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/mailboxes/mod.rs"
+      ],
+      "evidence": "Reproduced and repaired: `process/src/mailboxes/mod.rs::dispatch` maps registry caller ambiguity Conflict to Unauthenticated, leaving storage faults and key/claim conflict classification separate. `ambiguous_registry_caller_reports_authentication_failure`, real ambiguous process registry, authentication diagnostic, zero messages; full existing attested tests.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/mailboxes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1114#discussion_r3992138045",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/BENCHMARK.md"
+      ],
+      "evidence": "Benchmark tables labeled historical and unqualified for changed source.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1114#discussion_r3992138053",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "docs/architecture/AGENT_PROCESS_DIRECTION.md"
+      ],
+      "evidence": "Direction links historical 220-409ms loaded medians and separates spawn costs.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1114#discussion_r3996307787",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "0def619be29c4da48a94d21f66b033c12a10b0ca",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/benchmark/run.py"
+      ],
+      "evidence": "Six summary cases cover completion/publication and selected-kill duplicate guarantees.",
+      "test_files": [
+        "sdks/typescript/packages/ai-sdk-process/benchmark/test_summary.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1112#discussion_r3992118386",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/kernel/chio-process/src/worker.rs"
+      ],
+      "evidence": "Reproduced and repaired: `process/src/store/blobs.rs::storage` permits retained accounting reads after cancellation; put/read blob and invocation cancellation guards remain. Worker credential authentication stays first. `worker_protocol::guest_identity_is_fixed_and_admin_operations_are_absent` canceled inspect checkpoint/state, refused blob write/invoke and revoked inspect; existing expired-inspection refusal.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/worker_protocol.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1112#discussion_r3996289850",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/src/model-journal.ts"
+      ],
+      "evidence": "Reproduced and repaired. Inline stream red consumed 35 chunks past its 4 KiB representation bound. Final cancellation/read-count oracle consumes at most 5, preserves pending reservation, emits no tool effect; explicit checkpoint on a blob-capable host, auto inline, explicit blobs and auto blobs are controls.",
+      "test_files": [
+        "sdks/typescript/packages/ai-sdk-process/test/model-journal.test.mjs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1111#discussion_r3992125893",
+      "group": "4b",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/src/model-journal.ts"
+      ],
+      "evidence": "Technically inapplicable as a generic retry fix. HTTP 400/401/429 APICallError instances even marked isRetryable cannot prove provider non-completion. New tests retain a single provider call and unchanged pending reservation across restart; generic exception behavior remains fail closed.",
+      "test_files": [
+        "sdks/typescript/packages/ai-sdk-process/test/model-journal.test.mjs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1111#discussion_r3992125901",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/src/model-journal.ts"
+      ],
+      "evidence": "Reproduced and repaired. Invalid options previously yielded model_journal_full/model_storage_unavailable; all four option families now produce documented model_configuration_invalid without changing an existing reservation. Real capacity/storage availability controls retain their codes.",
+      "test_files": [
+        "sdks/typescript/packages/ai-sdk-process/test/model-journal.test.mjs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1111#discussion_r3992125906",
+      "group": "4b",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/typescript/packages/ai-sdk-process/src/model-journal.ts"
+      ],
+      "evidence": "Already repaired by inherited immutable blob design. Complete bodies, including growing request bodies, remain preserved. Existing large-response and 32-read replay/bounded-checkpoint tests are retained in the full suite; no truncation/redaction introduced.",
+      "test_files": [
+        "sdks/typescript/packages/ai-sdk-process/test/model-journal.test.mjs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1109#discussion_r3992100477",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "examples/repository-review/ADAPTIVE.md"
+      ],
+      "evidence": "Narrow repository-review .venv ignore; git check-ignore regression.",
+      "test_files": [
+        "examples/repository-review/test_distribution.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1109#discussion_r3992100483",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "examples/repository-review/distribution/qualify.py"
+      ],
+      "evidence": "Actual pip debug log proves index discovery disabled; negative fixture removes --no-index.",
+      "test_files": [
+        "examples/repository-review/test_distribution.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1109#discussion_r3996288421",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "examples/repository-review/distribution/review.py"
+      ],
+      "evidence": "Prepare/run/worker use -I; real user-site startup sentinel stays unexecuted.",
+      "test_files": [
+        "examples/repository-review/test_distribution.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1108#discussion_r3992052216",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1ba3148e5fb83e8480375d34c75fbc9f923a69b1",
+      "files": [
+        "examples/repository-review/adaptive/planning.py"
+      ],
+      "evidence": "Owning canonical encoded plan payload bounded before spawn with normalized slots and dyn_128 ceiling.",
+      "test_files": [
+        "examples/repository-review/test_adaptive.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1108#discussion_r3996343664",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1ba3148e5fb83e8480375d34c75fbc9f923a69b1",
+      "files": [
+        "examples/repository-review/adaptive/publisher.py"
+      ],
+      "evidence": "Shared report renderer budgets full text plus path JSON/HTML and header overhead before spawn.",
+      "test_files": [
+        "examples/repository-review/test_adaptive.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1106#discussion_r3992019823",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/journal.rs",
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "evidence": "Post-commit status publication is observational; committed outcomes and dependent work survive publication failure.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_host/lifecycle.py",
+          "name": "test_known_exit_survives_log_and_status_faults"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1106#discussion_r3996331112",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/diagnostics.rs"
+      ],
+      "evidence": "Reproduced and repaired: `cli/src/cli/process_host/diagnostics.rs` materializes bounded owned output and drops observer/reader/connection before stdout for status, logs and application state. `administration.py::diagnostic_pipe`: actual full stdout pipes for status/logs; after first byte writer is blocked while independent exclusive host.lock acquisition succeeds.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1105#discussion_r3991738167",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "examples/process-starter/run.py"
+      ],
+      "evidence": "Normalized system/machine compare before installation or execution; mismatch fixtures.",
+      "test_files": [
+        "examples/process-starter/test_artifacts.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1105#discussion_r3991738173",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "scripts/qualify-process-packages.py"
+      ],
+      "evidence": "Final clean-source installed qualifier passed exact producer.py drift-reason refusal.",
+      "test_files": [
+        "scripts/qualify-process-packages.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1105#discussion_r3991738181",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "sdks/python/chio-process/pyproject.toml"
+      ],
+      "evidence": "Final installed wheel METADATA and npm tarball README both passed absolute-link inspection.",
+      "test_files": [
+        "scripts/qualify-process-packages.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1105#discussion_r3996332703",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1920dfe1d91b725c9bcb948a6b43e98c5e5de253",
+      "files": [
+        "examples/process-starter/run.py"
+      ],
+      "evidence": "Exact manifest-selected wheel/tarball paths; unlisted and ambiguous artifacts refuse before installation.",
+      "test_files": [
+        "examples/process-starter/test_artifacts.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1104#discussion_r3991732725",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/plan.rs",
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "evidence": "Definite unstartable commands refuse before persistent reservations; ambiguous launches are not refunded.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_host/lifecycle.py",
+          "name": "test_unstartable_plan_precedes_journal"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1104#discussion_r3991732729",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/child.rs"
+      ],
+      "evidence": "Bootstrap consumes the original attempt deadline; valid slower configured bootstrap retains its full deadline.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/child.rs",
+          "name": "bootstrap_obeys_attempt_deadline"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/child.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1104#discussion_r3996327236",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs",
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "evidence": "Reaper-owned completion is recorded before cancellable diagnostics; unknown work remains unknown.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/tests/process_host/lifecycle.py",
+          "name": "test_reaped_exit_survives_interruption_during_descendant_log_drain"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/lifecycle.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1104#discussion_r3996327239",
+      "group": "2",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "3b926837372f2a878169671911e613968455f553",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs"
+      ],
+      "evidence": "Drain ready completions before interruption, without inventing completion for unfinished workers.",
+      "regressions": [
+        {
+          "path": "crates/products/chio-cli/src/cli/process_host/runner/mod.rs",
+          "name": "known_completion_precedes_ready_interruption"
+        }
+      ],
+      "test_files": [
+        "crates/products/chio-cli/src/cli/process_host/runner/mod.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1102#discussion_r3992033463",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1ba3148e5fb83e8480375d34c75fbc9f923a69b1",
+      "files": [
+        "examples/repository-review/review.py"
+      ],
+      "evidence": "Legacy qualifier tampers/restores publication row and requires exact signed-invocation failure plus count one.",
+      "test_files": [
+        "examples/repository-review/qualify.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1102#discussion_r3992033471",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1ba3148e5fb83e8480375d34c75fbc9f923a69b1",
+      "files": [
+        "examples/repository-review/README.md"
+      ],
+      "evidence": "README explicitly warns full evidence may contain private source; full-fidelity artifacts retained.",
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1102#discussion_r3992033479",
+      "group": "4c",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "bb338d9e5160cdad5984bf334b65bf2fc15ed34d",
+      "files": [
+        "examples/repository-review/qualify.py"
+      ],
+      "evidence": "Validated owned short work root and explicit --work-dir; fix round 1 covers the longest retained profile at exact byte boundaries.",
+      "test_files": [
+        "examples/repository-review/test_qualification.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1101#discussion_r3991666208",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host.rs"
+      ],
+      "evidence": "Reproduced and repaired: `process/src/store/credentials.rs::revoke_credentials` resolves exact process before deleting credentials, so unknown IDs fail. `administration.py::init_nonempty` real CLI unknown revoke; `worker_protocol` known revoke/revoked credential/unknown process, existing durable credential lifecycle.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/worker_protocol.rs",
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1101#discussion_r3991666217",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/PROCESS_HOST.md"
+      ],
+      "evidence": "Documentation repaired: `cli/PROCESS_HOST.md` states issuance adds a credential, rotation requires stop/revoke/new, retained operation identity is unchanged. No automatic revocation introduced. Existing credential issuance/revocation worker and CLI recovery fixtures preserve old versus revoked behavior.",
+      "test_files": [
+        "crates/kernel/chio-process/tests/worker_protocol.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1101#discussion_r3991666225",
+      "group": "4a",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "files": [
+        "crates/products/chio-cli/src/cli/process_host/state.rs"
+      ],
+      "evidence": "Reproduced and repaired: `cli/src/cli/process_host/state.rs::Lease::acquire` checks unrelated nonempty contents before creating host.lock, repeats under lock and preserves host.lock-only interrupted-init compatibility. `administration.py::init_nonempty` exact initial/final file names and bytes on refusal; real init positive used throughout CLI fixtures.",
+      "test_files": [
+        "crates/products/chio-cli/tests/process_host/administration.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1100#discussion_r3991471536",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-langgraph/README.md"
+      ],
+      "evidence": "Repaired documentation precondition in README and ChioProcessToolNode docstring. Existing assigned-message-ID persistence test retained; no new graph durability authority invented.",
+      "test_files": [
+        "sdks/python/chio-langgraph/tests/test_process_node.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1100#discussion_r3991471544",
+      "group": "4b",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "627dc589b28ab60ef391ad866009cefa31c44f5d",
+      "files": [
+        "sdks/python/chio-langgraph/src/chio_langgraph/process.py"
+      ],
+      "evidence": "Reproduced and repaired. Distinct kernel_denied/pending_approval/invalid_response reasons retain receipt text and stop the real graph, including resume with identical operation keys. Both supported LangGraph profiles exercised.",
+      "test_files": [
+        "sdks/python/chio-langgraph/tests/test_process_node.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1098#discussion_r3991381073",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-kernel-core/src/capability_verify/lineage.rs",
+        "crates/kernel/chio-kernel-core/tests/signed_lineage.rs"
+      ],
+      "evidence": "Eight signed-lineage tests exercise missing Delegate, link validity times, repeated identity, root binding and complete signed ancestors.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel-core/tests/signed_lineage.rs",
+          "name": "signed_lineage_refuses_missing_delegate_for_each_grant_family"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel-core/tests/signed_lineage.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1098#discussion_r3991381082",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/tests/processes.rs"
+      ],
+      "evidence": "Recognized lineage refusals use kernel-owned attributed signed denials after identity binding; storage faults cannot fall through.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-process/tests/processes.rs",
+          "name": "invalid_process_lineage_produces_attributed_signed_denials_without_dispatch"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-process/tests/processes.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1098#discussion_r3991381090",
+      "group": "4 final",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        ".github/workflows/cognition-market-hosted.yml"
+      ],
+      "evidence": "The retained 45-minute hosted workflow timeout is historical commit-scope commentary, not a runtime defect. No invented behavioral regression or history rewrite is required.",
+      "regressions": [],
+      "test_files": [],
+      "result": "Source/documentation inspection; no behavioral test is claimed."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1098#discussion_r3996327683",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/validation.rs",
+        "xtask/src/adapter_no_bypass.rs"
+      ],
+      "evidence": "Exact C30/D087 inventory and wrapper-to-helper contracts name actual evidence verification and authorization revalidation; no ignored bypass.",
+      "regressions": [
+        {
+          "path": "xtask/src/adapter_no_bypass.rs",
+          "name": "native_launch_gate_must_propagate_reauthorization_before_spawning"
+        }
+      ],
+      "test_files": [
+        "xtask/src/adapter_no_bypass.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3994851885",
+      "group": "4 final",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "crates/kernel/chio-kernel/src/admission_operation.rs"
+      ],
+      "evidence": "Rich native caller attachments use the closed, strictly increasing slot vocabulary rather than a stale numeric cap. The actual persistence/append regression passed.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel/src/admission_operation_tests/attachment_capacity.rs",
+          "name": "rich_native_caller_attachments_survive_outcome_append_and_persistence"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel/src/admission_operation_tests/attachment_capacity.rs"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483666",
+      "group": "4 final",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "crates/core/chio-core-types/src/receipt/kinds.rs",
+        "spec/schemas/chio-wire/v1/receipt/record.schema.json",
+        "spec/schemas/chio-http/v1/http-receipt.schema.json",
+        "spec/PROTOCOL.md"
+      ],
+      "evidence": "Both closed receipt schemas include chio_internal. Real signed receipts verify, altered origin breaks signature verification, and unknown origins reject. The owning schema regression passed on the current checkout.",
+      "regressions": [
+        {
+          "path": "crates/core/chio-core-types/tests/wire_protocol_schema.rs",
+          "name": "receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary"
+        }
+      ],
+      "test_files": [
+        "crates/core/chio-core-types/tests/wire_protocol_schema.rs"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483673",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "db451c6500bcd779ae29ef1bfb06aa7ded5ef63c",
+      "files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "evidence": "Reproduced and repaired. Nullable-load red, consuming and contextual-boundary cases, runtime empty-match fail-closed regression",
+      "test_files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483676",
+      "group": "4 final",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/mod.rs"
+      ],
+      "evidence": "A blanket Optional-to-Enforce API default change is not a proven selected-native bypass. Original and live native selection are checked before legacy fallbacks and require Enforce plus the native lifecycle. Both native-selection regressions passed; supported legacy Optional behavior remains.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition.rs",
+          "name": "native_dispatch_checks_live_selection_before_optional_fallbacks"
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition.rs",
+          "name": "native_dispatch_retains_original_requirement_when_live_selection_is_absent"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition.rs"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483684",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/chio-tee-fips.yml"
+      ],
+      "evidence": "Repaired setup reproducibility. Pinned install and actual compiler identity recording; source fixtures reject floating toolchain and removed identity steps. Original claim of actual compiler drift was not established",
+      "test_files": [
+        "scripts/tests/check-fips-ci-contract.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483688",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/chio-tee-fips.yml"
+      ],
+      "evidence": "Reproduced in source and repaired. Every affected Cargo invocation locked; fixture mutations remove locking from each owning test/build/lint step",
+      "test_files": [
+        "scripts/tests/check-fips-ci-contract.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483693",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/ci.yml"
+      ],
+      "evidence": "Reproduced and repaired in source. Required/reusable FIPS/nonce red, exact job and test inventory fixtures, trigger and privilege mutations",
+      "test_files": [
+        "scripts/tests/check-fips-ci-contract.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483699",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "a6d3690a4250a1fc63b8d3989ca9680788b734b1",
+      "files": [
+        ".github/workflows/enterprise-hardening.yml"
+      ],
+      "evidence": "Reproduced and repaired. Actual old binding shell returned zero on missing evidence; current shell refuses it, strict final gate executes true/false/absent cases",
+      "test_files": [
+        "scripts/tests/check-required-evidence-binding.test.py"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483704",
+      "group": "4d",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "db451c6500bcd779ae29ef1bfb06aa7ded5ef63c",
+      "files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "evidence": "Reproduced and repaired. Dotted-path constructor red, malformed escapes, escaped and empty-key positive paths, separate unresolved pointer rejection",
+      "test_files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483710",
+      "group": "4 final",
+      "disposition": "technically-inapplicable-with-reason",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "evidence": "Classifier already bounds rule count (256), expression bytes (4096), compiled/DFA bytes (65536), payload bytes (1048576) and findings (256). Differing limits in another guard and nested quantifiers do not establish catastrophic backtracking. Existing and added compiled-size tests pass; nullable and pointer defects were repaired separately. No latency or DoS benchmark claim.",
+      "regressions": [
+        {
+          "path": "crates/guards/chio-data-guards/src/structured_classification.rs",
+          "name": "nullable_regex_rules_reject_at_load_including_contextual_boundaries"
+        }
+      ],
+      "test_files": [
+        "crates/guards/chio-data-guards/src/structured_classification.rs"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3997874701",
+      "group": "4 final",
+      "disposition": "fixed-with-evidence",
+      "checkpoint": "63239c56c9bfcbe71de65ac66af6889b46d66c6c",
+      "files": [
+        "crates/kernel/chio-kernel/src/caller_delivery.rs",
+        "spec/schemas/chio-wire/v1/kernel/caller_dispatch_authorization.schema.json",
+        "spec/schemas/chio-wire/v1/kernel/caller_delivery_report.schema.json",
+        "spec/PROTOCOL.md",
+        "crates/core/chio-core-types/tests/protocol_primitives_generated.rs"
+      ],
+      "evidence": "Registered signed caller-dispatch authorization and delivery report schemas, PROTOCOL documentation and generated consumers are preserved. The owning real signed-codec/schema regression passed.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel/src/caller_delivery/tests/schema.rs",
+          "name": "signed_caller_artifacts_match_the_registered_schemas"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel/src/caller_delivery/tests/schema.rs"
+      ],
+      "result": "Focused regression passed on the Task 4D/current source; see final-only evidence."
+    },
+    {
+      "thread": "https://github.com/bb-connor/arc/pull/1117#discussion_r3997874703",
+      "group": "3",
+      "disposition": "reproduced-and-repaired",
+      "checkpoint": "ac2ca99973f24048b57b87e78cae4b61fa1d1d65",
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/custody.rs"
+      ],
+      "evidence": "All eight selected runtime/approval/DPoP combinations require custody before snapshot; genuinely unselected legacy absence stays supported.",
+      "regressions": [
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/custody.rs",
+          "name": "caller_custody_rejects_each_selected_family_without_its_physical_ledger"
+        }
+      ],
+      "test_files": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/custody.rs"
+      ],
+      "result": "Passed in the owning checkpoint's scoped qualification; see evidence groups. Not a whole-foundation or hosted result."
+    }
+  ]
+}

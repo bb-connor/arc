@@ -22,6 +22,20 @@ def _by_name(name: str) -> Any:
 
 
 @pytest.mark.asyncio
+async def test_approval_requires_retained_full_capability(
+    tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = make_configured_runtime(cwd=tmp_workspace)
+    runtime.signed_capability = None
+    monkeypatch.setattr(runtime.policy, "check_shell", lambda _cmd: True)
+    handler = make_handler(runtime, _by_name("chio_shell_run"))
+    payload = json.loads(await handler({"command": "rm -rf old/"}, task_id="id-only"))
+    assert payload["error"] == "chio_error"
+    assert "a full signed capability is required" in payload["message"]
+    assert runtime.chio_client.calls == []
+
+
+@pytest.mark.asyncio
 async def test_chio_shell_run_returns_requires_approval_envelope(
     tmp_workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -59,9 +73,12 @@ async def test_chio_shell_run_records_submit_call_with_command_args(
     ]
     assert len(submits) == 1
     ctx = submits[0].context
-    assert ctx["tool_name"] == "chio_shell_run"
+    assert ctx["tool_name"] == "run_command"
     assert ctx["tool_server"] == "shell"
     assert ctx["capability_id"] == runtime.capability_id
+    assert ctx["capability"] == runtime.signed_capability
+    assert ctx["requested_by"] == runtime.signed_capability["subject"]
+    assert ctx["parameters"] == {"command": "rm -rf old_build/", "approved": False}
     assert "rm -rf" in (ctx.get("summary") or "")
 
 

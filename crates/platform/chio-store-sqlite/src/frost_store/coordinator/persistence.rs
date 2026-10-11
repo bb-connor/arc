@@ -312,28 +312,13 @@ fn decode_canonical<T>(bytes: &[u8], column: usize) -> rusqlite::Result<T>
 where
     T: serde::de::DeserializeOwned + Serialize,
 {
-    let value: T = serde_json::from_slice(bytes).map_err(|error| {
+    crate::frost_store::decode_record(bytes).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
             column,
             rusqlite::types::Type::Blob,
             Box::new(error),
         )
-    })?;
-    let canonical = chio_core::canonical::canonical_json_bytes(&value).map_err(|error| {
-        rusqlite::Error::FromSqlConversionFailure(
-            column,
-            rusqlite::types::Type::Blob,
-            Box::new(error),
-        )
-    })?;
-    if canonical != bytes {
-        return Err(rusqlite::Error::FromSqlConversionFailure(
-            column,
-            rusqlite::types::Type::Blob,
-            "non-canonical coordinator JSON".into(),
-        ));
-    }
-    Ok(value)
+    })
 }
 
 fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, FrostStoreError> {

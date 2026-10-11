@@ -8,6 +8,7 @@
 
 pub mod assertions;
 pub mod capture;
+pub mod input;
 pub mod loaded_weights;
 pub mod replay;
 

@@ -4,7 +4,6 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::federation_policy::{
     verify_admission_proof_of_work, FederationAdmissionAntiSybilControls,
@@ -31,14 +30,6 @@ use chio_kernel::{BudgetStore, CapabilityAuthority, LocalCapabilityAuthority, Re
 use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::Client;
-
-fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -394,20 +385,24 @@ fn local_reputation_score(
     service_token: &str,
     subject_key: &str,
 ) -> f64 {
-    let body: serde_json::Value = client
+    let response = client
         .get(format!("{base_url}/v1/reputation/local/{subject_key}"))
         .header("Authorization", format!("Bearer {service_token}"))
         .send()
-        .expect("query local reputation")
-        .json()
-        .expect("parse local reputation");
+        .expect("query local reputation");
+    assert!(
+        response.status().is_success(),
+        "local reputation rejected: {}",
+        response.text().expect("rejection body")
+    );
+    let body: serde_json::Value = response.json().expect("parse local reputation");
     body["effectiveScore"].as_f64().expect("effectiveScore")
 }
 
 #[test]
 fn federation_policy_cli_supports_upsert_list_get_and_delete() {
-    let dir = unique_dir("chio-cli-federation-policy-cli");
-    fs::create_dir_all(&dir).expect("create temp dir");
+    let temporary = chio_test_support::private_tempdir().expect("private authority fixture");
+    let dir = temporary.path();
     let registry_path = dir.join("federation-policies.json");
     let input_path = dir.join("policy.json");
     let record = make_policy_record(
@@ -541,8 +536,8 @@ fn trust_service_evaluates_permissionless_federation_policy_with_reputation_gate
         return;
     }
 
-    let dir = unique_dir("chio-cli-federation-policy-http");
-    fs::create_dir_all(&dir).expect("create temp dir");
+    let temporary = chio_test_support::private_tempdir().expect("private authority fixture");
+    let dir = temporary.path();
     let federation_policies_file = dir.join("federation-policies.json");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -654,8 +649,8 @@ fn trust_service_enforces_permissionless_federation_anti_sybil_controls() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-federation-policy-anti-sybil");
-    fs::create_dir_all(&dir).expect("create temp dir");
+    let temporary = chio_test_support::private_tempdir().expect("private authority fixture");
+    let dir = temporary.path();
     let federation_policies_file = dir.join("federation-policies.json");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");

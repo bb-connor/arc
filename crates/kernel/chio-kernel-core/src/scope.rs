@@ -490,6 +490,10 @@ fn normalize_domain(value: &str) -> String {
     value.trim().trim_matches('.').to_ascii_lowercase()
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The loop checks candidate_idx and each pattern access is guarded by pattern_idx < pattern_chars.len(); backtracking uses a previously observed star."
+)]
 fn wildcard_matches(pattern: &str, candidate: &str) -> bool {
     let pattern_chars: Vec<char> = pattern.chars().collect();
     let candidate_chars: Vec<char> = candidate.chars().collect();
@@ -683,7 +687,10 @@ fn is_memory_store_key(key: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
+#[allow(
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod delivery_spelling_tests {
     use alloc::vec;
 

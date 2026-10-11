@@ -114,6 +114,23 @@ fn trusted_nitro_runtime_attestation() -> RuntimeAttestationEvidence {
     }
 }
 
+fn authenticated_runtime_attestation_record(
+    evidence: &RuntimeAttestationEvidence,
+    policy: &AttestationTrustPolicy,
+) -> chio_appraisal::VerifiedRuntimeAttestationRecord {
+    let authority = Keypair::generate();
+    let envelope =
+        chio_core::receipt::lineage::SignedExportEnvelope::sign(evidence.clone(), &authority)
+            .expect("test authority signs the complete attestation evidence");
+    chio_appraisal::verify_signed_runtime_attestation_record(
+        &envelope,
+        &authority.public_key(),
+        Some(policy),
+        150,
+    )
+    .expect("record is authenticated by the independently pinned test authority")
+}
+
 #[test]
 fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
     let call_chain = GovernedCallChainContext {
@@ -152,6 +169,7 @@ fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let metadata = governed_request_metadata(&request, None, 0)
@@ -231,6 +249,7 @@ fn governed_request_metadata_marks_matching_local_call_chain_evidence_as_observe
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -325,6 +344,7 @@ fn governed_request_metadata_marks_validated_upstream_call_chain_proof_as_verifi
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -403,6 +423,7 @@ fn governed_request_metadata_omits_unverified_runtime_assurance() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let metadata = governed_request_metadata(&request, None, 150)
@@ -419,7 +440,7 @@ fn governed_request_metadata_omits_unverified_runtime_assurance() {
 }
 
 #[test]
-fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
+fn governed_request_metadata_requires_authenticated_scoped_runtime_assurance() {
     let request = ToolCallRequest {
         request_id: "req-current-4".to_string(),
         capability: test_capability(),
@@ -449,12 +470,31 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
-    let metadata =
+    let unsigned_metadata =
         governed_request_metadata(&request, Some(&trusted_attestation_trust_policy()), 150)
             .expect("metadata should build")
             .expect("governed metadata should exist");
+    let unsigned: GovernedTransactionReceiptMetadata =
+        serde_json::from_value(unsigned_metadata["governed_transaction"].clone())
+            .expect("receipt metadata should deserialize");
+    assert!(
+        unsigned.runtime_assurance.is_none(),
+        "matching a policy must not authenticate raw attestation claims"
+    );
+
+    // This scopes an authority-authenticated record for receipt projection. It
+    // does not simulate hardware quote verification or fresh live admission.
+    let record = authenticated_runtime_attestation_record(
+        &trusted_runtime_attestation(),
+        &trusted_attestation_trust_policy(),
+    );
+    let _scope = scope_governed_runtime_attestation_receipt_record(Some(record));
+    let metadata = governed_request_metadata(&request, None, 150)
+        .expect("metadata should build")
+        .expect("governed metadata should exist");
     let governed: GovernedTransactionReceiptMetadata =
         serde_json::from_value(metadata["governed_transaction"].clone())
             .expect("receipt metadata should deserialize");
@@ -480,12 +520,10 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
 #[test]
 fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
     let attestation = trusted_nitro_runtime_attestation();
-    let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+    let verified_runtime_attestation = authenticated_runtime_attestation_record(
         &attestation,
-        Some(&trusted_nitro_attestation_trust_policy()),
-        150,
-    )
-    .expect("nitro attestation should verify at governed admission");
+        &trusted_nitro_attestation_trust_policy(),
+    );
     let request = ToolCallRequest {
         request_id: "req-current-nitro".to_string(),
         capability: test_capability(),
@@ -515,6 +553,7 @@ fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -544,12 +583,10 @@ fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
 #[test]
 fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_record() {
     let attestation = trusted_nitro_runtime_attestation();
-    let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+    let verified_runtime_attestation = authenticated_runtime_attestation_record(
         &attestation,
-        Some(&trusted_nitro_attestation_trust_policy()),
-        150,
-    )
-    .expect("nitro attestation should verify at governed admission");
+        &trusted_nitro_attestation_trust_policy(),
+    );
     let mut mismatched_attestation = attestation.clone();
     mismatched_attestation.evidence_sha256 = sha256_hex(b"mismatched-nitro-runtime-attestation");
     let request = ToolCallRequest {
@@ -581,6 +618,7 @@ fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_recor
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -650,14 +688,15 @@ fn request_receipt_metadata_omits_economic_authorization_without_verified_payee_
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let extra_metadata = serde_json::json!({
         "financial": FinancialReceiptMetadata {
             grant_index: 1,
             cost_charged: 230,
             currency: "USD".to_string(),
-            budget_remaining: 770,
-            budget_total: 1000,
+            budget_remaining: Some(770),
+            budget_total: Some(1000),
             delegation_depth: 0,
             root_budget_holder: "issuer-1".to_string(),
             payment_reference: Some("payref-1".to_string()),
@@ -708,6 +747,7 @@ fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_thro
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let extra_metadata = serde_json::json!({
         "financial": {

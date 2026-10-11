@@ -1,4 +1,7 @@
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "Preserve the typed rejection and its source without allocating a box on the failure path."
+)]
 
 #[path = "trust_control/finding_hosted_profile.rs"]
 pub mod finding_hosted_profile;
@@ -8,6 +11,8 @@ mod fiscal_handlers;
 mod fiscal_runtime;
 #[path = "trust_control/frost.rs"]
 pub mod frost;
+#[path = "trust_control/json_ingress.rs"]
+mod json_ingress;
 #[path = "trust_control/health.rs"]
 mod trust_control_health;
 
@@ -19,7 +24,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
+#[cfg(test)]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::Form;
 use axum::extract::{Path as AxumPath, Query, State};
@@ -88,19 +95,18 @@ use chio_credentials::{
 };
 use chio_did::DidChio;
 use chio_kernel::budget_store::{
-    ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAdmissionBinding,
-    BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
-    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
-    BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey,
-    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
-    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
-    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState,
-    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
-    DeniedBudgetHold, RevocationCommitMetadata,
+    ApprovalRequiredBudgetHold, BudgetAdmissionBinding, BudgetAuthorizationOutcome,
+    BudgetAuthorizeCumulativeApprovalRequest, BudgetAuthorizeHoldDecision,
+    BudgetAuthorizeHoldRequest, BudgetCancelCapturedBeforeDispatchRequest,
+    BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetCapturedBeforeDispatchCancellationDecision, BudgetCommitMetadata,
+    BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAuthorizationDecision,
+    BudgetCumulativeApprovalRequest, BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage,
+    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldAuthorizationRecord,
+    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
+    BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest,
+    BudgetReleaseHoldRequest, BudgetReverseHoldRequest, DeniedBudgetHold, RevocationCommitMetadata,
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
@@ -127,7 +133,7 @@ use chio_kernel::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
 };
 use chio_kernel::{
-    AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
+    AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
     BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
     BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
     BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,
@@ -336,6 +342,8 @@ pub mod finding_recovery_verifier;
 pub mod finding_retraction_resolver;
 #[path = "trust_control/finding_reveal_server.rs"]
 pub mod finding_reveal_server;
+#[path = "trust_control/finding_search_routes.rs"]
+mod finding_search_routes;
 #[path = "trust_control/finding_status_handlers.rs"]
 mod finding_status_handlers;
 #[path = "trust_control/finding_status_publisher.rs"]
@@ -344,10 +352,18 @@ pub mod finding_status_publisher;
 pub mod finding_status_verifier;
 #[path = "trust_control/finding_verified_fix.rs"]
 pub mod finding_verified_fix;
+#[path = "trust_control/ingress_lanes.rs"]
+mod ingress_lanes;
 #[path = "trust_control/passport_handlers.rs"]
 mod passport_handlers;
 #[path = "trust_control/receipt_handlers.rs"]
 mod receipt_handlers;
+#[path = "trust_control/receipt_query_service.rs"]
+mod receipt_query_service;
+#[path = "trust_control/receipt_snapshot_admin.rs"]
+mod receipt_snapshot_admin;
+#[path = "trust_control/registry_write_lane.rs"]
+mod registry_write_lane;
 #[path = "trust_control/report_rendering.rs"]
 pub(crate) mod report_rendering;
 #[path = "trust_control/report_validation.rs"]
@@ -392,6 +408,9 @@ pub(crate) use self::finding_purchase_routes::{
     handle_get_finding_proof_bundle, handle_publish_live_finding_status, handle_purchase_finding,
     FINDING_PURCHASE_MAX_BODY_BYTES,
 };
+pub(crate) use self::finding_search_routes::{
+    handle_search_findings_get, handle_search_findings_post,
+};
 pub use self::finding_status_handlers::build_operator_voluntary_retraction;
 pub(crate) use self::finding_status_handlers::*;
 // The evidenced-rail seam is part of the finding lane's deployment
@@ -404,5 +423,8 @@ pub(crate) use self::fiscal_handlers::*;
 pub(crate) use self::fiscal_runtime::*;
 pub(crate) use self::passport_handlers::*;
 pub(crate) use self::receipt_handlers::*;
+pub(crate) use self::receipt_snapshot_admin::{
+    handle_receipt_query_snapshot_recovery, RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
+};
 pub(crate) use self::risk_finance_handlers::*;
 pub use self::underwriting_and_support::*;

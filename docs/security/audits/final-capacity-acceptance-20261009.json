@@ -1,0 +1,78 @@
+{
+  "schema": "chio.security.review-acceptance-checkpoint.v1",
+  "observed_utc": "2026-10-09T21:21:25.158286+00:00",
+  "stage_head": "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+  "coordination_commit": "1f8b62c194",
+  "landing_pr": 1160,
+  "hosted_qualified": false,
+  "merged": false,
+  "findings": [
+    {
+      "id": "FINAL-F01",
+      "priority": "P1",
+      "status": "implementation-and-design-acceptance-open",
+      "requirement": "Native current-state capacity must recover without deleting retained authority or relocating a permanent denial to new admissions.",
+      "accepted_component": "Compact only dominated session state that no fence or nonterminal operation retains. Preserve imported and cross-principal taint.",
+      "remaining_acceptance": [
+        "Typed retryable refusal before global capacity, per-principal sharing and completion reservation for admitted work including parked approval.",
+        "Lineage and principal/epoch history remain authoritative. Authenticated cold state requires reviewed version/location commitments, bounded point proofs, cross-tier transition uniqueness and atomic recovery.",
+        "Account for declassification lifetime replay and spend records; no silent exemption from capacity acceptance."
+      ],
+      "ruling": "Compaction and pre-admission refusal alone do not close this finding. Cold-state implementation is not yet approved; design must resolve stale resurrection and unbounded epoch/startup scans."
+    },
+    {
+      "id": "FINAL-F02",
+      "priority": "P2",
+      "status": "producer-repair-and-legacy-acceptance-open",
+      "requirement": "Every admitted passport and certification record retains terminal revocation capacity and exact reopen.",
+      "producer_primary_commit": "693242da47b289bb38c3ed20f4e74c6859a3e995",
+      "remaining_acceptance": [
+        "Review and compose per-record terminal reserve with genuine Original tests and strict owning lint.",
+        "Preserve legacy files: a no-regression fallback may permit revocation that fits, but cannot guarantee a growing terminal write for an old file already at the read cap. Retain this as open pending a reviewed migration or explicit acceptance decision."
+      ],
+      "ruling": "No read-cap increase, deletion of signed records or assertion that new-write headroom covers every old file."
+    },
+    {
+      "id": "FINAL-F12",
+      "priority": "P1",
+      "status": "original-confirmed-repair-open",
+      "requirement": "An existing principal must refresh and join a legitimate second lineage; missing epoch state for an already materialized session or context must still refuse.",
+      "reviewed_source": "8f3dfac6b66b79ae04b745475a1a410000dbe06a",
+      "source_path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs",
+      "test": "lineage_observation::existing_principal_refreshes_a_second_lineage_through_the_kernel",
+      "original_evidence": {
+        "evidence_root": "claude-pr1160-evidence",
+        "path": "vfix/final-f01/side-lineage-observation-base.log",
+        "sha256": "12451015cb9aa11d54cdb681ba17bbce161e2d173e013e7230c48820197c39f0",
+        "exit": 101,
+        "passed": 0,
+        "failed": 1,
+        "failure": "second lineage refresh refused: native security state IntegrityFailure",
+        "scope": "Actual kernel refresh after first-lineage join; producer log independently inspected by integrator."
+      },
+      "remaining_acceptance": [
+        "Separate source-bound repair, kernel-path GREEN and inconsistent missing-epoch negative controls.",
+        "Owning tests and strict lint, composed validation and independent candidate review."
+      ]
+    },
+    {
+      "id": "FINAL-F13",
+      "priority": "P1",
+      "status": "source-confirmed-original-runtime-pending",
+      "requirement": "Concurrent passport/certification publication, dispute or revocation cannot overwrite successful terminal revocation; capacity decisions use the same current transaction.",
+      "reviewed_source": "c2c37c36c98e2bebad8deb6ebdfb589255acb8d3",
+      "source_paths": [
+        "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs",
+        "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs",
+        "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs"
+      ],
+      "observation": "The mutation handlers load, modify and replace registry files without a shared transaction or stale-write check. A later stale publisher can overwrite a successful revocation. This is source triage, not a completed runtime test.",
+      "remaining_acceptance": [
+        "Inventory all persistence mutation entry points, including CLI and separate processes, before choosing the transaction boundary.",
+        "Deterministic overlapping Original control, repaired terminal-state and capacity controls, owning strict lint and composition.",
+        "Bounded admission and cancellation-safe lock lifetime; a replaceable inode or path alias cannot bypass exclusion."
+      ]
+    }
+  ],
+  "qualification_boundary": "This checkpoint records open acceptance and a genuine Original failure. It does not establish a runtime repair, full candidate approval, hosted success or merge. KANI-PROOF-QUAL remains OPEN/UNPROVED under the owner amendment; no proof campaign was run."
+}

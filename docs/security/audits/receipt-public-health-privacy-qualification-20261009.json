@@ -1,0 +1,115 @@
+{
+  "schema": "chio.receipt-public-health-privacy-qualification.v1",
+  "observed_at": "2026-10-09T21:09:37.457608+00:00",
+  "parent": "3087b19be9e431bfdead0e633e5d6d3f3b7eca8f",
+  "findings": [
+    "FINAL-F09",
+    "FINAL-F04"
+  ],
+  "status": "LOCAL_COMPONENT_ACCEPTANCE_COMPLETE_CANDIDATE_REVIEW_OPEN",
+  "source_files": {
+    "crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs": "c05156c12c3a1141dae75473761883dd61c0dd088896f4db78979804503c6799",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_snapshot_recovery_tests.rs": "3462fc6cde20c2a3482f729056758bc89fbc4c8ae9892a4e87a5bbbe8fbe22c8",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests/receipt_query_snapshot_tests.rs": "b980fca458fc8f60b6d1e98bf55ddcc44449d5dd09ad1d452b4e15640ba02881"
+  },
+  "records": [
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "public_snapshot_health_discloses_only_configuration_and_readiness",
+        "--",
+        "--show-output"
+      ],
+      "exit": 101,
+      "seconds": 154.41664361953735,
+      "sha256": "b7e7f79c95f9fb68efe3b49c0aa05458df7cd7f7a085b953d0179349398b0f97",
+      "production_source": "3087b19be9e431bfdead0e633e5d6d3f3b7eca8f",
+      "log": "/tmp/pr1160-final-review-20261009/privacy/original.log",
+      "test_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1579 filtered out; finished in 0.44s"
+      ]
+    },
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "receipt_query_snapshot_tests",
+        "--",
+        "--show-output"
+      ],
+      "exit": 0,
+      "seconds": 160.48131585121155,
+      "sha256": "e97b60237de9890a439af9d3929beeccbca6fd3f32764eaa681e004a7ddc29bb",
+      "source_stable": true,
+      "log": "/tmp/pr1160-final-review-20261009/privacy/green.log",
+      "test_summaries": [
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1567 filtered out; finished in 6.81s"
+      ]
+    },
+    {
+      "command": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--",
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 301.3559374809265,
+      "sha256": "09ea63ba2cf9e69232103f30dabb357aacf4eecb0bccb7309e7f37c7c8ab0acf",
+      "log": "/tmp/pr1160-final-review-20261009/privacy/clippy.log",
+      "test_summaries": []
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 28.317281484603882,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "/tmp/pr1160-final-review-20261009/privacy/fmt.log",
+      "test_summaries": []
+    }
+  ],
+  "contracts": [
+    "Public receipt snapshot health discloses only configured/state, including under exhausted query admission. Counts, resource use, watermarks and raw diagnostics remain on trusted owner APIs.",
+    "Real1MiB projection exhaustion returns HTTP503; owner8MiB request recovers HTTP200 and all192 receipts in-process. Altered selected receipt data on the recovered service returns typed invalid500.",
+    "The existing one-shot storage-full recovery Original/GREEN and unchanged resource ceilings are retained in receipt-recovery-health-qualification-20261009.json."
+  ],
+  "remaining_acceptance": [
+    "F01/F02/F03/F11 repairs and composition; planner exact candidate delta review; exact protected hosted checks and merge.",
+    "Foundation permission does not qualify release or the explicitly OPEN/UNPROVED KANI-PROOF-QUAL obligation. No real proof tool ran."
+  ]
+}

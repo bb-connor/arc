@@ -32,12 +32,14 @@ required-features = ["pq"]
 
 [dependencies]
 chio-attest-verify = { workspace = true }
+chio-core-types = { workspace = true }
 chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 chio-reputation = { workspace = true, optional = true }
 oci-distribution = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 reqwest = { workspace = true, features = ["json", "query", "rustls"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+libc = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 

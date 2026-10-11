@@ -8,6 +8,9 @@ mod types;
 mod validators;
 mod verify;
 
+#[cfg(test)]
+pub(crate) use registry::revocation_capacity;
+
 pub use commands::{
     cmd_certify_check, cmd_certify_registry_consume, cmd_certify_registry_dispute,
     cmd_certify_registry_get_local, cmd_certify_registry_list_local,

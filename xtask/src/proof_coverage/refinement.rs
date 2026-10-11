@@ -45,9 +45,29 @@ pub(super) fn add_kani_artifacts(
         let Some(artifact) = artifacts.get_mut(&id) else {
             return Err(format!("Kani artifact disappeared: {id}"));
         };
-        artifact
-            .qualifiers
-            .insert("execution_lane".to_string(), harness.lane.clone());
+        match &harness.open_residual {
+            Some(KaniOpenResidual::AttestationDecomposition) => {
+                if harness.crate_name != "chio-attest-verify"
+                    || harness.harness != "public_expect_report_data_determinism_and_binding"
+                    || harness.lane != "pr"
+                {
+                    return Err(format!(
+                        "KANI-ATTEST-DECOMP is not authorized for {}::{}",
+                        harness.crate_name, harness.harness
+                    ));
+                }
+                artifact.qualifiers.extend([
+                    ("execution_lane".to_string(), "not-executed".to_string()),
+                    ("status".to_string(), "unproved".to_string()),
+                    ("followup".to_string(), "KANI-ATTEST-DECOMP".to_string()),
+                ]);
+            }
+            None => {
+                artifact
+                    .qualifiers
+                    .insert("execution_lane".to_string(), harness.lane.clone());
+            }
+        }
         if harness.notes.to_ascii_uppercase().contains("MODEL-ONLY") {
             artifact
                 .qualifiers

@@ -18,7 +18,7 @@ env:
   # CI lane.
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
   CHIO_CREUSOT_REV: a12f3ac7f688c7b93cee2c2eb60282004a2bdb30
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
 
 jobs:
   qualify:
@@ -160,8 +160,7 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-verification-tool-target
         run: |
           set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          cargo kani setup
+          bash scripts/install-kani-toolchain.sh
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y

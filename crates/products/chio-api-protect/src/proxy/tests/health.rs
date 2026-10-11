@@ -33,6 +33,16 @@ async fn health_route_reports_ready_when_the_receipt_store_is_reachable() {
     let (temp_dir, db_path) = temp_receipt_db();
     let state =
         test_state_with_receipt_db(Vec::new(), "http://127.0.0.1:1".to_string(), Some(&db_path));
+    // Assert steady readiness only after the actor acknowledges initialization.
+    state
+        .receipt_store
+        .as_ref()
+        .test_unwrap()
+        .lock()
+        .await
+        .core
+        .flush_receipt_writes()
+        .test_unwrap();
     let request = Request::builder()
         .method("GET")
         .uri("/chio/health")
@@ -65,9 +75,10 @@ async fn readiness_consults_the_store_reachability_signal() {
 
     let (temp_dir, db_path) = temp_receipt_db();
     let store = SqliteReceiptStore::open(&db_path).test_unwrap();
+    store.core.flush_receipt_writes().test_unwrap();
     assert!(
         store.is_reachable(),
-        "a freshly opened store must be reachable"
+        "an initialized receipt writer must be reachable"
     );
 
     drop(store);
@@ -78,12 +89,13 @@ async fn readiness_consults_the_store_reachability_signal() {
 async fn reachability_probe_touches_the_write_path_and_persists_nothing() {
     let (temp_dir, db_path) = temp_receipt_db();
     let store = SqliteReceiptStore::open(&db_path).test_unwrap();
+    store.core.flush_receipt_writes().test_unwrap();
 
     // A healthy store probes reachable, and the probe rolls back: exercising the
     // write path must not leave a durable receipt behind.
     assert!(
         store.is_reachable(),
-        "a freshly opened store must be reachable"
+        "an initialized receipt writer must be reachable"
     );
     assert!(
         store.load_receipts().test_unwrap().is_empty(),
@@ -94,7 +106,8 @@ async fn reachability_probe_touches_the_write_path_and_persists_nothing() {
     // would. A bare connection check would still answer here; the write-path probe
     // must not, so an instance that can no longer persist receipts leaves rotation.
     let side = rusqlite::Connection::open(&db_path).test_unwrap();
-    side.execute("DROP TABLE http_receipts", []).test_unwrap();
+    side.execute("DROP TABLE chio_tool_receipts", [])
+        .test_unwrap();
     drop(side);
 
     assert!(

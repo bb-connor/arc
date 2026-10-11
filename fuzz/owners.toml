@@ -16,6 +16,14 @@
 crate = "chio-attest-verify"
 path  = "crates/trust/chio-attest-verify"
 
+[targets.response_authority_protocol]
+crate = "chio-control-plane"
+path  = "crates/platform/chio-control-plane"
+
+[targets.response_lifecycle]
+crate = "chio-quarantine"
+path  = "crates/security/chio-quarantine"
+
 [targets.jwt_vc_verify]
 crate = "chio-credentials"
 path  = "crates/trust/chio-credentials"
@@ -120,6 +128,18 @@ path  = "crates/guards/chio-data-guards"
 crate = "chio-kernel"
 path  = "crates/kernel/chio-kernel"
 
+[targets.rollback_anchor_slots]
+crate = "chio-store-sqlite"
+path  = "crates/platform/chio-store-sqlite"
+
+[targets.peers_lock_decode]
+crate = "chio-conformance"
+path  = "crates/tooling/chio-conformance"
+
 [targets.fuzz_tool_action]
 crate = "chio-guards"
 path  = "crates/guards/chio-guards"
+
+[targets.frost_round2_envelope]
+crate = "chio-federation-authority"
+path = "crates/trust/chio-federation-authority"

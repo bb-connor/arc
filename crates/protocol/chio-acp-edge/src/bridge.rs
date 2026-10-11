@@ -15,6 +15,7 @@ struct CapabilityBinding {
     target_protocol: DiscoveryProtocol,
     server_id: String,
     tool_name: String,
+    security: BridgeSecurityMetadata,
 }
 
 struct AcpRequestIds {
@@ -36,7 +37,9 @@ impl CapabilityBridge for AcpCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(
@@ -47,8 +50,9 @@ impl CapabilityBridge for AcpCapabilityBridge {
         let chio_metadata = ensure_chio_metadata(envelope)?;
         chio_metadata.insert(
             "capabilityRef".to_string(),
-            serde_json::to_value(cap_ref)
-                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+            serde_json::to_value(cap_ref).map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })?,
         );
         Ok(())
     }
@@ -114,7 +118,7 @@ fn evaluate_bridge_fidelity(
                 "browser/session automation semantics are not yet truthfully projected on the ACP edge"
                     .to_string(),
         },
-        AcpCategory::Tool if tool.has_side_effects => BridgeFidelity::Unsupported {
+        AcpCategory::Tool if !tool.annotations.read_only => BridgeFidelity::Unsupported {
             reason:
                 "generic side-effectful tools do not map honestly to ACP capability classes on this edge"
                     .to_string(),
@@ -161,32 +165,30 @@ fn evaluate_bridge_fidelity(
     }
 }
 
+#[cfg(test)]
 fn current_unix_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
-
-fn current_unix_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_millis() as u64)
+    chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+        .unwrap_or_else(|error| panic!("test clock: {error}"))
+        .unix_millis()
+        .get()
+        / 1000
 }
 
 fn execute_orchestrated_acp_request(
+    peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
+    manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
 ) -> Result<OrchestratedToolCall, AcpEdgeError> {
     let registry = authoritative_target_registry();
     if !registry.supports_target_protocol(request.target_protocol) {
-        return Err(AcpEdgeError::InvalidRequest(format!(
-            "ACP authoritative execution does not have a registered `{}` target executor",
-            request.target_protocol
-        )));
+        return Err(AcpEdgeError::InvalidRequest(
+            AcpRequestError::UnsupportedTarget,
+        ));
     }
 
-    match CrossProtocolOrchestrator::new(kernel)
+    match CrossProtocolOrchestrator::new(kernel, manifest_registry)
+        .with_peer_capabilities(peer)?
         .with_registry(registry)
         .execute(&AcpCapabilityBridge, request)
     {

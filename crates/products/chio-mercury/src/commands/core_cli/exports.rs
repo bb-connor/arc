@@ -438,7 +438,7 @@ pub(super) fn export_mercury_run(
 
     write_json_file(&input_file, input_value)?;
     let bundle_manifest_paths = write_bundle_manifests(&bundle_manifest_dir, bundle_manifests)?;
-    populate_mercury_receipt_store(&receipt_db, capability_id, steps)?;
+    let kernel = populate_mercury_receipt_store(&receipt_db, capability_id, steps)?;
     evidence_export::cmd_evidence_export(
         &evidence_dir,
         None,
@@ -453,9 +453,14 @@ pub(super) fn export_mercury_run(
         Some(&receipt_db),
         None,
         None,
+        &kernel,
     )?;
 
-    let proof_package = build_proof_package(&evidence_dir, &bundle_manifest_paths)?;
+    let proof_package = build_proof_package(
+        &evidence_dir,
+        &bundle_manifest_paths,
+        &[kernel.public_key().to_hex()],
+    )?;
     let proof_report = proof_package
         .verify(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
