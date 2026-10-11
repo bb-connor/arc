@@ -237,13 +237,23 @@ fn orphaned_custody_is_an_integrity_refusal_that_still_reclaims_the_rest() {
     });
     prepared.sort_by(|left, right| left.1.ids.operation_id.cmp(&right.1.ids.operation_id));
     let [(request, orphan), (_, reclaimable)] = prepared;
-    rusqlite::Connection::open(&attempt_path)
-        .test_expect("open attempt database")
-        .execute(
-            "DELETE FROM broker_attempts WHERE attempt_id = ?1",
-            [&orphan.ids.attempt_id],
-        )
-        .test_expect("drop the durable attempt");
+    let fault_connection =
+        rusqlite::Connection::open(&attempt_path).test_expect("open attempt database");
+    // Inject missing durable state through this test-only connection. The store's
+    // own connection keeps foreign-key enforcement enabled.
+    fault_connection
+        .execute_batch("PRAGMA foreign_keys = OFF;")
+        .test_expect("disable FK only on fault connection");
+    assert_eq!(
+        fault_connection
+            .execute(
+                "DELETE FROM broker_attempts WHERE attempt_id = ?1",
+                [&orphan.ids.attempt_id],
+            )
+            .test_expect("drop the durable attempt"),
+        1,
+        "the fault must remove exactly the retained attempt"
+    );
 
     assert!(matches!(
         fixture
