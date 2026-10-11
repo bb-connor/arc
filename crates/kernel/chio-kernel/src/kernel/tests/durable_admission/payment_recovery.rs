@@ -17,6 +17,8 @@ mod authorization_window;
 mod continuation_controls;
 #[path = "payment_recovery/fx_clock.rs"]
 mod fx_clock;
+#[path = "payment_recovery/legacy_settled_prepaid.rs"]
+mod legacy_settled_prepaid;
 #[cfg(feature = "finding-market")]
 #[path = "payment_recovery/publication.rs"]
 mod publication;
