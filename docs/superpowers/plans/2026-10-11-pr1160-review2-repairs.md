@@ -44,8 +44,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
 - [x] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-002: Durable API Protect discards the configured shared budget authority
 
@@ -212,8 +212,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
 - [x] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-014: Simulation rejects valid repeated effects against one captured target
 
@@ -395,8 +395,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 - [x] Confirm current source and owning contract.
 - [x] Execute native test-only Original `d7c2a7c3e8` (two refusals plus two healthy controls).
 - [x] Implement and independently review minimal shared custody repair.
-- [ ] Pass native and owning Linux controls, strict lint and composition gates.
-- [ ] Compose and record exact-source qualification in the ledger.
+- [x] Pass native and owning Linux controls, strict lint and composition gates.
+- [x] Compose and record exact-source qualification in the ledger.
 
 ## Current execution checkpoint
 

@@ -22,7 +22,9 @@ composed package passed 299 tests and Ruff; four live-sidecar cases remain
 unavailable. The [component audit](audits/review2-local-components-20261011.json)
 and [Cage audit](audits/review2-cage-qualified-20261011.json) distinguish genuine
 Original failures, repaired results and native limitations. Descriptor custody
-repairs are composed and undergoing platform qualification. Other confirmed
+repairs passed their native Darwin controls and six-command Linux qualification;
+the [native audit](audits/review2-native-qualified-20261011.json) preserves source
+overlays, all artifact hashes and earlier failing runs. Other confirmed
 review items remain in assigned repair lanes. The canonical count stays **1,997**;
 only the named current states advance, preserving all historical requirements.
 
