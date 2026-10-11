@@ -1,0 +1,549 @@
+{
+  "schema": "chio.pr1160.review-batch-terminal.v1",
+  "observed_utc": "2026-10-11T17:40:31.046110+00:00",
+  "staged_source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+  "published_predecessor": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "local_audits": [
+    {
+      "path": "docs/security/audits/checkpoint-delta-20261011.json",
+      "sha256": "c3179edadeafaf39cffe5ce5270d92e9d21379dd13d9305e88a6535cbd28f6d8"
+    },
+    {
+      "path": "docs/security/audits/keyring-current-selector-20261011.json",
+      "sha256": "d84f24ff8f210e6f01444625a1ff4853c53a58260f8191837cfa5220a257db57"
+    },
+    {
+      "path": "docs/security/audits/compaction-static-repairs-20261011.json",
+      "sha256": "662d0e8a954dab70ed60ec82ccf180537fc600c67af88e639cc9a3db494054fe"
+    },
+    {
+      "path": "docs/security/audits/legacy-prepaid-periodic-control-20261011.json",
+      "sha256": "1cae1f5194513cad9b2fcc4df5b0aece705d5d4cd25beff02b76997221efe43e"
+    }
+  ],
+  "compiled_inventory_enumeration": {
+    "source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+    "inventories": [
+      {
+        "name": "native-flow",
+        "binary": "/var/tmp/pr1160-root-final-20261009/debug/deps/chio_store_sqlite-b5faae35b103b89a",
+        "binary_sha256": "b84dd1c43cfba6b78193de9b800ddf649405fdee9e3a1988afa8364875438e1e",
+        "expected": 145,
+        "actual": 145,
+        "log_sha256": "8c4815b4a7bee95932f8f1b8952752ab862ead8e6c58c7dc677aaff3eefee624",
+        "accepted": true
+      },
+      {
+        "name": "keyring",
+        "binary": "/var/tmp/pr1160-root-final-20261009/debug/deps/independent_services-68ef7e1be9893544",
+        "binary_sha256": "3a4c37b051e6a2374db9993c67183f184ef233daa68fb093790cbb31433aa78e",
+        "expected": 12,
+        "actual": 12,
+        "log_sha256": "86770931176f55b5349d80ae9df2f8509199917c7276104db0aa8de314d40da8",
+        "accepted": true
+      }
+    ],
+    "scope": "Enumeration against retained, already-qualified owner binaries only; not a new runtime campaign or full gate pass. All selected runtime tests have separate retained qualification. No proof execution."
+  },
+  "remaining_store_integration": {
+    "source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-store-sqlite",
+      "--features",
+      "admission-test-support",
+      "--lib",
+      "--",
+      "--skip",
+      "security_participant_state::"
+    ],
+    "exit": 0,
+    "seconds": 2171.96,
+    "counts": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        2240,
+        0,
+        13
+      ]
+    ],
+    "log_sha256": "8657aa24301633aa3dd6f490bbf3e2e06a1319f8a3bec75da4afb5fbd2394ffb",
+    "source_stable": true,
+    "accepted": true,
+    "scope": "Final integration boundary for remaining SQLite library groups. The188 participant-state cases were separately qualified on byte-equivalent runtime998 and are filtered here, not counted as passes.",
+    "count_interpretation": "The parent binary reports2240 passed,0 failed,13 ignored and188 filtered. The earlier1/0 child-process summary is nested and is not added to the parent pass count. Participant188 was separately qualified."
+  },
+  "static_preflight": {
+    "source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+    "records": [
+      {
+        "label": "ledger",
+        "command": [
+          "python3",
+          "scripts/check-security-landing-ledger.py"
+        ],
+        "exit": 0,
+        "seconds": 6.52,
+        "sha256": "4e0f4b17bc9fb33693747e24ed6ef97ce425081b04f23df035a0e55ef6a3ddd2"
+      },
+      {
+        "label": "rust-hygiene",
+        "command": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "seconds": 5.52,
+        "sha256": "c366f3c362994e7f0c3e281130143016c32023636f358be7a0b3d669be8ccfae"
+      },
+      {
+        "label": "security-ci",
+        "command": [
+          "python3",
+          "scripts/check-security-ci-contract.py"
+        ],
+        "exit": 0,
+        "seconds": 2.23,
+        "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      },
+      {
+        "label": "static-formal-contract",
+        "command": [
+          "python3",
+          "scripts/check-apalache-formal-slice.py"
+        ],
+        "exit": 0,
+        "seconds": 0.12,
+        "sha256": "523cb78090d956a1f7592bfa9c68b0fd42a7b257dd53e47240b02b1aad97d706"
+      },
+      {
+        "label": "wire-inventory",
+        "command": [
+          "python3",
+          "scripts/check-wire-schemas.py"
+        ],
+        "exit": 0,
+        "seconds": 9.54,
+        "sha256": "7bd408fe10382a98be619af9bad3535a76b1aae93dde0b3c7819d69d45c11234"
+      },
+      {
+        "label": "flow-gate-selftest",
+        "command": [
+          "bash",
+          "scripts/tests/check-flow-security.test.sh"
+        ],
+        "exit": 0,
+        "seconds": 2.0,
+        "sha256": "d62f4d6d68a811fed3faff073bdc31efddd6c46fa9b20384df30541284957659"
+      },
+      {
+        "label": "mandatory-anchors",
+        "command": [
+          "/var/tmp/pr1160-root-final-20261009/debug/xtask",
+          "check",
+          "formal-mirrors"
+        ],
+        "exit": 0,
+        "seconds": 3.82,
+        "sha256": "b8c3de37ecf82ae4bad9f88c6bb06ecc4644c25b28c12e30081b7f7e548b46a1"
+      },
+      {
+        "label": "coverage",
+        "command": [
+          "/var/tmp/pr1160-root-final-20261009/debug/xtask",
+          "gen",
+          "proof-coverage",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 4.04,
+        "sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+      }
+    ],
+    "accepted": true,
+    "scope": "Final assembled source static boundary only. No proof execution, Cargo compilation or runtime campaign."
+  },
+  "predecessor_required": {
+    "Build, lint, test": [
+      {
+        "state": "CANCELLED",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421106"
+      }
+    ],
+    "MSRV build and test": [
+      {
+        "state": "CANCELLED",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421093"
+      }
+    ],
+    "cargo-vet (locked supply-chain audit)": [
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38139898925/job/114471419928"
+      },
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421021"
+      }
+    ],
+    "cargo-deny (supply-chain bans/advisories/licenses)": [
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421112"
+      }
+    ]
+  },
+  "predecessor_failed": [
+    {
+      "name": "dispatch isolated enterprise Linux capture",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139895252/job/114471408288"
+    },
+    {
+      "name": "Build, lint, test",
+      "conclusion": "CANCELLED",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421106"
+    },
+    {
+      "name": "kani-public-pr (all lane=pr harnesses)",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471420943"
+    },
+    {
+      "name": "apalache-full-contract / apalache-contracts",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421192"
+    },
+    {
+      "name": "kani-manifest-pr (non-core lanes.pr sweep)",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139898731/job/114471511741"
+    },
+    {
+      "name": "apalache-full-contract / apalache-subset",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114483865975"
+    },
+    {
+      "name": "enterprise-security-contract / active defense security gates",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338636"
+    },
+    {
+      "name": "enterprise-security-contract / enterprise adversarial evidence",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338611"
+    },
+    {
+      "name": "enterprise-security-contract / enterprise real Linux enforcement",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338615"
+    },
+    {
+      "name": "MSRV build and test",
+      "conclusion": "CANCELLED",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421093"
+    },
+    {
+      "name": "Security contract",
+      "conclusion": "FAILURE",
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114532291654"
+    }
+  ],
+  "classifications": {
+    "https://github.com/bb-connor/arc/actions/runs/38139895252/job/114471408288": {
+      "classification": "known-disclosed-post-merge-prerequisite",
+      "name": "dispatch isolated enterprise Linux capture",
+      "job_id": 114471408288,
+      "step": "Authorize exact source and controller context",
+      "authorized_source": "d0496c14d824a327f00b98576132834306ff6694",
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "log_sha256": "0a8203d4e442ea4967d867914fddadfd1ee149c135c96841a7441905955d4bb0",
+      "scope": "Stale exact-source authorization boundary, independently classified by Claude. No execution evidence pass or authorized variable mutation."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421106": {
+      "classification": "operator-cancelled-incomplete-qualification",
+      "name": "Build, lint, test",
+      "job_id": 114471421106,
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "observed_utc": "2026-10-11T17:40:27.635455+00:00",
+      "log_sha256": "f3353a070c0d41d7026ed089a5f6f850d5edb51afe7f1142060d06ae08daa243",
+      "last_completed_test": "2026-10-11T17:36:09.9245610Z test security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody ... ok",
+      "completed_test_summaries": 307,
+      "failure_markers_observed": false,
+      "scope": "Claude cancelled the old run after relaying Connor's17:38Z push-now instruction. This is incomplete qualification, not a pass, timeout, source regression or established runner stall. Tests were still making progress before cancellation; full replacement checks remain mandatory."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471420943": {
+      "classification": "additional-weights-proof-residual-open-user-disposition-required",
+      "name": "kani-public-pr",
+      "job_id": 114471420943,
+      "failure": "chio-weights::public_weights_hash_of_determinism_and_shape timed out with exit124 after1800s; unwind66. Earlier harnesses succeeded.",
+      "ledger_row": "CI-KANI-WEIGHTS-20261011",
+      "scope": "Neither proof nor counterexample. Distinct from accepted attestation-only residual; no proof domain/budget/gate waiver, no manual proof campaign. Explicitly retain in merge-go-ahead disposition.",
+      "log_sha256": "bf59e1cbf583172c0a0c90ad2b7100e260222273a185159717649f261a805e3b"
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421192": {
+      "classification": "genuine-current-source-static-contract-drift-repaired-privately",
+      "name": "apalache-full-contract / apalache-contracts",
+      "job_id": 114471421192,
+      "failure": "check_post_admission_drop_guard: the model must classify all server-returned errors as outcome-unknown",
+      "repair": "7f9273387b",
+      "scope": "Checker still pinned the old polling boundary after reviewed model-header/source repair moved the boundary to mark_dispatch_started. Current guard passes and three mutated header contracts refuse; model body and proof execution unchanged.",
+      "log_sha256": "387503612b7b49d75a6a0f5726210688daab8dd3c6101c7df3e3982ba864a84c"
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139898731/job/114471511741": {
+      "classification": "additional-weights-proof-residual-open-user-disposition-required",
+      "name": "kani-manifest-pr",
+      "job_id": 114471511741,
+      "failure": "chio-weights::public_weights_hash_of_determinism_and_shape timed out with exit124 after1800s; unwind66. Earlier harnesses succeeded.",
+      "ledger_row": "CI-KANI-WEIGHTS-20261011",
+      "scope": "Neither proof nor counterexample. Distinct from accepted attestation-only residual; no proof domain/budget/gate waiver, no manual proof campaign. Explicitly retain in merge-go-ahead disposition.",
+      "log_sha256": "98767b4afd081e71c8cbf9fead558b58f5e1fa100a69a05820185b4d39a3da4b"
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114483865975": {
+      "classification": "downstream-static-contract-failure-repaired-privately",
+      "name": "apalache-full-contract / apalache-subset",
+      "job_id": 114483865975,
+      "upstream_job_id": 114471421192,
+      "failure": "Aggregate fails with CONTRACT_RESULT=failure; lifecycle, shard and negative jobs succeeded. Lane posture retains LANE_EXIT=1.",
+      "repair": "7f9273387b",
+      "scope": "No new cause. Current static checker repair and early guard69c192e131 reviewed locally; hosted replacement acceptance remains pending.",
+      "log_sha256": "a3dc5e5327c8d65f4cde5bf30e3ea56c07a347d80db26513db196888aa86a0d0"
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338636": {
+      "classification": "genuine-current-source-static-contract-drift-repaired-privately",
+      "name": "enterprise-security-contract / active defense security gates",
+      "job_id": 114474338636,
+      "failure": "check_post_admission_drop_guard: the model must classify all server-returned errors as outcome-unknown",
+      "repair": "7f9273387b",
+      "scope": "Checker still pinned the old polling boundary after reviewed model-header/source repair moved the boundary to mark_dispatch_started. Current guard passes and three mutated header contracts refuse; model body and proof execution unchanged.",
+      "log_sha256": "7a217a2317d54f36aa5e0e49ed8d5e7725aac76c4e2e7613ee08aeb2538bdc89"
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338611": {
+      "classification": "known-disclosed-post-merge-prerequisite",
+      "name": "enterprise-security-contract / enterprise adversarial evidence",
+      "job_id": 114474338611,
+      "authorized_source": "d0496c14d824a327f00b98576132834306ff6694",
+      "step": "Verify exact isolated security execution inputs",
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "log_sha256": "7a7bce276fa1ef63cc4ca074fb358edd63f09a46c5aa1484c9a34846febcfde0",
+      "scope": "Same stale exact-source authorization prerequisite, not adversarial execution acceptance."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114474338615": {
+      "classification": "known-disclosed-post-merge-prerequisite",
+      "name": "enterprise-security-contract / enterprise real Linux enforcement",
+      "job_id": 114474338615,
+      "step": "Verify exact isolated security execution inputs",
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "log_sha256": "d704e0813eda6c14beda73482ae3c9f0ab4751abcae6694b68143ee636daf0a7",
+      "scope": "Existing exact-source authorization mismatch independently classified by Claude. No authorized repository variable changes; not a native enforcement pass."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421093": {
+      "classification": "operator-cancelled-incomplete-qualification",
+      "name": "MSRV build and test",
+      "job_id": 114471421093,
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "observed_utc": "2026-10-11T17:40:27.635455+00:00",
+      "log_sha256": "ce410fb601081da6649d14c73040ce0cc9b8793dfeebd3a70fc0f3cb010e2cdb",
+      "last_completed_test": "2026-10-11T17:38:52.9117694Z test unconfirmed_preflight_cleanup_replays_on_the_next_preflight ... ok",
+      "completed_test_summaries": 773,
+      "failure_markers_observed": false,
+      "scope": "Claude cancelled the old run after relaying Connor's17:38Z push-now instruction. This is incomplete qualification, not a pass, timeout, source regression or established runner stall. Tests were still making progress before cancellation; full replacement checks remain mandatory."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114532291654": {
+      "classification": "known-post-merge-evidence-prerequisite-and-downstream-aggregate",
+      "name": "Security contract",
+      "job_id": 114532291654,
+      "event_head": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+      "log_sha256": "abbce6869273ab8d29bcb8dc74b3ffea3fc99315a7de93148f79908efc8c7fc4",
+      "failure": "The first check rejects empty COMMITTED_LINUX_EVIDENCE_SHA. Dependent checks also include cancelled Build/MSRV and separately classified failures.",
+      "scope": "No new source failure. Missing evidence and trusted setup remain disclosed post-merge prerequisites. Cancellation is retained distinctly from success; no variable rotation."
+    }
+  },
+  "unclassified": [],
+  "required_logs": [
+    {
+      "job": 114471421106,
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421106",
+      "conclusion": "cancelled",
+      "metadata_sha256": "7297de3c8e3a737793a55ada11bbfc8713900c28cf399a211d184d95a70b742b",
+      "log_sha256": "f3353a070c0d41d7026ed089a5f6f850d5edb51afe7f1142060d06ae08daa243",
+      "log_path": "/tmp/pr1160-ci-batch-20261010/published-9e9cf98942/required-terminal/114471421106.log"
+    },
+    {
+      "job": 114471421093,
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421093",
+      "conclusion": "cancelled",
+      "metadata_sha256": "ac22593a46a503467fada69c6aefdcaadf27c1f64dea2187e4828f708362cc3a",
+      "log_sha256": "ce410fb601081da6649d14c73040ce0cc9b8793dfeebd3a70fc0f3cb010e2cdb",
+      "log_path": "/tmp/pr1160-ci-batch-20261010/published-9e9cf98942/required-terminal/114471421093.log"
+    },
+    {
+      "job": 114471421021,
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421021",
+      "conclusion": "success",
+      "metadata_sha256": "fd03ac693477be92a665eb6dd92cf597738cffdb4344f735240bf0dc26b833f5",
+      "log_sha256": "bc395302f46188ed0b5fee9a55604e4205abbaf327358085d5cfb268f6e02640",
+      "log_path": "/tmp/pr1160-ci-batch-20261010/published-9e9cf98942/required-terminal/114471421021.log"
+    },
+    {
+      "job": 114471421112,
+      "url": "https://github.com/bb-connor/arc/actions/runs/38139899152/job/114471421112",
+      "conclusion": "success",
+      "metadata_sha256": "67375ceb61f0f0735c508494a86103f8f464fd373669f63e00b6b92c3e304dc7",
+      "log_sha256": "c234f710a43a5b970c6c8daefa14dd3a23fb629951bf4ceb16817d465f934f3f",
+      "log_path": "/tmp/pr1160-ci-batch-20261010/published-9e9cf98942/required-terminal/114471421112.log"
+    }
+  ],
+  "native_predecessor_operator_scenarios": {
+    "source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+    "run": 38139898754,
+    "job": 114483310088,
+    "result": "success",
+    "operator_fixture": {
+      "path": "examples/mini-swe-recovery/qualify_operator.py",
+      "sha256": "30fa719cea4673928687f08149f30c9357584bdaff047fdf35f1e6db8bb8b5b2",
+      "source_assertions": {
+        "provider_seconds": 10,
+        "completed_attempts": 1,
+        "successful_calls": 3,
+        "verified_receipts": 8,
+        "model_cost": 0.00108
+      }
+    },
+    "operator_results": [
+      {
+        "binary_sha256": "02af1b7fc8efc1fbe66a2ee5944bb3460b5b833baedf9e068f1ee3a8ba6d872c",
+        "successful_http_requests": 3,
+        "verified_receipts": 8,
+        "configuration_change_refused": true,
+        "completed_replay": true,
+        "provider_error_stopped": true
+      },
+      {
+        "binary_sha256": "02af1b7fc8efc1fbe66a2ee5944bb3460b5b833baedf9e068f1ee3a8ba6d872c",
+        "successful_http_requests": 3,
+        "verified_receipts": 8,
+        "configuration_change_refused": true,
+        "completed_replay": true,
+        "provider_error_stopped": true
+      }
+    ],
+    "retained_artifacts": [
+      {
+        "path": "./artifacts/ai-sdk-benchmark-Linux-X64.zip",
+        "sha256": "c5bf928246220eff7ee2e41efdcfb69f2918437b9663147558f802591d0ddc9d"
+      },
+      {
+        "path": "./artifacts/installed-consumer-host-qualification.zip",
+        "sha256": "11daabb202cccd60873bc680c12397166d1d8f9878962a1707dcf39cf8659ca1"
+      },
+      {
+        "path": "./artifacts/langgraph-process-recovery.zip",
+        "sha256": "06a314d728b2147ec3095290da71fafbe6bd499136cc1216077d6529b95a9b3d"
+      },
+      {
+        "path": "./artifacts/mini-swe-process-recovery.zip",
+        "sha256": "ff9fcedd61da8313533e5aa93477c0f7c931bf7d1767eb9bd33e3117724f2e75"
+      },
+      {
+        "path": "./artifacts/native-consumer-host-qualification.zip",
+        "sha256": "80ca0503c4390af3096a6cf4ed5779f5ed5232f92dabc35eeaac61e39888f449"
+      },
+      {
+        "path": "./artifacts/repository-review-recovery.zip",
+        "sha256": "360ed8c0af45797a619a21d5aa106d553ed80e9ecca3494945af34be3d42cee9"
+      },
+      {
+        "path": "./artifacts/shared-resource-recovery.zip",
+        "sha256": "fc2da0ed26d4c830b1651319b7629a3d734756db4035fc89a670c9683791f37d"
+      },
+      {
+        "path": "./job-114483310088.json",
+        "sha256": "9567e0f124a8d903e492c02a12d03b6a6396422c94b33a5ec47ff4f6f13303d0"
+      },
+      {
+        "path": "./job-114483310088.log",
+        "sha256": "0945c75b90b68ab48183542a8e4f3718755e3e4c77b093e1686aea1c4952a134"
+      },
+      {
+        "path": "./job-114489940190.json",
+        "sha256": "848d83c693f3794595739571684cd5fc978ba87ceae6c08d2aa9b3c136aa4c53"
+      },
+      {
+        "path": "./job-114489940190.log",
+        "sha256": "c285d4fd5280ed61532fe0d76b83267ed4d6874243eacaec7a43242f0cc76d34"
+      }
+    ],
+    "scope": "Worker-image and repository-image operator scenarios only. Native baseline is separate. No p99, capacity, concurrency or replacement-head qualification.",
+    "recording_note": "Initial source-check assertion used paraphrased object access; corrected by reading the actual indexed Python assertion. No native command or campaign was rerun."
+  },
+  "independent_evidence_review": {
+    "path": "/tmp/pr1160-ci-batch-20261010/checkpoint-final-independent-review/final-evidence-review-eeca48528b.json",
+    "sha256": "0b6cf3f24f1f1f865ce22f1f8f0d72b54b8ad3ffc0a6f2b070b17ecd37e4626f",
+    "report": {
+      "schema": "chio.pr1160.checkpoint.final-evidence-review.v1",
+      "worktree": "/home/connor/lanes/pr1160-landing-final",
+      "reviewed_head": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+      "runtime_source": "998745d26d2aa7224989bfb6c5727948a792ea82",
+      "metadata_source": "38d772e91653b6ec564e4a8a8c312650e972e4f0",
+      "audit_path": "docs/security/audits/checkpoint-delta-20261011.json",
+      "expected_audit_sha256": "c3179edadeafaf39cffe5ce5270d92e9d21379dd13d9305e88a6535cbd28f6d8",
+      "conclusion": "Bounded evidence approval. No materially false statement or missing qualification found in the checkpoint audit, current ledger disposition or plan checkpoint.",
+      "findings": [],
+      "verified": [
+        "The runtime summary exactly matches the audit: 36/0 focused, 188/0 participant-state, 1/0 cadence and strict exit 0. All four retained log hashes and terminal counts match.",
+        "The policy-constant summary exactly matches the audit: genuine missing-enrollment Original 0/1 with exit 101, repaired owner 25/0, strict/build/256-mirror/coverage/format exits 0. Its log hashes match.",
+        "The genuine growth Original is retained as 0/1: 24 checkpoints, 1644 retained rows, 115 changes, 34 initial rows and witness bound 264. Producer final focused log has 36/0.",
+        "The final cadence line and image probes match the audit; the audit explicitly limits these debug observations and makes no production latency or load claim.",
+        "Durable archive manifest SHA matches; all 62 manifest-listed evidence files exist and match their individual hashes.",
+        "All four prior independent review report hashes match, as do the six reviewed runtime/test files and three qualified metadata files.",
+        "Runtime998 to metadata38d changes only coverage, the formal manifest and xtask anchor enrollment. Metadata38d to private eeca changes only audit/ledger/plan documentation.",
+        "Canonical current_requirement_states marks checkpoint source-qualified-reviewed-hosted-pending, published=false, merged=false and full_qualified=false. Its historical intake requirement remains preserved.",
+        "The ledger and plan retain publication, exact-head required hosted checks, review response, proof/trusted/operational residuals and explicit user merge authorization.",
+        "The audit preserves failed fixture campaigns and unavailable overwritten logs, distinguishes source-reviewed old-reader refusal from old-binary execution, and states row-payload/record-overhead/storage/CPU limits."
+      ],
+      "limits": [
+        "Evidence review only. No source-review expansion, builds, tests or proofs.",
+        "This approval is source-scoped local evidence acceptance, not hosted qualification, publication, merge authorization, operational activation or release readiness.",
+        "No live hosted-state refresh was performed; the documents themselves retain hosted acceptance as pending."
+      ],
+      "reviewed_file_sha256": {
+        "docs/security/audits/checkpoint-delta-20261011.json": "c3179edadeafaf39cffe5ce5270d92e9d21379dd13d9305e88a6535cbd28f6d8",
+        "docs/security/landing-ledger.json": "69652bbe2bb5c07b4c8c865ac633f420dcfb33934a2043226bf85ad9f2df5e45",
+        "docs/security/landing-ledger.md": "41abbc42a4fc94ed6224401145580e2fb764a090186fc935ebecc943a55f3ae8",
+        "docs/superpowers/plans/2026-10-11-pr1160-exact-head-review.md": "17b9e93707d74b91fe050bccebd6612be8ce89d67b153edb64f11c78f2e04a5d"
+      },
+      "observed_utc": "2026-10-11T16:36:26.136193+00:00",
+      "observed_head": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+      "worktree_clean": true,
+      "requirements_count": 2020,
+      "current_requirement_states_count": 2020
+    }
+  },
+  "review_threads": {
+    "snapshot_path": "/tmp/pr1160-ci-batch-20261010/published-9e9cf98942/threads-20261011T173854Z.json",
+    "sha256": "60504751e98f2bf061d2e66dd73bcd21915eb27db545623aa22eadd1f7101db7",
+    "total": 65,
+    "unresolved": 33,
+    "all_unresolved_have_replies": true,
+    "scope": "Reply presence is not approval or resolution. The latest four-findings top-level review receives its final response after publication."
+  },
+  "remaining_acceptance": [
+    "Publish one reviewed replacement and require its four exact-head checks green.",
+    "Classify all other hosted failures, respond to review and obtain explicit user merge go-ahead.",
+    "Trusted setup and committed evidence remain post-merge prerequisites, with no variable or authorization rotation here.",
+    "The accepted attestation residual and additional weights timeout remain distinct; the latter requires explicit user disposition if unresolved.",
+    "Operational cold-state preparation, byte-capacity recovery, broader native latency/concurrency and authenticated legacy-debit recovery remain open."
+  ],
+  "merged": false,
+  "replacement_hosted_qualified": false,
+  "release_authorized": false
+}
