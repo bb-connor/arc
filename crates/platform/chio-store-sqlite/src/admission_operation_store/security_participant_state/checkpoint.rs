@@ -3,6 +3,7 @@ use super::*;
 
 mod cadence;
 mod compaction;
+mod delta;
 mod record;
 mod rows;
 mod schema;
@@ -36,9 +37,11 @@ pub(super) fn floors(
 pub(super) fn visit_rows(
     connection: &Connection,
     record: &Record,
-    apply: impl FnMut(&str, &[u8]) -> Result<(), AdmissionOperationStoreError>,
+    mut apply: impl FnMut(&str, &[u8]) -> Result<(), AdmissionOperationStoreError>,
 ) -> Result<(), AdmissionOperationStoreError> {
-    rows::visit(connection, record, apply)
+    delta::image(connection, record)?
+        .rows()
+        .try_for_each(|(table, row)| apply(table, row))
 }
 
 fn heads(
@@ -236,12 +239,32 @@ impl SqliteAdmissionOperationStore {
             "SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton = 1",
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         ).map_err(sqlite_error)?;
+        let before = previous
+            .as_ref()
+            .map(|record| delta::image(&tx, record))
+            .transpose()?;
         let tx = compaction::compact(tx, actual.authority.as_str(), observed_at, dead)?;
-        let (tables, current_rows, current_bytes) =
-            rows::copy(&tx, actual.authority.as_str(), sequence)?;
+        let current = rows::read(&tx, actual.authority.as_str())?;
+        let (delta, tables) =
+            match delta::plan(previous.as_ref().zip(before.as_ref()), &current.image)? {
+                delta::Seal::Keyframe => {
+                    rows::write(&tx, actual.authority.as_str(), sequence, current.rows())?;
+                    (None, current.fingerprints()?)
+                }
+                delta::Seal::Delta { delta, added } => {
+                    rows::write(
+                        &tx,
+                        actual.authority.as_str(),
+                        sequence,
+                        added.iter().map(|(table, row)| (*table, row.as_slice())),
+                    )?;
+                    (Some(delta), current.image.fingerprints()?)
+                }
+            };
         super::cutpoint(70)?;
+        let (current_rows, current_bytes) = current.image.totals();
         let record = Record {
-            schema: Record::format(),
+            schema: Record::format(delta.is_some()),
             authority: actual.authority.clone(),
             sequence,
             initialization: actual.digest.clone(),
@@ -258,9 +281,10 @@ impl SqliteAdmissionOperationStore {
             current_bytes,
             segment_events: u64::try_from(events).map_err(invalid)?,
             segment_bytes: u64::try_from(bytes).map_err(invalid)?,
+            delta,
         };
         record.insert(&tx)?;
-        rows::visit(&tx, &record, |_, _| Ok(()))?;
+        delta::image(&tx, &record)?;
         super::cutpoint(71)?;
         self.serving_owner
             .append_global_commit(
@@ -293,7 +317,15 @@ pub(crate) fn projection_reference(
     let record = record::load_local(connection, key, sequence)
         .map_err(map_integrity)?
         .ok_or_else(|| map_integrity("native checkpoint reference is absent"))?;
-    rows::visit(connection, &record, |_, _| Ok(())).map_err(map_integrity)?;
+    // A reference reads only the record's own stored rows: the whole image of
+    // a keyframe, or a delta's digest-authenticated added rows, which its
+    // validated chain budget bounds. The fold onto the keyframe is verified
+    // by every reader of the latest image and at open.
+    match record.delta {
+        None => rows::keyframe(connection, &record).map(drop),
+        Some(_) => rows::added(connection, &record).map(drop),
+    }
+    .map_err(map_integrity)?;
     record.digest().map_err(map_integrity)
 }
 
@@ -388,6 +420,9 @@ pub(in crate::admission_operation_store) fn verify_all(
     let mut statement = connection.prepare("SELECT security_authority_id,sequence FROM security_participant_checkpoint_events ORDER BY security_authority_id,sequence")
         .map_err(sqlite_error)?;
     let mut events = statement.query([]).map_err(sqlite_error)?;
+    // Each authority's archive folds forward once: keyframes restart the image
+    // and every delta must reproduce its committed fingerprints.
+    let mut folded: Option<(Record, delta::Image, delta::Chain)> = None;
     while let Some(event) = events.next().map_err(sqlite_error)? {
         let authority: String = event.get(0).map_err(sqlite_error)?;
         let sequence =
@@ -395,7 +430,21 @@ pub(in crate::admission_operation_store) fn verify_all(
         let record = record::load_local(connection, &authority, sequence)?
             .ok_or_else(|| invalid("native checkpoint archive event absent"))?;
         record::verify_reference(connection, &record)?;
-        rows::visit(connection, &record, |_, _| Ok(()))?;
+        let (image, chain) = match (&record.delta, folded.take()) {
+            (None, _) => (
+                rows::keyframe(connection, &record)?,
+                delta::Chain::start(&record)?,
+            ),
+            (Some(_), Some((previous, mut image, mut chain)))
+                if previous.authority == record.authority =>
+            {
+                chain.apply(&mut image, &record, rows::added(connection, &record)?)?;
+                image.verify(&record, Some(&previous))?;
+                (image, chain)
+            }
+            (Some(_), _) => return Err(invalid("native checkpoint delta lacks its keyframe")),
+        };
+        folded = Some((record, image, chain));
     }
     Ok(())
 }

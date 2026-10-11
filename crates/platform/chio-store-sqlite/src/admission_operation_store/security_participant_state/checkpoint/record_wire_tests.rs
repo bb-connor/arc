@@ -64,7 +64,7 @@ const TABLES: &[(&str, &str)] = &[
 
 fn record() -> Result<Record, AdmissionOperationStoreError> {
     Ok(Record {
-        schema: Record::format(),
+        schema: Record::format(false),
         authority: AdmissionIdentifier::try_new("authority", "wire-authority")?,
         sequence: 1,
         initialization: "1".repeat(64),
@@ -94,6 +94,7 @@ fn record() -> Result<Record, AdmissionOperationStoreError> {
         current_bytes: 0,
         segment_events: 0,
         segment_bytes: 0,
+        delta: None,
     })
 }
 
@@ -110,6 +111,36 @@ fn native_security_checkpoint_wire_pins_canonical_record_and_commitment(
         .and_then(|input| input.decode_signed())?;
     assert_eq!(decoded, prepared);
     assert_eq!(decoded.bytes()?, BYTES);
+    Ok(())
+}
+
+#[test]
+fn native_security_checkpoint_delta_wire_round_trips_and_keeps_keyframes_v1(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut prepared = record()?;
+    prepared.schema = Record::format(true);
+    prepared.sequence = 2;
+    prepared.delta = Some(delta::Delta {
+        base: 1,
+        base_rows: 1,
+        base_bytes: 7,
+        chain_rows: 1,
+        chain_bytes: 7,
+        added_rows: 0,
+        added_bytes: 0,
+        added_digest: delta::added_digest(std::iter::empty())?,
+        removed: vec![delta::Tombstone {
+            table: "security_transitions".into(),
+            digest: "3".repeat(64),
+            encoded_bytes: 7,
+        }],
+    });
+    let bytes = prepared.bytes()?;
+    let decoded: Record = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 65_536)
+        .and_then(|input| input.decode_signed())?;
+    assert_eq!(decoded, prepared);
+    assert_ne!(prepared.digest()?, record()?.digest()?);
+    assert!(!BYTES.windows(7).any(|window| window == b"\"delta\""));
     Ok(())
 }
 

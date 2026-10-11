@@ -420,6 +420,10 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::observation::observation_rejects_wrong_initialization_fence_and_time_without_writes \
   admission_operation_store::tests::security_participant_state::observation::unanchored_current_row_changes_cannot_be_observed_as_valid_state \
   admission_operation_store::tests::security_participant_state::checkpoint::checkpoint_abort_child \
+  admission_operation_store::tests::security_participant_state::checkpoint::delta::native_checkpoint_delta_folds_onto_a_v1_keyframe \
+  admission_operation_store::tests::security_participant_state::checkpoint::delta::native_checkpoint_delta_refuses_missing_duplicate_or_reordered_records \
+  admission_operation_store::tests::security_participant_state::checkpoint::delta::native_checkpoint_delta_seal_is_atomic_and_survives_reopen \
+  admission_operation_store::tests::security_participant_state::checkpoint::delta::native_checkpoint_retained_rows_stay_linear_in_row_changes \
   admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_counter_measures_actual_current_copy_and_sealed_row_visits \
   admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_observer_preserves_snapshot_corruption_refusal \
   admission_operation_store::tests::security_participant_state::checkpoint::image_visit_controls::image_observer_preserves_typed_fence_refusal_without_checkpoint_writes \
@@ -448,6 +452,7 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::egress::retention::expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path \
   admission_operation_store::tests::security_participant_state::egress::retention::failure_after_compaction_restores_rows_anchor_and_denying_callbacks \
   admission_operation_store::tests::security_participant_state::egress::retention::live_pending_fences_beyond_current_row_budget_remain_refused \
+  admission_operation_store::tests::security_participant_state::egress::retention::superseded_delta_added_row_substitution_is_refused \
   admission_operation_store::tests::security_participant_state::egress::session_capacity::a_parked_approval_across_the_budget_completes_from_its_reservation \
   admission_operation_store::tests::security_participant_state::egress::session_capacity::a_principal_at_its_share_is_refused_while_another_still_admits \
   admission_operation_store::tests::security_participant_state::egress::session_capacity::every_parked_admitted_operation_finishes_after_admissions_are_refused \
