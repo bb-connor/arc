@@ -423,7 +423,7 @@ def validate_trusted_runner(authorized_source_sha: str) -> Path:
     return identity.root
 
 
-def read_tree_listing(root: Path, head: str) -> bytes:
+def read_tree_listing(root: Path, head: str, timeout: int = 120) -> bytes:
     command = [
         "/usr/bin/git",
         "-c",
@@ -437,6 +437,7 @@ def read_tree_listing(root: Path, head: str) -> bytes:
         "--full-tree",
         head,
     ]
+    deadline = time.monotonic() + timeout
     try:
         process = subprocess.Popen(
             command,
@@ -450,21 +451,38 @@ def read_tree_listing(root: Path, head: str) -> bytes:
     if process.stdout is None:
         process.kill()
         raise BoundaryError("Git tree reader did not expose a bounded pipe")
+    raw = bytearray()
     try:
-        raw = process.stdout.read(MAX_TREE_OUTPUT_BYTES + 1)
-        if len(raw) > MAX_TREE_OUTPUT_BYTES:
-            raise BoundaryError("candidate tree listing exceeds the isolation bound")
-        if process.wait(timeout=120) != 0:
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ)
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise BoundaryError("candidate tree listing exceeded its time bound")
+                for key, _ in selector.select(min(remaining, 1.0)):
+                    chunk = os.read(key.fd, 65_536)
+                    if not chunk:
+                        selector.unregister(key.fd)
+                        continue
+                    if len(raw) + len(chunk) > MAX_TREE_OUTPUT_BYTES:
+                        raise BoundaryError(
+                            "candidate tree listing exceeds the isolation bound"
+                        )
+                    raw.extend(chunk)
+        try:
+            status = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired as error:
+            raise BoundaryError(
+                "candidate tree listing exceeded its time bound"
+            ) from error
+        if status != 0:
             raise BoundaryError("Git candidate tree listing failed")
-    except BaseException:
-        with contextlib.suppress(OSError):
-            process.kill()
-        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-            process.wait(timeout=5)
-        raise
     finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
         process.stdout.close()
-    return raw
+    return bytes(raw)
 
 
 def parse_tree(root: Path, head: str) -> list[tuple[int, str, str]]:

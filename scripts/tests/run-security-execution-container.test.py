@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -480,6 +481,43 @@ def tree_bound_tests() -> None:
                 "candidate tree listing exceeds the isolation bound",
                 lambda: BOUNDARY.parse_tree(identity.root, identity.head),
             )
+
+
+def tree_listing_stream_tests() -> None:
+    real_popen = subprocess.Popen
+    spawned: list[subprocess.Popen] = []
+
+    def listing(script: str, timeout: int) -> bytes:
+        def fake_popen(_command, **kwargs):
+            process = real_popen([sys.executable, "-c", script], **kwargs)
+            spawned.append(process)
+            return process
+
+        def fuse(_signum, _frame) -> None:
+            raise AssertionError("tree listing was not bounded by its deadline")
+
+        previous = signal.signal(signal.SIGALRM, fuse)
+        signal.alarm(30)
+        try:
+            with mock.patch.object(BOUNDARY.subprocess, "Popen", fake_popen):
+                return BOUNDARY.read_tree_listing(Path("."), "0" * 40, timeout)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
+
+    record = "sys.stdout.write('100644 blob ' + '0' * 40 + '\\tx\\0'); sys.stdout.flush()"
+    healthy = listing(f"import sys; {record}", 30)
+    if healthy != b"100644 blob " + b"0" * 40 + b"\tx\0":
+        raise AssertionError("healthy tree listing was altered")
+    try:
+        listing(f"import sys, time; {record}; time.sleep(120)", 1)
+    except BOUNDARY.BoundaryError as error:
+        if str(error) != "candidate tree listing exceeded its time bound":
+            raise AssertionError(f"unexpected stalled listing error: {error}") from error
+    else:
+        raise AssertionError("stalled tree listing was accepted")
+    if spawned[-1].poll() is None:
+        raise AssertionError("stalled tree listing child was not reaped")
 
 
 def copy_and_output_tests() -> None:
@@ -2541,6 +2579,7 @@ def main() -> int:
     run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
     static_contract_tests()
     tree_bound_tests()
+    tree_listing_stream_tests()
     copy_and_output_tests()
     refresh_inventory_tests()
     pending_promotion_tests()
