@@ -106,7 +106,7 @@ start_live_topology() {
   wait_for_http "${CONTROL_URL}/health"
 
   # Chio api protect sidecars
-  "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+  "${CHIO_BIN}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect --upstream "http://127.0.0.1:${COORD_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/coordinator-openapi.yaml" \
@@ -115,7 +115,7 @@ start_live_topology() {
     >"${LOG_DIR}/chio-coordinator-sidecar.log" 2>&1 &
   COORD_SIDECAR_PID=$!
 
-  "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+  "${CHIO_BIN}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect --upstream "http://127.0.0.1:${EXEC_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/executor-openapi.yaml" \

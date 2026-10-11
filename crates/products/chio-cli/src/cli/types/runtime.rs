@@ -937,6 +937,8 @@ pub(crate) enum ApiCommands {
         listen: String,
 
         /// Optional SQLite receipt store path.
+        /// A durable store also owns the mediation budget; --budget-db and
+        /// --control-url are rejected with it.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
         #[command(flatten)]

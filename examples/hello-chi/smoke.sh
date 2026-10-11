@@ -57,8 +57,6 @@ wait_for_port 127.0.0.1 "${APP_PORT}"
 (
   export CHIO_TRUSTED_ISSUER_KEY="${TRUSTED_ISSUER_KEY}"
   exec "${CHIO_BIN}" \
-    --control-url "${CONTROL_URL}" \
-    --control-token "${SERVICE_TOKEN}" \
     api protect \
     --upstream "${APP_URL}" \
     --spec "${EXAMPLE_ROOT}/openapi.yaml" \

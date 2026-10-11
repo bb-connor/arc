@@ -147,7 +147,7 @@ impl ApprovalHarness {
         let policy_hash = chio_core_types::sha256_hex(policy.as_bytes());
         let mut kernel = build_mediation_kernel(
             &self.signer,
-            budget.clone(),
+            super::super::MediationBudget::Durable(durable),
             super::super::MediationPolicy {
                 issuers: &[],
                 hash: Some(&policy_hash),
@@ -155,7 +155,6 @@ impl ApprovalHarness {
             },
             Vec::new(),
             None,
-            Some(durable),
             Arc::new(self.clock.clone()),
         )?;
         kernel.set_revocation_store_handle(revocation.clone());
