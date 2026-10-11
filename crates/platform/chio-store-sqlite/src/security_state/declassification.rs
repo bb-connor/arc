@@ -3,8 +3,6 @@
 //! or output authority and reuse the same one-shot use and receipt-pair rules.
 
 use super::scoped_sql::{declassification as sql, ScopedMutation, ScopedReader};
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     declassification_evidence_matches, declassification_evidence_row, declassification_phase_name,
     declassification_retain_until_unix_ms, declassification_retry_deadline_unix_ms,

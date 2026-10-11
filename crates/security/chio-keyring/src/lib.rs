@@ -15,15 +15,13 @@
 //! Authority key transparency with immutable events and transactional replay.
 
 mod checkpoint;
-#[cfg(all(test, target_vendor = "apple"))]
-mod darwin_acl {
-    mod native_tests;
-}
 mod enterprise_receipt;
 mod error;
 mod event;
 mod gossip;
 mod ipc;
+#[cfg(all(test, target_vendor = "apple"))]
+mod native_custody_tests;
 mod provisioning;
 mod router;
 mod runtime;
@@ -548,14 +546,6 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
 fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
     chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file)
         .map_err(KeyringError::Io)
-}
-
-/// Inspect a Darwin file descriptor's extended ACL without exposing the FFI
-/// boundary to unsafe-free persistence crates. Deny-only entries do not add
-/// authority; allow or unknown entries are reported as authority-granting.
-#[cfg(target_vendor = "apple")]
-pub fn darwin_descriptor_grants_extended_acl_authority(file: &std::fs::File) -> Result<bool> {
-    trusted_file_has_extended_acl(file)
 }
 
 /// Verify that SQLite's live main-database handle still names the file at the

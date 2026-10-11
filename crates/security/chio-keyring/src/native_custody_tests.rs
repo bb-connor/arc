@@ -1,7 +1,7 @@
 use crate::{
-    darwin_descriptor_grants_extended_acl_authority, validate_custody_sensitive_file_security,
-    validate_trusted_file_security, KeyringError,
+    validate_custody_sensitive_file_security, validate_trusted_file_security, KeyringError,
 };
+use chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority;
 use std::{
     fs::{File, OpenOptions, Permissions},
     io,

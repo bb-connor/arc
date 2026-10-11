@@ -63,7 +63,7 @@ webpki-roots = "1"
 zeroize = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-chio-keyring = { workspace = true }
+chio-sqlite-file-identity = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
