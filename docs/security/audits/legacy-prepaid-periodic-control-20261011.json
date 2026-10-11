@@ -1,0 +1,211 @@
+{
+  "schema": "chio.pr1160.legacy-prepaid-periodic-control.v1",
+  "observed_utc": "2026-10-11T14:40:24.113095+00:00",
+  "requirement": "incoming-pr1160-exact-head-20261011:REVIEW-9E9-PREPAID",
+  "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6109135494",
+  "qualified_private_source": "51ccfee5a6a046cf4434266e4c9a82b71d037d73",
+  "published_source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "classification": "Existing fail-closed behavior confirmed by additional test-only controls; no production payment repair.",
+  "producer_commits": [
+    "f28733d3a181635bd91e20809ebb883a7e04a8f8",
+    "075131a398"
+  ],
+  "integration_commits": [
+    "7eaa0956cc",
+    "737be5d74c",
+    "51ccfee5a6a046cf4434266e4c9a82b71d037d73"
+  ],
+  "controls": [
+    "Complete a real paid invocation in the kernel fixture, inject a settlement-intent failure, then model the migrated settled journal without its original authorized debit or attempt marker.",
+    "Use journal CAS revision 2, matching the actual populated SQLite v11-to-v12 migration control. Revision is not a schema version.",
+    "Expire the original claim and run the public periodic recovery entrypoint, exercising the shared recovery page.",
+    "Require exact LegacyPaymentAmountAbsent, retained Finalizing operation and settled journal, an open hold with exposure 10, no refund/capture/release and only the original authorization and invocation."
+  ],
+  "composed_qualification": {
+    "source": "51ccfee5a6a046cf4434266e4c9a82b71d037d73",
+    "records": [
+      {
+        "label": "prepaid-focused",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "review_legacy_settled_prepaid_quarantines_with_exact_legacy_amount_absent"
+        ],
+        "exit": 0,
+        "seconds": 88.3,
+        "counts": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "184ce1e38c5a8474d72c6b0861bb05e44adc2142745800669b28cf85353d38cc",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "payment-recovery",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "payment_recovery::"
+        ],
+        "exit": 0,
+        "seconds": 2.19,
+        "counts": [
+          [
+            42,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "16b3e2654851f8cb0109ce5554dc8b0b7e199e892470e3a6f9c1df56abb415d7",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "kernel-strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 61.33,
+        "counts": [],
+        "log_sha256": "2e4df867149f0004f9daa1cb4fabf7d5f58725ac44b24ec378dbdb6d54fdda31",
+        "source_stable": true,
+        "accepted": true
+      }
+    ],
+    "accepted": true
+  },
+  "prior_composed_qualification": {
+    "source": "737be5d74c1fcf7f5b1e53d3660b014947ee47eb",
+    "records": [
+      {
+        "label": "prepaid-focused",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "review_legacy_settled_prepaid_quarantines_with_exact_legacy_amount_absent"
+        ],
+        "exit": 0,
+        "seconds": 89.63,
+        "counts": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "8201dd7d3bf06428cba25c09d1efdd913e97bdee613bac4e7a976e970fbc6548",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "payment-recovery",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "payment_recovery::"
+        ],
+        "exit": 0,
+        "seconds": 2.26,
+        "counts": [
+          [
+            42,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "9b6007a6c334f6008c13ffb417a8c43b541219de0919c04fa15a267185458e74",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "kernel-strict",
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 215.28,
+        "counts": [],
+        "log_sha256": "740126616d169245452e9d479bd42e5704a07ce9b1de5bdef9dcb16de73263c0",
+        "source_stable": true,
+        "accepted": true
+      }
+    ],
+    "accepted": true
+  },
+  "paired_sqlite_migration_controls": {
+    "source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+    "passed": 2,
+    "failed": 0,
+    "log_sha256": "89db0696dc398e20c74e88f58cede52917a583695ae48b12609d7ea92290182d",
+    "tests": [
+      "budget12_populated_migration_preserves_original_fields_and_evidence_across_reopen",
+      "budget12_attempt_marker_cas_is_idempotent_and_survives_commit_before_rail"
+    ],
+    "scope": "Real SQLite migration preserves the legacy settled journal and absent debit, rejects unauthorized backfill and tests attempt-marker CAS/reopen behavior. The kernel control separately models the resulting row."
+  },
+  "retained_failed_fixture": {
+    "source": "f28733d3a1 on 9e9",
+    "passed": 0,
+    "failed": 1,
+    "log_sha256": "9ae3b53b6d2d68f34fedab0e7aa380113a8b54d84d1091ebc3f29a63a43b1907",
+    "diagnostic_log_sha256": "e4c521ed00ffe7a4e439d3d75fc3a365f3a77b00eb0906ef5f20a81430637c97",
+    "cause": "The original tool evaluation had already completed startup reconciliation. Reusing the same runtime startup entrypoint returned zero without visiting the recovery page. This was a fixture defect, not a failing production Original.",
+    "diagnostic": "Replay independently refused LegacyPaymentAmountAbsent while retaining liability and making no additional rail or invocation calls. Evidence-only debug prints were removed.",
+    "correction": "Call reconcile_recoverable_admissions instead of reconcile_durable_admission_startup, without resetting private runtime state or weakening assertions."
+  },
+  "independent_review": {
+    "reviewer": "Claude through coordination mailbox",
+    "approval": "2026-10-11T14:34:49Z: APPROVE 51ccfee5a6 revision-counter fixture alignment; assertions and production unchanged.",
+    "root_review": "Producer test, periodic-entrypoint correction and matching real SQLite migration/CAS controls inspected before qualification."
+  },
+  "limits": [
+    "42 owner tests include the focused control; the separate focused execution is a renewal, not an additional unique test.",
+    "Periodic shared-page coverage plus separate SQLite migration controls is not a native end-to-end migrated-store recovery campaign.",
+    "An unauthenticated missing original debit remains quarantined. No operator recovery mechanism is supplied and exposure must never substitute for the original debit.",
+    "Local ARM evidence does not qualify hosted CI or authorize merge."
+  ],
+  "remaining_acceptance": [
+    "Compose final checkpoint repair and renew shared gates.",
+    "Publish the reviewed batch, answer review, obtain exact-head required checks and user merge go-ahead."
+  ],
+  "published": false,
+  "merged": false,
+  "merge_ready": false
+}
