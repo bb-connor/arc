@@ -30,8 +30,10 @@ only the named current states advance, preserving all historical requirements.
 
 The bounded tree-copy repair is locally qualified, including the stalled-pipe
 regression found during review. Its [audit](audits/review2-tree-qualified-20261011.json)
-retains both failures and the passing final runner/helper checks. Full CI
-contract mutation testing continues on an isolated combined source snapshot.
+retains both failures and the passing final runner/helper checks. The [composed structural audit](audits/review2-composed-structural-20261011.json)
+records the passing full CI-contract mutation suite, 51 actual temporal tests
+and strict owning lint. The later one-name threshold enrollment has its own
+focused contract probes; runtime qualification is still in progress.
 
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
