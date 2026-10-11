@@ -124,9 +124,13 @@ async fn final_f11_follower_confirmation_is_bound_to_process_leader_and_term() {
             .test_unwrap()
             .lock()
             .test_unwrap();
-        cluster
-            .peers
-            .insert(new_leader.into(), PeerSyncState::default());
+        cluster.peers.insert(
+            new_leader.into(),
+            PeerSyncState {
+                signing_custody: true,
+                ..PeerSyncState::default()
+            },
+        );
     }
     update_peer_reachable(&pair.importer, new_leader);
     assert_eq!(
