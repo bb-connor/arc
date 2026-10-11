@@ -1,11 +1,12 @@
 //! Trust control serves under witnessed keyring custody through the real CLI.
 use super::*;
 use std::io::{BufRead, BufReader};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::sync::mpsc;
 
 const SERVICE_TOKEN: &str = "keyring-trust-service-token";
 const LISTENING: &str = "Chio trust control service listening";
+const SNAPSHOT_BUILDING: &str = "receipt_query_snapshot_building";
 const STARTUP_WINDOW: Duration = Duration::from_secs(120);
 
 #[test]
@@ -65,13 +66,55 @@ fn keyring_trust_service_starts_and_serves_admin_receipt_reads() -> TestResult {
         }
     }
 
-    let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port))?;
+    // Listening precedes the first published receipt snapshot. Only its typed
+    // building refusal is retried, at the server's Retry-After pace.
+    loop {
+        let response = admin_receipt_query(port, deadline)?;
+        if response.starts_with("HTTP/1.1 200 ") {
+            return Ok(());
+        }
+        let pause = building_retry_after(&response)
+            .ok_or_else(|| format!("admin receipt query refused:\n{response}"))?;
+        if Instant::now() + pause >= deadline {
+            return Err(format!("receipt snapshot still building:\n{response}").into());
+        }
+        thread::sleep(pause);
+    }
+}
+
+fn admin_receipt_query(port: u16, deadline: Instant) -> TestResult<String> {
+    let remaining = deadline
+        .checked_duration_since(Instant::now())
+        .filter(|remaining| !remaining.is_zero())
+        .ok_or("admin receipt query deadline elapsed")?;
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    let mut stream = TcpStream::connect_timeout(&address, remaining)?;
+    stream.set_read_timeout(Some(remaining))?;
+    stream.set_write_timeout(Some(remaining))?;
     write!(
         stream,
         "GET /v1/receipts/query HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {SERVICE_TOKEN}\r\nConnection: close\r\n\r\n"
     )?;
     let mut response = String::new();
     stream.read_to_string(&mut response)?;
-    assert!(response.starts_with("HTTP/1.1 200 "), "{response}");
-    Ok(())
+    Ok(response)
+}
+
+fn building_retry_after(response: &str) -> Option<Duration> {
+    let (head, body) = response.split_once("\r\n\r\n")?;
+    let mut lines = head.lines();
+    if !lines.next()?.starts_with("HTTP/1.1 503 ") {
+        return None;
+    }
+    let refusal: serde_json::Value = serde_json::from_str(body).ok()?;
+    if refusal["code"] != SNAPSHOT_BUILDING {
+        return None;
+    }
+    lines.find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        if !name.eq_ignore_ascii_case("retry-after") {
+            return None;
+        }
+        value.trim().parse().ok().map(Duration::from_secs)
+    })
 }
