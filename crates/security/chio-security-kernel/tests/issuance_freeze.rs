@@ -82,7 +82,7 @@ impl IssuanceFreezeStore for FakeFreezes {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .push(query.clone());
-        let frozen = matches!(self.behavior, Behavior::Freeze | Behavior::Tamper);
+        let frozen = matches!(self.behavior, Behavior::Freeze);
         let active_matches = if frozen {
             IssuanceFreezeMatches::new(vec![IssuanceFreezeMatch {
                 action_id: ActionId::new("freeze-action")
@@ -165,7 +165,11 @@ fn issue_and_delegate_use_the_exact_authoritative_context() {
 
 #[test]
 fn active_freeze_store_outage_and_tamper_all_fail_closed() {
-    for behavior in [Behavior::Freeze, Behavior::Fail, Behavior::Tamper] {
+    for (behavior, refusal) in [
+        (Behavior::Freeze, PortErrorKind::Conflict),
+        (Behavior::Fail, PortErrorKind::Unavailable),
+        (Behavior::Tamper, PortErrorKind::IntegrityFailure),
+    ] {
         let store: Arc<dyn IssuanceFreezeStore> = Arc::new(FakeFreezes::new(behavior));
         let admission = IssuanceFreezeAdmission::new(store);
         for query in [issue_query(), delegate_query()] {
@@ -173,12 +177,7 @@ fn active_freeze_store_outage_and_tamper_all_fail_closed() {
                 .authorize(&query)
                 .err()
                 .unwrap_or_else(|| panic!("frozen operation unexpectedly authorized"));
-            assert!(matches!(
-                error.kind(),
-                PortErrorKind::Conflict
-                    | PortErrorKind::Unavailable
-                    | PortErrorKind::IntegrityFailure
-            ));
+            assert_eq!(error.kind(), refusal);
         }
     }
 }
