@@ -15,16 +15,21 @@ use chio_core::{Keypair, PublicKey};
 const CONTROL_TOKEN: &str = "start-pin-control-token";
 const NOT_TRUSTED: &str = "capability issuer is not trusted";
 const BANNER_TIMEOUT: Duration = Duration::from_secs(60);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 struct Sidecar {
     child: Child,
     base_url: String,
+    stdout_reader: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Drop for Sidecar {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(reader) = self.stdout_reader.take() {
+            let _ = reader.join();
+        }
     }
 }
 
@@ -46,26 +51,30 @@ fn spawn_start(pin: Option<&PublicKey>) -> Sidecar {
     if let Some(pin) = pin {
         command.args(["--control-authority-public-key", &pin.to_hex()]);
     }
-    let mut child = command.spawn().expect("spawn chio start");
-    let stdout = child.stdout.take().expect("piped stdout");
+    let mut sidecar = Sidecar {
+        child: command.spawn().expect("spawn chio start"),
+        base_url: String::new(),
+        stdout_reader: None,
+    };
+    let stdout = sidecar.child.stdout.take().expect("piped stdout");
     let (banner_tx, banner_rx) = mpsc::channel();
     // The reader owns the pipe until the child exits, so later route lines
     // never hit a closed read end.
-    std::thread::spawn(move || {
+    sidecar.stdout_reader = Some(std::thread::spawn(move || {
         let mut lines = BufReader::new(stdout).lines();
         if let Some(Ok(banner)) = lines.next() {
             let _ = banner_tx.send(banner);
         }
         lines.for_each(drop);
-    });
+    }));
     let banner = banner_rx
         .recv_timeout(BANNER_TIMEOUT)
         .expect("chio start printed its banner");
-    let base_url = banner
+    sidecar.base_url = banner
         .strip_prefix("chio sidecar listening on ")
         .unwrap_or_else(|| panic!("unexpected chio start banner: {banner:?}"))
         .to_string();
-    Sidecar { child, base_url }
+    sidecar
 }
 
 fn capability_signed_by(authority: &Keypair) -> CapabilityToken {
@@ -75,10 +84,10 @@ fn capability_signed_by(authority: &Keypair) -> CapabilityToken {
             issuer: authority.public_key(),
             subject: Keypair::generate().public_key(),
             scope: ChioScope::default(),
-            // Fixed bounds keep the test off the wall clock: the validity window
-            // check passes for any current time.
+            // The fixture window ends in 2100 and stays inside canonical JSON's
+            // exact-integer range without depending on the test runner's clock.
             issued_at: 1,
-            expires_at: u64::MAX,
+            expires_at: 4_102_444_800,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         },
@@ -89,6 +98,7 @@ fn capability_signed_by(authority: &Keypair) -> CapabilityToken {
 
 fn validate(sidecar: &Sidecar, token: &CapabilityToken) -> serde_json::Value {
     ureq::post(&format!("{}/v1/capabilities/validate", sidecar.base_url))
+        .timeout(REQUEST_TIMEOUT)
         .set("Authorization", &format!("Bearer {CONTROL_TOKEN}"))
         .send_json(serde_json::to_value(token).expect("serialize capability"))
         .expect("validate capability")
