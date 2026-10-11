@@ -4,6 +4,8 @@
 use super::*;
 
 pub(in crate::admission_operation_store) mod checkpoint;
+#[cfg(test)]
+mod cold;
 pub(super) mod dispatch_ledger;
 pub(super) mod egress;
 pub(super) mod nonce_preflight;
