@@ -564,6 +564,7 @@ pub(crate) fn cmd_start(
     revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
@@ -596,7 +597,10 @@ pub(crate) fn cmd_start(
             .or_else(|| std::env::var("CHIO_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
-        let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let trusted_capability_issuers = trusted_capability_issuers(
+            parse_trusted_capability_issuers_from_env()?,
+            control_authority_public_key,
+        );
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             transport,
