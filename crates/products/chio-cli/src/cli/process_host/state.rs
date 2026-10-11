@@ -572,6 +572,13 @@ pub(super) struct Host {
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    #[cfg_attr(
+        not(target_os = "linux"),
+        expect(
+            dead_code,
+            reason = "retains key custody until the host lease is released"
+        )
+    )]
     pub keyring: Option<super::keyring::HostKeyring>,
     #[cfg(target_os = "linux")]
     pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
