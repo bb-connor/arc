@@ -1697,6 +1697,30 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn keyring_owned_seed_config_passes_serving_validation() {
+        let mut config = base_config();
+        config.authority_keyring_config_path = Some(PathBuf::from("keyring.yml"));
+        config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
+        config.authority_keyring_receipt_anchor_root = Some(PathBuf::from("/anchors/keyring"));
+        config.authority_workload_token = Some("authority-workload".to_string());
+        config.authority_seed_path = None;
+
+        config.validate().test_unwrap();
+        assert!(
+            build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
+                .test_unwrap()
+                .is_none()
+        );
+        let mut headers = HeaderMap::new();
+        let admin = format!("Bearer {}", config.service_token);
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(&admin).test_unwrap());
+        assert_eq!(
+            resolve_control_read_principal(&headers, &config).test_unwrap(),
+            ResolvedControlReadPrincipal::AdminService
+        );
+    }
+
+    #[test]
     fn cluster_snapshot_round_trip_copies_receipts_revocations_lineage_and_budgets() {
         let source_receipt_db = unique_temp_path("cluster-source-receipts", "sqlite3");
         let source_revocation_db = unique_temp_path("cluster-source-revocations", "sqlite3");

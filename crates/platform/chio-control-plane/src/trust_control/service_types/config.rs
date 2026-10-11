@@ -129,6 +129,19 @@ impl TrustServiceConfig {
         .map_err(CliError::from)
     }
 
+    /// Operator startup validation. A keyring takes custody of the authority
+    /// seed it is started with; startup then clears the seed from the serving
+    /// configuration, so only this check requires it.
+    pub(crate) fn validate_bootstrap(&self) -> Result<(), CliError> {
+        if self.authority_keyring_config_path.is_some() && self.authority_seed_path.is_none() {
+            return Err(CliError::cli_other_error(
+                "authority keyring configuration requires --authority-seed-file".to_string(),
+            ));
+        }
+        self.validate()
+    }
+
+    /// Serving invariants, which also hold once a keyring owns the seed.
     pub fn validate(&self) -> Result<(), CliError> {
         self.transport
             .validate(self.listen)
@@ -146,14 +159,13 @@ impl TrustServiceConfig {
             ));
         }
         if self.authority_keyring_config_path.is_some() {
-            if self.authority_seed_path.is_none()
-                || self.authority_db_path.is_some()
+            if self.authority_db_path.is_some()
                 || self.receipt_db_path.is_none()
                 || self.authority_keyring_receipt_anchor_root.is_none()
                 || self.authority_workload_token.is_none()
             {
                 return Err(CliError::cli_other_error(
-                    "authority keyring configuration requires --authority-seed-file, --receipt-db, --authority-keyring-receipt-anchor-root, and --authority-workload-token and forbids --authority-db"
+                    "authority keyring configuration requires --receipt-db, --authority-keyring-receipt-anchor-root, and --authority-workload-token and forbids --authority-db"
                         .to_string(),
                 ));
             }
@@ -467,10 +479,9 @@ mod service_config_tests {
             .validate()
             .test_expect_err("keyring without custody must fail");
         assert!(incomplete.to_string().contains(
-            "authority keyring configuration requires --authority-seed-file, --receipt-db"
+            "authority keyring configuration requires --receipt-db, --authority-keyring-receipt-anchor-root"
         ));
 
-        config.authority_seed_path = Some(PathBuf::from("authority.seed"));
         config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
         config.authority_workload_token = Some("authority-only".to_string());
         let unanchored = config
@@ -482,7 +493,18 @@ mod service_config_tests {
         config.authority_keyring_receipt_anchor_root = Some(PathBuf::from("/anchors/keyring"));
         config
             .validate()
-            .test_expect("complete single-node keyring config is valid");
+            .test_expect("keyring-owned seed config is a valid serving config");
+        let seedless = config
+            .validate_bootstrap()
+            .test_expect_err("keyring startup without an authority seed must fail");
+        assert!(
+            matches!(&seedless, CliError::Chio(error) if error.message() == "authority keyring configuration requires --authority-seed-file"),
+            "{seedless}"
+        );
+        config.authority_seed_path = Some(PathBuf::from("authority.seed"));
+        config
+            .validate_bootstrap()
+            .test_expect("complete single-node keyring config is valid at startup");
 
         config.peer_urls = vec!["https://peer.example".to_string()];
         let clustered = config
