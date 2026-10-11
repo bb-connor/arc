@@ -22,6 +22,8 @@ mod authority_evidence_contract;
 
 #[path = "authority_clock_contract.rs"]
 mod authority_clock_contract;
+#[path = "custody_election.rs"]
+mod custody_election;
 #[path = "governance_authority.rs"]
 mod governance_authority;
 

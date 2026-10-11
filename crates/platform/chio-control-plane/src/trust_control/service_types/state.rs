@@ -316,6 +316,9 @@ pub(crate) struct ClusterRuntimeState {
     pub(crate) term_started_at: Option<u64>,
     pub(crate) lease_expires_at: Option<u64>,
     pub(crate) lease_ttl_ms: u64,
+    /// This node's locally inspected signing custody. It ranks election
+    /// candidates and authorizes nothing.
+    pub(crate) signing_custody: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -345,6 +348,9 @@ pub(crate) struct PeerSyncState {
     /// Maximal authenticated refused history, retained through transport loss
     /// and lagging replies. Incomparable authenticated chains stay conflicting.
     pub(crate) authority_refused_history: Option<AuthorityHistoryWitness>,
+    /// The peer's advertised signing custody under its configured identity.
+    /// It ranks election candidates and authorizes nothing.
+    pub(crate) signing_custody: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -632,6 +638,7 @@ impl Default for PeerSyncState {
             authority_import_confirmation: None,
             authority_agreement_confirmation: None,
             authority_refused_history: None,
+            signing_custody: false,
         }
     }
 }

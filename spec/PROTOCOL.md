@@ -3015,7 +3015,8 @@ observe sufficient authenticated peer chain agreement in the current term to
 reach quorum. Agreement requires the configured peer's exact advertised self
 URL before and after envelope observation. A mismatched identity clears prior
 authority serving evidence while a genuine signed extension may still converge.
-Local key possession or URL election alone grants no serving or
+Election ranks nodes advertising `signingCustody` in cluster status ahead
+of lower URLs. Local key possession or URL election alone grants no serving or
 issuance authority. Known authenticated newer or conflicting history cannot
 become positive custody evidence even after an import refusal or transport
 loss. Refused-history evidence retains the maximal authenticated chain within

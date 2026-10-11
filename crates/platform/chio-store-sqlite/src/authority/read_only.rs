@@ -171,11 +171,7 @@ impl SqliteAuthorityInspection {
     ) -> Result<AuthorityVerificationStatus, AuthorityInspectionError> {
         self.read(|connection, now| {
             let snapshot = replication::read_snapshot(connection)?;
-            let holds_current_signing_custody =
-                SqliteCapabilityAuthority::read_keypair_from_connection(connection)?
-                    .public_key()
-                    .to_hex()
-                    == snapshot.public_key_hex;
+            let holds_current_signing_custody = holds_signing_custody(connection, &snapshot)?;
             let verified_envelope_digest =
                 if require_live_envelope || !holds_current_signing_custody {
                     Some(replication::verify_live_envelope(
@@ -204,6 +200,13 @@ impl SqliteAuthorityInspection {
                 inspected_at: now,
                 authenticated_history_commitments,
             })
+        })
+    }
+
+    /// Whether the local signing seed signs this database's own head.
+    pub fn holds_current_signing_custody(&self) -> Result<bool, AuthorityInspectionError> {
+        self.read(|connection, _| {
+            holds_signing_custody(connection, &replication::read_snapshot(connection)?)
         })
     }
 
@@ -313,3 +316,15 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
 #[cfg(all(test, target_os = "linux"))]
 #[path = "read_only_tests.rs"]
 mod tests;
+
+fn holds_signing_custody(
+    connection: &Connection,
+    snapshot: &AuthoritySnapshot,
+) -> Result<bool, AuthorityStoreError> {
+    Ok(
+        SqliteCapabilityAuthority::read_keypair_from_connection(connection)?
+            .public_key()
+            .to_hex()
+            == snapshot.public_key_hex,
+    )
+}

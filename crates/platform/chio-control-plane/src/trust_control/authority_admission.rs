@@ -74,7 +74,7 @@ where
     .await
 }
 
-async fn run_blocking_authority_task<T, F>(
+pub(crate) async fn run_blocking_authority_task<T, F>(
     state: &TrustServiceState,
     operation: F,
 ) -> Result<T, Response>

@@ -34,7 +34,7 @@ use authority_fixture::provision_cluster_authorities;
 
 #[path = "trust_cluster/health.rs"]
 mod health;
-use health::{assert_unavailable_leader_health, wait_for_node_health};
+use health::wait_for_node_health;
 
 #[path = "trust_cluster/revocation_proof.rs"]
 mod revocation_proof;
@@ -2881,8 +2881,8 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         &[url_a.clone(), url_b.clone()],
     );
 
-    // Budget replication stays available even when the elected leader lacks
-    // signing custody and correctly reports unavailable authority health.
+    // The custody-less lowest URL follows the signing custodian while it
+    // replays budget history.
     wait_until_with_diagnostics(
         "late budget node authenticated control reachable",
         Duration::from_secs(30),
@@ -2905,8 +2905,8 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             ) else {
                 return false;
             };
-            status["leaderUrl"].as_str() == Some(late_url.as_str())
-                && status["role"].as_str() == Some("leader")
+            status["leaderUrl"].as_str() == Some(warm_leader_url.as_str())
+                && status["role"].as_str() == Some("follower")
                 && status["electionTerm"].as_u64().is_some_and(|term| term > 0)
                 && status["hasQuorum"].as_bool() == Some(true)
                 && status["reachableNodes"].as_u64().unwrap_or(0) >= 2
@@ -2918,7 +2918,12 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         || cluster_status_diagnostics(&client, &all_urls, service_token),
     );
 
-    assert_unavailable_leader_health(&client, &late_url, service_token);
+    wait_for_node_health(
+        &client,
+        &late_url,
+        service_token,
+        "late follower serves custodian authority",
+    );
 
     let late_store = SqliteBudgetStore::open(&late_budget_db).expect("open late budget db");
     let pre_reconcile_events = late_store

@@ -11,16 +11,54 @@ fn identity_refused() -> CliError {
     CliError::cli_other_error(SOURCE_IDENTITY_MISMATCH.to_string())
 }
 
-/// Clear serving evidence as soon as authenticated peer metadata identifies
-/// a different logical node. Transport and independent replication continue.
+/// Clear serving evidence and election preference as soon as authenticated
+/// peer metadata identifies a different logical node. Transport and
+/// independent replication continue.
 pub(super) fn observe_peer_authority_identity(
     state: &TrustServiceState,
     peer_url: &str,
     status: &ClusterStatusResponse,
 ) {
-    if state.config.authority_db_path.is_some() && status.self_url != peer_url {
+    let same_node = status.self_url == peer_url;
+    update_peer_state(state, peer_url, |peer| {
+        peer.signing_custody = same_node && status.signing_custody;
+    });
+    if state.config.authority_db_path.is_some() && !same_node {
         update_peer_authority_error(state, peer_url, identity_refused().to_string());
     }
+}
+
+/// Inspection failure of any kind ranks this node custody-less.
+fn inspect_signing_custody(state: &TrustServiceState) -> bool {
+    open_inspection(state)
+        .ok()
+        .and_then(|inspection| inspection.holds_current_signing_custody().ok())
+        .unwrap_or(false)
+}
+
+fn record_signing_custody(state: &TrustServiceState, signing_custody: bool) {
+    if let Some(cluster) = state.cluster.as_ref() {
+        cluster
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .signing_custody = signing_custody;
+    }
+}
+
+/// Re-inspect local custody on a blocking sync worker, outside the cluster lock.
+pub(super) fn refresh_signing_custody(state: &TrustServiceState) {
+    record_signing_custody(state, inspect_signing_custody(state));
+}
+
+/// Re-inspect local custody on the bounded authority inspection lane. A
+/// refused permit ranks this node custody-less.
+pub(super) async fn refresh_signing_custody_on_lane(state: &TrustServiceState) -> bool {
+    let signing_custody =
+        run_blocking_authority_task(state, |state| Ok(inspect_signing_custody(state)))
+            .await
+            .unwrap_or(false);
+    record_signing_custody(state, signing_custody);
+    signing_custody
 }
 
 pub(super) fn authority_sync_context(
