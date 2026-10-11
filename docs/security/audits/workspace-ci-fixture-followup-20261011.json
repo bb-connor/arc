@@ -1,0 +1,152 @@
+{
+  "schema": "chio.security.ci-fixture-followup.v1",
+  "captured_utc": "2026-10-11T18:51:15.349524+00:00",
+  "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+  "base": "61c3b69f32c4c6b7404fbc4daa56807522b00887",
+  "scope": "Restore build-lint native fixture adjacency assertion after workspace extraction. Exactly two checker/test tuple additions, no workflow or Rust change.",
+  "files": {
+    "scripts/check-native-protocol-ci.py": "a9a324233b6f0094ea74b2d33f37daf18aa7de4e3c867db4379086e5f2d763f8",
+    "scripts/tests/check-native-protocol-ci.test.py": "348aafde52d0a49823698af7506329d99d2c9af474a741e0bdeae5d8fc411347"
+  },
+  "original": {
+    "source": "61c3b69f32c4c6b7404fbc4daa56807522b00887",
+    "change": "Enroll build-lint in test CONSUMERS before changing checker",
+    "exit_code": 1,
+    "tests": 15,
+    "missing_refusal_failures": 13,
+    "log_sha256": "e47a6ae9db2f6c387eb4b6614312846260b02f8cf182954809a24fe4f32f95a7"
+  },
+  "qualification": {
+    "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+    "completed_utc": "2026-10-11T18:49:32.683712+00:00",
+    "commands": [
+      {
+        "command": [
+          "python3",
+          "scripts/check-native-protocol-ci.py"
+        ],
+        "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+        "exit_code": 0,
+        "duration_seconds": 0.196,
+        "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/fixture-delta/check-native-protocol-ci.py.log",
+        "log_sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2"
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/tests/check-native-protocol-ci.test.py"
+        ],
+        "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+        "exit_code": 0,
+        "duration_seconds": 0.523,
+        "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/fixture-delta/check-native-protocol-ci.test.py.log",
+        "log_sha256": "d2f0034eb4fc243465227525dc309e63a32f6b3599e5b537ea1cfd3a2c2e0263"
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/check-security-ci-contract.py"
+        ],
+        "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+        "exit_code": 0,
+        "duration_seconds": 2.186,
+        "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/fixture-delta/check-security-ci-contract.py.log",
+        "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/tests/check-workspace-ci-extraction.test.py"
+        ],
+        "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+        "exit_code": 0,
+        "duration_seconds": 0.288,
+        "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/fixture-delta/check-workspace-ci-extraction.test.py.log",
+        "log_sha256": "31d705ec6de319c3b5a04b80dea4ed0b175d96eb7c5472763949940a95bd287c"
+      },
+      {
+        "command": [
+          "python3",
+          "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/verify-preservation.py",
+          "/home/connor/lanes/pr1160-landing-final"
+        ],
+        "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7",
+        "exit_code": 0,
+        "duration_seconds": 0.246,
+        "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/fixture-delta/verify-preservation.py.log",
+        "log_sha256": "aae993c0acf3d6a7c1be6e30721a18aa55ecdd3c99469758e230ca73138506c9"
+      }
+    ],
+    "accepted": true
+  },
+  "review": {
+    "reviewer": "Claude coordination session",
+    "verdict": "approve",
+    "observed_utc": "2026-10-11T18:50:00Z",
+    "source": "cf8a092871779e1b3d6b0be4b51f1d87366860b7"
+  },
+  "additional_discovery": {
+    "source": "61c3b69f32c4c6b7404fbc4daa56807522b00887",
+    "compiled_runtime_source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+    "binary_sha256": "b6cf137fbc0e4a51b3d6d135275611a22ea5762ab4e1c772f9c0821b70814ca5",
+    "listed_test_count": 1721,
+    "scope": "Runtime discovery only for exact pq-only kernel library inventories; not execution or broader source sweep.",
+    "records": [
+      {
+        "job": "threshold-crypto-floor",
+        "step": "Exact boot-gated threshold issuance",
+        "selector": "threshold_issuance",
+        "expected": 59,
+        "listed": 59,
+        "missing": [],
+        "unexpected": []
+      },
+      {
+        "job": "threshold-crypto-floor",
+        "step": "Exact threshold session ownership",
+        "selector": "session::threshold_continuation::tests",
+        "expected": 1,
+        "listed": 1,
+        "missing": [],
+        "unexpected": []
+      },
+      {
+        "job": "threshold-crypto-floor",
+        "step": "Exact shared signing authority forwarding",
+        "selector": "signing_authority::forwarding_tests",
+        "expected": 2,
+        "listed": 2,
+        "missing": [],
+        "unexpected": []
+      },
+      {
+        "job": "session-reports",
+        "step": "Exact kernel session reports",
+        "selector": "session_reports",
+        "expected": 16,
+        "listed": 16,
+        "missing": [],
+        "unexpected": []
+      },
+      {
+        "job": "session-reports",
+        "step": "Exact receipt evaluation isolation",
+        "selector": "receipt_scope_isolation",
+        "expected": 6,
+        "listed": 6,
+        "missing": [],
+        "unexpected": []
+      }
+    ],
+    "accepted": true
+  },
+  "evidence_packet": "/home/connor/lanes/pr1160-root-evidence/workspace-ci-fixture-followup-20261011",
+  "evidence_manifest_sha256": "9752d857a1a93dadd232bc655ca16544e1af13d659f13de38500ec0f97f76af0",
+  "remaining_acceptance": [
+    "Complete bounded changed-module inventory sweep, publish composed candidate once, obtain exact-head required checks and classify remaining failures.",
+    "Answer review threads and await explicit owner merge authorization. All existing postmerge, proof and operational limits remain."
+  ],
+  "published": false,
+  "hosted_qualified": false,
+  "merged": false
+}
