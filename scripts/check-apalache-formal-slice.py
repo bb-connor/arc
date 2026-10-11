@@ -363,7 +363,11 @@ def check_post_admission_drop_guard() -> None:
         in text
         and "URL elicitation follows this rule regardless of nested bridge activity."
         in text
-        and "Only a kernel error before polling invoke is pre-dispatch and reversible."
+        and "Only an error before mark_dispatch_started is pre-dispatch and reversible."
+        in text
+        and "After that mark, an expired deadline or failed/regressed clock read is"
+        in text
+        and "outcome-unknown even when invoke has not yet been polled. Holds remain."
         in text,
         "the model must classify all server-returned errors as outcome-unknown",
     )
