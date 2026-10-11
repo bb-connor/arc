@@ -281,7 +281,7 @@ mod unix {
     /// Holds in-flight stages. A stage of an operation that is never retried
     /// stays here; exact retry is the only reclamation path.
     const STAGING_DIRECTORY: &[u8] = b".chio-decoy-stage";
-    const STAGING_DOMAIN: &[u8] = b"chio-decoy-staging-name-v1";
+    const STAGING_DOMAIN: &[u8] = b"chio.decoy.staging-name.v1\0";
     #[cfg(any(
         target_vendor = "apple",
         target_os = "freebsd",

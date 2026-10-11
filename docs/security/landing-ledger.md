@@ -71,6 +71,9 @@ authenticated staging, writer serialization and explicit inherited-descriptor
 unlock. Linux passes 64 owning tests, strict lint and all 108 deception controls.
 Native macOS passes 70 executions, ten full parallel reruns and strict lint.
 Earlier failures and the recorded-clean native source boundary remain explicit.
+A later structural check found the new staging domain outside the existing
+NUL-terminated naming convention. Its tag is corrected and the unchanged domain
+check passes; Linux and native qualification of those new bytes remains pending.
 
 The [native cold-map preparation audit](audits/native-cold-map-preparation-20261011.json)
 records 26 passing controls, six runtime-killed mutants, strict lint and
