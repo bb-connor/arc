@@ -467,6 +467,7 @@ pub(crate) fn run() {
                 revocation_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                control_authority_public_key.as_ref(),
                 allow_ephemeral_receipts,
                 print_config,
             )
