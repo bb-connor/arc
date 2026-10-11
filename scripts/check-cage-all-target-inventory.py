@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 EXPECTED_COUNTS = {
-    "lib": 20,
+    "lib": 30,
     "bin_chio_cage_init": 0,
     "lib_chio_cage_plan": 7,
     "lib_chio_cage_init": 1,
@@ -21,8 +21,8 @@ EXPECTED_COUNTS = {
     "linux_compile": 27,
     "linux_enforcement": 38,
 }
-EXPECTED_TOTAL = 102
-EXPECTED_SHA256 = "b97039eb25ad3f43c474e09646e612fedef5b42a953d57384eef6b867867b8a8"
+EXPECTED_TOTAL = 112
+EXPECTED_SHA256 = "9b77f26d62862a0408513ea91cf0f0ed3cb455e3da1553192a3ec18c4af7adda"
 EXPECTED_INTEGRATION_TARGETS = {
     "enforcement_evidence.rs",
     "linux_compile.rs",

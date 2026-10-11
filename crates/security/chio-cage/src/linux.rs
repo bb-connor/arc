@@ -69,8 +69,43 @@ const SO_DOMAIN: c_int = 39;
 
 const DIRECTORY_SCAN_BUFFER_BYTES: usize = 64 * 1024;
 const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
+const MAX_READ_SCAN_ENTRIES: usize = 4096;
+const MAX_DIRECTORY_SCAN_NAME_BYTES: usize = 1024 * 1024;
 const MAX_FORBIDDEN_SCAN_ENTRIES: usize = 4096;
 const MAX_FORBIDDEN_SCAN_DEPTH: usize = 64;
+
+/// Bound scan work independently of retained grants. Valid non-dot names,
+/// including entries later skipped, are charged before allocation or sorting.
+/// Each caller shares one budget across every declared root and descendant.
+struct DirectoryScanBudget {
+    remaining_entries: usize,
+    remaining_name_bytes: usize,
+    label: &'static str,
+}
+
+impl DirectoryScanBudget {
+    const fn new(entries: usize, name_bytes: usize, label: &'static str) -> Self {
+        Self {
+            remaining_entries: entries,
+            remaining_name_bytes: name_bytes,
+            label,
+        }
+    }
+
+    fn charge(&mut self, name_bytes: usize) -> Result<(), CageError> {
+        let remaining_entries = self
+            .remaining_entries
+            .checked_sub(1)
+            .ok_or(CageError::ResourceLimitExceeded(self.label))?;
+        let remaining_name_bytes = self
+            .remaining_name_bytes
+            .checked_sub(name_bytes)
+            .ok_or(CageError::ResourceLimitExceeded(self.label))?;
+        self.remaining_entries = remaining_entries;
+        self.remaining_name_bytes = remaining_name_bytes;
+        Ok(())
+    }
+}
 
 #[repr(C)]
 struct OpenHow {
@@ -188,9 +223,19 @@ pub(crate) fn retain_read_grants(
     let root = open_root()?;
     let mut resources = Vec::new();
     let mut visited_directories = BTreeSet::new();
+    let mut scan_budget = DirectoryScanBudget::new(
+        MAX_READ_SCAN_ENTRIES,
+        MAX_DIRECTORY_SCAN_NAME_BYTES,
+        "read grants",
+    );
     for path in paths {
         let resource = retain_existing_from_root(&root, path, ExpectedAccess::Read)?;
-        retain_read_closure(resource, &mut resources, &mut visited_directories)?;
+        retain_read_closure(
+            resource,
+            &mut resources,
+            &mut visited_directories,
+            &mut scan_budget,
+        )?;
     }
     resources.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(resources)
@@ -200,6 +245,7 @@ fn retain_read_closure(
     resource: RetainedResource,
     resources: &mut Vec<RetainedResource>,
     visited_directories: &mut BTreeSet<(u64, u64)>,
+    scan_budget: &mut DirectoryScanBudget,
 ) -> Result<(), CageError> {
     // An explicit child grant can also be reached through a declared parent.
     // Retain that exact path once, but reject a replacement between visits.
@@ -231,10 +277,10 @@ fn retain_read_closure(
         return Ok(());
     }
 
-    for name in directory_entry_names(&traversal, &directory_path)? {
+    for name in directory_entry_names(&traversal, &directory_path, scan_budget)? {
         let child_path = directory_path.join(&name);
         if let Some(child) = retain_directory_entry(&traversal, &child_path, &name)? {
-            retain_read_closure(child, resources, visited_directories)?;
+            retain_read_closure(child, resources, visited_directories, scan_budget)?;
         }
     }
     Ok(())
@@ -262,6 +308,7 @@ fn open_directory_for_scan(resource: &RetainedResource) -> Result<File, CageErro
 fn directory_entry_names(
     directory: &File,
     path: &Path,
+    budget: &mut DirectoryScanBudget,
 ) -> Result<Vec<std::ffi::OsString>, CageError> {
     let mut names = Vec::new();
     let mut buffer = vec![0_u8; DIRECTORY_SCAN_BUFFER_BYTES];
@@ -319,15 +366,7 @@ fn directory_entry_names(
             let name = name_field.get(..terminator).ok_or_else(|| {
                 invalid_directory_record(path, "directory name bounds are invalid")
             })?;
-            if name != b"." && name != b".." {
-                if name.is_empty() || name.contains(&b'/') {
-                    return Err(invalid_directory_record(
-                        path,
-                        "directory entry name is invalid",
-                    ));
-                }
-                names.push(std::ffi::OsString::from_vec(name.to_vec()));
-            }
+            push_directory_name(path, name, &mut names, budget)?;
             offset = offset.checked_add(record_length).ok_or_else(|| {
                 invalid_directory_record(path, "directory record offset overflowed")
             })?;
@@ -341,6 +380,26 @@ fn directory_entry_names(
         ));
     }
     Ok(names)
+}
+
+fn push_directory_name(
+    path: &Path,
+    name: &[u8],
+    names: &mut Vec<std::ffi::OsString>,
+    budget: &mut DirectoryScanBudget,
+) -> Result<(), CageError> {
+    if name == b"." || name == b".." {
+        return Ok(());
+    }
+    if name.is_empty() || name.contains(&b'/') {
+        return Err(invalid_directory_record(
+            path,
+            "directory entry name is invalid",
+        ));
+    }
+    budget.charge(name.len())?;
+    names.push(std::ffi::OsString::from_vec(name.to_vec()));
+    Ok(())
 }
 
 fn invalid_directory_record(path: &Path, message: &'static str) -> CageError {
@@ -445,7 +504,11 @@ pub(crate) fn reject_forbidden_descendant_aliases(
     }
     let mut scan = ForbiddenTreeScan {
         linked: &linked,
-        entries: 0,
+        budget: DirectoryScanBudget::new(
+            MAX_FORBIDDEN_SCAN_ENTRIES,
+            MAX_DIRECTORY_SCAN_NAME_BYTES,
+            "forbidden directory entries",
+        ),
         visited_directories: BTreeSet::new(),
     };
     for directory in forbidden
@@ -463,7 +526,7 @@ pub(crate) fn reject_forbidden_descendant_aliases(
 
 struct ForbiddenTreeScan<'a> {
     linked: &'a [&'a RetainedResource],
-    entries: usize,
+    budget: DirectoryScanBudget,
     visited_directories: BTreeSet<(u64, u64)>,
 }
 
@@ -474,13 +537,7 @@ impl ForbiddenTreeScan<'_> {
                 "forbidden directory depth",
             ));
         }
-        for name in directory_entry_names(traversal, path)? {
-            self.entries = self.entries.saturating_add(1);
-            if self.entries > MAX_FORBIDDEN_SCAN_ENTRIES {
-                return Err(CageError::ResourceLimitExceeded(
-                    "forbidden directory entries",
-                ));
-            }
+        for name in directory_entry_names(traversal, path, &mut self.budget)? {
             let child_path = path.join(&name);
             let Some((child, metadata)) = open_directory_entry(traversal, &child_path, &name)?
             else {
