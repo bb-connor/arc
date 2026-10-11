@@ -29,7 +29,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
 )
 CONSUMERS = (
-    (0, "check", "Workspace tests"),
+    (0, "workspace-tests", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
     (3, "conformance", "Run live C++ conformance areas"),
@@ -265,7 +265,7 @@ class NativeProtocolCiTests(unittest.TestCase):
 
     def test_contract_and_negative_checks_remain_enrolled(self):
         for document, job_id, name in (
-            (0, "check", "Workspace structural gates"),
+            (0, "build-lint", "Workspace structural gates"),
             (1, "host-tests", "Default kernel and worker dependency boundary"),
         ):
             for script in (

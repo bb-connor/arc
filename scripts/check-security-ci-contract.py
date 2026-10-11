@@ -1165,7 +1165,6 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
     ),
     ("Workspace build", "cargo build --workspace"),
-    ("Workspace tests", "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards"),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
     (
         "cognition-market promoted-default build, clippy, and tests",
@@ -1192,7 +1191,6 @@ EXPECTED_CI_EVIDENCE_EXTRAS = {
         "Temporal security gate",
         "Workspace clippy",
         "Workspace build",
-        "Workspace tests",
         "Protocol peer-negotiation gate",
         "Wasm guards library tests",
         "Wasm guards Python SDK round-trip tests",
@@ -1202,13 +1200,79 @@ EXPECTED_CI_EVIDENCE_EXTRAS["Temporal security gate"] = {
     "env": EXPECTED_COMMON_CI_STEP_ENV,
     "shell": EXPECTED_TEMPORAL_STEP_SHELL,
 }
-for serial_fixture_step in (
-    "Workspace tests",
-    "cognition-market promoted-default build, clippy, and tests",
-):
-    EXPECTED_CI_EVIDENCE_EXTRAS[serial_fixture_step] = {
-        "env": EXPECTED_SERIAL_FIXTURE_CI_ENV
-    }
+EXPECTED_CI_EVIDENCE_EXTRAS[
+    "cognition-market promoted-default build, clippy, and tests"
+] = {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}
+
+EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
+    "python -m pip install --disable-pip-version-check "
+    "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
+)
+
+# The required context accepts only the two unconditional producing jobs.
+BUILD_LINT_TEST_NEEDS = ("build-lint", "workspace-tests")
+EXPECTED_BUILD_LINT_TEST_JOB = {
+    "name": "Build, lint, test",
+    "if": "${{ always() }}",
+    "needs": list(BUILD_LINT_TEST_NEEDS),
+    "runs-on": "ubuntu-latest",
+    "steps": [{
+        "name": "Require build, lint and workspace tests",
+        "run": (
+            "set -euo pipefail\n"
+            "test '${{ needs.build-lint.result }}' = success\n"
+            "test '${{ needs.workspace-tests.result }}' = success"
+        ),
+    }],
+}
+EXPECTED_WORKSPACE_TESTS_RUN = "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards"
+# Preserve tool versions and native authority preparation before the unchanged suite.
+EXPECTED_WORKSPACE_TEST_SETUP = [
+    {
+        "uses": "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+        "with": {"fetch-depth": "0"},
+    },
+    {
+        "name": "Install Rust toolchain",
+        "run": (
+            "rustup toolchain install --profile minimal --component rustfmt --component clippy\n"
+            "rustup show active-toolchain\n"
+        ),
+    },
+    {
+        "name": "Install protobuf compiler",
+        "uses": "./.github/actions/apt-install",
+        "with": {"packages": "protobuf-compiler ripgrep zstd"},
+    },
+    {
+        "uses": "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+        "with": {"python-version": "3.12"},
+    },
+    {
+        "name": "Install Python workflow validators",
+        "run": EXPECTED_CI_PYTHON_VALIDATORS_RUN,
+    },
+    {
+        "uses": "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "with": {"node-version": "22"},
+    },
+    {"name": "Enable pnpm", "run": "corepack enable"},
+    {
+        "name": "Install web3 contract dependencies",
+        "run": "pnpm --dir contracts install --frozen-lockfile",
+    },
+    {"uses": "Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32"},
+    {
+        "uses": "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+        "with": {"bun-version": "1.3.3"},
+    },
+    {
+        "name": "Qualify enforcing host and prepare native consumer fixture",
+        "uses": "./.github/actions/enforced-native-fixture",
+        "env": EXPECTED_COMMON_CI_STEP_ENV,
+    },
+]
+
 EXPECTED_KANI_STEP_EXTRAS = {
     "Verify all PR Kani harnesses": {
         "env": {"CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0"}
@@ -1300,10 +1364,6 @@ EXPECTED_THREAT_CONCURRENCY = {
     "group": "threat-model-coverage-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}",
     "cancel-in-progress": "false",
 }
-EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
-    "python -m pip install --disable-pip-version-check "
-    "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
-)
 EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
     "jsonschema==4.26.0 PyYAML==6.0.2"
@@ -5202,6 +5262,50 @@ def validate_committed_evidence_binding(committed_evidence: dict) -> None:
         raise ContractError("required committed Linux evidence binding changed")
 
 
+def validate_build_lint_test(ci: dict) -> None:
+    required_contexts = {
+        identifier for identifier, body in workflow_jobs(ci).items()
+        if isinstance(body, dict) and body.get("name") == "Build, lint, test"
+    }
+    if required_contexts != {"check"}:
+        raise ContractError("Build, lint, test must be the exact unique aggregate check name")
+    aggregate = job(ci, "check")
+    steps = aggregate.get("steps")
+    if not isinstance(steps, list) or len(steps) != 1 or not isinstance(steps[0], dict):
+        raise ContractError("Build, lint, test changes its exact fail-closed body")
+    run = steps[0].get("run")
+    observed = {
+        **aggregate,
+        "steps": [{**steps[0], "run": run.strip() if isinstance(run, str) else run}],
+    }
+    if observed != EXPECTED_BUILD_LINT_TEST_JOB:
+        raise ContractError("Build, lint, test changes its exact fail-closed body")
+    for identifier, name in (("build-lint", "Build and lint"), ("workspace-tests", "Workspace tests")):
+        producer = job(ci, identifier)
+        if (
+            set(producer) != {"name", "runs-on", "timeout-minutes", "steps"}
+            or producer.get("name") != name
+            or producer.get("runs-on") != "ubuntu-latest"
+            or producer.get("timeout-minutes") != "360"
+        ):
+            raise ContractError(f"{identifier} changes its unconditional execution contract")
+    tests = job(ci, "workspace-tests")
+    validate_exact_steps(
+        tests,
+        (("Workspace tests", EXPECTED_WORKSPACE_TESTS_RUN),),
+        "required CI workspace test evidence",
+        {"Workspace tests": {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}},
+    )
+    test_steps = tests.get("steps")
+    if (
+        not isinstance(test_steps, list)
+        or len(test_steps) != len(EXPECTED_WORKSPACE_TEST_SETUP) + 1
+        or test_steps[:-1] != EXPECTED_WORKSPACE_TEST_SETUP
+        or test_steps[-1].get("name") != "Workspace tests"
+    ):
+        raise ContractError("workspace-tests changes its exact prerequisite steps or fixture adjacency")
+
+
 def validate_nonce_fips_contract(root: Path) -> None:
     workflow = load_workflow(root / ".github/workflows/chio-tee-fips.yml")
     ci = load_workflow(root / ".github/workflows/ci.yml")
@@ -8582,16 +8686,17 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("security aggregate changes its exact fail-closed body")
 
-    for identifier in (*REQUIRED_AGGREGATE_NEEDS, "security-contract-required"):
+    for identifier in (*BUILD_LINT_TEST_NEEDS, *REQUIRED_AGGREGATE_NEEDS, "security-contract-required"):
         if contains_key(job(ci, identifier), "continue-on-error"):
             raise ContractError(f"required CI job uses continue-on-error: {identifier}")
 
     if job(ci, "msrv").get("timeout-minutes") != "360":
         raise ContractError("MSRV serial workspace budget must be exactly 360 minutes")
 
-    check_job = job(ci, "check")
+    check_job = job(ci, "build-lint")
     for identifier, boundary in (
-        ("check", "Workspace structural gates"),
+        ("build-lint", "Workspace structural gates"),
+        ("workspace-tests", "Workspace tests"),
         ("msrv", "MSRV workspace lane"),
     ):
         python_job = job(ci, identifier)
@@ -8606,6 +8711,7 @@ def validate(root: Path) -> None:
             raise ContractError(
                 f"{identifier} Python validators are installed after their consumers"
             )
+    validate_build_lint_test(ci)
     check_lines = run_lines(check_job)
     require_run_markers(
         check_job,
@@ -8649,7 +8755,6 @@ def validate(root: Path) -> None:
         )
     for command in (
         "cargo build --workspace",
-        "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards",
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
         "bash scripts/check-mapping.sh",
         "python3 scripts/check-patch-hygiene.py",

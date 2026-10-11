@@ -35,7 +35,7 @@ class PatchHygieneTests(unittest.TestCase):
         workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
         self.step = next(
             step["run"]
-            for step in workflow["jobs"]["check"]["steps"]
+            for step in workflow["jobs"]["build-lint"]["steps"]
             if step.get("name") == "Patch hygiene"
         )
 

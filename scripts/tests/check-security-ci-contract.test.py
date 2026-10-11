@@ -33,6 +33,10 @@ subprocess.run(
     [sys.executable, str(ROOT / "scripts/tests/security-image-inputs.test.py")],
     check=True,
 )
+subprocess.run(
+    [sys.executable, str(ROOT / "scripts/tests/check-workspace-ci-extraction.test.py")],
+    check=True,
+)
 
 
 stable_dump_fixture = ast.parse("def fixture(value=None):\n    return value\n").body[0]
@@ -652,9 +656,9 @@ assert_nonzero_bootstrap_accepted()
 # Full control-plane lanes must retain the same fixture isolation as the flow
 # security gate. Tests still exercise their explicit thread and process races.
 SERIAL_FIXTURE_STEPS = (
-    ("check", "Workspace tests", "required CI test and Loom evidence"),
+    ("workspace-tests", "Workspace tests", "required CI workspace test evidence"),
     (
-        "check",
+        "build-lint",
         "cognition-market promoted-default build, clippy, and tests",
         "required CI test and Loom evidence",
     ),
@@ -700,7 +704,7 @@ for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
         ),
         error_context if job_id == "msrv" else "required CI",
     )
-for python_job in ("check", "msrv"):
+for python_job in ("build-lint", "workspace-tests", "msrv"):
     for dependency in ("jsonschema==4.26.0", "referencing==0.37.0"):
         assert_rejected(
             f"{python_job} omits {dependency}",

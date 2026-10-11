@@ -100,7 +100,7 @@ def validate(
         "python3 scripts/tests/check-native-protocol-ci.test.py",
         "python3 scripts/tests/prepare-enforced-native-fixture.test.py",
     )
-    _, structural = named_step(ci["jobs"]["check"], "Workspace structural gates")
+    _, structural = named_step(ci["jobs"]["build-lint"], "Workspace structural gates")
     _, process_gate = named_step(
         process["jobs"]["host-tests"], "Default kernel and worker dependency boundary"
     )
@@ -111,7 +111,7 @@ def validate(
             f"native protocol CI omits required contract check: {command}",
         )
     for job_id, consumer, env in (
-        ("check", "Workspace tests", COMMON_ENV),
+        ("workspace-tests", "Workspace tests", COMMON_ENV),
         (
             "msrv",
             "MSRV workspace lane",
