@@ -11,6 +11,8 @@ use chio_swarm_authority::{
     SwarmJoinReceipt, SwarmRevocationEpoch, SwarmRoutePlanReceipt, SwarmTaskGraph,
 };
 
+#[path = "runtime_store/json_store_bounds.rs"]
+mod json_store_bounds;
 #[cfg(unix)]
 #[path = "runtime_store/replay_source.rs"]
 mod replay_source;
