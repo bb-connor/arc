@@ -1,0 +1,218 @@
+{
+  "schema": "chio.pr1160.msrv-terminal-repair.v1",
+  "observed_utc": "2026-10-11T12:33:20.884348+00:00",
+  "published_source": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+  "qualified_local_source": "016d3a2cde20d8e8b0878e68c131a9655cd496e6",
+  "qualified_local_tree": "d4e16b9106fc6602ae6e85e1d82a371b644f2e11",
+  "public_required": {
+    "Build, lint, test": [
+      {
+        "state": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38125088895/job/114427678878"
+      }
+    ],
+    "MSRV build and test": [
+      {
+        "state": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38125088895/job/114427678978"
+      }
+    ],
+    "cargo-vet (locked supply-chain audit)": [
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38125088479/job/114427677022"
+      },
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38125088895/job/114427679033"
+      }
+    ],
+    "cargo-deny (supply-chain bans/advisories/licenses)": [
+      {
+        "state": "SUCCESS",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38125088895/job/114427678956"
+      }
+    ]
+  },
+  "failed_or_cancelled_jobs": 19,
+  "unclassified_failures": 0,
+  "msrv": {
+    "job": 114427678978,
+    "run": 38125088895,
+    "conclusion": "failure",
+    "failed_targets": [
+      "-p chio-loadgen --test sustained",
+      "-p chio-open-market --test finding_admission"
+    ],
+    "scope": "The complete no-fail-fast workspace test invocation reports exactly these two failed targets. Subsequent formal-diff and WASM commands in the failed shell step did not run."
+  },
+  "repairs": {
+    "market": {
+      "commit": "336f65214a242a512e85e275c45c834e4e69abc1",
+      "evidence": "docs/security/audits/required-ci-preflight-20261011.json",
+      "final_admission_passed": 55
+    },
+    "loadgen": {
+      "commit": "016d3a2cde20d8e8b0878e68c131a9655cd496e6",
+      "file": "bench/chio-loadgen/tests/sustained.rs",
+      "cause": "The invalid-duration fixture supplied u64::MAX seconds to boot_smoke, so correct capability expiry validation rejected the harness before run_sustained was exercised.",
+      "repair": "Boot with one second, then supply the unchanged u64::MAX duration to run_sustained; retain the exact DurationTooLong assertion.",
+      "production_changed": false,
+      "assertions_or_budgets_weakened": false,
+      "original": {
+        "source": "0df8edfaa110a136b1b02c85fb97764d2cbd2221",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-loadgen",
+          "--test",
+          "sustained",
+          "run_sustained_rejects_unrepresentable_duration",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 146.8587606982328,
+        "log_sha256": "79f1adb44aac8376764976a4169e40b47fc48a60eb0c0d597a1eae96e37509ff",
+        "source_stable": true
+      },
+      "qualified_fixture": {
+        "qualified_commit": "016d3a2cde20d8e8b0878e68c131a9655cd496e6",
+        "qualified_tree": "d4e16b9106fc6602ae6e85e1d82a371b644f2e11",
+        "tested_source_base": "a490a155d63bb8ed23f6b0ad588313b41127cd0e",
+        "tested_patch_sha256": "fe7e97d9e73b96654ffc7956a9492322f2b920ba41f93e895e69d659299b77a0",
+        "complete_worktree_equals_committed_tree": true,
+        "review": "ci_coverage_gap_scan independent final diff review: no findings; source only, no rerun",
+        "tests_passed": 24,
+        "tests_failed": 0,
+        "strict_all_targets": true,
+        "format": true,
+        "rust_hygiene": true
+      },
+      "commands": [
+        {
+          "label": "loadgen-tests",
+          "command": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "chio-loadgen",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 26.36424741288647,
+          "log_sha256": "9561ad67e5bda71658487fe92aa188ca4d0c693feb141c3e03967cab8c0a5eb6",
+          "source_stable": true
+        },
+        {
+          "label": "loadgen-strict",
+          "command": [
+            "cargo",
+            "clippy",
+            "--locked",
+            "-p",
+            "chio-loadgen",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 118.99163008620963,
+          "log_sha256": "ec8f387f315ba72e62432974dc4b6230fff863205ae7b18d0cb3cb8605c951cf",
+          "source_stable": true
+        }
+      ],
+      "environment": {
+        "rustc": "1.95.0 (59807616e 2026-04-14)",
+        "host": "aarch64-unknown-linux-gnu",
+        "cargo_build_jobs": 2,
+        "rust_test_threads": 1,
+        "profile_debug": 0,
+        "incremental": false,
+        "umask": "022"
+      },
+      "review": {
+        "reviewer": "Root read-only ci_coverage_gap_scan helper",
+        "verdict": "no findings in final diff",
+        "scope": "Independent source review only; no duplicate tests, builds or proofs."
+      }
+    }
+  },
+  "security_aggregate": {
+    "job": 114469250733,
+    "conclusion": "failure",
+    "classification": "known-missing-evidence-and-failed-dependencies",
+    "scope": "The initial absent CHIO_COMMITTED_LINUX_EVIDENCE_SHA predicate fails. The materialized dependency checks also include failed Build, MSRV, Kani weights and enterprise jobs. No independent new source failure or authorized variable rotation."
+  },
+  "native_audit_review": {
+    "path": "docs/security/audits/native-recovery-hosted-20261011.json",
+    "sha256": "6cedc79e9871321a62c79f36c0566a870c58d678b733f90a37c2682b79eaf565",
+    "reviewer": "Root read-only ci_coverage_gap_scan helper",
+    "verdict": "No material mismatch or overclaim found in retained artifact hashes, source equality, acceptance assertions, five scenarios and 33 receipt outputs.",
+    "scope": "Evidence review only; no new runtime or signature campaign."
+  },
+  "retained_evidence": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/original.json",
+      "sha256": "26709c213a27ac56d2dc8e44dbe4e49611074bf16475fb3a5dd0269f3ea22900"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/original.log",
+      "sha256": "79f1adb44aac8376764976a4169e40b47fc48a60eb0c0d597a1eae96e37509ff"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/repair.patch",
+      "sha256": "fe7e97d9e73b96654ffc7956a9492322f2b920ba41f93e895e69d659299b77a0"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/repair-summary.json",
+      "sha256": "9e018241bdde48b28aaeed1b5f0faf3a8750a5d87babca6bbe340e6dcbda122f"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/commit-equivalence.json",
+      "sha256": "5248c58789431a924270c6883a382acc8b86a8ca08c4323c042df05a595cf0a3"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/loadgen-tests.log",
+      "sha256": "9561ad67e5bda71658487fe92aa188ca4d0c693feb141c3e03967cab8c0a5eb6"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/loadgen-strict.log",
+      "sha256": "ec8f387f315ba72e62432974dc4b6230fff863205ae7b18d0cb3cb8605c951cf"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/hosted-terminal/latest.json",
+      "sha256": "5404ff38abfd4a2d6cb64b670d158e173fd6dd8cff1995f1b78f17c887a8ff92"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/hosted-terminal/classifications.json",
+      "sha256": "741f73fba61a3bf50a5d1e61290203384ea142c8d2bde6e6ce3a5c7b39cb2920"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/hosted-terminal/msrv-114427678978.log",
+      "sha256": "59461640f26c178dd9f409ac805b13fa071a066a1b8b7dc1dd88c8f39edd5ebd"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/msrv-terminal-repair/hosted-terminal/security-contract-114469250733.log",
+      "sha256": "be2aabe4fd05518aa288d6da7037255c07190a19a8e5d83da2ac35239faaf370"
+    }
+  ],
+  "acceptance": {
+    "all_four_predecessor_required_terminal": true,
+    "local_repairs_qualified": true,
+    "replacement_published": false,
+    "hosted_qualified": false,
+    "merged": false,
+    "remaining": [
+      "Publish one reviewed replacement and require four exact-head green checks.",
+      "Refresh review threads and classify every additional failure; retain original failures as failures.",
+      "Known trusted authorization/evidence setup, attestation-only Kani and operational readiness remain disclosed. Additional weights proof still needs ordinary CI evidence or explicit user disposition.",
+      "Report final candidate and results to the user and Claude; await user merge authorization."
+    ]
+  }
+}
