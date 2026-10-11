@@ -14,7 +14,9 @@ import re
 import shlex
 import shutil
 import subprocess
+import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import clock
@@ -80,21 +82,103 @@ def slots_for(build_class: str, count: int) -> list[int]:
     return list(range(1, count))
 
 
-def acquire(slots: int | list[int], *, poll: float = 5.0, timeout: float | None = None) -> tuple[int, int, float]:
-    """Block until one of `slots` is free. Returns (fd, slot, seconds waited)."""
-    candidates = list(range(slots)) if isinstance(slots, int) else list(slots)
-    started = time.monotonic()
-    while True:
-        for slot in candidates:
-            fd = os.open(slot_dir() / f"slot-{slot}.lock", os.O_RDWR | os.O_CREAT, 0o644)
+@contextmanager
+def _queue_guard(queue: Path):
+    """Serialize ticket registration and scanning, never polling or builds."""
+    queue.mkdir(parents=True, exist_ok=True)
+    fd = os.open(queue / "guard.lock", os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _live_tickets(queue: Path) -> list[Path]:
+    """Called under the queue guard. A closed owner's flock marks a stale ticket."""
+    live = []
+    for path in sorted(queue.glob("ticket-*.lock")):
+        try:
+            fd = os.open(path, os.O_RDWR)
+        except FileNotFoundError:
+            continue
+        try:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                return fd, slot, time.monotonic() - started
             except BlockingIOError:
-                os.close(fd)
-        if timeout is not None and time.monotonic() - started >= timeout:
-            raise TimeoutError(f"no build slot free after {timeout:.0f}s")
-        time.sleep(poll)
+                live.append(path)
+            else:
+                path.unlink(missing_ok=True)
+        finally:
+            os.close(fd)
+    return live
+
+
+def _remove_ticket(path: Path, fd: int) -> None:
+    """Called under the queue guard; closing also releases the owner's flock."""
+    try:
+        path.unlink(missing_ok=True)
+    finally:
+        os.close(fd)
+
+
+def _join_queue(queue: Path) -> tuple[int, Path]:
+    with _queue_guard(queue):
+        live = _live_tickets(queue)
+        position = max((int(path.name.split("-", 2)[1]) for path in live), default=-1) + 1
+        fd, name = tempfile.mkstemp(prefix=f"ticket-{position:020d}-", suffix=".lock", dir=queue)
+        path = Path(name)
+        # Creation and initial flock share the scanner's guard, so the fresh
+        # file cannot be mistaken for an abandoned ticket between these calls.
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BaseException:
+            _remove_ticket(path, fd)
+            raise
+        return fd, path
+
+
+def acquire(
+    slots: int | list[int], *, poll: float = 5.0, timeout: float | None = None, build_class: str = "coder",
+) -> tuple[int, int, float]:
+    """Take a FIFO turn in this class, then a free slot. Returns (fd, slot, seconds waited)."""
+    if build_class not in CLASSES:
+        raise BuildRefused(f"build class must be one of {', '.join(CLASSES)}")
+    candidates = list(range(slots)) if isinstance(slots, int) else list(slots)
+    started = time.monotonic()
+    folder = slot_dir()
+    queue = folder / f"queue-{build_class}"
+    ticket_fd, ticket = _join_queue(queue)
+    try:
+        while True:
+            with _queue_guard(queue):
+                live = _live_tickets(queue)
+                if live and live[0] == ticket:
+                    for slot in candidates:
+                        fd = os.open(folder / f"slot-{slot}.lock", os.O_RDWR | os.O_CREAT, 0o644)
+                        try:
+                            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        except BlockingIOError:
+                            os.close(fd)
+                            continue
+                        except BaseException:
+                            os.close(fd)
+                            raise
+                        try:
+                            _remove_ticket(ticket, ticket_fd)
+                        except BaseException:
+                            os.close(fd)
+                            raise
+                        finally:
+                            ticket_fd = None
+                        return fd, slot, time.monotonic() - started
+            if timeout is not None and time.monotonic() - started >= timeout:
+                raise TimeoutError(f"no build slot free after {timeout:.0f}s")
+            time.sleep(poll)
+    finally:
+        if ticket_fd is not None:
+            with _queue_guard(queue):
+                _remove_ticket(ticket, ticket_fd)
 
 
 def release(fd: int) -> None:
@@ -162,7 +246,7 @@ def run(
     except OSError:
         pass
     try:
-        fd, slot, waited = acquire(slots_for(build_class, slot_count()))
+        fd, slot, waited = acquire(slots_for(build_class, slot_count()), build_class=build_class)
     finally:
         waiting.unlink(missing_ok=True)
     record_wait(slot, waited, item, build_class)
