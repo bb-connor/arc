@@ -1,0 +1,105 @@
+{
+  "format_version": 1,
+  "observed_at": "2026-10-11T00:20:31.380950+00:00",
+  "source_repair": "2deed48089fb5476b20a68b0c47d2fbc198b878f",
+  "producer": "2da16592138a4e2f87033b10838c77c17ad840d1",
+  "production_delta": {
+    "path": "crates/core/chio-core-types/src/crypto/encoding.rs",
+    "sha256": "f8a6ea7a4c100cfbcb635a2585c547f79475440c758990760cc49172196a0f54",
+    "lines_added": 21,
+    "lines_removed": 7,
+    "contract": "Build one checked-capacity owned String directly from shared checked ASCII hex pairs. Preserve borrowed output, lowercase wire bytes and non-ASCII compatibility fallback."
+  },
+  "original": {
+    "source": "4339c98366b5b5e5276e7777db0ebb149871346e",
+    "job": 114331336734,
+    "url": "https://github.com/bb-connor/arc/actions/runs/38092396816/job/114331336734",
+    "exit": 124,
+    "log_sha256": "a06db96553c602d3f54c8a1935bfb01901a37ac423ff5584c9232233c5075cad",
+    "diagnosis": "Hex fill completed in about1.75s; UTF8 validation still unwound after29min. No solver verdict. Preserve this failed campaign."
+  },
+  "independent_review": {
+    "reviewer": "Claude",
+    "mailbox_entry": "2026-10-10T23:44:54Z",
+    "disposition": "LAND, conditional on strict and compatibility checks; satisfied by exact producer bytes."
+  },
+  "ordinary_owning_qualification": {
+    "source": "2da16592138a4e2f87033b10838c77c17ad840d1",
+    "passed": 614,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 28,
+    "focused_wire_oracles_passed": 3,
+    "strict_all_targets": "pass",
+    "no_default_library_check": "pass",
+    "handoff_path": "/tmp/pr1160-hex-encoder-direct-index-20261010/HANDOFF.json",
+    "handoff_sha256": "3d47fd618cf68d78349eea7878fe4b50dfc033ad7aadacc2b2993a515add1e88",
+    "all_targets_log_sha256": "cc6ce33b830a4a9d0765f343c8e6e9956d32c4658d20195951a63c6baf518127",
+    "strict_log_sha256": "fb5135a61ee381179ce6a120d56508e349d27f3c16d1bd27f196818370c0587e"
+  },
+  "composed_downstream_qualification": {
+    "source": "2deed48089fb5476b20a68b0c47d2fbc198b878f",
+    "kernel_core_passed": 152,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 11,
+    "kernel_core_log_sha256": "74787a94a98b1f88739a42b081902004a690c0d82b1ad0cd1bf46fa2f2b6d2e2",
+    "strict_core_types_and_kernel_core_log_sha256": "802204ff95608a49f6e18c7a30e881698502a5ff1ea7e071e63c90825410c8c2",
+    "source_stable": true
+  },
+  "focused_proof": {
+    "source": "2da16592138a4e2f87033b10838c77c17ad840d1",
+    "harness": "kani_public_harnesses::public_sign_receipt_refuses_content_hash_mismatch",
+    "kani_version": "0.68.0",
+    "cbmc_version": "6.11.0",
+    "target": "aarch64-unknown-linux-gnu",
+    "unchanged_harness_unwind": 66,
+    "unchanged_public_key_equality_bound": 8,
+    "unchanged_timeout_seconds": 1800,
+    "safety_success": 5608,
+    "safety_unreachable": 388,
+    "safety_failed": 0,
+    "completion_cover_satisfied": 1,
+    "unwinding_checks_successful": 2,
+    "verification_seconds": 154.75844,
+    "exit": 0,
+    "source_stable": true,
+    "log_sha256": "6bec0ccdbbee45f6e1788488cbc6a669d65c9819b0f9b3f92598f2e39bdd69a9",
+    "result_sha256": "44fb27569c4ee0a33c3dc06baa5d4b23a7a418655a71ec6c2e6280d5fe2d9f0e",
+    "evidence_path": "/tmp/pr1160-ci-batch-20261010/receipt-proof-2da165-integrator",
+    "command": [
+      "/home/connor/.cache/pr1160-kani-private-20261008/kani-0.68.0/bin/kani-driver",
+      "kani",
+      "-p",
+      "chio-kernel-core",
+      "--lib",
+      "--harness",
+      "kani_public_harnesses::public_sign_receipt_refuses_content_hash_mismatch",
+      "--exact",
+      "--features",
+      "kani",
+      "-Z",
+      "unstable-options",
+      "--export-json",
+      "/tmp/chio-kani-cover.7NdLXxpS/result.json",
+      "--cbmc-args",
+      "--unwindset",
+      "_RNvXs0_NtCs7BcABCiFYCN_15chio_core_types6cryptoNtB5_9PublicKeyNtNtCsaaB9n4LsQ0N_4core3cmp9PartialEq2eq:8"
+    ]
+  },
+  "preserved_scope": [
+    "No proof-domain, assumption, harness, bound, timeout or checker change.",
+    "No unsafe code, lint waiver, dependency addition or extra owned encoding allocation.",
+    "Native focused proof is not a completed hosted Kani campaign or closure of broader KANI-PROOF-QUAL.",
+    "The first queued attempt was cancelled before executing a verifier and is retained separately."
+  ],
+  "generated_metadata": "Only the encoding source digest and aggregate input digest change in docs/formal/COVERAGE.md. No coverage count or proof status changes.",
+  "remaining_acceptance": [
+    "Exact-head hosted qualification of the frozen replacement batch.",
+    "All failures classified, review feedback answered, and a new explicit Connor merge go-ahead."
+  ],
+  "broader_kani_proof_qualification": "OPEN/UNPROVED",
+  "published": false,
+  "merged": false,
+  "release_ready": false
+}
