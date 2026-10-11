@@ -8,6 +8,7 @@ const SERVICE_TOKEN: &str = "keyring-trust-service-token";
 const LISTENING: &str = "Chio trust control service listening";
 const SNAPSHOT_BUILDING: &str = "receipt_query_snapshot_building";
 const STARTUP_WINDOW: Duration = Duration::from_secs(120);
+const MAX_RESPONSE_BYTES: usize = 64 * 1024;
 
 #[test]
 fn keyring_trust_service_starts_and_serves_admin_receipt_reads() -> TestResult {
@@ -83,21 +84,38 @@ fn keyring_trust_service_starts_and_serves_admin_receipt_reads() -> TestResult {
 }
 
 fn admin_receipt_query(port: u16, deadline: Instant) -> TestResult<String> {
-    let remaining = deadline
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    let mut stream = TcpStream::connect_timeout(&address, remaining(deadline)?)?;
+    let request = format!(
+        "GET /v1/receipts/query HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {SERVICE_TOKEN}\r\nConnection: close\r\n\r\n"
+    );
+    stream.set_write_timeout(Some(remaining(deadline)?))?;
+    stream.write_all(request.as_bytes())?;
+    let mut response = Vec::new();
+    let mut chunk = [0_u8; 4096];
+    loop {
+        stream.set_read_timeout(Some(remaining(deadline)?))?;
+        let read = stream.read(&mut chunk)?;
+        if read == 0 {
+            break;
+        }
+        if response.len() + read > MAX_RESPONSE_BYTES {
+            return Err(
+                format!("admin receipt response exceeds {MAX_RESPONSE_BYTES} bytes").into(),
+            );
+        }
+        response.extend_from_slice(&chunk[..read]);
+    }
+    // A response completed after the deadline is not accepted.
+    remaining(deadline)?;
+    Ok(String::from_utf8(response)?)
+}
+
+fn remaining(deadline: Instant) -> TestResult<Duration> {
+    deadline
         .checked_duration_since(Instant::now())
         .filter(|remaining| !remaining.is_zero())
-        .ok_or("admin receipt query deadline elapsed")?;
-    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-    let mut stream = TcpStream::connect_timeout(&address, remaining)?;
-    stream.set_read_timeout(Some(remaining))?;
-    stream.set_write_timeout(Some(remaining))?;
-    write!(
-        stream,
-        "GET /v1/receipts/query HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {SERVICE_TOKEN}\r\nConnection: close\r\n\r\n"
-    )?;
-    let mut response = String::new();
-    stream.read_to_string(&mut response)?;
-    Ok(response)
+        .ok_or_else(|| "admin receipt query deadline elapsed".into())
 }
 
 fn building_retry_after(response: &str) -> Option<Duration> {
