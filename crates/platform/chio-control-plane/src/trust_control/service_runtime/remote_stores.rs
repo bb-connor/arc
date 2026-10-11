@@ -33,7 +33,7 @@ pub fn build_remote_receipt_store(
 /// a blocking write parked far past the hot path's budget. The pool bounds that
 /// wait and the number of parked writes; a write it cannot answer within
 /// `budget` fails closed as a receipt-store `Timeout`.
-fn run_receipt_write<F, T>(
+pub(super) fn run_receipt_write<F, T>(
     writer: &BoundedWorkerPool,
     budget: std::time::Duration,
     operation: &str,

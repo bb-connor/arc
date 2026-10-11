@@ -932,6 +932,40 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
     cvar.notify_all();
 }
 
+#[test]
+fn queued_remote_receipt_write_is_skipped_after_its_budget() {
+    use crate::bounded_worker_pool::tests::{drain, park_the_worker};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let writer = Arc::new(crate::bounded_worker_pool::BoundedWorkerPool::new(1, 1));
+    let (release, caller) = park_the_worker(&writer);
+    let wrote = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&wrote);
+
+    let result = super::super::remote_stores::run_receipt_write(
+        &writer,
+        std::time::Duration::from_millis(250),
+        "queued write",
+        move || {
+            observed.store(true, Ordering::SeqCst);
+            Ok(())
+        },
+    );
+    assert!(
+        matches!(result, Err(chio_kernel::ReceiptStoreError::Timeout { .. })),
+        "a queued write must fail closed at its budget, got {result:?}"
+    );
+
+    release.send(()).test_unwrap();
+    caller.join().test_unwrap();
+    drain(&writer);
+    assert!(
+        !wrote.load(Ordering::SeqCst),
+        "a write dequeued after its budget must not reach the control plane"
+    );
+}
+
 fn sample_capability_token() -> chio_core::capability::token::CapabilityToken {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
