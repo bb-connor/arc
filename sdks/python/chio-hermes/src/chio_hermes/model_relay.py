@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import secrets
 import ssl
@@ -9,10 +10,12 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from typing import Any
 
 import certifi
+
+from .model_relay_limits import BoundedRelayServer, DeadlineReader, EvidenceLog, RelayLimits
 
 
 def validate_request(body: Any, model: str, tool_names: set[str]) -> None:
@@ -220,11 +223,15 @@ def validate_responses_request(body: Any, model: str, tool_names: set[str]) -> l
 class ModelRelay:
     """The model key stays in this unsandboxed operator process, never the host."""
 
-    def __init__(self, api_key: str | CodexSubscription, model: str, tool_names: set[str], max_requests: int = 100, on_tool_results=None) -> None:
+    def __init__(self, api_key: str | CodexSubscription, model: str, tool_names: set[str], max_requests: int = 100, on_tool_results=None, *, limits: RelayLimits | None = None) -> None:
         self.token = secrets.token_hex(32)
-        self.events: list[dict[str, Any]] = []
-        self._admission = threading.Lock()
+        limits = limits or RelayLimits()
+        self._admission = threading.RLock()
+        self._evidence = EvidenceLog(limits, self._admission)
         self._remaining = max_requests
+        self._closed = False
+        self._finalized = False
+        self._capture_ready = False
         owner = self
         subscription = isinstance(api_key, CodexSubscription)
         self.api_mode = "codex_responses" if subscription else "chat_completions"
@@ -233,12 +240,29 @@ class ModelRelay:
         tls_context = ssl.create_default_context(cafile=certifi.where())
 
         class Handler(BaseHTTPRequestHandler):
+            def setup(self) -> None:
+                super().setup()
+                self.deadline = owner.server.deadline(self.connection)
+                self.rfile.close()
+                self.rfile = io.BufferedReader(DeadlineReader(self.connection, self.deadline))
+
             def log_message(self, *_args: Any) -> None:
                 pass
 
+            def refuse(self, status: int) -> None:
+                body = b'{"error":{"message":"Model relay refused this request"}}'
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
             def do_POST(self) -> None:
                 event: dict[str, Any] = {"method": "POST", "path": self.path, "forwarded": False}
-                owner.events.append(event)
+                index = owner._evidence.begin(event)
+                if index is None:
+                    self.refuse(503)
+                    return
                 headers_sent = False
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
@@ -248,15 +272,23 @@ class ModelRelay:
                             or not 0 < length <= 8 * 1024 * 1024):
                         raise ValueError("route or authentication refused")
                     raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("incomplete model request body")
                     body = json.loads(raw)
                     if subscription:
                         observations = validate_responses_request(body, model, tool_names)
                     else:
                         validate_request(body, model, tool_names)
                         observations = body["messages"]
+                    # Header/body cancellation ends only after the complete
+                    # validated request, before delivery or paid/provider work.
+                    self.deadline.finish()
+                    self.connection.settimeout(limits.request_seconds)
+                    owner._assert_open()
                     if on_tool_results:
                         on_tool_results(observations)
                     with owner._admission:
+                        owner._assert_open()
                         if owner._remaining <= 0:
                             raise ValueError("model request budget exhausted")
                         owner._remaining -= 1
@@ -274,13 +306,21 @@ class ModelRelay:
                         headers["Authorization"] = "Bearer " + api_key
                     request = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers=headers)
                     opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=tls_context))
-                    event["forwarded"] = True
+                    # Start and close share one admission lock. Once this edge
+                    # is admitted, close preserves the already-started request
+                    # and its paid unit through reconciliation.
+                    with owner._admission:
+                        owner._assert_open()
+                        event["forwarded"] = True
+                        owner._evidence.update(index, forwarded=True)
                     try:
                         upstream = opener.open(request, timeout=60)
                     except urllib.error.HTTPError as exc:
                         upstream = exc
                     with upstream:
                         event["upstream_status"] = upstream.status
+                        if not owner._evidence.update(index, upstream_status=upstream.status):
+                            raise ValueError("relay evidence capacity exhausted")
                         self.send_response(upstream.status)
                         self.send_header("Content-Type", upstream.headers.get("Content-Type", "application/json"))
                         self.end_headers()
@@ -288,27 +328,69 @@ class ModelRelay:
                         while chunk := upstream.read1(65536):
                             self.wfile.write(chunk)
                             self.wfile.flush()
-                except (ValueError, OSError, urllib.error.URLError) as exc:
-                    event["error_type"] = type(exc).__name__
+                except BaseException as exc:
+                    fields: dict[str, Any] = {"error_type": type(exc).__name__}
                     if isinstance(exc, ValueError):
-                        event["reason"] = str(exc)
+                        fields["reason"] = str(exc)
                     if isinstance(exc, urllib.error.URLError):
-                        event["reason"] = str(exc.reason)
+                        fields["reason"] = str(exc.reason)
+                    retained = owner._evidence.update(index, **fields)
+                    if not isinstance(exc, Exception):
+                        raise
                     if not headers_sent:
-                        self.send_response(502 if event["forwarded"] else 403)
-                        self.end_headers()
-                        self.wfile.write(b'{"error":{"message":"Model relay refused this request"}}')
+                        status = 503 if not retained or owner._evidence.exhausted else 502 if event["forwarded"] else 403 if isinstance(exc, (ValueError, OSError)) else 500
+                        try:
+                            self.refuse(status)
+                        except OSError as delivery_error:
+                            owner._evidence.update(index, delivery_error_type=type(delivery_error).__name__)
+                finally:
+                    owner._evidence.finish(index)
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server = BoundedRelayServer(("127.0.0.1", 0), Handler, limits)
         self.base_url = f"http://127.0.0.1:{self.server.server_port}/v1"
 
+    def _assert_open(self) -> None:
+        with self._admission:
+            if self._closed or self._evidence.exhausted:
+                raise ValueError("relay evidence capacity exhausted or relay closed")
+
+    @property
+    def events(self) -> list[dict[str, Any]]:
+        return self._evidence.snapshot()
+
+    @property
+    def evidence_complete(self) -> bool:
+        with self._admission:
+            return self._evidence.complete and (not self._closed or self._capture_ready)
+
     def __enter__(self) -> ModelRelay:
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self._server_thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self._server_thread.start()
         return self
 
     def __exit__(self, *_args: Any) -> None:
+        self.finalize_capture()
+
+    def finalize_capture(self) -> bool:
+        """Close admission, cancel inbound readers and drain for at most one second.
+
+        Already-started provider requests keep their paid unit and handler
+        permit. If they remain, the saved capture is explicitly incomplete.
+        """
+        with self._admission:
+            if self._finalized:
+                return self.evidence_complete
+            self._finalized = True
+            self._closed = True
+        self.server.stop_readers()
         self.server.shutdown()
         self.server.server_close()
+        self._server_thread.join(timeout=1)
+        if not self.server.drain(1):
+            self._evidence.mark_incomplete()
+        with self._admission:
+            self._capture_ready = True
+        return self.evidence_complete
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

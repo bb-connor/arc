@@ -1,11 +1,12 @@
 """Real process lifecycle regression; this is not native-host acceptance."""
 import json
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
 import time
+from pathlib import Path
+
 import pytest
 
 

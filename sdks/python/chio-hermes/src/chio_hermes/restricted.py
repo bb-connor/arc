@@ -453,12 +453,13 @@ def main() -> int:
                 command, env, workspace = prepare(args)
                 try:
                     host_code, interrupted = run_host(command, env, workspace)
+                    relay.finalize_capture()
                     private = _private_json(args.gateway_config.absolute())
                     records = [_private_json(path) for path in Path(private["journalDir"]).glob("*.json")]
                     unresolved = any(record.get("state") in ["pending", "unknown"] or record.get("state") == "completed" and (not record.get("acknowledged") or not record.get("hostDeliveryConfirmed")) for record in records)
                     pending = any(record.get("state") == "awaiting_approval" for record in records)
                     unsuccessful = any(record.get("state") in ["denied", "not_dispatched"] or record.get("outcome", {}).get("result", {}).get("isError") is True for record in records)
-                    unresolved |= "unknown" in gateway.outcomes.values()
+                    unresolved |= "unknown" in gateway.outcomes.values() or not relay.evidence_complete
                     pending |= "awaiting_approval" in gateway.outcomes.values()
                     unsuccessful |= any(value in ["denied", "not_dispatched"] for value in gateway.outcomes.values())
                     outcome = "unresolved" if unresolved else "awaiting_approval" if pending else "protected_work_incomplete" if unsuccessful else "cancelled" if interrupted else "completed" if host_code == 0 else "host_failed"

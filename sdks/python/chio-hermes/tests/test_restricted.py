@@ -197,3 +197,52 @@ def test_launcher_evidence_write_refuses_a_planted_directory(tmp_path: Path) -> 
 
     with pytest.raises(OSError):
         restricted._write_state_file(state, "model-relay.json", "[]\n")
+
+
+@pytest.mark.parametrize("complete,expected", [(False, 2), (True, 0)])
+def test_launcher_terminal_requires_finalized_complete_model_capture(
+    launch_args: argparse.Namespace, monkeypatch: pytest.MonkeyPatch, complete: bool, expected: int,
+) -> None:
+    launch_args.state_dir.mkdir(mode=0o700)
+    finalized = []
+
+    class Gateway:
+        url, token = "http://fixture/mcp", "fixture-gateway-token"
+        events, outcomes = [], {}
+
+        def __init__(self, *_args):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def receive_host_results(self, _observations):
+            pass
+
+    class Relay(Gateway):
+        base_url, token, api_mode = "http://fixture/v1", "fixture-relay-token", "chat_completions"
+        evidence_complete = complete
+        events = [] if complete else [{"event": "capture_incomplete", "forwarded": False}]
+
+        def finalize_capture(self):
+            finalized.append(True)
+            return complete
+
+    argv = ["chio-hermes-restricted", "--model", launch_args.model, "--model-key-env", "TEST_MODEL_KEY"]
+    for name in ["host_python", "host_root", "node", "gateway_script", "gateway_config", "state_dir", "query_file"]:
+        argv += ["--" + name.replace("_", "-"), str(getattr(launch_args, name))]
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(restricted, "GatewayTransport", Gateway)
+    monkeypatch.setattr(restricted, "ModelRelay", Relay)
+    monkeypatch.setattr(restricted, "prepare", lambda _args: (["fixture-host"], {}, launch_args.host_root))
+    monkeypatch.setattr(restricted, "run_host", lambda *_args: (0, None))
+    assert restricted.main() == expected
+    assert finalized == [True]
+    terminal = json.loads((launch_args.state_dir / "terminal.json").read_text())
+    assert terminal["exitCode"] == expected
+    assert terminal["hostExitCode"] == 0
+    assert terminal["outcome"] == ("completed" if complete else "unresolved")
+    assert json.loads((launch_args.state_dir / "model-relay.json").read_text()) == Relay.events
