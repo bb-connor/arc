@@ -86,7 +86,7 @@ pub enum CredentialError {
     Unreadable { name: String, reason: String },
     /// The credential is not a regular file.
     NotARegularFile(String),
-    /// The credential is readable by its group or by others.
+    /// The credential grants authority outside its permitted custody.
     Exposed(String),
     /// The credential exceeds [`MAX_CREDENTIAL_BYTES`].
     TooLarge(String),
@@ -170,13 +170,8 @@ pub fn load_credential(directory: &Path, name: &str) -> Result<String, Credentia
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::MetadataExt;
-        // SAFETY: geteuid only returns the calling process identity.
-        let uid = unsafe { libc::geteuid() };
-        if metadata.nlink() != 1
-            || (metadata.uid() != uid || metadata.mode() & 0o077 != 0)
-                && !chio_secure_ipc::credentials::is_systemd_credential(&file, uid)
-                    .map_err(|error| unreadable(error.to_string()))?
+        if !credential_custody_is_private(&file, &metadata)
+            .map_err(|error| unreadable(error.to_string()))?
         {
             return Err(CredentialError::Exposed(name.to_string()));
         }
@@ -201,6 +196,46 @@ pub fn load_credential(directory: &Path, name: &str) -> Result<String, Credentia
         return Err(CredentialError::Padded(name.to_string()));
     }
     Ok(value.to_string())
+}
+
+/// Both delivery paths inspect the opened descriptor before accepting it.
+#[cfg(any(target_os = "linux", target_os = "android", target_vendor = "apple"))]
+pub(super) fn credential_custody_is_private(
+    file: &std::fs::File,
+    metadata: &std::fs::Metadata,
+) -> std::io::Result<bool> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    if metadata.nlink() != 1 {
+        return Ok(false);
+    }
+    // Darwin ACL authority is independent of the POSIX mode bits. A deny-only
+    // ACL is safe, but every allow or unknown entry must refuse custody.
+    #[cfg(target_vendor = "apple")]
+    if chio_keyring::darwin_descriptor_grants_extended_acl_authority(file)
+        .map_err(std::io::Error::other)?
+    {
+        return Ok(false);
+    }
+    let uid = rustix::process::geteuid().as_raw();
+    if metadata.uid() == uid && metadata.mode() & 0o077 == 0 {
+        return Ok(true);
+    }
+    chio_secure_ipc::credentials::is_systemd_credential(file, uid)
+}
+
+#[cfg(all(
+    unix,
+    not(any(target_os = "linux", target_os = "android", target_vendor = "apple"))
+))]
+pub(super) fn credential_custody_is_private(
+    _file: &std::fs::File,
+    _metadata: &std::fs::Metadata,
+) -> std::io::Result<bool> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "credential descriptor custody is unsupported on this platform",
+    ))
 }
 
 /// Resolve every binding against `directory`, refusing a variable that is

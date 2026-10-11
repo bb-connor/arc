@@ -43,13 +43,13 @@ mod unix {
     use std::fs::{File, OpenOptions};
     use std::io;
     use std::os::fd::AsRawFd;
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    use std::os::unix::fs::OpenOptionsExt;
     use std::os::unix::process::CommandExt;
     use std::path::Path;
     use std::process::Command;
 
     use super::{CredentialError, DescriptorCredentialBinding};
-    use crate::supervise::credentials::MAX_CREDENTIAL_BYTES;
+    use crate::supervise::credentials::{credential_custody_is_private, MAX_CREDENTIAL_BYTES};
 
     /// Open descriptors remain close-on-exec in the supervisor. Only the
     /// selected child clears that flag immediately before its exec transition.
@@ -86,12 +86,8 @@ mod unix {
                 if !metadata.is_file() {
                     return Err(CredentialError::NotARegularFile(binding.name.clone()));
                 }
-                // SAFETY: geteuid reads process identity and has no arguments.
-                let uid = unsafe { libc::geteuid() };
-                if metadata.nlink() != 1
-                    || (metadata.uid() != uid || metadata.mode() & 0o077 != 0)
-                        && !chio_secure_ipc::credentials::is_systemd_credential(&file, uid)
-                            .map_err(|error| unreadable(error.to_string()))?
+                if !credential_custody_is_private(&file, &metadata)
+                    .map_err(|error| unreadable(error.to_string()))?
                 {
                     return Err(unreadable("descriptor credential must be private, singly linked and owned by the service user".to_owned()));
                 }
