@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
@@ -461,6 +461,11 @@ impl GenericHttpsExecutor {
     }
 
     fn pin_destination(&self, request: &BrokerRequest) -> Result<PinnedDestination> {
+        let deadline = Instant::now()
+            .checked_add(Duration::from_millis(request.options.timeout_ms))
+            .ok_or_else(|| {
+                BrokerError::InvalidRequest("destination resolution deadline overflow".to_string())
+            })?;
         let destination = &request.destination;
         if self.exact_destination.as_ref().is_some_and(|(host, port)| {
             destination.scheme != BrokerScheme::Https
@@ -483,7 +488,7 @@ impl GenericHttpsExecutor {
             self.resolve_within(
                 &destination.normalized_host,
                 destination.explicit_port,
-                Duration::from_millis(request.options.timeout_ms),
+                deadline,
             )?
         };
         Ok(PinnedDestination {
@@ -492,11 +497,11 @@ impl GenericHttpsExecutor {
         })
     }
 
-    /// Resolve on a detached thread and wait at most the signed request
-    /// timeout. A stalled lookup keeps its slot until the resolver returns, so
-    /// the caller never waits past `timeout` and abandoned lookups never exceed
-    /// `MAX_RESOLUTIONS_IN_FLIGHT`.
-    fn resolve_within(&self, host: &str, port: u16, timeout: Duration) -> Result<Vec<IpAddr>> {
+    /// Resolve on a detached thread and accept only a result observed before
+    /// the absolute `deadline`, which already includes slot acquisition and
+    /// thread setup. A stalled lookup keeps its slot until the resolver
+    /// returns, so abandoned lookups never exceed `MAX_RESOLUTIONS_IN_FLIGHT`.
+    fn resolve_within(&self, host: &str, port: u16, deadline: Instant) -> Result<Vec<IpAddr>> {
         let slot = ResolutionSlot::acquire(&self.resolutions_in_flight)?;
         let resolver = Arc::clone(&self.resolver);
         let host = host.to_string();
@@ -508,15 +513,27 @@ impl GenericHttpsExecutor {
                 let _ = sender.send(resolver.resolve(&host, port).map_err(BrokerError::redacted));
             })
             .map_err(|_| BrokerError::Upstream("destination resolution failed".to_string()))?;
-        match receiver.recv_timeout(timeout) {
-            Ok(resolved) => resolved,
-            Err(RecvTimeoutError::Timeout) => Err(BrokerError::Upstream(
-                "destination resolution timed out".to_string(),
-            )),
-            Err(RecvTimeoutError::Disconnected) => Err(BrokerError::Upstream(
-                "destination resolution failed".to_string(),
-            )),
-        }
+        let received = receiver.recv_timeout(deadline.saturating_duration_since(Instant::now()));
+        accept_resolution(received, Instant::now(), deadline)
+    }
+}
+
+/// Accepts a resolver answer only when it was observed before `deadline`; an
+/// answer that arrives at or after it is refused like a lookup that never
+/// returned.
+fn accept_resolution(
+    received: std::result::Result<Result<Vec<IpAddr>>, RecvTimeoutError>,
+    observed_at: Instant,
+    deadline: Instant,
+) -> Result<Vec<IpAddr>> {
+    match received {
+        Ok(resolved) if observed_at < deadline => resolved,
+        Ok(_) | Err(RecvTimeoutError::Timeout) => Err(BrokerError::Upstream(
+            "destination resolution timed out".to_string(),
+        )),
+        Err(RecvTimeoutError::Disconnected) => Err(BrokerError::Upstream(
+            "destination resolution failed".to_string(),
+        )),
     }
 }
 
@@ -1339,6 +1356,36 @@ mod tests {
             Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
         ));
         drop(release);
+    }
+
+    #[test]
+    fn a_resolution_observed_at_or_after_its_deadline_is_refused() {
+        let answer = || Ok(vec!["93.184.216.34".parse().test_expect("address")]);
+        let observed_at = Instant::now();
+        let deadline = observed_at + Duration::from_millis(1);
+        assert_eq!(
+            accept_resolution(Ok(answer()), observed_at, deadline).test_expect("on time"),
+            vec!["93.184.216.34".parse::<IpAddr>().test_expect("address")]
+        );
+        for late in [deadline, deadline + Duration::from_millis(1)] {
+            assert!(matches!(
+                accept_resolution(Ok(answer()), late, deadline),
+                Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
+            ));
+        }
+    }
+
+    #[test]
+    fn an_answer_after_the_absolute_resolution_deadline_fails_closed() {
+        let executor = executor(
+            ResponseMode::Valid,
+            vec!["93.184.216.34".parse().test_expect("address")],
+        );
+        let spent_before_setup = Instant::now();
+        assert!(matches!(
+            executor.resolve_within("example.com", 443, spent_before_setup),
+            Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
+        ));
     }
 
     #[test]
