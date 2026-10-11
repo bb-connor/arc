@@ -115,6 +115,11 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs",
         symbols: &[
+            "Record",
+            "Record::format",
+            "Record::bytes",
+            "Record::validate",
+            "load_local",
             "latest",
             "verify_reference",
         ],
@@ -122,7 +127,34 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs",
         symbols: &[
-            "visit",
+            "Fingerprint",
+            "fingerprint",
+            "Current::fingerprints",
+            "read",
+            "write",
+            "stored",
+            "keyframe",
+            "added",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs",
+        symbols: &[
+            "Tombstone",
+            "Delta",
+            "Delta::validate",
+            "within_budget",
+            "charge",
+            "added_digest",
+            "Image",
+            "Image::insert",
+            "Image::remove",
+            "Image::verify",
+            "Chain",
+            "Chain::start",
+            "Chain::apply",
+            "image",
+            "plan",
         ],
     },
     RequiredSource {

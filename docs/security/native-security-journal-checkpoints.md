@@ -151,3 +151,5 @@ byte-capacity recovery and the durable authority classes that cannot be deleted.
 Under owner decision 0020 this blocks G5 outside-team preview, while the bounded
 foundation may land after its remaining qualification gates. No production or
 unlimited-capacity claim follows from this repair.
+
+The checkpoint entries in `formal/proof-manifest.toml` are source review anchors. They track changes to the wire record, authenticated row readers and writers, delta validation and folding, and seal planning. The drop-guard model does not prove these storage, migration, reconstruction-cost or cryptographic properties. The compatibility, corruption, growth and restart tests above provide executable evidence for the stated boundaries.

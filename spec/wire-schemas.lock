@@ -3470,6 +3470,11 @@ files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/securi
 first_seen = "de519d7776"
 
 [[schema]]
+value = "chio.native-security-checkpoint.v2"
+files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs"]
+first_seen = "662908fa0c"
+
+[[schema]]
 value = "chio.native-security-egress.v1"
 files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs"]
 first_seen = "7e54c14a60"
