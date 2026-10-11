@@ -1,0 +1,96 @@
+{
+  "schema": "chio.security.review2-tree-qualification.v1",
+  "observed_utc": "2026-10-11T01:33:59.541140+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-021"
+  ],
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "private_stage": "6495756a990b6cfd97e88227d26ef96e4a9ecd1b",
+  "producer": "0c9bd6ac431c7bc48a18d7f399de2725a87dde1e",
+  "files": [
+    "scripts/run-security-execution-container.py",
+    "scripts/tests/run-security-execution-container.test.py",
+    "scripts/tests/check-broker-helper-lifetime.test.py"
+  ],
+  "source_sha256": {
+    "scripts/run-security-execution-container.py": "bb20414e75a5ba5e34dce282b03c6675462631ad415b2849f5e4b1551543e954",
+    "scripts/tests/run-security-execution-container.test.py": "ffb69cd348186ccbf0cb2411e52c0d0d7fd7b1e7c1c891bea8a453ec0aeee885",
+    "scripts/tests/check-broker-helper-lifetime.test.py": "fdb24b8b8e1987d224474035fbcec9612dc87f2ec1cb3c50729acb194249f4f7"
+  },
+  "source_repair": {
+    "integration_commits": [
+      "8007cfafd9e8cc93f3a85225cc8dc324cd779937",
+      "4216097b80504295dbd9ea2087a887e398b2a12d",
+      "c7fba901ae08349cc891f121ea6d88380d3738ec",
+      "42a9a8ac594ca2c94703b99160c08198e5657f9b",
+      "a83d615842aab99d05f34f53c46bdb9dcc85f431",
+      "48fdf54cec6bdeaffea2ecf2a74f61e145a15567",
+      "83f4a1677f3916460549a9557ec4d5ced86953fa"
+    ],
+    "contract": "Count at most 100000 tree entries and retain at most 12 MiB of tree output. One monotonic 120-second deadline covers reading and terminal wait. Overflow and timeout kill/reap the child; pipe closure runs even on cleanup failure."
+  },
+  "original": [
+    {
+      "source": "974f22914bd339a62933831650c3d55dbaf76987",
+      "result": "Genuine assertion failure: eight empty-file entries accepted against a patched cap of seven.",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c4-copy-bounds/base-runner-RED.log",
+        "sha256": "040d0e87cbe39753ce642fd8fae86e9c3d42d0bdf6856a2dd81d7f6af1bba925"
+      }
+    },
+    {
+      "source": "5e8e680c2113f7039631866b905b33a769b558dd",
+      "result": "Review rejected the initial repair: blocking pipe read lost the previous timeout; the bounded control hit its 30-second fuse.",
+      "evidence": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c4-copy-bounds/stalled-pipe-RED-5e8e680c21.log",
+        "sha256": "e8fa490ba8d049274f7026d0138e5939e507fd1545d583d87472a09cf2b4d00a"
+      }
+    }
+  ],
+  "green": [
+    {
+      "command": "python3 scripts/tests/run-security-execution-container.test.py",
+      "exit": 0,
+      "evidence": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-tree-final/runner.log",
+        "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+      }
+    },
+    {
+      "command": "python3 scripts/tests/check-broker-helper-lifetime.test.py",
+      "exit": 0,
+      "evidence": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-tree-final/helper-lifetime.log",
+        "sha256": "d56aea3a002edcde172fa9a80d7b1fa311c2b860df8c503079c49058849be5d0"
+      }
+    },
+    {
+      "command": "python3 scripts/check-security-ci-contract.py",
+      "exit": 0,
+      "evidence": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-tree-final/contract-normalized-mode.log",
+        "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      }
+    }
+  ],
+  "local_setup_failure": {
+    "reason": "Cherry-pick inherited workstation umask and produced 0775 local executable files. Normalizing to the tracked required 0755 fixed the metadata refusal; no committed mode or verifier was relaxed.",
+    "evidence": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-tree-final/contract.log",
+      "sha256": "830f49e008ef9594bc7440e50091ca1612558d38dc0b0d4b7f2f5bf527f7ad1d"
+    }
+  },
+  "review": "Root found the timeout regression, reviewed the correction and terminal cleanup, and compared all three final source files with the reviewed Claude train.",
+  "qualification_limits": [
+    "The runner suite uses bounded local fixtures and fake container commands. It does not establish native container isolation or trusted Linux capture.",
+    "The two initial failures and local executable-mode refusal remain recorded, not relabeled as passing campaigns."
+  ],
+  "remaining_acceptance": [
+    "Finish exact structural mutation suite on the isolated combined candidate.",
+    "Complete all confirmed review repairs and four green required checks on the published replacement.",
+    "Classify other workflow failures, answer reviews and obtain explicit Connor merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
