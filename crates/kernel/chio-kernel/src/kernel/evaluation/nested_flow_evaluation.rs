@@ -1501,7 +1501,7 @@ impl ChioKernel {
             .deadlines
             .dispatch_budget_for(&request.server_id);
         let tool_output_result = self
-            .timed_dispatch(async {
+            .timed_dispatch(durable_admission.as_ref(), async {
                 match dispatch_budget {
                     Some(budget) => {
                         crate::kernel::dispatch::dispatch_nested_call_within_budget(

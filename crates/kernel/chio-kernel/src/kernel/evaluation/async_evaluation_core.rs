@@ -1756,13 +1756,14 @@ impl ChioKernel {
                 admission.operation(),
             );
         }
+        let dispatch = self.dispatch_resolved_server_within_budget(
+            server,
+            request,
+            has_monetary,
+            dispatch_context,
+        );
         let dispatch_result = self
-            .timed_dispatch(self.dispatch_resolved_server_within_budget(
-                server,
-                request,
-                has_monetary,
-                dispatch_context,
-            ))
+            .timed_dispatch(durable_admission.as_ref(), dispatch)
             .await;
         if let Some(outcome) = security_dispatch_outcome.take() {
             match &dispatch_result {
@@ -1770,8 +1771,7 @@ impl ChioKernel {
                 Err(_) => outcome.record_outcome_unknown_after_dispatch()?,
             }
         }
-        // Keep the guard armed through credential commitment and return recording.
-        // A failure after tool execution preserves outcome uncertainty.
+        // Preserve outcome uncertainty through credential commitment and return recording.
         let ((tool_output, reported_cost), tool_elapsed) = match dispatch_result {
             Ok(timed) => {
                 if let Err(error) = credential_reservation.commit() {

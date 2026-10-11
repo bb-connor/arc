@@ -83,6 +83,7 @@ impl chio_security_types::clock::Clock for ClockOutageAfterDispatch {
 }
 
 struct ClockOutageServer {
+    stream: bool,
     unavailable: Arc<AtomicBool>,
     invocations: Arc<AtomicU64>,
 }
@@ -106,6 +107,21 @@ impl ToolServerConnection for ClockOutageServer {
         self.invocations.fetch_add(1, Ordering::SeqCst);
         self.unavailable.store(true, Ordering::SeqCst);
         Ok(serde_json::json!({"result": "ok"}))
+    }
+
+    async fn invoke_stream(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        if !self.stream {
+            return Ok(None);
+        }
+        self.invoke(tool_name, arguments, bridge).await?;
+        Ok(Some(ToolServerStreamResult::Complete(ToolCallStream {
+            chunks: Vec::new(),
+        })))
     }
 
     async fn invoke_with_cost(
@@ -139,7 +155,8 @@ fn non_durable_tool_keeps_its_signed_receipt_when_the_post_dispatch_clock_sample
         });
         let invocations = Arc::new(AtomicU64::new(0));
         kernel.register_tool_server(Box::new(ClockOutageServer {
-            unavailable,
+            stream: false,
+            unavailable: unavailable.clone(),
             invocations: invocations.clone(),
         }));
         let agent_kp = Keypair::generate();
@@ -164,6 +181,10 @@ fn non_durable_tool_keeps_its_signed_receipt_when_the_post_dispatch_clock_sample
         assert_eq!(invocations.load(Ordering::SeqCst), 1);
         let response = response?;
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+        assert!(
+            unavailable.load(Ordering::SeqCst),
+            "ordinary values need no post-dispatch clock read"
+        );
         assert!(response.receipt.verify_signature()?);
         let financial = response
             .receipt
@@ -178,6 +199,63 @@ fn non_durable_tool_keeps_its_signed_receipt_when_the_post_dispatch_clock_sample
             .ok_or("budget usage")?;
         assert_eq!(usage.invocation_count, 1);
         assert_eq!(usage.committed_cost_units()?, 75);
+    }
+    Ok(())
+}
+
+#[test]
+fn non_durable_stream_refuses_an_unmeasured_duration_after_dispatch(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for nested in [false, true] {
+        let mut kernel = make_kernel(make_config());
+        assert!(kernel.durable_admission_runtime.is_none());
+        let unavailable = Arc::new(AtomicBool::new(false));
+        kernel.clock = Arc::new(ClockOutageAfterDispatch {
+            inner: chio_test_support::clock::clock(),
+            unavailable: unavailable.clone(),
+        });
+        let invocations = Arc::new(AtomicU64::new(0));
+        kernel.register_tool_server(Box::new(ClockOutageServer {
+            stream: true,
+            unavailable: unavailable.clone(),
+            invocations: invocations.clone(),
+        }));
+        let agent = make_keypair();
+        let mut grant = make_grant("cost-srv", "compute");
+        grant.max_invocations = Some(1);
+        let cap = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+        let request = make_request("unmeasured-stream", &cap, "compute", "cost-srv");
+        let response = if nested {
+            let session = kernel.open_session(request.agent_id.clone(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent = make_operation_context(&session, "stream-parent", &request.agent_id);
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )?
+        } else {
+            kernel.evaluate_tool_call_blocking(&request)?
+        };
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(
+            !unavailable.load(Ordering::SeqCst),
+            "streams must measure duration"
+        );
+        assert!(response.output.is_none());
+        assert!(response.receipt.verify_signature()?);
+        assert!(response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("trusted clock unavailable")));
+        let usage = kernel
+            .budget_store
+            .get_usage(&cap.id, 0)?
+            .ok_or("captured usage")?;
+        assert_eq!(usage.invocation_count, 1);
     }
     Ok(())
 }
