@@ -658,9 +658,9 @@ assert_nonzero_bootstrap_accepted()
 SERIAL_FIXTURE_STEPS = (
     ("workspace-tests", "Workspace tests", "required CI workspace test evidence"),
     (
-        "build-lint",
+        "cognition-market",
         "cognition-market promoted-default build, clippy, and tests",
-        "required CI test and Loom evidence",
+        "required CI cognition market evidence",
     ),
     ("msrv", "MSRV workspace lane", "MSRV evidence"),
 )

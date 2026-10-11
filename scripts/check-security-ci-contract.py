@@ -1166,10 +1166,6 @@ EXPECTED_CI_EVIDENCE_STEPS = (
     ),
     ("Workspace build", "cargo build --workspace"),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
-    (
-        "cognition-market promoted-default build, clippy, and tests",
-        EXPECTED_PROMOTED_MARKET_RUN,
-    ),
     ("Wasm guards library tests", "cargo test -p chio-wasm-guards --lib"),
     (
         "Wasm guards Python SDK round-trip tests",
@@ -1200,28 +1196,32 @@ EXPECTED_CI_EVIDENCE_EXTRAS["Temporal security gate"] = {
     "env": EXPECTED_COMMON_CI_STEP_ENV,
     "shell": EXPECTED_TEMPORAL_STEP_SHELL,
 }
-EXPECTED_CI_EVIDENCE_EXTRAS[
-    "cognition-market promoted-default build, clippy, and tests"
-] = {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}
+PROMOTED_MARKET_STEP = "cognition-market promoted-default build, clippy, and tests"
 
 EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
     "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
 )
 
-# The required context accepts only the two unconditional producing jobs.
-BUILD_LINT_TEST_NEEDS = ("build-lint", "workspace-tests")
+# The required context accepts only the three unconditional producing jobs.
+BUILD_LINT_TEST_NEEDS = ("build-lint", "workspace-tests", "cognition-market")
+BUILD_LINT_TEST_PRODUCERS = (
+    ("build-lint", "Build and lint"),
+    ("workspace-tests", "Workspace tests"),
+    ("cognition-market", "Cognition market promoted default"),
+)
 EXPECTED_BUILD_LINT_TEST_JOB = {
     "name": "Build, lint, test",
     "if": "${{ always() }}",
     "needs": list(BUILD_LINT_TEST_NEEDS),
     "runs-on": "ubuntu-latest",
     "steps": [{
-        "name": "Require build, lint and workspace tests",
+        "name": "Require build, lint, workspace and cognition market tests",
         "run": (
             "set -euo pipefail\n"
             "test '${{ needs.build-lint.result }}' = success\n"
-            "test '${{ needs.workspace-tests.result }}' = success"
+            "test '${{ needs.workspace-tests.result }}' = success\n"
+            "test '${{ needs.cognition-market.result }}' = success"
         ),
     }],
 }
@@ -1271,6 +1271,13 @@ EXPECTED_WORKSPACE_TEST_SETUP = [
         "uses": "./.github/actions/enforced-native-fixture",
         "env": EXPECTED_COMMON_CI_STEP_ENV,
     },
+]
+
+# The promoted market suite builds Rust with protoc; it has no Python
+# validator-module, Node, Bun or native enforcement fixture dependency.
+EXPECTED_COGNITION_MARKET_SETUP = [
+    *EXPECTED_WORKSPACE_TEST_SETUP[:3],
+    {"uses": "Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32"},
 ]
 
 EXPECTED_KANI_STEP_EXTRAS = {
@@ -5280,7 +5287,7 @@ def validate_build_lint_test(ci: dict) -> None:
     }
     if observed != EXPECTED_BUILD_LINT_TEST_JOB:
         raise ContractError("Build, lint, test changes its exact fail-closed body")
-    for identifier, name in (("build-lint", "Build and lint"), ("workspace-tests", "Workspace tests")):
+    for identifier, name in BUILD_LINT_TEST_PRODUCERS:
         producer = job(ci, identifier)
         if (
             set(producer) != {"name", "runs-on", "timeout-minutes", "steps"}
@@ -5304,6 +5311,35 @@ def validate_build_lint_test(ci: dict) -> None:
         or test_steps[-1].get("name") != "Workspace tests"
     ):
         raise ContractError("workspace-tests changes its exact prerequisite steps or fixture adjacency")
+    market = job(ci, "cognition-market")
+    validate_exact_steps(
+        market,
+        ((PROMOTED_MARKET_STEP, EXPECTED_PROMOTED_MARKET_RUN),),
+        "required CI cognition market evidence",
+        {PROMOTED_MARKET_STEP: {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}},
+    )
+    market_steps = market.get("steps")
+    if (
+        not isinstance(market_steps, list)
+        or len(market_steps) != len(EXPECTED_COGNITION_MARKET_SETUP) + 1
+        or market_steps[:-1] != EXPECTED_COGNITION_MARKET_SETUP
+        or market_steps[-1].get("name") != PROMOTED_MARKET_STEP
+    ):
+        raise ContractError("cognition-market changes its exact prerequisite steps")
+    for identifier, body in workflow_jobs(ci).items():
+        if identifier == "cognition-market" or not isinstance(body, dict):
+            continue
+        for step in body.get("steps") or []:
+            if isinstance(step, dict) and (
+                step.get("name") == PROMOTED_MARKET_STEP
+                or (
+                    isinstance(step.get("run"), str)
+                    and "cargo test -p chio-control-plane --lib" in step["run"]
+                )
+            ):
+                raise ContractError(
+                    f"cognition market suite must run only in cognition-market: {identifier}"
+                )
 
 
 def validate_nonce_fips_contract(root: Path) -> None:

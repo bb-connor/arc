@@ -442,21 +442,6 @@ jobs:
           fi
           echo "OK: the qualified cognition market is linked into the default control plane"
 
-      - name: cognition-market promoted-default build, clippy, and tests
-        env:
-          CARGO_BUILD_JOBS: "1"
-          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
-          RUST_TEST_THREADS: "1"
-        run: |
-          umask 022
-          cargo build -p chio-control-plane -p chio-store-sqlite -p chio-open-market
-          cargo clippy -p chio-control-plane -p chio-store-sqlite -p chio-open-market -- -D warnings
-          cargo test -p chio-control-plane --lib
-          cargo test -p chio-store-sqlite
-          cargo test -p chio-open-market
-          cargo test -p chio-cli --bin chio finding
-          cargo test -p chio-finding -p chio-finding-verifier
-
       - name: Wasm guards library tests
         env:
           CARGO_BUILD_JOBS: "1"
@@ -540,20 +525,58 @@ jobs:
           RUST_TEST_THREADS: "1"
         run: cargo test --workspace --no-fail-fast --exclude chio-wasm-guards
 
-  # Keep the required context stable while its two complete suites run in parallel.
+  cognition-market:
+    name: Cognition market promoted default
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal --component rustfmt --component clippy
+          rustup show active-toolchain
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler ripgrep zstd
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: cognition-market promoted-default build, clippy, and tests
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          RUST_TEST_THREADS: "1"
+        run: |
+          umask 022
+          cargo build -p chio-control-plane -p chio-store-sqlite -p chio-open-market
+          cargo clippy -p chio-control-plane -p chio-store-sqlite -p chio-open-market -- -D warnings
+          cargo test -p chio-control-plane --lib
+          cargo test -p chio-store-sqlite
+          cargo test -p chio-open-market
+          cargo test -p chio-cli --bin chio finding
+          cargo test -p chio-finding -p chio-finding-verifier
+
+  # Keep the required context stable while its complete suites run in parallel.
   check:
     name: Build, lint, test
     if: ${{ always() }}
     needs:
       - build-lint
       - workspace-tests
+      - cognition-market
     runs-on: ubuntu-latest
     steps:
-      - name: Require build, lint and workspace tests
+      - name: Require build, lint, workspace and cognition market tests
         run: |
           set -euo pipefail
           test '${{ needs.build-lint.result }}' = success
           test '${{ needs.workspace-tests.result }}' = success
+          test '${{ needs.cognition-market.result }}' = success
 
   kani-public-pr:
     name: kani-public-pr (all lane=pr harnesses)
