@@ -11,7 +11,7 @@ use super::{
     write_broker_ipc_response, BrokerIpcDeadlineIo, BrokerIpcServeFailure, Instant,
     UnixBrokerEndpoint, UnixStream,
 };
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 use super::{BrokerIpcHandler, Ed25519Backend, Keypair, Write};
 
 /// A privileged preparation may retain one descriptor while the kernel performs
