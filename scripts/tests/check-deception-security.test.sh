@@ -72,6 +72,10 @@ materialize.extend(
     "materialize::unix::reader_boundary_tests::" + name
     for name in rust_tests("crates/security/chio-decoy/src/materialize.rs")
 )
+materialize.extend(
+    "materialize::concurrency_tests::" + name
+    for name in rust_tests("crates/security/chio-decoy/src/materialize/concurrency_tests.rs")
+)
 adapters_path = "crates/security/chio-security-kernel/tests/adapters.rs"
 adapters = rust_tests(adapters_path)
 adapters_source = (ROOT / adapters_path).read_text(encoding="utf-8")
@@ -249,8 +253,8 @@ for label, (expected_filtered, expected_inventory, expected_command) in expected
         )
 
 total = sum(len(inventory) for _, inventory, _ in calls.values())
-if total != 104:
-    raise SystemExit(f"deception exact inventory total changed: expected=104 observed={total}")
+if total != 107:
+    raise SystemExit(f"deception exact inventory total changed: expected=107 observed={total}")
 PY
 }
 
@@ -374,4 +378,4 @@ for mutant in "${work}"/*.sh; do
   fi
 done
 
-echo "Deception security gate contract passed (12 exact inventories, 104 tests)"
+echo "Deception security gate contract passed (12 exact inventories, 107 tests)"

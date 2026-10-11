@@ -30,6 +30,9 @@ run_exact_target --label "decoy matcher" --expected \
 
 run_exact_target --label "decoy materialization" --expected \
   materialize::unix::reader_boundary_tests::materialized_paths_obey_the_persisted_path_limit \
+  materialize::concurrency_tests::concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication \
+  materialize::concurrency_tests::same_materializer_calls_acquire_independent_lock_descriptions \
+  materialize::concurrency_tests::dropped_lock_allows_torn_stage_recovery_and_exact_final_retry \
   cleanup_is_idempotent_and_recovers_after_quarantine_rename \
   cleanup_rejects_changed_or_replaced_content_without_removal \
   cleanup_rejects_forged_registry_identity_and_metadata_proof \
