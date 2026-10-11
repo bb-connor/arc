@@ -4,6 +4,15 @@ use std::collections::BTreeSet;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn assert_invariant(result: Result<(), AdmissionOperationStoreError>, reason: &str) {
+    match result {
+        Err(AdmissionOperationStoreError::Invariant(detail)) => {
+            assert_eq!(detail, format!("native security state: {reason}"));
+        }
+        other => panic!("expected invariant {reason:?}, got {other:?}"),
+    }
+}
+
 fn record(sequence: u64, delta: Option<Delta>) -> Result<Record, AdmissionOperationStoreError> {
     Ok(Record {
         schema: Record::format(delta.is_some()),
@@ -40,8 +49,13 @@ fn tombstone(row: &[u8]) -> Tombstone {
     }
 }
 
-fn delta(base: u64, chain: (u64, u64), removed: Vec<Tombstone>, added: &[&[u8]]) -> Delta {
-    Delta {
+fn delta(
+    base: u64,
+    chain: (u64, u64),
+    removed: Vec<Tombstone>,
+    added: &[&[u8]],
+) -> Result<Delta, AdmissionOperationStoreError> {
+    Ok(Delta {
         base,
         base_rows: 0,
         base_bytes: 0,
@@ -49,9 +63,9 @@ fn delta(base: u64, chain: (u64, u64), removed: Vec<Tombstone>, added: &[&[u8]])
         chain_bytes: chain.1,
         added_rows: added.len() as u64,
         added_bytes: added.iter().map(|row| row.len() as u64).sum(),
-        added_digest: added_digest(added.iter().map(|row| (0, *row))).unwrap_or_default(),
+        added_digest: added_digest(added.iter().map(|row| (0, *row)))?,
         removed,
-    }
+    })
 }
 
 fn step(
@@ -60,7 +74,7 @@ fn step(
     chain: (u64, u64),
     removed: Vec<Tombstone>,
 ) -> Result<Record, AdmissionOperationStoreError> {
-    record(sequence, Some(delta(base, chain, removed, &[])))
+    record(sequence, Some(delta(base, chain, removed, &[])?))
 }
 
 fn keyframe() -> Result<(Chain, Image), AdmissionOperationStoreError> {
@@ -104,50 +118,38 @@ fn delta_chain_applies_tombstones_then_adds() -> TestResult {
 #[test]
 fn delta_chain_refuses_mixed_base_missing_reordered_or_keyframe_steps() -> TestResult {
     let (mut chain, mut image) = keyframe()?;
-    assert!(
-        chain
-            .apply(&mut image, &step(2, 7, (1, 1), Vec::new())?, Vec::new())
-            .is_err(),
-        "mixed base"
+    assert_invariant(
+        chain.apply(&mut image, &step(2, 7, (1, 1), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain mixes keyframes",
     );
     let mut misstated = step(2, 1, (1, 1), Vec::new())?;
     if let Some(delta) = misstated.delta.as_mut() {
         delta.base_rows = 2;
     }
-    assert!(
-        chain.apply(&mut image, &misstated, Vec::new()).is_err(),
-        "base totals differ from the keyframe"
+    assert_invariant(
+        chain.apply(&mut image, &misstated, Vec::new()),
+        "native checkpoint delta chain mixes keyframes",
     );
-    assert!(
-        chain
-            .apply(&mut image, &step(3, 1, (1, 1), Vec::new())?, Vec::new())
-            .is_err(),
-        "missing step"
+    assert_invariant(
+        chain.apply(&mut image, &step(3, 1, (1, 1), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain is out of order",
     );
     chain.apply(&mut image, &step(2, 1, (1, 1), Vec::new())?, Vec::new())?;
-    assert!(
-        chain
-            .apply(&mut image, &step(2, 1, (2, 2), Vec::new())?, Vec::new())
-            .is_err(),
-        "repeated step"
+    assert_invariant(
+        chain.apply(&mut image, &step(2, 1, (2, 2), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain is out of order",
     );
-    assert!(
-        chain
-            .apply(&mut image, &record(3, None)?, Vec::new())
-            .is_err(),
-        "keyframe inside a chain"
+    assert_invariant(
+        chain.apply(&mut image, &record(3, None)?, Vec::new()),
+        "native checkpoint delta chain crosses a keyframe",
     );
-    assert!(
-        chain
-            .apply(&mut image, &step(3, 1, (3, 2), Vec::new())?, Vec::new())
-            .is_err(),
-        "chain rows"
+    assert_invariant(
+        chain.apply(&mut image, &step(3, 1, (3, 2), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain size differs",
     );
-    assert!(
-        chain
-            .apply(&mut image, &step(3, 1, (2, 3), Vec::new())?, Vec::new())
-            .is_err(),
-        "chain bytes"
+    assert_invariant(
+        chain.apply(&mut image, &step(3, 1, (2, 3), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain size differs",
     );
     Ok(())
 }
@@ -155,11 +157,9 @@ fn delta_chain_refuses_mixed_base_missing_reordered_or_keyframe_steps() -> TestR
 #[test]
 fn delta_chain_charges_an_empty_seal_one_row_and_one_byte() -> TestResult {
     let (mut chain, mut image) = keyframe()?;
-    assert!(
-        chain
-            .apply(&mut image, &step(2, 1, (0, 0), Vec::new())?, Vec::new())
-            .is_err(),
-        "uncharged empty seal"
+    assert_invariant(
+        chain.apply(&mut image, &step(2, 1, (0, 0), Vec::new())?, Vec::new()),
+        "native checkpoint delta chain size differs",
     );
     chain.apply(&mut image, &step(2, 1, (1, 1), Vec::new())?, Vec::new())?;
     chain.apply(&mut image, &step(3, 1, (2, 2), Vec::new())?, Vec::new())?;
@@ -170,35 +170,29 @@ fn delta_chain_charges_an_empty_seal_one_row_and_one_byte() -> TestResult {
 #[test]
 fn delta_chain_refuses_duplicate_rows_and_unmatched_tombstones() -> TestResult {
     let (mut chain, mut image) = keyframe()?;
-    assert!(
-        chain
-            .apply(
-                &mut image,
-                &step(2, 1, (1, 4), Vec::new())?,
-                vec![(0, b"kept".to_vec())]
-            )
-            .is_err(),
-        "duplicate add"
+    assert_invariant(
+        chain.apply(
+            &mut image,
+            &step(2, 1, (1, 4), Vec::new())?,
+            vec![(0, b"kept".to_vec())],
+        ),
+        "native checkpoint image repeats a row",
     );
     let (mut chain, mut image) = keyframe()?;
-    assert!(
-        chain
-            .apply(
-                &mut image,
-                &step(2, 1, (1, 6), vec![tombstone(b"absent")])?,
-                Vec::new()
-            )
-            .is_err(),
-        "absent row"
+    assert_invariant(
+        chain.apply(
+            &mut image,
+            &step(2, 1, (1, 6), vec![tombstone(b"absent")])?,
+            Vec::new(),
+        ),
+        "native checkpoint tombstone has no exact row",
     );
     let (mut chain, mut image) = keyframe()?;
     let mut short = tombstone(b"removed");
     short.encoded_bytes = 3;
-    assert!(
-        chain
-            .apply(&mut image, &step(2, 1, (1, 3), vec![short])?, Vec::new())
-            .is_err(),
-        "length"
+    assert_invariant(
+        chain.apply(&mut image, &step(2, 1, (1, 3), vec![short])?, Vec::new()),
+        "native checkpoint tombstone length differs",
     );
     Ok(())
 }
@@ -210,14 +204,20 @@ fn delta_metadata_refuses_unordered_tombstones_and_late_bases() -> TestResult {
         (2, 14),
         vec![tombstone(b"removed"), tombstone(b"removed")],
         &[],
+    )?;
+    assert_invariant(
+        repeated.validate(2, 4, 64),
+        "native checkpoint tombstones are malformed",
     );
-    assert!(repeated.validate(2, 4, 64).is_err());
     let late = Delta {
         base: 2,
-        ..delta(1, (1, 1), Vec::new(), &[])
+        ..delta(1, (1, 1), Vec::new(), &[])?
     };
-    assert!(late.validate(2, 4, 64).is_err());
-    assert!(delta(1, (1, 1), Vec::new(), &[]).validate(2, 4, 64).is_ok());
+    assert_invariant(
+        late.validate(2, 4, 64),
+        "native checkpoint delta metadata is malformed",
+    );
+    delta(1, (1, 1), Vec::new(), &[])?.validate(2, 4, 64)?;
     Ok(())
 }
 
@@ -230,20 +230,26 @@ fn delta_metadata_refuses_a_chain_past_the_row_budget() -> TestResult {
         .map(|index| tombstone(&[b'r', index]))
         .collect::<Vec<_>>();
     removed.sort_by(|left, right| left.digest.cmp(&right.digest));
-    let mut overlong = delta(1, (9, 18), removed, &[]);
+    let mut overlong = delta(1, (9, 18), removed, &[])?;
     overlong.base_rows = 10;
     overlong.base_bytes = 20;
-    assert!(overlong.validate(2, 1, 2).is_err());
+    assert_invariant(
+        overlong.validate(2, 1, 2),
+        "native checkpoint delta exceeds its read budget",
+    );
     overlong.validate(2, 10, 20)?;
     Ok(())
 }
 
 #[test]
 fn delta_metadata_refuses_a_chain_past_the_byte_budget() -> TestResult {
-    let mut heavy = delta(1, (1, 4_000), Vec::new(), &[]);
+    let mut heavy = delta(1, (1, 4_000), Vec::new(), &[])?;
     heavy.base_rows = 4;
     heavy.base_bytes = 1_000;
-    assert!(heavy.validate(2, 4, 1_000).is_err());
+    assert_invariant(
+        heavy.validate(2, 4, 1_000),
+        "native checkpoint delta exceeds its read budget",
+    );
     heavy.chain_bytes = 1_000;
     heavy.validate(2, 4, 1_000)?;
     Ok(())
@@ -251,9 +257,12 @@ fn delta_metadata_refuses_a_chain_past_the_byte_budget() -> TestResult {
 
 #[test]
 fn delta_metadata_refuses_a_charge_larger_than_its_chain() -> TestResult {
-    let undercharged = delta(1, (1, 1), Vec::new(), &[b"added-row"]);
-    assert!(undercharged.validate(2, 8, 64).is_err());
-    let charged = delta(1, (1, 9), Vec::new(), &[b"added-row"]);
+    let undercharged = delta(1, (1, 1), Vec::new(), &[b"added-row"])?;
+    assert_invariant(
+        undercharged.validate(2, 8, 64),
+        "native checkpoint delta exceeds its read budget",
+    );
+    let charged = delta(1, (1, 9), Vec::new(), &[b"added-row"])?;
     charged.validate(2, 8, 64)?;
     Ok(())
 }
