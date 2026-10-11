@@ -6,6 +6,10 @@ use super::{
 };
 use crate::KernelError;
 
+#[cfg(test)]
+#[path = "blocking_connection/cancellation_tests.rs"]
+mod cancellation_tests;
+
 /// Synchronous transport port adapted onto the kernel's asynchronous tool
 /// server boundary. Calls use `spawn_blocking` when a Tokio runtime is active
 /// and execute directly when driven by the kernel's no-runtime sync bridge.
