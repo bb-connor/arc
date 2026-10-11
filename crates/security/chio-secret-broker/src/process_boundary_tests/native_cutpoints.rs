@@ -225,7 +225,7 @@ pub(in super::super) fn hold_provider_response() -> bool {
     let Some(gate) = std::env::var_os(EFFECT_GATE_ENV).map(PathBuf::from) else {
         return false;
     };
-    write_private(&gate, b"observed");
+    publish_private_marker(&gate, b"observed");
     let released = gate.with_extension("release");
     let deadline = Instant::now() + Duration::from_secs(10);
     while !released.exists() {

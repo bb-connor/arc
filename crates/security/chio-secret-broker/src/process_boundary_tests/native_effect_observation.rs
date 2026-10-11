@@ -54,7 +54,7 @@ impl EffectObserver {
                 b"observed"
             );
             control.kill_at(Point::ProviderEffect);
-            write_private(
+            publish_private_marker(
                 &control.effect_gate.with_extension("release"),
                 b"broker-dead",
             );
