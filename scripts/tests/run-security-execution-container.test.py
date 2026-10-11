@@ -465,16 +465,16 @@ def tree_bound_tests() -> None:
             repository, {f"empty-{index}.txt": "" for index in range(8)}
         )
         identity = BOUNDARY.repository_identity(repository, head, None)
-        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 8, create=True):
+        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 8):
             if len(BOUNDARY.parse_tree(identity.root, identity.head)) != 8:
                 raise AssertionError("tree at the entry bound was not accepted")
-        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 7, create=True):
+        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 7):
             assert_bounded(
                 "empty file count",
                 "candidate tree exceeds the isolation entry bound",
                 lambda: BOUNDARY.parse_tree(identity.root, identity.head),
             )
-        with mock.patch.object(BOUNDARY, "MAX_TREE_OUTPUT_BYTES", 64, create=True):
+        with mock.patch.object(BOUNDARY, "MAX_TREE_OUTPUT_BYTES", 64):
             assert_bounded(
                 "aggregate tree listing",
                 "candidate tree listing exceeds the isolation bound",
