@@ -15,6 +15,9 @@ import (
 // decoding into an alias of its generated type. Each nested security object has
 // the same decoder, while arbitrary input/output JSON Schemas remain opaque.
 func decodeManifestObject(data []byte, target any, required, optional []string) error {
+	if len(data) > 1<<20 {
+		return fmt.Errorf("security wire artifact exceeds one MiB")
+	}
 	allowed := make(map[string]bool, len(required)+len(optional))
 	for _, name := range required {
 		allowed[name] = true

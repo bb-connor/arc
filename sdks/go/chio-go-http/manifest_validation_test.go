@@ -8,8 +8,62 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestManifestSizeRefusesBeforeAllowedFieldCopy(t *testing.T) {
+	// The allowed value would be copied before the missing-field check unless
+	// the public decoder refuses the whole artifact before preflight starts.
+	payload := []byte(`{"manifest":{"input_schema":"` + strings.Repeat("x", 1<<20) + `"}}`)
+	manifest := SecuritySignedToolManifestV2{SignerKey: "retained-key"}
+	want := manifest
+	err := manifest.UnmarshalJSON(payload)
+	if err == nil || err.Error() != "security wire artifact exceeds one MiB" {
+		t.Fatalf("expected size refusal before field decoding, got %v", err)
+	}
+	if !reflect.DeepEqual(manifest, want) {
+		t.Fatal("oversized manifest changed its destination")
+	}
+}
+
+func TestManifestExactSizeBoundaryPreservesValidFields(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-v2-consumers.json")
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corpus struct {
+		Cases []protocolPrimitiveFixtureCase `json:"cases"`
+	}
+	if err := json.Unmarshal(payload, &corpus); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range corpus.Cases {
+		if !fixture.Valid {
+			continue
+		}
+		var want, manifest SecuritySignedToolManifestV2
+		if err := json.Unmarshal(fixture.Instance, &want); err != nil {
+			t.Fatal(err)
+		}
+		padded := append(bytes.Clone(fixture.Instance), bytes.Repeat([]byte(" "), (1<<20)-len(fixture.Instance))...)
+		if err := manifest.UnmarshalJSON(padded); err != nil {
+			t.Fatalf("exact one MiB valid manifest was refused: %v", err)
+		}
+		if !reflect.DeepEqual(manifest, want) {
+			t.Fatal("size-boundary decoding changed manifest fields")
+		}
+		if err := manifest.UnmarshalJSON(append(padded, ' ')); err == nil || err.Error() != "security wire artifact exceeds one MiB" {
+			t.Fatalf("expected exact size refusal above one MiB, got %v", err)
+		}
+		if !reflect.DeepEqual(manifest, want) {
+			t.Fatal("size refusal changed retained manifest fields")
+		}
+		return
+	}
+	t.Fatal("manifest corpus has no valid size-boundary control")
+}
 
 func TestGeneratedManifestV2RuntimeCorpus(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-v2-consumers.json")
