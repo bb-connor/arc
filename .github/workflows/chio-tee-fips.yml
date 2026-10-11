@@ -149,6 +149,7 @@ jobs:
             kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material \
             kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority \
             kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request \
+            kernel::tests::threshold_issuance::session_continuation::guard_attempt::approved_session_retry_keeps_admitted_attempt_identity_and_one_dispatch \
             kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait \
             kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait \
             kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request \
