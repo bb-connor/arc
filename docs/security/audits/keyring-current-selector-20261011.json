@@ -1,0 +1,382 @@
+{
+  "schema": "chio.pr1160.keyring-current-selector-qualification.v1",
+  "observed_utc": "2026-10-11T14:18:11.655562+00:00",
+  "published_source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "qualified_private_source": "b4af756f20c2e47362eb8f9fe4e10ea5607a5f52",
+  "requirement": "incoming-pr1160-exact-head-20261011:REVIEW-9E9-KEYRING",
+  "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6109135494",
+  "repair": {
+    "producer": [
+      "7e314a5c1f85a274780ecc7345dd03a85f47b660",
+      "5ef61e16808bc8c69f0087193656892c3aa86d39"
+    ],
+    "integration": [
+      "053a5a01ee",
+      "8db1a2c1a6"
+    ],
+    "exact_panic_oracle": "b4af756f20",
+    "forwarding_patch_sha256": "fe0a84581e246281f644858bdf2ac0cbd7151eba5198fea537712f3f29846c68",
+    "composition": "All ten producer paths byte-identical at8db. Follow-upb4 strengthens only the injected-panic assertion; no baseline edit."
+  },
+  "behavior": [
+    "Fallible current signing identity refuses an unreadable router selector.",
+    "Governed authority trusts no key when selection fails and refuses all three issuance paths.",
+    "Shared and migration-guarded wrappers forward the fallible selector.",
+    "Reputation receipt-integrity trust uses the authority trust set without appending its compatibility key.",
+    "Infallible identity accessors remain documented compatibility interfaces; they do not replace current trust."
+  ],
+  "original": {
+    "source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+    "scope": "Keyring test dependency graph restored to the original production bytes. Kernel/control-plane producer edits are outside that graph. Additive test overlay performs real witnessed rotation A to B and poisons the router selector through its activation guard.",
+    "restored_blobs": [
+      {
+        "path": "crates/core/chio-core-types/src/crypto.rs",
+        "sha256": "cfc72b646b547d411ffeb4166d5a7a636f5cdd4111826cd601680d7366dd5aa2"
+      },
+      {
+        "path": "crates/security/chio-keyring/src/router.rs",
+        "sha256": "0069282a3a2ae16e209128d87c962e4b33fc6adee36c02ae868f28e0517561b4"
+      },
+      {
+        "path": "crates/security/chio-keyring/tests/independent_services.rs",
+        "sha256": "2ca48173f0f00ef544a4c534ce950c5c6f41632e311557e722a226dc0f32889e"
+      }
+    ],
+    "overlay_file_sha256": "ed560509a10fd08764d978a0a7a255396993494f1e2de0a395e40de734de5c83",
+    "overlay_diff_sha256": "24f3b445d9b6600c68f85e828105cb8f9dd6bd912e76ee69d37a91b03a6f37d8",
+    "scope_document_sha256": "a10bad7715daa8b3893380d5df6f9ec20c275881aa868e5651dbb080a4854c4a",
+    "command": "hcargo test --locked -p chio-keyring --test independent_services -- --exact authority_backend_never_reports_a_rotated_out_key_after_router_poison",
+    "exit": 101,
+    "passed": 0,
+    "failed": 1,
+    "log_sha256": "8109beb17aeff0869e2aab915269cd938e2b70f8e7219a2ed2522467d62e3e6c",
+    "interpretation": "Original reports genesis key A after actual rotation and selector poison; no test-only production seam."
+  },
+  "composed_owner_tests": {
+    "source": "8db1a2c1a65360abffbedcfa39a855f59991d31a",
+    "records": [
+      {
+        "label": "kernel-authority",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "authority::tests"
+        ],
+        "exit": 0,
+        "seconds": 255.22,
+        "counts": [
+          [
+            27,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "84439c8cecb4ac5babe389961ae2914e5b36cf94b0dd9eda139b6c232f0c5c90",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "kernel-forwarding",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "shared_backend_forwards"
+        ],
+        "exit": 0,
+        "seconds": 1.19,
+        "counts": [
+          [
+            2,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "1ee90dce8938c5f5cd08816cbbc6f637d466705952b6cf9f7949de8b194379e9",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "cp-trust",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "reputation_trust_excludes_an_authority_key_that_is_not_currently_readable"
+        ],
+        "exit": 0,
+        "seconds": 368.5,
+        "counts": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "797d984a73416d30be5e0a5bcb00202d17f014834743902632bc36a0b423794b",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "cp-forwarding",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "migration_guarded_backend_forwards_an_unreadable_current_key"
+        ],
+        "exit": 0,
+        "seconds": 1.67,
+        "counts": [
+          [
+            1,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "abc9c77b9aec5eef9f3f8e75342466dbd27ffa8941ecbe018725635aeebc580e",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "keyring-services",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-keyring",
+          "--test",
+          "independent_services"
+        ],
+        "exit": 0,
+        "seconds": 37.86,
+        "counts": [
+          [
+            12,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "fe5ec3143ff2d62e57d50d97b82b9e1f6b6f0fbea82abd48fe111ce23b019f3d",
+        "source_stable": true,
+        "accepted": true
+      },
+      {
+        "label": "crypto",
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-core-types",
+          "--lib",
+          "crypto::"
+        ],
+        "exit": 0,
+        "seconds": 25.63,
+        "counts": [
+          [
+            30,
+            0,
+            0
+          ]
+        ],
+        "log_sha256": "3940af0062ec1382efb2ad3a466c6c9b0ef0b4279beae5556427ed3d77ff24db",
+        "source_stable": true,
+        "accepted": true
+      }
+    ],
+    "accepted": true
+  },
+  "final_oracle_renewal": [
+    {
+      "label": "exact-panic",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "--test",
+        "independent_services",
+        "authority_current_selector_refuses_after_router_poison",
+        "--",
+        "--exact"
+      ],
+      "source": "b4af756f20c2e47362eb8f9fe4e10ea5607a5f52",
+      "exit": 0,
+      "seconds": 5.36,
+      "log_sha256": "7b75bcdc34bbfe119e89100eb88b53d8b27a6299ea1602a0a0e68ecd4b953955",
+      "test_counts": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 2.64s"
+      ]
+    },
+    {
+      "label": "exact-panic-strict",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "--test",
+        "independent_services",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "source": "b4af756f20c2e47362eb8f9fe4e10ea5607a5f52",
+      "exit": 0,
+      "seconds": 28.73,
+      "log_sha256": "743a29ac23d01cac65c900b8b35a4cdff63fee9cf80883e96aedd5ec59a019ec",
+      "test_counts": []
+    }
+  ],
+  "owning_strict": {
+    "source": "b4af756f20c2e47362eb8f9fe4e10ea5607a5f52",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-core-types",
+      "-p",
+      "chio-keyring",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-control-plane",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 303.19,
+    "log_sha256": "16f4e979f7ef80bf3cbc4d1e28f80128ed9329065d4fda6ededc4e8262e5ef47",
+    "source_stable": true
+  },
+  "static_campaign": [
+    {
+      "label": "transparency-runner",
+      "command": [
+        "bash",
+        "scripts/tests/check-keyring-transparency.test.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.2,
+      "log_sha256": "ab9ebb9be9baa66de26307e871fbc7def3ac9a01b3b65481d69fa6c16d418df3"
+    },
+    {
+      "label": "security-ci",
+      "command": [
+        "python3",
+        "scripts/check-security-ci-contract.py"
+      ],
+      "exit": 1,
+      "seconds": 1.34,
+      "log_sha256": "8ed6d8be45732ce4b70a02857174f3b05118b20325d6a286eff88927913a42c2"
+    },
+    {
+      "label": "clocks",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit": 0,
+      "seconds": 32.42,
+      "log_sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b"
+    },
+    {
+      "label": "hygiene",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit": 0,
+      "seconds": 6.27,
+      "log_sha256": "85b0c6a2734a8235ac0ec331cb18997ae7ad2b36db2eabee168b7910ad53f180"
+    },
+    {
+      "label": "negative-assertions",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit": 1,
+      "seconds": 1.31,
+      "log_sha256": "206a97375f6ed109f41e4227e79244cd185527ba3192a207c271274126b22047"
+    },
+    {
+      "label": "static-formal",
+      "command": [
+        "python3",
+        "scripts/check-apalache-formal-slice.py"
+      ],
+      "exit": 0,
+      "seconds": 0.18,
+      "log_sha256": "523cb78090d956a1f7592bfa9c68b0fd42a7b257dd53e47240b02b1aad97d706"
+    },
+    {
+      "label": "wire",
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit": 0,
+      "seconds": 10.19,
+      "log_sha256": "50ce5d4e0eb899a70ed6668a550bec21d4ed74848bea1658b4ad16a83d84718d"
+    }
+  ],
+  "static_renewals": {
+    "security_contract": {
+      "source": "8db1a2c1a65360abffbedcfa39a855f59991d31a",
+      "exit": 0,
+      "seconds": 2.2527022208087146,
+      "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "original_failure": "Root checkout created tracked100755 script as filesystem0775 under ambient group-write umask. Restored exact0755 in Root private/warm checkouts; bytes unchanged, no source or ratchet edit."
+    },
+    "negative_assertions": {
+      "source": "b4af756f20",
+      "exit": 0,
+      "log_sha256": "5d096f1ed75dc8ced9733161cdfdd5c6df8308e63998ef6c8f39c9d05c9b43cd",
+      "baseline_unchanged": true
+    }
+  },
+  "independent_review": {
+    "reviewer": "Claude through coordination mailbox",
+    "source_approvals": [
+      "7e314/5ef61 producer plus Root exact-diff review at2026-10-11T13:51Z",
+      "b4af756f20 approved2026-10-11T13:58:06Z"
+    ],
+    "root_review": "Fallible selector consumers, wrappers and reputation trust conversion inspected before composition."
+  },
+  "honest_limits": [
+    "The initial composed static campaign failed on a Root filesystem mode0775 and a weak panic assertion. Those failed records remain intact; exact mode0755 and exact-payload renewals pass.",
+    "The producer interrupted clippy.log is not terminal qualification; the Root owning strict result supplies this evidence.",
+    "73 composed owner tests plus one final-oracle renewal are distinct executions, not74 unique tests.",
+    "Local ARM evidence does not replace hosted exact-head qualification."
+  ],
+  "remaining_acceptance": [
+    "Compose checkpoint and corrected prepaid work, then renew shared metadata and changed-boundary gates.",
+    "Publish one reviewed batch after predecessor required checks report; obtain four exact-head required checks green and classify every other failure.",
+    "Answer the exact-source review, retain all proof and operational residuals, and await user merge go-ahead."
+  ],
+  "published": false,
+  "merged": false,
+  "merge_ready": false
+}
