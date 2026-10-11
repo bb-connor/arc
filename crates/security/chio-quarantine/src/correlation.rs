@@ -1111,7 +1111,8 @@ impl PartitionState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[cfg_attr(not(test), derive(Clone))]
+#[derive(Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(deny_unknown_fields)]
 struct PartialCandidate {
     stages: Vec<Option<StageContribution>>,
@@ -1666,6 +1667,8 @@ fn hex_bytes(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod mutation_tests {
+    include!("correlation/expansion_tests.rs");
+
     use super::{
         event_time_is_ordered_and_within, merge_validated_group_watermark, GroupWatermarkKnowledge,
         ValidatedGroupWatermarkMerge, MAX_JSON_SAFE_INTEGER,
