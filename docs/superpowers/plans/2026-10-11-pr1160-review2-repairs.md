@@ -297,11 +297,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Concurrent retry:** Each materialization opens and locks a fresh validated staging-directory descriptor nonblockingly before touching the stage or verifying an existing final file. Keep that descriptor alive through file and directory syncs and receipt verification. Contention returns the existing typed `Io(WouldBlock)` error. Preserve the genuine two-caller Original, same-instance contention, unchanged stage inode/content, exact final receipt and descriptor-drop recovery controls.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-020: Portable issuer fetch excludes DNS from its total deadline
 

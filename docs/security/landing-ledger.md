@@ -59,6 +59,12 @@ signing-custody election correction is also staged with source approval and
 runtime evidence pending. R2-020 has only its receipt-preserving worker
 extraction integrated; its issuer DNS repair remains open.
 
+The [decoy recovery audit](audits/review2-decoy-qualified-20261011.json) records
+authenticated staging, writer serialization and explicit inherited-descriptor
+unlock. Linux passes 64 owning tests, strict lint and all 108 deception controls.
+Native macOS passes 70 executions, ten full parallel reruns and strict lint.
+Earlier failures and the recorded-clean native source boundary remain explicit.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.
