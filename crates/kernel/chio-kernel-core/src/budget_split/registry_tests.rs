@@ -84,7 +84,12 @@ fn many_zero_share_parents_reach_the_global_edge_capacity() {
 fn global_id_byte_capacity_counts_both_owned_parent_id_copies() {
     let mut registry = InMemoryBudgetRegistry::new();
     let parent_id_bytes = MAX_REGISTRY_RETAINED_ID_BYTES / 16;
-    let parent = |index: usize| format!("{index:0parent_id_bytes$}");
+    let parent = |index: usize| {
+        let mut id = "0".repeat(parent_id_bytes);
+        let prefix = index.to_string();
+        id.replace_range(..prefix.len(), &prefix);
+        id
+    };
     for index in 0..8 {
         assert_eq!(registry.register_parent(parent(index), 0), Ok(()));
     }
@@ -169,11 +174,12 @@ fn stale_trusted_time_never_reclaims_an_unexpired_parent() {
 fn already_expired_new_registration_is_refused_and_leaves_nothing() {
     let mut registry = InMemoryBudgetRegistry::new();
     assert_eq!(
-        registry.register_expiring_parent("at-expiry".into(), 0, 100, 100),
+        registry.register_expiring_parent("at-expiry".into(), 0, 150, 150),
         Err(BudgetSplitError::ExpiredParent {
             parent_token_id: "at-expiry".into()
         })
     );
+    assert_eq!(registry.latest_trusted_now_secs, Some(150));
     assert_eq!(
         registry.register_expiring_parent("behind-watermark".into(), 0, 140, 120),
         Err(BudgetSplitError::ExpiredParent {
