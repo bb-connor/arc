@@ -1,3 +1,4 @@
+use super::json_file::{read_json_store, write_json_store};
 use super::traits::RuntimeAdmissionStore;
 use crate::validation::validate_non_empty;
 use crate::*;
@@ -46,14 +47,7 @@ impl JsonRuntimeAdmissionStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
         let path = path.as_ref().to_path_buf();
         let state = if path.exists() {
-            let json = fs::read_to_string(&path).map_err(ChioRuntimeError::Io)?;
-            let state: JsonRuntimeAdmissionStoreState =
-                chio_core_types::canonical::UntrustedJsonText::from_wire(
-                    json.as_bytes(),
-                    64 * 1024 * 1024,
-                )
-                .and_then(|input| input.decode_signed())
-                .map_err(ChioRuntimeError::from)?;
+            let state: JsonRuntimeAdmissionStoreState = read_json_store(&path)?;
             if !is_runtime_admission_store_schema(&state.schema) {
                 return Err(ChioRuntimeError::Rejected {
                     code: "unsupported_runtime_store_schema",
@@ -90,9 +84,9 @@ impl JsonRuntimeAdmissionStore {
             }
             return Err(ChioRuntimeError::DuplicateAdmissionBundle);
         }
-        state.bundles.push(bundle);
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        let mut candidate = state.clone();
+        candidate.bundles.push(bundle);
+        self.commit(&mut state, candidate)
     }
 
     pub fn insert_swarm_authority_bundle(
@@ -120,9 +114,9 @@ impl JsonRuntimeAdmissionStore {
                         .to_string(),
             });
         }
-        state.swarm_authority_bundles.push(bundle);
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        let mut candidate = state.clone();
+        candidate.swarm_authority_bundles.push(bundle);
+        self.commit(&mut state, candidate)
     }
 
     fn validate_locked_state(&self) -> Result<(), ChioRuntimeError> {
@@ -211,17 +205,16 @@ impl JsonRuntimeAdmissionStore {
         })
     }
 
-    fn persist_state(
+    /// Live state changes only after `candidate` is validated and persisted.
+    fn commit(
         &self,
-        state: &JsonRuntimeAdmissionStoreState,
+        live: &mut JsonRuntimeAdmissionStoreState,
+        candidate: JsonRuntimeAdmissionStoreState,
     ) -> Result<(), ChioRuntimeError> {
-        if let Some(parent) = self.path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(ChioRuntimeError::Io)?;
-            }
-        }
-        let json = serde_json::to_string_pretty(state).map_err(ChioRuntimeError::Json)?;
-        fs::write(&self.path, format!("{json}\n")).map_err(ChioRuntimeError::Io)
+        Self::validate_state(&candidate)?;
+        write_json_store(&self.path, &candidate)?;
+        *live = candidate;
+        Ok(())
     }
 }
 
@@ -270,9 +263,9 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
                 detail: format!("destructive lease {lease_id} was already consumed"),
             });
         }
-        state.consumed_lease_ids.push(lease_id.to_string());
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        let mut candidate = state.clone();
+        candidate.consumed_lease_ids.push(lease_id.to_string());
+        self.commit(&mut state, candidate)
     }
 
     fn release_destructive_lease(
@@ -281,11 +274,11 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         _admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        state
+        let mut candidate = state.clone();
+        candidate
             .consumed_lease_ids
             .retain(|consumed| consumed != lease_id);
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn consume_treaty_continuation(
@@ -304,11 +297,11 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
                 detail: format!("treaty continuation {continuation_id} was already consumed"),
             });
         }
-        state
+        let mut candidate = state.clone();
+        candidate
             .consumed_treaty_continuation_ids
             .push(continuation_id.to_string());
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn release_treaty_continuation(
@@ -317,11 +310,11 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         _admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        state
+        let mut candidate = state.clone();
+        candidate
             .consumed_treaty_continuation_ids
             .retain(|consumed| consumed != continuation_id);
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn consume_swarm_continuation(
@@ -340,11 +333,11 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
                 detail: format!("swarm continuation {continuation_id} was already consumed"),
             });
         }
-        state
+        let mut candidate = state.clone();
+        candidate
             .consumed_swarm_continuation_ids
             .push(continuation_id.to_string());
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn release_swarm_continuation(
@@ -353,11 +346,11 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         _admission_id: &str,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        state
+        let mut candidate = state.clone();
+        candidate
             .consumed_swarm_continuation_ids
             .retain(|consumed| consumed != continuation_id);
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn runtime_trust_floor(
@@ -378,15 +371,15 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
-        if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
+        let mut candidate = state.clone();
+        if let Some(existing) = candidate.trust_floors.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {
             *existing = entry;
         } else {
-            state.trust_floors.push(entry);
+            candidate.trust_floors.push(entry);
         }
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 
     fn validate_and_record_runtime_trust_floor(
@@ -403,14 +396,14 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
             })
             .cloned();
         validate_runtime_trust_floor_transition(existing, &entry, previous_hash_sha256)?;
-        if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
+        let mut candidate = state.clone();
+        if let Some(existing) = candidate.trust_floors.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {
             *existing = entry;
         } else {
-            state.trust_floors.push(entry);
+            candidate.trust_floors.push(entry);
         }
-        Self::validate_state(&state)?;
-        self.persist_state(&state)
+        self.commit(&mut state, candidate)
     }
 }
