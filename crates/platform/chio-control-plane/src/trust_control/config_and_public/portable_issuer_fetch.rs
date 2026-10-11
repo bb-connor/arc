@@ -4,6 +4,9 @@
 use super::*;
 
 use chio_egress_contract::HttpEgressContract;
+use std::time::Instant;
+
+use crate::bounded_worker_pool::{BoundedWorkerPool, BudgetElapsed};
 
 /// Read trusted whole-second time from an injected clock, preserving the clock
 /// port's regression and failure semantics. Used where acceptance time must be
@@ -22,10 +25,21 @@ pub(crate) const PORTABLE_ISSUER_FETCH_PERMITS: usize = 16;
 
 /// Transport bounds for every outbound portable-issuer or lifecycle fetch. A
 /// remote that accepts a connection but stalls is bounded by the read and
-/// overall deadlines, so it cannot pin a blocking worker indefinitely.
+/// overall deadlines, so it cannot pin a blocking worker indefinitely. The total
+/// deadline covers DNS resolution and HTTP together.
 const PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Workers that run host-resolver lookups for portable fetches. A lookup stalled
+/// in the host resolver cannot be cancelled, so it parks one of these workers
+/// until the resolver gives up; this caps how many such lookups exist at once.
+const PORTABLE_ISSUER_DNS_WORKERS: usize = 4;
+
+/// Lookups that may queue behind busy resolver workers. Workers plus queue cover
+/// every admitted fetch, so only a stalled resolver ever refuses a lookup.
+const PORTABLE_ISSUER_DNS_QUEUE_DEPTH: usize =
+    PORTABLE_ISSUER_FETCH_PERMITS - PORTABLE_ISSUER_DNS_WORKERS;
 
 /// Response-body ceiling for a portable-issuer JWKS or lifecycle document. The
 /// buffered decode stops here, so an endpoint cannot stream an unbounded body.
@@ -37,6 +51,39 @@ static PORTABLE_ISSUER_FETCH_LANE: LazyLock<Arc<tokio::sync::Semaphore>> =
 /// The process-wide portable-issuer fetch admission lane.
 pub(crate) fn portable_issuer_fetch_lane() -> Arc<tokio::sync::Semaphore> {
     Arc::clone(&PORTABLE_ISSUER_FETCH_LANE)
+}
+
+static PORTABLE_ISSUER_DNS_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|| {
+    BoundedWorkerPool::new(PORTABLE_ISSUER_DNS_WORKERS, PORTABLE_ISSUER_DNS_QUEUE_DEPTH)
+});
+
+/// The single monotonic deadline of one portable fetch. It is fixed before DNS
+/// resolution, and every phase is given only the time left when it starts.
+struct PortableFetchDeadline(Instant);
+
+impl PortableFetchDeadline {
+    fn start() -> Result<Self, CliError> {
+        Self::starting_at(Instant::now())
+    }
+
+    fn starting_at(start: Instant) -> Result<Self, CliError> {
+        start
+            .checked_add(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT)
+            .map(Self)
+            .ok_or_else(portable_fetch_deadline_exceeded)
+    }
+
+    /// The time left, sampled now. A passed deadline refuses the next phase.
+    fn remaining(&self) -> Result<Duration, CliError> {
+        self.0
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(portable_fetch_deadline_exceeded)
+    }
+}
+
+fn portable_fetch_deadline_exceeded() -> CliError {
+    CliError::cli_other_error("portable issuer fetch exceeded its deadline")
 }
 
 /// Why a bounded portable-issuer fetch produced no transport outcome.
@@ -126,11 +173,18 @@ pub(crate) struct RemotePortableIssuerFetch {
 
 impl RemotePortableIssuerFetch {
     pub(crate) fn resolve(self) -> Result<Vec<PublicKey>, CliError> {
+        let deadline = PortableFetchDeadline::start()?;
         let url = Url::parse(&self.jwks_url).map_err(|error| {
             CliError::cli_other_error(format!("portable issuer JWKS URL is invalid: {error}"))
         })?;
-        let pinned = pin_checked_https_addrs(&self.contract, &url, system_resolve_host)?;
-        let agent = build_portable_fetch_agent(pinned, true);
+        let pinned = pin_checked_https_addrs(
+            &self.contract,
+            &url,
+            &PORTABLE_ISSUER_DNS_POOL,
+            &deadline,
+            system_resolve_host,
+        )?;
+        let agent = build_portable_fetch_agent(pinned, true, &deadline)?;
         fetch_portable_issuer_jwks(&agent, &self.jwks_url)
     }
 }
@@ -204,13 +258,20 @@ pub(crate) struct RemotePassportLifecycleFetch {
 
 impl RemotePassportLifecycleFetch {
     pub(crate) fn resolve(self) -> Result<PassportLifecycleResolution, CliError> {
+        let deadline = PortableFetchDeadline::start()?;
         let parsed = Url::parse(&self.url).map_err(|error| {
             CliError::cli_other_error(format!(
                 "portable passport lifecycle URL is invalid: {error}"
             ))
         })?;
-        let pinned = pin_checked_https_addrs(&self.contract, &parsed, system_resolve_host)?;
-        let agent = build_portable_fetch_agent(pinned, true);
+        let pinned = pin_checked_https_addrs(
+            &self.contract,
+            &parsed,
+            &PORTABLE_ISSUER_DNS_POOL,
+            &deadline,
+            system_resolve_host,
+        )?;
+        let agent = build_portable_fetch_agent(pinned, true, &deadline)?;
         let response = agent.get(&self.url).call().map_err(|error| {
             portable_fetch_transport_error("portable passport lifecycle endpoint", error)
         })?;
@@ -286,13 +347,17 @@ fn strict_portable_fetch_contract(
 /// Resolve a host once, check every resolved address against the strict policy,
 /// and return the exact checked addresses. Pinning these into the fetch agent's
 /// resolver closes the validate-then-re-resolve gap that DNS rebinding exploits.
+/// The lookup runs on the bounded `dns` pool and is abandoned at the deadline,
+/// so a stalled resolver never holds the caller past its fetch budget.
 fn pin_checked_https_addrs<R>(
     contract: &HttpEgressContract,
     url: &Url,
+    dns: &BoundedWorkerPool,
+    deadline: &PortableFetchDeadline,
     resolve: R,
 ) -> Result<Vec<SocketAddr>, CliError>
 where
-    R: Fn(&str, u16) -> std::io::Result<Vec<SocketAddr>>,
+    R: FnOnce(&str, u16) -> std::io::Result<Vec<SocketAddr>> + Send + 'static,
 {
     contract
         .enforce_url(url.as_str(), 0)
@@ -303,9 +368,13 @@ where
     let port = url
         .port_or_known_default()
         .ok_or_else(|| CliError::cli_other_error("egress URL must declare a port".to_string()))?;
-    let resolved = resolve(host, port).map_err(|error| {
-        CliError::cli_other_error(format!("failed to resolve egress host `{host}`: {error}"))
-    })?;
+    let lookup_host = host.to_string();
+    let resolved = dns
+        .run_within_budget(deadline.remaining()?, move || resolve(&lookup_host, port))
+        .map_err(|BudgetElapsed| portable_fetch_deadline_exceeded())?
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to resolve egress host `{host}`: {error}"))
+        })?;
     let mut checked = Vec::with_capacity(resolved.len());
     for addr in resolved {
         contract
@@ -327,19 +396,27 @@ fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>
 
 /// Build the bounded fetch agent. The resolver returns only the pre-checked
 /// pinned addresses, redirects are disabled, and connect, read and overall
-/// deadlines bound every attempt. `require_https` enforces HTTPS on the one
-/// production transport; the loopback test seam supplies plaintext.
-fn build_portable_fetch_agent(pinned: Vec<SocketAddr>, require_https: bool) -> Agent {
+/// deadlines bound every attempt. The fetch deadline's remainder, sampled here
+/// after resolution, is the overall deadline and also caps the connect stage,
+/// which ureq otherwise times from its own start. `require_https` enforces
+/// HTTPS on the one production transport; the loopback test seam supplies
+/// plaintext.
+fn build_portable_fetch_agent(
+    pinned: Vec<SocketAddr>,
+    require_https: bool,
+    deadline: &PortableFetchDeadline,
+) -> Result<Agent, CliError> {
+    let remaining = deadline.remaining()?;
     let mut builder = ureq::AgentBuilder::new()
-        .timeout_connect(PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT)
+        .timeout_connect(remaining.min(PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT))
         .timeout_read(PORTABLE_ISSUER_FETCH_READ_TIMEOUT)
-        .timeout(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT)
+        .timeout(remaining)
         .redirects(0)
         .resolver(move |_netloc: &str| Ok(pinned.clone()));
     if require_https {
         builder = builder.https_only(true);
     }
-    builder.build()
+    Ok(builder.build())
 }
 
 /// Map a transport error to a fail-closed message that never echoes the fetched
