@@ -71,7 +71,7 @@ run_complete_inventory \
 
 run_filtered_inventory \
   "temporal correlation mutation controls" \
-  3 45e153188daf9b432216830a967d6c5a1e7b51078e33f065f1a05b9144536563 \
+  8 b94071e2e74ac084f799930bf67047f61452177f13e4b0633b563b2a7e4c0e8d \
   cargo test -p chio-quarantine --lib correlation::mutation_tests::
 
 run_complete_inventory \
@@ -115,10 +115,10 @@ run_filtered_inventory \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_
 
-if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 46 ]]; then
+if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 51 ]]; then
   builtin printf '%s\n' \
     "Temporal security gate incomplete (${completed_inventories} inventories, ${completed_tests} tests)" >&2
   builtin exit 1
 fi
 
-builtin printf '%s\n' "Temporal security gate passed (10 committed inventories, 46 tests)"
+builtin printf '%s\n' "Temporal security gate passed (10 committed inventories, 51 tests)"

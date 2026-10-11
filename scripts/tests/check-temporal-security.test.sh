@@ -22,7 +22,7 @@ runner="scripts/check-temporal-security.sh"
 exact_runner="scripts/run-exact-cargo-test-inventory.sh"
 verifier="scripts/check-exact-cargo-test-inventory.py"
 python_bin="/usr/bin/python3"
-expected_runner_sha256="c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17"
+expected_runner_sha256="f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101"
 test -x "${runner}"
 test -x "${exact_runner}"
 test -x "${verifier}"
@@ -191,7 +191,7 @@ builtin cd -- "${repo_root}"'''
             "every temporal Cargo test command must use one exact inventory: "
             f"commands={cargo_test_lines} inventories={len(calls)}"
         )
-    completion = '''if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 46 ]]; then
+    completion = '''if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 51 ]]; then
   builtin printf '%s\\n' \\
     "Temporal security gate incomplete (${completed_inventories} inventories, ${completed_tests} tests)" >&2
   builtin exit 1
@@ -200,11 +200,24 @@ fi'''
         raise SystemExit("temporal gate completion accounting changed")
     success = (
         "builtin printf '%s\\n' "
-        '"Temporal security gate passed (10 committed inventories, 46 tests)"'
+        '"Temporal security gate passed (10 committed inventories, 51 tests)"'
     )
     if source.count(success) != 1:
         raise SystemExit("temporal gate success contract changed")
     return calls
+
+
+def correlation_mutation_names() -> list[str]:
+    parent = Path("crates/security/chio-quarantine/src/correlation.rs")
+    child = Path("crates/security/chio-quarantine/src/correlation/expansion_tests.rs")
+    if parent.read_text().count('include!("correlation/expansion_tests.rs");') != 1:
+        raise SystemExit("temporal expansion tests must remain included exactly once")
+    if child.read_text().count("mod expansion_tests {") != 1:
+        raise SystemExit("temporal expansion test module declaration changed")
+    prefix = "correlation::mutation_tests::"
+    return source_names(str(parent), prefix, prefix) + source_names(
+        str(child), prefix + "expansion_tests::"
+    )
 
 
 source_contracts = {
@@ -214,11 +227,7 @@ source_contracts = {
     "temporal event-time correlation": source_names(
         "crates/security/chio-quarantine/tests/correlation.rs", ""
     ),
-    "temporal correlation mutation controls": source_names(
-        "crates/security/chio-quarantine/src/correlation.rs",
-        "correlation::mutation_tests::",
-        "correlation::mutation_tests::",
-    ),
+    "temporal correlation mutation controls": correlation_mutation_names(),
     "signed security event verification": source_names(
         "crates/core/chio-core-types/tests/signed_security_event.rs", ""
     ),
@@ -329,7 +338,7 @@ for label, names in source_contracts.items():
 expected_counts = {
     "temporal rule validation": 2,
     "temporal event-time correlation": 16,
-    "temporal correlation mutation controls": 3,
+    "temporal correlation mutation controls": 8,
     "signed security event verification": 5,
     "verified event provenance acceptance": 1,
     "receipt-backed event provenance rejection": 2,
@@ -505,8 +514,8 @@ expected_calls = [
     ),
     exact_args(
         "temporal correlation mutation controls",
-        3,
-        "45e153188daf9b432216830a967d6c5a1e7b51078e33f065f1a05b9144536563",
+        8,
+        "b94071e2e74ac084f799930bf67047f61452177f13e4b0633b563b2a7e4c0e8d",
         [
             "cargo",
             "test",
@@ -615,7 +624,7 @@ expected_calls = [
         filtered=True,
     ),
 ]
-success_line = "Temporal security gate passed (10 committed inventories, 46 tests)"
+success_line = "Temporal security gate passed (10 committed inventories, 51 tests)"
 
 
 def json_log(path: Path) -> list[list[str]]:
@@ -1200,4 +1209,4 @@ require(
 )
 PY
 
-builtin printf '%s\n' "Temporal security gate self-test passed (10 committed inventories, 46 tests)"
+builtin printf '%s\n' "Temporal security gate self-test passed (10 committed inventories, 51 tests)"
