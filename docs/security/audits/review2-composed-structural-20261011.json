@@ -1,0 +1,114 @@
+{
+  "schema": "chio.security.review2-composed-structural-qualification.v1",
+  "observed_utc": "2026-10-11T01:49:58.225879+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-005",
+    "incoming-pr1160-review2-20261011:R2-021"
+  ],
+  "private_stage": "fde5a83fc572d62416a11a219ed4745c69a57dab",
+  "source_repair": {
+    "checkpoint": "56b8c724e2ad631b961625c10e3cd03a689d3466",
+    "contract": "Replace newly introduced include! test assembly with normal path modules; preserve all eight control names/assertions and unchanged file caps. Renew only affected source pins."
+  },
+  "original_module_hygiene": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-temporal-module-hygiene/original.json",
+    "sha256": "acd15053c86f03307fa87c3e71d082009f8cd194cbda14c18f3329a7099d975e"
+  },
+  "extraction_preservation": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-temporal-module-hygiene/extraction.json",
+    "sha256": "426592cf6fe60f5d959bc1c18ec2a6c7c5ee6fec464e5190551ddf3f3b6a59cd"
+  },
+  "static": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-temporal-module-hygiene/static-results.json",
+    "sha256": "e145d3920e4e05178c387166b997a77df3d72eb7c1a14cd5f4a6cab3236ff887"
+  },
+  "temporal": {
+    "source": "6495756a990b6cfd97e88227d26ef96e4a9ecd1b",
+    "summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-temporal-composed/summary.json",
+      "sha256": "62a5b543015566c0592ba87e864e80955649123b02baa498d176255058319121"
+    },
+    "result": "Ten exact inventories, 51 actual tests and owning all-target strict Clippy pass.",
+    "commands": [
+      {
+        "argv": [
+          "/bin/bash",
+          "-p",
+          "scripts/check-temporal-security.sh"
+        ],
+        "exit": 0,
+        "log_sha256": "b9f4982798cc4244719d2bb9a8a5881c6f1d9c306e48baa84772e1a1e5cdbd3b",
+        "seconds": 524.4208741509356,
+        "source_stable": true,
+        "inputs_stable": true
+      },
+      {
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-quarantine",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "log_sha256": "e41d9a09ae3173a4eaa94cb2508e267d76508387e0523d6637633cbf97be4f1a",
+        "seconds": 101.38908362202346,
+        "source_stable": true,
+        "inputs_stable": true
+      }
+    ]
+  },
+  "ci_contract_mutations": {
+    "source": "6495756a990b6cfd97e88227d26ef96e4a9ecd1b",
+    "command": [
+      "python3",
+      "scripts/tests/check-security-ci-contract.test.py"
+    ],
+    "exit": 0,
+    "source_stable": true,
+    "seconds": 955.8555253869854,
+    "input_sha256": {
+      "scripts/check-security-ci-contract.py": "ef445fae4b52c472ac7cdc4f922571578a7c585ad6cfa3e25b8fb2097c5b8994",
+      "scripts/tests/check-security-ci-contract.test.py": "291de7dc4c4fa9ea44a0aed2c30eed591cd67fa39c84c1d215664694e0287c1e",
+      "scripts/check-temporal-security.sh": "f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101",
+      "scripts/tests/check-temporal-security.test.sh": "51996c0758edef0663a95a28174039ae2714282fee7bc806dd0c12aefa2494d8",
+      "scripts/run-security-execution-container.py": "bb20414e75a5ba5e34dce282b03c6675462631ad415b2849f5e4b1551543e954",
+      ".github/workflows/ci.yml": "84a9b0c9f72e3621d00bed384eab143d90ebede5cf7f33153fea76b4688a5ffa",
+      ".github/workflows/enterprise-hardening.yml": "b160b1b11322537616182a94f524c0f75167d8e5e51139db4b89ede56c00134c"
+    },
+    "log_sha256": "485d4398d13b6ee55e25efcce3603beb8e32dfcc686d30581aa0d6ecfdbfa8e1",
+    "scope": "Python structural and mutation contract suite on isolated candidate; no runtime, proof campaign, trusted capture or hosted qualification."
+  },
+  "ci_contract_mutations_summary": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-contract-mutations/summary.json",
+    "sha256": "db8df2eb72dcf5c20512bd9b039b0b26e438549df1b735177b19477b2b12d74f"
+  },
+  "later_threshold_inventory_delta": {
+    "checkpoint": "a4282db2517d08a7cf01b64061e2fc5a30e15e6e",
+    "delta": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-threshold-inventory/delta.json",
+      "sha256": "bdc78df7cf2700ddfed7fd8b66083cb411f2c38a81be3bf8f256669f425a2adb"
+    },
+    "targeted_probes": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-threshold-inventory/contract-probes.json",
+      "sha256": "3e15bfd0ce9084b20101b2168e8a52d4eccbc2779aef9d862202009061997bfd"
+    },
+    "scope": "Later one-name FIPS threshold enrollment changes only its parsed-job hash; current structural acceptance and missing-control/removed-feature refusals pass. Actual PQ runtime inventory is pending in R2-006 owning campaign."
+  },
+  "remaining_acceptance": [
+    "Finish remaining confirmed source repairs and candidate composition.",
+    "Pass all four required exact-head checks, classify other failures and answer reviews.",
+    "Obtain explicit Connor merge go-ahead."
+  ],
+  "limits": [
+    "No full final-candidate or hosted qualification from this component snapshot.",
+    "No trusted capture, proof campaign or general native isolation claim."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
