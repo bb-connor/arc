@@ -96,6 +96,15 @@ independent review of the authenticated copy-on-write map. It is registered only
 for tests. Durable persistence, trusted-root attachment and atomic production
 activation remain open, so cold-state capacity and G5 readiness are not closed.
 
+The [composed owner checkpoint](audits/review2-composed-owner-checkpoint-20261011.json)
+records the terminal `cf46d03851` run: kernel-core 90 pass, API Protect 280 pass,
+and separately classified broker/CLI failures. The CLI has 70 unavailable native
+platform tests plus two fixture failures. Portable native-broker capture/handoff
+failures are distinct and remain under investigation; a controlled umask022
+replay still fails. Reviewed orphan/export fixture repairs and equivalent Clippy
+simplifications await their composed renewals. The next control-plane/store and
+deception owner train runs independently on `e4bc85e479`.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.

@@ -1,0 +1,338 @@
+{
+  "schema": "chio.security.review2-composed-owner-checkpoint.v1",
+  "observed_utc": "2026-10-11T04:21:47.375114+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [],
+  "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+  "summary": {
+    "path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/summary.json",
+    "sha256": "7f6c4e01fcb045a0f06224500820003bd1c8feab6d19fb0254796193c3400779"
+  },
+  "commands": [
+    {
+      "label": "chio-kernel-core-owning",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel-core",
+        "--lib",
+        "--no-fail-fast"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 0,
+      "seconds": 9.338130870833993,
+      "log_sha256": "59e00a41bf2b8538a5b34681ca92e5dfacd6034fd9a0fee52b5982dcc19b80f3",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/01-chio-kernel-core-owning/result.json",
+      "result_sha256": "5c73bbebf1f30c3bca8f71697bf585013773a77b940d91f9ce9aaa401d04bee6",
+      "tests": {
+        "passed": 90,
+        "failed": 0,
+        "ignored": 0,
+        "binaries": 1
+      }
+    },
+    {
+      "label": "native-service-binaries",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--bins"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 0,
+      "seconds": 512.4765603877604,
+      "log_sha256": "ab210264809003b446f451a5f25c9bf55b8e91fade049db4bfc9b3eb246da1d5",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/02-native-service-binaries/result.json",
+      "result_sha256": "df1e20fa6f447bad2b0dea8942d3a15a4321aa379026837c1fe567fbf318912e",
+      "tests": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "binaries": 0
+      }
+    },
+    {
+      "label": "chio-secret-broker-owning",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--all-targets",
+        "--no-fail-fast"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 291.2761052758433,
+      "log_sha256": "cc61a171ca3862eab6a4944eb5c17d12d5442d46208e57fcda3d11fcd9b86266",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/03-chio-secret-broker-owning/result.json",
+      "result_sha256": "793fa2f20ce1433c51a81a7f58427934ecf92a0c2ffb82cbdc8bb458fcb9cc88",
+      "tests": {
+        "passed": 291,
+        "failed": 1,
+        "ignored": 0,
+        "binaries": 13
+      }
+    },
+    {
+      "label": "chio-cli-owning",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--all-targets",
+        "--no-fail-fast"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 1613.9299208121374,
+      "log_sha256": "b7669bf2fdfeec8042e031507acbfea2bd5ff587df0a7d43ed8c202df8094358",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/04-chio-cli-owning/result.json",
+      "result_sha256": "b8cb1543fdf733289b9aaa0d26cabc61786c394ec465f3ca0013b44330000250",
+      "tests": {
+        "passed": 1444,
+        "failed": 72,
+        "ignored": 7,
+        "binaries": 84
+      }
+    },
+    {
+      "label": "chio-api-protect-owning",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "--all-targets",
+        "--no-fail-fast"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 0,
+      "seconds": 288.7692176220007,
+      "log_sha256": "35c0af59390aaad0689ed6c616d7b82b4c214a0b867a8d15de1c3b528ef49019",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/05-chio-api-protect-owning/result.json",
+      "result_sha256": "0f47d47e6b2621a4308bd878a319fcb0d7773c208d84a272e70bae888a23dfba",
+      "tests": {
+        "passed": 280,
+        "failed": 0,
+        "ignored": 0,
+        "binaries": 2
+      }
+    },
+    {
+      "label": "broker-native-mcp",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--features",
+        "native-mcp",
+        "--all-targets",
+        "--no-fail-fast"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 270.2601867951453,
+      "log_sha256": "aab7758efc5d791a9d210cbd74513251fbadff2c02c88a6741a64579f6ec3391",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/06-broker-native-mcp/result.json",
+      "result_sha256": "cd10cd39f8a148e97ab589dbf0e4ef839d0b01b4ecc3a0ae4aa1913c40b48eae",
+      "tests": {
+        "passed": 327,
+        "failed": 5,
+        "ignored": 0,
+        "binaries": 13
+      }
+    },
+    {
+      "label": "broker-portable-gate",
+      "argv": [
+        "bash",
+        "scripts/check-secret-broker-boundary.sh",
+        "--portable"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 168.86834954284132,
+      "log_sha256": "e282bb95f74575985af6cd7b0b1a3fb940bf13fc38d343c75e08c7b82aca9e67",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/07-broker-portable-gate/result.json",
+      "result_sha256": "7435e8d41a7e1a11b542aaaf0ab10a739b3c74e993fa550abde1ede01c5d5cbe",
+      "tests": {
+        "passed": 42,
+        "failed": 1,
+        "ignored": 0,
+        "binaries": 10
+      }
+    },
+    {
+      "label": "strict-owning",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel-core",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-api-protect",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 274.89934116695076,
+      "log_sha256": "3fcd0c1dd1638ee1854ea0f09e874525b11d97d178b5e1981fd0cf56264bcfca",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/08-strict-owning/result.json",
+      "result_sha256": "48038422b93611e558b96ea539ef0b68c76fba54cb25d801895bbd29ff96fffd",
+      "tests": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "binaries": 0
+      }
+    },
+    {
+      "label": "strict-broker-all-features",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "exit": 101,
+      "seconds": 196.34056882886216,
+      "log_sha256": "f3f151f66885e511b2f3a5f62ee65bb018ffa50fa3c87f54f855c673281f6a18",
+      "source_stable": true,
+      "result_path": "/tmp/pr1160-ci-batch-20261010/composed-broker-cli-api-cf46/09-strict-broker-all-features/result.json",
+      "result_sha256": "097cf7ddd900f03d6c56f018b9399239f2994c20796b092fd15f58c9620c99f0",
+      "tests": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "binaries": 0
+      }
+    }
+  ],
+  "failure_dispositions": [
+    {
+      "failure": "Orphaned broker custody test fails at injected DELETE before recovery assertion",
+      "repair": "5c56c769d5f72c7a62254f254afc6246eba8827f",
+      "boundary": "Fixture-only foreign-key disabling on independent corruption connection; source reviewed, composed runtime renewal pending."
+    },
+    {
+      "failure": "CLI receipt export receives authenticated snapshot Building refusal",
+      "repair": "7dea6bae50389c8c0e847a003ab10481c68250d0",
+      "boundary": "Wait for receiptQuerySnapshot.state=ready within existing bound; source reviewed, composed runtime renewal pending."
+    },
+    {
+      "failure": "CLI proof fixture fails initial runtime parity package validation",
+      "boundary": "Claude C7 diagnosis and genuine fixture correction pending; no formal campaign."
+    },
+    {
+      "failure": "70 CLI native conformance/MCP tests cannot provision enforcement on local Linux ARM host",
+      "boundary": "Platform unavailable locally. Hosted Build and MSRV provision the existing Linux x86_64 enforcing fixture. No skip or substitute pass."
+    },
+    {
+      "failure": "Native broker capture or handoff fails before invoke at eight test threads",
+      "boundary": "Unresolved genuine failure under investigation. Four native process failures in full owning run, five in controlled umask022 replay. Do not classify as platform unavailable or umask-only."
+    },
+    {
+      "failure": "Strict default and all-feature lint reject two custody fixture expressions",
+      "repair": "e4bc85e479cf41d2b1c2b3ce7199b172e4ec4491",
+      "boundary": "Equivalent borrow and Boolean simplifications; format/diff passed, strict renewal pending."
+    },
+    {
+      "failure": "Actual broker portable gate stops at orphan test before native serial inventory",
+      "boundary": "Six custody controls pass and orphan control fails; later native inventory unexecuted, pending repaired gate renewal."
+    }
+  ],
+  "controlled_native_replay": {
+    "result": {
+      "source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "utc": "2026-10-11T04:10:33.497125+00:00",
+      "argv": [
+        "/var/tmp/pr1160-root-final-20261009/debug/deps/chio_secret_broker-51419309db9a0bcf",
+        "process_boundary_tests::native::",
+        "--test-threads",
+        "8"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/var/tmp/pr1160-root-final-20261009",
+        "CARGO_TERM_COLOR": "never",
+        "CHIO_CAPACITY_DIVISOR": "1",
+        "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-tripwire-input",
+        "CHIO_KEYLOG_AUDIT": "/var/tmp/pr1160-root-final-20261009/debug/chio-keylog-audit",
+        "CHIO_KEYLOG_WITNESS": "/var/tmp/pr1160-root-final-20261009/debug/chio-keylog-witness",
+        "RUST_TEST_THREADS": "8"
+      },
+      "old_umask": "0o2",
+      "umask": "022",
+      "binary_sha256_before": "f7f6a9de3f2ce8382944c15fda3e4fa467e5303482cc18480d0f73973c3558ec",
+      "scope": "Controlled cached binary execution; same frozen source and eight threads, with child creation umask022. No compile or source edits. Original full owning failure retained.",
+      "exit": 101,
+      "seconds": 63.37674834718928,
+      "binary_sha256_after": "f7f6a9de3f2ce8382944c15fda3e4fa467e5303482cc18480d0f73973c3558ec",
+      "log_sha256": "62d1fcd45787f2053fd01e1178028a695a062bf9b6f00b0aab825accfac5a91a",
+      "source_stable": true
+    },
+    "result_path": "/tmp/pr1160-ci-batch-20261010/native-process-umask022-cf46/result.json",
+    "result_sha256": "dc5fdde476380514b0d6497d4bc75cad0bdadf637bc273a5d149f5445393f80f",
+    "tests": {
+      "passed": 8,
+      "failed": 5,
+      "ignored": 0,
+      "filtered_out": 287
+    }
+  },
+  "current_composition": "e4bc85e479cf41d2b1c2b3ce7199b172e4ec4491",
+  "remaining_acceptance": [
+    "Finish native broker and proof fixture diagnoses, integrate reviewed repairs and renew affected gates.",
+    "Complete composed control-plane, store, decoy, deception and strict owner gates now running separately on e4bc85e479.",
+    "Reconcile source-pinned producer Originals and final qualification packets.",
+    "Pass four required checks on the published successor, classify other failures and answer review threads.",
+    "Obtain a fresh Connor merge go-ahead."
+  ],
+  "qualified": false,
+  "hosted_qualified": false,
+  "merged": false,
+  "limits": [
+    "Retain every failed and unavailable campaign separately. Counts summarize executed test reports and are not deduplicated across commands.",
+    "No new native confinement, cold-state, formal-proof, trusted authorization or full production-readiness claim."
+  ]
+}
