@@ -206,7 +206,7 @@ fn fixture(alternative_grants: bool) -> Fixture {
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let store = Arc::new(
         SqliteSecurityStateStore::open_with_trusted_clock(
-            &directory.path().join("throttle.db"),
+            directory.path().join("throttle.db"),
             clock.clone(),
         )
         .test_unwrap(),
