@@ -50,3 +50,43 @@ fn forged_public_split_cannot_wrap_its_share_total_into_admission() {
     assert_eq!(split.children.len(), count);
     assert_eq!(split.child_holders("new-child"), None);
 }
+
+#[test]
+fn zero_share_children_rejected_at_entry_capacity() {
+    let mut split = BudgetSplit::new("parent".into(), 0);
+    for index in 0..MAX_CHILDREN_PER_PARENT {
+        assert_eq!(split.verify_child_admission(index.to_string(), 0), Ok(()));
+    }
+    assert_eq!(
+        split.verify_child_admission("one-more".into(), 0),
+        Err(BudgetSplitError::ChildCapacityExhausted {
+            parent_token_id: "parent".into()
+        })
+    );
+    assert_eq!(split.children.len(), MAX_CHILDREN_PER_PARENT);
+    assert_eq!(split.verify_child_admission("0".into(), 0), Ok(()));
+    assert_eq!(split.try_admit_child("0".into(), 0), Ok(()));
+    assert_eq!(split.child_holders("0"), Some(1));
+}
+
+#[test]
+fn zero_share_children_rejected_at_identity_byte_capacity() {
+    const ID_BYTES: usize = 1_024;
+    let child_id = |index: usize| format!("{index:0ID_BYTES$}");
+    let mut split = BudgetSplit::new("parent".into(), 0);
+    let fitting = MAX_RETAINED_CHILD_ID_BYTES / ID_BYTES;
+    for index in 0..fitting {
+        assert_eq!(split.verify_child_admission(child_id(index), 0), Ok(()));
+    }
+    assert_eq!(
+        split.verify_child_admission(child_id(fitting), 0),
+        Err(BudgetSplitError::ChildCapacityExhausted {
+            parent_token_id: "parent".into()
+        })
+    );
+    assert_eq!(split.children.len(), fitting);
+    assert_eq!(split.try_admit_child(child_id(0), 0), Ok(()));
+    assert_eq!(split.release_child(&child_id(0), 0), Ok(()));
+    assert_eq!(split.child_share_bps(&child_id(0)), None);
+    assert_eq!(split.verify_child_admission(child_id(fitting), 0), Ok(()));
+}

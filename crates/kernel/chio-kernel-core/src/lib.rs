@@ -100,7 +100,8 @@ pub mod scope;
 
 pub use budget_split::{
     BudgetRegistry, BudgetSplit, BudgetSplitError, InMemoryBudgetRegistry, NoopBudgetRegistry,
-    MAX_BUDGET_SHARE_BPS,
+    MAX_BUDGET_PARENTS, MAX_BUDGET_SHARE_BPS, MAX_CHILDREN_PER_PARENT, MAX_REGISTRY_CHILD_EDGES,
+    MAX_REGISTRY_RETAINED_ID_BYTES, MAX_RETAINED_CHILD_ID_BYTES,
 };
 pub use capability_verify::{
     verify_capability, verify_capability_full, verify_capability_full_with_evidence,

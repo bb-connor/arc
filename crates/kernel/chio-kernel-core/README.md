@@ -51,7 +51,7 @@ containment does not add a portable context bridge or alter other caveat checks.
 | `capability_verify` | `verify_capability`, `verify_capability_with_floor`, `verify_capability_with_floor_and_trust_root`, `verify_capability_with_floor_and_resolver`, `verify_capability_full`, `VerifiedCapability`, `CapabilityError`, `TrustRootResolver` |
 | `guard` | `Guard`, `GuardContext`, `PortableToolCallRequest` |
 | `scope` | `resolve_matching_grants`, `resolve_capability_grants`, `MatchedGrant`, `ScopeMatchError` |
-| `budget_split` | `BudgetRegistry`, `BudgetSplit`, `InMemoryBudgetRegistry`, `NoopBudgetRegistry`, `MAX_BUDGET_SHARE_BPS`, `BudgetSplitError` |
+| `budget_split` | `BudgetRegistry`, `BudgetSplit`, `InMemoryBudgetRegistry`, `NoopBudgetRegistry`, `MAX_BUDGET_SHARE_BPS`, `MAX_CHILDREN_PER_PARENT`, `MAX_RETAINED_CHILD_ID_BYTES`, `MAX_BUDGET_PARENTS`, `MAX_REGISTRY_CHILD_EDGES`, `MAX_REGISTRY_RETAINED_ID_BYTES`, `BudgetSplitError` |
 | `receipts` | `sign_receipt`, `sign_receipt_with_handle`, `sign_receipt_relaying_trusted_body`, `ReceiptSigningError` |
 | `passport_verify` | `verify_passport`, `verify_parsed_passport`, `PortablePassportEnvelope`, `VerifiedPassport`, `VerifyError`, `PORTABLE_PASSPORT_SCHEMA` |
 | `normalized` | `NormalizedEvaluationVerdict`, `NormalizedVerifiedCapability`, `NormalizedScope`, `NormalizedCapability`, `NormalizationError` |

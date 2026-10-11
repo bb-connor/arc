@@ -570,28 +570,42 @@ impl ChioKernel {
         parent_share_bps: u16,
     ) -> Result<(), chio_kernel_core::BudgetSplitError> {
         use chio_kernel_core::BudgetRegistry;
-        let mut budgets = match self.budget_registry.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                // Recovering the guard keeps setup working, but tripping the flag
-                // means the next evaluation is denied at the pre-dispatch gate.
-                self.record_tcb_lock_poison("budget_registry");
-                poisoned.into_inner()
-            }
-        };
-        budgets.register_parent(parent_token_id, parent_share_bps)
+        self.budget_registry_for_setup()
+            .register_parent(parent_token_id, parent_share_bps)
+    }
+
+    /// Register a verified delegation parent with its token expiry, stamped
+    /// with the kernel's trusted time. A clock failure registers nothing.
+    pub(crate) fn register_expiring_budget_parent(
+        &self,
+        parent_token_id: String,
+        parent_share_bps: u16,
+        expires_at_secs: u64,
+    ) -> Result<(), KernelError> {
+        let now_secs = self.trusted_now_millis()?.as_secs();
+        self.budget_registry_for_setup()
+            .register_expiring_parent(parent_token_id, parent_share_bps, expires_at_secs, now_secs)
+            .map_err(|error| KernelError::DelegationInvalid(error.to_string()))
     }
 
     pub fn evict_budget_parent(&self, parent_token_id: &str) {
         use chio_kernel_core::BudgetRegistry;
-        let mut budgets = match self.budget_registry.lock() {
+        self.budget_registry_for_setup()
+            .evict_parent(parent_token_id);
+    }
+
+    /// Recovering the guard keeps setup working, but tripping the flag
+    /// means the next evaluation is denied at the pre-dispatch gate.
+    fn budget_registry_for_setup(
+        &self,
+    ) -> std::sync::MutexGuard<'_, chio_kernel_core::InMemoryBudgetRegistry> {
+        match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(poisoned) => {
                 self.record_tcb_lock_poison("budget_registry");
                 poisoned.into_inner()
             }
-        };
-        budgets.evict_parent(parent_token_id);
+        }
     }
 
     /// Check the revocation store for the capability and its entire
