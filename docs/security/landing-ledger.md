@@ -11,7 +11,7 @@ a later requirement state or establish current candidate qualification.
 ## Required CI repair and terminal local preflight (October 11 UTC)
 
 The [required CI preflight audit](audits/required-ci-preflight-20261011.json)
-records reviewed source `0df8edfaa1` and preserves **2,013 requirements**.
+records reviewed source `0df8edfaa1` and preserves **2,014 requirements**.
 Seven earlier repair states now explicitly record their publication in
 `36d77fe276`; their previous values and all 2,009 earlier requirements remain.
 Public `36d77fe276` passes Vet and Deny, fails Build on stale model metadata,
@@ -51,6 +51,8 @@ non-required results remain distinct from passes:
 - Nine redundant C++/Swift jobs are cancelled. Equivalent retained push runs
   `38125082335` and `38125082345` pass; their source trees and job commands match.
   The cancelled jobs themselves remain cancelled.
+
+The additional P3 [fuzz selector transport follow-up](../fuzzing/continuous.md#observed-selector-limitation-october-11-2026) records a dropped variable at the nested builder boundary. It causes full-inventory builds for subset requests; this full-33-target candidate loses no selected targets. It stays in the existing security follow-up track, with no additional PR or sampling waiver.
 
 The mandatory weights SHA-256 determinism/shape proof timed out in both automatic
 jobs at its unchanged budget. It remains **unproved and not owner-accepted**;
