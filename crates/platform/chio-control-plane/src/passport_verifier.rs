@@ -245,7 +245,14 @@ impl std::fmt::Display for RegistryUpdateError {
     }
 }
 
-impl std::error::Error for RegistryUpdateError {}
+impl std::error::Error for RegistryUpdateError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Busy | Self::Unsupported => None,
+            Self::Load(error) | Self::Refused(error) | Self::Persist(error) => Some(error),
+        }
+    }
+}
 
 impl From<RegistryUpdateError> for CliError {
     fn from(error: RegistryUpdateError) -> Self {
@@ -1894,5 +1901,32 @@ mod revocation_lag_tests {
             before, after,
             "a passport lifecycle revoke must not observe a capability revocation lag sample"
         );
+    }
+}
+
+#[cfg(test)]
+mod registry_update_error_tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn registry_update_error_source_reaches_retained_cli_error() {
+        for error in [
+            RegistryUpdateError::Load(CliError::cli_other_error("cause")),
+            RegistryUpdateError::Refused(CliError::cli_other_error("cause")),
+            RegistryUpdateError::Persist(CliError::cli_other_error("cause")),
+        ] {
+            let source = error.source();
+            assert!(
+                source.is_some_and(|cause| cause.downcast_ref::<CliError>().is_some()),
+                "{error:?} must expose its retained CliError"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_update_error_without_native_cause_has_no_source() {
+        assert!(RegistryUpdateError::Busy.source().is_none());
+        assert!(RegistryUpdateError::Unsupported.source().is_none());
     }
 }
