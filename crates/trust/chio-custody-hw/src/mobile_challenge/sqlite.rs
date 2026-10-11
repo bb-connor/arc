@@ -21,6 +21,8 @@ struct DatabaseCustody {
     #[cfg(unix)]
     file: std::fs::File,
     #[cfg(unix)]
+    parent: std::fs::File,
+    #[cfg(unix)]
     device: u64,
     #[cfg(unix)]
     inode: u64,
@@ -31,7 +33,24 @@ impl DatabaseCustody {
     fn validate(&self) -> Result<(), MobileChallengeError> {
         use std::os::unix::fs::MetadataExt as _;
 
-        validate_database_parent(&self.path)?;
+        let current_parent = validate_database_parent(&self.path)?;
+        let retained_parent_metadata = self.parent.metadata().map_err(|error| {
+            MobileChallengeError::StoreUnavailable(format!(
+                "mobile challenge parent descriptor metadata failed: {error}"
+            ))
+        })?;
+        let current_parent_metadata = current_parent.metadata().map_err(|error| {
+            MobileChallengeError::StoreUnavailable(format!(
+                "mobile challenge current parent metadata failed: {error}"
+            ))
+        })?;
+        if current_parent_metadata.dev() != retained_parent_metadata.dev()
+            || current_parent_metadata.ino() != retained_parent_metadata.ino()
+        {
+            return Err(MobileChallengeError::StoreUnavailable(
+                "mobile challenge database parent identity changed".to_string(),
+            ));
+        }
         let path_metadata = std::fs::symlink_metadata(&self.path).map_err(|error| {
             MobileChallengeError::StoreUnavailable(format!(
                 "mobile challenge database path metadata failed: {error}"
@@ -44,6 +63,7 @@ impl DatabaseCustody {
         })?;
         validate_database_metadata(&path_metadata)?;
         validate_database_metadata(&file_metadata)?;
+        validate_descriptor_acl(&self.file)?;
         if path_metadata.dev() != self.device
             || path_metadata.ino() != self.inode
             || file_metadata.dev() != self.device
@@ -579,13 +599,14 @@ fn validate_database_path(path: &Path) -> Result<(), MobileChallengeError> {
 fn prepare_database_custody(path: &Path) -> Result<DatabaseCustody, MobileChallengeError> {
     use std::os::unix::fs::MetadataExt as _;
 
-    validate_database_parent(path)?;
+    let parent = validate_database_parent(path)?;
     let owned_fd = rustix::fs::open(
         path,
         rustix::fs::OFlags::RDWR
             | rustix::fs::OFlags::CREATE
             | rustix::fs::OFlags::CLOEXEC
-            | rustix::fs::OFlags::NOFOLLOW,
+            | rustix::fs::OFlags::NOFOLLOW
+            | rustix::fs::OFlags::NONBLOCK,
         rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
     )
     .map_err(|error| {
@@ -600,9 +621,11 @@ fn prepare_database_custody(path: &Path) -> Result<DatabaseCustody, MobileChalle
         ))
     })?;
     validate_database_metadata(&metadata)?;
+    validate_descriptor_acl(&file)?;
     let custody = DatabaseCustody {
         path: path.to_path_buf(),
         file,
+        parent,
         device: metadata.dev(),
         inode: metadata.ino(),
     };
@@ -618,7 +641,7 @@ fn prepare_database_custody(_path: &Path) -> Result<DatabaseCustody, MobileChall
 }
 
 #[cfg(unix)]
-fn validate_database_parent(path: &Path) -> Result<(), MobileChallengeError> {
+fn validate_database_parent(path: &Path) -> Result<std::fs::File, MobileChallengeError> {
     use std::os::unix::fs::MetadataExt as _;
 
     let parent = path.parent().ok_or_else(|| {
@@ -636,11 +659,39 @@ fn validate_database_parent(path: &Path) -> Result<(), MobileChallengeError> {
             "mobile challenge database parent must not traverse symbolic links".to_string(),
         ));
     }
-    let metadata = std::fs::symlink_metadata(parent).map_err(|error| {
+    let path_metadata = std::fs::symlink_metadata(parent).map_err(|error| {
         MobileChallengeError::StoreUnavailable(format!(
             "mobile challenge database parent metadata failed: {error}"
         ))
     })?;
+    let descriptor = rustix::fs::open(
+        parent,
+        rustix::fs::OFlags::RDONLY
+            | rustix::fs::OFlags::DIRECTORY
+            | rustix::fs::OFlags::CLOEXEC
+            | rustix::fs::OFlags::NOFOLLOW
+            | rustix::fs::OFlags::NONBLOCK,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(|error| {
+        MobileChallengeError::StoreUnavailable(format!(
+            "open mobile challenge database parent descriptor: {error}"
+        ))
+    })?;
+    let file = std::fs::File::from(descriptor);
+    let metadata = file.metadata().map_err(|error| {
+        MobileChallengeError::StoreUnavailable(format!(
+            "mobile challenge database parent descriptor metadata failed: {error}"
+        ))
+    })?;
+    if !path_metadata.is_dir()
+        || path_metadata.dev() != metadata.dev()
+        || path_metadata.ino() != metadata.ino()
+    {
+        return Err(MobileChallengeError::StoreUnavailable(
+            "mobile challenge database parent changed while opening".to_string(),
+        ));
+    }
     if !metadata.file_type().is_dir()
         || metadata.uid() != rustix::process::geteuid().as_raw()
         || metadata.mode() & 0o022 != 0
@@ -653,7 +704,42 @@ fn validate_database_parent(path: &Path) -> Result<(), MobileChallengeError> {
             metadata.mode() & 0o777
         )));
     }
+    validate_descriptor_acl(&file)?;
+    Ok(file)
+}
+
+#[cfg(target_vendor = "apple")]
+fn validate_descriptor_acl(file: &std::fs::File) -> Result<(), MobileChallengeError> {
+    let grants_authority =
+        chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file).map_err(
+            |error| {
+                MobileChallengeError::StoreUnavailable(format!(
+                    "inspect mobile challenge descriptor ACL: {error}"
+                ))
+            },
+        )?;
+    if grants_authority {
+        return Err(MobileChallengeError::StoreUnavailable(
+            "mobile challenge descriptor grants extended ACL authority".to_string(),
+        ));
+    }
     Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn validate_descriptor_acl(_file: &std::fs::File) -> Result<(), MobileChallengeError> {
+    // Linux POSIX ACL authority is constrained by the mode mask checked above.
+    Ok(())
+}
+
+#[cfg(all(
+    unix,
+    not(any(target_os = "linux", target_os = "android", target_vendor = "apple"))
+))]
+fn validate_descriptor_acl(_file: &std::fs::File) -> Result<(), MobileChallengeError> {
+    Err(MobileChallengeError::StoreUnavailable(
+        "mobile challenge descriptor ACL custody is unsupported on this platform".to_string(),
+    ))
 }
 
 #[cfg(unix)]
