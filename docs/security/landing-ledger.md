@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Fourth repair-delta review (October 11 UTC)
+
+The [fourth review](../reviews/2026-10-11-pr1160-review4/findings.md) adds three
+P2 obligations and one P3 oracle gap. The [intake audit](audits/review4-intake-20261011.json)
+records all four and preserves the 1,998 earlier requirements, for **2,002 total**.
+Claude is repairing the final trusted-time sample taken before a blocking registry
+lock. Root fixed the helper inventory and passed its focused and full parent
+selftests. The issuer FIFO observation race is source-repaired; its runtime
+renewal is pending. The cold-map duplicate oracle now keeps a valid five-row
+shape, with runtime and mutation evidence still pending.
+
+The issuer test uses a spare test-only queue slot for the observation marker;
+production capacity, deadlines and no-start assertions are unchanged. This
+accepted alternative and the review's original recommendation both remain in
+the audit. No review obligation is silently dismissed. The public head remains
+`974f22914b`; local composition, exact-head hosted checks and explicit merge
+approval remain outstanding.
+
 ## Required CI terminal results and repair batch (October 11 UTC)
 
 All four required checks on published `974f22914b` have reported. Cargo Vet and

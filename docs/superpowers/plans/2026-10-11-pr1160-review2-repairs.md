@@ -421,3 +421,13 @@ evidence are pending. Initial Tokio blocking-queue time is outside the fetch bud
 - The fixed five-event native checkpoint trigger is privately integrated at `0ca1e3fb31` with bounded source approval. Its corrected wording at `2a771bba40` distinguishes sequential maintenance observations from later concurrent appends and has independent approval. The actual native 10-second fence, archive/open cost and cold-state acceptance remain open. Preserve `903189`, `e017687` and `ed3f1a` separately; they are not silently superseded or composed.
 - Cold-map preparation is test-only and independently reviewed. Durable persistence, trusted-root attachment and atomic production activation remain open; it does not close cold-state or G5 readiness.
 - Root is running the composed control-plane/store owners, Linux decoy and actual deception gate on frozen `e4bc85e479`, with explicit umask022. Corrected broker/CLI fixture renewals follow their pending repair handoffs. Shared CI content pins remain Root-owned. No cap raise, baseline waiver, authorization rotation or proof campaign. No merge without Connor's new go-ahead.
+
+
+## Fourth review follow-up
+
+- R4-001 (Claude C2): hold the parent registry mutex before the final trusted-time sample. Preserve a deterministic held-lock/clock-advance Original, refusal without insertion, clock failure behavior and owning/clock checks.
+- R4-002 (Root): exact helper inventory corrected by `8781b9b176`; genuine Original and focused/full parent selftests pass at the repaired source overlay. Independent review pending.
+- R4-003 (Claude C3, Root integration): `d3669ed272` uses one worker and two test-only slots for the expired job and its FIFO observer. Runtime renewal pending; production bounds and all no-start assertions remain unchanged.
+- R4-004 (Root): `9d07df2675` tests duplicate identity/outbox rows in an otherwise valid five-row Grant. Retain predecessor-oracle and removed-duplicate-guard controls, final cold-map tests and strict lint before acceptance.
+
+The canonical ledger now preserves 2,002 requirements. These rows extend the same replacement batch and do not open another landing PR.
