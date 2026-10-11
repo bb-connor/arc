@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Owner renewal and fixture corrections (October 11 UTC)
+
+The [owner renewal audit](audits/owner-renewal-followup-20261011.json) preserves
+terminal outcomes and source-reviewed repairs through 70bf8863d4. The ledger now
+contains **2,005 requirements**. The new snapshot-count fixture row and two
+updated current states preserve every earlier requirement, source and
+observation, including the previous state values.
+
+The store owner on e4bc85e479 finished **2,404 passed, two failed and 13 ignored**
+at the top level; a nested subprocess control passed separately. The failures
+were the reservation fixture's mismatched authority time and a count observer
+reading intentionally damaged custody. The unchanged custody verifier refused
+correctly. Both fixture corrections retain their safety assertions and require
+focused renewal. Strict all-target lint passed for the six owning packages on
+that predecessor.
+
+The native trace also caught a marker being observed before its bytes were
+written. The reviewed fixture now publishes both markers atomically. Separate
+capture-deadline failures predate the staged history-checkpoint correction;
+final native serial and parallel acceptance is pending. The proof-fixture hash
+mismatch remains under diagnosis. These local results do not establish hosted
+qualification or production readiness.
+
 ## Composed owner and fourth-review checkpoint (October 11 UTC)
 
 The [follow-up audit](audits/review4-followup-20261011.json) records source-reviewed
