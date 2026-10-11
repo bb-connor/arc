@@ -60,7 +60,7 @@ FIXTURES["broker HTTPS preparation deadline and pinned dispatch"] = {
     "argv": ["test", "--locked", "-p", "chio-secret-broker", "--lib", "generic_https::tests::"],
     "names": [
         "generic_https::tests::a_resolution_observed_at_or_after_its_deadline_is_refused",
-        "generic_https::tests::an_answer_after_the_absolute_resolution_deadline_fails_closed",
+        "generic_https::tests::an_expired_deadline_fails_closed_end_to_end",
         "generic_https::tests::dns_rebinding_tls_redirect_size_timeout_and_canary_responses_fail_closed",
         "generic_https::tests::executor_counts_response_head_overhead_in_the_signed_combined_budget",
         "generic_https::tests::forbidden_headers_provider_collisions_body_preview_and_options_deny_before_secret_use",
@@ -77,6 +77,25 @@ FIXTURES["broker HTTPS preparation deadline and pinned dispatch"] = {
         "generic_https::tests::stalled_resolution_fails_closed_at_the_signed_request_timeout",
         "generic_https::tests::stalled_resolutions_hold_the_in_flight_cap_and_further_lookups_fail_closed",
     ],
+}
+
+
+FIXTURES["broker expired custody and operation ownership"] = {
+    "argv": ["test", "--locked", "-p", "chio-secret-broker", "--lib", "service::tests::custody_cases::"],
+    "names": [
+        "service::tests::custody_cases::expired_captured_custody_stays_with_its_dispatch_owner",
+        "service::tests::custody_cases::expired_pre_capture_custody_is_tombstoned_and_reclaimed_on_prepare",
+        "service::tests::custody_cases::idle_reclaim_releases_expired_pre_capture_custody_without_a_new_prepare",
+        "service::tests::custody_cases::orphaned_custody_is_an_integrity_refusal_that_still_reclaims_the_rest",
+        "service::tests::custody_cases::prepare_dispatch_resolves_the_destination_once_before_retaining_custody",
+        "service::tests::custody_cases::reclaim_never_fails_an_attempt_whose_execution_has_captured_authority",
+        "service::tests::custody_cases::reclaim_never_fails_an_attempt_whose_preparation_retry_is_in_flight",
+    ],
+}
+
+FIXTURES["broker idle custody reclaim cadence"] = {
+    "argv": ["test", "--locked", "-p", "chio-secret-broker", "--lib", "daemon_runtime::tests::idle_custody_reclaim_never_starts_after_stop_and_runs_once_per_interval"],
+    "names": ["daemon_runtime::tests::idle_custody_reclaim_never_starts_after_stop_and_runs_once_per_interval"],
 }
 
 
