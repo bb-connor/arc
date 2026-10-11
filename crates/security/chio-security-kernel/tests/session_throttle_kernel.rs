@@ -180,6 +180,27 @@ struct Fixture {
     _directory: tempfile::TempDir,
 }
 
+fn kernel_config(trusted_issuers: Vec<chio_core::PublicKey>) -> KernelConfig {
+    KernelConfig {
+        keypair: Keypair::generate(),
+        ca_public_keys: trusted_issuers,
+        max_delegation_depth: 5,
+        policy_hash: "throttle-test-policy".to_owned(),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
+        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+    }
+}
+
 fn fixture(alternative_grants: bool) -> Fixture {
     let clock = Arc::new(FixedClock::from_millis(NOW_UNIX_MS));
     let directory = chio_test_support::private_tempdir().test_unwrap();
@@ -195,27 +216,7 @@ fn fixture(alternative_grants: bool) -> Fixture {
         session_id: SessionId::new("throttle-session").test_unwrap(),
     };
     install_one_invocation_throttle(&store, &key);
-    let mut kernel = ChioKernel::new_with_clock(
-        KernelConfig {
-            keypair: Keypair::generate(),
-            ca_public_keys: Vec::new(),
-            max_delegation_depth: 5,
-            policy_hash: "throttle-test-policy".to_owned(),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: true,
-            allow_ephemeral_revocation_store: true,
-            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        },
-        clock.clone(),
-    );
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(Vec::new()), clock.clone());
     let invocations = Arc::new(AtomicUsize::new(0));
     kernel.register_tool_server(Box::new(CountingReadServer {
         invocations: invocations.clone(),
@@ -552,4 +553,65 @@ fn actual_session_claim_preserves_one_throttle_unit_across_nonce_preflight_and_r
         ))
     ));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn fresh_kernel_reusing_session_and_request_names_consumes_a_new_throttle_attempt() {
+    let mut fixture = fixture(false);
+    let context = session_context(&fixture);
+    fixture
+        .kernel
+        .set_security_invocation_context_authority(Arc::new(SessionContextAuthority));
+    let operation = operation(&fixture.request);
+    let first = tool_response(
+        fixture
+            .kernel
+            .evaluate_session_operation(&context, &operation)
+            .test_unwrap(),
+    );
+    assert_eq!(first.verdict, Verdict::Allow);
+    assert!(first.output.is_some());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+
+    let clock = Arc::new(FixedClock::from_millis(NOW_UNIX_MS));
+    let mut recreated = ChioKernel::new_with_clock(
+        kernel_config(vec![fixture.request.capability.issuer.clone()]),
+        clock.clone(),
+    );
+    recreated.register_tool_server(Box::new(CountingReadServer {
+        invocations: fixture.invocations.clone(),
+    }));
+    recreated.add_guard(Box::new(SessionThrottleGuard::new(
+        fixture._store.clone(),
+        clock,
+        MissingContextPolicy::Deny,
+    )));
+    recreated.set_security_invocation_context_authority(Arc::new(SessionContextAuthority));
+    recreated
+        .open_session_with_id(
+            context.session_id.clone(),
+            fixture.request.agent_id.clone(),
+            vec![fixture.request.capability.clone()],
+        )
+        .test_unwrap();
+    recreated
+        .activate_session(&context.session_id)
+        .test_unwrap();
+    assert!(recreated
+        .session(&context.session_id)
+        .test_unwrap()
+        .request_lineage(&context.request_id)
+        .is_none());
+
+    let repeated = tool_response(
+        recreated
+            .evaluate_session_operation(&context, &operation)
+            .test_unwrap(),
+    );
+    assert_eq!(
+        (repeated.verdict, fixture.invocations.load(Ordering::SeqCst)),
+        (Verdict::Deny, 1),
+        "a fresh acquired claim must not reuse another kernel's throttle attempt"
+    );
+    assert!(repeated.output.is_none());
 }
