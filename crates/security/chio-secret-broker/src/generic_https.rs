@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
@@ -12,12 +15,14 @@ use crate::audit::{
 use crate::backend::SecretMaterial;
 use crate::proof::{body_digest, caller_header_digest, caller_option_digest, RequestProof};
 use crate::protocol::{
-    BrokerRequest, BrokerScheme, HeaderField, RequestConstraints, MAX_HEADER_COUNT,
+    BrokerDestination, BrokerRequest, BrokerScheme, HeaderField, RequestConstraints,
+    MAX_HEADER_COUNT,
 };
 use crate::provider::{rejects_forbidden_caller_header, ProviderAdapter};
 use crate::{BrokerError, Result};
 
 const MAX_RESOLVED_ADDRESSES: usize = 16;
+const MAX_RESOLUTIONS_IN_FLIGHT: usize = 4;
 pub(super) const MAX_RESPONSE_HEAD_BYTES: usize = 16_384;
 
 const fn is_redirect_status(status: u16) -> bool {
@@ -186,6 +191,38 @@ pub struct GenericHttpsExecutor {
     transport: Arc<dyn PinnedHttpsTransport>,
     network_policy: NetworkPolicy,
     exact_destination: Option<(String, u16)>,
+    resolutions_in_flight: Arc<AtomicUsize>,
+}
+
+/// A destination resolved and checked against the network policy exactly
+/// once. Preparation dispatches only to this address and only for this
+/// destination, so no later lookup can substitute a rebound address.
+pub(crate) struct PinnedDestination {
+    destination: BrokerDestination,
+    address: IpAddr,
+}
+
+/// Counts one resolver lookup against the executor's in-flight cap until the
+/// lookup itself returns, including a lookup its caller stopped waiting for.
+struct ResolutionSlot(Arc<AtomicUsize>);
+
+impl ResolutionSlot {
+    fn acquire(in_flight: &Arc<AtomicUsize>) -> Result<Self> {
+        in_flight
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                (count < MAX_RESOLUTIONS_IN_FLIGHT).then_some(count + 1)
+            })
+            .map_err(|_| {
+                BrokerError::Upstream("destination resolution capacity is exhausted".to_string())
+            })?;
+        Ok(Self(Arc::clone(in_flight)))
+    }
+}
+
+impl Drop for ResolutionSlot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 
 pub(crate) enum HttpsDispatchFailure {
@@ -202,6 +239,7 @@ impl GenericHttpsExecutor {
             transport: Arc::new(RustlsPinnedHttpsTransport::new()?),
             network_policy: NetworkPolicy::production(),
             exact_destination: None,
+            resolutions_in_flight: Arc::default(),
         })
     }
 
@@ -216,6 +254,7 @@ impl GenericHttpsExecutor {
             transport,
             network_policy,
             exact_destination: None,
+            resolutions_in_flight: Arc::default(),
         }
     }
 
@@ -224,7 +263,7 @@ impl GenericHttpsExecutor {
         request: &BrokerRequest,
         constraints: &RequestConstraints,
         proof: &RequestProof,
-    ) -> Result<()> {
+    ) -> Result<PinnedDestination> {
         validate_request_before_secret_use(request, constraints)?;
         if proof.body.body_sha256 != body_digest(&request.body)
             || proof.body.caller_headers_sha256 != caller_header_digest(&request.headers)?
@@ -234,8 +273,7 @@ impl GenericHttpsExecutor {
                 "request changed after proof verification".to_string(),
             ));
         }
-        let _ = self.resolve_and_pin(&request.destination)?;
-        Ok(())
+        self.pin_destination(request)
     }
 
     pub(crate) fn prepare(
@@ -244,16 +282,21 @@ impl GenericHttpsExecutor {
         request: &BrokerRequest,
         constraints: &RequestConstraints,
         credential: &SecretMaterial,
+        pinned: &PinnedDestination,
     ) -> Result<PreparedHttpsDispatch> {
         validate_request_before_secret_use(request, constraints)?;
         let mut prepared = provider.prepare(request, constraints, credential)?;
-        let pinned_address = self.resolve_and_pin(&prepared.caller.destination)?;
         let destination = &prepared.caller.destination;
+        if *destination != pinned.destination {
+            return Err(BrokerError::AuthorizationDenied(
+                "prepared destination differs from its pinned resolution".to_string(),
+            ));
+        }
         Ok(PreparedHttpsDispatch {
             outbound: PinnedHttpsRequest {
                 scheme: destination.scheme,
                 original_hostname: destination.normalized_host.clone(),
-                pinned_address,
+                pinned_address: pinned.address,
                 port: destination.explicit_port,
                 method: destination.method.clone(),
                 path_and_query: destination.exact_path_and_query.clone(),
@@ -417,7 +460,8 @@ impl GenericHttpsExecutor {
         validated.map_err(HttpsDispatchFailure::Response)
     }
 
-    fn resolve_and_pin(&self, destination: &crate::protocol::BrokerDestination) -> Result<IpAddr> {
+    fn pin_destination(&self, request: &BrokerRequest) -> Result<PinnedDestination> {
+        let destination = &request.destination;
         if self.exact_destination.as_ref().is_some_and(|(host, port)| {
             destination.scheme != BrokerScheme::Https
                 || &destination.normalized_host != host
@@ -436,11 +480,43 @@ impl GenericHttpsExecutor {
         let resolved = if let Some(address) = literal_address {
             vec![address]
         } else {
-            self.resolver
-                .resolve(&destination.normalized_host, destination.explicit_port)
-                .map_err(BrokerError::redacted)?
+            self.resolve_within(
+                &destination.normalized_host,
+                destination.explicit_port,
+                Duration::from_millis(request.options.timeout_ms),
+            )?
         };
-        validate_resolution(&resolved, self.network_policy)
+        Ok(PinnedDestination {
+            destination: destination.clone(),
+            address: validate_resolution(&resolved, self.network_policy)?,
+        })
+    }
+
+    /// Resolve on a detached thread and wait at most the signed request
+    /// timeout. A stalled lookup keeps its slot until the resolver returns, so
+    /// the caller never waits past `timeout` and abandoned lookups never exceed
+    /// `MAX_RESOLUTIONS_IN_FLIGHT`.
+    fn resolve_within(&self, host: &str, port: u16, timeout: Duration) -> Result<Vec<IpAddr>> {
+        let slot = ResolutionSlot::acquire(&self.resolutions_in_flight)?;
+        let resolver = Arc::clone(&self.resolver);
+        let host = host.to_string();
+        let (sender, receiver) = mpsc::sync_channel(1);
+        std::thread::Builder::new()
+            .name("chio-broker-resolve".to_string())
+            .spawn(move || {
+                let _slot = slot;
+                let _ = sender.send(resolver.resolve(&host, port).map_err(BrokerError::redacted));
+            })
+            .map_err(|_| BrokerError::Upstream("destination resolution failed".to_string()))?;
+        match receiver.recv_timeout(timeout) {
+            Ok(resolved) => resolved,
+            Err(RecvTimeoutError::Timeout) => Err(BrokerError::Upstream(
+                "destination resolution timed out".to_string(),
+            )),
+            Err(RecvTimeoutError::Disconnected) => Err(BrokerError::Upstream(
+                "destination resolution failed".to_string(),
+            )),
+        }
     }
 }
 
@@ -930,6 +1006,16 @@ mod tests {
         .test_expect("provider")
     }
 
+    pub(super) fn pin_and_prepare(
+        executor: &GenericHttpsExecutor,
+        request: &BrokerRequest,
+        constraints: &RequestConstraints,
+        credential: &SecretMaterial,
+    ) -> Result<PreparedHttpsDispatch> {
+        let pinned = executor.pin_destination(request)?;
+        executor.prepare(&provider(), request, constraints, credential, &pinned)
+    }
+
     #[test]
     fn local_adapter_pins_endpoint_and_tls_before_credential_delivery(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -975,14 +1061,14 @@ mod tests {
             request.options.timeout_ms = 2000;
             constraints.maximum_timeout_ms = 2000;
             for change in 0..3 {
-                let mut other = request.destination.clone();
+                let mut other = request.clone();
                 match change {
-                    0 => other.normalized_host = "different.example".into(),
-                    1 => other.explicit_port = if port == 443 { 444 } else { 443 },
-                    _ => other.normalized_host = "127.0.0.1".into(),
+                    0 => other.destination.normalized_host = "different.example".into(),
+                    1 => other.destination.explicit_port = if port == 443 { 444 } else { 443 },
+                    _ => other.destination.normalized_host = "127.0.0.1".into(),
                 }
                 assert!(matches!(
-                    executor.resolve_and_pin(&other),
+                    executor.pin_destination(&other),
                     Err(BrokerError::AuthorizationDenied(_))
                 ));
             }
@@ -1012,7 +1098,7 @@ mod tests {
                 Ok(received)
             });
             let credential = SecretMaterial::new(b"local-adapter-canary".to_vec());
-            let prepared = executor.prepare(&provider(), &request, &constraints, &credential)?;
+            let prepared = pin_and_prepare(&executor, &request, &constraints, &credential)?;
             let response = executor.dispatch(prepared, &constraints, &credential);
             let received = server
                 .join()
@@ -1080,27 +1166,19 @@ mod tests {
         forbidden.headers = vec![
             HeaderField::normalized("Authorization", b"caller").test_expect("forbidden header")
         ];
-        assert!(executor
-            .prepare(&provider(), &forbidden, &constraints, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&executor, &forbidden, &constraints, &credential).is_err());
 
         let mut body_changed = request.clone();
         body_changed.body.push(0);
-        assert!(executor
-            .prepare(&provider(), &body_changed, &constraints, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&executor, &body_changed, &constraints, &credential).is_err());
 
         let mut option_changed = request.clone();
         option_changed.options.streaming = true;
-        assert!(executor
-            .prepare(&provider(), &option_changed, &constraints, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&executor, &option_changed, &constraints, &credential).is_err());
 
         let mut collision = constraints;
         collision.provider_owned_headers = vec!["x-api-key".to_string()];
-        assert!(executor
-            .prepare(&provider(), &request, &collision, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&executor, &request, &collision, &credential).is_err());
     }
 
     #[test]
@@ -1118,8 +1196,7 @@ mod tests {
             let (request, constraints) = request_and_constraints();
             let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
             let executor = executor(mode, vec![public]);
-            let prepared = executor
-                .prepare(&provider(), &request, &constraints, &credential)
+            let prepared = pin_and_prepare(&executor, &request, &constraints, &credential)
                 .test_expect("prepare");
             assert!(executor
                 .dispatch(prepared, &constraints, &credential)
@@ -1132,9 +1209,7 @@ mod tests {
             ResponseMode::Valid,
             vec!["127.0.0.1".parse().test_expect("address")],
         );
-        assert!(restricted
-            .prepare(&provider(), &request, &constraints, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&restricted, &request, &constraints, &credential).is_err());
     }
 
     #[test]
@@ -1147,9 +1222,8 @@ mod tests {
             ResponseMode::NotModified,
             vec!["93.184.216.34".parse().test_expect("address")],
         );
-        let prepared = executor
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&executor, &request, &constraints, &credential).test_expect("prepare");
         let (status, _headers, body) = executor
             .dispatch(prepared, &constraints, &credential)
             .test_expect("304 cache validation response");
@@ -1171,9 +1245,7 @@ mod tests {
                 allow_exact_address: Some("1.1.1.1".parse().test_expect("address")),
             },
         );
-        assert!(mismatched
-            .prepare(&provider(), &request, &constraints, &credential)
-            .is_err());
+        assert!(pin_and_prepare(&mismatched, &request, &constraints, &credential).is_err());
 
         let matching = GenericHttpsExecutor::new(
             Arc::new(StaticResolver(Vec::new())),
@@ -1183,9 +1255,8 @@ mod tests {
                 allow_exact_address: Some("93.184.216.34".parse().test_expect("address")),
             },
         );
-        let prepared = matching
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&matching, &request, &constraints, &credential).test_expect("prepare");
         matching
             .dispatch(prepared, &constraints, &credential)
             .test_expect("matching IP exception");
@@ -1206,8 +1277,7 @@ mod tests {
         let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
         let (request, constraints) = request_and_constraints();
 
-        let prepared = executor
-            .prepare(&provider(), &request, &constraints, &credential)
+        let prepared = pin_and_prepare(&executor, &request, &constraints, &credential)
             .test_expect("prepare and pin public address");
         assert_eq!(calls.load(Ordering::SeqCst), 1);
 
@@ -1215,6 +1285,79 @@ mod tests {
             .dispatch(prepared, &constraints, &credential)
             .test_expect("dispatch retained pinned request");
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn prepare_refuses_a_destination_other_than_its_pinned_resolution() {
+        let executor = executor(
+            ResponseMode::Valid,
+            vec!["93.184.216.34".parse().test_expect("address")],
+        );
+        let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
+        let (request, constraints) = request_and_constraints();
+        let pinned = executor
+            .pin_destination(&request)
+            .test_expect("pin destination");
+        let mut rebound = request.clone();
+        rebound.destination = BrokerDestination::parse("https://rebound.example/v1", "POST", false)
+            .test_expect("destination");
+        assert!(matches!(
+            executor.prepare(&provider(), &rebound, &constraints, &credential, &pinned),
+            Err(BrokerError::AuthorizationDenied(message))
+                if message == "prepared destination differs from its pinned resolution"
+        ));
+    }
+
+    /// Blocks every lookup until the test drops the gate sender.
+    struct GatedResolver(std::sync::Mutex<mpsc::Receiver<()>>);
+
+    impl DestinationResolver for GatedResolver {
+        fn resolve(&self, _host: &str, _port: u16) -> Result<Vec<IpAddr>> {
+            if let Ok(gate) = self.0.lock() {
+                let _ = gate.recv();
+            }
+            Ok(vec!["93.184.216.34".parse().test_expect("address")])
+        }
+    }
+
+    fn gated_executor() -> (GenericHttpsExecutor, mpsc::Sender<()>) {
+        let (release, gate) = mpsc::channel();
+        let executor = GenericHttpsExecutor::new(
+            Arc::new(GatedResolver(std::sync::Mutex::new(gate))),
+            Arc::new(StaticTransport(ResponseMode::Valid)),
+            NetworkPolicy::production(),
+        );
+        (executor, release)
+    }
+
+    #[test]
+    fn stalled_resolution_fails_closed_at_the_signed_request_timeout() {
+        let (executor, release) = gated_executor();
+        let (request, _constraints) = request_and_constraints();
+        assert!(matches!(
+            executor.pin_destination(&request),
+            Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
+        ));
+        drop(release);
+    }
+
+    #[test]
+    fn stalled_resolutions_hold_the_in_flight_cap_and_further_lookups_fail_closed() {
+        let (executor, release) = gated_executor();
+        let (mut request, _constraints) = request_and_constraints();
+        request.options.timeout_ms = 1;
+        for _ in 0..MAX_RESOLUTIONS_IN_FLIGHT {
+            assert!(matches!(
+                executor.pin_destination(&request),
+                Err(BrokerError::Upstream(message)) if message == "destination resolution timed out"
+            ));
+        }
+        assert!(matches!(
+            executor.pin_destination(&request),
+            Err(BrokerError::Upstream(message))
+                if message == "destination resolution capacity is exhausted"
+        ));
+        drop(release);
     }
 
     #[test]
@@ -1312,9 +1455,8 @@ mod tests {
         request.options.response_limit_bytes = response_head_bytes + response_body_bytes;
         constraints.maximum_response_bytes = request.options.response_limit_bytes;
         let allowed = executor(ResponseMode::Valid, vec![public]);
-        let prepared = allowed
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&allowed, &request, &constraints, &credential).test_expect("prepare");
         assert!(allowed
             .dispatch(prepared, &constraints, &credential)
             .is_ok());
@@ -1322,9 +1464,8 @@ mod tests {
         request.options.response_limit_bytes -= 1;
         constraints.maximum_response_bytes = request.options.response_limit_bytes;
         let denied = executor(ResponseMode::Valid, vec![public]);
-        let prepared = denied
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&denied, &request, &constraints, &credential).test_expect("prepare");
         assert!(denied
             .dispatch(prepared, &constraints, &credential)
             .is_err());

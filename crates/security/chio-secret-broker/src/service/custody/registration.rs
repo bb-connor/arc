@@ -50,8 +50,9 @@ impl BrokerService {
         RegisterAttemptAcknowledgement::from_outcome(outcome, now_unix_seconds)
     }
 
-    /// Revalidate authority state, materialize the credential, resolve and pin
-    /// DNS, and retain the exact outbound operation before kernel capture.
+    /// Revalidate authority state and resolve and pin DNS outside custody, then
+    /// materialize the credential and retain the exact outbound operation
+    /// before kernel capture.
     pub fn prepare_dispatch(
         &self,
         registration: &AttemptRegistration,
@@ -94,14 +95,14 @@ impl BrokerService {
                 existing.state.as_str()
             )));
         }
-        let revocation_set = self
+        let (revocation_set, pinned_destination) = self
             .validate_request_authorities(
                 request,
                 &registration.revocation_authority_domain,
                 now_unix_seconds,
                 true,
             )?
-            .into_revocation_set();
+            .into_prepared()?;
 
         let mut retained = self.retained_prepared_dispatches()?;
         if let Some(prepared) = retained.get(&registration.ids.operation_id) {
@@ -135,6 +136,7 @@ impl BrokerService {
             &request.request,
             &request.capability.body.constraints,
             &credential,
+            &pinned_destination,
         )?;
         self.require_migrations_enforced(request)?;
         if existing.state == AttemptState::Registered

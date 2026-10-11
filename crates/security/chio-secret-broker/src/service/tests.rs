@@ -1555,6 +1555,7 @@ pub(super) fn advancing_authority_fixture(mode: &'static str) -> Fixture {
 #[cfg(target_os = "linux")]
 pub(super) use endpoint_test_handler_method;
 mod authority_time;
+mod custody_cases;
 mod dispatch_claim_cases;
 mod execute_cause_cases;
 mod execution_cases;

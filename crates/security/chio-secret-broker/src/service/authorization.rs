@@ -6,6 +6,7 @@ use super::{
     CanonicalBrokerRevocationSet, CapabilityLivenessRequest, GovernedAdminAuthorizer,
     ProviderAdapter, Result, SecretBackend,
 };
+use crate::generic_https::PinnedDestination;
 
 impl BrokerService {
     pub(super) fn authority_observation_time(&self, previous: u64) -> Result<u64> {
@@ -69,13 +70,15 @@ impl BrokerService {
         resolve_destination: bool,
     ) -> Result<ValidatedBrokerAuthorities> {
         self.validate_request_core(request, now_unix_seconds)?;
-        if resolve_destination {
-            self.https.preflight(
-                &request.request,
-                &request.capability.body.constraints,
-                &request.proof,
-            )?;
-        }
+        let pinned_destination = resolve_destination
+            .then(|| {
+                self.https.preflight(
+                    &request.request,
+                    &request.capability.body.constraints,
+                    &request.proof,
+                )
+            })
+            .transpose()?;
         let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
         let live_request = CapabilityLivenessRequest {
             parent_capability_id: request.capability.body.parent_capability_id.clone(),
@@ -123,7 +126,10 @@ impl BrokerService {
             &request.capability.body.capability_id,
             &request.capability.body.revocation_id,
         )?;
-        Ok(ValidatedBrokerAuthorities { revocation_set })
+        Ok(ValidatedBrokerAuthorities {
+            revocation_set,
+            pinned_destination,
+        })
     }
 
     fn validate_audit_request_authorities(
@@ -402,6 +408,7 @@ impl BrokerService {
 
 pub(super) struct ValidatedBrokerAuthorities {
     revocation_set: CanonicalBrokerRevocationSet,
+    pinned_destination: Option<PinnedDestination>,
 }
 
 impl ValidatedBrokerAuthorities {
@@ -409,8 +416,13 @@ impl ValidatedBrokerAuthorities {
         &self.revocation_set
     }
 
-    pub(super) fn into_revocation_set(self) -> CanonicalBrokerRevocationSet {
-        self.revocation_set
+    /// Authorities validated for preparation carry the only resolution that
+    /// preparation may dispatch to.
+    pub(super) fn into_prepared(self) -> Result<(CanonicalBrokerRevocationSet, PinnedDestination)> {
+        let pinned_destination = self.pinned_destination.ok_or_else(|| {
+            BrokerError::Invariant("prepared authorities lack a pinned destination".to_string())
+        })?;
+        Ok((self.revocation_set, pinned_destination))
     }
 }
 struct ValidatedBrokerAuditAuthorities {
