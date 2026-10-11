@@ -405,7 +405,7 @@ mod unix {
             let proof = self.stage_file(&staging, &staging_name, request, content_digest)?;
             #[cfg(test)]
             if let Some(pause) = &self.publication_pause {
-                pause.wait();
+                pause.wait(&staging);
             }
             if let Err(error) = rename_no_replace(
                 &staging,

@@ -9,14 +9,17 @@ use super::*;
 const PAUSE_LIMIT: Duration = Duration::from_secs(30);
 
 pub(super) struct PublicationPause {
-    entered: SyncSender<()>,
+    entered: SyncSender<std::fs::File>,
     resume: Mutex<Receiver<()>>,
 }
 
 impl PublicationPause {
-    pub(super) fn wait(&self) {
+    pub(super) fn wait(&self, staging: &std::fs::File) {
+        let duplicate = staging
+            .try_clone()
+            .unwrap_or_else(|error| panic!("duplicate staging descriptor: {error}"));
         self.entered
-            .send(())
+            .send(duplicate)
             .unwrap_or_else(|error| panic!("announce durable stage: {error}"));
         self.resume
             .lock()
@@ -48,6 +51,46 @@ fn concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication() {
 #[test]
 fn same_materializer_calls_acquire_independent_lock_descriptions() {
     check_concurrent_retry(true);
+}
+
+#[test]
+fn completed_publication_unlocks_even_while_a_duplicate_descriptor_lives() {
+    let root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let mut first = materializer(root.path());
+    let second = materializer(root.path());
+    let identity = identity();
+    let request = MaterializationRequest {
+        identity: &identity,
+        relative_path: std::path::Path::new("inherited.txt"),
+        content: b"complete durable contents",
+    };
+    let (entered_tx, entered_rx) = sync_channel(1);
+    let (resume_tx, resume_rx) = sync_channel(1);
+    first.pause_publication_for_test(PublicationPause {
+        entered: entered_tx,
+        resume: Mutex::new(resume_rx),
+    });
+    let (receipt, inherited) = std::thread::scope(|scope| {
+        let worker = scope.spawn(|| first.materialize(&request));
+        // A duplicate shares the open file description, just as an inherited
+        // descriptor does between fork and exec in another host thread.
+        let inherited = entered_rx
+            .recv_timeout(PAUSE_LIMIT)
+            .unwrap_or_else(|error| panic!("receive staging descriptor: {error}"));
+        resume_tx
+            .send(())
+            .unwrap_or_else(|error| panic!("release publication: {error}"));
+        let receipt = worker
+            .join()
+            .unwrap_or_else(|_| panic!("publication worker panicked"))
+            .unwrap_or_else(|error| panic!("original publication: {error}"));
+        (receipt, inherited)
+    });
+    let retry = second
+        .materialize(&request)
+        .unwrap_or_else(|error| panic!("retry while inherited descriptor lives: {error}"));
+    assert_eq!(retry, receipt);
+    drop(inherited);
 }
 
 fn check_concurrent_retry(same_instance: bool) {
