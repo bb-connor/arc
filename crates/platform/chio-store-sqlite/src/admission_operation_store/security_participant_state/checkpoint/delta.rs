@@ -20,6 +20,7 @@
 //! seal, when the row or the byte budget above would be exceeded, or when one
 //! seal removes more than `MAX_TOMBSTONES` rows. Each such copy is retained.
 use super::*;
+use super::{record, rows};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
