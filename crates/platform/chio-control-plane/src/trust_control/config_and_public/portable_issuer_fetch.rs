@@ -23,10 +23,10 @@ pub(crate) fn clock_unix_secs(
 /// are never queued: a fetch that finds no free permit is refused at once.
 pub(crate) const PORTABLE_ISSUER_FETCH_PERMITS: usize = 16;
 
-/// Transport bounds for every outbound portable-issuer or lifecycle fetch. A
-/// remote that accepts a connection but stalls is bounded by the read and
-/// overall deadlines, so it cannot pin a blocking worker indefinitely. The total
-/// deadline covers DNS resolution and HTTP together.
+/// Transport bounds for every outbound portable-issuer or lifecycle fetch.
+/// The total deadline bounds the caller's wait for DNS and HTTP together.
+/// A started fetch may retain its physical worker after that deadline; the
+/// fixed pool below bounds those workers independently of the waiting callers.
 const PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
