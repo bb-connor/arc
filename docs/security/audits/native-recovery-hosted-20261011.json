@@ -1,0 +1,226 @@
+{
+  "schema": "chio.pr1160.native-hosted-observation.v1",
+  "observed_utc": "2026-10-11T12:03:53.620855+00:00",
+  "published_source": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+  "executed_merge_source": "273c39c26e5ef569ea46faa4dbd8ec013ba24452",
+  "source_tree": "aade0004a01c5868de839acc92589aed4793052b",
+  "run": 38125088506,
+  "run_attempt": 1,
+  "job": 114440578983,
+  "job_url": "https://github.com/bb-connor/arc/actions/runs/38125088506/job/114440578983",
+  "conclusion": "success",
+  "artifact": {
+    "id": 11698668572,
+    "name": "mini-swe-process-recovery",
+    "sha256": "25e23fe9a59306e60ae3e8a821defcd7f5bd01cfe8cee6bb0819415295aeaeda",
+    "binary_sha256": "02af1b7fc8efc1fbe66a2ee5944bb3460b5b833baedf9e068f1ee3a8ba6d872c",
+    "worker_image": "sha256:6f50125aadecf090d39496bb3e730d0eb6768f3e3f5e51946d639da6a6dc4029"
+  },
+  "enforcing_host": {
+    "artifact_id": 11698688301,
+    "artifact_sha256": "40070d883064e774d1eba164120ffc220b2189dd6a31ba273617cef149ff6914",
+    "source_sha": "273c39c26e5ef569ea46faa4dbd8ec013ba24452",
+    "kernel": "6.17.0-1022-azure",
+    "helper_sha256": "c2479352b5434f54939c689e40e3f2ae110b2f46ed8da58116807b790dff6721"
+  },
+  "unchanged_from_failed_source": {
+    "source": "ddb7cad0068633acdbf0e7b016d1b313f37571fd",
+    "job": 114295424603,
+    "conclusion": "failure",
+    "files_sha256": {
+      "examples/mini-swe-recovery/qualify_operator.py": "30fa719cea4673928687f08149f30c9357584bdaff047fdf35f1e6db8bb8b5b2",
+      "examples/mini-swe-recovery/broker_campaign.py": "9abde15cb127afa01c7ab29f9c865c53f12bea37b0385171555be1a4571a08b4",
+      ".github/workflows/process-workers.yml": "ec3f2202ecede3ae0a06144e5e8d29fa8e5dcfd7eebd1dc3defe8a5c6027fe05"
+    },
+    "model_route_fence_ms": 10000,
+    "first_operator_attempts_assertion": 1,
+    "original_failure_retained": true,
+    "qualify_native_delta": "Failure-evidence preservation only; acceptance assertions and timeout values unchanged."
+  },
+  "native_scenarios": {
+    "baseline": {
+      "provider_dispatches": 3,
+      "patch_effects": 1,
+      "audit_effects": 2,
+      "original_model_and_command_receipts": 8,
+      "attempts": 1,
+      "completed_replay": true,
+      "verified_receipts": 8
+    },
+    "known": {
+      "provider_dispatches": 3,
+      "patch_effects": 1,
+      "audit_effects": 2,
+      "original_model_and_command_receipts": 8,
+      "attempts": 3,
+      "completed_replay": true,
+      "verified_receipts": 8
+    },
+    "unknown": {
+      "provider_dispatches": 1,
+      "command_effects": 0,
+      "unknown_outcome_stopped": true,
+      "attempts": 2,
+      "verified_receipts": 1
+    }
+  },
+  "operator_scenarios": {
+    "normal": {
+      "successful_http_requests": 3,
+      "failed_http_requests": 1,
+      "failure_attempts": 2,
+      "verified_receipts": 8,
+      "completed_replay": true,
+      "offline_cancelled_export_without_host_writes": true,
+      "provider_error_stopped": true
+    },
+    "repository": {
+      "verified_receipts": 8,
+      "verified_workspace_transitions": 5,
+      "forged_receipt_refused_before_export": true,
+      "completed_replay": true
+    },
+    "model_cost_both": 0.00108,
+    "first_attempt_success_basis": "The unchanged executed qualifier asserts complete, attempts == 1, and three successful provider calls before exporting each successful qualification. failure_attempts == 2 describes the deliberate provider-error control."
+  },
+  "independent_receipt_verification": {
+    "published_source": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+    "artifact_id": 11698668572,
+    "artifact_sha256": "25e23fe9a59306e60ae3e8a821defcd7f5bd01cfe8cee6bb0819415295aeaeda",
+    "verifier_binary_sha256": "8217aeafaf318165d30a8c8f6e47ee1a15379789df40311cf46f935005b029f1",
+    "verifier_build_source": "6335dbc1c07918c4567c93a40f9ba9213a4797e1",
+    "scope": "Independent signature/signer-pin/parameter-binding verification of retained hosted receipts with artifact fixture keys; not an independent new native runtime campaign or latency percentile measurement.",
+    "records": [
+      {
+        "scenario": "native-mini-swe/baseline",
+        "exit": 0,
+        "expected_receipts": 8,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "5dc95a887ee901c579c35a8505eeefdbbc328f2c70be5bf6a2787946888e8ea7"
+        },
+        "artifact_file_hashes": {
+          "receipts.ndjson": "daabc81eab3c0c560d24cf50286eef5ce44e4ab04b8d686afe2af8e60ad56c99",
+          "kernel.pub": "4e79da29b92a3131ceed40447da73b70fc9e777e67b3f67442ae62150aac81d0"
+        }
+      },
+      {
+        "scenario": "native-mini-swe/known",
+        "exit": 0,
+        "expected_receipts": 8,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "e3fb311e19df47dfc4d2efd000d00b33506d7c1d187080f5d3f78a91c5bd2d84"
+        },
+        "artifact_file_hashes": {
+          "receipts.ndjson": "39e0485e08adcb2f9a9ddb6fb4c3948f001de06d0bd2e346defc169da2ef791d",
+          "kernel.pub": "38398fd86dd269593e324699ad39de8635ed9f6c1186d6e36b3d78c2e42fb668"
+        }
+      },
+      {
+        "scenario": "native-mini-swe/unknown",
+        "exit": 0,
+        "expected_receipts": 1,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 1,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "3c41fe8e3e71bfb39985450249db7a536c1f783f071f11b703d6fdae46dab7e8"
+        },
+        "artifact_file_hashes": {
+          "receipts.ndjson": "b5997ec063c5b60b6f77dbdeffde426fcb325cae6c76df6e3fdf026febd99dd3",
+          "kernel.pub": "e5cf815896b7a094f31093bb30bfe124483fe9ab6a7d8fa1617f03d0f7a32db0"
+        }
+      },
+      {
+        "scenario": "operator",
+        "exit": 0,
+        "expected_receipts": 8,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "8cd293454dba78e83ec95c8d2eb96240e528cceeb1a499d530bf7196a31c3e90"
+        },
+        "artifact_file_hashes": {
+          "receipts.ndjson": "5e1528ce9cf71f13ec15d9e059e6de33453301b43c9bc6acc400e39326d2d645",
+          "kernel.pub": "904aa72e1908a0c6c37dfdbe66b7d12aaea3d518afd3a98a63b8a453bb55a28e"
+        }
+      },
+      {
+        "scenario": "repository-operator",
+        "exit": 0,
+        "expected_receipts": 8,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "19bc7d80bc7fc0e3413458a01685022ff8081b730857b13aa0befc4dc3e70748"
+        },
+        "artifact_file_hashes": {
+          "receipts.ndjson": "1c0dd2504d930b093141cd2ea3602464ec77a53973ea5ee487aa00101c2fe4e6",
+          "kernel.pub": "c3c8a461caaaaae86e579f618b02a2f2a8403b74c76783808f08cfae94deb3d9"
+        }
+      }
+    ]
+  },
+  "retained_local_evidence": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/native-original-job.json",
+      "sha256": "1aaceb12cebb527cb075eed83c3e5f8b90a78e833f1f1ffef4381af3c58609b9"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/installed-native-114440578983.log",
+      "sha256": "7eabe01105f2ad443784693a09904bc4353a6d7ab8c350c299f38299c79e9637"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/mcp-native-all-jobs.json",
+      "sha256": "845c77833604de899302b21b7f68a1cf974a51afe887505f7c5942ac928ebb50"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/native-artifacts.json",
+      "sha256": "7654130db935f9e54eb05e12cc32b7972e4ef31eb6ee05d8272169a426ef2361"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/native-qualification-source-diff.patch",
+      "sha256": "b4eed700de82720c258df2965a37d8bf44f69988721868b0280576b8f40314a9"
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/published-36d77fe276/merge-commit-native-verification.json",
+      "sha256": "db4a0101432dcc04ced4509d1e50abd7a538e89bf01bb95db2a00339ced50380"
+    }
+  ],
+  "acceptance_boundary": [
+    "The previously failing installed enforcing-native trajectory is now passing on published36d; native scenario acceptance is source-specific.",
+    "The cancelled and failed historical campaigns remain unchanged; this observation does not prove their exact cost cause or a latency percentile.",
+    "Cold-state preparation/activation, archive/open-time capacity, broader load/concurrency, trusted authorization and release readiness remain separate.",
+    "The optimized native-session conditional job was skipped, not passed.",
+    "Renew four required checks and relevant native evidence on the final replacement head, classify all failures, answer review threads and obtain user merge go-ahead."
+  ],
+  "merged": false,
+  "full_qualified": false
+}
