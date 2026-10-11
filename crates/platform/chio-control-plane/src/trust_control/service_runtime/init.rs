@@ -62,7 +62,7 @@ async fn serve_async_inner(
         Arc<dyn super::super::finding_challenge_handlers::FindingChallengeSubmissionExecutor>,
     >,
 ) -> Result<(), CliError> {
-    config.validate()?;
+    config.validate_bootstrap()?;
     let payload_maintenance_config = crate::TerminalPayloadMaintenanceConfig::from_env()?;
     payload_maintenance::validate_requested_authority(
         config.joint_authority_db_path.as_deref(),
