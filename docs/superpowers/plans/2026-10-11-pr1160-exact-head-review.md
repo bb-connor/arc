@@ -53,10 +53,10 @@ Files: `admission_operation_store/security_participant_state/checkpoint{.rs,/rec
 
 Files: `crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_recovery/legacy_settled_prepaid.rs` and test module wiring. Production payment code remains fail-closed.
 
-- [ ] Pair real SQLite v11-to-v12 migration/backfill controls with a kernel settled-PrepaidFinal recovery control modeling the resulting legacy row.
-- [ ] Require exact `LegacyPaymentAmountAbsent`, retained Finalizing operation/settled journal/hold/exposure, no refund/capture/release, and one original invocation.
-- [ ] Label this existing-behavior evidence as a control, not a failing Original. Disclose the unavailable original-debit/operator-recovery limitation.
-- [ ] Run owner tests/strict and review; reply to the finding with exact evidence.
+- [x] Pair real SQLite v11-to-v12 migration/backfill controls with a kernel settled-PrepaidFinal recovery control modeling the resulting legacy row.
+- [x] Require exact `LegacyPaymentAmountAbsent`, retained Finalizing operation/settled journal/hold/exposure, no refund/capture/release, and one original invocation.
+- [x] Label this existing-behavior evidence as a control, not a failing Original. Disclose the unavailable original-debit/operator-recovery limitation.
+- [x] Run owner tests/strict and obtain independent source review. The final PR response remains in Task 5.
 
 ## Task 5: One qualified replacement (Root with Claude triage)
 
@@ -86,3 +86,13 @@ exact source and final panic assertion. Checkpoint and prepaid acceptance stay
 open. The prepaid control will call periodic recovery after the initial tool
 call, because that call already completes the startup latch; this exercises the
 shared recovery page without resetting private runtime state.
+
+### Prepaid source qualification
+
+Source `51ccfee5a6` passes the focused periodic recovery control, all 42 owning
+payment-recovery tests and strict all-target kernel lint. Claude approved the
+final fixture revision. The [audit](../../security/audits/legacy-prepaid-periodic-control-20261011.json)
+pairs the kernel model with two real SQLite migration controls and retains the
+initial fixture failure. Missing authenticated original debit remains an
+operator-recovery limitation. Checkpoint acceptance and final publication stay
+open.

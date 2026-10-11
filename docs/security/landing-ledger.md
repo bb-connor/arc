@@ -8,6 +8,24 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Legacy prepaid quarantine qualified privately (October 11 UTC)
+
+The [periodic recovery audit](audits/legacy-prepaid-periodic-control-20261011.json)
+records source **`51ccfee5a6`**, **42 passing payment-recovery tests** and strict
+kernel lint, with Claude's source approval. The new control models the exact
+settled revision used by the two real SQLite migration/backfill controls.
+Recovery reports `LegacyPaymentAmountAbsent`, retains liability and makes no
+new rail calls or tool invocation. The initial startup-latch fixture failure
+remains recorded. This confirms existing quarantine behavior; it does not add
+an operator recovery path for an unauthenticated missing original debit.
+
+Checkpoint authentication and persisted resource bounds remain the unfinished
+source repair in the current batch. Keyring, compaction, static CI contracts and
+the prepaid control are qualified privately. All **2,020** ledger requirements
+are preserved. Published `9e9cf98942` still awaits Build and MSRV; Vet and Deny
+pass, and its eight unsuccessful jobs are classified. No replacement has been
+pushed and no merge readiness is claimed.
+
 ## Current signing identity qualified privately (October 11 UTC)
 
 The [keyring audit](audits/keyring-current-selector-20261011.json) records
