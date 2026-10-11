@@ -468,7 +468,7 @@ references = 1
 id = "D034"
 path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
 symbol = "ChioKernel::evaluate_tool_call_sync_with_session_and_security_context"
-target = ".evaluate_tool_call_async_with_session_context"
+target = ".evaluate_tool_call_sync_with_session_guard_attempt"
 references = 1
 
 [[dispatch_sites]]
@@ -496,7 +496,7 @@ references = 2
 id = "D038"
 path = "crates/kernel/chio-kernel/src/kernel/session_ops.rs"
 symbol = "ChioKernel::evaluate_session_operation"
-target = ".evaluate_tool_call_sync_with_session_and_security_context"
+target = ".evaluate_tool_call_sync_with_session_guard_attempt"
 references = 1
 
 [[dispatch_sites]]
@@ -835,4 +835,13 @@ id = "C34"
 path = "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs"
 symbol = "RemoteSessionFactory::bind_approval_intent"
 target = "chio_control_plane::build_kernel_with_clock"
+references = 1
+
+# The sync session bridge carries its owned guard attempt through the normal
+# asynchronous kernel evaluation path.
+[[dispatch_sites]]
+id = "D092"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_sync_with_session_guard_attempt"
+target = ".evaluate_tool_call_async_with_session_context"
 references = 1

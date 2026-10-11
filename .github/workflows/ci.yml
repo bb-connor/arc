@@ -112,13 +112,16 @@ jobs:
       - name: Proptest invariant coverage
         run: ./scripts/check-proptest-coverage.sh
 
-      # Reject stale model bindings and generated coverage before compiling
-      # the security suites. These checks execute metadata tooling only.
+      # Reject stale model bindings, coverage, and mediation inventories before
+      # compiling security suites. These checks execute metadata tooling only.
       - name: formal mirror drift guard
         run: cargo xtask check formal-mirrors
 
       - name: proof coverage drift guard
         run: cargo xtask gen proof-coverage --check
+
+      - name: Adapter mediation inventory
+        run: cargo xtask check adapter-no-bypass
 
       - name: Workspace structural gates
         env:
