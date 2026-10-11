@@ -448,6 +448,40 @@ def static_contract_tests() -> None:
                 )
 
 
+def tree_bound_tests() -> None:
+    def assert_bounded(label: str, message: str, callback) -> None:
+        try:
+            callback()
+        except BOUNDARY.BoundaryError as error:
+            if str(error) != message:
+                raise AssertionError(f"{label}: unexpected error {error}") from error
+            return
+        raise AssertionError(f"{label}: oversized candidate tree was accepted")
+
+    with tempfile.TemporaryDirectory(prefix="chio-boundary-tree-") as raw:
+        temporary = Path(raw).resolve()
+        repository = temporary / "candidate"
+        head = initialize_repository(
+            repository, {f"empty-{index}.txt": "" for index in range(8)}
+        )
+        identity = BOUNDARY.repository_identity(repository, head, None)
+        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 8, create=True):
+            if len(BOUNDARY.parse_tree(identity.root, identity.head)) != 8:
+                raise AssertionError("tree at the entry bound was not accepted")
+        with mock.patch.object(BOUNDARY, "MAX_TREE_ENTRIES", 7, create=True):
+            assert_bounded(
+                "empty file count",
+                "candidate tree exceeds the isolation entry bound",
+                lambda: BOUNDARY.parse_tree(identity.root, identity.head),
+            )
+        with mock.patch.object(BOUNDARY, "MAX_TREE_OUTPUT_BYTES", 64, create=True):
+            assert_bounded(
+                "aggregate tree listing",
+                "candidate tree listing exceeds the isolation bound",
+                lambda: BOUNDARY.parse_tree(identity.root, identity.head),
+            )
+
+
 def copy_and_output_tests() -> None:
     with tempfile.TemporaryDirectory(prefix="chio-boundary-copy-") as raw:
         temporary = Path(raw).resolve()
@@ -2506,6 +2540,7 @@ def main() -> int:
     candidate_helper_environment_tests()
     run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
     static_contract_tests()
+    tree_bound_tests()
     copy_and_output_tests()
     refresh_inventory_tests()
     pending_promotion_tests()

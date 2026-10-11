@@ -37,6 +37,8 @@ BASE_IMAGE_LABELS = {
 }
 MAX_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_FILE_BYTES = 64 * 1024 * 1024
+MAX_TREE_ENTRIES = 100_000
+MAX_TREE_OUTPUT_BYTES = 12 * 1024 * 1024
 MAX_TOTAL_OUTPUT_BYTES = 128 * 1024 * 1024
 SECCOMP_DENIED_SYSCALLS = (
     "_sysctl",
@@ -421,8 +423,52 @@ def validate_trusted_runner(authorized_source_sha: str) -> Path:
     return identity.root
 
 
+def read_tree_listing(root: Path, head: str) -> bytes:
+    command = [
+        "/usr/bin/git",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-C",
+        os.fspath(root),
+        "ls-tree",
+        "-rz",
+        "--full-tree",
+        head,
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            env=clean_host_env(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as error:
+        raise BoundaryError("unable to list candidate tree") from error
+    if process.stdout is None:
+        process.kill()
+        raise BoundaryError("Git tree reader did not expose a bounded pipe")
+    try:
+        raw = process.stdout.read(MAX_TREE_OUTPUT_BYTES + 1)
+        if len(raw) > MAX_TREE_OUTPUT_BYTES:
+            raise BoundaryError("candidate tree listing exceeds the isolation bound")
+        if process.wait(timeout=120) != 0:
+            raise BoundaryError("Git candidate tree listing failed")
+    except BaseException:
+        with contextlib.suppress(OSError):
+            process.kill()
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            process.wait(timeout=5)
+        raise
+    finally:
+        process.stdout.close()
+    return raw
+
+
 def parse_tree(root: Path, head: str) -> list[tuple[int, str, str]]:
-    raw = git_command(root, ["ls-tree", "-rz", "--full-tree", head], timeout=120)
+    raw = read_tree_listing(root, head)
     entries: list[tuple[int, str, str]] = []
     for record in raw.split(b"\0"):
         if not record:
@@ -448,6 +494,8 @@ def parse_tree(root: Path, head: str) -> list[tuple[int, str, str]]:
             or not SHA_PATTERN.fullmatch(object_id)
         ):
             raise BoundaryError(f"candidate tree entry is unsafe: {path!r}")
+        if len(entries) == MAX_TREE_ENTRIES:
+            raise BoundaryError("candidate tree exceeds the isolation entry bound")
         entries.append((mode, object_id, path))
     if not entries:
         raise BoundaryError("candidate tree is empty")
