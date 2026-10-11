@@ -291,3 +291,66 @@ fn persisted_transitions_use_one_fenced_observation() {
     drop(session);
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn terminal_transition_keeps_session_visible_while_upstream_shutdown_runs() {
+    struct BlockingShutdownTransport(Arc<std::sync::Barrier>);
+    impl McpTransport for BlockingShutdownTransport {
+        fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+            TestSessionTransport.list_tools()
+        }
+        fn call_tool(
+            &self,
+            name: &str,
+            arguments: Value,
+        ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
+            TestSessionTransport.call_tool(name, arguments)
+        }
+        fn shutdown(&self) -> Result<(), AdapterError> {
+            self.0.wait();
+            self.0.wait();
+            Ok(())
+        }
+    }
+    let runtime = || {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+    };
+    let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+    let clock = RemoteClock::new(source.clone());
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let mut init = session_init(clock.clone());
+    init.upstream_transport = Arc::new(BlockingShutdownTransport(barrier.clone()));
+    let sessions =
+        RemoteSessionLedger::new(clock, init.lifecycle_policy.clone(), None, None).unwrap();
+    let session = Arc::new(RemoteSession::new(init).unwrap());
+    session
+        .mark_ready(None, json!({}), PeerCapabilities::default())
+        .unwrap();
+    runtime().block_on(sessions.insert_active(session.clone()));
+    *source.0.lock().unwrap() = reading(2_000, 1_000_000_000);
+
+    let (during_shutdown, expired) = std::thread::scope(|scope| {
+        let expiry = scope.spawn(|| runtime().block_on(sessions.mark_expired(&session)));
+        barrier.wait();
+        let entry = runtime().block_on(sessions.lookup(&session.session_id));
+        barrier.wait();
+        (entry, expiry.join().unwrap())
+    });
+
+    expired.unwrap();
+    assert!(
+        matches!(
+            &during_shutdown,
+            Some(RemoteSessionEntry::Terminal(record))
+                if record.lifecycle.state == RemoteSessionState::Expired
+        ),
+        "session must stay visible as terminal while upstream shutdown runs: {during_shutdown:?}"
+    );
+    assert!(matches!(
+        runtime().block_on(sessions.lookup(&session.session_id)),
+        Some(RemoteSessionEntry::Terminal(record))
+            if record.lifecycle.state == RemoteSessionState::Expired
+    ));
+}
