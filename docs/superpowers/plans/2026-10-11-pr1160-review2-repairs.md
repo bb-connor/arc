@@ -41,9 +41,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Apply the existing Darwin descriptor ACL authority check to both loaders before accepting bytes or descriptors. Inspection errors and allow/unknown authority must refuse. Preserve genuine Linux systemd handling and deny-only ACL acceptance; add native tests at the actual loaders.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -85,9 +85,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-005: Temporal rule expansion is exponential before its candidate cap runs
 
@@ -97,11 +97,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Enforce the partial-candidate budget on each unique insertion and before intermediate-vector growth. Suppress/refuse immediately on exhaustion. Add a combined branching-plus-reuse control.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-006: Identical uncovered tool calls execute repeatedly for one throttle unit
 
@@ -111,8 +111,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Use a kernel-owned dispatch-attempt identity. Permit free replay only for an authenticated retained operation whose execution cannot repeat; otherwise consume again or deny.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
 - [ ] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
@@ -125,11 +125,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Give the adapter ownership of an abort-on-drop guard for each nested queued handoff. Avoid nested pool self-starvation using the existing dispatch boundary. Preserve the distinction between cancelling queued work and reconciling work that already started.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-008: Unbounded broker DNS blocks control work and can hold global secret custody
 
@@ -153,11 +153,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Bound connections before spawning handlers, enforce body deadlines, and bound retained event count/bytes including refusals. Refuse further traffic when evidence capacity is exhausted; do not silently truncate and claim complete capture.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-010: Abandoned prepared broker connections retain secret entries and capacity
 
@@ -165,7 +165,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-secret-broker/src/service/ipc/prepared.rs`, `crates/security/chio-secret-broker/src/service/custody/registration.rs`.
 
-**Required correction:** Bind transport abandonment to the exact retained operation and reconcile/sweep expired pre-capture entries. Preserve captured/later operation ownership and accounting; unconditional EOF deletion/refund is unsafe.
+**Required correction:** Bind transport abandonment to the exact retained operation and sweep expired pre-capture entries even in an idle daemon. Reuse a bounded cadence on the existing worker with no new wire operation; preserve captured/later operation ownership and accounting. Unconditional EOF deletion/refund is unsafe.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -197,9 +197,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-013: Mobile replay-store custody never checks Darwin ACL authority
 
@@ -209,9 +209,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Check retained parent and database descriptors for authority-granting Darwin ACLs during initial and subsequent custody validation. Reuse the existing descriptor inspection boundary and fail closed on inspection errors; do not add another FFI implementation.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -239,9 +239,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-016: Anthropic gate returns unevaluated tool content in message_start as safe
 
@@ -393,8 +393,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 **Required correction:** Inspect authority-granting ACLs on the retained descriptor before accepting resume-key bytes. Preserve root/current-owner policy, real Linux systemd credentials, bounded reads and metadata stability. No copied FFI implementation or changed mobile MSRV promise.
 
 - [x] Confirm current source and owning contract.
-- [ ] Execute native test-only Original `d7c2a7c3e8` (two refusals plus two healthy controls).
-- [ ] Implement and independently review minimal shared custody repair.
+- [x] Execute native test-only Original `d7c2a7c3e8` (two refusals plus two healthy controls).
+- [x] Implement and independently review minimal shared custody repair.
 - [ ] Pass native and owning Linux controls, strict lint and composition gates.
 - [ ] Compose and record exact-source qualification in the ledger.
 
