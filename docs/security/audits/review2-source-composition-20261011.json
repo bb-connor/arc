@@ -1,0 +1,327 @@
+{
+  "schema": "chio.security.review2-source-composition.v1",
+  "observed_utc": "2026-10-11T02:54:21.635361+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-002",
+    "incoming-pr1160-review2-20261011:R2-003",
+    "incoming-pr1160-review2-20261011:R2-008",
+    "incoming-pr1160-review2-20261011:R2-018",
+    "incoming-pr1160-review2-20261011:R2-023",
+    "incoming-pr1160-review2-20261011:R2-025",
+    "incoming-pr1160-review2-20261011:R2-020"
+  ],
+  "private_source": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+  "published_source": "974f22914bd339a62933831650c3d55dbaf76987",
+  "source_repairs": {
+    "R2-002": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "fff1351e86e33267d932f8a90c9fca89a88193e1"
+      ],
+      "files": [
+        "crates/products/chio-api-protect/src/error.rs",
+        "crates/products/chio-api-protect/src/proxy.rs",
+        "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs",
+        "crates/products/chio-api-protect/src/proxy/config.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/budget_configuration.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/approvals.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/authenticated.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/product_guards.rs",
+        "crates/products/chio-api-protect/src/proxy/state.rs",
+        "crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs",
+        "crates/products/chio-api-protect/src/proxy/state/tests/proxy_builder.rs",
+        "crates/products/chio-cli/src/cli/types.rs",
+        "crates/products/chio-cli/src/cli/types/runtime.rs",
+        "examples/agent-commerce-network/buyer/run-sidecar.sh",
+        "examples/hello-chi/smoke.sh",
+        "examples/hello-django/smoke.sh",
+        "examples/hello-dotnet/smoke.sh",
+        "examples/hello-drogon/smoke.sh",
+        "examples/hello-elysia/smoke.sh",
+        "examples/hello-express/smoke.sh",
+        "examples/hello-fastapi/smoke.sh",
+        "examples/hello-fastify/smoke.sh",
+        "examples/hello-openapi-sidecar/smoke.sh",
+        "examples/hello-spring-boot/smoke.sh",
+        "examples/internet-of-agents-incident-network/scenario/lib.sh",
+        "examples/internet-of-agents-incident-network/smoke.sh",
+        "examples/internet-of-agents-web3-network/scenario/lib.sh"
+      ],
+      "file_sha256": {
+        "crates/products/chio-api-protect/src/error.rs": "36b95d290b8f48afe11f9d33156469299bf5c980322a28af6290bf56a0104390",
+        "crates/products/chio-api-protect/src/proxy.rs": "9bd63656264fd3c2bc760f425580f8d40ede6e4fc190484ebca5c8e90d522904",
+        "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs": "a4b12cb0475405b6120d57039770f0eed309839426920d1961d9c78cf8c4fedb",
+        "crates/products/chio-api-protect/src/proxy/config.rs": "4f19fc1c93eff159f52f59ee2c2570449caccc57cb921de4bbaad1997e26ee6c",
+        "crates/products/chio-api-protect/src/proxy/mediated.rs": "4cb43165ce8137313287c52ca0c03e5ca2311bc9d17f7f9372edce9305f40698",
+        "crates/products/chio-api-protect/src/proxy/mediated/budget_configuration.rs": "1625a7fa7df169a12cc1496158df3f079629f4da4a8c918dd3a4d486f1d17e48",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests.rs": "8725e3737f5586a5960b8906371c474408d1475db7545e662056c6efac5dce4b",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/approvals.rs": "c868cbb27240b21f9a3708ede7c7227cecfe734f5e7a698fee149290cae37729",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/authenticated.rs": "c7f4b7b06973b3fdf47acdac0a32ea92c804d64a6eb682605e726b6ec725fafd",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs": "20f6c677d2d7e033956a3efa9fd7b422b35ecfb444e4b02a1878ead87eb12b84",
+        "crates/products/chio-api-protect/src/proxy/mediated/tests/product_guards.rs": "fd452f357fcf0588fe690f4d1495a0245f81a18055e80fb96b597a1934404990",
+        "crates/products/chio-api-protect/src/proxy/state.rs": "3e37dc966118c96973cb8ddea1db225b301a822faf24097a346147edcf02ddc7",
+        "crates/products/chio-api-protect/src/proxy/state/admission_maintenance_tests.rs": "44858856330fef0fee722ac588cdf67f9ab5d4b990d25d17ae3d25fde10433c6",
+        "crates/products/chio-api-protect/src/proxy/state/tests/proxy_builder.rs": "34ba93b802fc8e2c36eef12b118857e05b7eeec4f9b291f1943081af20169bcd",
+        "crates/products/chio-cli/src/cli/types.rs": "5688838ce76f5b8079b5d03644f157d5a2f92cfc5b38c66cdb273ef7e9d5d951",
+        "crates/products/chio-cli/src/cli/types/runtime.rs": "590b8729375f57fdc50b42b672b1153426622007fc1303bcb6099b55eb779e3a",
+        "examples/agent-commerce-network/buyer/run-sidecar.sh": "925a199d3313156f759c7f82f36416a54bd20e0d8f336e414cd40ca681ec35b5",
+        "examples/hello-chi/smoke.sh": "17a73758c644c3547d65b7d0911898bceaad89ffc2a11bc2a4bb87c16a4beb90",
+        "examples/hello-django/smoke.sh": "94362f21f8541d7aba2b7db2d410fe67d9c55e93cf5de727dd0039d9d3752218",
+        "examples/hello-dotnet/smoke.sh": "97d1f2b5ec999c607c7fa1cab25fcb15dfd14902942f3b750319ba596150be9c",
+        "examples/hello-drogon/smoke.sh": "4c3254f592f3bc3842f7052db98aafa8abfd429d8ef1e9664e568f5c3fafe4a8",
+        "examples/hello-elysia/smoke.sh": "d1fa123c5e07f3d8c93535dde1d458ed000c82bb713ed8e3f01c6bf98c150b70",
+        "examples/hello-express/smoke.sh": "39f1251f95ead6c0926a9c718ce2ac5345f45d85e4d2c9ab52fa485d8f99fb6c",
+        "examples/hello-fastapi/smoke.sh": "f880e7cd66babfcb3a82b092413ded27b03569e9709e3a638d0409b7926cfc6c",
+        "examples/hello-fastify/smoke.sh": "ee0f361fd1880a38b6f94689f6a2749e8e6e6d9259648caf7b1349b9c79b3f55",
+        "examples/hello-openapi-sidecar/smoke.sh": "0fb999f36548066d04480bb3f4087f28a69a1a2ff5c32e15b1b06fd601614a4e",
+        "examples/hello-spring-boot/smoke.sh": "585ebb1555add19aea8371786cf1655a4ede3463bcf1f14c426a09eb14afc076",
+        "examples/internet-of-agents-incident-network/scenario/lib.sh": "20bb111d002058909cfcab84b850e83e01aac84a3ea7101c3b00e0c94b36bb18",
+        "examples/internet-of-agents-incident-network/smoke.sh": "c07215537b153404686093a4e2e2ff1a4c8e545c4a9dd679dbdd691bb54a8969",
+        "examples/internet-of-agents-web3-network/scenario/lib.sh": "34d225219660549522a699a4dc8a4706dc7c425aa40d692acd78aeda0e77cc69"
+      },
+      "contract": "Reject durable admission with an externally supplied shared budget before provisioning; preserve a single authoritative budget implementation.",
+      "review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-002-independent-source-review-cb8b964eea9a.md",
+        "sha256": "ea91d052f24a11903d86c67c8df5c74a441db34d6e7fb1d3574e000385a66318"
+      }
+    },
+    "R2-003": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "db9c8e58f955f5db548cfd15eb47c5409cefed08",
+        "4627cd6b103ddaeb3815b47c919c0643c147f574",
+        "f6fd0d12889386eb19bb950ef6468eae9eb11150",
+        "213f9e21a324db3551c6be2e203653c49d014ce6"
+      ],
+      "files": [
+        "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring_trust.rs",
+        "scripts/check-secret-broker-boundary.sh",
+        "scripts/tests/check-secret-broker-boundary.test.py"
+      ],
+      "file_sha256": {
+        "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": "c929a5825c9b0032d931aa24f6a0c396d9868a174ed2f058ccc3bdaf56e17699",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs": "456e8230b4ce1ff413962194b9fe539f6ae743babb32b7e45a36bd6ebce314f3",
+        "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs": "01d79cf853ef5a0188d5a7b545cdfb7929865e979deceab04c9f0ea5f123f3bc",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs": "531432685928da1ebe65d5f688083c7bed0789c34942046dae96062faf01bc07",
+        "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring_trust.rs": "b90597886125533a2e1e6499c601f5f45ad586d20f732594c1819b2c5850e7a6",
+        "scripts/check-secret-broker-boundary.sh": "e92d38ea3bef7405bb89e8c079174f1127f500767a8a49810209aa76f7b331ec",
+        "scripts/tests/check-secret-broker-boundary.test.py": "9d23d1ad5df3b99df9288fe2989bba58a77cd404b2873bfb54471e9c065ceccd"
+      },
+      "contract": "Separate bootstrap custody checks from runtime configuration validation. Exercise real keyring-backed startup and admin receipt query under one bounded deadline, retrying only explicit snapshot-building responses.",
+      "review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-003-independent-review-v3.md",
+        "sha256": "dd8f5b564d208c841f598050cee6aac52dd9973bfe058579c7d4dae593080d63"
+      }
+    },
+    "R2-008": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "55019f12bb04842f18a722385b23a908ded553f8",
+        "a08ae722cbcbd863069ebc20f06a7f25b48748d0",
+        "f6afb443c995ae4e90b901fcef508ef02602a0e7"
+      ],
+      "files": [
+        "crates/security/chio-secret-broker/src/generic_https.rs",
+        "crates/security/chio-secret-broker/src/generic_https/local_adapter.rs",
+        "crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs",
+        "crates/security/chio-secret-broker/src/service.rs",
+        "crates/security/chio-secret-broker/src/service/authorization.rs",
+        "crates/security/chio-secret-broker/src/service/custody/registration.rs",
+        "crates/security/chio-secret-broker/src/service/ipc.rs",
+        "crates/security/chio-secret-broker/src/service/ipc/deadline.rs",
+        "crates/security/chio-secret-broker/src/service/tests.rs",
+        "crates/security/chio-secret-broker/src/service/tests/custody_cases.rs"
+      ],
+      "file_sha256": {
+        "crates/security/chio-secret-broker/src/generic_https.rs": "38295caa6500d2f91fd03b18e92ddd5198926c05705601c65ba55e4d08ad829c",
+        "crates/security/chio-secret-broker/src/generic_https/local_adapter.rs": "5e2850311a64b9fa7f8b79f24676ff50bd77b9ade18c81c3681931de6cd09b61",
+        "crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs": "a65b1443b9f5509fdaaec7ca88ad5cf1d3f7c0275864c8cb082add9af00360c7",
+        "crates/security/chio-secret-broker/src/service.rs": "069fe948b43759f02c410313dd1a1724f311a95a27d21bcfa80befcce96a7a4c",
+        "crates/security/chio-secret-broker/src/service/authorization.rs": "2ba22837f138b802602e78bd93cfabfcf969a6f419ae53e3801790319ddbd774",
+        "crates/security/chio-secret-broker/src/service/custody/registration.rs": "8f26f8f1d93ee15386442f742c64af54e637622d2d3188e9a34d9dcc6b96a695",
+        "crates/security/chio-secret-broker/src/service/ipc.rs": "855992d82ead6dc7f7595c017c7f49c41fb2aa96fecb531d59812f4e33784df2",
+        "crates/security/chio-secret-broker/src/service/ipc/deadline.rs": "d44ba04f0f06cc83934f5fdee056169201cce2a49cc8e5d24e771f9d75c6026f",
+        "crates/security/chio-secret-broker/src/service/tests.rs": "a594e3b76d2c2d19b46acab3cc026ad28ddcea6ee13a25281bc7f41f595310d3",
+        "crates/security/chio-secret-broker/src/service/tests/custody_cases.rs": "aaead3084efc613e9864891aa33b9f6cfe6177742d590ccbd5f487fc4fec6313"
+      },
+      "contract": "Resolve preparation DNS once outside secret custody using an absolute deadline capped by the signed timeout and server control budget. Retain occupied capacity until the underlying resolver exits.",
+      "review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-008-independent-review-v2.md",
+        "sha256": "dc138517dba57fc9f4b48b05eed88022f846894d78647b71fba55a025dd64282"
+      }
+    },
+    "R2-018": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "ed76a3d3be8557487275854465c36c3060bf348d"
+      ],
+      "files": [
+        "crates/security/chio-security-kernel/tests/capability_set_suspension.rs",
+        "crates/security/chio-security-kernel/tests/issuance_freeze.rs"
+      ],
+      "file_sha256": {
+        "crates/security/chio-security-kernel/tests/capability_set_suspension.rs": "b5954180621af054c03b152aad92c32f6db0b153a2bd753eb2572d6b75ce874a",
+        "crates/security/chio-security-kernel/tests/issuance_freeze.rs": "ca1f232c00c9281006063d4a511528d18f57073794a723b67621d904e325c8aa"
+      },
+      "contract": "Use otherwise-valid allowing replies with only tenant or lineage mismatches; assert exact integrity refusal and retain healthy allow and legitimate denial controls.",
+      "review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-r2-017-018-e00d780e-source-review.md",
+        "sha256": "5a708a384ba99d4e002852ec2c933bae63a8a5861ab36e40ea0edcf8547e72e3"
+      }
+    },
+    "R2-023": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "9c55261da07d656c910be8edb54574b9111a9e42",
+        "092afa9509f75a3490bde91b74b72ca4905baac1",
+        "e9c1f8e15136f88bc22a170ebb39159507b7a208"
+      ],
+      "files": [
+        "crates/kernel/chio-kernel-core/README.md",
+        "crates/kernel/chio-kernel-core/src/budget_split.rs",
+        "crates/kernel/chio-kernel-core/src/budget_split/boundary_tests.rs",
+        "crates/kernel/chio-kernel-core/src/budget_split/registry.rs",
+        "crates/kernel/chio-kernel-core/src/budget_split/registry_tests.rs",
+        "crates/kernel/chio-kernel-core/src/evaluate.rs",
+        "crates/kernel/chio-kernel-core/src/lib.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/budget_parent_expiry.rs",
+        "crates/kernel/chio-kernel/src/kernel/validation.rs",
+        "crates/kernel/chio-kernel/src/kernel/validation/lineage.rs"
+      ],
+      "file_sha256": {
+        "crates/kernel/chio-kernel-core/README.md": "ce5f8d8eacd4bfa6f1cefeb1eeba60928f902b53b2ac6292f4f06532fe7aefc7",
+        "crates/kernel/chio-kernel-core/src/budget_split.rs": "cede5e3b863af40bf59ac324bd4d767c6c3c749187e24aef800fc58834be26d9",
+        "crates/kernel/chio-kernel-core/src/budget_split/boundary_tests.rs": "63fca61abef92739240c478553d0a5388144adcd3b797d06a9bc2ed48774774c",
+        "crates/kernel/chio-kernel-core/src/budget_split/registry.rs": "588f83db836488fc836f1b9c2333885cb374eec732b18f2a7f1a76a2f503e3f1",
+        "crates/kernel/chio-kernel-core/src/budget_split/registry_tests.rs": "43084b2d50855b423abe7bbaccac0e2c676d22dd430ae10545b3dc80124e3371",
+        "crates/kernel/chio-kernel-core/src/evaluate.rs": "bf29605f73ed280e902f78355362aea5ac8cc1d06e15b863be54c343f401fc5c",
+        "crates/kernel/chio-kernel-core/src/lib.rs": "3ac3e41fc191ef174df158602623ccaa70d417d8a99e422e4c841b9617aeb197",
+        "crates/kernel/chio-kernel/src/kernel/tests.rs": "e0a7f369b0295545db8de039612ce8d77c82141020c095a8fd2dd1d1ddda920e",
+        "crates/kernel/chio-kernel/src/kernel/tests/budget_parent_expiry.rs": "457b05c75bf76976e4055f78b689bb1374a7c51f0da07befc441b92c70310a0f",
+        "crates/kernel/chio-kernel/src/kernel/validation.rs": "abfdfc153ba4f0dcf5c8ee0ac09ee0477aab78ce8997b0c7d3beb7500a3221ab",
+        "crates/kernel/chio-kernel/src/kernel/validation/lineage.rs": "a67a1ee261b10d230a181fe585e171ed2b93d8380ec7ee3e4da5636070fea269"
+      },
+      "contract": "Bound parents, aggregate child edges and owned ID bytes; reclaim only expired parents without live lease holders. Read monotone trusted time before registration. Move unchanged registration helpers to the existing lineage module to preserve the file-size cap.",
+      "review": {
+        "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-r2-023-fc7b2635-source-followup.md",
+        "sha256": "0384c6cdf61587bd8ea54cf4c04c49e3f28f51adb602c042c85331a91891d303"
+      }
+    },
+    "R2-025": {
+      "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+      "commits": [
+        "3bc451f026beb4b5a851a5ac2804f2d7ceaa65df"
+      ],
+      "files": [
+        "crates/platform/chio-control-plane/src/passport_verifier.rs"
+      ],
+      "file_sha256": {
+        "crates/platform/chio-control-plane/src/passport_verifier.rs": "6306e07256d94ba135b04f24047804bda6095e5bf596121f81aef87db28fe4c7"
+      },
+      "contract": "Expose retained Load, Refused and Persist error causes through Error::source; Busy and Unsupported remain cause-free.",
+      "review": {
+        "reviewer": "Root integrator independently inspected e8519cf493 and its complete match and two tests; no runtime evidence inferred from source."
+      }
+    }
+  },
+  "R2-020_preparation_only": {
+    "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+    "commits": [
+      "8e961918edd201bab8ffe9cee1cda1fef20517a2"
+    ],
+    "files": [
+      "crates/platform/chio-control-plane/src/bounded_worker_pool.rs",
+      "crates/platform/chio-control-plane/src/lib.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs"
+    ],
+    "file_sha256": {
+      "crates/platform/chio-control-plane/src/bounded_worker_pool.rs": "3c7e2a6a3cfcc40a3f3db62620be63a4027467837437f3061f76aa6ae4da47d6",
+      "crates/platform/chio-control-plane/src/lib.rs": "6b5cfe84bf6f8cf2de411eedd5846110c4c745c91c1b354326fa57a9bb62c5ae",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs": "ea34a690dea7d16e89cb369ae4e4766defd80c1da489f5b6bb3fbbd0f1c3c5e2",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs": "b760ee8eea8d83388e364d01fafbd33555874781f7ecab1f9fd76ced7ee6cc3b",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "b021166a62603bdf8df8e5cc41844537e1a0831b0af2171b1314802caf3abd88"
+    },
+    "contract": "Extract the existing bounded receipt worker into a neutral private pool without changing receipt outcomes or timeout mapping. This commit does not yet repair portable issuer DNS.",
+    "review": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-020-commit1-worker-pool-source-review-8ca534a329c5.md",
+      "sha256": "ee17507c1cf2ecccfc895994296978237de8dfde7ea62876b2100fa5013ccb38"
+    }
+  },
+  "related_signing_custody_liveness_repair": {
+    "checkpoint": "f0b3af8ca5f22fa15dd71da0fa6570b59d3fa5ad",
+    "commits": [
+      "fc0ed1f8fac3e6b17377efd1e1c0ff2d1a04138d",
+      "9b210ef220e721d6656843f76813e7ee2de8da7a"
+    ],
+    "files": [
+      "crates/platform/chio-control-plane/ARCHITECTURE.md",
+      "crates/platform/chio-control-plane/README.md",
+      "crates/platform/chio-control-plane/src/trust_control/authority_admission.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/authority_evidence.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/custody_election.rs",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/replication_heads.rs",
+      "crates/platform/chio-control-plane/src/trust_control/report_validation.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs",
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs",
+      "crates/products/chio-cli/tests/trust_cluster.rs",
+      "crates/products/chio-cli/tests/trust_cluster/health.rs",
+      "docs/operations/HA_CONTROL_AUTH_PLAN.md",
+      "spec/PROTOCOL.md"
+    ],
+    "file_sha256": {
+      "crates/platform/chio-control-plane/ARCHITECTURE.md": "6b139460a044efbb39bd94a706120f6159a8390f0612f46d44e7aed52bca5943",
+      "crates/platform/chio-control-plane/README.md": "95a26ded9d082ee846bfc5b58965e32e370934e0acfb6d91e0dd4ade496d8a44",
+      "crates/platform/chio-control-plane/src/trust_control/authority_admission.rs": "4d6e04f64121c139947ce5b6619826bfddf53778d95ef888724dfad1ebfff3f9",
+      "crates/platform/chio-control-plane/src/trust_control/cluster.rs": "02910520b82e78a5160e368cd044cd067bca1ab54353515936fdabcc5235d13d",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/authority_evidence.rs": "56dae068937b5ee8db944c953faa1d8ebcc8406fffda56a6c5360ce3800acc03",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs": "a47eae2e532151d37473aabc7327cfb090ea530a5df8e8328ab71068737fd7bb",
+      "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": "c52939e87f7b13f293268226c993974e8ff1aff007d3a2a18ad18147a7a82ac0",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": "c929a5825c9b0032d931aa24f6a0c396d9868a174ed2f058ccc3bdaf56e17699",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_sync_isolation.rs": "049f7ab71a6966ff9a1821e01a7909bc26bfd4295693a25904aea7af8bbe072c",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/custody_election.rs": "26ee8a21cb07c01543a205210919a1a680303bd110803bcabaa03081621b91f5",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/replication_heads.rs": "b191a0ae3d0f5b9af324eb7872c2204151ebc6d3de4f9e9af3c7ed2ddf11719c",
+      "crates/platform/chio-control-plane/src/trust_control/report_validation.rs": "42e4f6292d18a697bf4c469a112bc4eb1617526f3e7b67e5764fea973fb211cd",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs": "3b41f49289ad468d91cea441ec6a548d49cace014ab482dd36926a3f89a04b31",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "b021166a62603bdf8df8e5cc41844537e1a0831b0af2171b1314802caf3abd88",
+      "crates/platform/chio-store-sqlite/src/authority/read_only.rs": "b2fbaf4b3a3168dc13c10185af6453e4b9396325054b0df2ff6828d9f6b53ca9",
+      "crates/products/chio-cli/tests/trust_cluster.rs": "382b4dc30064658b8cea45ddcf0359764c691839cbad3770447b8c217073ca2b",
+      "crates/products/chio-cli/tests/trust_cluster/health.rs": "22aece2f92e48c216d854fa509a6060e112716e4587f437c5a91cb7b90fcf5cd",
+      "docs/operations/HA_CONTROL_AUTH_PLAN.md": "6065906734f7b254d93d072558fe2b883353d41ff9452946d4f49a4c269cb091",
+      "spec/PROTOCOL.md": "53e1fa7888d5f01231d46c6aea3eb3b23a230a2e7e029d23d79eaac004cc1ebf"
+    },
+    "contract": "Prefer reachable validated signing custody before URL order; reobserve status after admission. Preserve unavailable-custody fallback for independent budget/revocation service.",
+    "review": {
+      "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/independent-custody-election-79c9f14a-followup.md",
+      "sha256": "22162d4270dca99971863ba02d23785e871b027499b80ddc2b8d05dc57852687"
+    }
+  },
+  "static_qualification": {
+    "path": "/tmp/pr1160-ci-batch-20261010/composed-f6af-static/summary.json",
+    "sha256": "869d00db0b8a5e6efa905653bbbf94ad3d359235332c94908f8c6ca2e7661912"
+  },
+  "static_scope": "All four recorded commands passed on source-stable f6afb443c9. Later source changes have not rerun the full mutation suite; this is bounded prior evidence.",
+  "remaining_acceptance": [
+    "Collect producer genuine Originals and final composed owning tests and strict lint; source review alone does not close these findings.",
+    "Pass four required hosted checks on the published replacement head, classify other failures and answer reviews.",
+    "Obtain Connor explicit merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

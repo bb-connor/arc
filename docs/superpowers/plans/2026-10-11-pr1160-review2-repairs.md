@@ -55,9 +55,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Refuse incompatible external budget configuration before provisioning, or explicitly select one composite authority for probes, admission and settlement. Preserving old shared usage requires a qualified state transition; do not silently reset, copy or replace accounting.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -69,9 +69,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Keep direct seed access removed. Separate bootstrap custody validation from runtime configuration/token validation, and use the latter for cluster composition and request authentication. Exercise full healthy keyring startup, not just isolated constructors.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -139,9 +139,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Bound preparation DNS by one absolute deadline, resolve outside the custody mutex, and retain the resolver slot until the underlying lookup actually returns. Acquire nonblocking capacity before spawning. Reuse the checked pinned destination without a second lookup. The existing separate absolute connect/TLS/I/O deadline starts at execution, preserving the signed HTTP timeout semantics.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -279,9 +279,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Use tampered otherwise-allowing replies and assert the precise integrity/reflected-binding refusal at the real adapter. Preserve healthy allow and legitimate deny controls. No new harness is needed.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -353,9 +353,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Bound per-parent child count and retained child-ID bytes, plus registry totals of 10,000 parents, 100,000 child edges and 16 MiB of actually owned IDs. Keep exact counters and idempotent known admissions. Reclaim only signed-expired parents with no live lease holders using the existing trusted kernel clock. Preserve non-expiring operator registrations and fail closed on clock failure. Keep the generic trait contract stable through an additive concrete-registry path where possible; no wire/config schema expansion.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -381,9 +381,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Implement source for the three wrapped-error variants using the retained error; no new error abstraction.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 

@@ -51,6 +51,14 @@ records the genuine refusal/drain Original and a bounded sticky omission marker.
 The composed package passes 299 tests plus Ruff; four live-sidecar cases remain
 unavailable. Both R3-001 and the related R2-009 capture state are locally qualified.
 
+The [source composition audit](audits/review2-source-composition-20261011.json)
+records independently reviewed repairs for R2-002, R2-003, R2-008, R2-018,
+R2-023 and R2-025. Their source is integrated privately; final owning tests,
+strict lint and retained Originals remain the acceptance boundary. The related
+signing-custody election correction is also staged with source approval and
+runtime evidence pending. R2-020 has only its receipt-preserving worker
+extraction integrated; its issuer DNS repair remains open.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.
