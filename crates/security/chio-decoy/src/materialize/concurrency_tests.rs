@@ -210,8 +210,8 @@ fn dropped_lock_allows_torn_stage_recovery_and_exact_final_retry() {
         b"com"
     );
     assert!(!root.path().join(request.relative_path).exists());
-    // Process termination closes this same kernel-owned lock. No persistent
-    // lease or lockfile needs to be repaired after the descriptor disappears.
+    // Closing the last descriptor releases this kernel-owned lock. No persistent
+    // lease or lockfile needs repair; inherited descriptors can extend its lifetime.
     drop(held);
     let receipt = second
         .materialize(&request)
