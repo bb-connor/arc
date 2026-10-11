@@ -1,0 +1,640 @@
+{
+  "schema": "chio.security.ci-extraction-audit.v1",
+  "captured_utc": "2026-10-11T18:41:48.987095+00:00",
+  "pr": 1160,
+  "baseline": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+  "source": "021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630",
+  "implementation_commits": [
+    "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+    "021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630"
+  ],
+  "scope": "Unchanged workspace command moved to parallel runner with complete independent setup; exact required check remains fail-closed aggregate. Enroll existing unreadable-key forwarding test and renew its whole-job contract hash. No production Rust or acceptance waiver.",
+  "files": {
+    ".github/workflows/chio-tee-fips.yml": "26b1efd5ced49d5b9db214a025d149220999a84b2c2a293a5319a2c23d93f216",
+    ".github/workflows/ci.yml": "197f20339f593cefe6a067dadd5b3985f2a7530d6a051df400d0e39d53d03de8",
+    "docs/superpowers/plans/2026-10-11-pr1160-workspace-ci-extraction.md": "80d6bf60e57e1d5245ecdfca72341aab7ac6be481e9963da8b20ac372688d2ab",
+    "scripts/check-native-protocol-ci.py": "805852878807a6a030d0016290e491d2e7dba628826080dd8e6159c5349c0ebd",
+    "scripts/check-security-ci-contract.py": "8acd05b7e027e61b5f4d0af8edcdf392fa11117633d84d2f59cffa2c1237c6fd",
+    "scripts/tests/check-native-protocol-ci.test.py": "453c789042e63a7b3516d3392ddf663f8b7d2080f8dfd0303fe9b0b6c57d05a3",
+    "scripts/tests/check-patch-hygiene.test.py": "6bc1eac83b283d0fd309857a2d064553667dc32956e593387498246566daa95d",
+    "scripts/tests/check-security-ci-contract.test.py": "358ba6ffb7b799a85abe8410311a9fad674e6c57dd07dbd105ee24c8547dd1a3",
+    "scripts/tests/check-workspace-ci-extraction.test.py": "d4a8018293e52ce8ca78461314715166fcefd4030881fdb1644d72332be4afb2"
+  },
+  "extraction": {
+    "preservation": {
+      "baseline": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "candidate": "021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630",
+      "workflow_sha256": "197f20339f593cefe6a067dadd5b3985f2a7530d6a051df400d0e39d53d03de8",
+      "unchanged_other_jobs": 10,
+      "preserved_original_nonworkspace_steps": 49,
+      "unchanged_workspace_command": "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards",
+      "aggregate_cases": [
+        {
+          "build_lint": "success",
+          "workspace_tests": "success",
+          "exit_code": 0
+        },
+        {
+          "build_lint": "success",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "success",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "success",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "success",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "success",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "success",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "failure",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "success",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "cancelled",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "success",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "skipped",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "success",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "success",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "failure",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "cancelled",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "skipped",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "",
+          "exit_code": 1
+        },
+        {
+          "build_lint": "timed_out",
+          "workspace_tests": "timed_out",
+          "exit_code": 1
+        }
+      ],
+      "passed": true
+    },
+    "prerequisites": {
+      "source": "fc5308a5098a014d299903ea6b60e47224d8ff42",
+      "scope": "read-only setup dependency review for unchanged whole workspace Cargo command",
+      "dependencies": [
+        {
+          "id": "contracts-node",
+          "setup": "Node22, corepack, frozen contracts install",
+          "reason": "Consumer silently returns success without ethers/ganache; preserve working imports.",
+          "source_files": [
+            {
+              "path": "crates/economy/chio-settle/tests/runtime_devnet.rs",
+              "sha256": "e080572131e294ab7d98e5ac04ec6dd0274329004317673445fe178a22ce5b9c"
+            },
+            {
+              "path": "crates/economy/chio-settle/tests/web3_e2e_qualification.rs",
+              "sha256": "a48548038aca7a7ac5257ee25aadd44312291c57ac1a75dcf59685b42ccccc59"
+            }
+          ]
+        },
+        {
+          "id": "generated-vectors",
+          "setup": "Python3.12 with pinned jsonschema/referencing",
+          "reason": "Core types tests invoke the Python schema validator.",
+          "source_files": [
+            {
+              "path": "crates/core/chio-core-types/tests/security_generated_vectors.rs",
+              "sha256": "de5c87d80fc49b107bc910e1195c9d9c8818990943df344eeeb086772db2af8c"
+            },
+            {
+              "path": "scripts/check-security-wire-vectors.py",
+              "sha256": "c9ff40bb37adf98b0e4bdd8528220f66d5a57ea5b149e0a268868c3b97a2837e"
+            }
+          ]
+        },
+        {
+          "id": "rust-typescript-differentials",
+          "setup": "Bun1.3.3",
+          "reason": "Tamper controls refuse missing Bun; sibling differential would silently skip.",
+          "source_files": [
+            {
+              "path": "formal/diff-tests/tests/anchored_root_tamper.rs",
+              "sha256": "0ca70da5f3b57c4c4f92871c4614c4de7987e9d8186ce9e7d55213341a57c7c5"
+            },
+            {
+              "path": "formal/diff-tests/tests/anchored_root.rs",
+              "sha256": "2a124cb1b9ff64a6be9fdb6ea2cd9b7a65b14c92af48c2a814f7909120979031"
+            }
+          ]
+        },
+        {
+          "id": "native-authority",
+          "setup": "Independent fixture immediately before Workspace tests",
+          "reason": "Each runner must qualify its own helper, execution identity and independent anchor bindings.",
+          "source_files": [
+            {
+              "path": ".github/actions/enforced-native-fixture/action.yml",
+              "sha256": "8c25ad460fe8a5dbfd157fa62f75a4f14d2df2332f2fcaa08ffe814594722608"
+            }
+          ]
+        }
+      ],
+      "optional_outputs": "No mandatory generated dashboard or launch bundle dependency established; their producer gates remain in build-lint. Explicitly ignored receipt_encoding_diff remains ignored; no acceptance added."
+    },
+    "qualification": {
+      "completed_utc": "2026-10-11T18:36:43.866603+00:00",
+      "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+      "source_stable": true,
+      "worktree_clean": true,
+      "commands": [
+        {
+          "command": [
+            "python3",
+            "scripts/check-native-protocol-ci.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 0.205,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-native-protocol-ci.py.log",
+          "log_sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/check-security-ci-contract.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 2.455,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-security-ci-contract.py.log",
+          "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-fips-ci-contract.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 7.843,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-fips-ci-contract.test.py.log",
+          "log_sha256": "26a96676799cf559ea77e34854521a7a8b84ed57866104c2af6fb04a1527b735"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-native-protocol-ci.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 0.705,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-native-protocol-ci.test.py.log",
+          "log_sha256": "4b17fd704c4fd8d9ccb55a5c906f64274b5c3c66ddb27cd5eb920c45dee0d2f3"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-patch-hygiene.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 3.434,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-patch-hygiene.test.py.log",
+          "log_sha256": "606ae26c0b8a0b20ed6927998491753eabb8cef99a88ec60ec4e9105638b813f"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-required-evidence-binding.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 0.299,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-required-evidence-binding.test.py.log",
+          "log_sha256": "8f2c3cf5d3bf9284b6f5a737141442af9cd5313f865e0a157807be3354be9b86"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-security-ci-contract.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 1040.57,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-security-ci-contract.test.py.log",
+          "log_sha256": "c351bb6c7d53f019cfda46a147ef3b689d951d8dde33d16284fea70f59aa551f"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-security-definitions.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 50.902,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-security-definitions.test.py.log",
+          "log_sha256": "035455c450ef17dfe2d54804c2837ced55d25716ba77c07715af9c606c3e5802"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-workspace-ci-extraction.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 0.374,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/check-workspace-ci-extraction.test.py.log",
+          "log_sha256": "9d16aae44ada5eb7f5f449f579d48e90003ead8b21a9ca4226c73ceddb2f6026"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-currency-regressions.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 121.467,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/trusted-ci-currency-regressions.test.py.log",
+          "log_sha256": "a9cf8f7d71d1c16b6017f94c593652086a447432b95d1980cc6208f673cce944"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-identity-regressions.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 105.86,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/trusted-ci-identity-regressions.test.py.log",
+          "log_sha256": "9ddf1bb0f43953cf7ab0e12d72d6961ce43cbf6eac9d9406db68ff6e922eb8dd"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-landing-regressions.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 316.671,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/trusted-ci-landing-regressions.test.py.log",
+          "log_sha256": "a7670117045663b6985780ec49ded093d176e29f5239a269b6735e4cc1371c74"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-revocation-regressions.test.py"
+          ],
+          "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+          "exit_code": 0,
+          "duration_seconds": 307.067,
+          "log": "/tmp/pr1160-ci-batch-20261010/workspace-ci-extraction/qualification/trusted-ci-revocation-regressions.test.py.log",
+          "log_sha256": "cf8b873b45228108db375c0d97d2b162cb701cebea817933f9357cb696caa768"
+        }
+      ],
+      "scope": "Focused scripts; extraction and image-input tests nested by the main contract suite are not additional unique tests.",
+      "accepted": true
+    },
+    "review": {
+      "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+      "base": "fc5308a5098a014d299903ea6b60e47224d8ff42",
+      "reviews": [
+        {
+          "reviewer": "Claude coordination session",
+          "observed_utc": "2026-10-11T18:20:25Z",
+          "verdict": "approve",
+          "findings": [],
+          "scope": "Exact seven-file source diff; aggregate identity/body, unchanged 49 original nonworkspace steps, complete setup, readers and refusal tests. Additional compile work can affect timing; no hosted green claim."
+        },
+        {
+          "reviewer": "Root ci_coverage_gap_scan helper",
+          "verdict": "no findings",
+          "findings": [],
+          "scope": "Read-only exact source diff, setup preservation, independent aggregate and refusal inspection; ran no suites."
+        }
+      ],
+      "source_only": true,
+      "hosted_qualified": false
+    },
+    "original_contract_refusal": {
+      "workflow_source": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "workflow_sha256": "7788f6f92649c319be2876b417c8a40e062a0ad0a82fc23501aadb268699a8bc",
+      "new_contract_sha256": "06c1555dc09ef08587893c22f6aad914714a7392d9e4fc052027b0aa6ef82f5e",
+      "old_workflow_rejected": true,
+      "refusal": "Build, lint, test changes its exact fail-closed body",
+      "scope": "The new extraction contract rejects the old serial single-job shape; no historical Rust test failure is claimed."
+    },
+    "syntax": {
+      "source": "98a0e77ed38b23946267a417a029c0b1536a4f4b",
+      "tested_scoped_syntax": true,
+      "tests": 6,
+      "test_log_sha256": "b59d2412e371546aa2b15b05ec945f80f63a35cd60258504b9dfd865e8438f62",
+      "actionlint_baseline_exit": 1,
+      "actionlint_candidate_exit": 1,
+      "diagnostic": "artifact-metadata permission is unsupported by installed actionlint; same diagnostic before and after extraction apart from line numbers",
+      "baseline_log_sha256": "2511638ff6d1f47c7c3dc0ece47e643b5765a748415958f50b63e631bc985e58",
+      "candidate_log_sha256": "19d6348f7a9dd244059922f0d5ed7a38d8d07010bcb5f11a19ccfe2f6547410a",
+      "global_actionlint_passed": false
+    }
+  },
+  "fips": {
+    "source": "021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630",
+    "runtime_source": "eeca48528bd0f8ed9b558cfa599bffb0d911a964",
+    "runtime_scope": "Actual pq exact gate replay in warm unchanged production source; run body differs only by enrolled identity.",
+    "original_exit": 1,
+    "original_tests_passed": 2,
+    "original_failure": "Exact inventory unexpected unreadable current key forwarding test",
+    "fixed_exit": 0,
+    "fixed_exact_tests": 2,
+    "filtered_tests": 1719,
+    "composed_contract_exit": 0,
+    "composed_fips_regressions_exit": 0,
+    "composed_fips_regression_tests": 9,
+    "interrupted_compile": {
+      "exit": 143,
+      "scope": "Wrong profile rebuild stopped before tests, not Original regression evidence"
+    },
+    "logs": {
+      "original.log": {
+        "sha256": "652c91642e1d386ff6e713ab8b68149c6dc10e8169d35cda619d6befe68febdb",
+        "bytes": 6085
+      },
+      "fixed.log": {
+        "sha256": "e3847f2d746ae4173e472b3fe81c4ebb65e68eb8e8ce9302f8bfae6252fe1b95",
+        "bytes": 972
+      },
+      "composed-contract.log": {
+        "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+        "bytes": 49
+      },
+      "composed-fips-tests.log": {
+        "sha256": "d096fc4486317f611cd77107665ac47b27bcb26a46714e825609b7f5d3f261b9",
+        "bytes": 143
+      },
+      "interrupted-profile-compile.log": {
+        "sha256": "fa7481637204384050d2fadd66ce7a04a5b9d67fd889b525a0c3d46cf6d3db1b",
+        "bytes": 2449
+      }
+    },
+    "independent_review": {
+      "reviewer": "Claude coordination session",
+      "source": "021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630",
+      "observed_utc": "2026-10-11T18:41:35Z",
+      "verdict": "approve",
+      "scope": "Exact two-file delta; sorted identity enrollment and only owning threshold-crypto-floor hash changed."
+    }
+  },
+  "baseline_hosted_observation": {
+    "observed_utc": "2026-10-11T18:39:43.179216+00:00",
+    "head": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+    "required": {
+      "Build, lint, test": [
+        {
+          "state": "IN_PROGRESS",
+          "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532845909"
+        }
+      ],
+      "MSRV build and test": [
+        {
+          "state": "IN_PROGRESS",
+          "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532845962"
+        }
+      ],
+      "cargo-vet (locked supply-chain audit)": [
+        {
+          "state": "SUCCESS",
+          "url": "https://github.com/bb-connor/arc/actions/runs/38160711575/job/114532844085"
+        },
+        {
+          "state": "SUCCESS",
+          "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532845868"
+        }
+      ],
+      "cargo-deny (supply-chain bans/advisories/licenses)": [
+        {
+          "state": "SUCCESS",
+          "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532845902"
+        }
+      ]
+    },
+    "failed": [
+      {
+        "name": "dispatch isolated enterprise Linux capture",
+        "conclusion": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38160707762/job/114532833214"
+      },
+      {
+        "name": "nonce-fips-contract / Threshold approval crypto floor",
+        "conclusion": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532846014"
+      },
+      {
+        "name": "enterprise-security-contract / enterprise adversarial evidence",
+        "conclusion": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114536917980"
+      },
+      {
+        "name": "enterprise-security-contract / enterprise real Linux enforcement",
+        "conclusion": "FAILURE",
+        "url": "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114536917914"
+      }
+    ],
+    "unclassified": []
+  },
+  "baseline_failure_classifications": {
+    "https://github.com/bb-connor/arc/actions/runs/38160707762/job/114532833214": {
+      "classification": "known-disclosed-post-merge-prerequisite",
+      "name": "dispatch isolated enterprise Linux capture",
+      "job_id": 114532833214,
+      "event_head": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "authorized_source": "d0496c14d824a327f00b98576132834306ff6694",
+      "step": "Authorize exact source and controller context",
+      "log_sha256": "7fd19dbe10064520803aac4c36475af61ab1a839df2db411239caee72c23aa71",
+      "scope": "Retained exact-head log confirms unchanged stale authorization boundary. No capture acceptance or variable mutation."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114536917980": {
+      "classification": "known-postmerge-stale-authorized-execution-source",
+      "head": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "authorized_source": "d0496c14d824a327f00b98576132834306ff6694",
+      "stage": "trusted execution source file/mode preflight; workload not reached",
+      "first_source_inventory_mismatch": {
+        "path": "deploy/docker/security-evidence-seccomp-upstream.json",
+        "expected_mode": "644",
+        "authorized_mode": null
+      },
+      "log": "/tmp/pr1160-ci-batch-20261010/published-5f5e522aa5/enterprise-adversarial-114536917980.log",
+      "log_sha256": "c8a6a80dc222d2e606cdbe42eefc94aa945841ee93b4aa74b653c997a4427a13",
+      "remediation": "Retained postmerge authorization prerequisite; no variable or authorization rotation in this batch."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114536917914": {
+      "classification": "known-postmerge-stale-authorized-execution-source",
+      "head": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "authorized_source": "d0496c14d824a327f00b98576132834306ff6694",
+      "stage": "trusted execution source file/mode preflight; workload not reached",
+      "first_source_inventory_mismatch": {
+        "path": "deploy/docker/security-evidence-seccomp-upstream.json",
+        "expected_mode": "644",
+        "authorized_mode": null
+      },
+      "log": "/tmp/pr1160-ci-batch-20261010/published-5f5e522aa5/enterprise-linux-114536917914.log",
+      "log_sha256": "c0cee81acafe19ae29ff1c2fd1ba91feebb6aad780035f60a59e748ef008cf13",
+      "remediation": "Retained postmerge authorization prerequisite; no variable or authorization rotation in this batch."
+    },
+    "https://github.com/bb-connor/arc/actions/runs/38160711966/job/114532846014": {
+      "classification": "genuine-current-source-inventory-regression",
+      "status": "repair-in-progress",
+      "head": "5f5e522aa585174d7924e1da51d3a25fb2498b5d",
+      "cause": "New unreadable-current-key forwarding test is absent from the exact FIPS expected list. Both selected tests pass; the inventory correctly refuses the extra identity.",
+      "log": "/tmp/pr1160-ci-batch-20261010/published-5f5e522aa5/fips-forwarding-114532846014.log",
+      "log_sha256": "b7cb468e1e09eb09f5fda1b0694cc1ff13247f91263d479e3dbf56a9677fbe56",
+      "remaining_acceptance": "Repair enrollment, run exact focused gate and affected contracts, review, publish in the next batch."
+    }
+  },
+  "evidence_packet": "/home/connor/lanes/pr1160-root-evidence/workspace-ci-extraction-20261011",
+  "evidence_manifest_sha256": "33dfd64ac06493f063c791c7c4c69dd453717c241b35fc3976f1ba791260dc96",
+  "qualification_boundary": "Thirteen complete commands qualify frozen98a0. The two-line FIPS delta has its exact runtime gate replay, composed contract and nine owning mutation tests on021a5b8b0d. Full suite not rerun or claimed on the delta. These are local results, not hosted acceptance.",
+  "remaining_acceptance": [
+    "Finish the independent read-only exact inventory sweep before publication.",
+    "Publish one replacement, confirm local/remote/PR head equality and require four required checks green on that head.",
+    "Classify all other failures, answer review threads and report exact evidence before explicit owner merge authorization.",
+    "Trusted controller/enterprise authorization and committed Linux evidence remain postmerge setup; no variable or authorization changes.",
+    "Attestation-only accepted Kani residual remains open; weights timeouts are separately unproved and require owner disposition if still open. No new manual proof campaign.",
+    "Operational cold-state readiness, broader native latency/concurrency and missing authenticated legacy debit recovery remain explicit product limits."
+  ],
+  "published": false,
+  "hosted_qualified": false,
+  "merged": false
+}
