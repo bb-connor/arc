@@ -1197,19 +1197,31 @@ mod tests {
         forbidden.headers = vec![
             HeaderField::normalized("Authorization", b"caller").test_expect("forbidden header")
         ];
-        assert!(pin_and_prepare(&executor, &forbidden, &constraints, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&executor, &forbidden, &constraints, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
 
         let mut body_changed = request.clone();
         body_changed.body.push(0);
-        assert!(pin_and_prepare(&executor, &body_changed, &constraints, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&executor, &body_changed, &constraints, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
 
         let mut option_changed = request.clone();
         option_changed.options.streaming = true;
-        assert!(pin_and_prepare(&executor, &option_changed, &constraints, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&executor, &option_changed, &constraints, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
 
         let mut collision = constraints;
         collision.provider_owned_headers = vec!["x-api-key".to_string()];
-        assert!(pin_and_prepare(&executor, &request, &collision, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&executor, &request, &collision, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
     }
 
     #[test]
@@ -1240,7 +1252,10 @@ mod tests {
             ResponseMode::Valid,
             vec!["127.0.0.1".parse().test_expect("address")],
         );
-        assert!(pin_and_prepare(&restricted, &request, &constraints, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&restricted, &request, &constraints, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
     }
 
     #[test]
@@ -1276,7 +1291,10 @@ mod tests {
                 allow_exact_address: Some("1.1.1.1".parse().test_expect("address")),
             },
         );
-        assert!(pin_and_prepare(&mismatched, &request, &constraints, &credential).is_err());
+        assert!(matches!(
+            pin_and_prepare(&mismatched, &request, &constraints, &credential),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
 
         let matching = GenericHttpsExecutor::new(
             Arc::new(StaticResolver(Vec::new())),
