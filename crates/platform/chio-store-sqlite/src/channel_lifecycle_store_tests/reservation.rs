@@ -695,7 +695,7 @@ fn reservation_flow_from(
         authority_id: "channel-authority".to_owned(),
         authority_key_epoch: 7,
         authority_key: reservation_authority_key.public_key(),
-        trusted_time_unix_ms: timeline.at(BEGIN_AT),
+        trusted_time_unix_ms: open.trust.trusted_time_unix_ms,
     };
     let trusted_kernel_key = Keypair::from_seed(&[36; 32]);
     let reservation_body = ChannelReservationBodyV1 {
