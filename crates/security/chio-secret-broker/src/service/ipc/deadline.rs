@@ -2,7 +2,7 @@
 use super::Instant;
 use super::{BrokerError, Duration, Read, Result, Write};
 
-pub(super) const DEFAULT_BROKER_IPC_DEADLINE_MS: u64 = 5_000;
+pub(crate) const DEFAULT_BROKER_IPC_DEADLINE_MS: u64 = 5_000;
 pub(super) const MAX_BROKER_IPC_DEADLINE_MS: u64 = 30_000;
 
 /// Absolute read and write budgets for one accepted broker IPC connection.

@@ -219,6 +219,7 @@ mod failure;
 mod ipc;
 #[cfg(unix)]
 pub use ipc::UnixBrokerEndpoint;
+pub(crate) use ipc::DEFAULT_BROKER_IPC_DEADLINE_MS;
 pub use ipc::{BrokerIpcDeadlines, BrokerIpcHandler, BrokerIpcServeOutcome};
 
 mod lifecycle;
