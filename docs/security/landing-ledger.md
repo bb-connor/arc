@@ -7,6 +7,27 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Receipt mismatch proof repair (October 11 UTC)
+
+The private staging branch now contains encoder repair `2deed48089`, with
+**614 owning and 152 downstream tests passing**, strict lint, wire compatibility
+and no-default-feature checks. It builds one owned string from the same checked
+ASCII pairs used by the borrowed encoder, avoiding a redundant UTF8 scan.
+
+The unchanged receipt-mismatch harness passed locally with Kani 0.68 on aarch64
+in 154.758 seconds: zero failed safety properties, 5,608 successful properties,
+388 unreachable properties, both unwinding checks successful and the named
+completion witness reached. Its original domain, bounds and 1,800-second limit
+remain enforced. The [audit](audits/receipt-mismatch-proof-cost-20261011.json)
+preserves the earlier hosted timeout and the exact source and evidence hashes.
+
+All **1,968** earlier requirements, source records and current states remain
+unchanged, for **1,969 requirements**. In particular, broader
+**KANI-PROOF-QUAL remains OPEN/UNPROVED**. This repair is locally qualified in
+private staging; published `974f22914b` remains frozen for its hosted checks.
+A replacement batch still needs exact-head qualification and Connor's explicit
+merge go-ahead. No merge or release readiness is claimed.
+
 ## Required CI proof-room fixture (October 10)
 
 Source `4ba33a6cc48c746ae921dd2e685527f0760dbcb8` corrects the shared proof-room test graph with
