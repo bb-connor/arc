@@ -15,6 +15,11 @@ use crate::execution_nonce::SignedExecutionNonce;
 use crate::{AgentId, KernelError, ServerId};
 
 mod blocking_connection;
+mod blocking_task;
+pub(crate) use blocking_connection::{
+    blocking_dispatch_deadline_exceeded, with_blocking_tool_dispatch,
+};
+pub(crate) use blocking_task::AbortOnDrop;
 mod connection;
 mod dispatch_context;
 pub use blocking_connection::{BlockingToolServerAdapter, BlockingToolServerConnection};

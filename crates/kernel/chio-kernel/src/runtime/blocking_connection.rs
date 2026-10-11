@@ -5,14 +5,88 @@ use super::{
     ToolServerConnection,
 };
 use crate::KernelError;
+use std::cell::Cell;
+use std::time::Duration;
 
 #[cfg(test)]
 #[path = "blocking_connection/cancellation_tests.rs"]
 mod cancellation_tests;
 
+#[derive(Clone, Copy)]
+struct BlockingToolDispatch {
+    deadline: Option<tokio::time::Instant>,
+    budget: Duration,
+}
+
+thread_local! {
+    // Scheduling context for one call on an already-offloaded physical worker.
+    // This supplies no policy, custody or execution authority.
+    static BLOCKING_TOOL_DISPATCH: Cell<Option<BlockingToolDispatch>> = const { Cell::new(None) };
+}
+
+struct RestoreBlockingToolDispatch(Option<BlockingToolDispatch>);
+
+impl Drop for RestoreBlockingToolDispatch {
+    fn drop(&mut self) {
+        BLOCKING_TOOL_DISPATCH.with(|current| current.set(self.0));
+    }
+}
+
+pub(crate) fn with_blocking_tool_dispatch<T>(
+    deadline: Option<tokio::time::Instant>,
+    budget: Duration,
+    dispatch: impl FnOnce() -> T,
+) -> T {
+    let previous = BLOCKING_TOOL_DISPATCH
+        .with(|current| current.replace(Some(BlockingToolDispatch { deadline, budget })));
+    let _restore = RestoreBlockingToolDispatch(previous);
+    dispatch()
+}
+
+/// One typed refusal for every dispatch path and the adapter's expired worker.
+pub(crate) fn blocking_dispatch_deadline_exceeded(budget: Duration) -> KernelError {
+    KernelError::HotPathDeadlineExceeded {
+        stage: crate::HotPathStage::Dispatch,
+        budget_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
+    }
+}
+
+fn run_inline() -> Result<bool, KernelError> {
+    if tokio::runtime::Handle::try_current().is_err() {
+        return Ok(true);
+    }
+    let Some(dispatch) = BLOCKING_TOOL_DISPATCH.with(Cell::take) else {
+        return Ok(false);
+    };
+    // Timeout polls its inner future first, so reject expired work before
+    // entering a synchronous callback even when the timer is already ready.
+    if dispatch
+        .deadline
+        .is_some_and(|deadline| tokio::time::Instant::now() >= deadline)
+    {
+        return Err(blocking_dispatch_deadline_exceeded(dispatch.budget));
+    }
+    Ok(true)
+}
+
+async fn run_blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, KernelError> + Send + 'static,
+) -> Result<T, KernelError> {
+    let task = tokio::task::spawn_blocking(work);
+    let _abort_on_drop = super::AbortOnDrop(task.abort_handle());
+    task.await.map_err(|error| {
+        KernelError::ToolServerError(format!(
+            "blocking tool server task failed before returning: {error}"
+        ))
+    })?
+}
+
 /// Synchronous transport port adapted onto the kernel's asynchronous tool
-/// server boundary. Calls use `spawn_blocking` when a Tokio runtime is active
-/// and execute directly when driven by the kernel's no-runtime sync bridge.
+/// server boundary. The first call on the kernel's existing blocking dispatch
+/// worker executes directly. Other calls use `spawn_blocking` when a Tokio
+/// runtime is active, and the no-runtime sync bridge also executes directly.
+/// Dropping an awaiting call aborts work still queued; already-started
+/// synchronous work continues with its original outcome semantics.
 /// This is intended for bounded local IPC clients whose wire APIs are
 /// deliberately blocking.
 pub trait BlockingToolServerConnection: Send + Sync {
@@ -90,18 +164,12 @@ impl ToolServerConnection for BlockingToolServerAdapter {
         arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        if tokio::runtime::Handle::try_current().is_err() {
+        if run_inline()? {
             return self.inner.invoke_blocking_with_context(context, arguments);
         }
         let inner = Arc::clone(&self.inner);
         let context = context.clone();
-        tokio::task::spawn_blocking(move || inner.invoke_blocking_with_context(&context, arguments))
-            .await
-            .map_err(|error| {
-                KernelError::ToolServerError(format!(
-                    "blocking tool server task failed before returning: {error}"
-                ))
-            })?
+        run_blocking(move || inner.invoke_blocking_with_context(&context, arguments)).await
     }
 
     async fn invoke_with_cost_and_context(
@@ -121,33 +189,21 @@ impl ToolServerConnection for BlockingToolServerAdapter {
         arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        if tokio::runtime::Handle::try_current().is_err() {
+        if run_inline()? {
             return self.inner.invoke_blocking(tool_name, arguments);
         }
         let inner = Arc::clone(&self.inner);
         let tool_name = tool_name.to_string();
-        tokio::task::spawn_blocking(move || inner.invoke_blocking(&tool_name, arguments))
-            .await
-            .map_err(|error| {
-                KernelError::ToolServerError(format!(
-                    "blocking tool server task failed before returning: {error}"
-                ))
-            })?
+        run_blocking(move || inner.invoke_blocking(&tool_name, arguments)).await
     }
 
     async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
-        if tokio::runtime::Handle::try_current().is_err() {
+        if run_inline()? {
             return self.inner.prepare_delivery_blocking(context);
         }
         let inner = Arc::clone(&self.inner);
         let context = context.clone();
-        tokio::task::spawn_blocking(move || inner.prepare_delivery_blocking(&context))
-            .await
-            .map_err(|error| {
-                KernelError::ToolServerError(format!(
-                    "blocking tool server task failed before returning: {error}"
-                ))
-            })?
+        run_blocking(move || inner.prepare_delivery_blocking(&context)).await
     }
 
     async fn invoke_in_context(
@@ -157,7 +213,7 @@ impl ToolServerConnection for BlockingToolServerAdapter {
         arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        if tokio::runtime::Handle::try_current().is_err() {
+        if run_inline()? {
             return self
                 .inner
                 .invoke_blocking_in_context(context, tool_name, arguments);
@@ -165,15 +221,8 @@ impl ToolServerConnection for BlockingToolServerAdapter {
         let inner = Arc::clone(&self.inner);
         let context = context.clone();
         let tool_name = tool_name.to_string();
-        tokio::task::spawn_blocking(move || {
-            inner.invoke_blocking_in_context(&context, &tool_name, arguments)
-        })
-        .await
-        .map_err(|error| {
-            KernelError::ToolServerError(format!(
-                "blocking tool server task failed before returning: {error}"
-            ))
-        })?
+        run_blocking(move || inner.invoke_blocking_in_context(&context, &tool_name, arguments))
+            .await
     }
 
     async fn invoke_with_cost_in_context(

@@ -496,3 +496,125 @@ fn healthy_adapter_through_kernel_completes_with_one_blocking_slot() -> TestResu
     );
     Ok(())
 }
+
+#[test]
+fn expired_worker_refuses_before_entering_the_blocking_callback() -> TestResult {
+    let probe = Arc::new(Probe::default());
+    let adapter = BlockingToolServerAdapter::new(probe.clone())?;
+    let runtime = current_thread_runtime()?;
+    runtime.block_on(async {
+        let handle = tokio::runtime::Handle::current();
+        let result = tokio::task::spawn_blocking(move || {
+            with_blocking_tool_dispatch(
+                Some(tokio::time::Instant::now()),
+                Duration::from_millis(500),
+                || handle.block_on(adapter.invoke("work", serde_json::json!({}), None)),
+            )
+        })
+        .await?;
+        let error = match result {
+            Ok(value) => return Err(format!("expired callback ran: {value:?}").into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                error,
+                KernelError::HotPathDeadlineExceeded {
+                    stage: crate::HotPathStage::Dispatch,
+                    budget_ms: 500,
+                }
+            ),
+            "{error:?}"
+        );
+        drain_pool().await?;
+        assert_eq!(probe.started.load(Ordering::SeqCst), 0);
+        assert_eq!(probe.completed.load(Ordering::SeqCst), 0);
+        Ok(())
+    })
+}
+
+#[test]
+fn worker_inline_opportunity_is_single_use_and_later_calls_queue() -> TestResult {
+    let probe = Arc::new(Probe::default());
+    let adapter = BlockingToolServerAdapter::new(probe.clone())?;
+    let runtime = current_thread_runtime()?;
+    runtime.block_on(async {
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_blocking_tool_dispatch(Some(tokio::time::Instant::now() + FUSE), FUSE, || {
+                handle.block_on(async {
+                    assert_eq!(
+                        adapter.invoke("work", serde_json::json!({"first": true}), None).await?,
+                        serde_json::json!({"done": true, "tool": "work", "arguments": {"first": true}})
+                    );
+                    let mut later = adapter.invoke("work", serde_json::json!({"later": true}), None);
+                    poll_fn(|cx| {
+                        assert!(matches!(later.as_mut().poll(cx), Poll::Pending), "only the first adapter call may reuse the physical worker");
+                        Poll::Ready(())
+                    }).await;
+                    drop(later);
+                    Ok::<(), KernelError>(())
+                })
+            })
+        }).await??;
+        drain_pool().await?;
+        assert_eq!(probe.started.load(Ordering::SeqCst), 1);
+        assert_eq!(probe.completed.load(Ordering::SeqCst), 1);
+        Ok(())
+    })
+}
+
+#[test]
+fn worker_scope_restores_prior_context_after_nesting_and_unwind() -> TestResult {
+    let probe = Arc::new(Probe::default());
+    let adapter = BlockingToolServerAdapter::new(probe.clone())?;
+    let runtime = current_thread_runtime()?;
+    runtime.block_on(async {
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_blocking_tool_dispatch(Some(tokio::time::Instant::now() + FUSE), FUSE, || {
+                let unwound = std::panic::catch_unwind(|| {
+                    with_blocking_tool_dispatch(
+                        Some(tokio::time::Instant::now()),
+                        Duration::from_millis(1),
+                        || panic!("worker scope unwind control"),
+                    )
+                });
+                let payload = match unwound {
+                    Ok(()) => return Err(fixture_error("nested scope did not unwind")),
+                    Err(payload) => payload,
+                };
+                assert_eq!(
+                    payload.downcast_ref::<&str>(),
+                    Some(&"worker scope unwind control")
+                );
+                handle.block_on(async {
+                    assert_eq!(
+                        adapter.invoke("work", serde_json::json!({}), None).await?,
+                        serde_json::json!({"done": true, "tool": "work", "arguments": {}})
+                    );
+                    Ok::<(), KernelError>(())
+                })
+            })?;
+            // The raw worker no longer carries the restored outer context.
+            handle.block_on(async {
+                let mut call = adapter.invoke("work", serde_json::json!({}), None);
+                poll_fn(|cx| {
+                    assert!(
+                        matches!(call.as_mut().poll(cx), Poll::Pending),
+                        "worker context must not leak into the next unscoped call"
+                    );
+                    Poll::Ready(())
+                })
+                .await;
+                drop(call);
+                Ok::<(), KernelError>(())
+            })
+        })
+        .await??;
+        drain_pool().await?;
+        assert_eq!(probe.started.load(Ordering::SeqCst), 1);
+        assert_eq!(probe.completed.load(Ordering::SeqCst), 1);
+        Ok(())
+    })
+}

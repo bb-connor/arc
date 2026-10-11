@@ -5,6 +5,8 @@
 //! recording.
 
 use crate::budget_store::BudgetReverseHoldDecision;
+use crate::runtime::blocking_dispatch_deadline_exceeded as dispatch_deadline_exceeded;
+use crate::runtime::AbortOnDrop;
 use chio_log_redact::redacted;
 
 use super::*;
@@ -481,33 +483,6 @@ fn run_guards_owned(
 
 fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
     u64::try_from(budget.as_millis()).unwrap_or(u64::MAX)
-}
-
-/// The fail-closed error returned when a tool-server call outruns its dispatch
-/// budget. Shared by every dispatch path (top-level and nested-flow) so the
-/// timeout verdict is byte-identical wherever the deadline fires.
-fn dispatch_deadline_exceeded(budget: std::time::Duration) -> KernelError {
-    KernelError::HotPathDeadlineExceeded {
-        stage: HotPathStage::Dispatch,
-        budget_ms: budget_ms_saturating(budget),
-    }
-}
-
-/// Aborts an offloaded `spawn_blocking` task when the awaiting future is
-/// dropped, whether because its deadline fired or because the caller was
-/// cancelled. Dropping a bare `JoinHandle` only *detaches* the task: one still
-/// queued on a saturated blocking pool would then start and run the tool call
-/// (or guard) after the kernel has already emitted a timed-out response and
-/// unwound its charges. Aborting cancels a not-yet-started task so it cannot
-/// execute side effects past the deadline; a task already running its blocking
-/// body cannot be interrupted, but its own inner deadline still frees it, and a
-/// task that already finished is aborted as a harmless no-op.
-struct AbortOnDrop(tokio::task::AbortHandle);
-
-impl Drop for AbortOnDrop {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
 }
 
 thread_local! {
@@ -1728,6 +1703,15 @@ impl ChioKernel {
         };
 
         let timer_available = dispatch_timer_available();
+        let deadline = if timer_available {
+            Some(
+                tokio::time::Instant::now()
+                    .checked_add(budget)
+                    .ok_or_else(|| dispatch_deadline_exceeded(budget))?,
+            )
+        } else {
+            None
+        };
         let multi_thread = matches!(
             tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
             Ok(tokio::runtime::RuntimeFlavor::MultiThread)
@@ -1739,8 +1723,8 @@ impl ChioKernel {
                 request.arguments.clone(),
                 has_monetary_grant,
             );
-            if timer_available {
-                return match tokio::time::timeout(budget, call).await {
+            if let Some(deadline) = deadline {
+                return match tokio::time::timeout_at(deadline, call).await {
                     Ok(result) => result,
                     Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
                 };
@@ -1767,17 +1751,23 @@ impl ChioKernel {
         // without limit. Either way the outer timeout frees the async worker at
         // the budget, so the per-eval wall clock holds.
         let join = tokio::task::spawn_blocking(move || {
-            let call = Self::invoke_resolved_server(server, context, arguments, has_monetary_grant);
-            if timer_available {
-                handle.block_on(async move {
-                    match tokio::time::timeout(budget, call).await {
-                        Ok(result) => result,
-                        Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
-                    }
-                })
-            } else {
-                handle.block_on(call)
-            }
+            crate::runtime::with_blocking_tool_dispatch(deadline, budget, || {
+                let call =
+                    Self::invoke_resolved_server(server, context, arguments, has_monetary_grant);
+                if let Some(deadline) = deadline {
+                    handle.block_on(async move {
+                        if tokio::time::Instant::now() >= deadline {
+                            return Err(dispatch_deadline_exceeded(budget));
+                        }
+                        match tokio::time::timeout_at(deadline, call).await {
+                            Ok(result) => result,
+                            Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+                        }
+                    })
+                } else {
+                    handle.block_on(call)
+                }
+            })
         });
         // Cancel the offloaded call if the outer deadline fires before the
         // blocking pool even starts it. Dropping the join handle alone detaches
@@ -1786,8 +1776,8 @@ impl ChioKernel {
         // unwound its charges.
         let _abort_on_drop = AbortOnDrop(join.abort_handle());
 
-        if timer_available {
-            match tokio::time::timeout(budget, join).await {
+        if let Some(deadline) = deadline {
+            match tokio::time::timeout_at(deadline, join).await {
                 Ok(Ok(result)) => result,
                 Ok(Err(join_error)) => Err(KernelError::Internal(format!(
                     "dispatch task join failed: {join_error}"
