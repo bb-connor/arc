@@ -258,8 +258,8 @@ mod unix {
 
     use hmac::{Hmac, Mac};
     use rustix::fs::{
-        fchmod, fgetxattr, fsetxattr, mkdirat, open, openat, renameat_with, statat, unlinkat,
-        AtFlags, FileType, Mode, OFlags, RenameFlags, XattrFlags,
+        fchmod, fgetxattr, flock, fsetxattr, mkdirat, open, openat, renameat_with, statat,
+        unlinkat, AtFlags, FileType, FlockOperation, Mode, OFlags, RenameFlags, XattrFlags,
     };
     use sha2::{Digest, Sha256};
 
@@ -387,15 +387,20 @@ mod unix {
             &self,
             request: &MaterializationRequest<'_>,
         ) -> Result<MaterializationReceipt, MaterializeError> {
-            let (parent, basename) = self.materialization_parent(request)?;
+            validate_identity(request.identity)?;
+            let parsed = parse_relative_path(request.relative_path)?;
+            // A fresh directory description serializes threads and independent
+            // materializer instances. Keep it alive through receipt validation,
+            // including the already-published exact-retry path.
+            let staging = self.lock_staging_directory()?;
+            let (parent, basename) = self
+                .walk_parent(&parsed, true)?
+                .ok_or(MaterializeError::MetadataMismatch)?;
             let content_digest = digest_bytes(request.content);
             if let EntryState::Present(file) = open_file_at(&parent, basename)? {
                 return self.verify_retry(file, request, content_digest);
             }
 
-            let staging = self
-                .open_internal_directory(STAGING_DIRECTORY, true)?
-                .ok_or(MaterializeError::MetadataMismatch)?;
             let staging_name = self.staging_name(request)?;
             let proof = self.stage_file(&staging, &staging_name, request, content_digest)?;
             #[cfg(test)]
@@ -539,6 +544,16 @@ mod unix {
             }
         }
 
+        fn lock_staging_directory(&self) -> Result<File, MaterializeError> {
+            let staging = self
+                .open_internal_directory(STAGING_DIRECTORY, true)?
+                .ok_or(MaterializeError::MetadataMismatch)?;
+            flock(&staging, FlockOperation::NonBlockingLockExclusive)
+                .map_err(|error| errno_error("lock materialization staging directory", error))?;
+            Ok(staging)
+        }
+
+        #[cfg(test)]
         fn materialization_parent<'a>(
             &self,
             request: &MaterializationRequest<'a>,

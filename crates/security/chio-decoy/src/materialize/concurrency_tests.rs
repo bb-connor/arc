@@ -42,6 +42,15 @@ fn materializer(root: &std::path::Path) -> FileMaterializer {
 
 #[test]
 fn concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication() {
+    check_concurrent_retry(false);
+}
+
+#[test]
+fn same_materializer_calls_acquire_independent_lock_descriptions() {
+    check_concurrent_retry(true);
+}
+
+fn check_concurrent_retry(same_instance: bool) {
     let root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let mut first = materializer(root.path());
     let second = materializer(root.path());
@@ -71,7 +80,11 @@ fn concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication() {
             .path();
         let before = std::fs::metadata(&stage)
             .unwrap_or_else(|error| panic!("inspect original stage: {error}"));
-        let competing = second.materialize(&request);
+        let competing = if same_instance {
+            first.materialize(&request)
+        } else {
+            second.materialize(&request)
+        };
         let stage_unchanged = std::fs::metadata(&stage)
             .is_ok_and(|after| before.ino() == after.ino() && before.len() == after.len());
         let premature_final = root.path().join(request.relative_path).exists();
@@ -111,5 +124,84 @@ fn concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication() {
         std::fs::read(root.path().join(request.relative_path))
             .unwrap_or_else(|error| panic!("read published contents: {error}")),
         request.content
+    );
+}
+
+#[test]
+fn dropped_lock_allows_torn_stage_recovery_and_exact_final_retry() {
+    use rustix::fs::{flock, FlockOperation};
+
+    let root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let first = materializer(root.path());
+    let second = materializer(root.path());
+    let identity = identity();
+    let request = MaterializationRequest {
+        identity: &identity,
+        relative_path: std::path::Path::new("recovered.txt"),
+        content: b"complete durable contents",
+    };
+    first
+        .stage_without_publish_for_test(&request)
+        .unwrap_or_else(|error| panic!("seed interrupted stage: {error}"));
+    let directory = root.path().join(".chio-decoy-stage");
+    let held = std::fs::File::open(&directory)
+        .unwrap_or_else(|error| panic!("open staging directory: {error}"));
+    flock(&held, FlockOperation::NonBlockingLockExclusive)
+        .unwrap_or_else(|error| panic!("hold staging directory: {error}"));
+    let stage = std::fs::read_dir(&directory)
+        .unwrap_or_else(|error| panic!("read staging directory: {error}"))
+        .next()
+        .unwrap_or_else(|| panic!("staging entry is absent"))
+        .unwrap_or_else(|error| panic!("read staging entry: {error}"))
+        .path();
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&stage)
+        .unwrap_or_else(|error| panic!("open interrupted write: {error}"));
+    file.set_len(3)
+        .unwrap_or_else(|error| panic!("simulate interrupted write: {error}"));
+    drop(file);
+    assert_would_block(second.materialize(&request));
+    assert_eq!(
+        std::fs::read(&stage).unwrap_or_else(|error| panic!("read held stage: {error}")),
+        b"com"
+    );
+    assert!(!root.path().join(request.relative_path).exists());
+    // Process termination closes this same kernel-owned lock. No persistent
+    // lease or lockfile needs to be repaired after the descriptor disappears.
+    drop(held);
+    let receipt = second
+        .materialize(&request)
+        .unwrap_or_else(|error| panic!("recover after holder exit: {error}"));
+    assert_eq!(
+        std::fs::read(root.path().join(request.relative_path))
+            .unwrap_or_else(|error| panic!("read recovered file: {error}")),
+        request.content
+    );
+
+    let held = std::fs::File::open(&directory)
+        .unwrap_or_else(|error| panic!("reopen staging directory: {error}"));
+    flock(&held, FlockOperation::NonBlockingLockExclusive)
+        .unwrap_or_else(|error| panic!("hold exact retry: {error}"));
+    assert_would_block(second.materialize(&request));
+    drop(held);
+    assert_eq!(
+        second
+            .materialize(&request)
+            .unwrap_or_else(|error| panic!("exact retry after holder exit: {error}")),
+        receipt
+    );
+}
+
+fn assert_would_block(result: Result<MaterializationReceipt, MaterializeError>) {
+    assert!(
+        matches!(
+            result,
+            Err(MaterializeError::Io {
+                operation: "lock materialization staging directory",
+                kind: std::io::ErrorKind::WouldBlock,
+            })
+        ),
+        "contended materialization must return retryable WouldBlock: {result:?}"
     );
 }
