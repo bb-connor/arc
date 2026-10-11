@@ -5,6 +5,9 @@ use chio_kernel::SecurityInvocationContext;
 #[path = "checkpoint/image_visit_controls.rs"]
 mod image_visit_controls;
 
+#[path = "checkpoint/delta.rs"]
+mod delta;
+
 fn join(
     fixture: &Fixture,
     initialized: &SecurityParticipantStateInitialization,

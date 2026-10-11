@@ -549,3 +549,92 @@ fn expiry_under_a_sealed_full_head_is_recovered_by_either_maintenance_path() -> 
     }
     Ok(())
 }
+
+/// Sealed records in sequence order as (sequence, is delta, added rows).
+fn sealed_records(fixture: &Fixture) -> AnchoredTestResult<Vec<(i64, bool, u64)>> {
+    let connection = fixture.store.connection()?;
+    let mut statement = connection.prepare(
+        "SELECT sequence, canonical_record FROM security_participant_checkpoint_events
+         ORDER BY sequence",
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    rows.into_iter()
+        .map(|(sequence, bytes)| {
+            let record: serde_json::Value = serde_json::from_slice(&bytes)?;
+            let added = record["delta"]["added_rows"].as_u64().unwrap_or(0);
+            Ok((sequence, !record["delta"].is_null(), added))
+        })
+        .collect()
+}
+
+/// Each delta's added rows are authenticated on their own. Sustained calls
+/// replace rows, so their removals exhaust the read budget and force a later
+/// keyframe that supersedes earlier deltas for the latest image. A stored
+/// added row of such a delta, replaced by another valid row of the same table
+/// and length, is still refused at verification.
+#[test]
+fn superseded_delta_added_row_substitution_is_refused() -> AnchoredTestResult {
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let mut generation = None;
+    let mut superseded = None;
+    for index in 0..INVOCATIONS {
+        let finished = invoke(&fixture, &format!("superseded-{index}"), generation)?;
+        generation = Some(finished.fence.context_generation);
+        compensation::compensate(&fixture, &finished.pending)?;
+        let records = sealed_records(&fixture)?;
+        superseded = records.iter().find_map(|(sequence, delta, added)| {
+            (*delta
+                && *added > 0
+                && records
+                    .iter()
+                    .any(|(later, later_delta, _)| later > sequence && !later_delta))
+            .then_some(*sequence)
+        });
+        if superseded.is_some() {
+            break;
+        }
+    }
+    let delta_sequence = superseded.ok_or("no keyframe superseded a delta with added rows")?;
+    {
+        let connection = fixture.store.connection()?;
+        let (rowid, replacement): (i64, Vec<u8>) = connection.query_row(
+            "SELECT added.rowid, other.canonical_row
+             FROM security_participant_checkpoint_rows AS added
+             JOIN security_participant_checkpoint_rows AS other
+               ON other.table_name = added.table_name
+              AND length(other.canonical_row) = length(added.canonical_row)
+              AND other.canonical_row <> added.canonical_row
+             WHERE added.checkpoint_sequence = ?1
+             ORDER BY added.rowid, other.rowid LIMIT 1",
+            [delta_sequence],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        connection.execute_batch("DROP TRIGGER security_participant_checkpoint_rows_no_update")?;
+        connection.execute(
+            "UPDATE security_participant_checkpoint_rows SET canonical_row = ?1 WHERE rowid = ?2",
+            rusqlite::params![replacement, rowid],
+        )?;
+        connection.execute_batch(native::checkpoint::sql())?;
+        let error = native::checkpoint::verify_all(&connection)
+            .err()
+            .ok_or("archive validation accepted a substituted delta row")?;
+        assert!(
+            format!("{error:?}").contains("native checkpoint delta added rows digest differs"),
+            "{error:?}"
+        );
+    }
+    // Opening the store runs the same archive validation.
+    let error = reopen(fixture)
+        .err()
+        .ok_or("a substituted delta row must refuse the reopen")?;
+    assert!(
+        format!("{error:?}").contains("native checkpoint delta added rows digest differs"),
+        "{error:?}"
+    );
+    Ok(())
+}

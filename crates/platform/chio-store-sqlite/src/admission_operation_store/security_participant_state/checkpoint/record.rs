@@ -1,6 +1,7 @@
 use super::*;
 
 const FORMAT: &str = "chio.native-security-checkpoint.v1";
+const DELTA_FORMAT: &str = "chio.native-security-checkpoint.v2";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,11 +28,18 @@ pub(in crate::admission_operation_store::security_participant_state) struct Reco
     pub current_bytes: u64,
     pub segment_events: u64,
     pub segment_bytes: u64,
+    /// Present only on delta checkpoints. Keyframes keep their v1 bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<delta::Delta>,
 }
 
 impl Record {
-    pub(super) fn format() -> String {
-        FORMAT.into()
+    pub(super) fn format(delta: bool) -> String {
+        if delta {
+            DELTA_FORMAT.into()
+        } else {
+            FORMAT.into()
+        }
     }
 
     pub(super) fn bytes(&self) -> Result<Vec<u8>, AdmissionOperationStoreError> {
@@ -52,8 +60,14 @@ impl Record {
         let initialized =
             super::super::records::load_metadata(connection, self.authority.as_str())?
                 .ok_or_else(|| invalid("native checkpoint initialization is absent"))?;
-        if self.schema != FORMAT
-            || self.initialization != initialized.digest
+        match (&self.delta, self.schema.as_str()) {
+            (None, FORMAT) => {}
+            (Some(delta), DELTA_FORMAT) => {
+                delta.validate(self.sequence, self.current_rows, self.current_bytes)?;
+            }
+            _ => return Err(invalid("native checkpoint format and delta differ")),
+        }
+        if self.initialization != initialized.digest
             || self.fence.store_uuid != initialized.fence.store_uuid
             || !(1..=9_007_199_254_740_991).contains(&self.sequence)
             || self.global_sequence == 0
