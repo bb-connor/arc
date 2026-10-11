@@ -533,3 +533,18 @@ explicitly record publication at `36d77fe276`, retaining their previous states.
 The public Build failure, pending MSRV and additional unaccepted weights proof
 remain distinct from the completed local repairs. Publish only after all four
 current required checks report and any further genuine failure is addressed.
+
+### Full predecessor results and final fixture repair
+
+MSRV `114427678978` completed with exactly two failed targets: the already
+repaired market admission and the load-generator invalid-duration fixture.
+Root reproduced the latter on unchanged `0df8edfaa1`, then booted its harness
+with a valid lifetime before supplying `u64::MAX` to the runner. Commit
+`016d3a2cde` retains the exact `DurationTooLong` assertion and changes no
+production code. Owning 24/0, strict all-target lint, formatting and hygiene
+pass; independent source review finds no issue. The tested tree equals the
+committed tree. The terminal audit retains the failed Original and skipped
+later shell commands. All four predecessor results are now terminal, and all
+19 failed/cancelled jobs are classified. The ledger preserves 2,015 requirements.
+Publish the complete reviewed batch, qualify its exact head, then obtain the
+user's merge go-ahead with all remaining obligations stated.

@@ -8,6 +8,31 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Complete predecessor CI results and final fixture repair (October 11 UTC)
+
+All four required checks on `36d77fe276` have reported: Vet and Deny pass;
+Build fails on the repaired metadata drift, and MSRV job **114427678978**
+reports exactly two failed targets after its full `--no-fail-fast` workspace
+invocation. Market admission is repaired in `336f65214a`. The remaining
+load-generator fixture is repaired in **`016d3a2cde`**: boot a valid capability
+lifetime, then exercise the runner with the same `u64::MAX` duration and exact
+`DurationTooLong` assertion. No production code or budget changes.
+
+The [terminal audit](audits/msrv-terminal-repair-20261011.json) retains the local
+Original failure, all-target owning **24/0**, strict lint, independent source
+review and equivalence between the tested worktree and committed source.
+Formatting and Rust hygiene pass. The failed MSRV command did not execute its
+later formal-diff/WASM commands. Aggregate job **114469250733** also fails its
+known missing committed-evidence prerequisite; it adds no independent source
+failure. All **19** failed or cancelled jobs are classified, with none unclassified.
+
+The ledger preserves **2,015 requirements**, including the new fixture obligation
+and every earlier record. Publish one reviewed replacement, require its four
+checks green, classify other results and refresh answered threads. The additional
+weights proof residual still needs ordinary CI evidence or explicit user
+acceptance; trusted setup and operational prerequisites remain disclosed.
+Hosted replacement qualification and user merge authorization remain outstanding.
+
 ## Published native recovery qualification (October 11 UTC)
 
 The [hosted native audit](audits/native-recovery-hosted-20261011.json) records
