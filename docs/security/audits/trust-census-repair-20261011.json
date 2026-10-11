@@ -1,0 +1,176 @@
+{
+  "schema": "chio.security.trust-census-repair.v1",
+  "captured_utc": "2026-10-11T20:22:13.932032+00:00",
+  "source": "0f2aa61e41849cac82050b4357d745dfef9c1e90",
+  "base": "07d780147c703e7009837ef990494efd7f02211d",
+  "scope": "Preserve the lexical shared-reader trace across reviewed checkpoint keyframe/delta helpers with explicit module imports and a matching three-path census. No reader behavior or scanner algorithm changes.",
+  "files": {
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs": "1f0ea898d1178a11241d95a2c2c88b0aa97c5bd11f859be2df0b8e595833fa34",
+    "docs/security/trust-boundary-inventory.json": "d2888e8bb03f6b008cb5fe21f032299f74f580938d36c0ddfbe0d1b3009e3ce3"
+  },
+  "hosted_original": {
+    "source": "07d780147c703e7009837ef990494efd7f02211d",
+    "run": 38165670889,
+    "job": 114547605359,
+    "structural_gates": 114,
+    "failed_gates": 2,
+    "failed_calibration_tests": 3,
+    "calibration_tests": 63,
+    "reason": "framework/format/shared-reader census changed; classify each new input consumer",
+    "log_sha256": "056750acd632f591467e8ecb3b2976f28cd9773c9b2e297b3247d2e9fb9ae0bf"
+  },
+  "local_original": {
+    "source": "07d780147c703e7009837ef990494efd7f02211d",
+    "entrypoint": "check-trust-boundaries.check(root,catalog), unchanged source and catalog",
+    "exit_code": 1,
+    "errors": [
+      "framework/format/shared-reader census changed; classify each new input consumer"
+    ],
+    "evidence": "original-scan.json",
+    "sha256": "5e904ab7fcb6675983449f4acc1c8539951a4fbfff3843183594d1b9ce2d5efd"
+  },
+  "reviewed_reader_changes": {
+    "paths": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs"
+    ],
+    "added_call_observations": 19,
+    "removed_call_observations": 8,
+    "multiplicity_preserved": true,
+    "classification": "Bounded authenticated internal checkpoint rows and their canonical row codec; existing source-scoped runtime evidence is in checkpoint-delta-20261011.json.",
+    "retained_boundaries": [
+      "rows::read uses authority-scoped native rows and the existing row encoding/bounds.",
+      "rows::stored validates aggregate row/byte/type bounds before row allocation and canonical decoding.",
+      "rows::keyframe checks table fingerprints; rows::added checks the committed ordered/table-tagged digest.",
+      "delta::image loads canonical checkpoint records and verifies the bounded reconstructed image.",
+      "Explicit sibling module imports keep history::verify_rows -> checkpoint::visit_rows -> delta::image visible to the existing bounded lexical scanner."
+    ],
+    "no_semantic_debt_waiver": true,
+    "all_catalog_keys_except_ingress_census_unchanged": true,
+    "history_reader_edge_preserved": true
+  },
+  "qualification": {
+    "commands": [
+      {
+        "label": "checker",
+        "argv": [
+          "python3",
+          "scripts/check-trust-boundaries.py"
+        ],
+        "started_utc": "2026-10-11T20:08:31.052622+00:00",
+        "elapsed_seconds": 94.042,
+        "exit": 0,
+        "log_sha256": "e8086932b2921312c8030f13c66704b798492939ce16ad2acf25c5ea5b420a53"
+      },
+      {
+        "label": "calibration",
+        "argv": [
+          "python3",
+          "scripts/tests/check-trust-boundaries.test.py"
+        ],
+        "started_utc": "2026-10-11T20:08:31.066900+00:00",
+        "elapsed_seconds": 449.827,
+        "exit": 0,
+        "log_sha256": "5d34de08d362d2fefe112e082c3862e24a4da5700c5d270a02fa3dadbc0e1b98"
+      },
+      {
+        "label": "fmt",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "started_utc": "2026-10-11T20:08:31.064210+00:00",
+        "elapsed_seconds": 28.255,
+        "exit": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "store-strict",
+        "argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--all-targets",
+          "--features",
+          "admission-test-support",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started_utc": "2026-10-11T20:14:13.127944+00:00",
+        "elapsed_seconds": 150.677,
+        "exit": 0,
+        "log_sha256": "c529e41158e50c85f9324729afa17831a244dcf0e1166ca9c86b50ed3f7cb24b"
+      },
+      {
+        "label": "checker-final",
+        "argv": [
+          "python3",
+          "scripts/check-trust-boundaries.py"
+        ],
+        "started_utc": "2026-10-11T20:17:43.622688+00:00",
+        "elapsed_seconds": 93.724,
+        "exit": 0,
+        "log_sha256": "e8086932b2921312c8030f13c66704b798492939ce16ad2acf25c5ea5b420a53"
+      },
+      {
+        "label": "coverage",
+        "argv": [
+          "swarm",
+          "build",
+          "--class",
+          "integrator",
+          "--",
+          "cargo",
+          "xtask",
+          "gen",
+          "proof-coverage",
+          "--check"
+        ],
+        "started_utc": "2026-10-11T20:20:03.305002+00:00",
+        "elapsed_seconds": 16.553,
+        "exit": 0,
+        "log_sha256": "2cde6f8ba5f568931d71a9a035e64dd2644eb5e65b2dc9bbf5a16822a6872646"
+      }
+    ],
+    "calibration_tests": 63,
+    "calibration_catalog_key_order_only": {
+      "calibrated_catalog_sha256": "8688ce95962a8a0ef16e6789ccd9bf78657a477fb7c6e4cc87efed0374e6bcfb",
+      "final_catalog_sha256": "d2888e8bb03f6b008cb5fe21f032299f74f580938d36c0ddfbe0d1b3009e3ce3",
+      "decoded_json_identical": true,
+      "change": "Preserve original key order after calibration; no semantic input change."
+    },
+    "strict_scope": "ARM Linux owning crate all-target Clippy with admission-test-support on eeca plus the identical one-line import; every Rust/Cargo input matched 07d7 before that import.",
+    "final_checker_scope": "Clean committed0f2aa61e41 after preserving JSON key order; same decoded catalog used by the 63-case calibration.",
+    "coverage_scope": "Metadata generation check only:65 rows and179 artifacts match; no proof execution.",
+    "runtime_tests_rerun": false
+  },
+  "review": {
+    "reviewer": "Claude coordination session",
+    "verdict": "approve",
+    "source": "0f2aa61e41849cac82050b4357d745dfef9c1e90",
+    "observed_utc": "2026-10-11T20:19:39Z",
+    "scope": "Exact two-file source diff and preserved reader/debt semantics."
+  },
+  "evidence_packet": "/home/connor/lanes/pr1160-root-evidence/trust-census-0f2aa61e41-20261011",
+  "evidence_manifest_sha256": "3adcb44b09ac141ea658454a50ff5138c726d8827e993582bb9d2975abe50cfe",
+  "remaining_acceptance": [
+    "Integrate the independently reviewed MCP terminal-publication repair and all genuine current CI failures in one replacement batch.",
+    "Collect four required results, publish once, require four green exact-head checks, classify every other failure, close open source blockers and answer review.",
+    "Keep trusted setup, unproved proof obligations and product activation acceptance distinct from foundation landing."
+  ],
+  "published": false,
+  "hosted_qualified": false,
+  "merged": false
+}
