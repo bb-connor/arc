@@ -8,6 +8,32 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Reviewed replacement batch prepared (October 11 UTC)
+
+The [terminal batch audit](audits/review-batch-terminal-20261011.json) records
+reviewed source `eeca48528b`, terminal outcomes for all four predecessor
+checks and every unsuccessful job classification. Predecessor `9e9cf98942`:
+Build, lint, test: CANCELLED; MSRV build and test: CANCELLED; cargo-vet (locked supply-chain audit): SUCCESS,SUCCESS; cargo-deny (supply-chain bans/advisories/licenses): SUCCESS. All **2,020 requirements** remain preserved.
+
+Claude cancelled the old run after relaying Connor's October 11 17:38 UTC
+instruction to publish the replacement. Both cancelled logs retain passing
+test progress without a failed test summary. These incomplete results establish
+neither success nor a runner stall. The replacement still needs all four checks
+green.
+
+The four exact-head findings and static checker drift have locally qualified,
+reviewed dispositions. Eight final assembled static checks pass; the checkpoint
+runtime and metadata evidence also passed independent file/hash review. The
+predecessor installed native operator scenarios pass their unchanged ten-second
+fence, separately from broader capacity and latency acceptance.
+
+This is the qualification record prepared before the replacement publication.
+The PR body identifies its published SHA. Its exact hosted checks, subsequent
+review and explicit user merge go-ahead remain required. The weights proof
+timeout remains distinct from the accepted attestation residual; trusted setup,
+cold-state activation, broader native latency/concurrency and missing legacy
+debit recovery remain open. No authorization or proof budget was changed.
+
 ## Checkpoint delta repair qualified privately (October 11 UTC)
 
 The [checkpoint audit](audits/checkpoint-delta-20261011.json) retains the

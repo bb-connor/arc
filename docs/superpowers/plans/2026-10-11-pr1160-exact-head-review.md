@@ -61,7 +61,7 @@ Files: `crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_rec
 ## Task 5: One qualified replacement (Root with Claude triage)
 
 - [ ] Review and compose isolated commits; reconcile all four findings in the ledger and PR response.
-- [ ] Renew affected inventories, source anchors and generated coverage without changing models; run local changed-boundary and static gates.
+- [x] Renew affected inventories, source anchors and generated coverage without changing models; run local changed-boundary and static gates.
 - [ ] Classify every hosted failure on `9e9cf98942`; wait for its four required checks to report, then publish one reviewed batch.
 - [ ] Verify replacement head, required checks, review feedback and residual classifications. Report readiness and await explicit merge approval.
 
