@@ -45,6 +45,7 @@ const TERMINAL_STAGE_AT: u64 = 1_671;
 const TERMINAL_ANCHOR_AT: u64 = 1_672;
 const TERMINAL_COMMIT_AT: u64 = 1_673;
 const RECOVERY_EXPIRES_AT: u64 = 2_400;
+const SUCCESSOR: Timeline = Timeline(200);
 
 struct DirectTransitionVerifier;
 
@@ -62,6 +63,7 @@ struct StagedTerminal {
     operation: AdmissionOperationV1,
     advance: VerifiedEconomicStateBatchAdvance,
     batch_id: String,
+    successor: ReservationBase,
 }
 
 fn advance_operation(
@@ -683,6 +685,12 @@ fn stage_terminal(fixture: &Fixture, flow: &ReservationFlow) -> TestResult<Stage
         operation,
         batch_id: advance.batch().batch_id.clone(),
         advance,
+        successor: ReservationBase {
+            prior: next,
+            lifecycle: terminal_lifecycle,
+            escrow: terminal_escrow,
+            retained: Some(committed),
+        },
     })
 }
 
@@ -777,6 +785,42 @@ fn anchored_terminal_consumes_live_reservation_atomically_and_replays_exactly() 
         |row| row.get(0),
     )?;
     assert_eq!(state_count, 1);
+    Ok(())
+}
+
+#[test]
+fn completed_channel_admits_and_publishes_its_successor_reservation() -> TestResult {
+    let _runtime = chio_test_support::clock::scope_unix_secs(1);
+    let fixture = fixture()?;
+    let flow = reservation_flow_with_state_version(&fixture.fence, "terminal-predecessor", 5)?;
+    let staged = stage_terminal(&fixture, &flow)?;
+    fixture
+        .authority
+        .admission_operation_store()
+        .commit_anchored_terminal_projection(
+            &staged.batch_id,
+            &fixture.fence,
+            TERMINAL_COMMIT_AT,
+        )?;
+
+    let successor = reservation_flow_from(
+        &fixture.fence,
+        "terminal-successor",
+        open_fixture()?,
+        staged.successor,
+        SUCCESSOR,
+    )?;
+    let live = finalize_after_expiry(&fixture, &successor)?;
+
+    assert_eq!(live.disposition(), ChannelReservationDispositionV1::Live);
+    assert_eq!(live.reservation().body.next_sequence, 2);
+    let lifecycle: (i64, i64) = fixture.store.connection()?.query_row(
+        "SELECT state_version, record_version FROM channel_lifecycle_records",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!(lifecycle, (8, 4));
+    fixture.store.verify_invariants()?;
     Ok(())
 }
 

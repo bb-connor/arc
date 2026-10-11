@@ -284,7 +284,7 @@ fn verify_lifecycle(
                    latest_state_digest, latest_sequence, state_version,
                    lifecycle_fence, live_reservation_id, operation_id,
                    channel_head_digest, escrow_head_digest,
-                   checkpoint_sequence, checkpoint_digest, record_version
+                   checkpoint_sequence, checkpoint_digest
             FROM channel_lifecycle_records WHERE channel_id = ?1
             "#,
             [&prepared.reservation.channel_id],
@@ -307,7 +307,6 @@ fn verify_lifecycle(
                     row.get::<_, String>(14)?,
                     row.get::<_, i64>(15)?,
                     row.get::<_, String>(16)?,
-                    row.get::<_, i64>(17)?,
                 ))
             },
         )
@@ -316,6 +315,11 @@ fn verify_lifecycle(
     let Some(stored) = stored else {
         return Err(ChannelLifecycleStoreError::NotFound);
     };
+    // `channel_lifecycle_records_versioned` refuses any UPDATE that does not
+    // advance record_version, state_version and lifecycle_fence by exactly one
+    // each, and `channel_lifecycle_records_no_delete` refuses removal, so the
+    // exact prior state_version and lifecycle_fence pin the record version
+    // this plan observed.
     if stored.0 != encoded.open_intent_digest
         || stored.1 != encoded.open_intent_json
         || stored.2 != encoded.open_digest
@@ -333,7 +337,6 @@ fn verify_lifecycle(
         || stored.14 != prepared.escrow_head_digest
         || stored_u64(stored.15, "checkpoint_sequence")? != prepared.checkpoint_sequence
         || stored.16 != prepared.checkpoint_digest
-        || stored_u64(stored.17, "record_version")? != 1
     {
         return Err(ChannelLifecycleStoreError::Conflict);
     }
