@@ -141,9 +141,15 @@ pub struct InflightRequest {
     pub pending_execution_nonce_id: Option<String>,
     /// Session retry binding only, never approval or execution authority.
     pub pending_threshold_approval: Option<PendingThresholdApproval>,
+    /// Minted by the registry for this tracked request, retained through its waits.
+    guard_invocation_attempt_id: String,
 }
 
 impl InflightRequest {
+    pub(crate) fn guard_invocation_attempt_id(&self) -> &str {
+        &self.guard_invocation_attempt_id
+    }
+
     pub fn ownership(&self) -> RequestOwnershipSnapshot {
         RequestOwnershipSnapshot::request_owned()
     }
@@ -217,6 +223,7 @@ impl InflightRegistry {
                 cancellable,
                 pending_execution_nonce_id: None,
                 pending_threshold_approval: None,
+                guard_invocation_attempt_id: uuid::Uuid::new_v4().to_string(),
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -251,6 +258,7 @@ impl InflightRegistry {
                 cancellable,
                 pending_execution_nonce_id: None,
                 pending_threshold_approval: None,
+                guard_invocation_attempt_id: uuid::Uuid::new_v4().to_string(),
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);

@@ -47,8 +47,22 @@ impl<'kernel> ToolRequestClaim<'kernel> {
         self.retained.clone()
     }
 
-    pub(super) fn guard_invocation_attempt(&self) -> GuardInvocationAttempt {
-        GuardInvocationAttempt::for_session_claim(&self.context)
+    pub(super) fn guard_invocation_attempt(&self) -> Result<GuardInvocationAttempt, KernelError> {
+        self.kernel.with_sessions_read(|sessions| {
+            let session = session_from_map(sessions, &self.context.session_id)?;
+            let request = session
+                .inflight()
+                .get(&self.context.request_id)
+                .ok_or_else(|| {
+                    KernelError::GuardDenied("session tool claim lost its tracked request".into())
+                })?;
+            if request.operation_kind != OperationKind::ToolCall {
+                return Err(KernelError::GuardDenied(
+                    "session tool claim has another operation kind".into(),
+                ));
+            }
+            Ok(GuardInvocationAttempt::for_session_claim(&request))
+        })
     }
 
     pub(super) fn disarm(&mut self) {

@@ -80,7 +80,7 @@ impl ChioKernel {
                     client,
                     operation.extra_metadata.clone(),
                     security_context.as_ref(),
-                    Some(claim.guard_invocation_attempt()),
+                    Some(claim.guard_invocation_attempt()?),
                 )
             });
         // The sync bridge refused before polling the evaluation, so the
@@ -172,7 +172,7 @@ impl ChioKernel {
                     client,
                     operation.extra_metadata.clone(),
                     security_context.as_ref(),
-                    Some(claim.guard_invocation_attempt()),
+                    Some(claim.guard_invocation_attempt()?),
                 )
                 .await
             }

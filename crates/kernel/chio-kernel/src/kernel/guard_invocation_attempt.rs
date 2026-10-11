@@ -1,7 +1,7 @@
 //! Kernel-owned identity for one guard admission attempt.
 
 use super::admission_coordinator::DurableToolAdmission;
-use crate::OperationContext;
+use crate::session::InflightRequest;
 
 #[derive(Clone)]
 pub(crate) struct GuardInvocationAttempt {
@@ -16,13 +16,9 @@ impl GuardInvocationAttempt {
     }
 
     /// Called only while an acquired ToolRequestClaim owns or validates the retry.
-    pub(super) fn for_session_claim(context: &OperationContext) -> Self {
+    pub(super) fn for_session_claim(request: &InflightRequest) -> Self {
         Self {
-            identity: format!(
-                "session-request:{}:{}",
-                context.session_id.as_str(),
-                context.request_id.as_str()
-            ),
+            identity: format!("session-request:{}", request.guard_invocation_attempt_id()),
         }
     }
 

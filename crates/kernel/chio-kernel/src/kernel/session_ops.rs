@@ -839,7 +839,7 @@ impl ChioKernel {
                             tool_call.extra_metadata.clone(),
                             Some(&context.session_id),
                             security_context.as_ref(),
-                            Some(claim.guard_invocation_attempt()),
+                            Some(claim.guard_invocation_attempt()?),
                         )
                         .map(SessionOperationResponse::ToolCall)
                     })
