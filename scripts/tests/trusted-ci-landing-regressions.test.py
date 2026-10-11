@@ -299,6 +299,13 @@ else: key=path
 if key not in data:
     sys.stderr.write('unprovided API '+str(path)+'\n');sys.exit(1)
 result=data[key]
+if isinstance(result,dict) and '__api_versions' in result:
+    headers=[args[i+1] for i,value in enumerate(args[:-1]) if value == '-H']
+    version=next((h.split(':',1)[1].strip() for h in headers
+                  if h.lower().startswith('x-github-api-version:')), '2022-11-28')
+    if version not in result['__api_versions']:
+        sys.stderr.write('unsupported fixture API version\n');sys.exit(1)
+    result=result['__api_versions'][version]
 if isinstance(result,dict) and '__sequence' in result:
     p=pathlib.Path(os.environ['API_FIXTURE']+'.counts')
     counts=json.loads(p.read_text()) if p.exists() else {}
@@ -347,6 +354,36 @@ def run_audit(data: dict[str, dict]) -> tuple[subprocess.CompletedProcess, dict,
         report = json.loads(output.read_text()) if output.exists() else {}
         comments = directory / "comment.md"
         return result, report, comments.read_text() if comments.exists() else ""
+
+
+class AuditPullRequestApiVersionTests(unittest.TestCase):
+    @staticmethod
+    def versioned_snapshot(*, missing_merge: bool = False) -> dict:
+        data = snapshot()
+        if missing_merge:
+            del data[f"repos/{REPOSITORY}/pulls/{PR}"]["merge_commit_sha"]
+        for path, value in list(data.items()):
+            if not re.fullmatch(rf"repos/{REPOSITORY}/(?:pulls/\d+|commits/[0-9a-f]{{40}}/pulls)", path):
+                continue
+            removed = copy.deepcopy(value)
+            for pull in removed if isinstance(removed, list) else [removed]:
+                pull.pop("merge_commit_sha", None)
+            # GitHub's 2026-03-10 REST surface removes this field from both
+            # single-PR responses and commit-associated pull request lists.
+            data[path] = {"__api_versions": {"2022-11-28": value, "2026-03-10": removed}}
+        return data
+
+    def test_real_audit_can_authenticate_versioned_merge_identity(self) -> None:
+        result, report, _ = run_audit(self.versioned_snapshot())
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["status"], "verified")
+        self.assertEqual(report["protected_merge_commit_sha"], PROTECTED)
+
+    def test_compatible_api_still_refuses_missing_merge_identity(self) -> None:
+        result, report, _ = run_audit(self.versioned_snapshot(missing_merge=True))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["status"], "unverified")
+        self.assertEqual(report["error"], "invalid commit or blob SHA")
 
 
 class RecordedQualificationAuditTests(unittest.TestCase):

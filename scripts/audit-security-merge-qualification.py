@@ -82,8 +82,10 @@ class GitHub:
         self.prefix = f"repos/{repository}"
 
     def binary(self, path: str) -> bytes:
+        # Merge attribution reads merge_commit_sha from REST 2022-11-28.
+        # REST 2026-03-10 removes that field from pull request objects.
         command = ["gh", "api", "--hostname", "github.com", "--method", "GET",
-                   "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2026-03-10",
+                   "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28",
                    self.prefix + ("/" + path if path else "")]
         # Read incrementally so the download limit bounds memory before parsing.
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
