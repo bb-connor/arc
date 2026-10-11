@@ -77,3 +77,63 @@ fn lineage_registration_without_trusted_time_registers_nothing() {
         .split(&refused.id)
         .is_none());
 }
+
+/// Reads observed while the budget registry is held land after the parent
+/// expiry, as when registration waits behind a long registry holder.
+struct RegistryContentionClock {
+    kernel: std::sync::OnceLock<std::sync::Weak<ChioKernel>>,
+    monotonic_nanos: AtomicU64,
+}
+
+const BEFORE_EXPIRY_MILLIS: u64 = 1_800_000_000_000;
+const PARENT_TTL_SECS: u64 = 300;
+
+impl Clock for RegistryContentionClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let registry_held = self
+            .kernel
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+            .is_some_and(|kernel| kernel.budget_registry.try_lock().is_err());
+        let wall = if registry_held {
+            BEFORE_EXPIRY_MILLIS + PARENT_TTL_SECS * 1_000
+        } else {
+            BEFORE_EXPIRY_MILLIS
+        };
+        Ok(ClockReading::new(
+            UnixMillis::new(wall),
+            MonotonicInstant::from_nanos(self.monotonic_nanos.fetch_add(1, AtomicOrdering::SeqCst)),
+        ))
+    }
+}
+
+#[test]
+fn lineage_registration_reads_trusted_time_after_acquiring_the_registry() {
+    let clock = Arc::new(RegistryContentionClock {
+        kernel: std::sync::OnceLock::new(),
+        monotonic_nanos: AtomicU64::new(1),
+    });
+    let kernel = Arc::new(ChioKernel::new_with_clock(make_config(), clock.clone()));
+    let parent = make_capability(
+        &kernel,
+        &make_keypair(),
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+        PARENT_TTL_SECS,
+    );
+    assert!(clock.kernel.set(Arc::downgrade(&kernel)).is_ok());
+
+    let expected = chio_kernel_core::BudgetSplitError::ExpiredParent {
+        parent_token_id: parent.id.clone(),
+    }
+    .to_string();
+    assert!(matches!(
+        kernel.register_delegation_parent(&parent),
+        Err(KernelError::DelegationInvalid(reason)) if reason == expected
+    ));
+    assert!(kernel
+        .budget_registry
+        .lock()
+        .unwrap()
+        .split(&parent.id)
+        .is_none());
+}

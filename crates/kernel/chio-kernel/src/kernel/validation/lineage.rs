@@ -144,15 +144,18 @@ impl ChioKernel {
     }
 
     /// Register a verified delegation parent with its token expiry, stamped
-    /// with the kernel's trusted time. A clock failure registers nothing.
+    /// with trusted time read while the registry is held, so a wait for the
+    /// registry cannot register an already expired parent. A clock failure
+    /// registers nothing.
     pub(crate) fn register_expiring_budget_parent(
         &self,
         parent_token_id: String,
         parent_share_bps: u16,
         expires_at_secs: u64,
     ) -> Result<(), KernelError> {
+        let mut budgets = self.budget_registry_for_setup();
         let now_secs = self.trusted_now_millis()?.as_secs();
-        self.budget_registry_for_setup()
+        budgets
             .register_expiring_parent(parent_token_id, parent_share_bps, expires_at_secs, now_secs)
             .map_err(|error| KernelError::DelegationInvalid(error.to_string()))
     }
