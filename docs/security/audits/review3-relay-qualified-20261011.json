@@ -1,0 +1,97 @@
+{
+  "schema": "chio.security.review3-relay-qualification.v1",
+  "observed_utc": "2026-10-11T02:29:28.301316+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review3-20261011:R3-001",
+    "incoming-pr1160-review2-20261011:R2-009"
+  ],
+  "source_repair": {
+    "checkpoint": "cb440e816f4589c27c30ac3e7490df26f06420fb",
+    "producer_commit": "1a21007050c7158aa1f03aa9c7995a3eb319a576",
+    "files": [
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay.py",
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay_limits.py",
+      "sdks/python/chio-hermes/tests/test_model_relay_limits.py"
+    ],
+    "file_sha256": {
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay.py": "3354b61b65ae1cd4be8174a03979edb75d3a12e8f7f34b89c2ccdfebd18c62b5",
+      "sdks/python/chio-hermes/src/chio_hermes/model_relay_limits.py": "77c20d112238f6d12cea4b982f3baf5f82c0a9500d9b286a45a8aa10f57fdcc1",
+      "sdks/python/chio-hermes/tests/test_model_relay_limits.py": "867c4ce53577b2e75cacebeafeadab6e96d0fa7adee93cdb4259f4f72d32702d"
+    }
+  },
+  "contract": "Record one sticky omission latch before sending a capacity refusal. It makes capture incomplete after admitted handlers drain, using one fixed marker within the pre-reserved terminal count/bytes. It does not exhaust future request admission or create an additional handler.",
+  "original": {
+    "predecessor": "1265ee5519",
+    "log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c4-copy-bounds/hermes-capacity-RED-final.log",
+      "sha256": "7a36a7640a5ebcb8f86f3e85d3e347c045e143b7059dde5114ce53069f8d79af"
+    },
+    "result": "Exact final regression fails because finalize_capture unexpectedly returns true after an omitted capacity refusal."
+  },
+  "independent_review": {
+    "reviewer": "Root integrator, independent of producer",
+    "verdict": "approved",
+    "checks": [
+      "Callback is connected to the actual nonqueued refusal owner before503.",
+      "Finalization joins the server loop before capture acceptance, so the synchronous refusal callback completes before finalization returns.",
+      "Existing owner lock protects the sticky latch and snapshot; later healthy requests retain existing admission semantics.",
+      "The omitted marker uses107 encoded bytes within the existing113-byte terminal reserve and one reserved count.",
+      "The regression drains and finalizes real sockets and confirms no paid admission."
+    ]
+  },
+  "root_qualification": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review3-relay-composed/result.json",
+    "sha256": "bfb512752f3bccbb40e8be513b85ecf8c7f77d6595010e7b64148aa18314d5b6"
+  },
+  "results": {
+    "passed": 299,
+    "skipped": 4,
+    "ruff": "passed",
+    "source_files_stable": 309
+  },
+  "commands": [
+    {
+      "label": "owner",
+      "argv": [
+        "/tmp/pr1160-review2-relay-manifest-20261010/python-venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-rs",
+        "-o",
+        "asyncio_default_fixture_loop_scope=function",
+        "sdks/python/chio-hermes/tests"
+      ],
+      "cwd": "/home/connor/lanes/pr1160-landing-final",
+      "exit": 0,
+      "seconds": 29.117891264148057,
+      "log": "/tmp/pr1160-ci-batch-20261010/review3-relay-composed/owner.log",
+      "log_sha256": "ee380380c8c2298b5d7b5fa09b8ac6d21942625d6601781aa8a4eb12e02441cb"
+    },
+    {
+      "label": "ruff",
+      "argv": [
+        "/tmp/pr1160-review2-relay-manifest-20261010/python-venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "cwd": "/home/connor/lanes/pr1160-landing-final/sdks/python/chio-hermes",
+      "exit": 0,
+      "seconds": 0.0687177418731153,
+      "log": "/tmp/pr1160-ci-batch-20261010/review3-relay-composed/ruff.log",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete remaining repairs and composed replacement gates.",
+    "Four exact-head required checks green; all other failures classified and reviews answered.",
+    "Explicit Connor merge go-ahead."
+  ],
+  "limits": [
+    "Four live-sidecar tests require CHIO_INTEGRATION and remain unavailable, not passing.",
+    "Source and bounded package qualification only; no hosted, full-candidate or activation claim."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
