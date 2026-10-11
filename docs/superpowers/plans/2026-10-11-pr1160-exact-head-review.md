@@ -4,7 +4,7 @@
 
 **Goal:** Address all four findings in the review of `9e9cf98942`, retain honest evidence, and qualify one replacement candidate.
 
-**Architecture:** Preserve typed refusal at authority and payment boundaries. Maintenance returns safe scan progress without skipping deferred work. Authenticated checkpoint deltas bound retained row growth while preserving the five-event replay cadence and immutable v1 history.
+**Architecture:** Preserve typed refusal at authority and payment boundaries. Maintenance returns safe scan progress without skipping deferred work. Authenticated checkpoint deltas store changes between size-triggered keyframes while preserving the five-event replay cadence and immutable v1 history. Storage, row reconstruction and CPU limits are recorded separately.
 
 **Tech Stack:** Rust, SQLite, existing signed canonical records, GitHub Actions.
 
@@ -43,11 +43,11 @@ Files: `crates/core/chio-core-types` signing backend trait, `crates/security/chi
 
 Files: `admission_operation_store/security_participant_state/checkpoint{.rs,/record.rs,/rows.rs,/delta.rs}`, wire fixtures, store tests, `scripts/check-flow-security.sh`. Root owns `spec/wire-schemas.lock`, formal source anchors, coverage and landing ledger.
 
-- [ ] Demonstrate growing-live-set full-image archive amplification on Original.
-- [ ] Keep v1 keyframes byte-identical; add v2 authenticated deltas and size-triggered keyframes. Preserve cadence, immutability, current-image authentication and schema compatibility refusal.
-- [ ] Verify tombstones, duplicate/missing/reordered/mixed-base rejection, burst keyframes, bounded latest reconstruction, growing-state retained rows, crash/reopen and legacy v1.
-- [ ] Quantify retained rows and verification work independently; do not claim linear CPU merely because delta storage is linear.
-- [ ] Run owning tests/strict and unchanged native cadence controls. Review before shared pin renewal; no new manual proof execution.
+- [x] Demonstrate growing-live-set full-image archive amplification on Original.
+- [x] Keep v1 keyframes byte-identical; add v2 authenticated deltas and size-triggered keyframes. Preserve cadence, immutability, current-image authentication and schema compatibility refusal.
+- [x] Verify tombstones, duplicate/missing/reordered/mixed-base rejection, burst keyframes, bounded latest reconstruction, growing-state retained rows, crash/reopen and legacy v1.
+- [x] Quantify retained rows and verification work independently; do not claim linear CPU merely because delta storage is linear.
+- [x] Run owning tests/strict and unchanged native cadence controls. Review before shared pin renewal; no new manual proof execution.
 
 ## Task 4: Exact legacy prepaid quarantine control (Claude)
 
@@ -96,3 +96,12 @@ pairs the kernel model with two real SQLite migration controls and retains the
 initial fixture failure. Missing authenticated original debit remains an
 operator-recovery limitation. Checkpoint acceptance and final publication stay
 open.
+
+### Checkpoint source qualification
+
+See the [checkpoint audit](../../security/audits/checkpoint-delta-20261011.json)
+for the genuine growth Original, exact composed runtime source, constant-anchor
+regression controls and independent reviews. The local repair is qualified;
+Task 5 retains publication, exact-head hosted acceptance and the PR response.
+The implementation bounds row reconstruction, not total I/O or historical
+fingerprint CPU. The earlier failed fixture campaigns remain recorded.

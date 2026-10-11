@@ -8,6 +8,31 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Checkpoint delta repair qualified privately (October 11 UTC)
+
+The [checkpoint audit](audits/checkpoint-delta-20261011.json) retains the
+Original growth failure, the reviewed v2 delta implementation, exact refusal
+controls, composed owner/cadence tests, strict lint and source-inventory
+controls. Keyframes preserve v1 bytes; every delta authenticates its added
+rows and exact removals, and archive validation checks superseded deltas.
+Producer and reader share the row and byte reconstruction bounds.
+
+The factor-two bound covers row payloads, with record overhead stated
+separately. Retained storage includes each forced full keyframe, and dirty-table
+hashing across historical images can still have quadratic CPU cost. No general
+linear-CPU, unlimited-capacity or production-readiness claim is made.
+
+All four exact-head findings now have source-scoped dispositions and evidence.
+The prepaid item confirms quarantine without adding an authenticated recovery
+path for missing historical debit. The static CI contract repair is also
+qualified. All **2,020** requirements remain preserved; direct keyring and
+prepaid source-repair links are now populated from their existing audits.
+
+The public candidate remains `9e9cf98942` until the one reviewed replacement
+push. Exact hosted checks, failure classifications, review response and explicit
+user merge authorization remain required. Historical snapshots below retain
+the observations made before this qualification.
+
 ## Legacy prepaid quarantine qualified privately (October 11 UTC)
 
 The [periodic recovery audit](audits/legacy-prepaid-periodic-control-20261011.json)
