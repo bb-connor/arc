@@ -59,6 +59,13 @@ signing-custody election correction is also staged with source approval and
 runtime evidence pending. R2-020 has only its receipt-preserving worker
 extraction integrated; its issuer DNS repair remains open.
 
+The [second source composition audit](audits/review2-source-composition-wave2-20261011.json)
+adds reviewed custody reclamation, repeated-effect simulation, Anthropic ingress,
+Start authority-pin forwarding, successor channel reservations and mobile grant
+refusal. Their production changes are privately integrated; runtime and hosted
+qualification remain pending. The corrected kernel-core library passes all 90
+tests, with its two earlier fixture failures retained.
+
 The [decoy recovery audit](audits/review2-decoy-qualified-20261011.json) records
 authenticated staging, writer serialization and explicit inherited-descriptor
 unlock. Linux passes 64 owning tests, strict lint and all 108 deception controls.

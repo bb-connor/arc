@@ -167,9 +167,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Bind transport abandonment to the exact retained operation and sweep expired pre-capture entries even in an idle daemon. Reuse a bounded cadence on the existing worker with no new wire operation; preserve captured/later operation ownership and accounting. Unconditional EOF deletion/refund is unsafe.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -223,9 +223,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Validate each effect's base against the immutable captured state, then apply ordered contributions to the working copy. Alternatively explicitly forbid the combination consistently in validation/builders/schema if it is unsupported.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -251,9 +251,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Refuse populated initial tool content, or route every allowed initial content item through the same evaluation state machine before release. Keep the existing provider-lifecycle checks.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -265,9 +265,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Pass the current authority pin through Start and use the same issuer-list construction as its API Protect counterpart. Test the actual command-to-config boundary, not only the helper.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -339,9 +339,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Fence against the observed monotonic lifecycle version in the existing transaction and publication path, preserving exact channel/reservation/snapshot checks. Do not reset the counter or weaken the fence.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
@@ -367,9 +367,9 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Expose a clearly non-authoritative portable outcome and require mediated authorization for unsupported requirements, or refuse those matched grants in the mobile gate. Align the offline guide. Avoid a compatibility alias that preserves ambiguous Allow.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
