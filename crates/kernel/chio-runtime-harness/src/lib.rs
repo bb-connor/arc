@@ -217,6 +217,14 @@ fn run_runtime_loopback_scenario_with_static_baseline(
                 ))
             })?,
     );
+    // Evaluation starts only after the receipt writer has verified its durable head.
+    receipt_store
+        .wait_for_writer_ready(std::time::Duration::from_secs(30))
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback receipt writer readiness: {error}"
+            ))
+        })?;
 
     let admission = execute_runtime_admission_loop(
         &steps,

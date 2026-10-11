@@ -894,9 +894,20 @@ fn writer_seed_wait_separates_a_failed_seed_from_a_ready_writer(
         other => return Err(format!("a settled failed seed must not report {other:?}").into()),
     }
 
+    match failed.wait_for_writer_ready(std::time::Duration::from_secs(30)) {
+        Err(ReceiptStoreError::Conflict(message)) => {
+            assert!(
+                message.contains("injected writer seed failure"),
+                "{message}"
+            );
+        }
+        other => return Err(format!("a failed seed must not report ready: {other:?}").into()),
+    }
+
     let (_ready_directory, ready_path) = temp_db("chio-seed-ready-")?;
     let ready = SqliteReceiptStore::open(&ready_path)?;
     assert!(ready.wait_for_writer_seed(std::time::Duration::from_secs(30))?);
+    ready.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     Ok(())
 }
 
@@ -911,8 +922,16 @@ fn writer_seed_wait_reports_a_held_seed_as_still_seeding_without_a_cutoff(
         assert!(!store.wait_for_writer_seed(std::time::Duration::ZERO)?);
     }
     assert_eq!(store.receipt_commit_actor.writer_counters().queue_depth, 0);
+    match store.wait_for_writer_ready(std::time::Duration::ZERO) {
+        Err(ReceiptStoreError::Timeout {
+            operation,
+            timeout_ms: 0,
+        }) => assert_eq!(operation, "sqlite receipt commit flush"),
+        other => return Err(format!("a held seed must not report ready: {other:?}").into()),
+    }
     test_hooks::release_held_seeds();
     assert!(store.wait_for_writer_seed(std::time::Duration::from_secs(30))?);
+    store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     Ok(())
 }
 
