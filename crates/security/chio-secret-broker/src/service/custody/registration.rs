@@ -1,8 +1,8 @@
 use super::super::{
-    prepared_dispatch_id, AttemptRegistration, AttemptState, AttemptTransitionEvidence,
-    BrokerError, BrokerExecuteRequest, BrokerService, PrepareDispatchAcknowledgement,
-    RegisterAttemptAcknowledgement, RegisterAttemptOutcome, ReleaseAttemptAcknowledgement, Result,
-    MAX_RETAINED_PREPARED_DISPATCHES,
+    failure_receipt_key_digest, prepared_dispatch_id, AttemptRegistration, AttemptState,
+    AttemptTransitionEvidence, BrokerError, BrokerExecuteRequest, BrokerService,
+    PrepareDispatchAcknowledgement, RegisterAttemptAcknowledgement, RegisterAttemptOutcome,
+    ReleaseAttemptAcknowledgement, Result, MAX_RETAINED_PREPARED_DISPATCHES,
 };
 use super::RetainedPreparedDispatch;
 
@@ -59,9 +59,9 @@ impl BrokerService {
         request: &BrokerExecuteRequest,
         now_unix_seconds: u64,
     ) -> Result<PrepareDispatchAcknowledgement> {
+        self.reclaim_expired_prepared_dispatches(now_unix_seconds)?;
         let _operation_guard = self.attempt_operation_guard_for_request(request)?;
         self.budget.capabilities().require_production()?;
-        self.reclaim_expired_prepared_dispatches(now_unix_seconds)?;
         if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
             return Err(BrokerError::AuthorizationDenied(failure.diagnostic_code));
         }
@@ -167,6 +167,7 @@ impl BrokerService {
                 prepared_dispatch_id: expected_prepared_dispatch_id,
                 request_canonical_digest: registration.request_canonical_digest.clone(),
                 prepared_at_unix_seconds: now_unix_seconds,
+                operation_gate_digest: failure_receipt_key_digest(request)?,
                 expires_at_unix_seconds: request.capability.body.expires_at_unix_seconds,
                 dispatch,
                 credential,
@@ -180,33 +181,55 @@ impl BrokerService {
     /// Discard custody whose capability has expired while its attempt is still
     /// pre-capture. The durable Registered or Prepared to Failed transition
     /// fences a concurrent capture, and only its winner removes custody; Held
-    /// and later attempts keep custody for their dispatch owner.
+    /// and later attempts keep custody for their dispatch owner. Custody whose
+    /// operation gate is busy is skipped, because the execution holding it may
+    /// already have captured authority, or preparation may be about to
+    /// retain custody for an attempt it loaded as Prepared. Custody without a
+    /// durable attempt is an integrity failure: it is kept as evidence, the
+    /// remaining entries are still reclaimed, and the pass then fails.
     pub(crate) fn reclaim_expired_prepared_dispatches(&self, now_unix_seconds: u64) -> Result<()> {
         let expired = self
             .retained_prepared_dispatches()?
             .values()
             .filter(|prepared| now_unix_seconds >= prepared.expires_at_unix_seconds)
-            .map(|prepared| (prepared.operation_id.clone(), prepared.attempt_id.clone()))
+            .map(|prepared| {
+                (
+                    prepared.operation_id.clone(),
+                    prepared.attempt_id.clone(),
+                    prepared.operation_gate_digest.clone(),
+                )
+            })
             .collect::<Vec<_>>();
-        for (operation_id, attempt_id) in expired {
-            let Some(state) = self
-                .attempts
-                .load_attempt(&attempt_id)?
-                .map(|attempt| attempt.state)
-                .filter(|state| matches!(state, AttemptState::Registered | AttemptState::Prepared))
+        let mut orphaned = false;
+        for (operation_id, attempt_id, gate_digest) in expired {
+            let Some(_operation_guard) =
+                self.try_attempt_operation_guard_for_digest(&gate_digest)?
             else {
                 continue;
             };
-            match self.attempts.transition(
-                &attempt_id,
-                state,
-                AttemptState::Failed,
-                &AttemptTransitionEvidence::default(),
-                now_unix_seconds,
-            ) {
-                Ok(_) => {}
-                Err(BrokerError::Conflict(_)) => continue,
-                Err(error) => return Err(error),
+            match self
+                .attempts
+                .load_attempt(&attempt_id)?
+                .map(|attempt| attempt.state)
+            {
+                Some(state @ (AttemptState::Registered | AttemptState::Prepared)) => {
+                    match self.attempts.transition(
+                        &attempt_id,
+                        state,
+                        AttemptState::Failed,
+                        &AttemptTransitionEvidence::default(),
+                        now_unix_seconds,
+                    ) {
+                        Ok(_) => {}
+                        Err(BrokerError::Conflict(_)) => continue,
+                        Err(error) => return Err(error),
+                    }
+                }
+                Some(_) => continue,
+                None => {
+                    orphaned = true;
+                    continue;
+                }
             }
             let mut retained = self.retained_prepared_dispatches()?;
             if retained
@@ -215,6 +238,11 @@ impl BrokerService {
             {
                 retained.remove(&operation_id);
             }
+        }
+        if orphaned {
+            return Err(BrokerError::Invariant(
+                "retained custody has no durable broker attempt".to_string(),
+            ));
         }
         Ok(())
     }

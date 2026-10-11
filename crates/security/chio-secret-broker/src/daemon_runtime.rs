@@ -435,6 +435,8 @@ const IDLE_CUSTODY_RECLAIM_INTERVAL: std::time::Duration = std::time::Duration::
 
 /// Paces the prepared worker's idle reclaim of expired pre-capture custody to
 /// at most once per interval, and never starts it once the worker is stopping.
+/// A service fault ends the worker; any other failure waits for the next
+/// interval.
 #[cfg(unix)]
 struct IdleCustodyReclaim {
     next_due: std::time::Instant,
@@ -454,7 +456,11 @@ impl IdleCustodyReclaim {
         self.next_due = now
             .checked_add(IDLE_CUSTODY_RECLAIM_INTERVAL)
             .unwrap_or(now);
-        reclaim()
+        match reclaim() {
+            Err(error) if error.is_service_fault() => Err(error),
+            // Request-local failures retry next interval without a per-tick diagnostic.
+            Ok(()) | Err(_) => Ok(()),
+        }
     }
 }
 
@@ -1414,6 +1420,33 @@ mod tests {
             &mut runs,
         );
         assert_eq!(runs, 2);
+
+        let clock_failed_at = start + IDLE_CUSTODY_RECLAIM_INTERVAL * 2;
+        idle.run_if_due(&stop, clock_failed_at, || {
+            Err(chio_security_types::clock::ClockError::Unavailable.into())
+        })
+        .test_expect("a request-local failure keeps the worker alive");
+        tick(&mut idle, &stop, clock_failed_at, &mut runs);
+        assert_eq!(runs, 2, "a failed reclaim waits for the next interval");
+        tick(
+            &mut idle,
+            &stop,
+            clock_failed_at + IDLE_CUSTODY_RECLAIM_INTERVAL,
+            &mut runs,
+        );
+        assert_eq!(runs, 3);
+
+        assert!(matches!(
+            idle.run_if_due(
+                &stop,
+                clock_failed_at + IDLE_CUSTODY_RECLAIM_INTERVAL * 2,
+                || Err(BrokerError::Invariant(
+                    "retained custody has no durable broker attempt".into()
+                ))
+            ),
+            Err(BrokerError::Invariant(message))
+                if message == "retained custody has no durable broker attempt"
+        ));
     }
 
     #[test]

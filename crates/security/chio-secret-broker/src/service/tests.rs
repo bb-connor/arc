@@ -95,6 +95,7 @@ struct AtomicAuthority {
     state: Mutex<AuthorityState>,
     deny_capture: bool,
     deny_migration_after_capture: Mutex<Option<Arc<crate::migration::TestBrokerMigrationEnforcer>>>,
+    after_next_capture: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
 impl AtomicAuthority {
@@ -103,6 +104,7 @@ impl AtomicAuthority {
             state: Mutex::new(AuthorityState::default()),
             deny_capture,
             deny_migration_after_capture: Mutex::new(None),
+            after_next_capture: Mutex::new(None),
         }
     }
 
@@ -122,6 +124,15 @@ impl AtomicAuthority {
             .test_expect("authority lock")
             .holds
             .insert(hold_id.to_string(), state);
+    }
+
+    /// Runs `hook` once, after the next capture commits and before the
+    /// broker records the Captured transition.
+    fn run_after_next_capture(&self, hook: Box<dyn FnOnce() + Send>) {
+        *self
+            .after_next_capture
+            .lock()
+            .test_expect("capture hook lock") = Some(hook);
     }
 
     fn deny_migration_after_next_capture(
@@ -277,6 +288,14 @@ impl BrokerExecutionBudget for AtomicAuthority {
             .take()
         {
             enforcer.set_quota_enforcement_enforced(false);
+        }
+        if let Some(hook) = self
+            .after_next_capture
+            .lock()
+            .test_expect("capture hook lock")
+            .take()
+        {
+            hook();
         }
         Ok(ExecutionHoldState::Captured(commit))
     }

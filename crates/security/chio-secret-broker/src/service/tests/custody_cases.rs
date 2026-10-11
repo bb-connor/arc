@@ -167,3 +167,164 @@ fn expired_captured_custody_stays_with_its_dispatch_owner() {
         std::collections::BTreeSet::from([registration.ids.operation_id])
     );
 }
+
+#[test]
+fn reclaim_never_fails_an_attempt_whose_execution_has_captured_authority() {
+    let fixture = fixture(1, false, false);
+    let (request, trusted) = execution(&fixture, 305, 1);
+    let ids = register_prepared_execution(&fixture, &request, &trusted, 20);
+    let expiry = request.capability.body.expires_at_unix_seconds;
+    let service = Arc::downgrade(&fixture.service);
+    let reclaimed = Arc::new(Mutex::new(None));
+    let observed = Arc::clone(&reclaimed);
+    fixture.authority.run_after_next_capture(Box::new(move || {
+        let outcome = service
+            .upgrade()
+            .map(|service| service.reclaim_expired_prepared_dispatches(expiry).is_ok());
+        *observed.lock().test_expect("reclaim observation lock") = outcome;
+    }));
+
+    let executed = fixture.service.execute(&request, &trusted, 21);
+
+    assert_eq!(
+        *reclaimed.lock().test_expect("reclaim observation lock"),
+        Some(true),
+        "reclaim must run inside the capture window"
+    );
+    assert_eq!(fixture.authority.captured_count(), 1);
+    let state = fixture
+        .attempts
+        .load_attempt(&ids.attempt_id)
+        .test_expect("load attempt")
+        .test_expect("attempt exists")
+        .state;
+    assert_ne!(
+        state,
+        AttemptState::Failed,
+        "a captured hold must never belong to a Failed attempt"
+    );
+    assert!(executed.is_ok(), "{executed:?}");
+}
+
+#[test]
+fn orphaned_custody_is_an_integrity_refusal_that_still_reclaims_the_rest() {
+    let directory = crate::private_tempdir().test_expect("tempdir");
+    let directory =
+        std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
+    let attempt_path = directory.join("attempts.sqlite3");
+    let receipt_signer = Keypair::from_seed(&[3; 32]);
+    let fixture = fixture_with_stores(
+        1,
+        false,
+        false,
+        Arc::new(SqliteAttemptStore::open(&attempt_path).test_expect("attempt store")),
+        Arc::new(
+            crate::receipt::SqliteBrokerReceiptSink::open(
+                &directory.join("receipts.sqlite3"),
+                receipt_signer.public_key(),
+            )
+            .test_expect("receipt sink"),
+        ),
+        Arc::new(Mutex::new(Vec::new())),
+    );
+    let mut prepared = [306, 308].map(|invocation_index| {
+        let (request, registration) = registered_and_held(&fixture, invocation_index);
+        fixture
+            .service
+            .prepare_dispatch(&registration, &request, 20)
+            .test_expect("prepare broker dispatch");
+        (request, registration)
+    });
+    prepared.sort_by(|left, right| left.1.ids.operation_id.cmp(&right.1.ids.operation_id));
+    let [(request, orphan), (_, reclaimable)] = prepared;
+    rusqlite::Connection::open(&attempt_path)
+        .test_expect("open attempt database")
+        .execute(
+            "DELETE FROM broker_attempts WHERE attempt_id = ?1",
+            [&orphan.ids.attempt_id],
+        )
+        .test_expect("drop the durable attempt");
+
+    assert!(matches!(
+        fixture
+            .service
+            .reclaim_expired_prepared_dispatches(request.capability.body.expires_at_unix_seconds),
+        Err(BrokerError::Invariant(message))
+            if message == "retained custody has no durable broker attempt"
+    ));
+    assert_eq!(
+        fixture
+            .service
+            .retained_prepared_dispatch_keys()
+            .test_expect("retained dispatch lock"),
+        std::collections::BTreeSet::from([orphan.ids.operation_id])
+    );
+    assert_eq!(attempt_state(&fixture, &reclaimable), AttemptState::Failed);
+}
+
+/// Runs one armed hook from inside the next destination resolution.
+struct HookedResolver {
+    hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+}
+
+impl DestinationResolver for HookedResolver {
+    fn resolve(&self, _host: &str, _port: u16) -> Result<Vec<IpAddr>> {
+        if let Some(hook) = self.hook.lock().test_expect("resolver hook lock").take() {
+            hook();
+        }
+        Ok(vec![IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34))])
+    }
+}
+
+#[test]
+fn reclaim_never_fails_an_attempt_whose_preparation_retry_is_in_flight() {
+    let mut fixture = fixture(1, false, false);
+    let resolver = Arc::new(HookedResolver {
+        hook: Mutex::new(None),
+    });
+    Arc::get_mut(&mut fixture.service)
+        .test_expect("unshared fixture service")
+        .https = Arc::new(GenericHttpsExecutor::new(
+        Arc::clone(&resolver) as Arc<dyn DestinationResolver>,
+        Arc::new(ObservingTransport {
+            observed_authorizations: Arc::clone(&fixture.observed_authorizations),
+            fail: false,
+            redirect: false,
+        }),
+        NetworkPolicy::production(),
+    ));
+    let (request, registration) = registered_and_held(&fixture, 307);
+    fixture
+        .service
+        .prepare_dispatch(&registration, &request, 20)
+        .test_expect("prepare broker dispatch");
+    let expiry = request.capability.body.expires_at_unix_seconds;
+    let service = Arc::downgrade(&fixture.service);
+    let reclaimed = Arc::new(Mutex::new(None));
+    let observed = Arc::clone(&reclaimed);
+    *resolver.hook.lock().test_expect("resolver hook lock") = Some(Box::new(move || {
+        let outcome = service
+            .upgrade()
+            .map(|service| service.reclaim_expired_prepared_dispatches(expiry).is_ok());
+        *observed.lock().test_expect("reclaim observation lock") = outcome;
+    }));
+
+    let retried = fixture
+        .service
+        .prepare_dispatch(&registration, &request, 21);
+
+    assert_eq!(
+        *reclaimed.lock().test_expect("reclaim observation lock"),
+        Some(true),
+        "reclaim must run inside the preparation retry"
+    );
+    let retained = fixture
+        .service
+        .retained_prepared_dispatch_keys()
+        .test_expect("retained dispatch lock");
+    assert!(
+        !(attempt_state(&fixture, &registration) == AttemptState::Failed && !retained.is_empty()),
+        "custody must never be retained for a Failed attempt"
+    );
+    assert!(retried.is_ok(), "{retried:?}");
+}
