@@ -331,6 +331,8 @@ mod unix {
         root: File,
         root_identity: RootIdentity,
         ownership_key: OwnershipKey,
+        #[cfg(test)]
+        publication_pause: Option<super::concurrency_tests::PublicationPause>,
     }
 
     impl FileMaterializer {
@@ -368,7 +370,17 @@ mod unix {
                 root,
                 root_identity,
                 ownership_key,
+                #[cfg(test)]
+                publication_pause: None,
             })
+        }
+
+        #[cfg(test)]
+        pub(super) fn pause_publication_for_test(
+            &mut self,
+            pause: super::concurrency_tests::PublicationPause,
+        ) {
+            self.publication_pause = Some(pause);
         }
 
         pub fn materialize(
@@ -386,6 +398,10 @@ mod unix {
                 .ok_or(MaterializeError::MetadataMismatch)?;
             let staging_name = self.staging_name(request)?;
             let proof = self.stage_file(&staging, &staging_name, request, content_digest)?;
+            #[cfg(test)]
+            if let Some(pause) = &self.publication_pause {
+                pause.wait();
+            }
             if let Err(error) = rename_no_replace(
                 &staging,
                 &staging_name,
@@ -1304,6 +1320,10 @@ mod unix {
         }
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "materialize/concurrency_tests.rs"]
+mod concurrency_tests;
 
 #[cfg(unix)]
 pub use unix::FileMaterializer;
