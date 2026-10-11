@@ -1346,7 +1346,10 @@ fn authority_current_selector_refuses_after_router_poison() {
     let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         runtime.collect_witnesses_and_activate(&mut pending, &services)
     }));
-    assert!(panicked.is_err());
+    assert!(matches!(panicked, Err(payload)
+        if payload.downcast_ref::<&str>().copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            == Some("activation guard panicked inside the selector write section")));
     assert!(matches!(
         router.active_public_key(),
         Err(chio_keyring::KeyringError::Synchronization)
