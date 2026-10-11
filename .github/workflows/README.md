@@ -191,7 +191,7 @@ The "MSRV build and test" job (`msrv` in `ci.yml`) runs `cargo build
 cover the whole workspace. It runs:
 
 ```
-cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
+cargo test --workspace --no-fail-fast --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
 cargo test -p chio-formal-diff-tests --no-run
 cargo test -p chio-wasm-guards --lib
 ```
