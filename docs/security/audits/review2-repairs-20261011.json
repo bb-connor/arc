@@ -1,0 +1,662 @@
+{
+  "schema": "chio.security.review2-repair-intake.v1",
+  "observed_utc": "2026-10-11T00:54:05.566540+00:00",
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "private_stage": "d09397a1f9f8c62f4ad188f4b87e89ff13d71dad",
+  "scope": "Review intake and bounded component evidence. No replacement publication, hosted qualification or merge.",
+  "original_report": {
+    "findings.md": {
+      "path": "/home/connor/lanes/review2-pr1160/findings.md",
+      "sha256": "6350c0cc608d13f228e5c8b324b11a9fe72d4d5e3b2eed551846a77019a64eee"
+    },
+    "findings-data.json": {
+      "path": "/home/connor/lanes/review2-pr1160/findings-data.json",
+      "sha256": "fcd99ce625485945fe5fbf020cf03b2aec04fd2f2dadce097e308aba0b5c6330"
+    },
+    "summary.md": {
+      "path": "/home/connor/lanes/review2-pr1160/summary.md",
+      "sha256": "7c36cdbbeb72eacf58d589806dff672000b5367bdf3e0acd153f7419ab446212"
+    },
+    "architecture.md": {
+      "path": "/home/connor/lanes/review2-pr1160/architecture.md",
+      "sha256": "1e16a79bd1224be50d4f4f672b2b2dbe3b21f9a558d04014fafb83dbaaee84d4"
+    }
+  },
+  "finding_count": 26,
+  "requirements": [
+    {
+      "id": "R2-001",
+      "severity": "P0",
+      "title": "Supervisor accepts Darwin credentials with authority-granting ACLs",
+      "refs": [
+        [
+          "crates/products/chio-cli/src/supervise/credentials.rs",
+          171,
+          182
+        ],
+        [
+          "crates/products/chio-cli/src/supervise/descriptor_credentials.rs",
+          89,
+          96
+        ]
+      ],
+      "origin": "Introduced. Both loaders are new relative to main 2b1d467e17; the mode/owner gate is blamed to 255f1ee8da8, on the environment loader introduced by 6d09eeb2453.",
+      "fix": "Apply the existing Darwin descriptor ACL authority check to both loaders before accepting bytes or descriptors. Inspection errors and allow/unknown authority must refuse. Preserve genuine Linux systemd handling and deny-only ACL acceptance; add native tests at the actual loaders.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-002",
+      "severity": "P1",
+      "title": "Durable API Protect discards the configured shared budget authority",
+      "refs": [
+        [
+          "crates/products/chio-api-protect/src/proxy/mediated.rs",
+          183,
+          198
+        ],
+        [
+          "crates/products/chio-api-protect/src/proxy/state.rs",
+          541,
+          561
+        ],
+        [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+          727,
+          744
+        ]
+      ],
+      "origin": "Introduced by the sidecar durable caller-execution composition in e44ce720cbb; approval-specific selection later changed in 11485c4ef67. Base retained the configured kernel budget handle.",
+      "fix": "Refuse incompatible external budget configuration before provisioning, or explicitly select one composite authority for probes, admission and settlement. Preserving old shared usage requires a qualified state transition; do not silently reset, copy or replace accounting.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-003",
+      "severity": "P1",
+      "title": "Valid keyring-backed trust service configurations always fail startup",
+      "refs": [
+        [
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+          122,
+          127
+        ],
+        [
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+          192,
+          195
+        ],
+        [
+          "crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs",
+          128,
+          143
+        ],
+        [
+          "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs",
+          148,
+          158
+        ]
+      ],
+      "origin": "Introduced by b39b131271e keyring composition and seed stripping, interacting with pre-existing cluster/config revalidation.",
+      "fix": "Keep direct seed access removed. Separate bootstrap custody validation from runtime configuration/token validation, and use the latter for cluster composition and request authentication. Exercise full healthy keyring startup, not just isolated constructors.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-004",
+      "severity": "P1",
+      "title": "Cage admission buffers an entire directory before enforcing its scan limit",
+      "refs": [
+        [
+          "crates/security/chio-cage/src/linux.rs",
+          262,
+          343
+        ],
+        [
+          "crates/security/chio-cage/src/linux.rs",
+          199,
+          239
+        ],
+        [
+          "crates/security/chio-cage/src/linux.rs",
+          470,
+          483
+        ]
+      ],
+      "origin": "Introduced in new linux.rs by 3d3e4b4d9d2. Later F012 repair reuses this enumerator.",
+      "fix": "Pass a remaining entry/byte budget into the shared enumerator and refuse before pushing beyond it. Count skipped entries and bound the aggregate walk before sorting.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-005",
+      "severity": "P1",
+      "title": "Temporal rule expansion is exponential before its candidate cap runs",
+      "refs": [
+        [
+          "crates/security/chio-quarantine/src/correlation.rs",
+          1251,
+          1306
+        ],
+        [
+          "crates/security/chio-quarantine/src/rules.rs",
+          147,
+          189
+        ]
+      ],
+      "origin": "Introduced by 6ea79bb5dab in the new correlator; later indexing/conversion edits do not move the cap.",
+      "fix": "Enforce the partial-candidate budget on each unique insertion and before intermediate-vector growth. Suppress/refuse immediately on exhaustion. Add a combined branching-plus-reuse control.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-006",
+      "severity": "P1",
+      "title": "Identical uncovered tool calls execute repeatedly for one throttle unit",
+      "refs": [
+        [
+          "crates/security/chio-security-kernel/src/session_throttle.rs",
+          69,
+          96
+        ],
+        [
+          "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs",
+          979,
+          1092
+        ]
+      ],
+      "origin": "Introduced by 9e9b3be5f61 and the new session-throttle store/guard contract.",
+      "fix": "Use a kernel-owned dispatch-attempt identity. Permit free replay only for an authenticated retained operation whose execution cannot repeat; otherwise consume again or deny.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-007",
+      "severity": "P1",
+      "title": "Dropping a timed-out blocking adapter leaves its queued invocation runnable",
+      "refs": [
+        [
+          "crates/kernel/chio-kernel/src/runtime/blocking_connection.rs",
+          94,
+          100
+        ],
+        [
+          "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
+          1769,
+          1787
+        ]
+      ],
+      "origin": "Adapter file is new; the context-aware invoke path is attributed to 631edf1b208. The outer dispatch abort guard predates this PR.",
+      "fix": "Give the adapter ownership of an abort-on-drop guard for each nested queued handoff. Avoid nested pool self-starvation using the existing dispatch boundary. Preserve the distinction between cancelling queued work and reconciling work that already started.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-008",
+      "severity": "P1",
+      "title": "Unbounded broker DNS blocks control work and can hold global secret custody",
+      "refs": [
+        [
+          "crates/security/chio-secret-broker/src/generic_https.rs",
+          450,
+          457
+        ],
+        [
+          "crates/security/chio-secret-broker/src/service/custody/registration.rs",
+          106,
+          138
+        ],
+        [
+          "crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs",
+          92,
+          97
+        ]
+      ],
+      "origin": "Introduced in the new broker resolver/preparation implementation by 38d8cd43412.",
+      "fix": "Include DNS in one enforceable end-to-end preparation deadline and resolve outside the custody mutex. Avoid a second unconstrained lookup while retaining checked destination pinning. A timeout around an uncancellable worker alone does not bound retained work.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-009",
+      "severity": "P1",
+      "title": "Hermes guest can exhaust its privileged model relay before admission",
+      "refs": [
+        [
+          "sdks/python/chio-hermes/src/chio_hermes/model_relay.py",
+          239,
+          262
+        ],
+        [
+          "sdks/python/chio-hermes/src/chio_hermes/model_relay.py",
+          302,
+          311
+        ],
+        [
+          "sdks/python/chio-hermes/src/chio_hermes/restricted.py",
+          336,
+          345
+        ]
+      ],
+      "origin": "Introduced by aa8d006f7ac in the new relay; later Responses-mode work preserves these paths.",
+      "fix": "Bound connections before spawning handlers, enforce body deadlines, and bound retained event count/bytes including refusals. Refuse further traffic when evidence capacity is exhausted; do not silently truncate and claim complete capture.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-010",
+      "severity": "P2",
+      "title": "Abandoned prepared broker connections retain secret entries and capacity",
+      "refs": [
+        [
+          "crates/security/chio-secret-broker/src/service/ipc/prepared.rs",
+          39,
+          44
+        ],
+        [
+          "crates/security/chio-secret-broker/src/service/ipc/prepared.rs",
+          75,
+          149
+        ],
+        [
+          "crates/security/chio-secret-broker/src/service/custody/registration.rs",
+          123,
+          170
+        ]
+      ],
+      "origin": "Introduced in the new preparation map (38d8cd43412); prepared transport cleanup is attributed to 9ef512d0ba0.",
+      "fix": "Bind transport abandonment to the exact retained operation and reconcile/sweep expired pre-capture entries. Preserve captured/later operation ownership and accounting; unconditional EOF deletion/refund is unsafe.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-011",
+      "severity": "P2",
+      "title": "Runtime JSON stores can successfully write a file they refuse to reopen",
+      "refs": [
+        [
+          "crates/kernel/chio-runtime-core/src/store/json.rs",
+          49,
+          55
+        ],
+        [
+          "crates/kernel/chio-runtime-core/src/store/json.rs",
+          214,
+          224
+        ],
+        [
+          "crates/kernel/chio-runtime-core/src/store/trust_floor.rs",
+          102,
+          109
+        ]
+      ],
+      "origin": "New reader/writer mismatch introduced by a76864ad1a6: bounded readers replace permissive base readers while existing writers remain unbounded.",
+      "fix": "Use one backend size constant, serialize an isolated candidate including its newline, refuse before publishing oversized bytes, and publish live state only after successful persistence.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-012",
+      "severity": "P2",
+      "title": "Cage artifact opening can block on a FIFO before rejecting its type",
+      "refs": [
+        [
+          "crates/security/chio-cage/src/linux.rs",
+          699,
+          715
+        ]
+      ],
+      "origin": "New file/role flags introduced by 3d3e4b4d9d2; later kind checking remains after open.",
+      "fix": "Open non-directory artifacts with O_NONBLOCK and O_NOCTTY, then reject non-regular descriptors before reading. Preserve strict resolution and descriptor identity; a path stat before open is insufficient.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-013",
+      "severity": "P2",
+      "title": "Mobile replay-store custody never checks Darwin ACL authority",
+      "refs": [
+        [
+          "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+          618,
+          668
+        ]
+      ],
+      "origin": "Introduced by c85ef77b08d in the new durable mobile challenge store.",
+      "fix": "Check retained parent and database descriptors for authority-granting Darwin ACLs during initial and subsequent custody validation. Reuse the existing descriptor inspection boundary and fail closed on inspection errors; do not add another FFI implementation.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-014",
+      "severity": "P2",
+      "title": "Simulation rejects valid repeated effects against one captured target",
+      "refs": [
+        [
+          "crates/core/chio-response-model/src/simulation.rs",
+          78,
+          100
+        ],
+        [
+          "crates/platform/chio-store-sqlite/src/security_state/response_simulation.rs",
+          26,
+          33
+        ]
+      ],
+      "origin": "Introduced in the new simulation loop by 5920a896c7c.",
+      "fix": "Validate each effect's base against the immutable captured state, then apply ordered contributions to the working copy. Alternatively explicitly forbid the combination consistently in validation/builders/schema if it is unsupported.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-015",
+      "severity": "P2",
+      "title": "Go manifest validation copies oversized fields before its size refusal",
+      "refs": [
+        [
+          "sdks/go/chio-go-http/manifest_validation.go",
+          17,
+          60
+        ],
+        [
+          "sdks/go/chio-go-http/protocol_validation.go",
+          142,
+          145
+        ]
+      ],
+      "origin": "Introduced by 348b7ae4c22 in the new manifest preflight decoder.",
+      "fix": "Apply the shared input size limit before constructing the manifest decoder or copying a property. Keep presence, duplicate and semantic validation.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-016",
+      "severity": "P2",
+      "title": "Anthropic gate returns unevaluated tool content in message_start as safe",
+      "refs": [
+        [
+          "crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs",
+          93,
+          111
+        ]
+      ],
+      "origin": "Pre-existing in main 2b1d467e17; retained in the PR-revised lifetime gate (6ef28e8f4d). Not an introduced execution bypass.",
+      "fix": "Refuse populated initial tool content, or route every allowed initial content item through the same evaluation state machine before release. Keep the existing provider-lifecycle checks.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-017",
+      "severity": "P2",
+      "title": "The Start convenience command drops the accepted current authority pin",
+      "refs": [
+        [
+          "crates/products/chio-cli/src/cli/dispatch/mod.rs",
+          452,
+          472
+        ],
+        [
+          "crates/products/chio-cli/src/cli/runtime.rs",
+          593,
+          624
+        ]
+      ],
+      "origin": "The global pin was introduced by c336ce08385. Current API Protect wiring was repaired by 4fd87c47794; the Start alias still retains the old environment-only selection.",
+      "fix": "Pass the current authority pin through Start and use the same issuer-list construction as its API Protect counterpart. Test the actual command-to-config boundary, not only the helper.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-018",
+      "severity": "P2",
+      "title": "Two tamper tests cannot detect removal of reflected-decision validation",
+      "refs": [
+        [
+          "crates/security/chio-security-kernel/tests/issuance_freeze.rs",
+          167,
+          181
+        ],
+        [
+          "crates/security/chio-security-kernel/tests/capability_set_suspension.rs",
+          213,
+          219
+        ]
+      ],
+      "origin": "Both test files and their fixtures are introduced by 9e9b3be5f61.",
+      "fix": "Use tampered otherwise-allowing replies and assert the precise integrity/reflected-binding refusal at the real adapter. Preserve healthy allow and legitimate deny controls. No new harness is needed.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-019",
+      "severity": "P2",
+      "title": "Interrupted decoy creation leaves a final file that exact retry cannot recover",
+      "refs": [
+        [
+          "crates/security/chio-decoy/src/materialize.rs",
+          468,
+          501
+        ],
+        [
+          "crates/security/chio-decoy/src/materialize.rs",
+          519,
+          540
+        ],
+        [
+          "crates/security/chio-decoy/src/registry.rs",
+          816,
+          880
+        ]
+      ],
+      "origin": "Introduced by 6ea79bb5dab in the new materializer/registry.",
+      "fix": "Complete content and ownership metadata in a private same-parent staging object, fsync, then publish with no-replace semantics and sync the parent. Define bounded staging recovery without deleting an unproven final object.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-020",
+      "severity": "P2",
+      "title": "Portable issuer fetch excludes DNS from its total deadline",
+      "refs": [
+        [
+          "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs",
+          306,
+          342
+        ]
+      ],
+      "origin": "Introduced by 08de2d8bd27, the new bounded portable issuer/lifecycle fetch implementation.",
+      "fix": "Start one enforceable budget before DNS and carry remaining time into HTTP, using resolution whose lifetime is bounded. Keep checked-address pinning. Merely timing out the await does not reclaim the worker/permit.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-021",
+      "severity": "P2",
+      "title": "Candidate copy bounds ignore Git tree metadata and empty-file count",
+      "refs": [
+        [
+          "scripts/run-security-execution-container.py",
+          424,
+          451
+        ],
+        [
+          "scripts/run-security-execution-container.py",
+          484,
+          511
+        ]
+      ],
+      "origin": "Introduced by 8be503269ea in the new host runner.",
+      "fix": "Bound tree-output bytes, entry count and aggregate path metadata before retaining/materializing them. Preserve the existing per-blob and total-content limits. Use the existing runner boundary rather than new qualification tooling.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-022",
+      "severity": "P2",
+      "title": "A completed channel cannot accept its next valid service reservation",
+      "refs": [
+        [
+          "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/prepared.rs",
+          336,
+          336
+        ],
+        [
+          "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/reservation.rs",
+          548,
+          548
+        ],
+        [
+          "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/terminal.rs",
+          302,
+          318
+        ]
+      ],
+      "origin": "Pre-existing in changed files. Both version==1 fences blame to 51e46336b1f, an ancestor of base; PR parser/diagnostic changes do not introduce them.",
+      "fix": "Fence against the observed monotonic lifecycle version in the existing transaction and publication path, preserving exact channel/reservation/snapshot checks. Do not reset the counter or weaken the fence.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-023",
+      "severity": "P2",
+      "title": "Zero-share verifier children have no retained identity bound",
+      "refs": [
+        [
+          "crates/kernel/chio-kernel-core/src/budget_split.rs",
+          331,
+          381
+        ],
+        [
+          "crates/kernel/chio-kernel-core/src/budget_split.rs",
+          611,
+          621
+        ]
+      ],
+      "origin": "Pre-existing in changed code: VerifyOnly insertion/retention is from 818d1c5c94a. This PR's 916e5d8364c adds checked arithmetic, not the missing identity bound.",
+      "fix": "Apply finite per-parent entry and retained-identity byte limits before new insertion, preserving idempotent existing-child checks and live holders. A cached sum improves work but does not bound memory. Reject zero-share authority only if that is the intended schema contract.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-024",
+      "severity": "P2",
+      "title": "Mobile gating exposes a plain Allow for requirements it cannot enforce",
+      "refs": [
+        [
+          "crates/kernel/chio-kernel-core/src/evaluate.rs",
+          455,
+          516
+        ],
+        [
+          "crates/kernel/chio-kernel-mobile/src/lib.rs",
+          402,
+          443
+        ]
+      ],
+      "origin": "Pre-existing mobile projection from 00b6eb15658 and inherited ordinary-grant omissions, retained in PR-changed evaluator/mobile files.",
+      "fix": "Expose a clearly non-authoritative portable outcome and require mediated authorization for unsupported requirements, or refuse those matched grants in the mobile gate. Align the offline guide. Avoid a compatibility alias that preserves ambiguous Allow.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    },
+    {
+      "id": "R2-025",
+      "severity": "P3",
+      "title": "RegistryUpdateError stops traversal of retained native causes",
+      "refs": [
+        [
+          "crates/platform/chio-control-plane/src/passport_verifier.rs",
+          248,
+          248
+        ]
+      ],
+      "origin": "Introduced by f83f1fef0b4; the outer source-bearing wrapper is from 66bc596efe2.",
+      "fix": "Implement source for the three wrapped-error variants using the retained error; no new error abstraction.",
+      "state": "repair-in-progress; exact owner qualification pending"
+    }
+  ],
+  "additional": [
+    {
+      "id": "R2-026",
+      "severity": "P1",
+      "title": "Resume HMAC reader lacks native descriptor ACL authority check",
+      "source": "Claude cross-family source verification on published974f",
+      "repair_candidate": "2353b2c8a6; composed descriptor lane f788338862; native GREEN pending"
+    },
+    {
+      "id": "CI-MSRV-COMMAND-PIN",
+      "severity": "P2",
+      "title": "MSRV regression still pins pre-no-fail-fast workspace command",
+      "source_job": 114341282995,
+      "repair": "5955d1cc6a;6 local regressions and CI contract pass"
+    },
+    {
+      "id": "CI-MACOS-RUSTIX",
+      "severity": "P1",
+      "title": "CLI macOS build lacks rustix dependency for Unix transport",
+      "source": "Exact5ef4 native build E0433 in discovery/transport.rs",
+      "repair": "a6f7df1b73 -> private fbc0e20378",
+      "native_compile_blocker_log_sha256": "ef5fd71cf318f3ff86aefb96b2827f0d5bb71b6d4fc4bd9f8cc41d86e8ffb384"
+    }
+  ],
+  "local_evidence": {
+    "go_final": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-go-final/result.json",
+      "sha256": "60fa254892d2926ddfbba57f1770a37124a4c3b01211fe84285a083017166570"
+    },
+    "go_original_and_owning": {
+      "path": "/tmp/pr1160-review2-relay-manifest-20261010/go-qualification-v2.json",
+      "sha256": "f29c94fa306628a4cdc9b57b820843c0e4c3e537d43e6c16da865d077870aaaa"
+    },
+    "cage_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-cage-original/summary.json",
+      "sha256": "5f586d85d5c69afbf25722f7c7a91a3dd91b18cf29e25b3c6673a3eebd66b8cd"
+    },
+    "adapter_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-007-original-v2/summary.json",
+      "sha256": "14a8609f25d0fbffdb2230a2a4ce2ead8214c2923ef5d1c7070fb72b31cd1c8a"
+    },
+    "correlation_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-005-original-v2/summary.json",
+      "sha256": "29d96de4c55c8df9c0b96253affc0317ba0b9bb0a990f0d3229bce4093e69f5f"
+    },
+    "throttle_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-original/summary.json",
+      "sha256": "6de5cd969da186e7796b3fda27642f5bcdf87ccffcb99e7cef7e525cfb02e894"
+    },
+    "native_prepared": {
+      "path": "/tmp/pr1160-ci-batch-20261010/descriptor-custody-prepared.json",
+      "sha256": "6f6dae582f50ef553b33d49ea5ec3efb80d7db4f02e35ee4ce45d924e4e93bd2"
+    }
+  },
+  "known_hosted_failure": {
+    "job": 114341282950,
+    "result": "receipt mismatch harness timeout124 on published974f; same privately repaired encoder boundary",
+    "log_sha256": "672f9a27588a2a67e4963296132e8766b0bf2c580cd8266d0961b7249cec7008",
+    "broader_proof_qualification": "OPEN"
+  },
+  "required_checks": {
+    "Build": "in_progress",
+    "MSRV": "failure; private source repair",
+    "cargo-vet": "success",
+    "cargo-deny": "success"
+  },
+  "remaining_acceptance": [
+    "Finish and independently review every confirmed repair, retaining genuine Original and owner-specific evidence.",
+    "Compose one replacement, refresh exact inventories and source pins, qualify local integration before publication.",
+    "Four required checks green on exact replacement head; classify other failures, answer threads.",
+    "New explicit Connor merge go-ahead. No authorization or evidence-variable mutation."
+  ],
+  "requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-001",
+    "incoming-pr1160-review2-20261011:R2-002",
+    "incoming-pr1160-review2-20261011:R2-003",
+    "incoming-pr1160-review2-20261011:R2-004",
+    "incoming-pr1160-review2-20261011:R2-005",
+    "incoming-pr1160-review2-20261011:R2-006",
+    "incoming-pr1160-review2-20261011:R2-007",
+    "incoming-pr1160-review2-20261011:R2-008",
+    "incoming-pr1160-review2-20261011:R2-009",
+    "incoming-pr1160-review2-20261011:R2-010",
+    "incoming-pr1160-review2-20261011:R2-011",
+    "incoming-pr1160-review2-20261011:R2-012",
+    "incoming-pr1160-review2-20261011:R2-013",
+    "incoming-pr1160-review2-20261011:R2-014",
+    "incoming-pr1160-review2-20261011:R2-015",
+    "incoming-pr1160-review2-20261011:R2-016",
+    "incoming-pr1160-review2-20261011:R2-017",
+    "incoming-pr1160-review2-20261011:R2-018",
+    "incoming-pr1160-review2-20261011:R2-019",
+    "incoming-pr1160-review2-20261011:R2-020",
+    "incoming-pr1160-review2-20261011:R2-021",
+    "incoming-pr1160-review2-20261011:R2-022",
+    "incoming-pr1160-review2-20261011:R2-023",
+    "incoming-pr1160-review2-20261011:R2-024",
+    "incoming-pr1160-review2-20261011:R2-025",
+    "incoming-pr1160-review2-20261011:R2-026",
+    "incoming-pr1160-review2-20261011:CI-MSRV-COMMAND-PIN",
+    "incoming-pr1160-review2-20261011:CI-MACOS-RUSTIX"
+  ],
+  "evidence_limits": [
+    "Go v1 omitted .go file pins; retained as incomplete, superseded by renewed v2 actual974f Original and Go-inclusive source pins.",
+    "Adapter v1 and correlation v1 failed compilation of test fixtures; neither is a genuine behavioral RED. Corrected versions compile and assert the intended defects.",
+    "Native ACL Originals were executed by Claude on macOS26.4 arm64/Rust1.95; source pin and log custody still being consolidated by Root. Native successor qualification is pending.",
+    "Root aarch64 Cage evidence does not claim x86_64 enforcing qualification.",
+    "No previously failed/cancelled/incomplete or unproved campaign is relabeled successful."
+  ]
+}
