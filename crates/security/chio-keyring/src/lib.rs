@@ -15,8 +15,10 @@
 //! Authority key transparency with immutable events and transactional replay.
 
 mod checkpoint;
-#[cfg(any(target_vendor = "apple", test))]
-mod darwin_acl;
+#[cfg(all(test, target_vendor = "apple"))]
+mod darwin_acl {
+    mod native_tests;
+}
 mod enterprise_receipt;
 mod error;
 mod event;
@@ -544,7 +546,8 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
 
 #[cfg(target_vendor = "apple")]
 fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
-    darwin_acl::trusted_file_has_extended_acl(file)
+    chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file)
+        .map_err(KeyringError::Io)
 }
 
 /// Inspect a Darwin file descriptor's extended ACL without exposing the FFI
@@ -594,13 +597,6 @@ pub fn validate_sqlite_main_database_live_path_binding(
         ));
     }
     Ok(())
-}
-
-#[cfg(target_vendor = "apple")]
-fn apple_acl_tag_grants_additional_authority(tag_type: std::os::raw::c_int) -> bool {
-    const ACL_EXTENDED_DENY: std::os::raw::c_int = 2;
-
-    tag_type != ACL_EXTENDED_DENY
 }
 
 #[cfg(all(
@@ -721,16 +717,6 @@ mod storage_identity_tests {
             validate_custody_sensitive_file_security_values(501, 501, 0o644, 2, false).is_err()
         );
         assert!(validate_custody_sensitive_file_security_values(501, 501, 0o644, 1, true).is_err());
-    }
-
-    #[cfg(target_vendor = "apple")]
-    #[test]
-    fn apple_acl_policy_accepts_deny_only_and_rejects_allow_entries() {
-        use super::apple_acl_tag_grants_additional_authority;
-
-        assert!(!apple_acl_tag_grants_additional_authority(2));
-        assert!(apple_acl_tag_grants_additional_authority(1));
-        assert!(apple_acl_tag_grants_additional_authority(99));
     }
 
     #[cfg(target_vendor = "apple")]

@@ -1,12 +1,14 @@
+//! Shared Darwin ACL inspection on a borrowed, live file descriptor.
+
 use std::{io, os::raw::c_int};
 
-pub(super) fn acl_entry_returned(result: c_int, error: io::Error) -> io::Result<bool> {
+fn acl_entry_returned(result: c_int, error: io::Error) -> io::Result<bool> {
     // Darwin yields an entry with 0 and ends the list with -1/EINVAL.
     // errno may be stale after a successful call, so inspect it only on -1.
     if result == 0 {
         return Ok(true);
     }
-    if result == -1 && error.raw_os_error() == Some(rustix::io::Errno::INVAL.raw_os_error()) {
+    if result == -1 && error.raw_os_error() == Some(libc::EINVAL) {
         return Ok(false);
     }
     Err(if result == -1 {
@@ -16,8 +18,11 @@ pub(super) fn acl_entry_returned(result: c_int, error: io::Error) -> io::Result<
     })
 }
 
+/// Inspect a borrowed Darwin descriptor's extended ACL. Deny-only entries do
+/// not add authority; allow or unknown tags do. Inspection errors are returned
+/// intact so callers can fail closed without acquiring custody from this check.
 #[cfg(target_vendor = "apple")]
-pub(super) fn trusted_file_has_extended_acl(file: &std::fs::File) -> super::Result<bool> {
+pub fn darwin_descriptor_grants_extended_acl_authority(file: &std::fs::File) -> io::Result<bool> {
     use std::os::fd::AsRawFd;
 
     type Acl = *mut std::ffi::c_void;
@@ -43,7 +48,7 @@ pub(super) fn trusted_file_has_extended_acl(file: &std::fs::File) -> super::Resu
         if error.kind() == io::ErrorKind::NotFound {
             return Ok(false);
         }
-        return Err(super::KeyringError::Io(error));
+        return Err(error);
     }
     let mut entry = std::ptr::null_mut();
     // SAFETY: `acl` is a live ACL object and `entry` points to writable storage.
@@ -68,7 +73,7 @@ pub(super) fn trusted_file_has_extended_acl(file: &std::fs::File) -> super::Resu
         // A deny-only entry cannot add authority. Any allow or unknown tag is
         // rejected conservatively without trying to reproduce Darwin's ACL
         // precedence rules.
-        if super::apple_acl_tag_grants_additional_authority(tag_type) {
+        if apple_acl_tag_grants_additional_authority(tag_type) {
             grants_additional_authority = true;
             break;
         }
@@ -78,39 +83,42 @@ pub(super) fn trusted_file_has_extended_acl(file: &std::fs::File) -> super::Resu
     // SAFETY: `acl` was allocated by `acl_get_fd_np` and is freed exactly once.
     let free_result = unsafe { acl_free(acl) };
     if let Some(error) = acl_error {
-        return Err(super::KeyringError::Io(error));
+        return Err(error);
     }
     if free_result != 0 {
-        return Err(super::KeyringError::Io(io::Error::last_os_error()));
+        return Err(io::Error::last_os_error());
     }
     Ok(grants_additional_authority)
 }
 
-#[cfg(all(test, target_vendor = "apple"))]
-mod native_tests;
+fn apple_acl_tag_grants_additional_authority(tag_type: c_int) -> bool {
+    const ACL_EXTENDED_DENY: c_int = 2;
+
+    tag_type != ACL_EXTENDED_DENY
+}
 
 #[cfg(test)]
 mod tests {
-    use super::acl_entry_returned;
+    use super::{acl_entry_returned, apple_acl_tag_grants_additional_authority};
     use std::io;
 
     #[test]
     fn acl_return_code_zero_yields_an_entry_even_with_stale_errno() -> io::Result<()> {
-        let stale_error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
+        let stale_error = io::Error::from_raw_os_error(libc::EINVAL);
         assert!(acl_entry_returned(0, stale_error)?);
         Ok(())
     }
 
     #[test]
     fn acl_return_code_einval_terminates_an_empty_or_exhausted_acl() -> io::Result<()> {
-        let error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
+        let error = io::Error::from_raw_os_error(libc::EINVAL);
         assert!(!acl_entry_returned(-1, error)?);
         Ok(())
     }
 
     #[test]
     fn acl_return_code_real_errors_fail_closed() {
-        let errno = rustix::io::Errno::IO.raw_os_error();
+        let errno = libc::EIO;
         let result = acl_entry_returned(-1, io::Error::from_raw_os_error(errno));
         assert_eq!(
             result.err().and_then(|error| error.raw_os_error()),
@@ -120,7 +128,7 @@ mod tests {
 
     #[test]
     fn acl_return_code_linux_success_is_rejected() {
-        let stale_error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
+        let stale_error = io::Error::from_raw_os_error(libc::EINVAL);
         assert!(matches!(
             acl_entry_returned(1, stale_error),
             Err(error) if error.kind() == io::ErrorKind::Other
@@ -131,12 +139,19 @@ mod tests {
 
     #[test]
     fn acl_return_code_unexpected_status_fails_closed() {
-        let stale_error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
+        let stale_error = io::Error::from_raw_os_error(libc::EINVAL);
         assert!(matches!(
             acl_entry_returned(2, stale_error),
             Err(error) if error.kind() == io::ErrorKind::Other
                 && error.raw_os_error().is_none()
                 && error.to_string() == "unexpected Darwin ACL entry result"
         ));
+    }
+
+    #[test]
+    fn apple_acl_policy_accepts_deny_only_and_rejects_allow_entries() {
+        assert!(!apple_acl_tag_grants_additional_authority(2));
+        assert!(apple_acl_tag_grants_additional_authority(1));
+        assert!(apple_acl_tag_grants_additional_authority(99));
     }
 }

@@ -1,11 +1,19 @@
-//! Narrow audited boundary for binding a `rusqlite` connection to the exact
-//! main-database file borrowed by SQLite.
+//! Audited descriptor inspection for SQLite file identity and Darwin ACLs.
+//!
+//! Inspection does not grant custody. Callers retain and validate ownership,
+//! permissions, file type and the expected descriptor identity separately.
 //!
 //! The workspace uses rusqlite's pinned `bundled` SQLite build. Qualified
 //! stores require a bundled Unix VFS, whose `unixFile` prefix is stable and
 //! contains the database descriptor after SQLite's public `sqlite3_file` base.
 
 #![deny(unsafe_op_in_unsafe_fn)]
+
+#[cfg(any(target_vendor = "apple", test))]
+mod darwin_acl;
+
+#[cfg(target_vendor = "apple")]
+pub use darwin_acl::darwin_descriptor_grants_extended_acl_authority;
 
 #[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};
