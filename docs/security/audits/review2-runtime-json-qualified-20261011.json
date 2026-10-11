@@ -1,0 +1,150 @@
+{
+  "schema": "chio.security.review2-runtime-json-qualification.v1",
+  "observed_utc": "2026-10-11T02:25:02.804315+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-011"
+  ],
+  "source_repair": {
+    "checkpoint": "65b81c453c3e3268e3263b7893c118c984ad67da",
+    "producer_commit": "f400a57f969d17b61b8787f83c562e47f4898d20",
+    "files": [
+      "crates/kernel/chio-runtime-core/src/store/json.rs",
+      "crates/kernel/chio-runtime-core/src/store/json_file.rs",
+      "crates/kernel/chio-runtime-core/src/store/mod.rs",
+      "crates/kernel/chio-runtime-core/src/store/trust_floor.rs",
+      "crates/kernel/chio-runtime-core/tests/runtime_store.rs",
+      "crates/kernel/chio-runtime-core/tests/runtime_store/json_store_bounds.rs"
+    ],
+    "file_sha256": {
+      "crates/kernel/chio-runtime-core/src/store/json.rs": "1284fec00ca38311bd1ad0ca4dd4bfbb322993e2b31bb3ada560e3c930233b02",
+      "crates/kernel/chio-runtime-core/src/store/json_file.rs": "f958445895bbe49f3da70a0691c046740df17708268f7a2647cf3b1d2611f219",
+      "crates/kernel/chio-runtime-core/src/store/mod.rs": "309bdb8f089322deec5ef1bd6734c6915d013f0122d018d75fa1ca12b3550e67",
+      "crates/kernel/chio-runtime-core/src/store/trust_floor.rs": "120eec833cef562eb16caa6e649d475ba24e3e3bc95398c5359a8cfccb604421",
+      "crates/kernel/chio-runtime-core/tests/runtime_store.rs": "ebee71f3278ca6e7ad36a6009cb88b4d976747bf039ea2f402ffbf5251c49bb7",
+      "crates/kernel/chio-runtime-core/tests/runtime_store/json_store_bounds.rs": "7c9e0b06aef318f1f8fcfe1e21d1eb1cbc71c1309f17dcb8d4adc2a525a65769"
+    }
+  },
+  "contract": "Both JSON stores share the 64 MiB reader/writer bound. All 12 mutations validate and serialize a cloned candidate, including its newline, before writing and assigning live state. Oversized candidates leave the persisted and cached state unchanged. Signed parsing remains strict.",
+  "review": {
+    "reviewer": "Root integrator, independent of Claude producer",
+    "verdict": "bounded source approval",
+    "scope": "All changed persistence paths and both real overflow/reopen controls. No wire or admission authority change. Non-UTF-8 files now report signed-json-not-utf8 rather than runtime_admission_io; both refuse and the more specific provenance is retained."
+  },
+  "original": {
+    "source_predecessor": "974f22914bd339a62933831650c3d55dbaf76987",
+    "producer_log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-011-original.log",
+      "sha256": "5880ce7ceb742986679ac1b850a8294d3f7b6bb303ba83a909e6801d03b9a253"
+    },
+    "producer_overlay_script": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/originals.sh",
+      "sha256": "7ce0290e6bd83dcb2b13e1b615463098dbe41916a04b22a8b259759498c74183"
+    },
+    "result": "0 passed, 2 genuine assertion failures: both oversized mutations unexpectedly returned Ok."
+  },
+  "producer_green": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-011-green.log",
+    "sha256": "fa2d2ab8cd49d3bf29316a8a3f77df96ec1fbf443ff69a9e60508b004328e230"
+  },
+  "root_campaign": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-011-composed/summary.json",
+    "sha256": "9f8e9bddf6ffd1b8cd5c93f6047f85b989f679397f1499210a5095733afcbcc6"
+  },
+  "root_tail": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-011-bench-lint/summary.json",
+    "sha256": "85eacd3275c3087fbc947c72763bce1da744a362c5c85e578134c7bfc82ca3db"
+  },
+  "results": {
+    "owning_lib_and_integration_tests_passed": 309,
+    "ignored": 0,
+    "criterion_benchmark_smoke": "passed",
+    "strict_owning_all_targets": "passed"
+  },
+  "retained_failed_attempt": "The first full all-target command passed all 309 lib/integration tests but exited101 because --test-threads=8 was forwarded to Criterion. The separate exact-source Criterion command passed without that libtest-only option, followed by strict all-target Clippy. The tail runner prose mistakenly says409; actual test summaries sum309 and this record corrects that count. Failed command and runner inputs remain preserved.",
+  "commands": [
+    {
+      "label": "owning-runtime-core",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-runtime-core",
+        "--all-targets",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=8"
+      ],
+      "exit": 101,
+      "seconds": 244.26225992431864,
+      "log_sha256": "ad01d228ee52609d2772e3c3ad2ca7e7f48763ef2f7d68c3bddeef14743b3bb3",
+      "test_summaries": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s",
+        "test result: ok. 91 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.35s",
+        "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.10s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+        "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.50s",
+        "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "criterion-runtime-core",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-runtime-core",
+        "--bench",
+        "cross_boundary_admission"
+      ],
+      "exit": 0,
+      "seconds": 3.289127316325903,
+      "log_sha256": "a170c42828e4ba9af393e057592e1c613460e6b8c1760e06830e06ec77da473e",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "strict-runtime-core",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-runtime-core",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 91.28519987687469,
+      "log_sha256": "c020e47d068d873618b1436299250333fdd7080a9b829e4ea73a571827a43944",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    }
+  ],
+  "remaining_acceptance": [
+    "Complete remaining confirmed repairs and composed candidate qualification.",
+    "Four required exact-head hosted checks green; other failures classified and reviews answered.",
+    "Connor explicit merge go-ahead."
+  ],
+  "limits": [
+    "Producer Original is retained as its test overlay and log; Root source-stable campaign qualifies composed65b.",
+    "No complete workspace, hosted, native or production activation claim."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
