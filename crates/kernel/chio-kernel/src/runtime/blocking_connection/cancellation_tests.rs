@@ -472,7 +472,9 @@ fn healthy_adapter_through_kernel_completes_with_one_blocking_slot() -> TestResu
     );
     assert_eq!(
         response.output,
-        Some(serde_json::json!({"done": true, "tool": "work", "arguments": {"record": "R2-007"}}))
+        Some(crate::ToolCallOutput::Value(
+            serde_json::json!({"done": true, "tool": "work", "arguments": {"record": "R2-007"}})
+        ))
     );
     assert_eq!(probe.started.load(Ordering::SeqCst), 1);
     assert_eq!(probe.completed.load(Ordering::SeqCst), 1);
