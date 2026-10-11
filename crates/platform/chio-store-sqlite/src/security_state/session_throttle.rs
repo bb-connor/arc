@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     body_hash, canonical_json_bytes, decode_digest, effect_request_matches_query, from_i64, params,
     predict_session_throttle_apply, predict_session_throttle_remove,

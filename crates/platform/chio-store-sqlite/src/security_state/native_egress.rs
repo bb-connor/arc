@@ -1,6 +1,4 @@
 //! Closed egress commands and exact row policies, not mutation authority.
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     decode_declassification_receipt, encode_retained_security_values, flow_state,
     native_declassification as declassification, to_i64,
