@@ -334,9 +334,6 @@ fn durable_sidecar(
     config.sidecar_control_token = Some("durable-budget-control".into());
     config.spec_content =
         Some("openapi: 3.0.3\ninfo:\n  title: Budget\n  version: 1.0.0\npaths: {}\n".into());
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs();
     let capability = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "durable-budget-capability".into(),
@@ -355,8 +352,10 @@ fn durable_sidecar(
                 }],
                 ..ChioScope::default()
             },
-            issued_at: now - 60,
-            expires_at: now + 3600,
+            // This fixture exercises budget ownership, not token expiry. Keep
+            // its lifetime valid through 2100 without an ambient clock read.
+            issued_at: 1,
+            expires_at: 4_102_444_800,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         },
