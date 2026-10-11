@@ -5,7 +5,8 @@ use super::report_rendering::{
     stored_tool_receipt_views,
 };
 use super::report_validation::{
-    normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_auth,
+    normalize_cluster_config_url, normalize_cluster_url, run_blocking_authority_task,
+    validate_cluster_peer_auth,
 };
 use super::*;
 

@@ -399,6 +399,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     let Some(self_url) = cluster_self_url(state) else {
         return Ok(());
     };
+    super::authority_evidence::refresh_signing_custody(state);
     let client = service_runtime::client::build_cluster_peer_client(
         peer_url,
         &state.config.service_token,

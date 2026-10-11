@@ -1,6 +1,8 @@
 #[path = "authority_admission.rs"]
 mod authority_admission;
-pub(crate) use authority_admission::inspect_authority_state_blocking;
+pub(crate) use authority_admission::{
+    inspect_authority_state_blocking, run_blocking_authority_task,
+};
 
 use super::cluster::{
     cluster_authority_lease_view, cluster_authority_read_role, ClusterAuthorityReadRole,

@@ -225,6 +225,7 @@ mod cluster_and_reports_tests {
             term_started_at: None,
             lease_expires_at: None,
             lease_ttl_ms: authority_lease_ttl(Duration::from_millis(25)).as_millis() as u64,
+            signing_custody: false,
         };
 
         let initial = compute_cluster_consensus_locked(&mut cluster);
@@ -311,6 +312,7 @@ mod cluster_and_reports_tests {
             term_started_at: None,
             lease_expires_at: None,
             lease_ttl_ms: authority_lease_ttl(Duration::from_millis(25)).as_millis() as u64,
+            signing_custody: false,
         };
 
         let consensus = compute_cluster_consensus_locked(&mut cluster);
