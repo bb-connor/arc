@@ -667,11 +667,11 @@ mod tests {
 
     use super::*;
     use crate::backend::SecretMaterial;
+    use crate::generic_https::tests::pin_and_prepare;
     use crate::generic_https::{DestinationResolver, GenericHttpsExecutor, NetworkPolicy};
     use crate::protocol::{
         BrokerDestination, BrokerRequest, CallerOptions, RedirectPolicy, RequestConstraints,
     };
-    use crate::provider::{CredentialPlacement, GenericCredentialProvider};
 
     #[test]
     fn status_parser_rejects_truncation_and_non_http_whitespace() {
@@ -902,15 +902,6 @@ mod tests {
         (request, constraints)
     }
 
-    fn provider() -> GenericCredentialProvider {
-        GenericCredentialProvider::new(
-            "generic-bearer".to_string(),
-            1,
-            CredentialPlacement::BearerAuthorization,
-        )
-        .test_expect("provider")
-    }
-
     fn local_executor(server: &LocalTlsServer) -> GenericHttpsExecutor {
         GenericHttpsExecutor::new(
             Arc::new(StaticResolver(server.address.ip())),
@@ -937,9 +928,8 @@ mod tests {
         let token = vec![b'k'; 1_024];
         let credential = SecretMaterial::new(token.clone());
         let (request, constraints) = request_and_constraints(8443, 2_000);
-        let prepared = executor
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&executor, &request, &constraints, &credential).test_expect("prepare");
         let head = build_request_head(&prepared.outbound).test_expect("request head");
         assert!(head.windows(token.len()).any(|window| window == token));
         assert_eq!(head.len(), head.capacity());
@@ -954,9 +944,8 @@ mod tests {
         let credential = SecretMaterial::new(canary.to_vec());
         let (request, constraints) = request_and_constraints(server.address.port(), 2_000);
         let executor = local_executor(&server);
-        let prepared = executor
-            .prepare(&provider(), &request, &constraints, &credential)
-            .test_expect("prepare");
+        let prepared =
+            pin_and_prepare(&executor, &request, &constraints, &credential).test_expect("prepare");
         let (_, _, body) = executor
             .dispatch(prepared, &constraints, &credential)
             .test_expect("dispatch");
@@ -985,8 +974,7 @@ mod tests {
             let credential = SecretMaterial::new(canary.to_vec());
             let (request, constraints) = request_and_constraints(server.address.port(), 250);
             let executor = local_executor(&server);
-            let prepared = executor
-                .prepare(&provider(), &request, &constraints, &credential)
+            let prepared = pin_and_prepare(&executor, &request, &constraints, &credential)
                 .test_expect("prepare");
             let error = executor
                 .dispatch(prepared, &constraints, &credential)

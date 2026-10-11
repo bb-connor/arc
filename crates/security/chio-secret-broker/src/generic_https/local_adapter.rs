@@ -76,6 +76,7 @@ impl GenericHttpsExecutor {
                 allow_exact_address: Some(config.address),
             },
             exact_destination: Some((config.server_name.clone(), config.port)),
+            resolutions_in_flight: Arc::default(),
         })
     }
 }
