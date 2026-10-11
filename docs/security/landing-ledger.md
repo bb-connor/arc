@@ -8,6 +8,31 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Exact-head review and CI repair intake (October 11 UTC)
+
+Published candidate **`9e9cf98942`** is under hosted qualification. Its new
+[review](https://github.com/bb-connor/arc/pull/1160#issuecomment-6109135494)
+adds four P2 obligations: current signing-key refusal, compaction cursor
+progress, checkpoint archive growth, and exact legacy prepaid quarantine.
+The [intake](audits/exact-head-review-intake-20261011.json) and
+[execution plan](../superpowers/plans/2026-10-11-pr1160-exact-head-review.md)
+record ownership and acceptance. All **2,015** prior requirements and states
+are preserved; the four findings plus one CI contract repair bring the ledger
+to **2,020 requirements**.
+
+Compaction has a genuine final Original failure and **23 passing repaired
+controls**; strict owner qualification and final fixture review remain pending
+at intake. The static drop-guard contract repair **`7f9273387b`** passes all
+8 structural checks and three negative controls, with independent approval.
+It addresses hosted jobs **114474338636** and **114471421192** without changing
+model behavior or executing proofs. Keyring and checkpoint repairs and the
+settled legacy-payment control are in progress on isolated producer branches.
+The existing authorization failures remain classified prerequisites.
+
+These obligations are open until their final acceptance is recorded. The
+candidate is **not merge-ready**; exact replacement checks, review and user
+merge authorization remain required.
+
 ## Complete predecessor CI results and final fixture repair (October 11 UTC)
 
 All four required checks on `36d77fe276` have reported: Vet and Deny pass;
