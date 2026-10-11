@@ -321,11 +321,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Bound tree-output bytes, entry count and aggregate path metadata before retaining/materializing them. Preserve the existing per-blob and total-content limits. Use the existing runner boundary rather than new qualification tooling.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-022: A completed channel cannot accept its next valid service reservation
 

@@ -26,6 +26,11 @@ repairs are composed and undergoing platform qualification. Other confirmed
 review items remain in assigned repair lanes. The canonical count stays **1,997**;
 only the named current states advance, preserving all historical requirements.
 
+The bounded tree-copy repair is locally qualified, including the stalled-pipe
+regression found during review. Its [audit](audits/review2-tree-qualified-20261011.json)
+retains both failures and the passing final runner/helper checks. Full CI
+contract mutation testing continues on an isolated combined source snapshot.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.
