@@ -73,6 +73,23 @@ fn compaction_retained_prefix_resumes_replay_verification_under_same_byte_cap() 
             .sync_after_write(&connection)
             .expect("anchor");
     }
+    let first_row_error = fixture
+        .outcomes
+        .compact_retained_invocation_blobs_page_with_limits(
+            now,
+            &fixture.fence,
+            now,
+            Some(&predecessor),
+            ToolOutcomeCompactionLimits {
+                max_payload_bytes: cap - 1,
+                ..ToolOutcomeCompactionLimits::default()
+            },
+        )
+        .expect_err("an unfit first row has no cursor progress to return");
+    assert_eq!(first_row_error, ToolOutcomeStoreError::Unavailable(
+        "terminal raw payload replay verification exceeds the maintenance payload byte budget; bytes and cursor retained".into()
+    ));
+    assert!(blob_state(&fixture, value.raw_output_digest().as_str()).1);
     let stream_size = u64::try_from(blob_state(&fixture, stream.raw_output_digest().as_str()).0)
         .expect("bounded stream raw size");
     assert!(stream_size > 0);

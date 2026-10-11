@@ -319,7 +319,9 @@ impl SqliteToolOutcomeStore {
                             continue;
                         }
                         ReplayOwners::ByteDeferred => {
-                            if page.compacted == 0 {
+                            // Retained rows are safe scan progress even when no
+                            // bytes were erased. Retry this owner on the next page.
+                            if last_inspected.as_ref() == after_digest {
                                 return Err(ToolOutcomeStoreError::Unavailable("terminal raw payload replay verification exceeds the maintenance payload byte budget; bytes and cursor retained".into()));
                             }
                             page.byte_budget_exhausted = true;

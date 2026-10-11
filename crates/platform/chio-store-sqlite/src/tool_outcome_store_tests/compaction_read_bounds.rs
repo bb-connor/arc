@@ -188,13 +188,29 @@ fn compaction_refuses_recovery_status_bytes_before_payload_read() {
             }))
             .expect("observe current-component payload column");
     }
+    // Start immediately before the raw owner. Earlier retained rows are valid
+    // cursor progress; this control specifically exercises first-row refusal.
+    let predecessor: Option<String> = fixture
+        .outcomes
+        .connection()
+        .expect("connection")
+        .query_row(
+            "SELECT MAX(digest) FROM tool_outcome_blobs WHERE digest < ?1",
+            [outcome.raw_output_digest().as_str()],
+            |row| row.get(0),
+        )
+        .expect("raw predecessor");
+    let predecessor = predecessor
+        .map(|digest| AdmissionDigest::try_new("predecessor", digest))
+        .transpose()
+        .expect("valid predecessor");
     let error = fixture
         .outcomes
         .compact_retained_invocation_blobs_page_with_limits(
             now,
             &fixture.fence,
             now,
-            None,
+            predecessor.as_ref(),
             ToolOutcomeCompactionLimits {
                 // Keep the measured healthy cap. Adding a physical current
                 // component must consume extra bytes, before decoding it.
