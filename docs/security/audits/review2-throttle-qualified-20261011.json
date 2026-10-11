@@ -1,0 +1,767 @@
+{
+  "schema": "chio.security.review2-throttle-qualification.v1",
+  "observed_utc": "2026-10-11T02:11:16.518507+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-006"
+  ],
+  "private_stage": "679e713a3828618fa76c1fe5111ba9ec6d71479c",
+  "source_repair": {
+    "checkpoint": "679e713a3828618fa76c1fe5111ba9ec6d71479c",
+    "producer_commit": "5f74127b33d264879cf163b861f0ee91c33558de",
+    "integration_commit": "fa9cb164e081779974739d7c4b9a7a44153dab65",
+    "files": [
+      "crates/kernel/chio-kernel/src/session.rs",
+      "crates/kernel/chio-kernel/src/kernel/guard_invocation_attempt.rs",
+      "crates/kernel/chio-kernel/src/kernel/session_ops/request_claim.rs",
+      "crates/security/chio-security-kernel/src/session_throttle.rs",
+      "crates/security/chio-security-kernel/tests/session_throttle_kernel.rs",
+      ".github/workflows/chio-tee-fips.yml",
+      "scripts/check-security-ci-contract.py"
+    ],
+    "contract": "A private random identity is minted once for each actual in-flight request and retained across approval waits. Actual acquired claims project it; textual session and request names cannot identify a prior attempt. Verified durable operation identity has priority. Store idempotency and signed wire payloads are unchanged."
+  },
+  "source_manifest": {
+    "path": "/tmp/pr1160-r2-correlation-throttle-20261010/r2-006-repair-v2-source.json",
+    "sha256": "d4eb41f4dccdfc58693260834fecf6ff7e031006c25126fd1a5da5ecdddc4247"
+  },
+  "originals": {
+    "first": {
+      "path": "/tmp/pr1160-r2-correlation-throttle-20261010/r2-006-original-result.json",
+      "sha256": "e731f3917a7afa78895efa4c6744ec92bdd152871af676a8e94a2c0a53b13512"
+    },
+    "first_result": {
+      "expected": [
+        "Deny",
+        1
+      ],
+      "failed": 1,
+      "ignored": 0,
+      "observed": [
+        "Allow",
+        2
+      ],
+      "passed": 1
+    },
+    "incarnation": {
+      "expected": [
+        "Deny",
+        1
+      ],
+      "failed": 1,
+      "ignored": 0,
+      "log_path": "/tmp/pr1160-ci-batch-20261010/review2-006-incarnation-original/001-original/output.log",
+      "log_sha256": "aae07000f347fdd28ed5d15632aae17a9f4ee64ea2ee9ea18e3b089c633c183a",
+      "observed": [
+        "Allow",
+        2
+      ],
+      "passed": 0,
+      "producer_test_commit": "d05094be7aa919fcb589c3b732dbf675841f37ef",
+      "root_composed_source": "6495756a990b6cfd97e88227d26ef96e4a9ecd1b",
+      "unchanged_test_sha256": "4a74659b281e60e1ac3d11b859d41fd1de5535636b09cfdb4f0f8254ff75eadd"
+    },
+    "root_incarnation_summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-incarnation-original/summary.json",
+      "sha256": "e3d6a255719a0885ff6675c2e6d24f8c966195d5983a3a58fb9e2690e7ca80b7"
+    }
+  },
+  "independent_review": {
+    "path": "/tmp/pr1160-r2-correlation-throttle-20261010/independent-r2-006-review-v2.md",
+    "sha256": "a4fd45f0c2c0aa7228a6f6d1830efb073b52c29ed540536b4b4accd5c1441d8c"
+  },
+  "runtime_summary": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-006-green/summary.json",
+    "sha256": "e0ddfdae13ccefb72c9eedd15993fd9baaf7213361b185299f9e83cef00a3c93"
+  },
+  "continuation_summary": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-006-inventory-tail/summary.json",
+    "sha256": "bf4c217fcf4582dc7a1d1bbce52a9bb95ef7a6041a0a92e0bba1dbccd39eff9d"
+  },
+  "final_lint_summary": {
+    "path": "/tmp/pr1160-ci-batch-20261010/review2-006-final-lint/summary.json",
+    "sha256": "16b6f45498a413384c0838bc440ad18b4175f4ee87c2da53920b868f95fa37b3"
+  },
+  "test_fixture_lint_repair": {
+    "checkpoint": "679e713a3828618fa76c1fe5111ba9ec6d71479c",
+    "contract": "Remove one needless borrow around an unchanged throttle database fixture path; no assertions or production code changed. The initial strict failure is retained. Six actual kernel throttle controls and strict owning/downstream gates pass afterward."
+  },
+  "focused_inventories": [
+    {
+      "all_passed": true,
+      "count": 6,
+      "exact_names": [
+        "actual_session_claim_preserves_one_throttle_unit_across_nonce_preflight_and_retry",
+        "alternative_matching_grants_share_one_throttle_attempt",
+        "authenticated_manifest_session_and_inflight_record_do_not_mint_attempt_authority",
+        "caller_request_text_cannot_claim_session_or_admission_attempt_identity",
+        "fresh_kernel_reusing_session_and_request_names_consumes_a_new_throttle_attempt",
+        "repeated_unowned_read_only_request_is_denied_before_a_second_dispatch"
+      ],
+      "group": 1
+    },
+    {
+      "all_passed": true,
+      "count": 6,
+      "exact_names": [
+        "exact_decisions_allow_with_distinct_kernel_attempts",
+        "exhausted_outage_and_tampered_decisions_all_deny",
+        "missing_authoritative_session_cannot_bypass_enforcement",
+        "reconstructed_guard_preserves_the_session_and_uses_a_new_attempt",
+        "standalone_security_context_cannot_mint_a_kernel_attempt",
+        "zero_or_failed_clock_denies_before_consumption"
+      ],
+      "group": 2
+    },
+    {
+      "all_passed": true,
+      "count": 5,
+      "exact_names": [
+        "kernel::tests::hot_path_deadlines::guard_attempt::actual_admitted_operation_owns_guard_identity_and_replay_dispatches_once",
+        "kernel::tests::hot_path_deadlines::guard_attempt::kernel_attempt_identity_survives_inline_guards",
+        "kernel::tests::hot_path_deadlines::guard_attempt::kernel_attempt_identity_survives_per_guard_offload",
+        "kernel::tests::hot_path_deadlines::guard_attempt::kernel_attempt_identity_survives_pipeline_offload",
+        "kernel::tests::hot_path_deadlines::guard_attempt::kernel_attempt_identity_survives_timerless_offload"
+      ],
+      "group": 3
+    },
+    {
+      "all_passed": true,
+      "count": 1,
+      "exact_names": [
+        "kernel::tests::threshold_issuance::session_continuation::guard_attempt::approved_session_retry_keeps_admitted_attempt_identity_and_one_dispatch"
+      ],
+      "group": 4
+    }
+  ],
+  "results": {
+    "focused": 18,
+    "security_kernel_all_targets": 85,
+    "kernel_library": 1668,
+    "pq_threshold": 59,
+    "ignored": 0,
+    "strict_owning_all_targets": "passed",
+    "strict_additional_workspace_owners": 7
+  },
+  "commands": [
+    {
+      "label": "focused-1-list",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--test",
+        "session_throttle_kernel",
+        "--",
+        "--list"
+      ],
+      "exit": 0,
+      "seconds": 128.51137293316424,
+      "log_sha256": "9d6e8837f142879ac57c8cef71f9949b708bc1629896ae38a71124e12442bef5",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-1",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--test",
+        "session_throttle_kernel",
+        "--",
+        "--test-threads=8"
+      ],
+      "exit": 0,
+      "seconds": 3.550812965258956,
+      "log_sha256": "be0756efdaa1b854b1466ae74c87cf07de44791635aeabba90269a0178faf9e1",
+      "test_summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-2-list",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--test",
+        "session_throttle",
+        "--",
+        "--list"
+      ],
+      "exit": 0,
+      "seconds": 11.766433475073427,
+      "log_sha256": "3b5e9260ac276671b123e6e9f3bff59758fab4248e86a10e96d3a13567705e15",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-2",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--test",
+        "session_throttle",
+        "--",
+        "--test-threads=8"
+      ],
+      "exit": 0,
+      "seconds": 2.9690298549830914,
+      "log_sha256": "ab89e897bd96d5060955ea0b65d8634c0b1e359351577917c8d4ac849143dd99",
+      "test_summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-3-list",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "kernel::tests::hot_path_deadlines::guard_attempt::",
+        "--",
+        "--list"
+      ],
+      "exit": 0,
+      "seconds": 199.33063872903585,
+      "log_sha256": "226e73ec4bde24b4b297472d3c847f71e48fb0718b387ed904e20fa45d4968c2",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-3",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "kernel::tests::hot_path_deadlines::guard_attempt::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 3.0772353811189532,
+      "log_sha256": "40440f68f7f255f735d45f7daff00c343d2a2f0053570d1e9efdd27183a8622f",
+      "test_summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1663 filtered out; finished in 0.12s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-4-list",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "kernel::tests::threshold_issuance::session_continuation::guard_attempt::",
+        "--",
+        "--list"
+      ],
+      "exit": 0,
+      "seconds": 2.9258691952563822,
+      "log_sha256": "beee8e11e64f0446568d332fec0750bac1eb3f8b54a7733570679a0576375a90",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "focused-4",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "kernel::tests::threshold_issuance::session_continuation::guard_attempt::",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 2.996742478106171,
+      "log_sha256": "42d929e9b8fa7ec8cd51beb4e5767138e297fceec7d18b00f25d1c799735cc9f",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1667 filtered out; finished in 0.07s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "security-kernel-owning",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--all-targets",
+        "--no-fail-fast"
+      ],
+      "exit": 0,
+      "seconds": 33.55256891110912,
+      "log_sha256": "3960211369f0a1a5b8ef7c8c4205786b198fcb50d24172da9e27555e8e8c68a8",
+      "test_summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s",
+        "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "kernel-owning-lib",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "--no-fail-fast"
+      ],
+      "exit": 0,
+      "seconds": 71.00690995436162,
+      "log_sha256": "b5a0932e980fde4f435c4c710a47a78c0350b039db0c06daecf09908fb586234",
+      "test_summaries": [
+        "test result: ok. 1668 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 67.93s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "pq-threshold-list",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--features",
+        "pq",
+        "--lib",
+        "threshold_issuance",
+        "--",
+        "--list"
+      ],
+      "exit": 0,
+      "seconds": 266.869623567909,
+      "log_sha256": "61ec1631eae53146c06397d790154c78b46387ad1cf0cdf5e64554333e7d2dac",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "pq-threshold-run",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--features",
+        "pq",
+        "--lib",
+        "threshold_issuance",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 8.71211128309369,
+      "log_sha256": "7d80e10ea9280ba735078f1d07f1a2d379ee27654c6a1bbfc1b796a282ba05c8",
+      "test_summaries": [
+        "test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 1645 filtered out; finished in 5.31s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "pq-original-inventory",
+      "argv": [
+        "python3",
+        "scripts/check-exact-cargo-test-inventory.py",
+        "--label",
+        "Boot-gated threshold issuance",
+        "--allow-filtered",
+        "--list-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/011-pq-threshold-list/output.log",
+        "--run-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/012-pq-threshold-run/output.log",
+        "--expected",
+        "kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal",
+        "kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time",
+        "kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal",
+        "kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority",
+        "kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority",
+        "kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal",
+        "kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal",
+        "kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability",
+        "kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority",
+        "kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request",
+        "kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes",
+        "kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile",
+        "kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_below_threshold_needs_no_approval_resolver",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_same_tenant_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_requires_owned_context_on_raw_entry",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_pending_threshold_debug_omits_original_arguments",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_async_retry_restores_the_original_threshold_claim",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_dispatched_retry_cannot_execute_a_second_effect",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_initial_async_request_completes_session_ownership_as_cancelled",
+        "kernel::tests::threshold_issuance::session_continuation::session_claim_race::cancellation_at_restore_checkpoint_completes_threshold_ownership",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::session_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_sync_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_async_host_cancel_before_dispatch_records_cancelled_outcome"
+      ],
+      "exit": 2,
+      "seconds": 2.1794419549405575,
+      "log_sha256": "8ee3d3834f3a66bd5f0d3e73d121517343ecb59daf3b0fa094be6c753bdd160d",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "pq-original-inventory",
+      "argv": [
+        "python3",
+        "scripts/check-exact-cargo-test-inventory.py",
+        "--label",
+        "Boot-gated threshold issuance",
+        "--allow-filtered",
+        "--list-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/011-pq-threshold-list/output.log",
+        "--run-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/012-pq-threshold-run/output.log",
+        "kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal",
+        "kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time",
+        "kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal",
+        "kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority",
+        "kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority",
+        "kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal",
+        "kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal",
+        "kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability",
+        "kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority",
+        "kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request",
+        "kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes",
+        "kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile",
+        "kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_below_threshold_needs_no_approval_resolver",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_same_tenant_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_requires_owned_context_on_raw_entry",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_pending_threshold_debug_omits_original_arguments",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_async_retry_restores_the_original_threshold_claim",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_dispatched_retry_cannot_execute_a_second_effect",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_initial_async_request_completes_session_ownership_as_cancelled",
+        "kernel::tests::threshold_issuance::session_continuation::session_claim_race::cancellation_at_restore_checkpoint_completes_threshold_ownership",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::session_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_sync_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_async_host_cancel_before_dispatch_records_cancelled_outcome"
+      ],
+      "exit": 1,
+      "seconds": 2.08312337519601,
+      "log_sha256": "91642a53a645ba4dbf187737f974c76e7bf5eb67fa799374933e7719793cd1dc",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "pq-current-inventory",
+      "argv": [
+        "python3",
+        "scripts/check-exact-cargo-test-inventory.py",
+        "--label",
+        "Boot-gated threshold issuance",
+        "--allow-filtered",
+        "--list-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/011-pq-threshold-list/output.log",
+        "--run-output",
+        "/tmp/pr1160-ci-batch-20261010/review2-006-green/012-pq-threshold-run/output.log",
+        "kernel::tests::threshold_issuance::classical_boot_preserves_canonical_proposal",
+        "kernel::tests::threshold_issuance::hybrid_signing_config_debug_omits_seed",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_refreshes_stale_admission_time",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_rechecks_expiry_after_policy_lookup",
+        "kernel::tests::threshold_issuance::cumulative_proposal_clock_does_not_trust_future_artifact_time",
+        "kernel::tests::threshold_issuance::installed_hybrid_backend_signs_cumulative_proposal",
+        "kernel::tests::threshold_issuance::pq_required_proposal_uses_the_boot_verified_authority",
+        "kernel::tests::threshold_issuance::classical_installed_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::hybrid_proposal_dispatches_and_replays_once",
+        "kernel::tests::threshold_issuance::returned_backend_drop_keeps_installed_authority",
+        "kernel::tests::threshold_issuance::failed_boot_reconfiguration_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::missing_seed_preserves_previous_authority_and_floor",
+        "kernel::tests::threshold_issuance::incompatible_installed_signer_denies_without_publishing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_crypto_floor_without_reissuing_proposal",
+        "kernel::tests::threshold_issuance::pending_retry_rechecks_current_directory",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity",
+        "kernel::tests::threshold_issuance::reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal",
+        "kernel::tests::threshold_issuance::rotated_authority_does_not_resign_retained_proposal",
+        "kernel::tests::threshold_issuance::pq_capability_without_boot_signer_cannot_publish_classical_proposal",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_admission_retains_the_original_request_and_capability",
+        "kernel::tests::threshold_issuance::retained_request::rejected_capability_does_not_retain_original_request_material",
+        "kernel::tests::threshold_issuance::retained_request::cumulative_retry_cannot_backfill_missing_original_authority",
+        "kernel::tests::threshold_issuance::session_continuation::approved_session_retry_resumes_original_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::guard_attempt::approved_session_retry_keeps_admitted_attempt_identity_and_one_dispatch",
+        "kernel::tests::threshold_issuance::session_continuation::altered_session_operation_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::replacement_signed_proposal_cannot_take_over_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::missing_proposal_cannot_restart_pending_session_request",
+        "kernel::tests::threshold_issuance::session_continuation::changed_session_lineage_cannot_consume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::rotated_session_authentication_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::cancelled_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::draining_session_cannot_resume_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_revoked_capability",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_current_threshold_policy",
+        "kernel::tests::threshold_issuance::session_continuation::resumed_session_revalidates_approval_votes",
+        "kernel::tests::threshold_issuance::session_continuation::nested_sync_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::nested_async_session_resumes_threshold_request",
+        "kernel::tests::threshold_issuance::session_continuation::threshold_session_rejects_unsupported_durable_nonce_profile",
+        "kernel::tests::threshold_issuance::session_continuation::concurrent_threshold_retry_cannot_claim_same_session_wait",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_below_threshold_needs_no_approval_resolver",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_same_tenant_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_cannot_cross_sessions",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_bound_threshold_artifact_requires_owned_context_on_raw_entry",
+        "kernel::tests::threshold_issuance::session_continuation::scope_binding::ap23_session_pending_threshold_debug_omits_original_arguments",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority",
+        "kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_async_retry_restores_the_original_threshold_claim",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_dispatched_retry_cannot_execute_a_second_effect",
+        "kernel::tests::threshold_issuance::session_continuation::session_cancellation::dropped_initial_async_request_completes_session_ownership_as_cancelled",
+        "kernel::tests::threshold_issuance::session_continuation::session_claim_race::cancellation_at_restore_checkpoint_completes_threshold_ownership",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_bridge_refusal_keeps_approved_threshold_wait",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::session_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::current_thread_bridge::nested_sync_approved_threshold_wait_completes_on_multi_thread_runtime",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::session_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_sync_host_cancel_before_dispatch_records_cancelled_outcome",
+        "kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_async_host_cancel_before_dispatch_records_cancelled_outcome"
+      ],
+      "exit": 0,
+      "seconds": 2.0491800820454955,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "strict-owning",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-security-kernel",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 200.11476909881458,
+      "log_sha256": "3f9a763de8fca888c31cf2f85f3e7ec10b3ede92f2efe8ed0fb349453cfecafb",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "fixture-focused",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-security-kernel",
+        "--test",
+        "session_throttle_kernel",
+        "--",
+        "--test-threads=8"
+      ],
+      "exit": 0,
+      "seconds": 17.8200526968576,
+      "log_sha256": "584ce0c1e1c097fa1762c9bf36dc472dfba214c8a473d30b56ac16eedf59cf54",
+      "test_summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s"
+      ],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "strict-owning",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-security-kernel",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 9.117869580164552,
+      "log_sha256": "dde5c6538fb3324fff4b31539ce4d6d75ed29a9c0f4f55b96002f89c43ebd0be",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    },
+    {
+      "label": "strict-downstream",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-conformance",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-data-guards",
+        "-p",
+        "chio-e2e",
+        "-p",
+        "chio-external-guards",
+        "-p",
+        "chio-guards",
+        "-p",
+        "chio-wasm-guards",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 303.05943887727335,
+      "log_sha256": "ae34fb396dac1784af9beb21585fa6a2e6069f73b61df6cea7d3fea62ec63c22",
+      "test_summaries": [],
+      "source_stable": true,
+      "inputs_stable": true
+    }
+  ],
+  "inventory_correction": {
+    "delta": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-threshold-inventory/delta.json",
+      "sha256": "bdc78df7cf2700ddfed7fd8b66083cb411f2c38a81be3bf8f256669f425a2adb"
+    },
+    "contract_probes": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review2-006-threshold-inventory/contract-probes.json",
+      "sha256": "3e15bfd0ce9084b20101b2168e8a52d4eccbc2779aef9d862202009061997bfd"
+    },
+    "result": "The previous 58-name inventory rejects the actual 59-name Rust listing/runtime; the repaired 59-name inventory accepts. A temporary runner used an invalid --expected argument first and exited 2. That harness error is retained and is not the Original. The corrected continuation reuses the unchanged actual Rust logs, then obtains genuine old-inventory refusal (1), current acceptance (0), and the initial strict Clippy failure (101, one needless fixture borrow). The fixture-only correction is separately pinned and renewed in the final lint record."
+  },
+  "remaining_acceptance": [
+    "Compose remaining confirmed repairs and qualify the replacement candidate.",
+    "Pass four exact-head required checks, classify all other failures and answer reviews.",
+    "Obtain Connor explicit merge go-ahead."
+  ],
+  "limits": [
+    "Full workspace, hosted and native qualification are not established by these component gates.",
+    "Earlier partial candidate and temporary runner failures remain recorded; they are not relabeled passing.",
+    "No proof campaign, authorization rotation, baseline waiver or ratchet relaxation."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}

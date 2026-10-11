@@ -293,6 +293,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Use one validated private internal staging directory on the same device. Tag the newly created inode before writing, then fsync and publish with no-replace semantics, syncing both parents. Authenticate non-empty staging objects before reclaiming; recover the empty create-before-tag state only within enforced internal-directory custody. Check descriptor ACL authority on Darwin. Preserve every unproven final object and test each interrupted-write stage.
 
+**Descriptor ownership:** The dependency gate forbids the decoy engine from reaching platform crates. Move the existing Darwin ACL inspector and its tests unchanged from `chio-sqlite-file-identity` into the small core `chio-file-custody` utility, depending only on `libc`. Existing consumers call that owner directly; SQLite VFS inspection remains in its original crate. Root owns workspace/lock updates and the decoy hook after Claude releases its staging repair. Verify unchanged inspector bytes, dependency layering, portable tests, strict lint and native Darwin controls before publication.
+
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
 - [ ] Implement and review the minimal correction; preserve healthy and denial paths.
