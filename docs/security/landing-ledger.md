@@ -65,6 +65,12 @@ unlock. Linux passes 64 owning tests, strict lint and all 108 deception controls
 Native macOS passes 70 executions, ten full parallel reruns and strict lint.
 Earlier failures and the recorded-clean native source boundary remain explicit.
 
+The [native cold-map preparation audit](audits/native-cold-map-preparation-20261011.json)
+records 26 passing controls, six runtime-killed mutants, strict lint and
+independent review of the authenticated copy-on-write map. It is registered only
+for tests. Durable persistence, trusted-root attachment and atomic production
+activation remain open, so cold-state capacity and G5 readiness are not closed.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.

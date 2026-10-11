@@ -1,0 +1,334 @@
+{
+  "schema": "chio.security.native-cold-map-preparation.v1",
+  "observed_utc": "2026-10-11T03:12:24.896806+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-final-review-20261009:SEC-1160-COLDSTATE"
+  ],
+  "classification": "locally qualified test-only C1 preparation; full cold-state requirement remains OPEN",
+  "source_repair": {
+    "producer": "95a574ca3b3a52a337eaabbecda2a2dcd530563a",
+    "producer_tree": "861209943bf997b9d1291f77ad4a8622864ba08e",
+    "integration": "f9c733a223867535019c5170356228e4f67ae134",
+    "observed_composition": "71ea814333920ce187d51873824e568eae80f24b",
+    "files": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/encoding.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree_tests.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/fixtures/native-cold-v1-vectors.json"
+    ],
+    "source_sha256": {
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs": "2ca7f5eab587d85f1c1e2f0ef7d90970aac18ae28aa896026a5d131f89398613",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold.rs": "1b67c9342276e362292922c51a8201543a1b0695e761ace3e497fcc099224833",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/encoding.rs": "40a407fe55a5a43b559248d5737cbd6bc8dfafe56be72a5d5a4bec2da2bc4fea",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree.rs": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree_tests.rs": "19499f6a1a0802125894206640d30f7311715f7751368a247d7d0740656c4a47",
+      "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/fixtures/native-cold-v1-vectors.json": "438ad47d0f9e1053b1d0150f71109653a22a833de78ca39be748334188106aca"
+    },
+    "patch_sha256": "1284d17ed1b28ba2a6e172cc6b71e3d64fd13eb3002531385aaae8fe2bb30ba8",
+    "registration": "cfg(test) only; no production schema or reader activation"
+  },
+  "handoff": {
+    "path": "/home/connor/lanes/pr1160-cold-state-map-evidence/c1-handoff.json",
+    "sha256": "4016b395cf448b3c0c9e841a8adb5ee799a9bdc0adcdc8e3abd5068d0ceed25a"
+  },
+  "independent_review": {
+    "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/c1-native-cold-map-95a574ca3b-review.json",
+    "sha256": "295784292db93037aa81d1ebee19e3276e78f03f715ed07b0bcb5c6ef0b5fc9d",
+    "scope": "Exact six source files, vectors, authentication and bounded reads; no production activation approval"
+  },
+  "owning_evidence": {
+    "tested_source": "95a574ca3b3a52a337eaabbecda2a2dcd530563a",
+    "commands": [
+      {
+        "name": "strict",
+        "argv": [
+          "cargo",
+          "clippy",
+          "-p",
+          "chio-store-sqlite",
+          "--locked",
+          "--features",
+          "admission-test-support",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_s": 283.521,
+        "log": "/home/connor/lanes/pr1160-cold-state-map-evidence/final-gates-20261011T025449.574204Z/strict.log",
+        "log_sha256": "2e4cac7104e06494b5f9955ab1134e4efa84b2a31bb5f2f59f9710be7ae4670b"
+      },
+      {
+        "name": "restored26",
+        "argv": [
+          "cargo",
+          "test",
+          "-p",
+          "chio-store-sqlite",
+          "--locked",
+          "--features",
+          "admission-test-support",
+          "--lib",
+          "cold::tree_tests",
+          "--",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "elapsed_s": 110.547,
+        "log": "/home/connor/lanes/pr1160-cold-state-map-evidence/final-gates-20261011T025449.574204Z/restored26.log",
+        "log_sha256": "541b9d599cb2348dfdaeb54435e2f067c49093590da9cf0e1e264cb541770029"
+      },
+      {
+        "name": "fmt",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_s": 28.824,
+        "log": "/home/connor/lanes/pr1160-cold-state-map-evidence/final-gates-20261011T025449.574204Z/fmt.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "hygiene",
+        "argv": [
+          "python3",
+          "-B",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit_code": 0,
+        "elapsed_s": 5.409,
+        "log": "/home/connor/lanes/pr1160-cold-state-map-evidence/final-gates-20261011T025449.574204Z/hygiene.log",
+        "log_sha256": "6b8d2cf0c9b7bcb80c47bffac33ee569074ec146c3042bd0bd748f2806a3fd13"
+      },
+      {
+        "name": "diff",
+        "argv": [
+          "git",
+          "diff",
+          "--cached",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_s": 0.01,
+        "log": "/home/connor/lanes/pr1160-cold-state-map-evidence/final-gates-20261011T025449.574204Z/diff.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "source_bytes_stable": true,
+    "restored_tests": {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 2395,
+      "runtime_s": 0.1
+    },
+    "mutant_witnesses": [
+      {
+        "name": "node_digest",
+        "test": "missing_and_corrupt_nodes_refuse_inclusion_and_absence",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "6cfad4db83389edd91910984d86a5e60c1b259ceedcb201d660fbc5a33e5ad96",
+        "baseline_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+        "mutated_sha256": "fec0d96e114bd7bdb0f1de9b575b236e3a017b608998d6c41157a52ea9d71ebe",
+        "restored_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1"
+      },
+      {
+        "name": "key_binding",
+        "test": "a_valid_value_of_another_key_or_authority_is_refused",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "5e0df62e5d353bf90968d9f9c8a1bb348d1c07e5f787a90776773a6ae648175c",
+        "baseline_sha256": "40a407fe55a5a43b559248d5737cbd6bc8dfafe56be72a5d5a4bec2da2bc4fea",
+        "mutated_sha256": "ab22b563ea6735b7704afe9437abfb26984a5f5c0121d2e4d7e4b2e304b67c82",
+        "restored_sha256": "40a407fe55a5a43b559248d5737cbd6bc8dfafe56be72a5d5a4bec2da2bc4fea"
+      },
+      {
+        "name": "required_branch",
+        "test": "an_empty_sibling_beside_a_leaf_is_noncanonical_on_both_paths",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "833591670af7e0815496ec47f6bf56cbd9ddeee9c5a48927d02bb43ddffda42d",
+        "baseline_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+        "mutated_sha256": "c68a989735a18b71f537f1fef37150041f80bf5305688535a69e75e45c00c9fd",
+        "restored_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1"
+      },
+      {
+        "name": "leaf_prefix",
+        "test": "misplaced_leaf_never_proves_absence",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "4eb0de6f2dcfeb400b627fe7a116bf9a6d17a4ec9c30e0c7ede1629602637e16",
+        "baseline_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+        "mutated_sha256": "01d7c0f688f349ad94b492f022da2ddd0f738b178929b1cf58b54c5b32077ef6",
+        "restored_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1"
+      },
+      {
+        "name": "read_bound",
+        "test": "worst_case_walk_reads_257_nodes_and_absence_reads_256",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "316ee9f55931ae9c02d2d1771e890976850cfb6e0c6752e905d8f3a5bc88335e",
+        "baseline_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+        "mutated_sha256": "1ad4bc66a391a51a97ac6b59cbb2f2b263f2598ff07ff51b69918c269c432716",
+        "restored_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1"
+      },
+      {
+        "name": "malformed_payload",
+        "test": "authenticated_malformed_payloads_never_prove_absence",
+        "exit_code": 101,
+        "killed": true,
+        "log_sha256": "e7a85c3c3ad4fadd68f11c20dfd946f57f7af1b8f4363945e8893c5203c00a34",
+        "baseline_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1",
+        "mutated_sha256": "c715501fbeb4ec671d4a9f48b4f1a0c48054b58931d144234f33066adfec8b5c",
+        "restored_sha256": "b8736eea89963a1e8f6794668a65ec98d6c6b068b20affec13debbdd009a8cc1"
+      }
+    ]
+  },
+  "originals_and_failed_attempts": {
+    "original_manifest": {
+      "classification": "compiling new-surface predecessor; not a tip defect",
+      "base_commit": "682feccaf24e0e1d63431c7447cc46b26603543d",
+      "source_tree": "4dc8e045dc962b12188efa1e016434d061ece8f5",
+      "source_sha256": {
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs": "451789ad4c1389586ae3f07004dc34f7a3df13a1bc35cb1d0ca6405d7ecdf9b6",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold.rs": "cb21695fc7ec680069e7272f806f4a810d583300fd51322ba9e2e3af9fccb817",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/encoding.rs": "6f526fcc614a35b577b77db63fe42bea3e3eaf6a6f55383328ec5c80c040736f",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree.rs": "bab91e8ab42821a71aeef89e6044e2363dc34ba672f9cf80e094e04955fddcc5",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree_tests.rs": "51d1f9930c5fdc538eb72d70db9ed99b058802ae07080ece1dfef285c9ae8cbb",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/fixtures/native-cold-v1-vectors.json": "438ad47d0f9e1053b1d0150f71109653a22a833de78ca39be748334188106aca"
+      },
+      "reference_sha256": "04c21bd88c3890f097149366f4e28b511ae0ab612d187e3f452ebf096c6c3b3c",
+      "argv": [
+        "swarm",
+        "build",
+        "--class",
+        "coder",
+        "--item",
+        "SEC-1160-COLDSTATE",
+        "--",
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--locked",
+        "--features",
+        "admission-test-support",
+        "--lib",
+        "cold::tree_tests",
+        "--",
+        "--nocapture"
+      ],
+      "env": {
+        "CARGO_TARGET_DIR": "/var/tmp/pr1160-cold-map-target",
+        "CARGO_BUILD_JOBS": "2",
+        "CHIO_CHECKOUT_ROOT": "/home/connor/lanes/pr1160-cold-state-map"
+      },
+      "expected_result": "behavioral failures including authenticated_lookup_returns_inclusion_and_compressed_absence; compile errors do not qualify",
+      "result": {
+        "exit_code": 101,
+        "passed": 0,
+        "failed": 25,
+        "ignored": 0,
+        "filtered_out": 2395,
+        "log_sha256": "0604ff0097832d529ae8e1dd9219e6f0c5a39387b2cfe47d3829b6443a9b9a55"
+      }
+    },
+    "original_scope": "Compiling new-surface predecessor, 0 PASS/25 FAIL; explicitly not a tip defect.",
+    "writer_shape_red_manifest": {
+      "classification": "internal C1 implementation regression; not a tip defect",
+      "source_tree": "30c5eae003e1e5bc29d990a7c8477b12dbba38f2",
+      "source_sha256": {
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs": "2ca7f5eab587d85f1c1e2f0ef7d90970aac18ae28aa896026a5d131f89398613",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold.rs": "1b67c9342276e362292922c51a8201543a1b0695e761ace3e497fcc099224833",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/encoding.rs": "40a407fe55a5a43b559248d5737cbd6bc8dfafe56be72a5d5a4bec2da2bc4fea",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree.rs": "07f4eab314124a82c1a25eb4c4872709407dc8bff1368a201244538b22bd7335",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree_tests.rs": "19499f6a1a0802125894206640d30f7311715f7751368a247d7d0740656c4a47",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/fixtures/native-cold-v1-vectors.json": "438ad47d0f9e1053b1d0150f71109653a22a833de78ca39be748334188106aca"
+      },
+      "expected_failure": "a_new_key_cannot_repair_a_noncanonical_predecessor_sibling: malformed predecessor accepted after filling left EMPTY",
+      "argv": [
+        "swarm",
+        "build",
+        "--class",
+        "integrator",
+        "--item",
+        "SEC-1160-COLDSTATE",
+        "--",
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--locked",
+        "--features",
+        "admission-test-support",
+        "--lib",
+        "cold::tree_tests::a_new_key_cannot_repair_a_noncanonical_predecessor_sibling",
+        "--",
+        "--nocapture"
+      ],
+      "allocation": "Root lent existing idle integrator slot; jobs2/private target unchanged",
+      "result": {
+        "exit_code": 101,
+        "passed": 0,
+        "failed": 1,
+        "filtered_out": 2420,
+        "log_sha256": "3adb578ed82c0566d6d462a853ca2dd6d828e61b66e9c99f5259a687c3c3f0b8"
+      }
+    },
+    "writer_shape_scope": "Genuine predecessor-child shadowing regression failed before repair, then final26 GREEN.",
+    "unstarted_coder_attempt": "/home/connor/lanes/pr1160-cold-state-map-evidence/writer-shape-red-coder-cancelled.json",
+    "mutation_driver_pause": "/home/connor/lanes/pr1160-cold-state-map-evidence/mutations-pause.json",
+    "pause_scope": "Submission driver interrupted after running read_bound gate terminal; no started test cancelled.",
+    "fmt_history": "Initial module-order formatting failure corrected; all current final source checks pass."
+  },
+  "contract": {
+    "domain_separation": "Class-specific and length-delimited canonical key/value/node encodings.",
+    "integrity": "Authenticate node digest, key, payload and legal tree shape before inclusion or absence.",
+    "per_point_lookup_node_reads": {
+      "inclusion_maximum": 257,
+      "valid_absence_maximum": 256
+    },
+    "history": "Copy-on-write nodes preserve previous roots and values; NodeSink exposes no deletion.",
+    "limits": [
+      "Read bounds apply per lookup, not to an unbounded multi-operation batch.",
+      "Map replacement alone does not enforce fact-once or version monotonicity; future durable callers must.",
+      "Trusted root attachment, persistent catalog, atomic publication and retention are not implemented by C1."
+    ]
+  },
+  "golden_vector_provenance": {
+    "generator": "/home/connor/lanes/pr1160-cold-state-map-evidence/generate_vectors.py",
+    "generator_sha256": "04c21bd88c3890f097149366f4e28b511ae0ab612d187e3f452ebf096c6c3b3c",
+    "reference": "Independent Python hashlib implementation; complete sorted leaf-set shape, no Rust imports or incremental writer reuse.",
+    "fixture_sha256": "438ad47d0f9e1053b1d0150f71109653a22a833de78ca39be748334188106aca",
+    "review": {
+      "fixture_sha256": "438ad47d0f9e1053b1d0150f71109653a22a833de78ca39be748334188106aca",
+      "independent_manual_shape_check": "255 unary prefix branches outside one terminal binary branch",
+      "worst_case_root": "bfd1f0ab207a71591ee6b6445ab39eabbd4f1ed423f21e236fa3018e37239186",
+      "key_vectors": 9,
+      "fact_vectors": 5,
+      "value_vectors": 5,
+      "worst_case_inclusion_reads": 257,
+      "worst_case_absence_reads": 256
+    },
+    "expectations_not_regenerated_during_tests": true
+  },
+  "remaining_acceptance": [
+    "Complete current candidate store composition checks and exact-head hosted qualification.",
+    "Implement reviewed durable node storage, catalog and checkpoint binding before production activation.",
+    "Activate live and cold readers atomically with verified retention and recovery; qualify capacity and G5 outside-team preview separately.",
+    "No production cold-state, G5, merge or release readiness is claimed by this test-only preparation."
+  ],
+  "production_activated": false,
+  "cold_state_qualified": false,
+  "hosted_qualified": false,
+  "merged": false
+}
