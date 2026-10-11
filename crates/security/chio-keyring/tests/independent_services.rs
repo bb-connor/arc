@@ -1217,7 +1217,7 @@ impl chio_keyring::KeyLogActivationGuard for PoisoningActivationGuard {
 }
 
 #[test]
-fn authority_backend_never_reports_a_rotated_out_key_after_router_poison() {
+fn authority_current_selector_refuses_after_router_poison() {
     let fixture = Fixture::new();
     let mut children = Children(
         (0..3)
