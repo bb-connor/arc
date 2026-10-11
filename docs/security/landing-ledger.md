@@ -8,6 +8,28 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Checkpoint reader census repaired privately (October 11 UTC)
+
+The [census repair audit](audits/trust-census-repair-20261011.json) records
+reviewed source `0f2aa61e41`. All **2,023 requirements** remain preserved.
+Hosted Build/lint job `114547605359` and the unchanged local source reproduced
+the stale reader census. One explicit sibling-module import keeps the new
+keyframe/delta reader chain visible to the existing scanner; the matching
+three-path inventory retains call multiplicity and the old history-reader
+edge. Raw-input, SQL and framework debt and all scanner algorithms are unchanged.
+
+The checker, all 63 calibration tests, formatting and strict owning store
+Clippy pass. The final committed-source checker also passes after preserving
+JSON key order. The proof-coverage metadata generator matches 65 rows and
+179 artifacts; this runs no proofs. The audit scopes the ARM compiler evidence
+and retains both the Original and reviewed source hashes.
+
+Public `07d780147c` remains under qualification. Its separate MCP terminal
+publication race is still being repaired, and the required workspace/MSRV
+jobs continue to collect failures. This private repair supplies neither
+hosted qualification nor merge readiness. The next publication must batch
+all genuine failures and satisfy the existing four-check and review bar.
+
 ## CI extraction and FIPS inventory qualified privately (October 11 UTC)
 
 The [CI batch audit](audits/workspace-ci-extraction-20261011.json) records
