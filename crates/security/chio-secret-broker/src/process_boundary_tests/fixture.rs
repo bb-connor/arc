@@ -209,6 +209,17 @@ pub(super) fn write_private(path: &Path, bytes: &[u8]) {
         .test_expect("private test file permissions");
 }
 
+/// Publishes a polled cross-process marker with one rename, so a reader that
+/// observes the path also observes its complete contents.
+#[cfg(feature = "kernel-admission")]
+pub(super) fn publish_private_marker(path: &Path, bytes: &[u8]) {
+    let mut staged = path.as_os_str().to_owned();
+    staged.push(".staged");
+    let staged = PathBuf::from(staged);
+    write_private(&staged, bytes);
+    fs::rename(&staged, path).test_expect("private marker publication");
+}
+
 fn enforced_broker_migration(directory: &Path) -> BrokerDaemonMigrationConfig {
     let directory = fs::canonicalize(directory).test_expect("canonical migration directory");
     let state_database_path = directory.join("enterprise-migration.sqlite3");
