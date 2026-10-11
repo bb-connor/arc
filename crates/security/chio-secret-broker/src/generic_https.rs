@@ -26,11 +26,12 @@ const MAX_RESOLVED_ADDRESSES: usize = 16;
 const MAX_RESOLUTIONS_IN_FLIGHT: usize = 4;
 pub(super) const MAX_RESPONSE_HEAD_BYTES: usize = 16_384;
 
-/// Server-owned bound on how long preparation waits for destination
-/// resolution, measured from the start of pinning. It is the broker's default
-/// control deadline; a shorter signed request timeout tightens it and a longer
-/// one never extends it. A lookup that outlives the wait keeps its in-flight
-/// slot until its resolver thread exits.
+/// Fixed server-owned bound on how long preparation waits for destination
+/// resolution, measured from the start of pinning. It equals the broker's
+/// default control deadline and does not follow operator-configured IPC
+/// deadlines; a shorter signed request timeout tightens it and a longer one
+/// never extends it. A lookup that outlives the wait keeps its in-flight slot
+/// until its resolver thread exits.
 const PREPARATION_RESOLUTION_BUDGET: Duration =
     Duration::from_millis(DEFAULT_BROKER_IPC_DEADLINE_MS);
 
@@ -1410,7 +1411,7 @@ mod tests {
     }
 
     #[test]
-    fn an_answer_after_the_absolute_resolution_deadline_fails_closed() {
+    fn an_expired_deadline_fails_closed_end_to_end() {
         let executor = executor(
             ResponseMode::Valid,
             vec!["93.184.216.34".parse().test_expect("address")],

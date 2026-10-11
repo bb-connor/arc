@@ -80,6 +80,29 @@ impl BrokerService {
             })
     }
 
+    /// Take an attempt operation gate only when it is free. A caller that
+    /// already holds one gate never waits on another, and a busy gate means
+    /// its attempt is owned by an operation in progress.
+    pub(super) fn try_attempt_operation_guard_for_digest(
+        &self,
+        digest: &str,
+    ) -> Result<Option<MutexGuard<'_, ()>>> {
+        let gate_index = attempt_operation_gate_index(digest)?;
+        let gate = self
+            .attempt_operation_gates
+            .get(gate_index)
+            .ok_or_else(|| {
+                BrokerError::Invariant("broker attempt gate index is invalid".to_owned())
+            })?;
+        match gate.try_lock() {
+            Ok(guard) => Ok(Some(guard)),
+            Err(std::sync::TryLockError::WouldBlock) => Ok(None),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(BrokerError::Invariant(
+                "broker attempt operation gate is poisoned".to_string(),
+            )),
+        }
+    }
+
     pub(super) fn attempt_operation_guard_for_request(
         &self,
         request: &BrokerExecuteRequest,
