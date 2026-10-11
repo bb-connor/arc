@@ -192,6 +192,18 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
     }
 }
 
+/// Kernel signing keys whose issuance-context receipts count toward reputation:
+/// the inner authority's current trust set. An authority that cannot read its
+/// current key trusts none, so every receipt is filtered as unsigned
+/// (see chio-reputation::receipt_integrity_valid).
+pub(super) fn reputation_trusted_kernel_keys(authority: &dyn CapabilityAuthority) -> Vec<String> {
+    authority
+        .trusted_public_keys()
+        .iter()
+        .map(PublicKey::to_hex)
+        .collect()
+}
+
 impl PolicyBackedCapabilityAuthority {
     fn issue(
         &self,
@@ -211,19 +223,7 @@ impl PolicyBackedCapabilityAuthority {
         )?;
 
         if let Some(policy) = &self.issuance_policy {
-            // Reputation integrity validation requires a trust set of kernel
-            // signing keys. The inner authority (the local kernel) is the
-            // canonical signer of issuance-context receipts, and its trusted
-            // peers (federation/cross-kernel) extend that set. Without these,
-            // an empty trust set would silently filter every receipt as
-            // unsigned (see chio-reputation::receipt_integrity_valid).
-            let mut trusted_keys: Vec<String> = self
-                .inner
-                .trusted_public_keys()
-                .into_iter()
-                .map(|key| key.to_hex())
-                .collect();
-            trusted_keys.push(self.inner.authority_public_key().to_hex());
+            let trusted_keys = reputation_trusted_kernel_keys(self.inner.as_ref());
             let receipt_store = self
                 .receipt_store
                 .as_ref()

@@ -347,6 +347,9 @@ fn validate_issued_response_at(
 }
 
 pub trait CapabilityAuthority: Send + Sync {
+    /// Compatibility identity of this authority. A rotating authority may
+    /// report a key it no longer signs with, so trust decisions use
+    /// [`Self::trusted_public_keys`] and issuance signs with the current key.
     fn authority_public_key(&self) -> PublicKey;
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
@@ -591,6 +594,14 @@ impl GovernedCapabilityAuthority {
         Self { backend, clock }
     }
 
+    /// The backend's current signing identity. An unreadable selector refuses
+    /// issuance rather than naming an older key as issuer.
+    fn current_issuer(&self) -> Result<PublicKey, KernelError> {
+        self.backend
+            .current_public_key()
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
+
     /// Issue a capability with an explicit aggregate limit over its own calls.
     /// Delegation-family limits use `issue_aggregate_family_root` instead.
     pub fn issue_capability_with_aggregate_budget(
@@ -608,7 +619,7 @@ impl GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.backend.public_key(),
+            issuer: self.current_issuer()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -630,6 +641,15 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
         self.backend.public_key()
     }
 
+    /// Only the backend's current identity is trusted; an unreadable selector
+    /// trusts nothing.
+    fn trusted_public_keys(&self) -> Vec<PublicKey> {
+        self.backend
+            .current_public_key()
+            .map(|key| vec![key])
+            .unwrap_or_default()
+    }
+
     fn issue_aggregate_family_root(
         &self,
         subject: &PublicKey,
@@ -641,7 +661,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.authority_public_key(),
+            issuer: self.current_issuer()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -667,7 +687,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.backend.public_key(),
+            issuer: self.current_issuer()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -1182,6 +1202,67 @@ mod tests {
         assert_eq!(capability.issuer, public_key);
         assert_eq!(capability.issued_at, 1_700_000_000);
         assert!(matches!(capability.verify_signature(), Ok(true)));
+    }
+
+    /// A rotating backend whose current selector is unreadable while its
+    /// compatibility identity still names an earlier key.
+    struct UnreadableSelectorBackend(chio_core::crypto::Ed25519Backend);
+
+    impl SigningBackend for UnreadableSelectorBackend {
+        fn algorithm(&self) -> chio_core::SigningAlgorithm {
+            self.0.algorithm()
+        }
+
+        fn public_key(&self) -> PublicKey {
+            self.0.public_key()
+        }
+
+        fn current_public_key(&self) -> chio_core::error::Result<PublicKey> {
+            Err(chio_core::Error::InvalidPublicKey(
+                "selector unavailable".to_string(),
+            ))
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+            self.0.sign_bytes(message)
+        }
+    }
+
+    #[test]
+    fn governed_authority_without_a_current_key_trusts_nothing_and_refuses_issuance() {
+        let authority = GovernedCapabilityAuthority::new(
+            Arc::new(UnreadableSelectorBackend(
+                chio_core::crypto::Ed25519Backend::new(Keypair::generate()),
+            )),
+            Arc::new(FixedClock(Ok(1_700_000_000_000))),
+        );
+        let subject = Keypair::generate().public_key();
+        let refused = |result: Result<CapabilityToken, KernelError>| {
+            matches!(
+                result,
+                Err(KernelError::CapabilityIssuanceFailed(message))
+                    if message == "invalid public key: selector unavailable"
+            )
+        };
+
+        assert!(authority.trusted_public_keys().is_empty());
+        assert!(refused(authority.issue_capability(
+            &subject,
+            ChioScope::default(),
+            60
+        )));
+        assert!(refused(authority.issue_capability_with_aggregate_budget(
+            &subject,
+            ChioScope::default(),
+            60,
+            1,
+        )));
+        assert!(refused(authority.issue_aggregate_family_root(
+            &subject,
+            ChioScope::default(),
+            60,
+            1,
+        )));
     }
 }
 
