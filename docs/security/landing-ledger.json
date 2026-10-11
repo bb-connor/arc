@@ -5,9 +5,7 @@
   "reference_tag": "archive/security-roadmap-pre-landing-20261004",
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
-  "active_landing_prs": [
-    1160
-  ],
+  "active_landing_prs": [],
   "waiting_foundation_pr": null,
   "landing_units": {
     "dependencies": 1168,
@@ -133916,5 +133914,20 @@
 "workspace_ci_final_composition_20261011":{"audit":"docs/security/audits/workspace-ci-fixture-followup-20261011.json","audit_sha256":"750541c7fb0aa96381369b1bdaffc3183a8b23f1efc78b2b5ccd9a56c5eb8931","source":"cf8a092871779e1b3d6b0be4b51f1d87366860b7","inventory_sweep":{"reviewer":"Claude/C7","observed_utc":"2026-10-11T18:51:20Z","source":"61c3b69f32c4c6b7404fbc4daa56807522b00887","invocations":120,"files":30,"changed_rust_files":26,"remaining_findings":0,"scope":"Static delta sweep against9e9 plus manual filter review; not120 runtime executions. Only forwarding drift found and repaired. Root separately discovered5 pq kernel inventories.","logs":{"c7-sweep.py":"4703cf510d02b6d1574d888f42a2f17908bec4ce8228e50e094ceffd4030d701","c7-sweep.log":"226bc90fb5b216bd34fd31d471803bff1a9f8636483ca3e5eb991d321e365221","c7-sweep-61c3.log":"08357afc924115c2272dd84a6b4933a542e4a189f89a1bdf8a2337049e657ace"}},"independent_source_review":"approved","hosted_qualified":false,"merged":false,"required_acceptance":"Four exact-head checks green, no unclassified failures, review answered and explicit user merge go-ahead."},
 "trust_census_repair_20261011":{"source":"0f2aa61e41849cac82050b4357d745dfef9c1e90","audit":"docs/security/audits/trust-census-repair-20261011.json","audit_sha256":"4240063cbd6df92033b81c5ce16b430f9d35e2e5d671d3169938d28bc829cc52","requirements_preserved":2023,"public_source":"07d780147c703e7009837ef990494efd7f02211d","hosted_failed_job":114547605359,"source_review":"Claude approved2026-10-11T20:19:39Z","published":false,"hosted_qualified":false,"merged":false},
 "mcp_terminal_handoff_20261011":{"source":"7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0","audit":"docs/security/audits/mcp-terminal-handoff-20261011.json","audit_sha256":"3fcb19d2cef53c213aa020b3d7dd87cd08267a009128a9528d1ced18c4ede9ef","local_library_passed":198,"strict_all_targets":"pass","requirements_preserved":2024,"publication_ruling":{"source":"Claude mailbox2026-10-11T20:38:35Z relaying direct owner instruction; Root ack20:39Z","decision":"Publish this batch after local library/strict qualification without awaiting predecessor Workspace/MSRV. Preserve cancelled predecessor results as incomplete. Exact replacement four-green merge bar remains unchanged."},"qualification":"private-source-qualified-reviewed; exact successor hosted and merge pending"},
-"cognition_ci_extraction_20261011":{"source":"326d10e667a4aea50617d1cc5c469836bbd3ff27","audit":"docs/security/audits/cognition-ci-extraction-20261011.json","audit_sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","requirements_preserved":2025,"qualification":"source-qualified-reviewed; replacement hosted and landing pending","source_scope":"No production Rust delta; exact test commands/feature graphs/serial profiles/budgets preserved.","verification":"Full13affectedcommands across Claude andRoot; same executable/configuration inputs after composition;216 Bash controls; complete unaffected job/step preservation."}
+"cognition_ci_extraction_20261011":{"source":"326d10e667a4aea50617d1cc5c469836bbd3ff27","audit":"docs/security/audits/cognition-ci-extraction-20261011.json","audit_sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","requirements_preserved":2025,"qualification":"source-qualified-reviewed; replacement hosted and landing pending","source_scope":"No production Rust delta; exact test commands/feature graphs/serial profiles/budgets preserved.","verification":"Full13affectedcommands across Claude andRoot; same executable/configuration inputs after composition;216 Bash controls; complete unaffected job/step preservation."},
+  "foundation_postmerge_20261011": {
+    "path": "docs/security/audits/foundation-postmerge-20261011.json",
+    "sha256": "620c6e6fee42e76be91de893ef7c88b72bc086a54a3a43af9b3aba83d714737d",
+    "observed_utc": "2026-10-11T23:28:37.266324+00:00",
+    "state": "merged-qualification-incomplete",
+    "source": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
+    "merge_commit": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+    "tree": "9000ce6bb655ebb9be185190cad8ac4ecb53949d",
+    "requirement_count": 2025,
+    "authority": "Authoritative landing-event observation. Earlier landing_state and per-requirement acceptance snapshots remain historical and are not rewritten as qualified.",
+    "historical_active_landing_prs": [
+      1160
+    ],
+    "merged_false_scope": "Existing per-requirement merged:false values retain their recorded acceptance boundary; they do not assert that the foundation PR is still open. No requirement closure is inferred from the squash merge."
+  }
 }

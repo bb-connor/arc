@@ -1,11 +1,61 @@
 # Security and process landing ledger
 
-The first checkpoint below is the latest staged summary. For each requirement,
+The first checkpoint below is the latest landing observation. For each requirement,
 use `current_requirement_states` in the [canonical JSON ledger](landing-ledger.json),
 with its stated source and acceptance boundary. The remaining dated sections
 preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
+
+## Foundation merged with qualification incomplete (October 11 UTC)
+
+PR [#1160](https://github.com/bb-connor/arc/pull/1160) was squash-merged as
+`28d826e3e6b73af22388fc4eb117b3d8184ba5cf` at `2026-10-11T23:08:37Z`.
+The [post-merge audit](audits/foundation-postmerge-20261011.json) verifies that
+its tree exactly equals source `29327c5d7cb9782e8ed72932e436a96bd21b0ea9`.
+The source branch and `archive/pr1160-reviewed-29327c5d7c` remain preserved.
+All **2,025 requirements** and their recorded acceptance obligations remain.
+
+This was a bypass of the four-green landing bar. Cargo Vet and Cargo Deny
+had passed; Build/lint, workspace, cognition and MSRV were still running.
+Claude reports executing the temporary ruleset change and squash merge as
+`bb-connor` after an owner instruction to merge immediately. Root independently
+verified the merge and that ruleset `22033486` was active again, but did not execute
+the ruleset change or declare the candidate qualified. Source-run
+[38177003267](https://github.com/bb-connor/arc/actions/runs/38177003267)
+and main-run [38183162158](https://github.com/bb-connor/arc/actions/runs/38183162158)
+remain separate qualification records. Later success cannot establish that
+checks passed before the merge.
+
+The 57 retired foundation PRs have renewed preservation evidence: 54 heads
+remain ancestors of the archived source; three have byte-identical full-index
+patches in that history. Their original branches still point to the inventoried
+heads. None of those 57 heads is an ancestor of the squash commit. Their landing
+link is the verified source/merge tree identity, not invented main ancestry or
+automatic closure of their review obligations.
+
+Trusted-definition and authorization setup, incomplete Kani proofs and
+operational acceptance remain open. The post-merge audit job failed before
+executing its auditor because the pinned `c009ace` definition lacks the script.
+Both automatic Kani lanes timed out in the weights determinism/shape harness;
+those runs establish neither a proof nor a counterexample. The current native
+MCP job did pass the repaired tombstone restart case (43 passed, one ignored),
+and the FIPS smoke passed its exact 18-test crypto-wire inventory.
+
+F038's performance follow-up remains open, but the later external-writer
+omission claim was withdrawn: both the existing store regression and the
+isolated indexed proposal's four controls reject external mutations through
+the serving-owner `data_version` fence. This does not qualify the proposal's
+funded or outcome-unknown query cost. F086, F070/F071, F041, F038 and F020 retain
+their individual follow-up acceptance.
+
+The next CI change targets shared pheromone compilation while preserving all
+facet commands, environment coverage and failures. Critical run isolation stays:
+PR-number-only cancellation would reintroduce F074's sticky authority revocation.
+No repository variables, proof budgets, required tests or feature graphs were
+changed by this reconciliation. The JSON `foundation_postmerge_20261011` record
+is authoritative for the landing event. Per-requirement `merged: false` values
+retain their earlier scoped acceptance state; they do not mean #1160 is open.
 
 
 ## Cognition CI extraction qualified privately (October 11 UTC)
