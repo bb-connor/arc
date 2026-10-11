@@ -28,6 +28,7 @@ use std::path::Path;
 use std::sync::Arc;
 mod anchor_egress;
 pub mod attestation;
+mod bounded_worker_pool;
 pub mod certify;
 mod durable_admission;
 mod error;

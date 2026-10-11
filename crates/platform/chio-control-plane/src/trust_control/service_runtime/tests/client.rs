@@ -878,7 +878,7 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
     use std::sync::{Arc, Condvar, Mutex, PoisonError};
 
     const WORKERS: usize = 2;
-    let writer = super::super::remote_stores::BoundedReceiptWriter::new(WORKERS, WORKERS);
+    let writer = crate::bounded_worker_pool::BoundedWorkerPool::new(WORKERS, WORKERS);
 
     let concurrent = Arc::new(AtomicU64::new(0));
     let peak = Arc::new(AtomicU64::new(0));
@@ -892,7 +892,7 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
         let peak = Arc::clone(&peak);
         let worker_threads = Arc::clone(&worker_threads);
         let release = Arc::clone(&release);
-        let result = writer.run_within_budget::<_, ()>(budget, "stalled write", move || {
+        let result = writer.run_within_budget(budget, move || {
             worker_threads
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -905,10 +905,9 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
                 released = cvar.wait(released).unwrap_or_else(PoisonError::into_inner);
             }
             concurrent.fetch_sub(1, Ordering::SeqCst);
-            Ok(())
         });
         assert!(
-            matches!(result, Err(chio_kernel::ReceiptStoreError::Timeout { .. })),
+            result == Err(crate::bounded_worker_pool::BudgetElapsed),
             "a write parked on a stalled control plane must fail closed at the budget, got {result:?}"
         );
     }
