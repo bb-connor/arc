@@ -15,7 +15,7 @@
 - Base source is `66dc1bf22df3ff6d06557fa028c8e46c59c4a934`.
 - Preserve the complete promoted-default step dictionary, including commands, feature selection, `umask 022`, `RUST_TEST_THREADS=1`, `CARGO_BUILD_JOBS=1` and Rust flags.
 - Preserve the 360-minute job ceilings, toolchain and dependency pins. No retries, test exclusions, proof changes, authorization rotation or production Rust edits.
-- Prepare each runner's native authority fixture independently. Do not copy another runner's authority, ownership or `/dev/shm` bindings.
+- Keep native authority preparation in its existing consuming jobs. The selected market targets do not consume it; do not copy another runner's authority, ownership or `/dev/shm` bindings.
 - Keep the cheap default-market dependency assertion in Build and lint. Move only the expensive promoted-default step.
 - Keep the published candidate running while preparing the replacement. Retain cancelled results as incomplete evidence.
 
@@ -34,9 +34,9 @@
 **Interfaces:** `validate_build_lint_test(ci)` consumes the workflow and rejects any aggregate or producer weakening. The new job is `cognition-market`, reported as `Cognition market promoted default`.
 
 - [ ] Add the three-child shape, exact moved-step and prerequisite assertions. Run them against unchanged `66dc1bf22d`; expect refusal because the new required child is absent.
-- [ ] Extract the exact step and copy the necessary pinned setup with native fixture preparation immediately before it.
+- [ ] Extract the exact step with pinned checkout, Rust toolchain, protobuf compiler and Rust cache preparation.
 - [ ] Require all three successful results in the unconditional aggregate. Preserve the existing context name.
-- [ ] Reject removed dependencies, conditional or tolerated children, modified commands/environment, omitted setup and misplaced fixture preparation.
+- [ ] Reject removed dependencies, conditional or tolerated children, modified commands/environment and omitted or reordered setup. Preserve existing native fixture preparation in its consuming jobs.
 - [ ] Execute the real aggregate Bash for all 216 triples of success, failure, cancelled, skipped, missing and timed-out results; only three successes may pass.
 - [ ] Run owning checker/regressions and review the isolated commit before handoff.
 
@@ -66,3 +66,14 @@ that unchanged campaign on both producer and integrator adds delay without
 new coverage. Retain the producer's exact source and logs, prove input equality,
 and scope the composed checks honestly. A production or configuration delta
 invalidates that reuse and requires the affected broader checks again.
+
+Root's initial setup proposal copied the complete workspace prefix. The selected
+consumer trace narrows that requirement: control-plane library tests use Rust
+and SQLite fixtures; the CLI `finding` filter does not select the enforcing
+integration tests; store and finding tests consume tracked fixtures and spawn
+their own test processes. CLI/proof-room build scripts embed tracked fixtures.
+The dashboard fallback is optional. The CLI runtime-mount test can inspect the
+host Python standard library, but does not need the installed Python validator
+modules. No selected consumer of Node contract outputs, Bun or the native
+action's environment bindings was found. Keep those preparations unchanged in
+the original jobs, and retain the bounded source trace in the extraction audit.
