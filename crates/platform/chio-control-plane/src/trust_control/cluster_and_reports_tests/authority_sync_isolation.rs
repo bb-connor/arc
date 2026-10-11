@@ -213,8 +213,8 @@ enum AuthorityFault {
     LaggingImporterClock,
     /// The exporting follower holds a pinned anchor but no live envelope.
     ExporterWithoutEnvelope,
-    /// The signing custodian pulls a follower that relays an envelope older
-    /// than the one the custodian last issued to another follower.
+    /// The elected signing custodian serves an earlier signed envelope than
+    /// the one the importing follower has already authenticated.
     RelayedEnvelopeRegresses,
 }
 
@@ -265,6 +265,7 @@ fn gated_replication_pair(
         None,
     );
     importer.config.authority_db_path = Some(importer_authority.clone());
+    let mut authority_snapshot_override = None;
 
     match fault {
         AuthorityFault::UnpinnedImporter => {
@@ -308,7 +309,7 @@ fn gated_replication_pair(
         AuthorityFault::RelayedEnvelopeRegresses => {
             let issued_at = provisioned_at;
             let custodian = SqliteCapabilityAuthority::open_with_clock(
-                &importer_authority,
+                &exporter_authority,
                 fixed_clock(issued_at),
             )
             .test_unwrap();
@@ -317,20 +318,23 @@ fn gated_replication_pair(
                 .test_unwrap();
             let relayed = custodian.signed_snapshot().test_unwrap();
             let follower = SqliteCapabilityAuthority::open_with_clock(
-                &exporter_authority,
-                fixed_clock(issued_at),
+                &importer_authority,
+                fixed_clock(issued_at + 5),
             )
             .test_unwrap();
             follower.pin_replication_anchor(&anchor).test_unwrap();
-            follower.apply_signed_snapshot(&relayed).test_unwrap();
-            // A later pull by another follower advances the custodian's envelope.
-            SqliteCapabilityAuthority::open_with_clock(
-                &importer_authority,
+            let current = SqliteCapabilityAuthority::open_with_clock(
+                &exporter_authority,
                 fixed_clock(issued_at + 5),
             )
             .test_unwrap()
             .signed_snapshot()
             .test_unwrap();
+            follower.apply_signed_snapshot(&current).test_unwrap();
+            // Custody-aware election keeps the exporter eligible to lead.
+            // Return its genuine older envelope so import, rather than safe
+            // prefix agreement with a nonleader, exercises replay refusal.
+            authority_snapshot_override = Some(relayed);
             exporter.finding_challenge_clock = fixed_clock(issued_at + 10);
             importer.finding_challenge_clock = fixed_clock(issued_at + 10);
         }
@@ -344,6 +348,7 @@ fn gated_replication_pair(
         })
         .test_unwrap();
     let exporter = ServedPeer::serve(listener, exporter_url, exporter, gate);
+    *exporter.authority_snapshot_override.lock().test_unwrap() = authority_snapshot_override;
     let importer_peer = if matches!(fault, AuthorityFault::LaggingImporterClock) {
         // The cached signed prefix gives the custodian actual current-term
         // quorum evidence without depending on follower public admission.
