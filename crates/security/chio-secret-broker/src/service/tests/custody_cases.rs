@@ -220,7 +220,7 @@ fn orphaned_custody_is_an_integrity_refusal_that_still_reclaims_the_rest() {
         Arc::new(SqliteAttemptStore::open(&attempt_path).test_expect("attempt store")),
         Arc::new(
             crate::receipt::SqliteBrokerReceiptSink::open(
-                &directory.join("receipts.sqlite3"),
+                directory.join("receipts.sqlite3"),
                 receipt_signer.public_key(),
             )
             .test_expect("receipt sink"),
@@ -333,7 +333,7 @@ fn reclaim_never_fails_an_attempt_whose_preparation_retry_is_in_flight() {
         .retained_prepared_dispatch_keys()
         .test_expect("retained dispatch lock");
     assert!(
-        !(attempt_state(&fixture, &registration) == AttemptState::Failed && !retained.is_empty()),
+        attempt_state(&fixture, &registration) != AttemptState::Failed || retained.is_empty(),
         "custody must never be retained for a Failed attempt"
     );
     assert!(retried.is_ok(), "{retried:?}");
