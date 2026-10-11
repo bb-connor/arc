@@ -195,6 +195,8 @@ mod budget_governed_assurance;
 mod budget_governed_call_chain;
 #[path = "tests/budget_governed_fallback.rs"]
 mod budget_governed_fallback;
+#[path = "tests/budget_parent_expiry.rs"]
+mod budget_parent_expiry;
 #[path = "tests/constraint_variants.rs"]
 mod constraint_variants;
 #[path = "tests/emergency.rs"]

@@ -126,10 +126,10 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         self.validate_non_tool_capability(capability, &capability.subject.to_hex())?;
         self.record_observed_capability_snapshot(capability)?;
-        self.register_budget_parent(
+        self.register_expiring_budget_parent(
             capability.id.clone(),
             capability.budget_share_bps.unwrap_or(10_000),
+            capability.expires_at,
         )
-        .map_err(|error| KernelError::DelegationInvalid(error.to_string()))
     }
 }
