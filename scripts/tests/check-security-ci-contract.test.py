@@ -13,6 +13,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import tomllib
 import warnings
 import zipfile
 from pathlib import Path
@@ -149,6 +150,15 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/tests/run-security-execution-container.test.py"),
     Path("scripts/tests/check-temporal-security.test.sh"),
 )
+WORKSPACE_MANIFESTS = (
+    Path("Cargo.toml"),
+    *(
+        Path(member) / "Cargo.toml"
+        for member in tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))[
+            "workspace"
+        ]["members"]
+    ),
+)
 
 
 def set_bootstrap_sha(body: str, sha: str) -> str:
@@ -177,7 +187,7 @@ def populate_fixture(fixture: Path) -> None:
     shutil.copy2(ROOT / CONTRACT_DOCUMENT, document)
     for relative in (Path("Cargo.lock"), Path("rust-toolchain.toml")):
         shutil.copy2(ROOT / relative, fixture / relative)
-    for relative in SECURITY_EXECUTION_BOUNDARY_FILES:
+    for relative in (*SECURITY_EXECUTION_BOUNDARY_FILES, *WORKSPACE_MANIFESTS):
         destination = fixture / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / relative, destination)
@@ -652,7 +662,7 @@ assert_nonzero_bootstrap_accepted()
 # Full control-plane lanes must retain the same fixture isolation as the flow
 # security gate. Tests still exercise their explicit thread and process races.
 SERIAL_FIXTURE_STEPS = (
-    ("check", "Workspace tests", "required CI test and Loom evidence"),
+    ("workspace-tests", "Workspace tests", "required CI workspace test shards"),
     (
         "check",
         "cognition-market promoted-default build, clippy, and tests",
@@ -700,7 +710,7 @@ for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
         ),
         error_context if job_id == "msrv" else "required CI",
     )
-for python_job in ("check", "msrv"):
+for python_job in ("check", "workspace-tests", "msrv"):
     for dependency in ("jsonschema==4.26.0", "referencing==0.37.0"):
         assert_rejected(
             f"{python_job} omits {dependency}",
@@ -728,6 +738,357 @@ for python_job in ("check", "msrv"):
         ),
         f"required CI job uses continue-on-error: {python_job}",
     )
+# Workspace tests run as exactly two complementary shards, and only the
+# fail-closed aggregate reports the required Build, lint, test context.
+WORKSPACE_FIXTURE_STEP = (
+    "      - name: Qualify enforcing host and prepare native consumer fixture\n"
+    "        uses: ./.github/actions/enforced-native-fixture\n"
+    "        env:\n"
+    '          CARGO_BUILD_JOBS: "1"\n'
+    '          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"\n'
+    "\n"
+)
+NATIVE_SHARD_FILTER = 'filter: "security::adapters::tests::native_flow"'
+REST_SHARD_FILTER = 'filter: "--skip security::adapters::tests::native_flow"'
+
+
+def compose(*mutations: Callable[[str], str]) -> Callable[[str], str]:
+    def mutate(body: str) -> str:
+        for mutation in mutations:
+            body = mutation(body)
+        return body
+
+    return mutate
+
+
+for label, mutation, expected_error in (
+    (
+        "Build, lint, test omits the workspace test dependency",
+        replace_in_named_job("build-lint-test", "      - workspace-tests\n", ""),
+        "Build, lint, test changes its exact fail-closed body",
+    ),
+    (
+        "Build, lint, test omits the build and lint dependency",
+        replace_in_named_job("build-lint-test", "      - check\n", ""),
+        "Build, lint, test changes its exact fail-closed body",
+    ),
+    (
+        "Build, lint, test tolerates a cancelled shard",
+        replace_in_named_job(
+            "build-lint-test",
+            "test '${{ needs.workspace-tests.result }}' = success",
+            "test '${{ needs.workspace-tests.result }}' != failure",
+        ),
+        "Build, lint, test changes its exact fail-closed body",
+    ),
+    (
+        "Build, lint, test exits before its assertions",
+        replace_in_named_job(
+            "build-lint-test",
+            "set -euo pipefail\n",
+            "set -euo pipefail\n          exit 0\n",
+        ),
+        "Build, lint, test changes its exact fail-closed body",
+    ),
+    (
+        "Build, lint, test is skipped when a dependency fails",
+        replace_in_named_job("build-lint-test", "    if: ${{ always() }}\n", ""),
+        "Build, lint, test changes its exact fail-closed body",
+    ),
+    (
+        "Build, lint, test tolerates its own failure",
+        replace_in_named_job(
+            "build-lint-test",
+            "    runs-on: ubuntu-latest\n",
+            "    runs-on: ubuntu-latest\n    continue-on-error: true\n",
+        ),
+        "required CI job uses continue-on-error: build-lint-test",
+    ),
+    (
+        "build and lint job claims the required context",
+        replace_in_named_job(
+            "check", "    name: Build and lint\n", "    name: Build, lint, test\n"
+        ),
+        "Build, lint, test must be the exact unique aggregate check name",
+    ),
+    (
+        "security aggregate depends on build and lint instead of every shard",
+        compose(
+            replace_in_named_job(
+                "security-contract-required",
+                "      - build-lint-test\n",
+                "      - check\n",
+            ),
+            replace_in_named_job(
+                "security-contract-required",
+                "test '${{ needs.build-lint-test.result }}' = success",
+                "test '${{ needs.check.result }}' = success",
+            ),
+        ),
+        "security aggregate does not depend on the exact required jobs",
+    ),
+    (
+        "third workspace test shard",
+        replace_in_named_job(
+            "workspace-tests",
+            f"            {REST_SHARD_FILTER}\n",
+            f"            {REST_SHARD_FILTER}\n"
+            "          - shard: extra\n"
+            '            filter: "security"\n',
+        ),
+        "workspace test matrix must be exactly the native and rest shards",
+    ),
+    (
+        "missing rest shard",
+        replace_in_named_job(
+            "workspace-tests",
+            f"          - shard: rest\n            {REST_SHARD_FILTER}\n",
+            "",
+        ),
+        "workspace test matrix must be exactly the native and rest shards",
+    ),
+    (
+        "missing native shard",
+        replace_in_named_job(
+            "workspace-tests",
+            f"          - shard: native\n            {NATIVE_SHARD_FILTER}\n",
+            "",
+        ),
+        "workspace test matrix must be exactly the native and rest shards",
+    ),
+    (
+        "shard carries an extra matrix key",
+        replace_in_named_job(
+            "workspace-tests",
+            f"            {NATIVE_SHARD_FILTER}\n",
+            f"            {NATIVE_SHARD_FILTER}\n            features: all\n",
+        ),
+        "workspace test matrix must be exactly the native and rest shards",
+    ),
+    (
+        "rest skips a wider prefix",
+        replace_in_named_job(
+            "workspace-tests",
+            REST_SHARD_FILTER,
+            'filter: "--skip security::adapters::tests"',
+        ),
+        "workspace test shard filters are not exact complements",
+    ),
+    (
+        "native selects a narrower prefix",
+        replace_in_named_job(
+            "workspace-tests",
+            NATIVE_SHARD_FILTER,
+            'filter: "security::adapters::tests::native_flow::lease"',
+        ),
+        "workspace test shard filters are not exact complements",
+    ),
+    (
+        "native matches exactly instead of by prefix",
+        compose(
+            replace_in_named_job(
+                "workspace-tests",
+                NATIVE_SHARD_FILTER,
+                'filter: "--exact security::adapters::tests::native_flow"',
+            ),
+            replace_in_named_job(
+                "workspace-tests",
+                REST_SHARD_FILTER,
+                'filter: "--skip --exact security::adapters::tests::native_flow"',
+            ),
+        ),
+        "workspace test shard filters are not exact complements",
+    ),
+    (
+        "complementary shards move to an unreviewed partition",
+        compose(
+            replace_in_named_job(
+                "workspace-tests", NATIVE_SHARD_FILTER, 'filter: "security"'
+            ),
+            replace_in_named_job(
+                "workspace-tests", REST_SHARD_FILTER, 'filter: "--skip security"'
+            ),
+        ),
+        "workspace test shards change the reviewed partition",
+    ),
+    (
+        "workspace test shards cancel each other",
+        replace_in_named_job(
+            "workspace-tests", "      fail-fast: false\n", "      fail-fast: true\n"
+        ),
+        "workspace test shards must run every shard without fail-fast",
+    ),
+    (
+        "workspace test shards inherit default fail-fast",
+        replace_in_named_job("workspace-tests", "      fail-fast: false\n", ""),
+        "workspace test shards must run every shard without fail-fast",
+    ),
+    (
+        "workspace test shards cap parallelism",
+        replace_in_named_job(
+            "workspace-tests",
+            "      fail-fast: false\n",
+            "      fail-fast: false\n      max-parallel: 1\n",
+        ),
+        "workspace test shards must run every shard without fail-fast",
+    ),
+    (
+        "workspace test shards are conditional",
+        replace_in_named_job(
+            "workspace-tests",
+            "    runs-on: ubuntu-latest\n",
+            "    runs-on: ubuntu-latest\n    if: ${{ github.event_name == 'push' }}\n",
+        ),
+        "workspace test shards change their execution contract",
+    ),
+    (
+        "workspace test shards tolerate failure",
+        replace_in_named_job(
+            "workspace-tests",
+            "    timeout-minutes: 360\n",
+            "    timeout-minutes: 360\n    continue-on-error: true\n",
+        ),
+        "required CI job uses continue-on-error: workspace-tests",
+    ),
+    (
+        "one workspace test shard tolerates failure",
+        replace_in_named_job(
+            "workspace-tests",
+            "    timeout-minutes: 360\n",
+            "    timeout-minutes: 360\n"
+            "    continue-on-error: ${{ matrix.shard == 'native' }}\n",
+        ),
+        "required CI job uses continue-on-error: workspace-tests",
+    ),
+    (
+        "workspace tests step tolerates failure",
+        replace_in_named_step(
+            "Workspace tests",
+            "      - name: Workspace tests\n",
+            "      - name: Workspace tests\n        continue-on-error: true\n",
+        ),
+        "required CI job uses continue-on-error: workspace-tests",
+    ),
+    (
+        "workspace tests drop the shard filter",
+        replace_in_named_step("Workspace tests", " -- ${{ matrix.filter }}", ""),
+        "required CI workspace test shards changes mandatory step body",
+    ),
+    (
+        "workspace tests add ignored tests to a shard",
+        replace_in_named_step(
+            "Workspace tests",
+            "-- ${{ matrix.filter }}",
+            "-- ${{ matrix.filter }} --include-ignored",
+        ),
+        "required CI workspace test shards changes mandatory step body",
+    ),
+    (
+        "workspace tests drop warning denial",
+        replace_in_named_step(
+            "Workspace tests",
+            'RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"',
+            'RUSTFLAGS: "-C debuginfo=0"',
+        ),
+        "required CI workspace test shards changes mandatory step shape",
+    ),
+    (
+        "workspace tests gain parallel Cargo jobs",
+        replace_in_named_step(
+            "Workspace tests",
+            '          CARGO_BUILD_JOBS: "1"\n',
+            '          CARGO_BUILD_JOBS: "4"\n',
+        ),
+        "required CI workspace test shards changes mandatory step shape",
+    ),
+    (
+        "workspace tests gain an extra environment variable",
+        replace_in_named_step(
+            "Workspace tests",
+            '          RUST_TEST_THREADS: "1"\n',
+            '          RUST_TEST_THREADS: "1"\n          PROPTEST_CASES: "1"\n',
+        ),
+        "required CI workspace test shards changes mandatory step shape",
+    ),
+    (
+        "workspace test shards drop the native fixture",
+        replace_in_named_job("workspace-tests", WORKSPACE_FIXTURE_STEP, ""),
+        "workspace test shard step inventory changed",
+    ),
+    (
+        "workspace test shards prepare the native fixture after the tests",
+        compose(
+            replace_in_named_job("workspace-tests", WORKSPACE_FIXTURE_STEP, ""),
+            replace_in_named_job(
+                "workspace-tests",
+                "-- ${{ matrix.filter }}\n",
+                "-- ${{ matrix.filter }}\n\n" + WORKSPACE_FIXTURE_STEP.rstrip("\n") + "\n",
+            ),
+        ),
+        "workspace test shard step inventory changed",
+    ),
+    (
+        "workspace test shards drop Bun for the TypeScript differentials",
+        replace_in_named_job(
+            "workspace-tests",
+            "      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6\n"
+            "        with:\n"
+            '          bun-version: "1.3.3"\n\n',
+            "",
+        ),
+        "workspace test shard step inventory changed",
+    ),
+    (
+        "workspace test shards drop the web3 contract dependencies",
+        replace_in_named_job(
+            "workspace-tests",
+            "      - name: Install web3 contract dependencies\n"
+            "        run: pnpm --dir contracts install --frozen-lockfile\n\n",
+            "",
+        ),
+        "workspace test shard step inventory changed",
+    ),
+):
+    assert_rejected(label, "ci.yml", mutation, expected_error)
+
+
+def assert_custom_harness_rejected(label: str, manifest: Path, old: str, new: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="chio-security-ci-contract-") as raw:
+        fixture = Path(raw)
+        populate_fixture(fixture)
+        path = fixture / manifest
+        original = path.read_text(encoding="utf-8")
+        if original.count(old) != 1:
+            raise AssertionError(f"{label}: mutation anchor is not unique")
+        path.write_text(original.replace(old, new), encoding="utf-8")
+        try:
+            CHECKER.validate(fixture)
+        except CHECKER.ContractError as error:
+            if "must declare required-features" not in str(error):
+                raise AssertionError(f"{label}: unexpected rejection: {error}") from error
+        else:
+            raise AssertionError(f"security CI accepted mutation: {label}")
+
+
+assert_custom_harness_rejected(
+    "default-selected dudect harness",
+    Path("crates/trust/chio-credentials/Cargo.toml"),
+    'required-features = ["dudect"]\n',
+    "",
+)
+assert_custom_harness_rejected(
+    "empty required-features on a custom harness",
+    Path("crates/trust/chio-credentials/Cargo.toml"),
+    'required-features = ["dudect"]\n',
+    "required-features = []\n",
+)
+assert_custom_harness_rejected(
+    "new ungated custom harness test",
+    Path("crates/core/chio-core/Cargo.toml"),
+    "[package]\n",
+    '[[test]]\nname = "custom_main"\npath = "tests/custom_main.rs"\nharness = false\n\n[package]\n',
+)
+
 assert_rejected(
     "all-zero enterprise workflow bootstrap placeholder",
     "ci.yml",
@@ -843,8 +1204,8 @@ assert_rejected(
     "ci.yml",
     replace_in_named_job(
         "check",
-        "    name: Build, lint, test\n",
-        "    name: Build, lint, test\n"
+        "    name: Build and lint\n",
+        "    name: Build and lint\n"
         "    permissions:\n"
         "      actions: write\n"
         "      contents: read\n",

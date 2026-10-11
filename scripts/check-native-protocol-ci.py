@@ -111,7 +111,7 @@ def validate(
             f"native protocol CI omits required contract check: {command}",
         )
     for job_id, consumer, env in (
-        ("check", "Workspace tests", COMMON_ENV),
+        ("workspace-tests", "Workspace tests", COMMON_ENV),
         (
             "msrv",
             "MSRV workspace lane",

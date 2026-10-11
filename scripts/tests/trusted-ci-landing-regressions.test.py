@@ -89,7 +89,7 @@ class CriticalCiProducerTests(unittest.TestCase):
     def test_every_original_critical_dependency_still_requires_success(self) -> None:
         aggregate = workflow("ci.yml")["jobs"]["security-contract-required"]
         dependencies = [
-            "check", "kani-public-pr", "formal-proof-contract", "apalache-full-contract",
+            "build-lint-test", "kani-public-pr", "formal-proof-contract", "apalache-full-contract",
             "threat-model-coverage-contract", "msrv", "cargo-vet", "cargo-deny",
             "enterprise-security-contract", "nonce-fips-contract",
         ]
@@ -97,6 +97,10 @@ class CriticalCiProducerTests(unittest.TestCase):
         body = aggregate["steps"][0]["run"]
         for name in dependencies:
             self.assertIn(f"test '${{{{ needs.{name}.result }}}}' = success", body)
+        build = workflow("ci.yml")["jobs"]["build-lint-test"]
+        self.assertEqual(build["needs"], ["check", "workspace-tests"])
+        for name in build["needs"]:
+            self.assertIn(f"test '${{{{ needs.{name}.result }}}}' = success", build["steps"][0]["run"])
         self.assertEqual(
             workflow("security-contract-revocation.yml")["on"]["workflow_run"]["workflows"],
             ["CI", "Enterprise evidence finalizer"],

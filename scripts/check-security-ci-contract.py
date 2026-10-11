@@ -10,6 +10,7 @@ import json
 import re
 import stat
 import sys
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -20,7 +21,7 @@ class ContractError(RuntimeError):
 
 
 REQUIRED_AGGREGATE_NEEDS = (
-    "check",
+    "build-lint-test",
     "kani-public-pr",
     "formal-proof-contract",
     "apalache-full-contract",
@@ -36,7 +37,7 @@ REQUIRED_AGGREGATE_ASSERTIONS = {
     for identifier in REQUIRED_AGGREGATE_NEEDS
 }
 EXPECTED_REQUIRED_CONTEXTS = {
-    "check": "Build, lint, test",
+    "build-lint-test": "Build, lint, test",
     "msrv": "MSRV build and test",
     "cargo-vet": "cargo-vet (locked supply-chain audit)",
     "cargo-deny": "cargo-deny (supply-chain bans/advisories/licenses)",
@@ -1165,7 +1166,6 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
     ),
     ("Workspace build", "cargo build --workspace"),
-    ("Workspace tests", "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards"),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
     (
         "cognition-market promoted-default build, clippy, and tests",
@@ -1192,7 +1192,6 @@ EXPECTED_CI_EVIDENCE_EXTRAS = {
         "Temporal security gate",
         "Workspace clippy",
         "Workspace build",
-        "Workspace tests",
         "Protocol peer-negotiation gate",
         "Wasm guards library tests",
         "Wasm guards Python SDK round-trip tests",
@@ -1202,13 +1201,63 @@ EXPECTED_CI_EVIDENCE_EXTRAS["Temporal security gate"] = {
     "env": EXPECTED_COMMON_CI_STEP_ENV,
     "shell": EXPECTED_TEMPORAL_STEP_SHELL,
 }
-for serial_fixture_step in (
-    "Workspace tests",
-    "cognition-market promoted-default build, clippy, and tests",
-):
-    EXPECTED_CI_EVIDENCE_EXTRAS[serial_fixture_step] = {
-        "env": EXPECTED_SERIAL_FIXTURE_CI_ENV
-    }
+EXPECTED_CI_EVIDENCE_EXTRAS[
+    "cognition-market promoted-default build, clippy, and tests"
+] = {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}
+# Every workspace test runs in exactly one shard: libtest and rustdoc match
+# names by substring, so the plain filter and its --skip form are complements.
+WORKSPACE_TEST_SHARD_PREFIX = "security::adapters::tests::native_flow"
+EXPECTED_WORKSPACE_TEST_SHARDS = [
+    {"shard": "native", "filter": WORKSPACE_TEST_SHARD_PREFIX},
+    {"shard": "rest", "filter": f"--skip {WORKSPACE_TEST_SHARD_PREFIX}"},
+]
+EXPECTED_WORKSPACE_TESTS_RUN = (
+    "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards "
+    "-- ${{ matrix.filter }}"
+)
+EXPECTED_WORKSPACE_TESTS_EXTRAS = {
+    "Workspace tests": {"env": EXPECTED_SERIAL_FIXTURE_CI_ENV}
+}
+EXPECTED_WORKSPACE_TESTS_INVENTORY = (
+    (None, None, "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5"),
+    ("Install Rust toolchain", None, None),
+    ("Install protobuf compiler", None, "./.github/actions/apt-install"),
+    (None, None, "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"),
+    ("Install Python workflow validators", None, None),
+    (None, None, "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"),
+    ("Enable pnpm", None, None),
+    ("Install web3 contract dependencies", None, None),
+    (None, None, "Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32"),
+    (None, None, "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6"),
+    (
+        "Qualify enforcing host and prepare native consumer fixture",
+        None,
+        "./.github/actions/enforced-native-fixture",
+    ),
+    ("Workspace tests", None, None),
+)
+BUILD_LINT_TEST_NEEDS = ("check", "workspace-tests")
+EXPECTED_BUILD_LINT_TEST_RUN = "\n".join(
+    (
+        "set -euo pipefail",
+        *(
+            f"test '${{{{ needs.{identifier}.result }}}}' = success"
+            for identifier in BUILD_LINT_TEST_NEEDS
+        ),
+    )
+)
+EXPECTED_BUILD_LINT_TEST_JOB = {
+    "name": "Build, lint, test",
+    "if": "${{ always() }}",
+    "needs": list(BUILD_LINT_TEST_NEEDS),
+    "runs-on": "ubuntu-latest",
+    "steps": [
+        {
+            "name": "Require build, lint and every workspace test shard",
+            "run": EXPECTED_BUILD_LINT_TEST_RUN,
+        }
+    ],
+}
 EXPECTED_KANI_STEP_EXTRAS = {
     "Verify all PR Kani harnesses": {
         "env": {"CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0"}
@@ -5202,6 +5251,97 @@ def validate_committed_evidence_binding(committed_evidence: dict) -> None:
         raise ContractError("required committed Linux evidence binding changed")
 
 
+def validate_build_lint_test(ci: dict[str, object]) -> None:
+    named_build_lint_test = {
+        identifier
+        for identifier, body in workflow_jobs(ci).items()
+        if isinstance(body, dict) and body.get("name") == "Build, lint, test"
+    }
+    if named_build_lint_test != {"build-lint-test"}:
+        raise ContractError("Build, lint, test must be the exact unique aggregate check name")
+    aggregate = job(ci, "build-lint-test")
+    steps = aggregate.get("steps")
+    if not isinstance(steps, list) or len(steps) != 1 or not isinstance(steps[0], dict):
+        raise ContractError("Build, lint, test changes its exact fail-closed body")
+    run = steps[0].get("run")
+    observed = {
+        **aggregate,
+        "steps": [{**steps[0], "run": run.strip() if isinstance(run, str) else run}],
+    }
+    if observed != EXPECTED_BUILD_LINT_TEST_JOB:
+        raise ContractError("Build, lint, test changes its exact fail-closed body")
+
+    tests = job(ci, "workspace-tests")
+    if (
+        set(tests) != {"name", "runs-on", "timeout-minutes", "strategy", "steps"}
+        or tests.get("name") != "Workspace tests (${{ matrix.shard }})"
+        or tests.get("runs-on") != "ubuntu-latest"
+        or tests.get("timeout-minutes") != "360"
+    ):
+        raise ContractError("workspace test shards change their execution contract")
+    strategy = tests.get("strategy")
+    if (
+        not isinstance(strategy, dict)
+        or set(strategy) != {"fail-fast", "matrix"}
+        or strategy.get("fail-fast") != "false"
+    ):
+        raise ContractError("workspace test shards must run every shard without fail-fast")
+    matrix = strategy.get("matrix")
+    shards = matrix.get("include") if isinstance(matrix, dict) else None
+    if (
+        not isinstance(matrix, dict)
+        or set(matrix) != {"include"}
+        or not isinstance(shards, list)
+        or any(not isinstance(shard, dict) or set(shard) != {"shard", "filter"} for shard in shards)
+        or [shard["shard"] for shard in shards] != ["native", "rest"]
+    ):
+        raise ContractError("workspace test matrix must be exactly the native and rest shards")
+    native, rest = (shard["filter"] for shard in shards)
+    if (
+        not isinstance(native, str)
+        or re.fullmatch(r"[A-Za-z0-9_]+(::[A-Za-z0-9_]+)*", native) is None
+        or rest != f"--skip {native}"
+    ):
+        raise ContractError("workspace test shard filters are not exact complements")
+    if shards != EXPECTED_WORKSPACE_TEST_SHARDS:
+        raise ContractError("workspace test shards change the reviewed partition")
+    validate_step_inventory(
+        tests, EXPECTED_WORKSPACE_TESTS_INVENTORY, "workspace test shard"
+    )
+    validate_exact_steps(
+        tests,
+        (("Workspace tests", EXPECTED_WORKSPACE_TESTS_RUN),),
+        "required CI workspace test shards",
+        EXPECTED_WORKSPACE_TESTS_EXTRAS,
+    )
+    if step_position(
+        tests, "Qualify enforcing host and prepare native consumer fixture"
+    ) >= step_position(tests, "Workspace tests"):
+        raise ContractError("workspace test shards run before the native fixture")
+
+
+# Libtest filters do not reach custom harnesses, so a default-selected
+# harness = false test would run in every workspace test shard.
+def validate_custom_harness_tests(root: Path) -> None:
+    try:
+        workspace = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+        members = workspace["workspace"]["members"]
+    except (OSError, UnicodeError, KeyError, tomllib.TOMLDecodeError) as error:
+        raise ContractError(f"unreadable workspace members: {error}") from error
+    for member in members:
+        manifest_path = root / member / "Cargo.toml"
+        try:
+            manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+            raise ContractError(f"{member}: unreadable member manifest: {error}") from error
+        for target in manifest.get("test", []):
+            if target.get("harness", True) is False and not target.get("required-features"):
+                raise ContractError(
+                    f"{member}: custom-harness test {target.get('name')} must declare "
+                    "required-features so libtest shard filters cannot duplicate it"
+                )
+
+
 def validate_nonce_fips_contract(root: Path) -> None:
     workflow = load_workflow(root / ".github/workflows/chio-tee-fips.yml")
     ci = load_workflow(root / ".github/workflows/ci.yml")
@@ -5251,6 +5391,7 @@ def validate_nonce_fips_contract(root: Path) -> None:
 
 def validate(root: Path) -> None:
     validate_nonce_fips_contract(root)
+    validate_custom_harness_tests(root)
     validate_global_workflow_boundaries(root)
     validate_environment_provisioning_document(root)
     validate_security_execution_boundary_files(root)
@@ -8582,9 +8723,14 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("security aggregate changes its exact fail-closed body")
 
-    for identifier in (*REQUIRED_AGGREGATE_NEEDS, "security-contract-required"):
+    for identifier in (
+        *BUILD_LINT_TEST_NEEDS,
+        *REQUIRED_AGGREGATE_NEEDS,
+        "security-contract-required",
+    ):
         if contains_key(job(ci, identifier), "continue-on-error"):
             raise ContractError(f"required CI job uses continue-on-error: {identifier}")
+    validate_build_lint_test(ci)
 
     if job(ci, "msrv").get("timeout-minutes") != "360":
         raise ContractError("MSRV serial workspace budget must be exactly 360 minutes")
@@ -8592,6 +8738,7 @@ def validate(root: Path) -> None:
     check_job = job(ci, "check")
     for identifier, boundary in (
         ("check", "Workspace structural gates"),
+        ("workspace-tests", "Workspace tests"),
         ("msrv", "MSRV workspace lane"),
     ):
         python_job = job(ci, identifier)
@@ -8649,7 +8796,6 @@ def validate(root: Path) -> None:
         )
     for command in (
         "cargo build --workspace",
-        "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards",
         "cargo clippy --workspace --lib --bins --examples -- -D warnings",
         "bash scripts/check-mapping.sh",
         "python3 scripts/check-patch-hygiene.py",

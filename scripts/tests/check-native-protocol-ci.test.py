@@ -29,7 +29,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
 )
 CONSUMERS = (
-    (0, "check", "Workspace tests"),
+    (0, "workspace-tests", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
     (3, "conformance", "Run live C++ conformance areas"),

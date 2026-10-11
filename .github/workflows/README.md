@@ -3,7 +3,9 @@
 ## The PR build/lint/test gate lives in `ci.yml`
 
 The required gate that catches workspace-wide compile breakage is the
-`check` job ("Build, lint, test") in [`ci.yml`](./ci.yml). It runs on
+"Build, lint, test" context in [`ci.yml`](./ci.yml). It is reported by the
+`build-lint-test` aggregate job, which succeeds only when the `check` job
+("Build and lint") and every shard of the `workspace-tests` matrix succeed. It runs on
 `pull_request` and `push` to `main`, on the toolchain pinned by the
 repo-root `rust-toolchain.toml` (1.94.1), with `Swatinem/rust-cache` for the
 cargo registry/target cache. The four gate steps are:
@@ -13,23 +15,23 @@ cargo registry/target cache. The four gate steps are:
 | Format | "Workspace format" | `cargo fmt --all -- --check` |
 | Lint | "Workspace clippy" | `cargo clippy --workspace --lib --bins --examples -- -D warnings` |
 | **Workspace build** | "Workspace build" | `cargo build --workspace` |
-| Tests | "Workspace tests" + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
+| Tests | "Workspace tests" (`workspace-tests` job) + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
 
 The full set of required check contexts (the `name:` values GitHub branch
 rulesets match on) is four jobs, not one:
 
-- "Build, lint, test" (the `check` job, containing the four steps above)
+- "Build, lint, test" (the `build-lint-test` aggregate over `check` and `workspace-tests`)
 - "MSRV build and test" (the `msrv` job; see below for its coverage caveats)
 - "cargo-vet (locked supply-chain audit)" (the `cargo-vet` job)
 - "cargo-deny (supply-chain bans/advisories/licenses)" (the `cargo-deny` job)
 
 All four are required; cargo-vet and cargo-deny are not optional. The "Tokio
 console smoke" check is *not* a separate required context: it is a step inside
-the "Build, lint, test" job (see the test-lane section below), so it surfaces
-under that job's context rather than as its own check.
+the `check` job (see the test-lane section below), so it surfaces under the
+"Build, lint, test" aggregate rather than as its own check.
 
 The regression-test deletion guard and its scratch-repository self-test also
-run inside "Build, lint, test". On pull requests, a deletion or rename from a
+run inside the `check` job. On pull requests, a deletion or rename from a
 guarded regression path fails that required context unless a separate same-line
 issue reference names each affected file.
 
@@ -145,7 +147,14 @@ closes the downstream-exhaustiveness gap.
 The tests run in two steps, not one, and they do *not* uniformly cover
 integration-test targets:
 
-- "Workspace tests" runs `cargo test --workspace --exclude chio-wasm-guards`.
+- "Workspace tests" runs `cargo test --workspace --exclude chio-wasm-guards`
+  as two matrix shards. The `native` shard passes the libtest filter
+  `security::adapters::tests::native_flow`; the `rest` shard passes
+  `--skip security::adapters::tests::native_flow`. Libtest and rustdoc match
+  both by substring, so every unit, integration and doc test runs in exactly
+  one shard. Custom-harness (`harness = false`) test targets ignore these
+  filters, so `scripts/check-security-ci-contract.py` requires each one to
+  declare `required-features`.
   The job installs Bun 1.3.3 first because the anchored-root tamper tests run
   required Rust-TypeScript differentials and fail when Bun is unavailable.
   Across every other workspace member this compiles and runs `#[cfg(test)]`
