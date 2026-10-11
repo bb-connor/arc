@@ -1,4 +1,7 @@
-use chio_security_types::clock::{AuthorityDeadline, Clock, MonotonicInstant};
+#[cfg(any(target_os = "linux", test))]
+use chio_security_types::clock::Clock;
+#[cfg(target_os = "linux")]
+use chio_security_types::clock::{AuthorityDeadline, MonotonicInstant};
 #[cfg(target_os = "linux")]
 use std::fs;
 #[cfg(target_os = "linux")]
@@ -9,13 +12,17 @@ use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 #[cfg(target_os = "linux")]
 use std::path::Path;
+#[cfg(target_os = "linux")]
 use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 use chio_secure_ipc::PeerIdentity;
-use chio_security_types::ports::{PortError, PortResult};
+#[cfg(target_os = "linux")]
+use chio_security_types::ports::PortError;
+#[cfg(any(target_os = "linux", test))]
+use chio_security_types::ports::PortResult;
 
 #[cfg(all(test, target_os = "linux"))]
 mod clock_tests;

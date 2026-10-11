@@ -23,8 +23,12 @@ use chio_security_types::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(any(target_os = "linux", test, feature = "fuzz"))]
 mod validation;
-use validation::{decode_authority_request, VerifiedAuthorityRequest};
+#[cfg(any(target_os = "linux", test, feature = "fuzz"))]
+use validation::decode_authority_request;
+#[cfg(target_os = "linux")]
+use validation::VerifiedAuthorityRequest;
 mod client;
 mod protocol;
 #[cfg(test)]
