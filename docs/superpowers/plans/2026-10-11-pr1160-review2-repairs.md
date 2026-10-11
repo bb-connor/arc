@@ -109,7 +109,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-security-kernel/src/session_throttle.rs`, `crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs`.
 
-**Required correction:** Use a kernel-owned dispatch-attempt identity. Permit free replay only for an authenticated retained operation whose execution cannot repeat; otherwise consume again or deny.
+**Required correction:** Use a kernel-owned dispatch-attempt identity. Retain a private random identity on the actual acquired in-flight request, including waits; reused session/request text in a fresh kernel cannot identify an old attempt. Authenticated durable operation identity takes priority. Permit free replay only for retained execution that cannot repeat; otherwise consume again or deny.
 
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
@@ -137,7 +137,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-secret-broker/src/generic_https.rs`, `crates/security/chio-secret-broker/src/service/custody/registration.rs`, `crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs`.
 
-**Required correction:** Include DNS in one enforceable end-to-end preparation deadline and resolve outside the custody mutex. Avoid a second unconstrained lookup while retaining checked destination pinning. A timeout around an uncancellable worker alone does not bound retained work.
+**Required correction:** Bound preparation DNS by one absolute deadline, resolve outside the custody mutex, and retain the resolver slot until the underlying lookup actually returns. Acquire nonblocking capacity before spawning. Reuse the checked pinned destination without a second lookup. The existing separate absolute connect/TLS/I/O deadline starts at execution, preserving the signed HTTP timeout semantics.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -291,7 +291,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-decoy/src/materialize.rs`, `crates/security/chio-decoy/src/registry.rs`.
 
-**Required correction:** Complete content and ownership metadata in a private same-parent staging object, fsync, then publish with no-replace semantics and sync the parent. Define bounded staging recovery without deleting an unproven final object.
+**Required correction:** Use one validated private internal staging directory on the same device. Tag the newly created inode before writing, then fsync and publish with no-replace semantics, syncing both parents. Authenticate non-empty staging objects before reclaiming; recover the empty create-before-tag state only within enforced internal-directory custody. Check descriptor ACL authority on Darwin. Preserve every unproven final object and test each interrupted-write stage.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -347,7 +347,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/kernel/chio-kernel-core/src/budget_split.rs`.
 
-**Required correction:** Apply finite per-parent entry and retained-identity byte limits before new insertion, preserving idempotent existing-child checks and live holders. A cached sum improves work but does not bound memory. Reject zero-share authority only if that is the intended schema contract.
+**Required correction:** Bound per-parent child count and retained child-ID bytes, plus registry totals of 10,000 parents, 100,000 child edges and 16 MiB of actually owned IDs. Keep exact counters and idempotent known admissions. Reclaim only signed-expired parents with no live lease holders using the existing trusted kernel clock. Preserve non-expiring operator registrations and fail closed on clock failure. Keep the generic trait contract stable through an additive concrete-registry path where possible; no wire/config schema expansion.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
