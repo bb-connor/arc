@@ -64,6 +64,7 @@ struct ServedPeer {
     snapshot_unavailable: Arc<std::sync::atomic::AtomicBool>,
     authority_snapshot_unavailable: Arc<std::sync::atomic::AtomicBool>,
     authority_snapshot_override: Arc<std::sync::Mutex<Option<AuthoritySnapshotView>>>,
+    cluster_status_override: Arc<std::sync::Mutex<Option<Value>>>,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     server: Option<std::thread::JoinHandle<()>>,
 }
@@ -94,6 +95,18 @@ impl ServedPeer {
         let authority_snapshot_override =
             Arc::new(std::sync::Mutex::new(None::<AuthoritySnapshotView>));
         let served_authority_snapshot_override = authority_snapshot_override.clone();
+        let cluster_status_override = Arc::new(std::sync::Mutex::new(None::<Value>));
+        let served_cluster_status_override = cluster_status_override.clone();
+        let cluster_status = move |state: State<TrustServiceState>, headers: HeaderMap| {
+            let status_override = served_cluster_status_override.clone();
+            async move {
+                let status = status_override.lock().test_unwrap().clone();
+                match status {
+                    Some(status) => Json(status).into_response(),
+                    None => handle_internal_cluster_status(state, headers).await,
+                }
+            }
+        };
         let cluster_snapshot = move |state: State<TrustServiceState>, headers: HeaderMap| {
             let unavailable = served_snapshot_unavailable.clone();
             async move {
@@ -135,10 +148,7 @@ impl ServedPeer {
             };
         let router = axum::Router::new()
             .route(AUTHORITY_PATH, get(handle_authority_status))
-            .route(
-                INTERNAL_CLUSTER_STATUS_PATH,
-                get(handle_internal_cluster_status),
-            )
+            .route(INTERNAL_CLUSTER_STATUS_PATH, get(cluster_status))
             .route(INTERNAL_CLUSTER_SNAPSHOT_PATH, get(cluster_snapshot))
             .route(
                 INTERNAL_AUTHORITY_SNAPSHOT_PATH,
@@ -173,6 +183,7 @@ impl ServedPeer {
             snapshot_unavailable,
             authority_snapshot_unavailable,
             authority_snapshot_override,
+            cluster_status_override,
             shutdown: Some(shutdown),
             server: Some(server),
         }
