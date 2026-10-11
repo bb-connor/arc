@@ -7,6 +7,28 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Composed owner and fourth-review checkpoint (October 11 UTC)
+
+The [follow-up audit](audits/review4-followup-20261011.json) records source-reviewed
+R4-001, R4-002 and R4-004, the repaired authority-relay fixture, and a named P3
+diagnostic follow-up in the existing sequential security track. The ledger
+contains **2,004 requirements**. All 2,002 earlier requirement records and all
+historical observations remain; the three updated current states retain their
+previous values in the new observation.
+
+The composed control-plane campaign on `e4bc85e479` remains **failed**: 1,968
+passed, three failed and one was ignored. The failures are the two relay fixtures
+(repaired at `0c66d0ccfc`) and the issuer drain race (repaired at `d3669ed272`).
+The production custody-election and native cadence controls passed. Neither
+that result nor the twelve cached serial broker passes closes native latency,
+the parallel callback failures or full production readiness.
+
+The expiry-lock repair at `00b23066f1` and cold duplicate oracle still require
+their recorded runtime/mutation evidence. The helper inventory has independent
+source/evidence approval. The proof-package hash mismatch remains under diagnosis.
+The public head remains `974f22914b`; one replacement push, four required green
+checks, classified other failures and answered review threads remain outstanding.
+
 ## Fourth repair-delta review (October 11 UTC)
 
 The [fourth review](../reviews/2026-10-11-pr1160-review4/findings.md) adds three
