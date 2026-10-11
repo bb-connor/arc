@@ -20,6 +20,20 @@ use std::sync::mpsc;
 use chio_test_support::prelude::*;
 
 const GLOBAL_IPV4: &str = "8.8.8.8";
+const HANG_GUARD: Duration = Duration::from_secs(30);
+
+/// A fetch deadline with only `left` remaining, as if the fetch had already
+/// spent the rest of its total budget.
+fn deadline_with(left: Duration) -> PortableFetchDeadline {
+    let start = Instant::now()
+        .checked_sub(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT - left)
+        .test_unwrap();
+    PortableFetchDeadline::starting_at(start).test_unwrap()
+}
+
+fn test_dns_pool() -> BoundedWorkerPool {
+    BoundedWorkerPool::new(1, 1)
+}
 
 fn empty_config() -> TrustServiceConfig {
     TrustServiceConfig {
@@ -133,7 +147,12 @@ fn serve_once(mut stream: TcpStream, status: &str, body: &str) {
 }
 
 fn loopback_fetch_agent(addr: std::net::SocketAddr) -> Agent {
-    build_portable_fetch_agent(vec![addr], false)
+    build_portable_fetch_agent(
+        vec![addr],
+        false,
+        &PortableFetchDeadline::start().test_unwrap(),
+    )
+    .test_unwrap()
 }
 
 #[test]
@@ -216,7 +235,14 @@ fn pin_checked_addrs_refuses_private_resolution() {
     let url = Url::parse(&fetch.jwks_url).test_unwrap();
     let private =
         |_host: &str, port: u16| Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()]);
-    let error = pin_checked_https_addrs(&fetch.contract, &url, private).test_unwrap_err();
+    let error = pin_checked_https_addrs(
+        &fetch.contract,
+        &url,
+        &test_dns_pool(),
+        &PortableFetchDeadline::start().test_unwrap(),
+        private,
+    )
+    .test_unwrap_err();
     assert!(error.to_string().to_lowercase().contains("loopback"));
 }
 
@@ -247,7 +273,14 @@ fn dns_resolution_is_pinned_to_the_checked_addresses_once() {
             Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()])
         }
     };
-    let pinned = pin_checked_https_addrs(&fetch.contract, &url, rebinding).test_unwrap();
+    let pinned = pin_checked_https_addrs(
+        &fetch.contract,
+        &url,
+        &test_dns_pool(),
+        &PortableFetchDeadline::start().test_unwrap(),
+        rebinding,
+    )
+    .test_unwrap();
     assert_eq!(
         pinned,
         vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()]
@@ -387,7 +420,7 @@ async fn offload_leaves_the_async_worker_free_while_the_remote_stalls() {
     let fetch_done = Arc::new(AtomicBool::new(false));
     let done = Arc::clone(&fetch_done);
     let fetch = tokio::spawn(run_portable_issuer_fetch_with_lane(lane, move || {
-        let agent = build_portable_fetch_agent(vec![addr], false);
+        let agent = loopback_fetch_agent(addr);
         let outcome = fetch_portable_issuer_jwks(
             &agent,
             "http://remote.issuer.example/.well-known/jwks.json",
@@ -414,6 +447,125 @@ async fn offload_leaves_the_async_worker_free_while_the_remote_stalls() {
     let _ = fetch.await;
     drop(accepted_rx);
     let _ = server.join();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn stalled_dns_returns_the_deadline_refusal_and_frees_the_fetch_permit() {
+    let url = Url::parse("https://good.example/.well-known/jwks.json").test_unwrap();
+    let contract =
+        strict_portable_fetch_contract(url.as_str(), "control-plane.portable-issuer-jwks")
+            .test_unwrap();
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    // Stands in for a host resolver stuck inside getaddrinfo: it answers only
+    // once the test releases it, long after the fetch deadline.
+    let stalled = move |_host: &str, port: u16| {
+        entered_tx.send(()).test_unwrap();
+        let _ = release_rx.recv_timeout(HANG_GUARD);
+        Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
+    };
+    let dns = test_dns_pool();
+    let deadline = deadline_with(Duration::from_millis(100));
+    let lane = Arc::new(tokio::sync::Semaphore::new(1));
+
+    let outcome = run_portable_issuer_fetch_with_lane(Arc::clone(&lane), move || {
+        pin_checked_https_addrs(&contract, &url, &dns, &deadline, stalled)
+    })
+    .await;
+
+    let Ok(Err(error)) = outcome else {
+        panic!("a stalled resolver must end the fetch with a refusal");
+    };
+    assert_eq!(
+        error.to_string(),
+        portable_fetch_deadline_exceeded().to_string()
+    );
+    entered_rx.recv_timeout(HANG_GUARD).test_unwrap();
+    // The resolver is still parked, yet the fetch permit is already free.
+    assert_eq!(lane.available_permits(), 1);
+    release_tx.send(()).test_unwrap();
+}
+
+#[test]
+fn http_phase_is_bounded_by_the_budget_left_after_resolution() {
+    // A listener that accepts and never answers. Under a full budget the read
+    // timeout would end the fetch; the remaining budget must end it first.
+    let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+    let addr = listener.local_addr().test_unwrap();
+    let (accepted_tx, accepted_rx) = mpsc::channel::<TcpStream>();
+    let server = std::thread::spawn(move || {
+        if let Ok((stream, _)) = listener.accept() {
+            let _ = accepted_tx.send(stream);
+        }
+    });
+
+    let agent = build_portable_fetch_agent(
+        vec![addr],
+        false,
+        &deadline_with(Duration::from_millis(200)),
+    )
+    .test_unwrap();
+    let started = Instant::now();
+    let error =
+        fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
+            .test_unwrap_err();
+    let elapsed = started.elapsed();
+
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error("portable issuer JWKS endpoint was unreachable").to_string()
+    );
+    assert!(
+        elapsed < PORTABLE_ISSUER_FETCH_READ_TIMEOUT,
+        "the HTTP phase must get only the remaining budget, took {elapsed:?}"
+    );
+    drop(accepted_rx);
+    let _ = server.join();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn connect_stage_cannot_outlive_the_fetch_deadline() {
+    // A listener whose one-slot accept queue is already full, so the kernel
+    // leaves the next connection attempt unanswered.
+    let socket = tokio::net::TcpSocket::new_v4().test_unwrap();
+    socket
+        .bind("127.0.0.1:0".parse().test_unwrap())
+        .test_unwrap();
+    let listener = socket.listen(0).test_unwrap();
+    let addr = listener.local_addr().test_unwrap();
+    let _queued = TcpStream::connect(addr).test_unwrap();
+
+    // Resolution has spent all but a sliver of the budget, far less than the
+    // connect timeout a fresh connect clock would allow.
+    let deadline = deadline_with(Duration::from_millis(300));
+    let agent = build_portable_fetch_agent(vec![addr], false, &deadline).test_unwrap();
+    let error =
+        fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
+            .test_unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error("portable issuer JWKS endpoint was unreachable").to_string()
+    );
+    let overrun = Instant::now().saturating_duration_since(deadline.0);
+    assert!(
+        overrun < Duration::from_secs(1),
+        "the connect stage outlived the fetch deadline by {overrun:?}"
+    );
+}
+
+#[test]
+fn exhausted_deadline_refuses_the_http_phase() {
+    let error = build_portable_fetch_agent(
+        vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()],
+        true,
+        &deadline_with(Duration::ZERO),
+    )
+    .test_unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        portable_fetch_deadline_exceeded().to_string()
+    );
 }
 
 #[test]
