@@ -757,7 +757,14 @@ pub(crate) fn retain_runtime_artifact(
         RuntimeArtifactRole::WorkingDirectory => O_PATH | O_DIRECTORY | O_CLOEXEC,
         RuntimeArtifactRole::CageInitHelper
         | RuntimeArtifactRole::TargetExecutable
-        | RuntimeArtifactRole::RuntimeFile => O_CLOEXEC,
+        | RuntimeArtifactRole::RuntimeFile => {
+            // Verify the opened descriptor before reading; a FIFO must not
+            // rendezvous with a writer or a TTY become the controlling terminal.
+            O_RDONLY
+                | O_CLOEXEC
+                | u64::from(libc::O_NONBLOCK.cast_unsigned())
+                | u64::from(libc::O_NOCTTY.cast_unsigned())
+        }
     };
     let file = openat2(root.as_raw_fd(), relative, flags, 0, strict_resolution())
         .map_err(|source| map_open_error(path, source))?;
