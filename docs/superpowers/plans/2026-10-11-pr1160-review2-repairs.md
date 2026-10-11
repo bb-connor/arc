@@ -300,8 +300,12 @@ For each row below: read its frozen source and verifier, establish an exact boun
 - [x] Confirm current source and owning contract; record disputed scope precisely.
 - [x] Establish a bounded failing control on the unchanged predecessor.
 - [x] Implement and review the minimal correction; preserve healthy and denial paths.
-- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [x] Compose into the replacement batch and reconcile its ledger state.
+
+The corrected NUL-terminated staging domain has matching native Darwin renewal
+(70 tests, five full reruns and strict lint). Its Linux owning, strict and actual
+deception-boundary renewal is pending; prior domain evidence remains historical.
 
 ### R2-020: Portable issuer fetch excludes DNS from its total deadline
 
@@ -408,12 +412,12 @@ evidence are pending. Initial Tokio blocking-queue time is outside the fetch bud
 
 ## Current execution checkpoint
 
-- Root public head remains `974f22914bd339a62933831650c3d55dbaf76987`: Vet/Deny pass, Build active, MSRV failed before compile. Its repair is private `5955d1cc6a`.
-- R2-004 and R2-012 genuine Originals each produced one passing preservation control and one assertion failure at `5aa488acb7`. Repairs are isolated; no green claim yet.
-- R2-007 initial test-only compile failure is retained separately; corrected Original `7521410a53` is executing. A compile error is not a reproduced behavioral defect.
-- R2-015 private composition `193ef17c75` and `95a3c64953` preserves reviewed source. Renewed Go-inclusive Original fails at the intended size-order assertion; owning 55 top-level tests and 79 subtests plus vet pass, and Root focused composition passes. Claude independent review is pending. Earlier evidence omitted Go source pins and remains explicitly superseded.
-- R2-001 native Original `5ef4faacd7` is running on Claude's Mac. R2-013/026 test-only continuation `d7c2a7c3e8` is queued there. Native evidence is required; Linux excludes these controls.
-- R2-002 is inherited but stays in scope: refuse an explicit external budget configuration that durable admission cannot honor atomically; enable the valid co-located durable authority without a dummy budget flag. Preserve supported ephemeral behavior.
-- R2-003 requires healthy keyring service startup, bootstrap validation and runtime/read validation controls. R2-014 compares against immutable captured state and applies ordered contributions. R2-016 refuses populated initial streaming tool content before forwarding.
-- Resolver permits remain owned until actual completion, including after caller timeout; one absolute deadline covers all stages. Relay finalization stops new admission before terminal evidence publication, preserves started work reconciliation and labels unfinished capture unresolved.
-- Shared CI content pins remain Root-owned. No cap raise, baseline waiver, authorization rotation or proof campaign. No merge without Connor's new go-ahead.
+- Public `974f22914bd339a62933831650c3d55dbaf76987` remains unchanged. All four required checks are terminal: Vet and Deny passed; Build and MSRV failed before workspace compilation on the stale command fixture, repaired privately by `5955d1cc6a`.
+- Private source checkpoint `7dea6bae50` contains the reviewed repair batch. Cargo Vet, Cargo Deny and the duplicate/wildcard policies pass there. The canonical landing ledger preserves all 1,998 requirements and distinguishes source integration from qualification.
+- Root's earlier composed kernel run passed 1,909 tests with two ignored, plus strict owning lint. Its two kernel-core fixture failures were repaired; the corrected core suite passes all 90 on `cf46d03851`. These are separate source-specific results, not a full-candidate workspace pass.
+- The frozen `cf46d03851` broker/CLI/API train continues with no-fail-fast. Broker orphan injection initially failed its foreign-key guard before reaching the recovery assertion; private `5c56c769d5` corrects only that corruption fixture. CLI export initially raced authenticated snapshot readiness; reviewed `7dea6bae50` corrects only that wait. The proof-package fixture failure is assigned to Claude. Native MCP execution refuses this ARM host; hosted CI provisions its required Linux x86_64 enforcement material.
+- The final issuer-fetch repair is source-reviewed and composed. One original deadline bounds queued admission through final observation; sixteen workers and sixteen queued jobs bound retained work without hard cancellation. Initial Tokio queue time remains outside the deadline. Expired unstarted receipt jobs refuse under the recorded scope decision; started writes continue.
+- The signing-custody election repair is privately integrated and reviewed; its corrected follower fixture and final composed control-plane runtime evidence remain pending. Producer Original and final owning/strict packets are still being reconciled for the other integrated review rows.
+- The fixed five-event native checkpoint trigger is privately integrated at `0ca1e3fb31` with bounded source approval. Its wording must distinguish sequential maintenance observations from later concurrent appends. The actual native 10-second fence, archive/open cost and cold-state acceptance remain open. Preserve `903189`, `e017687` and `ed3f1a` separately; they are not silently superseded or composed.
+- Cold-map preparation is test-only and independently reviewed. Durable persistence, trusted-root attachment and atomic production activation remain open; it does not close cold-state or G5 readiness.
+- Root owns the next final control-plane/store owner run, corrected fixture renewals and Linux decoy qualification. Shared CI content pins remain Root-owned. No cap raise, baseline waiver, authorization rotation or proof campaign. No merge without Connor's new go-ahead.
