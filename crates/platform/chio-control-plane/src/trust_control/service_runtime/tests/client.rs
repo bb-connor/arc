@@ -935,11 +935,11 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
 
 #[test]
 fn queued_remote_receipt_write_is_skipped_after_its_budget() {
-    use crate::bounded_worker_pool::tests::{drain, park_the_worker};
+    use crate::bounded_worker_pool::tests::{drain, park_the_worker, single_worker_pool};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
-    let writer = Arc::new(crate::bounded_worker_pool::BoundedWorkerPool::new(1, 1));
+    let writer = Arc::new(single_worker_pool());
     let (release, caller) = park_the_worker(&writer);
     let wrote = Arc::new(AtomicBool::new(false));
     let observed = Arc::clone(&wrote);

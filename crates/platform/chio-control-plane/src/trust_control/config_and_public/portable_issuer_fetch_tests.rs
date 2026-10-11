@@ -19,7 +19,7 @@ use std::sync::mpsc;
 
 use chio_test_support::prelude::*;
 
-use crate::bounded_worker_pool::tests::drain;
+use crate::bounded_worker_pool::tests::{drain, single_worker_pool};
 
 const GLOBAL_IPV4: &str = "8.8.8.8";
 const HANG_GUARD: Duration = Duration::from_secs(30);
@@ -473,7 +473,7 @@ fn healthy_fetch_runs_dns_through_decode_on_a_single_worker() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn stalled_fetch_holds_its_worker_but_not_the_fetch_permit() {
-    let pool = Arc::new(BoundedWorkerPool::new(1, 1));
+    let pool = Arc::new(single_worker_pool());
     let lane = Arc::new(tokio::sync::Semaphore::new(1));
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel::<()>();
