@@ -29,14 +29,13 @@ fn issuing_kernel(
     Arc::new(
         build_mediation_kernel(
             signer,
-            budget,
+            MediationBudget::Configured(budget),
             super::MediationPolicy {
                 issuers: trusted_capability_issuers,
                 hash: None,
                 receipt_store: None,
             },
             Vec::new(),
-            None,
             None,
             Arc::new(clock::ProxyClock::default()),
         )
@@ -195,14 +194,13 @@ fn mediated_test_state_core(
 ) -> Arc<ProxyState> {
     mediated_test_state_with_durable_admission(
         signer,
-        budget,
+        MediationBudget::Configured(budget),
         trusted_capability_issuers,
         sidecar_control_token,
         receipt_store,
         hold_capable,
         payment_adapter,
         revocation_store,
-        None,
     )
 }
 
@@ -237,15 +235,15 @@ fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStor
 #[allow(clippy::too_many_arguments)]
 fn mediated_test_state_with_durable_admission(
     signer: Keypair,
-    budget: Arc<dyn BudgetStore>,
+    budget: MediationBudget,
     trusted_capability_issuers: Vec<PublicKey>,
     sidecar_control_token: Option<String>,
     receipt_store: Option<SqliteReceiptStore>,
     hold_capable: bool,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
-    durable_admission: Option<DurableAdmissionStores>,
 ) -> Arc<ProxyState> {
+    let budget_store = budget.store();
     let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
     let signer_public_key = signer.public_key();
     let mut trusted_capability_issuers = trusted_capability_issuers;
@@ -270,7 +268,7 @@ fn mediated_test_state_with_durable_admission(
     let mediation_kernel = Mutex::new(
         build_mediation_kernel(
             &signer,
-            Arc::clone(&budget),
+            budget,
             super::MediationPolicy {
                 issuers: &trusted_capability_issuers,
                 hash: None,
@@ -281,7 +279,6 @@ fn mediated_test_state_with_durable_admission(
             },
             Vec::new(),
             payment_adapter,
-            durable_admission,
             Arc::new(clock::ProxyClock::default()),
         )
         .test_unwrap(),
@@ -307,7 +304,7 @@ fn mediated_test_state_with_durable_admission(
         trusted_capability_issuers,
         trusted_receipt_signers,
         sidecar_control_token,
-        budget_store: Some(budget),
+        budget_store: Some(budget_store),
         mediation_hold_capable: hold_capable,
         mediation_kernel: Some(Arc::new(mediation_kernel)),
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
@@ -1272,14 +1269,13 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
         Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
     let kernel = build_mediation_kernel(
         &signer,
-        Arc::clone(&budget),
+        MediationBudget::Configured(Arc::clone(&budget)),
         super::MediationPolicy {
             issuers: &[],
             hash: None,
             receipt_store: None,
         },
         Vec::new(),
-        None,
         None,
         Arc::new(clock::ProxyClock::default()),
     )

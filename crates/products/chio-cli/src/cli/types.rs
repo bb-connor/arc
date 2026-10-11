@@ -983,6 +983,8 @@ pub(crate) enum Commands {
         listen: String,
 
         /// Optional SQLite receipt store path for a durable audit log.
+        /// A durable store also owns the mediation budget; --budget-db and
+        /// --control-url are rejected with it.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
         #[command(flatten)]

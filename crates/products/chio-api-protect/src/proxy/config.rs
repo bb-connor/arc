@@ -51,10 +51,14 @@ pub struct ProtectConfig {
     /// Explicit ordinary approval authority and authenticated executor.
     pub approval: Option<super::approval_authority::ProtectApprovalConfig>,
     /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
+    /// Rejected at startup with a durable `receipt_db`: durable admission
+    /// reserves budget in the authority co-located with the receipt store.
     pub control_url: Option<String>,
     /// Bearer token for the control-plane budget endpoints.
     pub control_token: Option<String>,
     /// Local SQLite budget-store path used when no `control_url` is configured.
+    /// Rejected at startup with a durable `receipt_db`: durable admission
+    /// reserves budget in the authority co-located with the receipt store.
     pub budget_db: Option<String>,
     /// Optional durable SQLite revocation-store path. When set, the sidecar
     /// loads its revoked capability ids at startup so operator revocations

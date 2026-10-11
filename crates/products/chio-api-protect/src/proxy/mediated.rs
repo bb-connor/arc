@@ -19,7 +19,7 @@ use chio_kernel::{
 pub(crate) mod authenticated;
 #[path = "mediated/budget_configuration.rs"]
 mod budget_configuration;
-pub(crate) use budget_configuration::build_budget_store;
+pub(crate) use budget_configuration::{build_budget_store, MediationBudget};
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 #[path = "mediated/tests.rs"]
@@ -113,11 +113,10 @@ pub(crate) struct MediationPolicy<'a> {
 
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
-    budget_store: Arc<dyn BudgetStore>,
+    budget: MediationBudget,
     policy: MediationPolicy<'_>,
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
-    durable_admission: Option<DurableAdmissionStores>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
@@ -180,12 +179,8 @@ pub(crate) fn build_mediation_kernel(
             .set_receipt_store_handle(store)
             .map_err(|error| ProtectError::Config(error.to_string()))?;
     }
-    match durable_admission {
-        Some(durable) => {
-            // Durable operations, their preflight holds and their executable
-            // holds share the authority's budget store; a separately configured
-            // budget store cannot back a reservation the admission authority
-            // owns.
+    match budget {
+        MediationBudget::Durable(durable) => {
             kernel.set_budget_store_handle(durable.budget_store);
             kernel
                 .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
@@ -195,7 +190,7 @@ pub(crate) fn build_mediation_kernel(
                     ))
                 })?;
         }
-        None => kernel.set_budget_store_handle(budget_store),
+        MediationBudget::Configured(store) => kernel.set_budget_store_handle(store),
     }
     let nonce_cfg = ExecutionNonceConfig {
         require_nonce: true,
@@ -343,7 +338,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
-            "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
+            "mediated tool-call route requires a durable receipt store or a configured budget store (--budget-db or --control-url)",
         );
     };
     // Under durable admission the reservation is the operation's own and an
@@ -730,7 +725,7 @@ pub(crate) async fn sidecar_reconcile_handler(
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
-            "reconcile route requires a configured budget store (--control-url or --budget-db)",
+            "reconcile route requires a durable receipt store or a configured budget store (--budget-db or --control-url)",
         );
     };
     // A reserved hold can only be resolved by nonce when the budget store

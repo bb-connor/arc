@@ -242,6 +242,129 @@ async fn receipt_retention_runs_from_the_actual_proxy_serving_lifetime(
     Ok(())
 }
 
+#[cfg(unix)]
+#[tokio::test]
+async fn durable_admission_refuses_external_budget_before_serving(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::budget_store::BudgetStore as _;
+    let externals: [fn(&mut ProtectConfig, String); 2] = [
+        |config, budget_db| config.budget_db = Some(budget_db),
+        |config, _| config.control_url = Some("http://127.0.0.1:1".into()),
+    ];
+    for configure_external in externals {
+        let directory = tempfile::tempdir()?;
+        let sidecar = durable_sidecar(directory.path())?;
+        let budget_db = directory.path().join("external-budget.db");
+        let external = chio_store_sqlite::budget_store::SqliteBudgetStore::open(&budget_db)?;
+        assert!(external.try_increment(&sidecar.capability.id, 0, Some(1))?);
+        drop(external);
+        let mut config = sidecar.config;
+        configure_external(&mut config, budget_db.to_string_lossy().into_owned());
+        let error = ProtectProxy::new(config)
+            .run_with_observer(|_| panic!("sidecar served with an external budget"))
+            .await
+            .err()
+            .ok_or("sidecar started with an external budget")?;
+        assert!(
+            matches!(error, ProtectError::ExternalBudgetWithDurableAdmission),
+            "{error}"
+        );
+        assert!(!directory.path().join("receipts.db").exists());
+        assert!(!directory
+            .path()
+            .join("receipts.db.authority-locks")
+            .exists());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn durable_receipt_store_enables_mediation_without_external_budget(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let sidecar = durable_sidecar(directory.path())?;
+    let (ready, address) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(
+        ProtectProxy::new(sidecar.config).run_with_observer(move |address| {
+            let _ = ready.send(address);
+        }),
+    );
+    let address = tokio::time::timeout(Duration::from_secs(10), address).await??;
+    let evaluate = |request_id: &'static str| {
+        reqwest::Client::new()
+            .post(format!("http://{address}/v1/evaluate"))
+            .json(&serde_json::json!({
+                "capability": sidecar.capability,
+                "tool_server": "budget-srv",
+                "tool_name": "charge",
+                "parameters": {"invoice": request_id},
+                "request_id": request_id,
+            }))
+            .send()
+    };
+    let reserved: serde_json::Value = evaluate("first").await?.json().await?;
+    let exhausted: serde_json::Value = evaluate("second").await?.json().await?;
+    task.abort();
+    let _ = task.await;
+    assert_eq!(reserved["status"], "reserved", "{reserved}");
+    assert_eq!(exhausted["status"], "deny", "{exhausted}");
+    Ok(())
+}
+
+#[cfg(unix)]
+struct DurableSidecar {
+    config: ProtectConfig,
+    capability: CapabilityToken,
+}
+
+/// A durable sidecar and a capability its signer issued for one invocation.
+#[cfg(unix)]
+fn durable_sidecar(
+    directory: &std::path::Path,
+) -> Result<DurableSidecar, Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let signer = Keypair::generate();
+    let seed = directory.join("signer.seed");
+    std::fs::write(&seed, signer.seed_hex())?;
+    std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600))?;
+    let mut config = minimal_config();
+    config.receipt_db = Some(directory.join("receipts.db").to_string_lossy().into_owned());
+    config.signer_seed_file = Some(seed);
+    config.sidecar_control_token = Some("durable-budget-control".into());
+    config.spec_content =
+        Some("openapi: 3.0.3\ninfo:\n  title: Budget\n  version: 1.0.0\npaths: {}\n".into());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "durable-budget-capability".into(),
+            issuer: signer.public_key(),
+            subject: Keypair::generate().public_key(),
+            scope: ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "budget-srv".into(),
+                    tool_name: "charge".into(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: Some(1),
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+            issued_at: now - 60,
+            expires_at: now + 3600,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &signer,
+    )?;
+    Ok(DurableSidecar { config, capability })
+}
+
 fn minimal_config() -> ProtectConfig {
     ProtectConfig {
         transport: Default::default(),

@@ -7,14 +7,13 @@ fn product_default_guards_mediation_preserves_authority_policy_identity() {
     for hash in [Some(provided.as_str()), None] {
         let kernel = build_mediation_kernel(
             &signer,
-            Arc::new(InMemoryBudgetStore::new()),
+            MediationBudget::Configured(Arc::new(InMemoryBudgetStore::new())),
             MediationPolicy {
                 issuers: &[],
                 hash,
                 receipt_store: None,
             },
             Vec::new(),
-            None,
             None,
             Arc::new(clock::ProxyClock::default()),
         )

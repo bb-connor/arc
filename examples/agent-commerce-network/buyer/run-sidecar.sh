@@ -19,8 +19,6 @@ CONTROL_AUTHORITY_PUBLIC_KEY="$(chio_control_authority_public_key "${CONTROL_URL
 
 if [[ -n "${CHIO_BIN:-}" ]]; then
   exec "${CHIO_BIN}" \
-    --control-url "${CONTROL_URL}" \
-    --control-token "${CONTROL_TOKEN}" \
     --control-authority-public-key "${CONTROL_AUTHORITY_PUBLIC_KEY}" \
     api protect \
     --upstream "${BUYER_UPSTREAM_URL:-http://127.0.0.1:8101}" \
@@ -30,8 +28,6 @@ if [[ -n "${CHIO_BIN:-}" ]]; then
 fi
 
 exec cargo run --bin chio -- \
-  --control-url "${CONTROL_URL}" \
-  --control-token "${CONTROL_TOKEN}" \
   --control-authority-public-key "${CONTROL_AUTHORITY_PUBLIC_KEY}" \
   api protect \
   --upstream "${BUYER_UPSTREAM_URL:-http://127.0.0.1:8101}" \

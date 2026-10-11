@@ -1,5 +1,22 @@
 use super::*;
 
+/// The one budget authority behind mediation. Durable admission reserves,
+/// starts and settles operations inside its co-located authority, so it never
+/// shares accounting with an operator-configured store.
+pub(crate) enum MediationBudget {
+    Durable(DurableAdmissionStores),
+    Configured(Arc<dyn BudgetStore>),
+}
+
+impl MediationBudget {
+    pub(crate) fn store(&self) -> Arc<dyn BudgetStore> {
+        match self {
+            Self::Durable(durable) => Arc::clone(&durable.budget_store),
+            Self::Configured(store) => Arc::clone(store),
+        }
+    }
+}
+
 /// A configured budget store together with whether it supports the pre-execution
 /// hold APIs the mediated reservation path depends on.
 ///

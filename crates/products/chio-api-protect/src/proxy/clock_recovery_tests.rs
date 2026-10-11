@@ -88,14 +88,15 @@ fn service_clock_recovery_keeps_kernel_and_nonce_expiry_consistent(
     let directory = tempfile::tempdir()?;
     let mut kernel = super::super::build_mediation_kernel(
         &signer,
-        Arc::new(InMemoryBudgetStore::with_clock(Arc::new(clock.clone()))),
+        super::super::MediationBudget::Configured(Arc::new(InMemoryBudgetStore::with_clock(
+            Arc::new(clock.clone()),
+        ))),
         super::super::mediated::MediationPolicy {
             issuers: &[],
             hash: None,
             receipt_store: None,
         },
         Vec::new(),
-        None,
         None,
         Arc::new(clock.clone()),
     )?;

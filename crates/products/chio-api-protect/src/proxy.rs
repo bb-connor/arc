@@ -103,7 +103,7 @@ pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;
 pub(crate) use self::mediated::{
-    build_budget_store, build_mediation_kernel, load_revocation_db_ids,
+    build_budget_store, build_mediation_kernel, load_revocation_db_ids, MediationBudget,
 };
 pub(crate) use self::receipts::*;
 pub(crate) use self::router::*;

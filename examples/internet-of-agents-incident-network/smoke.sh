@@ -86,8 +86,6 @@ wait_for_http "http://127.0.0.1:${TRUST_PORT}/health"
 
 # -- Chio api protect sidecars (the chio_asgi middleware in services talks to these) --
 "${CHIO_BIN}" \
-  --control-url "http://127.0.0.1:${TRUST_PORT}" \
-  --control-token "${SERVICE_TOKEN}" \
   --control-authority-public-key "$(chio_control_authority_public_key "http://127.0.0.1:${TRUST_PORT}" "${SERVICE_TOKEN}")" \
   api protect \
   --upstream "http://127.0.0.1:${COORD_PORT}" \
