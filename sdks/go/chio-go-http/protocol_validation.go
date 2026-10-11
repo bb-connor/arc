@@ -14,6 +14,8 @@ import (
 	"strings"
 )
 
+const maxSecurityWireBytes = 1 << 20
+
 // readProtocolValue retains exact numbers and rejects duplicate keys at every
 // depth, including otherwise opaque objects. The bounded profile permits up to
 // 64 nested objects/arrays and one MiB per artifact.
@@ -140,7 +142,7 @@ func checkProtocolShape(value any, shape reflect.Type) error {
 }
 
 func decodeProtocolObject(data []byte, target any) error {
-	if len(data) > 1<<20 {
+	if len(data) > maxSecurityWireBytes {
 		return fmt.Errorf("security wire artifact exceeds one MiB")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
