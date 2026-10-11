@@ -1,0 +1,124 @@
+name: Chio Pheromone Pinned Fixture Gates
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chio-pheromone-pinned.yml"
+      - "ci-gates/pheromone.toml"
+      - "crates/observability/chio-metrics-spec/**"
+      - "crates/products/chio-cli/**"
+      - "crates/tooling/chio-spec-validate/**"
+      - "crates/trust/chio-federation/**"
+      - "crates/trust/chio-federation/src/pheromone_gossip.rs"
+      - "crates/trust/chio-federation/tests/pheromone_gossip.rs"
+      - "crates/trust/chio-pheromone-relay/**"
+      - "crates/trust/chio-pheromone-runtime/**"
+      - "crates/trust/chio-pheromone/**"
+      - "deploy/prometheus/**"
+      - "docs/release/CHIO_PHEROMONE_RELAY_RUNBOOK.md"
+      - "docs/release/chio-pheromone-relay/**"
+      - "examples/chio-3vendor/**"
+      - "examples/chio-3vendor/fixtures/pheromone/relay/**"
+      - "scripts/check-pheromone-ci.py"
+      - "scripts/check-sre-metrics-registry.sh"
+      - "scripts/tests/check-pheromone-ci.test.py"
+      - "spec/CHIO_PHEROMONE.md"
+      - "spec/schemas/chio-pheromone/**"
+      - "spec/schemas/chio-pheromone/v1/**"
+      - "spec/schemas/registry.json"
+      - "xtask/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/chio-pheromone-pinned.yml"
+      - "ci-gates/pheromone.toml"
+      - "crates/observability/chio-metrics-spec/**"
+      - "crates/products/chio-cli/**"
+      - "crates/tooling/chio-spec-validate/**"
+      - "crates/trust/chio-federation/**"
+      - "crates/trust/chio-federation/src/pheromone_gossip.rs"
+      - "crates/trust/chio-federation/tests/pheromone_gossip.rs"
+      - "crates/trust/chio-pheromone-relay/**"
+      - "crates/trust/chio-pheromone-runtime/**"
+      - "crates/trust/chio-pheromone/**"
+      - "deploy/prometheus/**"
+      - "docs/release/CHIO_PHEROMONE_RELAY_RUNBOOK.md"
+      - "docs/release/chio-pheromone-relay/**"
+      - "examples/chio-3vendor/**"
+      - "examples/chio-3vendor/fixtures/pheromone/relay/**"
+      - "scripts/check-pheromone-ci.py"
+      - "scripts/check-sre-metrics-registry.sh"
+      - "scripts/tests/check-pheromone-ci.test.py"
+      - "spec/CHIO_PHEROMONE.md"
+      - "spec/schemas/chio-pheromone/**"
+      - "spec/schemas/chio-pheromone/v1/**"
+      - "spec/schemas/registry.json"
+      - "xtask/**"
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-fixture-gates:
+    name: Pheromone fixture gates (pinned actions)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-pinned-fixture-gates-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: crates/products/chio-cli/dashboard/package-lock.json
+      - name: Install dashboard dependencies
+        run: npm ci
+        working-directory: crates/products/chio-cli/dashboard
+
+      - name: Check Chio pheromone directory lifecycle
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures directory-lifecycle
+
+      - name: Check Chio pheromone relay alert assurance archive hardening
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance-archive-hardening
+
+      - name: Check Chio pheromone relay alert assurance archive package
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance-archive-package
+
+      - name: Check Chio pheromone relay alert assurance archive
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance-archive
+
+      - name: Check Chio pheromone relay alert assurance export
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance-export
+
+      - name: Check Chio pheromone relay alert assurance external retention
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance-external-retention
+
+      - name: Check Chio pheromone relay observability
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-observability
+
+      - name: Check Chio pheromone relay operations
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-ops
+
+      - name: Check Chio pheromone relay
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay
+
+      - name: Check Chio pheromone runtime
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures runtime
+
+      - name: Run Chio pheromone transit gate
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures transit
