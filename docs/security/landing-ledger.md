@@ -8,6 +8,36 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## CI extraction and FIPS inventory qualified privately (October 11 UTC)
+
+The [CI batch audit](audits/workspace-ci-extraction-20261011.json) records
+source `98a0e77ed3` with all thirteen affected contract commands passing, and
+the independently reviewed FIPS delta `021a5b8b0d`. All **2,022 requirements**
+are preserved, including the two new CI obligations.
+
+The original full workspace command now has a parallel job with independent
+runner preparation. All 49 other original steps and ten unrelated jobs remain
+unchanged. The required `Build, lint, test` identity accepts only successful
+build/lint and workspace jobs. Thirty-six real Bash result combinations and
+setup/refusal mutations verify that boundary. No Rust source, test scope,
+proof budget, authorization or repository variable changed.
+
+The FIPS gate reproduced the genuine hosted inventory mismatch after two
+passing tests. Adding the unreadable-current-key identity produces two exact
+passes; the composed checker and nine owning mutation tests pass. Claude
+approved both source changes. The full thirteen-command campaign belongs to
+`98a0e77ed3`; focused delta checks belong to `021a5b8b0d`. Targeted actionlint
+still reports the same pre-existing unsupported permission on both workflow
+versions, so no global syntax pass is claimed.
+
+The exact-inventory sweep, one replacement publication and hosted qualification
+remain pending. Public `5f5e522aa5` has green Vet/Deny and running Build/MSRV at
+the audit snapshot; its FIPS failure has this qualified repair and its three
+trusted-setup failures are classified. Earlier cancelled candidates supply no
+pass. All review threads were answered at the latest refresh. The explicit
+merge bar and postmerge/proof/product limits remain unchanged; the PR body
+tracks the published SHA and Root waits for the owner's merge go-ahead.
+
 ## Reviewed replacement batch prepared (October 11 UTC)
 
 The [terminal batch audit](audits/review-batch-terminal-20261011.json) records
