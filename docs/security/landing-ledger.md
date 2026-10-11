@@ -7,6 +7,28 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+
+## Focused renewal and proof-clock correction (October 11 UTC)
+
+The ledger now contains **2,007 requirements**, retaining all 2,005 previous
+requirements and observations. The [renewal audit](audits/focused-renewal-and-proof-parity-20261011.json)
+records five completed owner phases on `9196515b30`: expiry 3, issuer 30,
+authority/custody 88, reservation 6, and snapshot 151 passing tests (seven
+snapshot campaigns remain ignored). The cold duplicate oracle detects the
+removed guard; restored cold 26 and strict store lint pass on byte-identical
+store source. These results preserve the earlier failed broad campaigns.
+
+Proof parity is now causally explained: ambient elapsed time enters signed
+outcomes despite an injected fixed clock. Claude owns both Rust paths and
+clock-failure custody controls; Root's reviewed CI scanner detects both current
+sites. A separate writer startup denial remains cause-unconfirmed and must be
+classified from its actual health error, not speculative SQLite retries.
+
+The private candidate is still under local qualification. CLI/broker/native and
+strict phases remain active. Public `974f22914b` remains failed; all 33 unresolved
+review threads are answered. One replacement push, four required exact-head
+green checks, classified failures and explicit merge authorization remain.
+
 ## Owner renewal and fixture corrections (October 11 UTC)
 
 The [owner renewal audit](audits/owner-renewal-followup-20261011.json) preserves
