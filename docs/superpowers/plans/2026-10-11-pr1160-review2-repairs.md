@@ -426,7 +426,7 @@ evidence are pending. Initial Tokio blocking-queue time is outside the fetch bud
 ## Fourth review follow-up
 
 - R4-001 (Claude C2): hold the parent registry mutex before the final trusted-time sample. Preserve a deterministic held-lock/clock-advance Original, refusal without insertion, clock failure behavior and owning/clock checks.
-- R4-002 (Root): exact helper inventory corrected by `8781b9b176`; genuine Original and focused/full parent selftests pass at the repaired source overlay. Independent review pending.
+- R4-002 (Root): exact helper inventory corrected by `8781b9b176`; genuine Original failure retained; repaired focused/full parent selftests pass. Claude approved the source and evidence at 04:45:30Z.
 - R4-003 (Claude C3, Root integration): `d3669ed272` uses one worker and two test-only slots for the expired job and its FIFO observer. Runtime renewal pending; production bounds and all no-start assertions remain unchanged.
 - R4-004 (Root): `9d07df2675` tests duplicate identity/outbox rows in an otherwise valid five-row Grant. Retain predecessor-oracle and removed-duplicate-guard controls, final cold-map tests and strict lint before acceptance.
 
