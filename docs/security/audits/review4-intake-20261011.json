@@ -1,0 +1,109 @@
+{
+  "schema": "chio.security.review4-intake.v1",
+  "observed_utc": "2026-10-11T04:46:38.181351+00:00",
+  "requirement_ids": [
+    "incoming-pr1160-review4-20261011:R4-001",
+    "incoming-pr1160-review4-20261011:R4-002",
+    "incoming-pr1160-review4-20261011:R4-003",
+    "incoming-pr1160-review4-20261011:R4-004"
+  ],
+  "evidence_requirement_ids": [],
+  "review": {
+    "path": "docs/reviews/2026-10-11-pr1160-review4/findings.md",
+    "sha256": "cb056e8e9b7d817fa073007f0f378aee81dc5f898ded80a0f4df2da69ccfbe52",
+    "reviewed_base": "16c36036de95db2eaaee7d30654db4fb56c94782",
+    "reviewed_source": "4bb3208f447b7e7734acca2f26e5fe5f7b16d30d",
+    "limits": "Read-only repair-delta review, not an executed full candidate campaign."
+  },
+  "composition": "9d07df2675a5b33a4df763981752a4849fc3bb54",
+  "items": [
+    {
+      "id": "incoming-pr1160-review4-20261011:R4-001",
+      "label": "R4-001",
+      "priority": "P2",
+      "owner": "Claude C2; Root integration",
+      "requirement": "Take the final trusted-time sample while holding the parent registry lock; refuse a parent that expires during lock wait and leave the registry unchanged on clock failure.",
+      "state": "repair-and-owner-qualification-pending",
+      "source_repair": null,
+      "evidence": "Frozen source establishes a stale-time interleaving; deterministic held-lock Original and repair assigned to C2.",
+      "files": [
+        "crates/kernel/chio-kernel/src/kernel/validation/lineage.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/budget_parent_expiry.rs"
+      ]
+    },
+    {
+      "id": "incoming-pr1160-review4-20261011:R4-002",
+      "label": "R4-002",
+      "priority": "P2",
+      "owner": "Root; Claude independent review",
+      "requirement": "Keep the exact broker helper-lifetime inventory synchronized with all four enrolled release test groups and preserve every helper across candidate commands.",
+      "state": "locally-verified-source-review-pending",
+      "source_repair": {
+        "checkpoint": "8781b9b17606429bf58db6806e6cfebcaf103e01",
+        "files": [
+          "scripts/tests/check-broker-helper-lifetime.test.py"
+        ]
+      },
+      "evidence": "Unchanged d366 predecessor fails exact8-versus6. Literal6->8 repair passes focused fixture and complete parent container-execution selftest. Independent source review pending."
+    },
+    {
+      "id": "incoming-pr1160-review4-20261011:R4-003",
+      "label": "R4-003",
+      "priority": "P2",
+      "owner": "Claude C3; Root integration",
+      "requirement": "Observe completed queue progress after expired issuer/receipt jobs without racing observer admission, while preserving no-start assertions and production nonblocking bounded admission.",
+      "state": "source-reviewed-and-integrated-runtime-pending",
+      "source_repair": {
+        "checkpoint": "d3669ed27230910bddda838954fb022187f3e949",
+        "files": [
+          "crates/platform/chio-control-plane/src/bounded_worker_pool_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch_tests.rs",
+          "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs"
+        ]
+      },
+      "evidence": "Actual producer29PASS/1FAIL retained; FIFO test helper1worker/2slots permits one expired job and its observation sentinel. All deadlines and no-start assertions unchanged; current runtime renewal pending."
+    },
+    {
+      "id": "incoming-pr1160-review4-20261011:R4-004",
+      "label": "R4-004",
+      "priority": "P3",
+      "owner": "Root; Claude independent review",
+      "requirement": "Duplicate-row oracle must retain a valid Grant shape and per-table counts, so removing duplicate rejection makes it fail; retain healthy encoding and noncanonical-order controls.",
+      "state": "test-repair-integrated-validation-pending",
+      "source_repair": {
+        "checkpoint": "9d07df2675a5b33a4df763981752a4849fc3bb54",
+        "files": [
+          "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/cold/tree_tests.rs"
+        ]
+      },
+      "evidence": "Test-only valid five-row identity/outbox duplicate controls privately composed. Format/diff pass; runtime, predecessor-oracle comparison and mutation rejection pending. No production cold activation."
+    }
+  ],
+  "retained_evidence": {
+    "helper_original": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review4-helper-lifetime/original.json",
+      "sha256": "c629c34a8a5523440bce7a00dcac3321e3eec78b562c569474fe798882c01dc4"
+    },
+    "helper_repaired": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review4-helper-lifetime/summary.json",
+      "sha256": "fbfaff87fa140e4689cb3afeab09c81a79c07a0bb6938a3c55edc6eed3c41ceb"
+    },
+    "issuer_failed_green": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c3-issuer-dns/c5-green-tests.log",
+      "sha256": "33e7eb6385a28cae7343daae22a217a736cf19141ebc64d9803a41a5ba2b97d1"
+    },
+    "cold_predecessor": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review4-cold-duplicate-oracle/predecessor.json",
+      "sha256": "fc43152b8538bca254f1a7df556670adb9c04218caec922ac2b3483ba62a7158"
+    }
+  },
+  "issuer_fixture_ruling": "Use a test-only two-slot queue for one expired job and its FIFO observation sentinel. The review suggested no queue enlargement; Root accepts this alternative because these controls test expiry/no-start, not queue capacity, and production capacity/deadlines are unchanged. Separate saturation/worker-growth controls remain. No sleep, ignored refusal or blocking production admission added.",
+  "remaining_acceptance": [
+    "Complete R4-001 Original, repair, review and owning/clock checks.",
+    "Retain source review and runtime/mutation evidence for R4-002 through R4-004.",
+    "Complete replacement composition gates, four exact-head required checks, classify other failures and answer review threads.",
+    "Obtain explicit Connor merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
