@@ -5,6 +5,8 @@
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
+use std::time::Duration;
 
 use chio_core::capability::scope::ChioScope;
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
@@ -12,6 +14,7 @@ use chio_core::{Keypair, PublicKey};
 
 const CONTROL_TOKEN: &str = "start-pin-control-token";
 const NOT_TRUSTED: &str = "capability issuer is not trusted";
+const BANNER_TIMEOUT: Duration = Duration::from_secs(60);
 
 struct Sidecar {
     child: Child,
@@ -45,12 +48,20 @@ fn spawn_start(pin: Option<&PublicKey>) -> Sidecar {
     }
     let mut child = command.spawn().expect("spawn chio start");
     let stdout = child.stdout.take().expect("piped stdout");
-    let mut banner = String::new();
-    BufReader::new(stdout)
-        .read_line(&mut banner)
-        .expect("read chio start banner");
+    let (banner_tx, banner_rx) = mpsc::channel();
+    // The reader owns the pipe until the child exits, so later route lines
+    // never hit a closed read end.
+    std::thread::spawn(move || {
+        let mut lines = BufReader::new(stdout).lines();
+        if let Some(Ok(banner)) = lines.next() {
+            let _ = banner_tx.send(banner);
+        }
+        lines.for_each(drop);
+    });
+    let banner = banner_rx
+        .recv_timeout(BANNER_TIMEOUT)
+        .expect("chio start printed its banner");
     let base_url = banner
-        .trim()
         .strip_prefix("chio sidecar listening on ")
         .unwrap_or_else(|| panic!("unexpected chio start banner: {banner:?}"))
         .to_string();
@@ -58,18 +69,16 @@ fn spawn_start(pin: Option<&PublicKey>) -> Sidecar {
 }
 
 fn capability_signed_by(authority: &Keypair) -> CapabilityToken {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system clock after epoch")
-        .as_secs();
     CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-start-pin".to_string(),
             issuer: authority.public_key(),
             subject: Keypair::generate().public_key(),
             scope: ChioScope::default(),
-            issued_at: now - 60,
-            expires_at: now + 3600,
+            // Fixed bounds keep the test off the wall clock: the validity window
+            // check passes for any current time.
+            issued_at: 1,
+            expires_at: u64::MAX,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         },
