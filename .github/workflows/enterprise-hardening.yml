@@ -452,10 +452,10 @@ jobs:
           test -f "${temporal_self_test}"
           test ! -L "${temporal_self_test}"
           test -x "${temporal_self_test}"
-          printf '%s  %s\n' 'c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
-          printf '%s  %s\n' 'a406ec677779a6b5856ebe53c1bd467559da45f09ef3e619edd69ed99f841d2b' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' '02e7241415d3f546d8851bbe9afff5753ab3a6921feaf345047ec23891d7e6d4' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
           /bin/bash -p "${temporal_self_test}"
-          printf '%s  %s\n' 'c23b0dd2775be2a07af27124a4f1017f3d5f65b2ed5d936c549586c1c9cedc17' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
           /bin/bash -p "${temporal_runner}"
 
       - name: Response recovery behavior
