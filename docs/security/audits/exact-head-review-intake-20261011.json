@@ -1,0 +1,57 @@
+{
+  "schema": "chio.pr1160.exact-head-review-intake.v1",
+  "observed_utc": "2026-10-11T13:24:56.093215+00:00",
+  "review_source": "9e9cf98942c487b228298616cf12b7f3157a6c8b",
+  "review_url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-6109135494",
+  "review_body_sha256": "d5ff736650df3aacb9d09677faf6443936b97747c9a212049c7ff3c3f9b6c0fa",
+  "plan": "docs/superpowers/plans/2026-10-11-pr1160-exact-head-review.md",
+  "items": [
+    {
+      "id": "REVIEW-9E9-KEYRING",
+      "priority": "P2",
+      "requirement": "Refuse unavailable current signing identity at governed trust and issuance boundaries after router rotation and poison; distinguish infallible compatibility identities.",
+      "owner": "Claude",
+      "scope": "now"
+    },
+    {
+      "id": "REVIEW-9E9-COMPACTION",
+      "priority": "P2",
+      "requirement": "Commit safe retained-prefix cursor progress when later replay verification reaches the byte ceiling; retry the deferred owner under the same limit and retain first-row refusal.",
+      "owner": "Root",
+      "scope": "now"
+    },
+    {
+      "id": "REVIEW-9E9-CHECKPOINT",
+      "priority": "P2",
+      "requirement": "Prevent repeated immutable full-image checkpoint storage amplification while preserving authenticated historical fragments, current-image integrity, bounded replay cadence and v1 history.",
+      "owner": "Claude",
+      "scope": "now"
+    },
+    {
+      "id": "REVIEW-9E9-PREPAID",
+      "priority": "P2",
+      "requirement": "Preserve exact legacy prepaid liabilities through typed quarantine when no authenticated original debit exists; never reinterpret exposure as the debit.",
+      "owner": "Claude",
+      "scope": "now"
+    },
+    {
+      "id": "CI-9E9-DROP-GUARD-CONTRACT",
+      "priority": "P2",
+      "requirement": "Keep the static drop-guard checker aligned with the reviewed dispatch-mark boundary, including marked pre-poll deadline and clock failures as outcome-unknown.",
+      "owner": "Root",
+      "scope": "now"
+    }
+  ],
+  "ci_failure_jobs": [
+    114474338636,
+    114471421192
+  ],
+  "current_boundaries": [
+    "Four review findings require final source/evidence disposition, not merely answered thread counts.",
+    "Static gate repair7f927 passed all8 checks and3 negative in-memory mutations; no model or proof execution.",
+    "Compaction source14d2 plus fixture4180: genuine final Original and23 repaired tests; strict owning lint and final fixture review pending at intake.",
+    "Keyring and checkpoint isolated producer repairs pending. Legacy prepaid exact settled-state control pending; no authenticated fallback established.",
+    "Replacement publication, exact-head required checks, remaining failure classification, review and user merge authorization remain pending."
+  ],
+  "qualification": false
+}
