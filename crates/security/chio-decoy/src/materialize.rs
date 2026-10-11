@@ -327,6 +327,21 @@ mod unix {
         Present(File),
     }
 
+    struct StagingDirectoryLock {
+        directory: File,
+    }
+
+    impl Drop for StagingDirectoryLock {
+        fn drop(&mut self) {
+            // Close alone cannot release this description's lock while a
+            // forked child retains a duplicate. Unlock before closing, and
+            // retry an interrupted unlock without panicking during Drop.
+            while let Err(rustix::io::Errno::INTR) = flock(&self.directory, FlockOperation::Unlock)
+            {
+            }
+        }
+    }
+
     pub struct FileMaterializer {
         root: File,
         root_identity: RootIdentity,
@@ -392,7 +407,8 @@ mod unix {
             // A fresh directory description serializes threads and independent
             // materializer instances. Keep it alive through receipt validation,
             // including the already-published exact-retry path.
-            let staging = self.lock_staging_directory()?;
+            let staging_lock = self.lock_staging_directory()?;
+            let staging = &staging_lock.directory;
             let (parent, basename) = self
                 .walk_parent(&parsed, true)?
                 .ok_or(MaterializeError::MetadataMismatch)?;
@@ -402,24 +418,24 @@ mod unix {
             }
 
             let staging_name = self.staging_name(request)?;
-            let proof = self.stage_file(&staging, &staging_name, request, content_digest)?;
+            let proof = self.stage_file(staging, &staging_name, request, content_digest)?;
             #[cfg(test)]
             if let Some(pause) = &self.publication_pause {
-                pause.wait(&staging);
+                pause.wait(staging);
             }
             if let Err(error) = rename_no_replace(
-                &staging,
+                staging,
                 &staging_name,
                 &parent,
                 basename,
                 MaterializeError::ForeignExisting,
                 "publish materialized file",
             ) {
-                self.discard_staging(&staging, &staging_name, request, content_digest)?;
+                self.discard_staging(staging, &staging_name, request, content_digest)?;
                 return Err(error);
             }
             sync_file(&parent, "sync materialization parent")?;
-            sync_file(&staging, "sync materialization staging directory")?;
+            sync_file(staging, "sync materialization staging directory")?;
 
             let parsed = parse_relative_path(request.relative_path)?;
             let (rooted_parent, rooted_basename) = self
@@ -544,13 +560,13 @@ mod unix {
             }
         }
 
-        fn lock_staging_directory(&self) -> Result<File, MaterializeError> {
+        fn lock_staging_directory(&self) -> Result<StagingDirectoryLock, MaterializeError> {
             let staging = self
                 .open_internal_directory(STAGING_DIRECTORY, true)?
                 .ok_or(MaterializeError::MetadataMismatch)?;
             flock(&staging, FlockOperation::NonBlockingLockExclusive)
                 .map_err(|error| errno_error("lock materialization staging directory", error))?;
-            Ok(staging)
+            Ok(StagingDirectoryLock { directory: staging })
         }
 
         #[cfg(test)]

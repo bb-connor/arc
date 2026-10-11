@@ -33,6 +33,7 @@ run_exact_target --label "decoy materialization" --expected \
   materialize::concurrency_tests::concurrent_exact_retry_cannot_replace_a_durable_stage_before_publication \
   materialize::concurrency_tests::same_materializer_calls_acquire_independent_lock_descriptions \
   materialize::concurrency_tests::dropped_lock_allows_torn_stage_recovery_and_exact_final_retry \
+  materialize::concurrency_tests::completed_publication_unlocks_even_while_a_duplicate_descriptor_lives \
   cleanup_is_idempotent_and_recovers_after_quarantine_rename \
   cleanup_rejects_changed_or_replaced_content_without_removal \
   cleanup_rejects_forged_registry_identity_and_metadata_proof \
@@ -150,4 +151,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (107 exact tests)"
+echo "Deception security gate passed (108 exact tests)"
