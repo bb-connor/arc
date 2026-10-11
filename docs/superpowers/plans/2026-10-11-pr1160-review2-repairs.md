@@ -39,7 +39,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/products/chio-cli/src/supervise/credentials.rs`, `crates/products/chio-cli/src/supervise/descriptor_credentials.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Apply the existing Darwin descriptor ACL authority check to both loaders before accepting bytes or descriptors. Inspection errors and allow/unknown authority must refuse. Preserve genuine Linux systemd handling and deny-only ACL acceptance; add native tests at the actual loaders.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -53,7 +53,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/products/chio-api-protect/src/proxy/mediated.rs`, `crates/products/chio-api-protect/src/proxy/state.rs`, `crates/platform/chio-store-sqlite/src/admission_operation_store.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Refuse incompatible external budget configuration before provisioning, or explicitly select one composite authority for probes, admission and settlement. Preserving old shared usage requires a qualified state transition; do not silently reset, copy or replace accounting.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -67,7 +67,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs`, `crates/platform/chio-control-plane/src/trust_control/cluster/consensus.rs`, `crates/platform/chio-control-plane/src/trust_control/service_types/config.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Keep direct seed access removed. Separate bootstrap custody validation from runtime configuration/token validation, and use the latter for cluster composition and request authentication. Exercise full healthy keyring startup, not just isolated constructors.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -81,10 +81,10 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-cage/src/linux.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Pass a remaining entry/byte budget into the shared enumerator and refuse before pushing beyond it. Count skipped entries and bound the aggregate walk before sorting.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
 - [ ] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
@@ -95,7 +95,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-quarantine/src/correlation.rs`, `crates/security/chio-quarantine/src/rules.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Enforce the partial-candidate budget on each unique insertion and before intermediate-vector growth. Suppress/refuse immediately on exhaustion. Add a combined branching-plus-reuse control.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -109,7 +109,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-security-kernel/src/session_throttle.rs`, `crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Use a kernel-owned dispatch-attempt identity. Permit free replay only for an authenticated retained operation whose execution cannot repeat; otherwise consume again or deny.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -123,7 +123,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/kernel/chio-kernel/src/runtime/blocking_connection.rs`, `crates/kernel/chio-kernel/src/kernel/dispatch.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Give the adapter ownership of an abort-on-drop guard for each nested queued handoff. Avoid nested pool self-starvation using the existing dispatch boundary. Preserve the distinction between cancelling queued work and reconciling work that already started.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -137,7 +137,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-secret-broker/src/generic_https.rs`, `crates/security/chio-secret-broker/src/service/custody/registration.rs`, `crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Include DNS in one enforceable end-to-end preparation deadline and resolve outside the custody mutex. Avoid a second unconstrained lookup while retaining checked destination pinning. A timeout around an uncancellable worker alone does not bound retained work.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -151,7 +151,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `sdks/python/chio-hermes/src/chio_hermes/model_relay.py`, `sdks/python/chio-hermes/src/chio_hermes/restricted.py`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Bound connections before spawning handlers, enforce body deadlines, and bound retained event count/bytes including refusals. Refuse further traffic when evidence capacity is exhausted; do not silently truncate and claim complete capture.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -165,7 +165,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-secret-broker/src/service/ipc/prepared.rs`, `crates/security/chio-secret-broker/src/service/custody/registration.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Bind transport abandonment to the exact retained operation and reconcile/sweep expired pre-capture entries. Preserve captured/later operation ownership and accounting; unconditional EOF deletion/refund is unsafe.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -175,11 +175,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-011: Runtime JSON stores can successfully write a file they refuse to reopen
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/kernel/chio-runtime-core/src/store/json.rs`, `crates/kernel/chio-runtime-core/src/store/trust_floor.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Use one backend size constant, serialize an isolated candidate including its newline, refuse before publishing oversized bytes, and publish live state only after successful persistence.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -193,10 +193,10 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/security/chio-cage/src/linux.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Open non-directory artifacts with O_NONBLOCK and O_NOCTTY, then reject non-regular descriptors before reading. Preserve strict resolution and descriptor identity; a path stat before open is insufficient.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
 - [ ] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
@@ -207,7 +207,7 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Check retained parent and database descriptors for authority-granting Darwin ACLs during initial and subsequent custody validation. Reuse the existing descriptor inspection boundary and fail closed on inspection errors; do not add another FFI implementation.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -217,11 +217,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-014: Simulation rejects valid repeated effects against one captured target
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/core/chio-response-model/src/simulation.rs`, `crates/platform/chio-store-sqlite/src/security_state/response_simulation.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Validate each effect's base against the immutable captured state, then apply ordered contributions to the working copy. Alternatively explicitly forbid the combination consistently in validation/builders/schema if it is unsupported.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -235,21 +235,21 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Files:** `sdks/go/chio-go-http/manifest_validation.go`, `sdks/go/chio-go-http/protocol_validation.go`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Apply the shared input size limit before constructing the manifest decoder or copying a property. Keep presence, duplicate and semantic validation.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
 - [ ] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-016: Anthropic gate returns unevaluated tool content in message_start as safe
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Refuse populated initial tool content, or route every allowed initial content item through the same evaluation state machine before release. Keep the existing provider-lifecycle checks.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -259,11 +259,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-017: The Start convenience command drops the accepted current authority pin
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/products/chio-cli/src/cli/dispatch/mod.rs`, `crates/products/chio-cli/src/cli/runtime.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Pass the current authority pin through Start and use the same issuer-list construction as its API Protect counterpart. Test the actual command-to-config boundary, not only the helper.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -273,11 +273,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-018: Two tamper tests cannot detect removal of reflected-decision validation
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/security/chio-security-kernel/tests/issuance_freeze.rs`, `crates/security/chio-security-kernel/tests/capability_set_suspension.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Use tampered otherwise-allowing replies and assert the precise integrity/reflected-binding refusal at the real adapter. Preserve healthy allow and legitimate deny controls. No new harness is needed.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -287,11 +287,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-019: Interrupted decoy creation leaves a final file that exact retry cannot recover
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/security/chio-decoy/src/materialize.rs`, `crates/security/chio-decoy/src/registry.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Complete content and ownership metadata in a private same-parent staging object, fsync, then publish with no-replace semantics and sync the parent. Define bounded staging recovery without deleting an unproven final object.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -301,11 +301,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-020: Portable issuer fetch excludes DNS from its total deadline
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Start one enforceable budget before DNS and carry remaining time into HTTP, using resolution whose lifetime is bounded. Keep checked-address pinning. Merely timing out the await does not reclaim the worker/permit.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -315,11 +315,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-021: Candidate copy bounds ignore Git tree metadata and empty-file count
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `scripts/run-security-execution-container.py`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Bound tree-output bytes, entry count and aggregate path metadata before retaining/materializing them. Preserve the existing per-blob and total-content limits. Use the existing runner boundary rather than new qualification tooling.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -329,11 +329,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-022: A completed channel cannot accept its next valid service reservation
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/platform/chio-store-sqlite/src/channel_lifecycle_store/prepared.rs`, `crates/platform/chio-store-sqlite/src/channel_lifecycle_store/reservation.rs`, `crates/platform/chio-store-sqlite/src/channel_lifecycle_store/terminal.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Fence against the observed monotonic lifecycle version in the existing transaction and publication path, preserving exact channel/reservation/snapshot checks. Do not reset the counter or weaken the fence.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -343,11 +343,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-023: Zero-share verifier children have no retained identity bound
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/kernel/chio-kernel-core/src/budget_split.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Apply finite per-parent entry and retained-identity byte limits before new insertion, preserving idempotent existing-child checks and live holders. A cached sum improves work but does not bound memory. Reject zero-share authority only if that is the intended schema contract.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -357,11 +357,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-024: Mobile gating exposes a plain Allow for requirements it cannot enforce
 
-**Severity:** P2. **Owner:** Root.
+**Severity:** P2. **Owner:** Claude.
 
 **Files:** `crates/kernel/chio-kernel-core/src/evaluate.rs`, `crates/kernel/chio-kernel-mobile/src/lib.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Expose a clearly non-authoritative portable outcome and require mediated authorization for unsupported requirements, or refuse those matched grants in the mobile gate. Align the offline guide. Avoid a compatibility alias that preserves ambiguous Allow.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -371,11 +371,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 ### R2-025: RegistryUpdateError stops traversal of retained native causes
 
-**Severity:** P3. **Owner:** Root.
+**Severity:** P3. **Owner:** Claude.
 
 **Files:** `crates/platform/chio-control-plane/src/passport_verifier.rs`.
 
-**Required correction:** Verify source before choosing the repair.
+**Required correction:** Implement source for the three wrapped-error variants using the retained error; no new error abstraction.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
@@ -383,3 +383,29 @@ For each row below: read its frozen source and verifier, establish an exact boun
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
 
+
+### R2-026: Resume HMAC reader omits Darwin ACL custody
+
+**Severity:** P1 sibling. **Owner:** Root.
+
+**Files:** `crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs`, its native reader tests, shared existing descriptor ACL boundary as approved.
+
+**Required correction:** Inspect authority-granting ACLs on the retained descriptor before accepting resume-key bytes. Preserve root/current-owner policy, real Linux systemd credentials, bounded reads and metadata stability. No copied FFI implementation or changed mobile MSRV promise.
+
+- [x] Confirm current source and owning contract.
+- [ ] Execute native test-only Original `d7c2a7c3e8` (two refusals plus two healthy controls).
+- [ ] Implement and independently review minimal shared custody repair.
+- [ ] Pass native and owning Linux controls, strict lint and composition gates.
+- [ ] Compose and record exact-source qualification in the ledger.
+
+## Current execution checkpoint
+
+- Root public head remains `974f22914bd339a62933831650c3d55dbaf76987`: Vet/Deny pass, Build active, MSRV failed before compile. Its repair is private `5955d1cc6a`.
+- R2-004 and R2-012 genuine Originals each produced one passing preservation control and one assertion failure at `5aa488acb7`. Repairs are isolated; no green claim yet.
+- R2-007 initial test-only compile failure is retained separately; corrected Original `7521410a53` is executing. A compile error is not a reproduced behavioral defect.
+- R2-015 private composition `193ef17c75` and `95a3c64953` preserves reviewed source. Renewed Go-inclusive Original fails at the intended size-order assertion; owning 55 top-level tests and 79 subtests plus vet pass, and Root focused composition passes. Claude independent review is pending. Earlier evidence omitted Go source pins and remains explicitly superseded.
+- R2-001 native Original `5ef4faacd7` is running on Claude's Mac. R2-013/026 test-only continuation `d7c2a7c3e8` is queued there. Native evidence is required; Linux excludes these controls.
+- R2-002 is inherited but stays in scope: refuse an explicit external budget configuration that durable admission cannot honor atomically; enable the valid co-located durable authority without a dummy budget flag. Preserve supported ephemeral behavior.
+- R2-003 requires healthy keyring service startup, bootstrap validation and runtime/read validation controls. R2-014 compares against immutable captured state and applies ordered contributions. R2-016 refuses populated initial streaming tool content before forwarding.
+- Resolver permits remain owned until actual completion, including after caller timeout; one absolute deadline covers all stages. Relay finalization stops new admission before terminal evidence publication, preserves started work reconciliation and labels unfinished capture unresolved.
+- Shared CI content pins remain Root-owned. No cap raise, baseline waiver, authorization rotation or proof campaign. No merge without Connor's new go-ahead.
