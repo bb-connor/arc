@@ -1,0 +1,521 @@
+{
+  "schema": "chio.security.ci-extraction-audit.v1",
+  "captured_utc": "2026-10-11T21:33:46.828796+00:00",
+  "pr": 1160,
+  "baseline": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+  "source": "326d10e667a4aea50617d1cc5c469836bbd3ff27",
+  "producer": "7d168f63a7c9167f6ca6c1fd49f63995ec55a644",
+  "scope": "Move the unchanged promoted-default suite to its own required aggregate child; no Rust, test selection, feature, serial profile, budget, authorization or proof change.",
+  "files": {
+    ".github/workflows/ci.yml": "e8a474fab50bee3e0d31b849f95f810c06af16421b9c798fffeef58101917baf",
+    "scripts/check-security-ci-contract.py": "ec34a97a4ca39fb3e73d20a1b8d1ebecd1f7029170c18bf31130ba852e7f1d10",
+    "scripts/tests/check-security-ci-contract.test.py": "1b6ad3a6d345f265df247292c4ac6e6d9ca657705826cd0e6a6532cbf8233b8d",
+    "scripts/tests/check-workspace-ci-extraction.test.py": "2614a0ea633899d0ff0e09241432206874ae061eb5b3cc004b230675581bb0d1"
+  },
+  "qualification": {
+    "producer_main_contract": "PASS; Claude run-03 exact input snapshot, comment-only successor AST identical",
+    "root_remaining_contracts": {
+      "completed_utc": "2026-10-11T21:30:04.154799+00:00",
+      "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+      "source_stable": true,
+      "worktree_clean": false,
+      "base": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+      "input_patch_sha256": "3be0f7acdc855dfd53b1eebbe2f7d9737f1d3b77793ebaa47822fe58ac91ed86",
+      "scope_note": "Producer may be uncommitted; identity is exact baseline plus retained binary patch, verified again after all checks.",
+      "commands": [
+        {
+          "command": [
+            "python3",
+            "scripts/check-native-protocol-ci.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 0.202,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.py.log",
+          "log_sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/check-security-ci-contract.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 2.27,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-ci-contract.py.log",
+          "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-fips-ci-contract.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 7.357,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-fips-ci-contract.test.py.log",
+          "log_sha256": "3fa67afbdce5adb6963d34a223f8513d18ba4358365061c312e8e4c9e8671567"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-native-protocol-ci.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 0.562,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.test.py.log",
+          "log_sha256": "237eba88e17667fc755c944d89846f238d14e2e13c1ef14386f38d0561651061"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-patch-hygiene.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 2.666,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-patch-hygiene.test.py.log",
+          "log_sha256": "1d0383d928b9ad904a0aa10ec5bb5b41a2596a2e27c04d5b616be2820b1e6c3b"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-required-evidence-binding.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 0.196,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-required-evidence-binding.test.py.log",
+          "log_sha256": "c1de396add63b60b7739446ae754c9af4d1c4c8af85083ffc8071726ef9e4e98"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-security-definitions.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 31.43,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-definitions.test.py.log",
+          "log_sha256": "95469080a1f8a7174b9b17f9d847c6c2699e90db49eff1a23398ccd054a93d96"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/check-workspace-ci-extraction.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 1.138,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-workspace-ci-extraction.test.py.log",
+          "log_sha256": "95af5255b8cd461d89a465177867581b9a67563e4968c960ff55ff57729c6bcf"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-currency-regressions.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 85.672,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-currency-regressions.test.py.log",
+          "log_sha256": "798b4eae551f1f3aac5fddca0cca6841e61c44dd51eda98f024a16adc0c70bc6"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-identity-regressions.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 80.83,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-identity-regressions.test.py.log",
+          "log_sha256": "9c262e7142227aea39290fa687badb2d446624d76500327683926fe664d7147e"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-landing-regressions.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 232.653,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-landing-regressions.test.py.log",
+          "log_sha256": "a57bab8c9f78d8d8502bb3c260d3ffda76be9c3ade1f6e1a6ab83928a8b86a6c"
+        },
+        {
+          "command": [
+            "python3",
+            "scripts/tests/trusted-ci-revocation-regressions.test.py"
+          ],
+          "source": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+          "exit_code": 0,
+          "duration_seconds": 235.313,
+          "log": "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-revocation-regressions.test.py.log",
+          "log_sha256": "b3c9e0c3623b416dbf1b4e2b2464b977ab2e19819d5fcbd129f6d97cc8e9ac50"
+        }
+      ],
+      "scope": "Focused scripts; extraction and image-input tests nested by the main contract suite are not additional unique tests.",
+      "accepted": true
+    },
+    "root_composition": {
+      "producer": "7d168f63a7c9167f6ca6c1fd49f63995ec55a644",
+      "source": "326d10e667a4aea50617d1cc5c469836bbd3ff27",
+      "different_paths": [
+        "docs/superpowers/plans/2026-10-11-pr1160-cognition-ci-extraction.md"
+      ],
+      "executable_and_contract_inputs_equal": true,
+      "finished_utc": "2026-10-11T21:33:38.888503+00:00",
+      "checks": [
+        {
+          "name": "security-contract",
+          "command": [
+            "python3",
+            "scripts/check-security-ci-contract.py"
+          ],
+          "exit_code": 0,
+          "seconds": 2.238,
+          "log": "security-contract.log",
+          "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+        },
+        {
+          "name": "native-contract",
+          "command": [
+            "python3",
+            "scripts/check-native-protocol-ci.py"
+          ],
+          "exit_code": 0,
+          "seconds": 0.218,
+          "log": "native-contract.log",
+          "sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2"
+        },
+        {
+          "name": "preservation",
+          "command": [
+            "python3",
+            "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/verify-extraction.py",
+            "/home/connor/lanes/pr1160-landing-final",
+            "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/preservation.json"
+          ],
+          "exit_code": 0,
+          "seconds": 0.774,
+          "log": "preservation.log",
+          "sha256": "5ead2d8c57f804d1c35d40c78fa39ad315499f520dc8f73dddbc44f78b8c2a96"
+        },
+        {
+          "name": "patch-diff",
+          "command": [
+            "git",
+            "diff",
+            "--check",
+            "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+            "326d10e667a4aea50617d1cc5c469836bbd3ff27"
+          ],
+          "exit_code": 0,
+          "seconds": 0.018,
+          "log": "patch-diff.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "source_stable": true,
+      "clean_after": true
+    },
+    "review": "Claude approval/release mailbox2026-10-11T21:32:58Z; Root independently reviewed four files, selected consumers, input and AST equality, preservation and216 real Bash controls.",
+    "comment_equivalence": [
+      {
+        "path": "scripts/check-security-ci-contract.py",
+        "before": "54e80988b1641146522c0431aa2b4cac8dafec8435e575f648a00bbdab1a23a7",
+        "after": "ec34a97a4ca39fb3e73d20a1b8d1ebecd1f7029170c18bf31130ba852e7f1d10",
+        "python_ast_identical": true
+      }
+    ],
+    "original": "New contract refuses the unchanged 66dc workflow; Original extraction regression reports77failures/10errors due missing third-child shape. Root preservation probe independently refuses it. These are structural Originals, not runtime failures."
+  },
+  "preservation": {
+    "base": "66dc1bf22df3ff6d06557fa028c8e46c59c4a934",
+    "source": "326d10e667a4aea50617d1cc5c469836bbd3ff27",
+    "workflow_sha256": "e8a474fab50bee3e0d31b849f95f810c06af16421b9c798fffeef58101917baf",
+    "remaining_build_lint_steps_preserved": 48,
+    "unchanged_jobs": [
+      "workspace-tests",
+      "kani-public-pr",
+      "formal-proof-contract",
+      "apalache-full-contract",
+      "threat-model-coverage-contract",
+      "nonce-fips-contract",
+      "enterprise-security-contract",
+      "security-contract-required",
+      "msrv",
+      "cargo-vet",
+      "cargo-deny"
+    ],
+    "moved_step_identical": true,
+    "independent_setup_preserved_selected_prerequisites": true,
+    "setup_steps": 4,
+    "real_bash_combinations": 216
+  },
+  "prerequisites": {
+    "setup": [
+      "pinned checkout",
+      "pinned Rust toolchain",
+      "protobuf compiler/ripgrep/zstd",
+      "pinned Rust cache"
+    ],
+    "trace": "Selected target sources and build scripts use tracked fixtures. CP native_flow uses Rust/SQLite and self-spawned test processes. CLI finding excludes native integration consumers; runtime mounts optionally inspect host Python stdlib, not validator modules. Native/Python-validator/Node/Bun setup stays unchanged in original consumers.",
+    "producer_trace_sha256": "7f01433ff65969e1e38437a3d7f06b69ddba095ad346239525eb9f49cd933062"
+  },
+  "timing": {
+    "basis": "Claude/C7 read-only estimate in mailbox2026-10-11T21:01:13Z from predecessor retained timings",
+    "prior_build_lint_minutes": {
+      "central": 320,
+      "range": [
+        280,
+        365
+      ]
+    },
+    "budget_minutes": 360,
+    "decision": "Separate unchanged long work to reduce serial timeout risk. No timeout increase or workload removal.",
+    "limitation": "Estimates are not hosted results or a deadline guarantee. MSRV/workspace remain long; no sub-hour pipeline claim."
+  },
+  "remaining_acceptance": [
+    "Publish the reviewed replacement and obtain exact-head successful Build/lint, workspace and cognition children plus required aggregate, MSRV, Cargo Vet and Cargo Deny.",
+    "Require successor x86 enforcing MCP qualification; classify other failures and answer reviews.",
+    "Trusted setup and missing Linux evidence variable remain postmerge; open attestation/weights proofs and operational activation remain distinct.",
+    "Root qualification report, Claude final review and exact-head merge handshake."
+  ],
+  "artifact_manifest": {
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-fips-ci-contract.test.py.json": {
+      "sha256": "a50337d47f0379ad84d541d84f241c9285d0fa97c7d9f11e3e2db72b94c70ffa",
+      "bytes": 397
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-fips-ci-contract.test.py.log": {
+      "sha256": "3fa67afbdce5adb6963d34a223f8513d18ba4358365061c312e8e4c9e8671567",
+      "bytes": 143
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.py.json": {
+      "sha256": "933cbf5c12e54eae3ed3cb055cf0a4ffedb8481cac565b381df6746026d60ca3",
+      "bytes": 385
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.py.log": {
+      "sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2",
+      "bytes": 109
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.test.py.json": {
+      "sha256": "e9b096deaad5151b8d4c18a544d3fbb40df729340a32e47dff70bffed135bb99",
+      "bytes": 401
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-native-protocol-ci.test.py.log": {
+      "sha256": "237eba88e17667fc755c944d89846f238d14e2e13c1ef14386f38d0561651061",
+      "bytes": 114
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-patch-hygiene.test.py.json": {
+      "sha256": "c28a21b720a5cd19efc5ea273dcb16d0839711a238c240b05be795d114e0aa4b",
+      "bytes": 391
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-patch-hygiene.test.py.log": {
+      "sha256": "1d0383d928b9ad904a0aa10ec5bb5b41a2596a2e27c04d5b616be2820b1e6c3b",
+      "bytes": 112
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-required-evidence-binding.test.py.json": {
+      "sha256": "33b4516650538809735cff8882111b43e6e3e8b14056b6eba2d6585b649e4f53",
+      "bytes": 415
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-required-evidence-binding.test.py.log": {
+      "sha256": "c1de396add63b60b7739446ae754c9af4d1c4c8af85083ffc8071726ef9e4e98",
+      "bytes": 104
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-ci-contract.py.json": {
+      "sha256": "d47c6020440e38b77620943a9ca474108543aa22c924a22bcc73194313e202f5",
+      "bytes": 388
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-ci-contract.py.log": {
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "bytes": 49
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-definitions.test.py.json": {
+      "sha256": "c933a911c957c9593a7abbb10d789f809764476a0b5abe56c45b09fbdf03b65f",
+      "bytes": 405
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-security-definitions.test.py.log": {
+      "sha256": "95469080a1f8a7174b9b17f9d847c6c2699e90db49eff1a23398ccd054a93d96",
+      "bytes": 3460
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-workspace-ci-extraction.test.py.json": {
+      "sha256": "ab6631dff5c88db60a1b0f4fbbd1af976dcb11c3bd1dde6ade3343df0dbe8329",
+      "bytes": 411
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/check-workspace-ci-extraction.test.py.log": {
+      "sha256": "95af5255b8cd461d89a465177867581b9a67563e4968c960ff55ff57729c6bcf",
+      "bytes": 115
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/input.patch": {
+      "sha256": "3be0f7acdc855dfd53b1eebbe2f7d9737f1d3b77793ebaa47822fe58ac91ed86",
+      "bytes": 17955
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/summary.json": {
+      "sha256": "69b0c502847891f350c95e572d7949de912488abe452b33136aec56c80bdbfdd",
+      "bytes": 6019
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-currency-regressions.test.py.json": {
+      "sha256": "34df451f38ed47526598952916343bf96b955d18becb1d1c39a436c2aeea13d4",
+      "bytes": 416
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-currency-regressions.test.py.log": {
+      "sha256": "798b4eae551f1f3aac5fddca0cca6841e61c44dd51eda98f024a16adc0c70bc6",
+      "bytes": 119
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-identity-regressions.test.py.json": {
+      "sha256": "c2de2881cdb1a69d87b2bc4ffe2fb5167baafa4f353a8f142cc9654a8a893363",
+      "bytes": 415
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-identity-regressions.test.py.log": {
+      "sha256": "9c262e7142227aea39290fa687badb2d446624d76500327683926fe664d7147e",
+      "bytes": 123
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-landing-regressions.test.py.json": {
+      "sha256": "d4d731b70d5e718ed84c7a5a78fa012ab58692d8cc8674ff04d938ed9a9a2cae",
+      "bytes": 415
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-landing-regressions.test.py.log": {
+      "sha256": "a57bab8c9f78d8d8502bb3c260d3ffda76be9c3ade1f6e1a6ab83928a8b86a6c",
+      "bytes": 192
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-revocation-regressions.test.py.json": {
+      "sha256": "4d3348e85176eb76bffd40bd5e7b7d7e68c26fd47d7f6f2c3aed9c435f41c219",
+      "bytes": 421
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/remaining-contracts/trusted-ci-revocation-regressions.test.py.log": {
+      "sha256": "b3c9e0c3623b416dbf1b4e2b2464b977ab2e19819d5fcbd129f6d97cc8e9ac50",
+      "bytes": 124
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/input-equivalence.json": {
+      "sha256": "fd6effbb4480a1fbbe25c55a53202fe6212e0742552ee20c75291a3e3f494e42",
+      "bytes": 267
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/native-contract.log": {
+      "sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2",
+      "bytes": 109
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/patch-diff.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/preservation.json": {
+      "sha256": "81d414060ed6265bfeadb2a5bd42b9dc6926faf3c904c1e83d46b64aebbae309",
+      "bytes": 24820
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/preservation.log": {
+      "sha256": "5ead2d8c57f804d1c35d40c78fa39ad315499f520dc8f73dddbc44f78b8c2a96",
+      "bytes": 639
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/security-contract.log": {
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "bytes": 49
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/composed/summary.json": {
+      "sha256": "a932ab3739503b0c59b9a977a23c17140a85ecb171083c7058a2f8f35fa4c751",
+      "bytes": 1863
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-02/extraction-test-green.log": {
+      "sha256": "d7aa7eadafadde9c7ed41e173ae163ed01d682628eaf0fda0256e7fbc323f149",
+      "bytes": 2583
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-02/original-contract.log": {
+      "sha256": "047268132f892285caa412d98b614660033ea2f97ed708f82203307e1a6cbda5",
+      "bytes": 68
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-02/original-extraction.log": {
+      "sha256": "e2359913bbcc4f275276d3d17697c756691fc557a477f664a3364b1c877a18ad",
+      "bytes": 87400
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-02/preservation.log": {
+      "sha256": "007b0b78496aac9dd0e64f88a457b72b9458e5a51eaef5c291991bccf9c125ff",
+      "bytes": 223
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/contract-test.log": {
+      "sha256": "8f2f66a822c9bbf9ead55958cced106b7b00fc982b3b7e2453be89eb873df424",
+      "bytes": 286
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/contract.log": {
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "bytes": 49
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/extraction-test.log": {
+      "sha256": "aa618edd90824591493462fef26eff2b61ad0f49e5b89ef9f27a2ffa17bcfe28",
+      "bytes": 115
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/native-protocol-test.log": {
+      "sha256": "2dfe22f75f92e8479f3e33621342553b68a3f8613c687c3cd4a7e5aa47e5ac80",
+      "bytes": 114
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/native-protocol.log": {
+      "sha256": "8edfda409541b990578a469effb8e6a9f247bbecec1429590dfe6529f2b1b1e2",
+      "bytes": 109
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/swept-inputs.txt": {
+      "sha256": "891b3fde98f7ced76a06e11c4acbe37735de44480fd785ab68a93e5055d409f5",
+      "bytes": 1073
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/syntax-ci-66dc.log": {
+      "sha256": "06351bb1acef27920fa6d11806450c26a3b16b10326d27f3e9db2e17e13ba2b0",
+      "bytes": 149
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/syntax-ci-new.log": {
+      "sha256": "06351bb1acef27920fa6d11806450c26a3b16b10326d27f3e9db2e17e13ba2b0",
+      "bytes": 149
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-03/trusted-ci-landing-regressions.log": {
+      "sha256": "9c667cd717f0ba315019e47c50fa6ffe96658203f2e06d62b09e0416d95dc371",
+      "bytes": 36
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/ast-equivalence.txt": {
+      "sha256": "ed02b9c038c8e6473896f3d6f6a75342f70a3be5de3ade23c07674c46f333849",
+      "bytes": 145
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/comment-only.diff": {
+      "sha256": "f97031de74f5907c7cbf080b49c7d3cca583682ac7a263941998d99f9d4b9c56",
+      "bytes": 293
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/committed-inputs.txt": {
+      "sha256": "3cc7c39dfced921a4b46e2e10505f1c2523c19187c38e3e951527662599472cf",
+      "bytes": 428
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/committed.diff": {
+      "sha256": "3badcdd03eb8b0756566bbb3b709b645b6e121b3e3c42e7f46e597aa50f3470e",
+      "bytes": 17978
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/fast-contract.log": {
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "bytes": 49
+    },
+    "/home/connor/lanes/claude-pr1160-evidence/cognition-extraction/run-04/fast-extraction.log": {
+      "sha256": "bab006129038679c0c01493f74b7e236e19c0389607312b7b51d58025c5f3fa8",
+      "bytes": 115
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/original-minimal.json": {
+      "sha256": "af5d9522c88716a2151db4726d4ba794c9687f09c9cf888a0b38020806d4ed66",
+      "bytes": 252
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/original-minimal.log": {
+      "sha256": "6db6506da4b01bd82c40da4fc482f4e33d73e3bb8748a2139f46396d70474636",
+      "bytes": 420
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/verify-extraction.py": {
+      "sha256": "40a810a9d4566af265c08e7ffb299420ea975268eb12a478719d86eacb1ce48d",
+      "bytes": 3604
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/selected-prerequisites.json": {
+      "sha256": "0868d9edffa30680b56605f7f4ac4587d8af604d63074bf28cdacf5dc0ee37e2",
+      "bytes": 331005
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/comment-correction-equivalence.json": {
+      "sha256": "419f210c6c6baf439af413d94dada88fc47e0ef04fdff028f2fd6ccbdb798b12",
+      "bytes": 261
+    },
+    "/tmp/pr1160-ci-batch-20261010/cognition-ci-extraction/root-working-review.json": {
+      "sha256": "501844a64416cff85d007c1a94d34f9887e6a1ab5056e53b7cb427edaa8b0b8b",
+      "bytes": 1819
+    }
+  }
+}
