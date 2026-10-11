@@ -230,8 +230,8 @@ fn check(index: usize, cost: &Cost, second: Option<&Cost>) -> TestResult {
         "call {index} walk exceeds the {walk_bound}-event suffix contract\n{HEADER}\n{measured}"
     );
     if let Some(second) = second {
-        // Relative to call 2, which already replays initialization and call 1,
-        // each walk may retain at most the declared cadence of completed calls.
+        // Call 2 supplies the observed baseline for this sequential full-call
+        // fixture, including its remaining initialization/checkpoint overhead.
         let slack = u64::try_from(cost.walks.len())?
             .checked_mul(CHECKPOINT_CADENCE_CALLS)
             .and_then(|walks| walks.checked_mul(per_call))

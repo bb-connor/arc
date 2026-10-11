@@ -1,8 +1,9 @@
 use super::*;
 use chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1;
 
-/// Most anchored family events one native call appends: nonce preflight,
-/// input join, egress acquisition and commitment, and output join.
+/// A complete native egress call appends five anchored family events: nonce
+/// preflight, input join, egress acquisition and commitment, and output join.
+/// This is the maintenance trigger, not a bound on concurrent history.
 const MAX_EVENTS_PER_CALL: u64 = 5;
 
 pub(super) enum Selection<'a> {
@@ -29,9 +30,10 @@ impl Selection<'_> {
     }
 }
 
-/// Maintenance runs before each invocation's fence. Sealing once the suffix
-/// holds a full call keeps every verification inside that fence replaying at
-/// most one call's events, whatever the session length.
+/// Maintenance runs before each invocation's fence and seals a suffix of at
+/// least five events. In sequential use, fewer than five earlier events remain
+/// at that observation, before the current call adds its events. This does not
+/// bound events appended by concurrent invocations after maintenance.
 pub(super) fn due(events: i64) -> Result<bool, AdmissionOperationStoreError> {
     Ok(u64::try_from(events).map_err(invalid)? >= MAX_EVENTS_PER_CALL)
 }
