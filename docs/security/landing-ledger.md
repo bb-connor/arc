@@ -25,8 +25,8 @@ Original failures, repaired results and native limitations. Descriptor custody
 repairs passed their native Darwin controls and six-command Linux qualification;
 the [native audit](audits/review2-native-qualified-20261011.json) preserves source
 overlays, all artifact hashes and earlier failing runs. Other confirmed
-review items remain in assigned repair lanes. The canonical count stays **1,997**;
-only the named current states advance, preserving all historical requirements.
+review items remain in assigned repair lanes. The canonical count is now **1,998**, including the later R3-001 review finding;
+all 1,997 earlier requirements and their historical evidence remain preserved.
 
 The bounded tree-copy repair is locally qualified, including the stalled-pipe
 regression found during review. Its [audit](audits/review2-tree-qualified-20261011.json)
@@ -42,6 +42,13 @@ Temporary runner and initial test-fixture lint failures remain recorded.
 The [runtime JSON audit](audits/review2-runtime-json-qualified-20261011.json)
 records both overflow Originals, 309 library/integration tests, Criterion smoke
 and strict owning lint. The initial benchmark-wrapper failure remains recorded.
+
+The [repair-delta review](../reviews/2026-10-11-pr1160-repair-delta/findings.md)
+found one new P2, R3-001: capacity refusal can be omitted from a relay capture
+that later reports complete. Its [intake](audits/review3-intake-20261011.json)
+assigns the bounded correction to Claude C4. Earlier relay resource tests remain
+valid; full capture closure stays pending until the refusal/finalization control
+and owning qualification pass.
 
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
