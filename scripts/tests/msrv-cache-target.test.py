@@ -98,7 +98,7 @@ class MsrvCacheTarget(unittest.TestCase):
         commands = textwrap.dedent(lane.split('        run: |\n', 1)[1]).strip().splitlines()
         self.assertEqual(commands, [
             'cargo build --workspace',
-            'cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests',
+            'cargo test --workspace --no-fail-fast --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests',
             'cargo test -p chio-formal-diff-tests --no-run',
             'cargo test -p chio-wasm-guards --lib',
         ])
