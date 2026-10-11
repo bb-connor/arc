@@ -1,0 +1,432 @@
+{
+  "schema": "chio.security.focused-renewal.v1",
+  "observed_utc": "2026-10-11T06:35:48.852353+00:00",
+  "source_stage_head": "25e8206bd43adf498b2299e708bc30ffe147805d",
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "new_requirement_ids": [
+    "incoming-pr1160-focused-renewal-20261011:CI-PROOF-ELAPSED",
+    "incoming-pr1160-focused-renewal-20261011:CI-WRITER-STARTUP"
+  ],
+  "focused_partial_results": [
+    {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/01-kernel-expiry-ownership/result.json",
+        "sha256": "b3946791c0952d79868e0a6f02278c01699a4b4ea22ec390a791a8209ee45b6c"
+      },
+      "evidence": {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "kernel::tests::budget_parent_expiry::"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "kernel-expiry-ownership",
+        "log_sha256": "f0e6ab047475986f6970199c720da03f0549da90c67694a0de9c96472fdcf932",
+        "seconds": 189.4879090259783,
+        "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:17:42.651562+00:00",
+        "test_summaries": [
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1668 filtered out; finished in 0.07s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    },
+    {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/02-issuer-pool-and-receipt-deadlines/result.json",
+        "sha256": "c273f6cbbfd2c5f5e043bce6f3687b1fc58ac52b86220074b0afb049fd01c033"
+      },
+      "evidence": {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "--",
+          "bounded_worker_pool::tests",
+          "portable_issuer_fetch::tests",
+          "queued_remote_receipt_write_is_skipped_after_its_budget",
+          "remote_receipt_store_append_fails_closed_at_the_configured_budget",
+          "remote_receipt_store_capability_snapshot_fails_closed_at_the_configured_budget",
+          "bounded_receipt_writer_does_not_grow_threads_per_stalled_write"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "issuer-pool-and-receipt-deadlines",
+        "log_sha256": "287657a9a2245e2514a2f120f0a8bc332978de108bf65ad31a4538a880662a29",
+        "seconds": 302.49459472391754,
+        "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:20:53.856882+00:00",
+        "test_summaries": [
+          "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 1765 filtered out; finished in 6.53s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    },
+    {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/03-authority-replication-and-custody/result.json",
+        "sha256": "c34dafbce88cf811471fc507bb6e56638e8182cfe1d7ff7cdfd23c1d773bb960"
+      },
+      "evidence": {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-control-plane",
+          "--lib",
+          "authority_sync_isolation::"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "authority-replication-and-custody",
+        "log_sha256": "86b73872978aead78293d4b1f04f5bd1339fd3b6e35f21c903fb09c77a980141",
+        "seconds": 41.826008420903236,
+        "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:25:58.185279+00:00",
+        "test_summaries": [
+          "test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 1707 filtered out; finished in 39.92s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    },
+    {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/04-channel-reservation-family/result.json",
+        "sha256": "ecc07b2f7c5643cfad7884a86b489238cc5403f5f75908c9c28dad14b47cdd78"
+      },
+      "evidence": {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "channel_lifecycle_store::tests::reservation::"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "channel-reservation-family",
+        "log_sha256": "ffffb87400c0b4f7d1151597cf682a88f3c718878a36a15ebea47f830f768979",
+        "seconds": 15.632021756377071,
+        "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:26:41.888251+00:00",
+        "test_summaries": [
+          "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 2413 filtered out; finished in 14.28s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    },
+    {
+      "result": {
+        "path": "/tmp/pr1160-ci-batch-20261010/focused-residual-final/05-receipt-snapshot-family/result.json",
+        "sha256": "32aefa2ea8e9ede648cc7af7da7f985477ba7128c7d6390d77a9294af41aaa91"
+      },
+      "evidence": {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "receipt_query_snapshot::",
+          "--",
+          "--test-threads=8"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "receipt-snapshot-family",
+        "log_sha256": "afe2f6aea5564a8577ff3992e826640073ad809a4567238a5004bfe793dc63c1",
+        "seconds": 61.96433908911422,
+        "source": "9196515b30ecf45c4b648918fa2dc4434ce9910b",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:26:59.422950+00:00",
+        "test_summaries": [
+          "test result: ok. 151 passed; 0 failed; 7 ignored; 0 measured; 2261 filtered out; finished in 60.71s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    }
+  ],
+  "focused_campaign_terminal": false,
+  "cold_oracle": {
+    "source": "70bf8863d470e787800478f7f0b8608ab6520989",
+    "summary": {
+      "path": "/tmp/pr1160-ci-batch-20261010/cold-oracle-70bf/summary.json",
+      "sha256": "95ebef5b9574900649c472da88926b7fec768ab4483e0d51f0d6b72521abe260"
+    },
+    "restoration": {
+      "path": "/tmp/pr1160-ci-batch-20261010/cold-oracle-70bf/restored.json",
+      "sha256": "b7e8fb7334354b79edb7e55a572fa87de74fc69ae51fcd1f2eff816e4c176618"
+    },
+    "accepted": true,
+    "phases": [
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "admission_operation_store::security_participant_state::cold::tree_tests::grant_values_refuse_duplicate_rows_and_noncanonical_row_order",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_failed": 0,
+        "expected_passed": 1,
+        "label": "01-repaired-oracle",
+        "log_sha256": "8b912d6d939adfd61b0c1cd6ecd11fe53532d1d83f1a46300ad664a9bf6e6e47",
+        "seconds": 200.56842876179144,
+        "source_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:04:25.343921+00:00",
+        "test_counts": [
+          [
+            1,
+            0
+          ]
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "admission_operation_store::security_participant_state::cold::tree_tests::grant_values_refuse_duplicate_rows_and_noncanonical_row_order",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_failed": 0,
+        "expected_passed": 1,
+        "label": "02-predecessor-misses-removed-guard",
+        "log_sha256": "a5b68818251225e7dbba2bc2cc18175fd0f7a91ffdca5bc6dfd8cfb81b4d099f",
+        "seconds": 97.53616988379508,
+        "source_patch_sha256": "b94a45d1942facc3d32ac3dcd818d52d3272c0c0ff157da2d1f848d794907b93",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:07:47.883898+00:00",
+        "test_counts": [
+          [
+            1,
+            0
+          ]
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "admission_operation_store::security_participant_state::cold::tree_tests::grant_values_refuse_duplicate_rows_and_noncanonical_row_order",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "expected_exit": 101,
+        "expected_failed": 1,
+        "expected_oracle_panic": true,
+        "expected_passed": 0,
+        "label": "03-repaired-oracle-detects-removed-guard",
+        "log_sha256": "b51ac36ccaba6d4d6fa872670b1857471d3fea11a824dd597b23abc2c8c1dffe",
+        "seconds": 99.07089591491967,
+        "source_patch_sha256": "afee91592167ea7fb120070c3ad08c2663ec51595a53dd7426a407ca2fabd62f",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:09:27.419266+00:00",
+        "test_counts": [
+          [
+            0,
+            1
+          ]
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "admission_operation_store::security_participant_state::cold::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_failed": 0,
+        "expected_passed": 26,
+        "label": "04-restored-cold-family",
+        "log_sha256": "31f8dc7b9dff6e7348e655f25add59ba6085141a2da068880db85fa7abc23a2c",
+        "seconds": 101.9913848140277,
+        "source_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:11:10.370560+00:00",
+        "test_counts": [
+          [
+            26,
+            0
+          ]
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_failed": null,
+        "expected_passed": null,
+        "label": "05-strict-owning",
+        "log_sha256": "1de8a8b1777e94a730598774a8d96cb1eb31aab3802f7b198839014a3db131ce",
+        "seconds": 156.50336441025138,
+        "source_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_stable": true,
+        "started_utc": "2026-10-11T06:12:54.379788+00:00",
+        "test_counts": [],
+        "timeout_seconds": 1800
+      }
+    ],
+    "scope": "Test-oracle qualification only. No production cold-state/G5 readiness acceptance. Store source is byte-identical through the stage head."
+  },
+  "expiry_original": {
+    "log": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r4-001/original.log",
+      "sha256": "e4ddb7035d2547386c8dbe931bf3bb229ad2651b7e36d49705649c2bbeee4661"
+    },
+    "passed": 2,
+    "failed": 1,
+    "scope": "Unchanged landing-parent production with a test-only lock-ownership oracle, not an actual concurrent waiting thread."
+  },
+  "proof_elapsed": {
+    "status": "causal-original-retained-repair-in-progress",
+    "production_files": [
+      "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
+      "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
+    ],
+    "independent_artifact_verification": {
+      "path": "/tmp/pr1160-ci-batch-20261010/c7-elapsed-independent-verification.json",
+      "sha256": "9571b7307c3f1e7e927f9d04b8ec8a55284225624218d8d2830c696cb17220eb"
+    },
+    "parity_stage_passed": 88,
+    "parity_stage_failed": 8,
+    "full_fixture_qualification": false,
+    "reason": "Every parity failure contains nonzero ambient elapsed_millis; every stage pass has zero. These elapsed values enter authenticated outcome digests. The diagnostic run lacked the later collect signer environment, so its parity evidence is not complete fixture success.",
+    "independent_complete_fixture_control": {
+      "binary_source": "cf46d03851018797c62f1fb1ace2e73f3a566955",
+      "manifest": {
+        "path": "/var/tmp/claude-c7-stress/binary.sha256",
+        "sha256": "ed514fa291deca4f6f760457f378d9ce4de4b977460ae9856cc39d2584d8b0b4"
+      },
+      "runner": {
+        "path": "/var/tmp/claude-c7-stress/run.sh",
+        "sha256": "118e1019a3733b2ab012e324d8dcd920b541e6a7f736053f4467652bf98e1d31"
+      },
+      "log": {
+        "path": "/var/tmp/claude-c7-stress/run.log",
+        "sha256": "f922f8324ce9e7150c17badfa0b7828ef177f61717d3be52d13d227055f0ebe0"
+      },
+      "complete_identical": 40,
+      "parity_failed": 7,
+      "writer_failed": 1
+    },
+    "clock_gate_repair": {
+      "checkpoint": "25e8206bd43adf498b2299e708bc30ffe147805d",
+      "review": "Claude source approval 2026-10-11T06:32:36Z",
+      "red": {
+        "path": "/tmp/pr1160-ci-batch-20261010/receipt-monotonic-gate/red.json",
+        "sha256": "b5ebbfa19f8ccc3ffc6633e76d8bc118c933c410a8e1a30f5fa4f2470a472dcc"
+      },
+      "green": {
+        "path": "/tmp/pr1160-ci-batch-20261010/receipt-monotonic-gate/green.json",
+        "sha256": "7902d93f39e7ab4bd7fcd8395698f7c96c6b74162085bee858ab8a630bd8f8d2"
+      },
+      "original_source": {
+        "path": "/tmp/pr1160-ci-batch-20261010/receipt-monotonic-gate/original-source.json",
+        "sha256": "2c87fd097a278c08b03f6b933b2a0a3fa53e0fe7e0c08823d3ab3fbd7163ad22"
+      },
+      "scope": "13 calibration tests pass; unchanged source is correctly refused at both known production observations. No allowances added. Full source gate awaits Rust repair."
+    }
+  },
+  "writer_startup": {
+    "status": "confirmed-fail-closed-event-cause-unconfirmed",
+    "error_artifact": {
+      "path": "/var/tmp/claude-c7-stress/out/r2-9.err",
+      "sha256": "2a7c6a1fc35e8dd2295086871714287c4aaade6edc116265878e36d565e90c21"
+    },
+    "error": "federated receipt persistence degraded: commit writer is not serving",
+    "assessment": "The single startup denial is retained separately. The no-busy-handler hypothesis is contradicted by rusqlite installing 5000ms on open. Obtain actual writer health error before selecting a repair; no retry or fail-open waiver."
+  },
+  "review_threads": {
+    "snapshot": {
+      "path": "/tmp/pr1160-ci-batch-20261010/review-threads-0635.json",
+      "sha256": "6082c99c130cb6ddf9527a4ef7bb86ae8bf2b56631d80189e619df44ba06efa9"
+    },
+    "total": 65,
+    "unresolved": 33,
+    "unanswered": 0
+  },
+  "remaining_acceptance": [
+    "Complete and review the injected-clock Rust repair, custody failure controls and concurrent artifact equality.",
+    "Classify the actual writer startup error and repair any confirmed candidate failure without weakening admission.",
+    "Finish focused CLI/broker/native/strict qualification and the pending producer Original packets.",
+    "Publish one replacement; require four exact-head green checks, classified other failures and answered review threads.",
+    "Report landing readiness and obtain the explicit merge go-ahead."
+  ],
+  "hosted_qualified": false,
+  "merged": false,
+  "production_ready": false
+}
