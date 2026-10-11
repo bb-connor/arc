@@ -64,6 +64,10 @@ impl SigningBackend for MigrationGuardedSigningBackend {
         self.inner.public_key()
     }
 
+    fn current_public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
+        self.inner.current_public_key()
+    }
+
     fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
         self.require_enforced()?;
         let signature = self.inner.sign_bytes(message)?;

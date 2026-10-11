@@ -348,6 +348,51 @@ impl CapabilityAuthority for FixedResponseAuthority {
     }
 }
 
+/// A rotating backend whose current selector is unreadable while its
+/// compatibility identity still names an earlier key.
+struct UnreadableSelectorBackend(chio_core::crypto::Ed25519Backend);
+
+impl chio_core::crypto::SigningBackend for UnreadableSelectorBackend {
+    fn algorithm(&self) -> chio_core::SigningAlgorithm {
+        self.0.algorithm()
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.0.public_key()
+    }
+
+    fn current_public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Err(chio_core::Error::InvalidPublicKey(
+            "selector unavailable".to_string(),
+        ))
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+        self.0.sign_bytes(message)
+    }
+}
+
+#[test]
+fn reputation_trust_excludes_an_authority_key_that_is_not_currently_readable() {
+    let current = Keypair::generate();
+    let local = chio_kernel::LocalCapabilityAuthority::new_with_clock(
+        current.clone(),
+        chio_test_support::clock::clock(),
+    );
+    assert_eq!(
+        super::authority::reputation_trusted_kernel_keys(&local),
+        vec![current.public_key().to_hex()]
+    );
+
+    let governed = chio_kernel::GovernedCapabilityAuthority::new(
+        std::sync::Arc::new(UnreadableSelectorBackend(
+            chio_core::crypto::Ed25519Backend::new(Keypair::generate()),
+        )),
+        chio_test_support::clock::clock(),
+    );
+    assert!(super::authority::reputation_trusted_kernel_keys(&governed).is_empty());
+}
+
 #[test]
 fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() {
     let receipt_db_path = unique_path("issuance-policy-receipts", ".sqlite3");

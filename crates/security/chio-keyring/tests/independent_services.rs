@@ -1199,3 +1199,163 @@ fn a_private_witness_layout_provisions_once_and_restarts_without_provisioning() 
     assert_eq!(first.body.storage_identity, restarted.body.storage_identity);
     assert_ne!(first.body.process_id, restarted.body.process_id);
 }
+
+/// Panics inside the router's selector write section once armed, the way any
+/// panic while that lock is held poisons it.
+struct PoisoningActivationGuard {
+    armed: AtomicBool,
+}
+
+impl chio_keyring::KeyLogActivationGuard for PoisoningActivationGuard {
+    fn require_activation(&self) -> chio_keyring::Result<()> {
+        assert!(
+            !self.armed.load(Ordering::SeqCst),
+            "activation guard panicked inside the selector write section"
+        );
+        Ok(())
+    }
+}
+
+#[test]
+fn authority_backend_never_reports_a_rotated_out_key_after_router_poison() {
+    let fixture = Fixture::new();
+    let mut children = Children(
+        (0..3)
+            .map(|index| fixture.spawn_witness(index, true))
+            .collect(),
+    );
+    let witness_clients = (0..3)
+        .map(|index| fixture.witness_client(index))
+        .collect::<Vec<_>>();
+    for (index, client) in witness_clients.iter().enumerate() {
+        wait_for_witness(client, &format!("poison-witness-{index}"));
+    }
+    let (store, operator_path) = fixture.witnessed_genesis(&witness_clients);
+    let expected_pin = store.head_pin().test_unwrap().test_unwrap();
+    for index in 0..2 {
+        children
+            .0
+            .push(spawn_audit(&fixture.audit_config(index, &operator_path)));
+    }
+    let policy = chio_keyring::load_key_log_policy(&fixture.policy_path).test_unwrap();
+    let services = {
+        let started = Instant::now();
+        loop {
+            let witness_endpoints = (0..3)
+                .map(|index| {
+                    (
+                        chio_keyring::WitnessId::new(fixture.witness_ids[index]).test_unwrap(),
+                        fixture.path(format!("witness-{index}.sock")),
+                    )
+                })
+                .collect();
+            let audit_endpoints = BTreeMap::from([
+                ("audit.a".to_string(), fixture.path("audit-0.sock")),
+                ("audit.b".to_string(), fixture.path("audit-1.sock")),
+            ]);
+            if let Ok((services, _)) = chio_keyring::IndependentKeyLogServices::connect_and_validate(
+                &policy,
+                witness_endpoints,
+                audit_endpoints,
+                &expected_pin,
+                &expected_pin,
+            ) {
+                break Arc::new(services);
+            }
+            assert!(
+                started.elapsed() < WAIT_LIMIT,
+                "independent services did not reach the genesis pin"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+    };
+
+    let original = fixture.active.public_key();
+    let router = Arc::new(
+        KeyringSigningRouter::open_enterprise(
+            Arc::clone(&store),
+            Box::new(fixture.active.clone()),
+            chio_keyring::AnchorId::new("clock.independent.v1").test_unwrap(),
+            Arc::new(fixture.artifact_time.clone()),
+        )
+        .test_unwrap(),
+    );
+    let authority = chio_keyring::KeyringAuthoritySigningBackend::new_enterprise(
+        Arc::clone(&router),
+        Arc::clone(&services),
+    )
+    .test_unwrap();
+    let guard = Arc::new(PoisoningActivationGuard {
+        armed: AtomicBool::new(false),
+    });
+    let runtime = WitnessedRotationRuntime::new_enterprise(
+        Arc::clone(&store),
+        Arc::clone(&router),
+        Arc::new(fixture.operator.clone()),
+        Arc::new(RecoverableEnterpriseReceiptSink {
+            fail_active: AtomicBool::new(false),
+            active_attempts: AtomicUsize::new(0),
+        }),
+        guard.clone(),
+    )
+    .test_unwrap();
+
+    let genesis = store.load_events().test_unwrap().remove(0);
+    let rotated = backend(4);
+    let rotation_issued_at = genesis.body.issued_at.checked_add(1).test_unwrap();
+    let rotation_body = KeyLogEventBody {
+        schema: KEY_LOG_EVENT_SCHEMA.to_string(),
+        log_id: genesis.body.log_id.clone(),
+        sequence: 1,
+        event_id: EventId::new("event.independent.poison-rotation").test_unwrap(),
+        previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
+        authority_id: genesis.body.authority_id.clone(),
+        key_id: derive_key_id(rotated.algorithm(), &rotated.public_key()).test_unwrap(),
+        algorithm: rotated.algorithm(),
+        public_key: rotated.public_key(),
+        operation: KeyLogOperation::Rotate {
+            previous_key_id: genesis.body.key_id,
+            witness_roster_id: WitnessRosterId::new("roster.independent.v1").test_unwrap(),
+            witness_roster_binding: policy.witness_roster_binding().test_unwrap(),
+        },
+        effective_at: rotation_issued_at,
+        verify_until: Some(rotation_issued_at.checked_add(60_000).test_unwrap()),
+        reason: Some(EventReason::new("poisoned selector rotation").test_unwrap()),
+        issued_at: rotation_issued_at,
+    };
+    let rotation = chio_keyring::SignedKeyLogEvent {
+        authorizations: KeyLogAuthorizations::rotation(
+            OldKeyAuthorization::sign(&rotation_body, &fixture.active).test_unwrap(),
+            NewKeyProofOfPossession::sign(&rotation_body, &rotated).test_unwrap(),
+        ),
+        body: rotation_body,
+    };
+    let mut pending = runtime
+        .begin_rotation(&rotation, Box::new(rotated.clone()))
+        .test_unwrap();
+    runtime
+        .collect_witnesses_and_activate(&mut pending, &services)
+        .test_unwrap();
+    assert_eq!(
+        router.active_public_key().test_unwrap(),
+        rotated.public_key()
+    );
+
+    // Re-activation reaches the guard while the selector write lock is held.
+    guard.armed.store(true, Ordering::SeqCst);
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        runtime.collect_witnesses_and_activate(&mut pending, &services)
+    }));
+    assert!(panicked.is_err());
+    assert!(matches!(
+        router.active_public_key(),
+        Err(chio_keyring::KeyringError::Synchronization)
+    ));
+
+    assert_eq!(authority.public_key(), original);
+    assert!(matches!(
+        authority.current_public_key(),
+        Err(chio_core_types::Error::InvalidPublicKey(message))
+            if message == chio_keyring::KeyringError::Synchronization.to_string()
+    ));
+}

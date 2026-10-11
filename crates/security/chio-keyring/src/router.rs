@@ -592,7 +592,9 @@ impl KeyringSigningRouter {
 
 pub struct KeyringAuthoritySigningBackend {
     router: Arc<KeyringSigningRouter>,
-    fallback_public_key: PublicKey,
+    /// Identity active at construction. It answers only the infallible
+    /// compatibility accessors and never a current-identity read.
+    compatibility_identity: PublicKey,
     _independent_services: Arc<IndependentKeyLogServices>,
 }
 
@@ -611,10 +613,10 @@ impl KeyringAuthoritySigningBackend {
                 "authority router and independent services use different policy bindings",
             ));
         }
-        let fallback_public_key = router.active_public_key()?;
+        let compatibility_identity = router.active_public_key()?;
         Ok(Self {
             router,
-            fallback_public_key,
+            compatibility_identity,
             _independent_services: independent_services,
         })
     }
@@ -625,13 +627,19 @@ impl SigningBackend for KeyringAuthoritySigningBackend {
         self.router
             .active_public_key()
             .map(|key| key.algorithm())
-            .unwrap_or_else(|_| self.fallback_public_key.algorithm())
+            .unwrap_or_else(|_| self.compatibility_identity.algorithm())
     }
 
     fn public_key(&self) -> PublicKey {
         self.router
             .active_public_key()
-            .unwrap_or_else(|_| self.fallback_public_key.clone())
+            .unwrap_or_else(|_| self.compatibility_identity.clone())
+    }
+
+    fn current_public_key(&self) -> chio_core_types::Result<PublicKey> {
+        self.router
+            .active_public_key()
+            .map_err(|error| chio_core_types::Error::InvalidPublicKey(error.to_string()))
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {

@@ -916,10 +916,25 @@ pub struct SigningOutcome {
 /// passed as `&dyn SigningBackend` through artifact signing helpers.
 pub trait SigningBackend: Send + Sync {
     /// Algorithm this backend produces.
+    ///
+    /// Compatibility identity: a rotating backend may report a key it no
+    /// longer signs with. Trust and issuance decisions use
+    /// [`Self::current_public_key`].
     fn algorithm(&self) -> SigningAlgorithm;
 
     /// Public half of this backend's signing identity.
+    ///
+    /// Compatibility identity: a rotating backend may report a key it no
+    /// longer signs with. Trust and issuance decisions use
+    /// [`Self::current_public_key`].
     fn public_key(&self) -> PublicKey;
+
+    /// The identity this backend signs with now. A rotating backend whose
+    /// current selector cannot be read returns an error instead of an older
+    /// key.
+    fn current_public_key(&self) -> Result<PublicKey> {
+        Ok(self.public_key())
+    }
 
     /// Produce a detached signature over `message`.
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;

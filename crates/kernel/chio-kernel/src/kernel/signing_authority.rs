@@ -164,6 +164,10 @@ impl SigningBackend for SharedSigningBackend {
         self.0.public_key()
     }
 
+    fn current_public_key(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
+        self.0.current_public_key()
+    }
+
     fn sign_bytes(&self, message: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
         self.0.sign_bytes(message)
     }
