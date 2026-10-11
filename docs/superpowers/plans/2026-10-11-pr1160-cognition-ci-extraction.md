@@ -47,7 +47,7 @@
 **Interfaces:** Consume the reviewed producer and its Original/green evidence. Produce one qualified workflow candidate with unchanged runtime scope.
 
 - [ ] Independently trace prerequisite inputs, compare the moved step and every unaffected job/step against `66dc1bf22d`, and run aggregate/refusal controls.
-- [ ] Compose the producer and run the affected security, native, FIPS, trusted-definition, evidence-binding and patch-hygiene contracts on the exact composed source.
+- [ ] Run the affected security, native, FIPS, trusted-definition, evidence-binding and patch-hygiene contracts once on the frozen producer. After composition, prove all executable/configuration inputs identical and run the fast checkers and independent aggregate controls. Repeat broad checks only for changed inputs or unresolved failures.
 - [ ] Record logs, source hashes, independent review and timing limitations. The estimate is a reason to reduce risk, not a successful hosted run or a guaranteed deadline.
 - [ ] Publish the reviewed batch, verify local/remote/PR/archive equality, then stop superseded runs and preserve their incomplete logs.
 - [ ] Obtain exact-head green results for the three aggregate children, the aggregate, MSRV, Vet and Deny; qualify the repaired enforcing MCP HTTP job and address new review/failures.
@@ -60,3 +60,9 @@ with a material upper-tail risk. Separating unchanged work reduces that risk
 without changing what must pass. Workspace and MSRV still have long execution
 times; this extraction does not establish a sub-hour pipeline. Parallel test
 profiles, cache changes, lane retirement and contract redesign remain separate.
+
+The previous full security-contract regression took 1,040.6 seconds. Repeating
+that unchanged campaign on both producer and integrator adds delay without
+new coverage. Retain the producer's exact source and logs, prove input equality,
+and scope the composed checks honestly. A production or configuration delta
+invalidates that reuse and requires the affected broader checks again.
