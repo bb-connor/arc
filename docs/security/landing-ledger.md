@@ -8,6 +8,23 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Compaction and static CI repairs qualified privately (October 11 UTC)
+
+The [repair audit](audits/compaction-static-repairs-20261011.json) records
+**23/0 compaction tests**, strict all-target store lint, and independent
+approval of the production repair and final deterministic fixture. The final
+fixture fails against original `9e9cf98942` production and passes with
+`14d2f8c935` plus `4180df8fb7`; unchanged first-row refusal remains tested.
+The initial compile error, zero-test filter and random-namespace fixture
+failure are retained separately. They are not passing qualification evidence.
+
+The same audit records approved static contract repair **`7f9273387b`**,
+8 passing structural checks and three rejected contract mutations. These two
+requirements are source-qualified, with hosted replacement acceptance pending.
+The other three review obligations remain in progress. All **2,020** ledger
+requirements are preserved. Published `9e9cf98942` is still under CI, and no
+merge readiness or authorization is claimed.
+
 ## Exact-head review and CI repair intake (October 11 UTC)
 
 Published candidate **`9e9cf98942`** is under hosted qualification. Its new

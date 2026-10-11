@@ -25,10 +25,10 @@ Files: `crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compact
 
 - [x] Trace `ReplayOwners::ByteDeferred`: `page.compacted == 0` discards safely retained prefix progress.
 - [x] Add actual signed stream/value completions with deterministic request identities and both clock domains; measure the value's replay reads and restore its exact raw bytes.
-- [ ] Observe Original refusing the first page instead of returning its retained-prefix cursor.
-- [ ] Refuse replay byte deferral only when the scan cursor has not advanced. Keep the deferred row after the returned cursor.
-- [ ] Prove a zero-compaction first page resumes under the identical cap, stream bytes remain, value bytes are erased only after verification, and existing first-row refusal controls still pass.
-- [ ] Run owning compaction tests and strict store Clippy; get independent review and enroll the regression in the existing gate if applicable.
+- [x] Observe Original refusing the first page instead of returning its retained-prefix cursor.
+- [x] Refuse replay byte deferral only when the scan cursor has not advanced. Keep the deferred row after the returned cursor.
+- [x] Prove a zero-compaction first page resumes under the identical cap, stream bytes remain, value bytes are erased only after verification, and existing first-row refusal controls still pass.
+- [x] Run owning compaction tests and strict store Clippy; get independent review and enroll the regression in the existing gate if applicable.
 
 ## Task 2: Fallible current signing identity (Claude)
 
@@ -64,3 +64,14 @@ Files: `crates/kernel/chio-kernel/src/kernel/tests/durable_admission/payment_rec
 - [ ] Renew affected inventories, source anchors and generated coverage without changing models; run local changed-boundary and static gates.
 - [ ] Classify every hosted failure on `9e9cf98942`; wait for its four required checks to report, then publish one reviewed batch.
 - [ ] Verify replacement head, required checks, review feedback and residual classifications. Report readiness and await explicit merge approval.
+
+### Root qualification checkpoint
+
+Source `7f9273387b`: final original-production regression fails as intended;
+repaired compaction **23/0** and strict all-target store lint pass. Claude
+approves production `14d2f8c935` and deterministic fixture `4180df8fb7`.
+Static checker repair `7f9273387b` also has approval, eight positive checks
+and three rejected mutations; run `python3 scripts/check-apalache-formal-slice.py`
+in final local prepublication gates. See the source-scoped
+[repair audit](../../security/audits/compaction-static-repairs-20261011.json).
+Keyring, checkpoint, prepaid control and final composition remain pending.
