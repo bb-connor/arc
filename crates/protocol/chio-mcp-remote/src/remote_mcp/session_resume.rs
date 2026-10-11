@@ -1,3 +1,7 @@
+#[cfg(all(test, target_vendor = "apple"))]
+#[path = "session_resume_darwin_tests.rs"]
+mod session_resume_darwin_tests;
+
 #[cfg(unix)]
 fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Metadata) -> bool {
     use std::os::unix::fs::MetadataExt;

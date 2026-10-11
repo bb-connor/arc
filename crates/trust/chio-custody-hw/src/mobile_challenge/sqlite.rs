@@ -1,3 +1,6 @@
+#[cfg(all(test, target_vendor = "apple"))]
+mod darwin_tests;
+
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
