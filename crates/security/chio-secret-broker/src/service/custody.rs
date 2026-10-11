@@ -15,6 +15,9 @@ struct RetainedPreparedDispatch {
     prepared_dispatch_id: String,
     request_canonical_digest: String,
     prepared_at_unix_seconds: u64,
+    /// Signed capability expiry; no execution can verify the capability at or
+    /// after this instant, so pre-capture custody past it has no owner.
+    expires_at_unix_seconds: u64,
     dispatch: PreparedHttpsDispatch,
     credential: SecretMaterial,
     credential_version: chio_store_sqlite::BlobHandle,
