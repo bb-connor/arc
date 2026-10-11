@@ -25,6 +25,11 @@ pub enum ProtectError {
     #[error("configuration error: {0}")]
     Config(String),
 
+    #[error(
+        "durable admission owns the budget authority beside the receipt store; remove budget_db (--budget-db) and control_url (--control-url)"
+    )]
+    ExternalBudgetWithDurableAdmission,
+
     #[error("upstream request failed: {0}")]
     Upstream(String),
 

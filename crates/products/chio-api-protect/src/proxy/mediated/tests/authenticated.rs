@@ -29,14 +29,13 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
     let cap = issue_invocation_capability(&kernel, &agent, "caller-server", "effect", 1);
     let state = mediated_test_state_with_durable_admission(
         signer.clone(),
-        budget,
+        MediationBudget::Durable(durable),
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.into()),
         None,
         true,
         None,
         None,
-        Some(durable),
     );
     state
         .mediation_kernel

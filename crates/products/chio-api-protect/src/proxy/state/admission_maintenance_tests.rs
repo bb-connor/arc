@@ -248,7 +248,7 @@ impl Fixture {
         trace.pending.store(true, Ordering::SeqCst);
         let kernel = build_mediation_kernel(
             &signer,
-            budget.clone(),
+            super::super::MediationBudget::Durable(durable),
             super::super::mediated::MediationPolicy {
                 issuers: &[],
                 hash: None,
@@ -256,7 +256,6 @@ impl Fixture {
             },
             vec![Box::new(PaidOutput(trace.clone()))],
             Some(Box::new(PendingRail(trace.clone()))),
-            Some(durable),
             Arc::new(clock.clone()),
         )?;
         let subject = Keypair::from_seed(&[28; 32]).public_key();

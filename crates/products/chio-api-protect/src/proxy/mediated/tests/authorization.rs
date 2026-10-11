@@ -1234,14 +1234,13 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
     let params = serde_json::json!({ "invoice": "inv-durable" });
     let state = mediated_test_state_with_durable_admission(
         signer,
-        budget,
+        MediationBudget::Durable(durable),
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.to_string()),
         None,
         true,
         None,
         None,
-        Some(durable),
     );
     assert!(
         state

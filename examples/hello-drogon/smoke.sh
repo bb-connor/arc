@@ -99,8 +99,6 @@ wait_for_http "${APP_URL}/healthz"
   export CHIO_TRUSTED_ISSUER_KEY="${TRUSTED_ISSUER_KEY}"
   exec "${CHIO_BIN}" \
     --authority-seed-file "${SIGNER_SEED}" \
-    --control-url "${CONTROL_URL}" \
-    --control-token "${SERVICE_TOKEN}" \
     api protect \
     --upstream "${APP_URL}" \
     --spec "${EXAMPLE_ROOT}/openapi.yaml" \

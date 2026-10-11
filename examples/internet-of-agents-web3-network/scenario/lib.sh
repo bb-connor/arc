@@ -135,7 +135,7 @@ start_live_topology() {
   CHIO_TRUSTED_ISSUER_KEY="${OPERATOR_AUTHORITY_PUB}" \
   wait_for_http "${OPERATOR_CONTROL_URL}/health"
 
-    "${CHIO_BIN}" --control-url "${OPERATOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    "${CHIO_BIN}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${OPERATOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect \
     --upstream "${MARKET_RAW_URL}" \
@@ -146,7 +146,7 @@ start_live_topology() {
   MARKET_SIDECAR_PID=$!
 
   CHIO_TRUSTED_ISSUER_KEY="${OPERATOR_AUTHORITY_PUB}" \
-    "${CHIO_BIN}" --control-url "${OPERATOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    "${CHIO_BIN}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${OPERATOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect \
     --upstream "${SETTLEMENT_RAW_URL}" \

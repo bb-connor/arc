@@ -155,8 +155,9 @@ pub(crate) struct ProxyState {
     /// this is `false`, rather than mint a reserved nonce that can never be
     /// reconciled by nonce or reclaimed by the TTL reaper.
     pub(crate) mediation_hold_capable: bool,
-    /// The process-lifetime kernel-mediation authority, built once when a budget
-    /// store is configured. Held behind a `Mutex` because admitting the
+    /// The process-lifetime kernel-mediation authority, built once when the
+    /// sidecar has a budget authority (durable admission or a configured budget
+    /// store). Held behind a `Mutex` because admitting the
     /// caller-named tool server (registration) needs `&mut self`, and reused
     /// across requests so the approval-token and DPoP replay stores stay
     /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
@@ -389,6 +390,15 @@ impl ProtectProxy {
             ));
         }
 
+        // Durable admission reserves, starts and settles every operation inside
+        // the authority beside the receipt store; no external budget can take
+        // part in that transaction.
+        if durable_receipt_db.is_some()
+            && (self.config.budget_db.is_some() || self.config.control_url.is_some())
+        {
+            return Err(ProtectError::ExternalBudgetWithDurableAdmission);
+        }
+
         if durable_receipt_db.is_some() {
             chio_store_sqlite::SqliteAuthorityStore::ensure_serving_supported()
                 .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
@@ -538,27 +548,17 @@ impl ProtectProxy {
         let http_client = client_builder_with_contract(&egress_contract)
             .timeout(self.config.upstream_request_timeout)
             .build()?;
-        let configured_budget_store = build_budget_store(&self.config, Arc::new(clock.clone()))?;
-        // Under durable admission the authority's composite budget store backs
-        // every reservation, so the mediation routes are hold-capable there.
-        let mediation_hold_capable = durable_admission.is_some()
-            || configured_budget_store
-                .as_ref()
-                .map(|configured| configured.hold_capable)
-                .unwrap_or(false);
-        let budget_store = if self.config.approval.is_some() {
-            Some(
-                durable_admission
-                    .as_ref()
-                    .ok_or_else(|| {
-                        ProtectError::Config("approval authority requires durable admission".into())
-                    })?
-                    .budget_store
-                    .clone(),
-            )
-        } else {
-            configured_budget_store.map(|configured| configured.store)
+        let (mediation_budget, mediation_hold_capable) = match durable_admission {
+            Some(durable) => (Some(MediationBudget::Durable(durable)), true),
+            None => match build_budget_store(&self.config, Arc::new(clock.clone()))? {
+                Some(configured) => (
+                    Some(MediationBudget::Configured(configured.store)),
+                    configured.hold_capable,
+                ),
+                None => (None, false),
+            },
         };
+        let budget_store = mediation_budget.as_ref().map(MediationBudget::store);
 
         // Automatic reconcile/reverse of open holds requires the durable receipt
         // log (ADR-0013) to build the realized-spend arbitration map. Without
@@ -590,14 +590,14 @@ impl ProtectProxy {
         // the approval-token and DPoP replay stores it carries stay authoritative
         // across `/v1/evaluate` requests and the nonce it mints is the one it
         // verifies and consumes on `/v1/reconcile`. It exists exactly when a
-        // budget store is configured; without one, `/v1/evaluate` and
+        // budget authority exists; without one, `/v1/evaluate` and
         // `/v1/reconcile` deny fail-closed.
         let payment_adapter = self.payment_adapter;
-        let mediation_kernel = match budget_store.as_ref() {
-            Some(store) => {
+        let mediation_kernel = match mediation_budget {
+            Some(budget) => {
                 let mut kernel = build_mediation_kernel(
                     &keypair,
-                    Arc::clone(store),
+                    budget,
                     super::mediated::MediationPolicy {
                         issuers: &trusted_capability_issuers,
                         hash: Some(&policy_hash),
@@ -607,7 +607,6 @@ impl ProtectProxy {
                     },
                     Vec::new(),
                     payment_adapter,
-                    durable_admission,
                     Arc::new(clock.clone()),
                 )?;
                 if let Some(store) = revocation_store.as_ref() {
