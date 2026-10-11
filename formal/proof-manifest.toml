@@ -4212,6 +4212,8 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs"
 rust_symbols = [
+  "FORMAT",
+  "DELTA_FORMAT",
   "Record",
   "Record::format",
   "Record::bytes",
@@ -4220,8 +4222,10 @@ rust_symbols = [
   "latest",
   "verify_reference",
 ]
-normalized_sha256 = "34ae9a96fe4b7704f1acca3614712112ac2769a20fb8b59e0944e8fade5271c1"
+normalized_sha256 = "acf2bc1496c5862028b2ab8048194c6907aa1fbe0171659766beac13103518f0"
 symbol_sha256 = [
+  { symbol = "FORMAT", sha256 = "0f51d5e826eca281f8f8cdf553a7dc3063d4c33e910f9cbf1de2c99c83487c00" },
+  { symbol = "DELTA_FORMAT", sha256 = "5f9949236468aab917bca411a378a5e2734bc0276806af681a38eac8106e9d8e" },
   { symbol = "Record", sha256 = "854baa05328e046655ee9dbc200e55d262777b14381355b42b735453454d6041" },
   { symbol = "Record::format", sha256 = "6bfa1dacf2b8d14bd4d90075723ebe98f17369af6ed38bbf4aa92f41edca613f" },
   { symbol = "Record::bytes", sha256 = "767444cf60f94e9aeb6a435821ebe57b27830f4d9ad10c39deb237150e4185db" },
@@ -4264,6 +4268,8 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs"
 rust_symbols = [
+  "READ_FACTOR",
+  "MAX_TOMBSTONES",
   "Tombstone",
   "Delta",
   "Delta::validate",
@@ -4280,8 +4286,10 @@ rust_symbols = [
   "image",
   "plan",
 ]
-normalized_sha256 = "7edfaba76a9a39cee5acf7343e96a9b4bc2a60cada7b599406eb62cad2efd8f3"
+normalized_sha256 = "f5a20ac9cd8210fbd6f1b9dcd53abcf3c86ece1d408b16d1d9fd01ef58a66d3b"
 symbol_sha256 = [
+  { symbol = "READ_FACTOR", sha256 = "400dc145ab22ae0ddefba7dbe4811ad67defd2b432bf8dda6b99415610d31455" },
+  { symbol = "MAX_TOMBSTONES", sha256 = "a46810c10657fbe0ec0f87b47a887df2756a4ecccad279b5756f26da2e95798f" },
   { symbol = "Tombstone", sha256 = "aacab2346065186b094b970b5f29f48afbca4940a54c06ff074a9b1ad5580fa4" },
   { symbol = "Delta", sha256 = "05fe0b5fa2a407b226e15028dce3868104c3fd1df9264a1d98896851f67d049f" },
   { symbol = "Delta::validate", sha256 = "2c3b014b7a6f90abe0f1d68728c1fee784aad7b2092d90faa490ed87c5d31f92" },

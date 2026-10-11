@@ -115,6 +115,8 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs",
         symbols: &[
+            "FORMAT",
+            "DELTA_FORMAT",
             "Record",
             "Record::format",
             "Record::bytes",
@@ -140,6 +142,8 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs",
         symbols: &[
+            "READ_FACTOR",
+            "MAX_TOMBSTONES",
             "Tombstone",
             "Delta",
             "Delta::validate",
@@ -1780,6 +1784,18 @@ mod tests {
     fn extracted_validators_and_drop_clock_failures_remain_drift_guarded() -> Result<(), String> {
         let root = crate::workspace_root().map_err(|error| error.to_string())?;
         for (path, symbol, before, after) in [
+            (
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs",
+                "READ_FACTOR",
+                "const READ_FACTOR: u64 = 2;",
+                "const READ_FACTOR: u64 = 3;",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs",
+                "MAX_TOMBSTONES",
+                "const MAX_TOMBSTONES: usize = 256;",
+                "const MAX_TOMBSTONES: usize = 512;",
+            ),
             (
                 "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs",
                 "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
