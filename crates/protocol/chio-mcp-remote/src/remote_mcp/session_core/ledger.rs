@@ -67,7 +67,7 @@ impl RemoteSessionLedger {
             .cloned()
             .collect::<Vec<_>>();
         let terminal = self.terminal.lock().await;
-        // A session mid-transition sits in both maps; it is reported once, as terminal.
+        // A session that terminalized after the active read is reported once, as terminal.
         let active = active
             .iter()
             .filter(|session| !terminal.contains_key(&session.session_id))
@@ -97,6 +97,15 @@ impl RemoteSessionLedger {
     pub(super) async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
         self.transition_to_terminal(session, RemoteSessionState::Expired)
             .await
+    }
+
+    /// Moves an active session whose lifecycle is already terminal into
+    /// terminal diagnostics. The published record is the in-memory diagnostic
+    /// only; it claims no durable tombstone or fence.
+    pub(super) async fn retire_terminal(&self, session: &Arc<RemoteSession>) {
+        let mut active = self.active.lock().await;
+        let mut terminal = self.terminal.lock().await;
+        retire_terminal_locked(&mut active, &mut terminal, session);
     }
 
     pub(super) async fn cleanup_due_sessions(&self) -> Result<(), CliError> {
@@ -143,9 +152,7 @@ impl RemoteSessionLedger {
                 RemoteSessionState::Initializing
                 | RemoteSessionState::Deleted
                 | RemoteSessionState::Expired => {}
-                RemoteSessionState::Closed => {
-                    self.active.lock().await.remove(&session.session_id);
-                }
+                RemoteSessionState::Closed => self.retire_terminal(&session).await,
             }
         }
 
@@ -196,7 +203,12 @@ impl RemoteSessionLedger {
                 )));
             }
         }
+        // Every await precedes the first state change, so cancelling this
+        // future leaves the session untouched. Map guards are always taken
+        // active then terminal.
         let _terminalization = session.terminalization.lock().await;
+        let mut active = self.active.lock().await;
+        let mut terminal = self.terminal.lock().await;
         let mut record = session.diagnostic_record();
         let (terminal_at, durable_tombstone) = {
             // Serialize renewal with expiry adjudication and durable terminal intent.
@@ -205,6 +217,8 @@ impl RemoteSessionLedger {
                 .lock()
                 .map_err(|_| ClockError::Unavailable)?;
             if lifecycle.state.is_terminal() {
+                drop(lifecycle);
+                retire_terminal_locked(&mut active, &mut terminal, session);
                 return Ok(());
             }
             let reading = self.clock.read()?;
@@ -256,13 +270,12 @@ impl RemoteSessionLedger {
             lifecycle.deadline = None;
             (terminal_at, durable_tombstone)
         };
-        // The session is published as a terminal diagnostic before it leaves
-        // active lookup, so lookup observes it in at least one map throughout.
-        self.terminal
-            .lock()
-            .await
-            .insert(session.session_id.clone(), Arc::new(record.clone()));
-        self.active.lock().await.remove(&session.session_id);
+        // The signed tombstone carries this same record, so the diagnostic is
+        // final once published.
+        active.remove(&session.session_id);
+        terminal.insert(session.session_id.clone(), Arc::new(record));
+        drop(terminal);
+        drop(active);
 
         // The durable terminal intent and active-row deletion are committed
         // before the owned upstream transport receives its terminal effect.
@@ -274,19 +287,12 @@ impl RemoteSessionLedger {
         let shutdown_result = session.shutdown_upstream_transport();
 
         let finalization_result = if let Some((path, keyring, tombstone)) = durable_tombstone {
-            let result = session.ensure_session_store_owned().and_then(|()| {
+            session.ensure_session_store_owned().and_then(|()| {
                 finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)
-            });
-            record = tombstone.record;
-            result
+            })
         } else {
             Ok(())
         };
-
-        self.terminal
-            .lock()
-            .await
-            .insert(session.session_id.clone(), Arc::new(record));
         match (shutdown_result, finalization_result) {
             (Ok(()), Ok(())) => Ok(()),
             (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
@@ -316,4 +322,24 @@ impl RemoteSessionLedger {
             }
         }
     }
+}
+
+/// Leaves an existing terminal record in place, and acts only while the
+/// session is still active so purged records are never recreated.
+fn retire_terminal_locked(
+    active: &mut HashMap<String, Arc<RemoteSession>>,
+    terminal: &mut HashMap<String, Arc<RemoteSessionDiagnosticRecord>>,
+    session: &RemoteSession,
+) {
+    if !active.contains_key(&session.session_id) {
+        return;
+    }
+    let record = session.diagnostic_record();
+    if !record.lifecycle.state.is_terminal() {
+        return;
+    }
+    active.remove(&session.session_id);
+    terminal
+        .entry(session.session_id.clone())
+        .or_insert_with(|| Arc::new(record));
 }

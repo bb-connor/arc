@@ -382,6 +382,8 @@ enum RemoteSessionEntry {
 #[derive(Clone)]
 struct RemoteSessionLedger {
     clock: RemoteClock,
+    // A session leaves `active` only in the same critical section that makes
+    // it visible in `terminal`. Code holding both guards takes `active` first.
     active: Arc<Mutex<HashMap<String, Arc<RemoteSession>>>>,
     terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
