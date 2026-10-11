@@ -20,6 +20,8 @@ mod caller_budget_snapshot;
 mod delivery_revalidation;
 #[path = "durable_admission/dispatch_commit_failure.rs"]
 mod dispatch_commit_failure;
+#[path = "durable_admission/dispatch_elapsed.rs"]
+mod dispatch_elapsed;
 #[path = "durable_admission/dpop_acquisition.rs"]
 mod dpop_acquisition;
 #[path = "durable_admission/federation_context.rs"]

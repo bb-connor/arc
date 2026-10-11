@@ -20,6 +20,21 @@ pub(super) struct EvaluationReturnRecording<'a> {
 }
 
 impl ChioKernel {
+    /// Time one committed dispatch on the authority clock's monotonic domain.
+    /// Callers own the dispatch through an armed, started drop guard first. The
+    /// dispatch future runs only after the start reading succeeds. A failed or
+    /// regressed reading reaches the caller's post-commit failure arm, which
+    /// keeps the operation and holds and records the outcome as unknown.
+    pub(super) async fn timed_dispatch<T>(
+        &self,
+        dispatch: impl std::future::Future<Output = Result<T, KernelError>>,
+    ) -> Result<(T, Duration), KernelError> {
+        let started = self.authority_clock_reading()?.monotonic();
+        let output = dispatch.await?;
+        let finished = self.authority_clock_reading()?.monotonic();
+        Ok((output, finished.duration_since(started)?))
+    }
+
     pub(super) fn record_evaluation_return(
         &self,
         admission: Option<&mut DurableToolAdmission>,

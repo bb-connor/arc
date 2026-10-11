@@ -1725,7 +1725,6 @@ impl ChioKernel {
                 "dispatch reached without a resolved tool server".to_owned(),
             ));
         };
-        let tool_started_at = Instant::now();
         let has_monetary = budget_mutation.charge_result().is_some();
         // The guard owns the original dispatch snapshot while the live
         // admission advances to its separately recorded return.
@@ -1759,7 +1758,12 @@ impl ChioKernel {
             );
         }
         let dispatch_result = self
-            .dispatch_resolved_server_within_budget(server, request, has_monetary, dispatch_context)
+            .timed_dispatch(self.dispatch_resolved_server_within_budget(
+                server,
+                request,
+                has_monetary,
+                dispatch_context,
+            ))
             .await;
         if let Some(outcome) = security_dispatch_outcome.take() {
             match &dispatch_result {
@@ -1769,13 +1773,13 @@ impl ChioKernel {
         }
         // Keep the guard armed through credential commitment and return recording.
         // A failure after tool execution preserves outcome uncertainty.
-        let (tool_output, reported_cost) = match dispatch_result {
-            Ok(result) => {
+        let ((tool_output, reported_cost), tool_elapsed) = match dispatch_result {
+            Ok(timed) => {
                 if let Err(error) = credential_reservation.commit() {
                     post_admission_drop_guard.mark_dispatch_credential_commit_failed();
                     return Err(error);
                 }
-                result
+                timed
             }
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
                 if let Err(commit_error) = credential_reservation.commit() {
@@ -1923,7 +1927,6 @@ impl ChioKernel {
                 );
             }
         };
-        let tool_elapsed = tool_started_at.elapsed();
         let durable_outcome = match self.record_evaluation_return(
             durable_admission.as_mut(),
             &mut post_admission_drop_guard,
