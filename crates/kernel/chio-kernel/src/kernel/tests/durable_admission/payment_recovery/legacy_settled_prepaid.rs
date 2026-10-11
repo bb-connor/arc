@@ -48,7 +48,7 @@ fn review_legacy_settled_prepaid_quarantines_with_exact_legacy_amount_absent() -
         .ok_or("claim expiry time")?;
     let _claim_expired = chio_test_support::clock::scope_unix_secs(claim_expired_at);
 
-    assert_eq!(kernel.reconcile_durable_admission_startup()?, 0);
+    assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
 
     assert_eq!(
         store.operation().state(),
