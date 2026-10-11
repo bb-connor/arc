@@ -288,6 +288,7 @@ mod deadline;
 
 #[cfg(unix)]
 use deadline::BrokerIpcDeadlineIo;
+pub(crate) use deadline::DEFAULT_BROKER_IPC_DEADLINE_MS;
 use deadline::MAX_BROKER_IPC_DEADLINE_MS;
 pub use deadline::{BrokerIpcDeadlines, BrokerIpcServeOutcome};
 
