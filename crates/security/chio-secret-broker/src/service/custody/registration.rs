@@ -61,6 +61,7 @@ impl BrokerService {
     ) -> Result<PrepareDispatchAcknowledgement> {
         let _operation_guard = self.attempt_operation_guard_for_request(request)?;
         self.budget.capabilities().require_production()?;
+        self.reclaim_expired_prepared_dispatches(now_unix_seconds)?;
         if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
             return Err(BrokerError::AuthorizationDenied(failure.diagnostic_code));
         }
@@ -166,6 +167,7 @@ impl BrokerService {
                 prepared_dispatch_id: expected_prepared_dispatch_id,
                 request_canonical_digest: registration.request_canonical_digest.clone(),
                 prepared_at_unix_seconds: now_unix_seconds,
+                expires_at_unix_seconds: request.capability.body.expires_at_unix_seconds,
                 dispatch,
                 credential,
                 credential_version,
@@ -173,6 +175,48 @@ impl BrokerService {
             },
         );
         PrepareDispatchAcknowledgement::new(registration, request, now_unix_seconds)
+    }
+
+    /// Discard custody whose capability has expired while its attempt is still
+    /// pre-capture. The durable Registered or Prepared to Failed transition
+    /// fences a concurrent capture, and only its winner removes custody; Held
+    /// and later attempts keep custody for their dispatch owner.
+    pub(crate) fn reclaim_expired_prepared_dispatches(&self, now_unix_seconds: u64) -> Result<()> {
+        let expired = self
+            .retained_prepared_dispatches()?
+            .values()
+            .filter(|prepared| now_unix_seconds >= prepared.expires_at_unix_seconds)
+            .map(|prepared| (prepared.operation_id.clone(), prepared.attempt_id.clone()))
+            .collect::<Vec<_>>();
+        for (operation_id, attempt_id) in expired {
+            let Some(state) = self
+                .attempts
+                .load_attempt(&attempt_id)?
+                .map(|attempt| attempt.state)
+                .filter(|state| matches!(state, AttemptState::Registered | AttemptState::Prepared))
+            else {
+                continue;
+            };
+            match self.attempts.transition(
+                &attempt_id,
+                state,
+                AttemptState::Failed,
+                &AttemptTransitionEvidence::default(),
+                now_unix_seconds,
+            ) {
+                Ok(_) => {}
+                Err(BrokerError::Conflict(_)) => continue,
+                Err(error) => return Err(error),
+            }
+            let mut retained = self.retained_prepared_dispatches()?;
+            if retained
+                .get(&operation_id)
+                .is_some_and(|prepared| prepared.attempt_id == attempt_id)
+            {
+                retained.remove(&operation_id);
+            }
+        }
+        Ok(())
     }
 
     /// Tombstone a registered attempt only while it remains pre-budget and

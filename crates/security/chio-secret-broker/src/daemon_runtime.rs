@@ -429,6 +429,35 @@ struct BrokerDaemonAuditContext {
 #[cfg(not(unix))]
 pub struct BrokerDaemonRuntime;
 
+/// Bounds how long expired pre-capture custody survives in an idle daemon.
+#[cfg(unix)]
+const IDLE_CUSTODY_RECLAIM_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Paces the prepared worker's idle reclaim of expired pre-capture custody to
+/// at most once per interval, and never starts it once the worker is stopping.
+#[cfg(unix)]
+struct IdleCustodyReclaim {
+    next_due: std::time::Instant,
+}
+
+#[cfg(unix)]
+impl IdleCustodyReclaim {
+    fn run_if_due(
+        &mut self,
+        stop: &std::sync::atomic::AtomicBool,
+        now: std::time::Instant,
+        reclaim: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
+        if stop.load(std::sync::atomic::Ordering::Acquire) || now < self.next_due {
+            return Ok(());
+        }
+        self.next_due = now
+            .checked_add(IDLE_CUSTODY_RECLAIM_INTERVAL)
+            .unwrap_or(now);
+        reclaim()
+    }
+}
+
 #[cfg(unix)]
 fn run_daemon_serving_worker<F>(
     label: &'static str,
@@ -789,7 +818,7 @@ impl BrokerDaemonRuntime {
     pub fn serve_until_stopped(&self, shutdown: &std::sync::atomic::AtomicBool) -> Result<()> {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::mpsc;
-        use std::time::Duration;
+        use std::time::{Duration, Instant};
 
         // Control, prepared execution, and audit each have a fixed worker.
         // An authenticated idle execution descriptor never occupies control
@@ -821,12 +850,26 @@ impl BrokerDaemonRuntime {
             let prepared_sender = failure_sender.clone();
             let prepared_stop = &stop;
             let prepared_endpoint = &self.endpoint;
+            let custody = &self.audit;
             scope.spawn(move || {
                 run_daemon_serving_worker("prepared execution", prepared_sender, || {
+                    let mut idle_reclaim = IdleCustodyReclaim {
+                        next_due: Instant::now(),
+                    };
                     while !prepared_stop.load(Ordering::Acquire) {
                         match prepared_endpoint.try_serve_prepared() {
                             Ok(Some(_)) => {}
-                            Ok(None) => std::thread::sleep(Duration::from_millis(2)),
+                            Ok(None) => {
+                                idle_reclaim.run_if_due(prepared_stop, Instant::now(), || {
+                                    custody.audit_service.reclaim_expired_prepared_dispatches(
+                                        custody
+                                            .audit_clock
+                                            .unix_millis()
+                                            .map(chio_security_types::clock::UnixMillis::as_secs)?,
+                                    )
+                                })?;
+                                std::thread::sleep(Duration::from_millis(2));
+                            }
                             Err(error) => return Err(error),
                         }
                     }
@@ -1334,6 +1377,43 @@ mod tests {
             ));
             drop(peer_sender);
         }
+    }
+
+    #[test]
+    fn idle_custody_reclaim_never_starts_after_stop_and_runs_once_per_interval() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::Instant;
+
+        fn tick(idle: &mut IdleCustodyReclaim, stop: &AtomicBool, at: Instant, runs: &mut u32) {
+            idle.run_if_due(stop, at, || {
+                *runs += 1;
+                Ok(())
+            })
+            .test_expect("idle reclaim tick");
+        }
+
+        let start = Instant::now();
+        let mut idle = IdleCustodyReclaim { next_due: start };
+        let stop = AtomicBool::new(true);
+        let mut runs = 0;
+        tick(&mut idle, &stop, start, &mut runs);
+        assert_eq!(runs, 0, "a stopping worker must not start reclaim");
+        stop.store(false, Ordering::Release);
+        tick(&mut idle, &stop, start, &mut runs);
+        tick(
+            &mut idle,
+            &stop,
+            start + IDLE_CUSTODY_RECLAIM_INTERVAL / 2,
+            &mut runs,
+        );
+        assert_eq!(runs, 1);
+        tick(
+            &mut idle,
+            &stop,
+            start + IDLE_CUSTODY_RECLAIM_INTERVAL,
+            &mut runs,
+        );
+        assert_eq!(runs, 2);
     }
 
     #[test]
