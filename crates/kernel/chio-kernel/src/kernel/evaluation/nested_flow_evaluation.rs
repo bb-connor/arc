@@ -1420,7 +1420,6 @@ impl ChioKernel {
             None
         };
 
-        let tool_started_at = Instant::now();
         // The guard owns the original dispatch snapshot while the live
         // admission advances to its separately recorded return.
         let guarded_dispatch_operation = durable_admission
@@ -1497,17 +1496,24 @@ impl ChioKernel {
         // the future cannot be moved onto `spawn_blocking` like the top-level
         // path). On expiry the buffered child receipts recorded so far are still
         // persisted below, and the abort arm unwinds like a cancellation.
-        let tool_output_result = match self
+        let dispatch_budget = self
             .config
             .deadlines
-            .dispatch_budget_for(&request.server_id)
-        {
-            Some(budget) => {
-                crate::kernel::dispatch::dispatch_nested_call_within_budget(dispatch_call, budget)
-                    .await
-            }
-            None => dispatch_call.await,
-        };
+            .dispatch_budget_for(&request.server_id);
+        let tool_output_result = self
+            .timed_dispatch(async {
+                match dispatch_budget {
+                    Some(budget) => {
+                        crate::kernel::dispatch::dispatch_nested_call_within_budget(
+                            dispatch_call,
+                            budget,
+                        )
+                        .await
+                    }
+                    None => dispatch_call.await,
+                }
+            })
+            .await;
         if let Some(outcome) = security_dispatch_outcome.take() {
             match &tool_output_result {
                 Ok(_) => outcome.record_released()?,
@@ -1530,13 +1536,13 @@ impl ChioKernel {
         // records a terminal ambiguous receipt. On success it is disarmed with
         // an empty child buffer, so no receipt is double-recorded.
         post_admission_drop_guard.record_buffered_child_receipts()?;
-        let (tool_output, reported_cost) = match tool_output_result {
-            Ok(output) => {
+        let ((tool_output, reported_cost), tool_elapsed) = match tool_output_result {
+            Ok(timed) => {
                 if let Err(error) = credential_reservation.commit() {
                     post_admission_drop_guard.mark_dispatch_credential_commit_failed();
                     return Err(error);
                 }
-                output
+                timed
             }
             Err(error @ KernelError::UrlElicitationsRequired { .. })
                 if nested_interaction_observed =>
@@ -1713,7 +1719,6 @@ impl ChioKernel {
                 );
             }
         };
-        let tool_elapsed = tool_started_at.elapsed();
         let durable_outcome = match self.record_evaluation_return(
             durable_admission.as_mut(),
             &mut post_admission_drop_guard,
