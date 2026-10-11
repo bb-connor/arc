@@ -12,6 +12,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from chio_hermes.model_relay import ModelRelay
+from chio_hermes.model_relay_limits import EvidenceLog
 
 MODEL = "fixture-model"
 TOOLS = {"fixture-tool"}
@@ -95,6 +96,12 @@ def test_connection_capacity_refuses_before_a_fifth_handler_starts(monkeypatch):
         response = rejected.recv(4096)
         assert int(response.split()[1]) == 503, (response, len(entered))
         assert len(entered) == 4
+        assert relay._remaining == 1
+        stack.close()
+        assert relay.server.drain(2)
+        assert relay.finalize_capture() is False
+        assert relay.evidence_complete is False
+        assert relay.events[-1] == EvidenceLog.OMITTED
         assert relay._remaining == 1
 
 

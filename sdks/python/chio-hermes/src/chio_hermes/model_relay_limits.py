@@ -7,6 +7,7 @@ import json
 import math
 import socket
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import ThreadingHTTPServer
 from time import monotonic
@@ -91,8 +92,11 @@ REFUSAL = (
 class BoundedRelayServer(ThreadingHTTPServer):
     """Nonqueued admission owns its permit until the entire handler finishes."""
 
-    def __init__(self, address: Any, handler: Any, limits: RelayLimits) -> None:
+    def __init__(
+        self, address: Any, handler: Any, limits: RelayLimits, refused: Callable[[], None]
+    ) -> None:
         self.limits = limits
+        self._refused = refused
         self._permits = threading.BoundedSemaphore(limits.connections)
         self._lock = threading.Condition()
         self._accepting = True
@@ -122,6 +126,7 @@ class BoundedRelayServer(ThreadingHTTPServer):
             with self._lock:
                 self._deadlines.pop(request, None)
                 self._lock.notify_all()
+            self._refused()
             try:
                 request.settimeout(min(self.limits.request_seconds, 0.1))
                 request.sendall(REFUSAL)
@@ -181,8 +186,15 @@ class EvidenceLog:
         "reason": "active handlers remained at finalization",
     }
 
+    OMITTED = {
+        "event": "capture_incomplete",
+        "forwarded": False,
+        "reason": "connection capacity refusals were not recorded",
+    }
+
     def __init__(self, limits: RelayLimits, lock: Any) -> None:
         self.limits, self._lock = limits, lock
+        self.omitted = False
         self._events: list[dict[str, Any]] = []
         self._pending: set[int] = set()
         self.exhausted = False
@@ -209,6 +221,10 @@ class EvidenceLog:
     def mark_incomplete(self) -> None:
         with self._lock:
             self._exhaust(self.INCOMPLETE)
+
+    def omit_refusal(self) -> None:
+        with self._lock:
+            self.omitted = True
 
     def begin(self, event: dict[str, Any]) -> int | None:
         with self._lock:
@@ -247,8 +263,11 @@ class EvidenceLog:
     @property
     def complete(self) -> bool:
         with self._lock:
-            return not self.exhausted and not self._pending
+            return not self.exhausted and not self.omitted and not self._pending
 
     def snapshot(self) -> list[dict[str, Any]]:
         with self._lock:
-            return [dict(event) for event in self._events]
+            events = [dict(event) for event in self._events]
+            if self.omitted and not self.exhausted:
+                events.append(dict(self.OMITTED))
+            return events
