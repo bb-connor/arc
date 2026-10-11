@@ -8,6 +8,30 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Cognition CI extraction qualified privately (October 11 UTC)
+
+The [extraction audit](audits/cognition-ci-extraction-20261011.json) records
+reviewed source `326d10e667`. All **2,025 requirements** remain preserved.
+The unchanged promoted-default suite runs in its own required parallel job.
+The aggregate keeps its name and requires explicit success from build/lint,
+workspace tests and cognition market tests. The other 48 build steps and all
+11 unrelated jobs are unchanged. Selected-consumer traces justify the four
+copied setup steps; existing native fixtures stay in their consuming jobs.
+
+The Original workflow fails the new contract. All 13 affected contract
+commands pass across Claude and Root, with exact input hashes and Python AST
+equivalence for a comment-only correction. Root's composed checks and all 216
+real Bash result combinations pass. No production Rust, test filter, feature
+graph, serial profile, timeout, proof or authorization changes are included.
+The timing estimate motivates splitting a near-ceiling serial job; it does
+not establish a hosted pass or a sub-hour pipeline.
+
+The census and MCP repairs are published at `66dc1bf22d`; their local evidence
+remains scoped to its recorded source. Replacement hosted qualification,
+the enforcing x86 MCP result and the exact-head landing handshake remain
+pending. All cancelled predecessor jobs remain incomplete. Trusted setup,
+open proofs and operational acceptance remain separately disclosed.
+
 ## MCP terminal handoff qualified privately (October 11 UTC)
 
 The [terminal handoff audit](audits/mcp-terminal-handoff-20261011.json)

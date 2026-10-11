@@ -33,12 +33,12 @@
 
 **Interfaces:** `validate_build_lint_test(ci)` consumes the workflow and rejects any aggregate or producer weakening. The new job is `cognition-market`, reported as `Cognition market promoted default`.
 
-- [ ] Add the three-child shape, exact moved-step and prerequisite assertions. Run them against unchanged `66dc1bf22d`; expect refusal because the new required child is absent.
-- [ ] Extract the exact step with pinned checkout, Rust toolchain, protobuf compiler and Rust cache preparation.
-- [ ] Require all three successful results in the unconditional aggregate. Preserve the existing context name.
-- [ ] Reject removed dependencies, conditional or tolerated children, modified commands/environment and omitted or reordered setup. Preserve existing native fixture preparation in its consuming jobs.
-- [ ] Execute the real aggregate Bash for all 216 triples of success, failure, cancelled, skipped, missing and timed-out results; only three successes may pass.
-- [ ] Run owning checker/regressions and review the isolated commit before handoff.
+- [x] Add the three-child shape, exact moved-step and prerequisite assertions. Run them against unchanged `66dc1bf22d`; expect refusal because the new required child is absent.
+- [x] Extract the exact step with pinned checkout, Rust toolchain, protobuf compiler and Rust cache preparation.
+- [x] Require all three successful results in the unconditional aggregate. Preserve the existing context name.
+- [x] Reject removed dependencies, conditional or tolerated children, modified commands/environment and omitted or reordered setup. Preserve existing native fixture preparation in its consuming jobs.
+- [x] Execute the real aggregate Bash for all 216 triples of success, failure, cancelled, skipped, missing and timed-out results; only three successes may pass.
+- [x] Run owning checker/regressions and review the isolated commit before handoff.
 
 ## Task 2: Root composition and publication
 
@@ -46,9 +46,9 @@
 
 **Interfaces:** Consume the reviewed producer and its Original/green evidence. Produce one qualified workflow candidate with unchanged runtime scope.
 
-- [ ] Independently trace prerequisite inputs, compare the moved step and every unaffected job/step against `66dc1bf22d`, and run aggregate/refusal controls.
-- [ ] Run the affected security, native, FIPS, trusted-definition, evidence-binding and patch-hygiene contracts once on the frozen producer. After composition, prove all executable/configuration inputs identical and run the fast checkers and independent aggregate controls. Repeat broad checks only for changed inputs or unresolved failures.
-- [ ] Record logs, source hashes, independent review and timing limitations. The estimate is a reason to reduce risk, not a successful hosted run or a guaranteed deadline.
+- [x] Independently trace prerequisite inputs, compare the moved step and every unaffected job/step against `66dc1bf22d`, and run aggregate/refusal controls.
+- [x] Run the affected security, native, FIPS, trusted-definition, evidence-binding and patch-hygiene contracts once on the frozen producer. After composition, prove all executable/configuration inputs identical and run the fast checkers and independent aggregate controls. Repeat broad checks only for changed inputs or unresolved failures.
+- [x] Record logs, source hashes, independent review and timing limitations. The estimate is a reason to reduce risk, not a successful hosted run or a guaranteed deadline.
 - [ ] Publish the reviewed batch, verify local/remote/PR/archive equality, then stop superseded runs and preserve their incomplete logs.
 - [ ] Obtain exact-head green results for the three aggregate children, the aggregate, MSRV, Vet and Deny; qualify the repaired enforcing MCP HTTP job and address new review/failures.
 - [ ] Report readiness to the owner and Claude for the agreed exact-head merge handshake.
