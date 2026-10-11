@@ -8,6 +8,33 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Terminal owner evidence and clock repair (October 11 UTC)
+
+The [terminal owner audit](audits/terminal-owner-renewal-20261011.json) updates the
+current states while preserving every earlier requirement and observation. The
+ledger contains **2,008 requirements**, including one named P3 native-conflict
+diagnostic follow-up in the existing security track.
+
+The injected-clock repair is source-reviewed. Its producer passes all ten fault
+controls, strict lint and the proof-parity contract. All **48 concurrent generated
+fixture trees** independently hash to the same prior healthy fixture. Root's
+strengthened hold/quota/replay and timer-calibration assertions are approved;
+final owning qualification on `66d4568ab7` is running. A separate intermittent
+writer startup refusal still needs its actual health-error classification.
+
+The `9196515b30` focused campaign retains ten passing phases and one failed extra
+eight-thread native phase. The actual portable gate includes **13 passing serial
+native tests**; the separate debug/load diagnostic reproduces five fail-closed
+capture conflicts after fence expiry. This classifies that measured failure but
+does not close native latency or concurrency acceptance. No fence budget changed.
+Mobile all-targets **62 tests and strict lint pass** on the host. C1, C3 and C5
+Original/mutation packets are retained; corrected C2/C6 Originals remain pending.
+
+Public `974f22914b` still fails Build and MSRV; Vet and Deny pass. One batched
+replacement, four exact-head required green checks, classified failures, answered
+threads and explicit merge authorization remain. Trusted authorization/evidence,
+open proof gates, cold activation and native operational acceptance remain separate.
+
 ## Focused renewal and proof-clock correction (October 11 UTC)
 
 The ledger now contains **2,007 requirements**, retaining all 2,005 previous
