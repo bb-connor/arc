@@ -1,0 +1,459 @@
+{
+  "schema": "chio.security.review2-local-components.v1",
+  "observed_utc": "2026-10-11T01:10:30.808834+00:00",
+  "private_stage": "5438788ae4e970777f17079a863e3e578a6e2fe2",
+  "published_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-005",
+    "incoming-pr1160-review2-20261011:R2-007",
+    "incoming-pr1160-review2-20261011:R2-009"
+  ],
+  "components": {
+    "R2-005": {
+      "repair": "1e8b6b7adaa6d9c57b5d4c94cae7b5c244dc8fc1",
+      "producer": "ced2605f30a3bdb20d41b6ba3b2fb00eeaa414d0",
+      "files": [
+        "crates/security/chio-quarantine/src/correlation.rs",
+        "crates/security/chio-quarantine/src/correlation/expansion_tests.rs",
+        "scripts/check-temporal-security.sh",
+        "scripts/tests/check-temporal-security.test.sh"
+      ],
+      "original": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-005-original-v2/summary.json",
+        "sha256": "29d96de4c55c8df9c0b96253affc0317ba0b9bb0a990f0d3229bce4093e69f5f",
+        "source": "18083e4cb3df3b45d014ff4d0254a6c454220e5e",
+        "source_stable": true,
+        "commands": [
+          {
+            "label": "list",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--lib",
+              "correlation::mutation_tests::expansion_tests::",
+              "--",
+              "--list"
+            ],
+            "exit": 0,
+            "log_sha256": "37e9da9a7fd65ac376e58cde3696f6e53b09064390686684f7c46fc86f28ba0a",
+            "test_summaries": [],
+            "seconds": 16.097836713306606
+          },
+          {
+            "label": "original",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--lib",
+              "correlation::mutation_tests::expansion_tests::",
+              "--",
+              "--test-threads=4",
+              "--nocapture"
+            ],
+            "exit": 101,
+            "log_sha256": "50bc65f268e53e59b533d5fe93383b5e2e293b0446b855483bc46685f6528a25",
+            "test_summaries": [
+              "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.02s"
+            ],
+            "seconds": 3.202075525186956
+          }
+        ]
+      },
+      "green": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-005-green/summary.json",
+        "sha256": "d5388e7366f708515c091baf3c3ae873dce34266d64977c4b4ed9e400711b97e",
+        "source": "ced2605f30a3bdb20d41b6ba3b2fb00eeaa414d0",
+        "source_stable": true,
+        "commands": [
+          {
+            "label": "mutation-list",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--lib",
+              "correlation::mutation_tests::",
+              "--",
+              "--list"
+            ],
+            "exit": 0,
+            "log_sha256": "4182875f75835ed1a6feb64e7e0a8868993c826c165669bfa5856fa72516c563",
+            "test_summaries": [],
+            "seconds": 58.748644154984504
+          },
+          {
+            "label": "mutation-green",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--lib",
+              "correlation::mutation_tests::",
+              "--",
+              "--test-threads=4",
+              "--nocapture"
+            ],
+            "exit": 0,
+            "log_sha256": "ff15446a5ab725c192c42c864cc10f04a758b014539189eeee50ba2377ef49c1",
+            "test_summaries": [
+              "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.01s"
+            ],
+            "seconds": 3.098794592078775
+          },
+          {
+            "label": "owning",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--no-fail-fast",
+              "--",
+              "--test-threads=8"
+            ],
+            "exit": 0,
+            "log_sha256": "1cc10162fce877eaae5999b8764d6e76e00315c1c8a6208ad4b1932dc75434e4",
+            "test_summaries": [
+              "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.46s",
+              "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+              "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+              "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+              "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.44s",
+              "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+              "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+              "test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.69s",
+              "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s"
+            ],
+            "seconds": 52.97867366205901
+          },
+          {
+            "label": "strict",
+            "argv": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-quarantine",
+              "--all-targets",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit": 0,
+            "log_sha256": "22bfd4bbb0e892bb6a08591d8c74a9b0ab916be7fa8f754d27c3c75f86340c9c",
+            "test_summaries": [],
+            "seconds": 105.37447133800015
+          }
+        ]
+      },
+      "handoff": {
+        "path": "/tmp/pr1160-r2-correlation-throttle-20261010/r2-005-immutable-handoff.json",
+        "sha256": "399da0aae59699b765a3f73413d4c192d99098cad64ed729de8897904495f10d"
+      },
+      "summary": "Genuine Original 3 PASS/1 assertion FAIL (31 clones exceed 18 work budget); bounded incremental expansion gives 8 mutation controls, 133 owning tests and strict all-target Clippy PASS. Exact inventory is now 8 mutation controls, 51 temporal tests.",
+      "limits": [
+        "Initial test accessor compile failure is not counted as a runtime Original.",
+        "Composed full temporal runner and final CI contract mutation suite remain pending; fake-Cargo self-test is contract evidence only."
+      ],
+      "source_sha256": {
+        "crates/security/chio-quarantine/src/correlation.rs": "75cda03d0eb6b5b343138659e89a861c1e4bfbbee3bd8e248f6c6ca0740065c9",
+        "crates/security/chio-quarantine/src/correlation/expansion_tests.rs": "322dbc1af8e8e554e59fcdc81a6fae4218cd729881fa51cd9dfe69b374a3909b",
+        "scripts/check-temporal-security.sh": "f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101",
+        "scripts/tests/check-temporal-security.test.sh": "02e7241415d3f546d8851bbe9afff5753ab3a6921feaf345047ec23891d7e6d4"
+      }
+    },
+    "R2-007": {
+      "repair": "fd9a923bca790a79efa9cef5f5cccc11495b5c95",
+      "producer": "457cc51a4c5496b01139b9e77d4f84e6c5375fe2",
+      "files": [
+        "crates/kernel/chio-kernel/src/runtime.rs",
+        "crates/kernel/chio-kernel/src/runtime/blocking_connection.rs",
+        "crates/kernel/chio-kernel/src/runtime/blocking_task.rs",
+        "crates/kernel/chio-kernel/src/runtime/blocking_connection/cancellation_tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs"
+      ],
+      "original": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-007-original-v2/summary.json",
+        "sha256": "14a8609f25d0fbffdb2230a2a4ce2ead8214c2923ef5d1c7070fb72b31cd1c8a",
+        "source": "7521410a530cb8095edd65b7419883da0f4d82f0",
+        "source_stable": true,
+        "commands": [
+          {
+            "label": "list",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "runtime::blocking_connection::cancellation_tests::",
+              "--",
+              "--list"
+            ],
+            "exit": 0,
+            "log_sha256": "89a8612461268303b6ba5c853a237a31e97203295dc0e676b31d3e57d2850953",
+            "test_summaries": [],
+            "seconds": 194.81419574609026
+          },
+          {
+            "label": "original",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "runtime::blocking_connection::cancellation_tests::",
+              "--",
+              "--test-threads=4",
+              "--nocapture"
+            ],
+            "exit": 101,
+            "log_sha256": "98d607a180fb4bda946443cf8faa3c5012ff56b8c88a27386b4f4de8cc80c1ce",
+            "test_summaries": [
+              "test result: FAILED. 3 passed; 8 failed; 0 ignored; 0 measured; 1648 filtered out; finished in 0.60s"
+            ],
+            "seconds": 3.8267873218283057
+          }
+        ]
+      },
+      "green": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-007-green/summary.json",
+        "sha256": "f9ea52339c84b2591c5ae5fc2e81fce1b0ecd22378bee6def4cb22ad2aaf85a2",
+        "source": "457cc51a4c5496b01139b9e77d4f84e6c5375fe2",
+        "source_stable": true,
+        "commands": [
+          {
+            "label": "list",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "runtime::blocking_connection::cancellation_tests::",
+              "--",
+              "--list"
+            ],
+            "exit": 0,
+            "log_sha256": "41ac23ab219101a905a3d6aafe7a68b3230e0da369fd631ac3f04a937e91f62e",
+            "test_summaries": [],
+            "seconds": 198.97775855008513
+          },
+          {
+            "label": "green",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "runtime::blocking_connection::cancellation_tests::",
+              "--",
+              "--test-threads=4",
+              "--nocapture"
+            ],
+            "exit": 0,
+            "log_sha256": "bd9078b556caaa321b4a124cb169b58261507c086b317528c6d6da08846a8d21",
+            "test_summaries": [
+              "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1648 filtered out; finished in 0.08s"
+            ],
+            "seconds": 4.037550465669483
+          },
+          {
+            "label": "invocation-dispatch",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "kernel::tests::invocation_dispatch::",
+              "--",
+              "--test-threads=4"
+            ],
+            "exit": 0,
+            "log_sha256": "21021ef69e5f989bb2b684bbf8e3c3a87236994408f85b8bd6633388eada5d85",
+            "test_summaries": [
+              "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1659 filtered out; finished in 0.02s"
+            ],
+            "seconds": 3.297776537016034
+          },
+          {
+            "label": "invocation-context",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "kernel::tests::invocation_context::",
+              "--",
+              "--test-threads=4"
+            ],
+            "exit": 0,
+            "log_sha256": "be3e724834ae7d9b2098509529eaeb247cf462e208952b50c84c24924f6139ac",
+            "test_summaries": [
+              "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1660 filtered out; finished in 0.02s"
+            ],
+            "seconds": 3.209802812896669
+          },
+          {
+            "label": "queued-deadline",
+            "argv": [
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--lib",
+              "timed_out_dispatch_aborts_a_queued_blocking_task_before_it_runs_the_tool",
+              "--",
+              "--test-threads=4"
+            ],
+            "exit": 0,
+            "log_sha256": "a53707bee1c0103b89b5f17d046c025bd6f32d9d0b0230ec4ab4f0d93866147c",
+            "test_summaries": [
+              "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1661 filtered out; finished in 1.14s"
+            ],
+            "seconds": 4.332514547742903
+          },
+          {
+            "label": "strict",
+            "argv": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "chio-kernel",
+              "--all-targets",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit": 0,
+            "log_sha256": "bf44a96f788de1959b292cfc0aaaa8b15d169335f13f39b1ca8ba74b732b1a84",
+            "test_summaries": [],
+            "seconds": 209.60678800707683
+          }
+        ]
+      },
+      "handoff": {
+        "path": "/tmp/pr1160-blocking-adapter-cancel-20261011/immutable-handoff.json",
+        "sha256": "544347ac547a7dbf6334ff33ac5a968f501d24dffeaea15195e36617c21b5e71"
+      },
+      "summary": "Genuine Original 3 PASS/8 assertion FAIL; exact composed 457 source passes 14 new controls, 6 existing invocation/deadline controls and owning all-target Clippy. Independent source review found no blocking defect.",
+      "limits": [
+        "Initial test output type compile failure is not counted as a runtime Original.",
+        "Private comment-only 447721dd9b corrects abort documentation: already-started synchronous work cannot be preempted; it needs its own transport bounds and outcome reconciliation.",
+        "Panic in the newly inline first callback maps to outer Internal instead of prior ToolServerError; both take the same unknown-outcome, hold-retaining denial. Normal typed callback errors and Dispatch budget refusal are preserved."
+      ],
+      "source_sha256": {
+        "crates/kernel/chio-kernel/src/runtime.rs": "aaa50f602291ffa845e0e6c8d30b548b66641b1b35042db621c4dad788bb7bc3",
+        "crates/kernel/chio-kernel/src/runtime/blocking_connection.rs": "0bbf21ae6e24856ff014ab97d8caa0001d1c1553ad08d0c459a573604d79518a",
+        "crates/kernel/chio-kernel/src/runtime/blocking_task.rs": "d20b8ea2a72247b2f5f47bbfb6a7af097a6c8ebe8852fc663d59fe6080b7e754",
+        "crates/kernel/chio-kernel/src/runtime/blocking_connection/cancellation_tests.rs": "4d1d9fdc570a88623848ab05690cd1dae04cfde1f6d7481dbba09e39817b27b6",
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs": "b29d1ff8d524d5307ea702dd7f814a741e3c92d54dc144915d64e27f7f082e35"
+      }
+    },
+    "R2-009": {
+      "repair": "989e1f85c33b9787e447f0fa4135babab90cc7e6",
+      "producer": "39cd5f51210b45662801349e9293fa6201d39fb3",
+      "files": [
+        "sdks/python/chio-hermes/src/chio_hermes/model_relay.py",
+        "sdks/python/chio-hermes/src/chio_hermes/model_relay_limits.py",
+        "sdks/python/chio-hermes/src/chio_hermes/restricted.py",
+        "sdks/python/chio-hermes/tests/test_host_cancellation.py",
+        "sdks/python/chio-hermes/tests/test_model_relay_limits.py",
+        "sdks/python/chio-hermes/tests/test_restricted.py"
+      ],
+      "original": {
+        "path": "/tmp/pr1160-review2-relay-manifest-20261010/relay-original-v1.json",
+        "sha256": "bb2f634be9d8d49e6934ae94856cd8c91b77be56e326b82bed9b929be7844cf9"
+      },
+      "green": {
+        "path": "/tmp/pr1160-ci-batch-20261010/review2-relay-final/result.json",
+        "sha256": "e5b46c8536c693ba81c3f0b2e97f5e5c928c77c1ff0656371fd4ca0de17a1b25",
+        "source": "989e1f85c33b9787e447f0fa4135babab90cc7e6",
+        "source_stable": true,
+        "commands": [
+          {
+            "label": "owner",
+            "argv": [
+              "/tmp/pr1160-review2-relay-manifest-20261010/python-venv/bin/python",
+              "-m",
+              "pytest",
+              "-q",
+              "-rs",
+              "-o",
+              "asyncio_default_fixture_loop_scope=function",
+              "sdks/python/chio-hermes/tests"
+            ],
+            "exit": 0,
+            "log_sha256": "da4c4cc4997a2e2f8acc8519cb876814eba38098fdec5cacbcd16ec3cf8108a7",
+            "seconds": 29.170184092130512
+          },
+          {
+            "label": "ruff",
+            "argv": [
+              "/tmp/pr1160-review2-relay-manifest-20261010/python-venv/bin/ruff",
+              "check",
+              "."
+            ],
+            "exit": 0,
+            "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+            "seconds": 0.07228112313896418
+          }
+        ]
+      },
+      "handoff": {
+        "path": "/tmp/pr1160-review2-relay-manifest-20261010/relay-reviewed-handoff.json",
+        "sha256": "b3229f6a2b17a0642b1eb7fd16da4b9c4199b77c4115450bc1b6e75bdd7fd8a4"
+      },
+      "independent_review": {
+        "path": "/tmp/pr1160-review2-relay-manifest-20261010/independent-relay-review.md",
+        "sha256": "72d675afab1d62cf78a4f941399f77e3e8096670495be461da94acf890c2e5f6"
+      },
+      "summary": "Three genuine Original runtime failures; final composed source passes 299 Hermes tests and canonical Ruff with all 309 Python inputs stable. Independent review found no blocking defect.",
+      "limits": [
+        "Four existing live-sidecar tests remain skipped because CHIO_INTEGRATION is unset; no live-service acceptance.",
+        "Provider start is the logical admission edge under the close lock; later physical I/O is not claimed as delivery at that edge.",
+        "The existing 60-second upstream I/O timeout is not a total provider lifetime guarantee. Active work at bounded close causes sticky incomplete capture and unresolved publication."
+      ],
+      "source_sha256": {
+        "sdks/python/chio-hermes/src/chio_hermes/model_relay.py": "3f282665c9fa6fcf5dfe0e306d12bf800bbfc9d691601945fa00f09d16402070",
+        "sdks/python/chio-hermes/src/chio_hermes/model_relay_limits.py": "ae0e006fe066cd1166c35d39ab59973aa9c1e4a953e86539f42cfc230b4fcdbb",
+        "sdks/python/chio-hermes/src/chio_hermes/restricted.py": "ad19876ad90fa9422a3b1d4caca791a25be25adf15bf71bb73e45d88d4c7d9e2",
+        "sdks/python/chio-hermes/tests/test_host_cancellation.py": "3dd367cceba4cfca6b1bb849a630bded900d8e235fe52d04262640d127b2b1fa",
+        "sdks/python/chio-hermes/tests/test_model_relay_limits.py": "f1cce0a4cf88b971106a4df67db985d084e7356a58be39b259711922fc1ca82c",
+        "sdks/python/chio-hermes/tests/test_restricted.py": "9e801e7f22a40daaebb2bb706cca8907c2a194b79be7b7cb3a9a506d74a5d37e"
+      }
+    }
+  },
+  "remaining_acceptance": [
+    "Complete the composed replacement gates and remaining confirmed review repairs.",
+    "Four required hosted checks green on the exact replacement head; all other failures classified and review threads answered.",
+    "Explicit Connor merge go-ahead; no production activation or release readiness inferred."
+  ],
+  "published": false,
+  "merged": false,
+  "full_qualified": false
+}
