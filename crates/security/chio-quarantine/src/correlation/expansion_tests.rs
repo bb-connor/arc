@@ -243,4 +243,22 @@ mod expansion_tests {
         assert_eq!(duplicate.findings, first.findings);
         assert_eq!(duplicate.findings.len(), 1);
     }
+
+    #[test]
+    fn repeated_event_deduplicates_a_finding_at_exact_finding_capacity() {
+        let rule = fan_out_rule(2, 1);
+        let event = verified_event();
+        let body =
+            parse_verified_event(&event).unwrap_or_else(|()| panic!("verified event rejected"));
+        let group = group_hash(&rule, &body).unwrap_or_else(|()| panic!("group hash rejected"));
+        let mut state = PartitionState::empty();
+
+        let result = process_events(&rule, &mut state, &[event.clone(), event], group, 100, 0)
+            .unwrap_or_else(|()| panic!("duplicate event rejected"));
+
+        assert!(!result.overflow);
+        assert!(!result.suppressed);
+        assert_eq!(state.candidates.len(), 1);
+        assert_eq!(result.findings.len(), 1);
+    }
 }

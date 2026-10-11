@@ -1239,30 +1239,33 @@ fn process_events(
                 source_receipt_id: body.source_receipt_id.clone(),
                 event_time_unix_ms: event.event_time_unix_ms,
             };
-            let candidates = if stage_index == 0 {
-                let mut stages = vec![None; rule.stages().len()];
-                *stages.first_mut().ok_or(())? = Some(contribution);
+            let extension = if stage_index == 0 {
+                None
+            } else {
+                Some((
+                    stage.predecessor_index().ok_or(())?,
+                    stage.within_ms().ok_or(())?,
+                ))
+            };
+            let sources = if stage_index == 0 {
                 vec![PartialCandidate {
-                    stages,
+                    stages: vec![None; rule.stages().len()],
                     lineage_seed: body.subject.lineage_seed.clone(),
                 }]
+            } else if rule.allow_event_reuse() {
+                working.clone()
             } else {
-                let predecessor = stage.predecessor_index().ok_or(())?;
-                let window = stage.within_ms().ok_or(())?;
-                let sources = if rule.allow_event_reuse() {
-                    working.clone()
-                } else {
-                    base.clone()
-                };
-                let mut extended = Vec::new();
-                for source in sources {
-                    if source.lineage_seed != body.subject.lineage_seed
-                        || source.stages.get(stage_index).ok_or(())?.is_some()
+                base.clone()
+            };
+            for mut candidate in sources {
+                if let Some((predecessor, window)) = extension {
+                    if candidate.lineage_seed != body.subject.lineage_seed
+                        || candidate.stages.get(stage_index).ok_or(())?.is_some()
                     {
                         continue;
                     }
                     let Some(predecessor_event) =
-                        source.stages.get(predecessor).and_then(Option::as_ref)
+                        candidate.stages.get(predecessor).and_then(Option::as_ref)
                     else {
                         continue;
                     };
@@ -1271,7 +1274,7 @@ fn process_events(
                         predecessor_event.event_time_unix_ms,
                         window,
                     ) || !rule.allow_event_reuse()
-                        && source
+                        && candidate
                             .stages
                             .iter()
                             .flatten()
@@ -1279,32 +1282,29 @@ fn process_events(
                     {
                         continue;
                     }
-                    let mut candidate = source;
-                    *candidate.stages.get_mut(stage_index).ok_or(())? = Some(contribution.clone());
-                    extended.push(candidate);
                 }
-                extended
-            };
-            for candidate in candidates {
+                *candidate.stages.get_mut(stage_index).ok_or(())? = Some(contribution.clone());
                 if candidate.stages.iter().all(Option::is_some) {
                     let finding = correlated_finding(rule, group_key_hash, &body, &candidate)?;
-                    findings.insert(finding.finding_id.as_str().to_owned(), finding);
+                    let finding_id = finding.finding_id.as_str().to_owned();
+                    if !findings.contains_key(&finding_id)
+                        && u32::try_from(findings.len())
+                            .map_or(true, |count| count >= rule.max_partial_matches_per_group())
+                    {
+                        return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
+                    }
+                    findings.insert(finding_id, finding);
                 } else if !working.contains(&candidate) {
+                    if u32::try_from(working.len())
+                        .map_or(true, |count| count >= rule.max_partial_matches_per_group())
+                    {
+                        return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
+                    }
                     working.push(candidate);
                 }
             }
             working.sort();
             working.dedup();
-            if u32::try_from(findings.len())
-                .map_or(true, |count| count > rule.max_partial_matches_per_group())
-            {
-                return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
-            }
-        }
-        if u32::try_from(working.len())
-            .map_or(true, |count| count > rule.max_partial_matches_per_group())
-        {
-            return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
         }
         state.candidates = working;
     }
