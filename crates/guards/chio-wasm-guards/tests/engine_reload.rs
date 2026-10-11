@@ -112,14 +112,11 @@ fn evaluate_guard(guard: &WasmGuard) -> TestResult<Verdict> {
     let scope = ChioScope::default();
     let agent_id = "agent-1".to_string();
     let server_id = "test_server".to_string();
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     Ok(guard.evaluate(&ctx)?.verdict)
 }

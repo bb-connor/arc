@@ -167,13 +167,35 @@ impl ChioKernel {
         session_id: Option<&SessionId>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_guard_attempt(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            session_id,
+            security_context,
+            None,
+        )
+    }
+
+    pub(crate) fn evaluate_tool_call_sync_with_session_guard_attempt(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+        security_context: Option<&SecurityInvocationContext>,
+        guard_attempt: Option<GuardInvocationAttempt>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let disposition = guard_attempt.map_or_else(EvaluationDisposition::kernel, |attempt| {
+            EvaluationDisposition::kernel().with_session_guard_attempt(attempt)
+        });
         block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
             request,
             session_filesystem_roots,
             extra_metadata,
             session_id,
             security_context,
-            EvaluationDisposition::kernel(),
+            disposition,
         ))
     }
 

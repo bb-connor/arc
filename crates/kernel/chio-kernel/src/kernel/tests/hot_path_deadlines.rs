@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "hot_path_deadlines/guard_attempt.rs"]
+mod guard_attempt;
 // Hot-path deadline and writer-watchdog behavior: a hung guard or tool server
 // fails closed within budget without pinning a worker, a dispatch deadline runs
 // the full cancellation unwind, and a wedged writer denies before any tool side
@@ -755,7 +758,14 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
         );
         let worker = std::thread::current().id();
         let outcome = kernel
-            .run_guards_within_budget(&request, &scope, None, None, None)
+            .run_guards_within_budget(
+                &request,
+                &scope,
+                None,
+                None,
+                None,
+                &GuardInvocationAttempt::fresh(),
+            )
             .await;
         assert!(outcome.is_ok(), "the recording guard allows");
         let guard = guard_thread
@@ -805,7 +815,14 @@ fn always_offload_moves_guards_off_the_worker_without_a_timer_even_with_a_budget
         );
         let worker = std::thread::current().id();
         let outcome = kernel
-            .run_guards_within_budget(&request, &scope, None, None, None)
+            .run_guards_within_budget(
+                &request,
+                &scope,
+                None,
+                None,
+                None,
+                &GuardInvocationAttempt::fresh(),
+            )
             .await;
         assert!(outcome.is_ok(), "the recording guard allows");
         let guard = guard_thread
@@ -846,9 +863,14 @@ fn always_offload_runs_guards_inline_without_a_tokio_runtime(
     let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
 
     // Drive the future with the futures executor: no Tokio runtime is entered.
-    let outcome = futures::executor::block_on(
-        kernel.run_guards_within_budget(&request, &scope, None, None, None),
-    );
+    let outcome = futures::executor::block_on(kernel.run_guards_within_budget(
+        &request,
+        &scope,
+        None,
+        None,
+        None,
+        &GuardInvocationAttempt::fresh(),
+    ));
 
     assert!(
         outcome.is_ok(),

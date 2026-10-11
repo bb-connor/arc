@@ -1227,14 +1227,12 @@ guards:
         declassification_grant: None,
     };
     let session_roots = vec!["/workspace/project".to_string()];
-    let ctx = chio_kernel::GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: Some(session_roots.as_slice()),
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope)
+            .with_session_filesystem_roots(Some(session_roots.as_slice()));
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
 
     let result = pipeline.evaluate(&ctx).test_unwrap();
@@ -1523,15 +1521,8 @@ capabilities:
         ..SqlGuardConfig::default()
     })
     .test_unwrap();
-    let context = GuardContext {
-        request: &request,
-        scope: &request.capability.scope,
-        agent_id: &request.agent_id,
-        server_id: &request.server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: Some(0),
-        security_context: None,
-    };
+    let context =
+        GuardContext::new(&request, &request.capability.scope).with_matched_grant_index(Some(0));
     assert_eq!(
         broad_guard.evaluate(&context).test_unwrap().verdict,
         Verdict::Allow
@@ -1576,15 +1567,8 @@ rules:
         )
         .test_unwrap();
         let loaded = load_policy(&path).test_unwrap();
-        let context = GuardContext {
-            request: &request,
-            scope: &loaded.default_capabilities[0].scope,
-            agent_id: &request.agent_id,
-            server_id: &request.server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: Some(0),
-            security_context: None,
-        };
+        let context = GuardContext::new(&request, &loaded.default_capabilities[0].scope)
+            .with_matched_grant_index(Some(0));
         assert_eq!(
             loaded
                 .guard_pipeline

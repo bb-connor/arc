@@ -92,6 +92,7 @@ fn evaluate(
             &mut NoopNestedFlowClient,
             None,
             context,
+            None,
         )
     } else if let Some(context) = context {
         kernel.evaluate_tool_call_blocking_with_security_context(request, context)

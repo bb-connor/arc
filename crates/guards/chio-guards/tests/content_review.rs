@@ -71,14 +71,12 @@ fn eval_with<G: Guard>(
     matched_grant_index: Option<usize>,
 ) -> Verdict {
     let (request, scope, agent_id, server_id) = make_request_with_scope(tool, args, scope, intent);
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context =
+            GuardContext::new(&request, &scope).with_matched_grant_index(matched_grant_index);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

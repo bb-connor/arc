@@ -407,6 +407,7 @@ struct OwnedGuardInvocation {
     session_filesystem_roots: Option<Vec<String>>,
     matched_grant_index: Option<usize>,
     security_context: Option<SecurityInvocationContext>,
+    guard_attempt: GuardInvocationAttempt,
 }
 
 /// Synchronous fail-closed guard loop. Shared by the inline path and the
@@ -469,15 +470,11 @@ fn run_guards_owned(
     guards: &[Arc<dyn Guard>],
     owned: &OwnedGuardInvocation,
 ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
-    let ctx = GuardContext {
-        request: &owned.request,
-        scope: &owned.scope,
-        agent_id: &owned.request.agent_id,
-        server_id: &owned.request.server_id,
-        session_filesystem_roots: owned.session_filesystem_roots.as_deref(),
-        matched_grant_index: owned.matched_grant_index,
-        security_context: owned.security_context.as_ref(),
-    };
+    let ctx = GuardContext::new(&owned.request, &owned.scope)
+        .with_session_filesystem_roots(owned.session_filesystem_roots.as_deref())
+        .with_matched_grant_index(owned.matched_grant_index)
+        .with_security_context(owned.security_context.as_ref())
+        .with_invocation_attempt_id(owned.guard_attempt.as_str());
     evaluate_guards_sequential(guards, &ctx)
 }
 
@@ -773,17 +770,14 @@ impl ChioKernel {
                 ));
             }
         }
-        let guard_context = GuardContext {
-            request,
-            scope: &request.capability.scope,
-            agent_id: &request.agent_id,
-            server_id: &request.server_id,
-            session_filesystem_roots: current_session_roots
-                .as_deref()
-                .or(session_filesystem_roots),
-            matched_grant_index: Some(matched_grant_index),
-            security_context,
-        };
+        let guard_context = GuardContext::new(request, &request.capability.scope)
+            .with_session_filesystem_roots(
+                current_session_roots
+                    .as_deref()
+                    .or(session_filesystem_roots),
+            )
+            .with_matched_grant_index(Some(matched_grant_index))
+            .with_security_context(security_context);
         for guard in self.guards.iter() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 if revalidate_all {
@@ -1225,16 +1219,13 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
         security_context: Option<&SecurityInvocationContext>,
+        guard_attempt: &GuardInvocationAttempt,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
-        let ctx = GuardContext {
-            request,
-            scope,
-            agent_id: &request.agent_id,
-            server_id: &request.server_id,
-            session_filesystem_roots,
-            matched_grant_index,
-            security_context,
-        };
+        let ctx = GuardContext::new(request, scope)
+            .with_session_filesystem_roots(session_filesystem_roots)
+            .with_matched_grant_index(matched_grant_index)
+            .with_security_context(security_context)
+            .with_invocation_attempt_id(guard_attempt.as_str());
         evaluate_guards_sequential(self.guards.as_slice(), &ctx)
     }
 
@@ -1261,6 +1252,7 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
         security_context: Option<&SecurityInvocationContext>,
+        guard_attempt: &GuardInvocationAttempt,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
@@ -1279,6 +1271,7 @@ impl ChioKernel {
                 session_filesystem_roots,
                 matched_grant_index,
                 security_context,
+                guard_attempt,
             );
         }
 
@@ -1296,6 +1289,7 @@ impl ChioKernel {
                 session_filesystem_roots,
                 matched_grant_index,
                 security_context,
+                guard_attempt,
             );
         }
 
@@ -1305,6 +1299,7 @@ impl ChioKernel {
             session_filesystem_roots: session_filesystem_roots.map(<[String]>::to_vec),
             matched_grant_index,
             security_context: security_context.cloned(),
+            guard_attempt: guard_attempt.clone(),
         });
 
         // Per-guard budgets require a per-guard timeout, so this path only runs

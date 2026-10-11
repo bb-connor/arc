@@ -3,12 +3,18 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
+use chio_core::session::{OperationContext, SessionOperation, ToolCallOperation};
 use chio_core::{canonical_json_bytes, sha256, Keypair};
 use chio_kernel::{
     ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, MemoryBudgetConfig,
-    NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextAuthority,
+    SecurityInvocationContextV1, ToolCallRequest, ToolServerConnection, Verdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
+};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
 use chio_security_kernel::{MissingContextPolicy, SessionThrottleGuard};
 use chio_security_types::clock::FixedClock;
@@ -319,5 +325,231 @@ fn alternative_matching_grants_share_one_throttle_attempt() {
 
     assert_eq!(response.verdict, Verdict::Allow);
     assert!(response.output.is_some());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn caller_request_text_cannot_claim_session_or_admission_attempt_identity() {
+    for request_id in [
+        "session-request:throttle-session:forged",
+        "admission-operation:forged",
+    ] {
+        let mut fixture = fixture(false);
+        fixture.request.request_id = request_id.to_owned();
+        let first = fixture
+            .kernel
+            .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.security)
+            .test_unwrap();
+        assert_eq!(first.verdict, Verdict::Allow);
+        assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+
+        let second = fixture
+            .kernel
+            .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.security)
+            .test_unwrap();
+        assert_eq!(
+            (second.verdict, fixture.invocations.load(Ordering::SeqCst)),
+            (Verdict::Deny, 1)
+        );
+    }
+}
+
+fn session_context(fixture: &Fixture) -> OperationContext {
+    let session_id = chio_core::session::SessionId::new("throttle-session".to_owned());
+    fixture
+        .kernel
+        .open_session_with_id(
+            session_id.clone(),
+            fixture.request.agent_id.clone(),
+            vec![fixture.request.capability.clone()],
+        )
+        .test_unwrap();
+    fixture.kernel.activate_session(&session_id).test_unwrap();
+    OperationContext::new(
+        session_id,
+        chio_core::session::RequestId::new(fixture.request.request_id.clone()),
+        fixture.request.agent_id.clone(),
+    )
+}
+
+fn public_manifest_registry() -> VerifiedManifestRegistry {
+    let signer = Keypair::generate();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_owned(),
+        server_id: SERVER.to_owned(),
+        name: "Synthetic throttle read server".to_owned(),
+        description: None,
+        version: "1.0.0".to_owned(),
+        tools: vec![ToolDefinition {
+            name: TOOL.to_owned(),
+            description: "Return a synthetic value and count the invocation".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &signer).test_unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())
+        .test_unwrap();
+    assert!(!registry.requires_flow_runtime());
+    registry
+}
+
+#[test]
+fn authenticated_manifest_session_and_inflight_record_do_not_mint_attempt_authority() {
+    let fixture = fixture(false);
+    let context = session_context(&fixture);
+    // An externally started record is not the private tool claim acquired by SessionOperation.
+    fixture
+        .kernel
+        .begin_session_request(&context, chio_core::session::OperationKind::ToolCall, true)
+        .test_unwrap();
+    let registry = public_manifest_registry();
+    let security = registry.bridge_security(SERVER, TOOL).test_unwrap();
+    let evaluate = || {
+        fixture
+            .kernel
+            .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+                &fixture.request,
+                &registry,
+                &security,
+                None,
+                &context.session_id,
+                &fixture.security,
+            )
+            .test_unwrap()
+    };
+    let first = evaluate();
+    assert_eq!(first.verdict, Verdict::Allow);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert!(fixture
+        .kernel
+        .session(&context.session_id)
+        .test_unwrap()
+        .inflight()
+        .get(&context.request_id)
+        .is_some());
+
+    let second = evaluate();
+    assert_eq!(
+        (second.verdict, fixture.invocations.load(Ordering::SeqCst)),
+        (Verdict::Deny, 1)
+    );
+    assert!(second.output.is_none());
+}
+
+struct SessionContextAuthority;
+
+impl SecurityInvocationContextAuthority for SessionContextAuthority {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &OperationContext,
+        operation: &ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError> {
+        Ok(SecurityInvocationContext::v1(
+            SecurityInvocationContextV1::new(
+                TenantId::new("throttle-tenant").test_unwrap(),
+                SessionId::new(context.session_id.as_str()).test_unwrap(),
+                PrincipalId::new(context.agent_id.clone()).test_unwrap(),
+                IsolationEpochId::new("throttle-epoch").test_unwrap(),
+                LineageId::new(operation.capability.id.clone()).test_unwrap(),
+                1,
+            ),
+        ))
+    }
+}
+
+fn operation(request: &ToolCallRequest) -> SessionOperation {
+    SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        capability: request.capability.clone(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        arguments: request.arguments.clone(),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        model_metadata: None,
+        supplemental_authorization: None,
+        extra_metadata: None,
+    }))
+}
+
+fn tool_response(response: chio_kernel::SessionOperationResponse) -> chio_kernel::ToolCallResponse {
+    match response {
+        chio_kernel::SessionOperationResponse::ToolCall(response) => response,
+        _ => panic!("expected tool-call response"),
+    }
+}
+
+#[test]
+fn actual_session_claim_preserves_one_throttle_unit_across_nonce_preflight_and_retry() {
+    let mut fixture = fixture(false);
+    let context = session_context(&fixture);
+    fixture
+        .kernel
+        .set_security_invocation_context_authority(Arc::new(SessionContextAuthority));
+    let nonce_config = chio_kernel::execution_nonce::ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 8,
+        require_nonce: true,
+    };
+    fixture.kernel.set_execution_nonce_store(
+        nonce_config.clone(),
+        Box::new(
+            chio_kernel::execution_nonce::InMemoryExecutionNonceStore::with_clock(
+                nonce_config.nonce_store_capacity,
+                fixture.kernel.authority_clock(),
+            ),
+        ),
+    );
+    let mut operation = operation(&fixture.request);
+    let preflight = tool_response(
+        fixture
+            .kernel
+            .evaluate_session_operation(&context, &operation)
+            .test_unwrap(),
+    );
+    assert_eq!(preflight.verdict, Verdict::Allow);
+    assert!(preflight.output.is_none());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    let nonce = preflight.execution_nonce.as_deref().test_unwrap();
+    let SessionOperation::ToolCall(call) = &mut operation else {
+        panic!("expected tool-call operation");
+    };
+    call.execution_nonce = Some(serde_json::to_value(nonce).test_unwrap());
+
+    let executed = tool_response(
+        fixture
+            .kernel
+            .evaluate_session_operation(&context, &operation)
+            .test_unwrap(),
+    );
+    assert_eq!(executed.verdict, Verdict::Allow);
+    assert!(executed.output.is_some());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        fixture
+            .kernel
+            .evaluate_session_operation(&context, &operation),
+        Err(KernelError::Session(
+            chio_kernel::session::SessionError::ExecutionNonceRetryMismatch { .. }
+        ))
+    ));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
 }

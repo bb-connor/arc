@@ -242,14 +242,11 @@ fn evaluate_span_records_exact_field_set() {
         let scope = ChioScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let verdict = match guard.evaluate(&ctx) {
@@ -312,14 +309,11 @@ fn evaluation_emits_verdict_duration_and_fuel() {
     let scope = ChioScope::default();
     let agent_id = "agent-1".to_string();
     let server_id = "test_server".to_string();
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
 
     let verdict = match guard.evaluate(&ctx) {
@@ -473,14 +467,11 @@ fn deny_records_bounded_reason_class_from_reason_string() {
     let scope = ChioScope::default();
     let agent_id = "agent-1".to_string();
     let server_id = "test_server".to_string();
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     let verdict = match guard.evaluate(&ctx) {
         Ok(verdict) => verdict,
@@ -521,14 +512,11 @@ fn malformed_argument_deny_records_metrics() {
     let scope = ChioScope::default();
     let agent_id = "agent-1".to_string();
     let server_id = "test_server".to_string();
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     let verdict = match guard.evaluate(&ctx) {
         Ok(verdict) => verdict,

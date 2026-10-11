@@ -4,8 +4,10 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 use chio_kernel::{
-    Guard, GuardContext, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    Verdict,
+    ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, MemoryBudgetConfig,
+    NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_kernel::{Clock, MissingContextPolicy, SessionThrottleGuard};
 use chio_security_types::ports::{
@@ -200,7 +202,7 @@ fn request() -> ToolCallRequest {
             subject: keypair.public_key(),
             scope: scope(),
             issued_at: 1,
-            expires_at: u64::MAX,
+            expires_at: 60,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         },
@@ -227,47 +229,112 @@ fn request() -> ToolCallRequest {
     }
 }
 
-fn security_context() -> SecurityInvocationContext {
+fn security_context(request: &ToolCallRequest) -> SecurityInvocationContext {
     SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
         throttle_key().tenant_id,
         throttle_key().session_id,
-        PrincipalId::new("principal-a").unwrap_or_else(|error| panic!("principal id: {error}")),
+        PrincipalId::new(request.agent_id.clone())
+            .unwrap_or_else(|error| panic!("principal id: {error}")),
         IsolationEpochId::new("epoch-a").unwrap_or_else(|error| panic!("isolation epoch: {error}")),
-        LineageId::new("lineage-a").unwrap_or_else(|error| panic!("lineage id: {error}")),
+        LineageId::new(request.capability.id.clone())
+            .unwrap_or_else(|error| panic!("lineage id: {error}")),
         1,
     ))
 }
 
+struct SharedGuard(Arc<SessionThrottleGuard>);
+
+impl Guard for SharedGuard {
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
+        self.0.evaluate(context)
+    }
+}
+
+struct ReadServer;
+
+#[async_trait::async_trait]
+impl ToolServerConnection for ReadServer {
+    fn server_id(&self) -> &str {
+        "server-a"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["tool-a".to_owned()]
+    }
+
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        tool_name == "tool-a"
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Ok(serde_json::json!({"ok": true}))
+    }
+}
+
 fn evaluate(
-    guard: &SessionThrottleGuard,
+    guard: &Arc<SessionThrottleGuard>,
     request: &ToolCallRequest,
     security: Option<&SecurityInvocationContext>,
 ) -> Verdict {
-    let context =
-        GuardContext::new(request, &request.capability.scope).with_security_context(security);
-    guard
-        .evaluate(&context)
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![request.capability.issuer.clone()],
+            max_delegation_depth: 5,
+            policy_hash: "throttle-guard-test-policy".to_owned(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        Arc::new(chio_security_types::clock::FixedClock::from_millis(10_500)),
+    );
+    kernel.register_tool_server(Box::new(ReadServer));
+    kernel.add_guard(Box::new(SharedGuard(guard.clone())));
+    let result = if let Some(security) = security {
+        kernel.evaluate_tool_call_blocking_with_security_context(request, security)
+    } else {
+        kernel.evaluate_tool_call_blocking(request)
+    };
+    result
         .unwrap_or_else(|error| panic!("evaluate throttle guard: {error}"))
         .verdict
 }
 
 #[test]
-fn exact_decision_allows_and_invocation_identity_is_deterministic() {
+fn exact_decisions_allow_with_distinct_kernel_attempts() {
     let store = Arc::new(FakeThrottles::new(Behavior::Allow));
     let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
-    let guard = SessionThrottleGuard::new(
+    let guard = Arc::new(SessionThrottleGuard::new(
         throttle_store,
         Arc::new(FixedClock(10_500)),
         MissingContextPolicy::Deny,
-    );
+    ));
     let request = request();
-    let security = security_context();
+    let security = security_context(&request);
     assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Allow);
     assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Allow);
     let invocations = store.invocations();
     assert_eq!(invocations.len(), 2);
     assert_eq!(invocations[0].key, throttle_key());
-    assert_eq!(invocations[0].invocation_id, invocations[1].invocation_id);
+    assert_ne!(invocations[0].invocation_id, invocations[1].invocation_id);
     assert!(invocations[0]
         .invocation_id
         .as_str()
@@ -275,25 +342,25 @@ fn exact_decision_allows_and_invocation_identity_is_deterministic() {
 }
 
 #[test]
-fn reconstructed_guard_preserves_session_throttle_identity() {
+fn reconstructed_guard_preserves_the_session_and_uses_a_new_attempt() {
     let store = Arc::new(FakeThrottles::new(Behavior::Allow));
     let request = request();
-    let security = security_context();
+    let security = security_context(&request);
     {
         let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
-        let guard = SessionThrottleGuard::new(
+        let guard = Arc::new(SessionThrottleGuard::new(
             throttle_store,
             Arc::new(FixedClock(10_500)),
             MissingContextPolicy::Deny,
-        );
+        ));
         assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Allow);
     }
     let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
-    let restored_guard = SessionThrottleGuard::new(
+    let restored_guard = Arc::new(SessionThrottleGuard::new(
         throttle_store,
         Arc::new(FixedClock(10_500)),
         MissingContextPolicy::Deny,
-    );
+    ));
     assert_eq!(
         evaluate(&restored_guard, &request, Some(&security)),
         Verdict::Allow
@@ -303,19 +370,20 @@ fn reconstructed_guard_preserves_session_throttle_identity() {
     assert_eq!(invocations.len(), 2);
     assert_eq!(invocations[0].key, invocations[1].key);
     assert_eq!(invocations[0].key.session_id.as_str(), "session-a");
+    assert_ne!(invocations[0].invocation_id, invocations[1].invocation_id);
 }
 
 #[test]
 fn exhausted_outage_and_tampered_decisions_all_deny() {
     let request = request();
-    let security = security_context();
+    let security = security_context(&request);
     for behavior in [Behavior::Deny, Behavior::Fail, Behavior::Tamper] {
         let store: Arc<dyn SessionThrottleStore> = Arc::new(FakeThrottles::new(behavior));
-        let guard = SessionThrottleGuard::new(
+        let guard = Arc::new(SessionThrottleGuard::new(
             store,
             Arc::new(FixedClock(10_500)),
             MissingContextPolicy::Deny,
-        );
+        ));
         assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Deny);
     }
 }
@@ -324,11 +392,11 @@ fn exhausted_outage_and_tampered_decisions_all_deny() {
 fn missing_authoritative_session_cannot_bypass_enforcement() {
     let store = Arc::new(FakeThrottles::new(Behavior::Allow));
     let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
-    let guard = SessionThrottleGuard::new(
+    let guard = Arc::new(SessionThrottleGuard::new(
         throttle_store,
         Arc::new(FixedClock(10_500)),
         MissingContextPolicy::Deny,
-    );
+    ));
     let request = request();
     assert_eq!(evaluate(&guard, &request, None), Verdict::Deny);
     assert!(store.invocations().is_empty());
@@ -353,15 +421,43 @@ fn zero_or_failed_clock_denies_before_consumption() {
     }
 
     let request = request();
-    let security = security_context();
+    let security = security_context(&request);
     for clock in [
         Arc::new(FixedClock(0)) as Arc<dyn Clock>,
         Arc::new(FailingClock) as Arc<dyn Clock>,
     ] {
         let store = Arc::new(FakeThrottles::new(Behavior::Allow));
         let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
-        let guard = SessionThrottleGuard::new(throttle_store, clock, MissingContextPolicy::Deny);
+        let guard = Arc::new(SessionThrottleGuard::new(
+            throttle_store,
+            clock,
+            MissingContextPolicy::Deny,
+        ));
         assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Deny);
         assert!(store.invocations().is_empty());
     }
+}
+
+#[test]
+fn standalone_security_context_cannot_mint_a_kernel_attempt() {
+    let store = Arc::new(FakeThrottles::new(Behavior::Allow));
+    let guard = SessionThrottleGuard::new(
+        store.clone(),
+        Arc::new(FixedClock(10_500)),
+        MissingContextPolicy::Deny,
+    );
+    let request = request();
+    let security = security_context(&request);
+    let context = GuardContext::new(&request, &request.capability.scope)
+        .with_security_context(Some(&security));
+
+    assert!(context.invocation_attempt_id().is_none());
+    assert_eq!(
+        guard
+            .evaluate(&context)
+            .unwrap_or_else(|error| panic!("guard: {error}"))
+            .verdict,
+        Verdict::Deny
+    );
+    assert!(store.invocations().is_empty());
 }

@@ -87,6 +87,7 @@ pub(super) fn evaluate(
             &mut NoopNestedFlowClient,
             None,
             Some(&context),
+            None,
         )?
     } else {
         kernel.evaluate_tool_call_blocking_with_security_context(request, &context)?

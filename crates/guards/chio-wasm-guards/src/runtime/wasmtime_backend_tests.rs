@@ -858,14 +858,11 @@ fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    let ctx = chio_kernel::GuardContext {
-        request: &tool_request,
-        scope: &scope,
-        agent_id: &req.agent_id,
-        server_id: &req.server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = chio_kernel::GuardContext::new(&tool_request, &scope);
+        constructed_guard_context.agent_id = &req.agent_id;
+        constructed_guard_context.server_id = &req.server_id;
+        constructed_guard_context
     };
     let _ = guard.evaluate(&ctx).unwrap();
 

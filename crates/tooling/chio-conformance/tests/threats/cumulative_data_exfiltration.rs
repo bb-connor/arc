@@ -72,14 +72,11 @@ fn guard_ctx<'a>(
     agent_id: &'a String,
     server_id: &'a String,
 ) -> GuardContext<'a> {
-    GuardContext {
-        request,
-        scope,
-        agent_id,
-        server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    {
+        let mut constructed_guard_context = GuardContext::new(request, scope);
+        constructed_guard_context.agent_id = agent_id;
+        constructed_guard_context.server_id = server_id;
+        constructed_guard_context
     }
 }
 

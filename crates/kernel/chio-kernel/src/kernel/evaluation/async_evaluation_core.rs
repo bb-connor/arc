@@ -18,6 +18,7 @@ impl ChioKernel {
         let EvaluationDisposition {
             preflight_hold: preflight_disposition,
             dispatch: dispatch_mode,
+            session_guard_attempt,
         } = disposition;
         self.validate_security_invocation_context_binding(request, security_context, session_id)?;
         self.validate_session_threshold_intent(request, session_id)?;
@@ -417,6 +418,10 @@ impl ChioKernel {
         let mut governed_error = None;
         let mut guard_denial = None;
         let mut selected = None;
+        let guard_attempt = GuardInvocationAttempt::for_evaluation(
+            durable_admission.as_ref(),
+            session_guard_attempt,
+        );
         for matching in &matching_grants {
             if required_delivery_grant_index.is_some_and(|required| matching.index != required) {
                 continue;
@@ -487,6 +492,7 @@ impl ChioKernel {
                     session_filesystem_roots,
                     Some(matching.index),
                     security_context,
+                    &guard_attempt,
                 )
                 .await;
             guard_drop_guard.disarm();

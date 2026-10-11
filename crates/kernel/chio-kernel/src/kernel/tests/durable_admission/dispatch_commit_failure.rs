@@ -200,6 +200,7 @@ fn payment_dispatch_failure(
             &mut NoopNestedFlowClient,
             None,
             context.as_ref(),
+            None,
         )?
     } else if matches!(boundary, FailureBoundary::Security) {
         kernel.evaluate_tool_call_blocking_with_security_context(

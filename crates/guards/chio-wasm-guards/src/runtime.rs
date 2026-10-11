@@ -169,14 +169,11 @@ mod tests {
         let scope = ChioScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
-        let context = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let context = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
         guard.evaluate(&context).unwrap().verdict
     }
@@ -193,14 +190,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx);
@@ -230,14 +224,11 @@ mod tests {
         let scope = ChioScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
-        let context = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let context = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let decision = guard.evaluate(&context).unwrap();
@@ -271,14 +262,11 @@ mod tests {
         let scope = ChioScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
-        let context = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let context = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let decision = guard.evaluate(&context).unwrap();
@@ -334,14 +322,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx);
@@ -364,14 +349,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         // Advisory guards should allow even when the backend denies
@@ -445,14 +427,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx);
@@ -568,14 +547,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -590,14 +566,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -614,14 +587,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -646,14 +616,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -673,14 +640,12 @@ mod tests {
         let server_id = "test_server".to_string();
         let roots = vec!["/home".to_string(), "/tmp".to_string()];
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: Some(&roots),
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context =
+                GuardContext::new(&request, &scope).with_session_filesystem_roots(Some(&roots));
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -698,14 +663,12 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: Some(3),
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context =
+                GuardContext::new(&request, &scope).with_matched_grant_index(Some(3));
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -719,14 +682,11 @@ mod tests {
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
 
-        let ctx = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let req = WasmGuard::build_request(&ctx);

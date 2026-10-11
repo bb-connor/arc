@@ -2,6 +2,9 @@
 
 use super::*;
 
+#[path = "session_continuation/guard_attempt.rs"]
+mod guard_attempt;
+
 #[path = "scope_binding.rs"]
 mod scope_binding;
 #[path = "session_boundary.rs"]

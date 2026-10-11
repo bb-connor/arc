@@ -298,14 +298,13 @@ impl DispatchAllowFixture {
     }
 
     fn evaluate_guard(&self, guard: &BenchGuard) -> bool {
-        let ctx = GuardContext {
-            request: &self.guard_request,
-            scope: &self.guard_scope,
-            agent_id: &self.guard_agent_id,
-            server_id: &self.guard_server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: Some(0),
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context =
+                GuardContext::new(&self.guard_request, &self.guard_scope)
+                    .with_matched_grant_index(Some(0));
+            constructed_guard_context.agent_id = &self.guard_agent_id;
+            constructed_guard_context.server_id = &self.guard_server_id;
+            constructed_guard_context
         };
 
         match guard.evaluate(&ctx) {

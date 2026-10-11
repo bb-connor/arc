@@ -426,15 +426,7 @@ impl ChioKernel {
                 "Finding memory write requires a memory provenance store".to_owned(),
             ));
         }
-        let guard_context = GuardContext {
-            request,
-            scope: &request.capability.scope,
-            agent_id: &request.agent_id,
-            server_id: &request.server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
-        };
+        let guard_context = GuardContext::new(request, &request.capability.scope);
         let mut required_status_feed: Option<String> = None;
         for guard in self.guards.iter() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

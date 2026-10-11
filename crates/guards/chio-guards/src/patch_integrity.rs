@@ -377,14 +377,11 @@ mod tests {
             declassification_grant: None,
         };
 
-        let ctx = chio_kernel::GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
@@ -435,14 +432,11 @@ mod tests {
             declassification_grant: None,
         };
 
-        let ctx = chio_kernel::GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
@@ -497,14 +491,11 @@ mod tests {
             declassification_grant: None,
         };
 
-        let ctx = chio_kernel::GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let ctx = {
+            let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");

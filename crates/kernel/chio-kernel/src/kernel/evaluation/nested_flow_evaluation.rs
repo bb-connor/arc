@@ -24,6 +24,7 @@ impl ChioKernel {
             client,
             extra_metadata,
             None,
+            None,
         )
     }
 
@@ -36,6 +37,7 @@ impl ChioKernel {
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
         security_context: Option<&SecurityInvocationContext>,
+        session_guard_attempt: Option<GuardInvocationAttempt>,
     ) -> Result<ToolCallResponse, KernelError> {
         block_on_async_tool_dispatch(
             self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
@@ -44,6 +46,7 @@ impl ChioKernel {
                 client,
                 extra_metadata,
                 security_context,
+                session_guard_attempt,
             ),
         )
     }
@@ -62,6 +65,7 @@ impl ChioKernel {
             client,
             extra_metadata,
             None,
+            None,
         )
         .await
     }
@@ -75,6 +79,7 @@ impl ChioKernel {
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
         security_context: Option<&SecurityInvocationContext>,
+        session_guard_attempt: Option<GuardInvocationAttempt>,
     ) -> Result<ToolCallResponse, KernelError> {
         // Keep the large evaluation state out of the bridge's stack frames.
         // Deep, bounded custody verification must still fit a normal host stack.
@@ -85,6 +90,7 @@ impl ChioKernel {
                 client,
                 extra_metadata,
                 security_context,
+                session_guard_attempt,
             ),
         ))
         .await
@@ -97,6 +103,7 @@ impl ChioKernel {
         client: &mut C,
         extra_metadata: Option<serde_json::Value>,
         security_context: Option<&SecurityInvocationContext>,
+        session_guard_attempt: Option<GuardInvocationAttempt>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.validate_security_invocation_context_binding(
             request,
@@ -430,6 +437,7 @@ impl ChioKernel {
                 request,
                 extra_metadata: &extra_metadata,
                 security_context,
+                session_guard_attempt,
                 now,
                 now_unix_ms,
                 cap,

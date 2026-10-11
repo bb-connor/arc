@@ -12,6 +12,7 @@ pub(super) struct NestedFlowGrantSelection<'a> {
     pub(super) request: &'a ToolCallRequest,
     pub(super) extra_metadata: &'a Option<serde_json::Value>,
     pub(super) security_context: Option<&'a SecurityInvocationContext>,
+    pub(super) session_guard_attempt: Option<GuardInvocationAttempt>,
     pub(super) now: u64,
     pub(super) now_unix_ms: u64,
     pub(super) cap: &'a CapabilityToken,
@@ -42,6 +43,7 @@ impl ChioKernel {
             request,
             extra_metadata,
             security_context,
+            session_guard_attempt,
             now,
             now_unix_ms,
             cap,
@@ -56,6 +58,10 @@ impl ChioKernel {
         let mut governed_error = None;
         let mut guard_denial = None;
         let mut selected = None;
+        let guard_attempt = GuardInvocationAttempt::for_evaluation(
+            durable_admission.as_ref(),
+            session_guard_attempt,
+        );
         for matching in matching_grants {
             if required_delivery_grant_index.is_some_and(|required| matching.index != required) {
                 continue;
@@ -126,6 +132,7 @@ impl ChioKernel {
                     Some(session_roots),
                     Some(matching.index),
                     security_context,
+                    &guard_attempt,
                 )
                 .await;
             guard_drop_guard.disarm();

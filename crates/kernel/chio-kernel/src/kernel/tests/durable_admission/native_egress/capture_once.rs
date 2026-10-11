@@ -352,6 +352,7 @@ fn evaluate(case: &Case) -> Result<ToolCallResponse, KernelError> {
                 &mut NoopNestedFlowClient,
                 None,
                 Some(&case.context),
+                None,
             ),
     }
 }

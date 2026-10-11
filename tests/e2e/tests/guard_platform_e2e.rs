@@ -238,14 +238,11 @@ fn publish_pull_verify_swap_rollback_and_metrics_gate() {
     let prior_epoch = guard.current_epoch_id();
 
     let (request, scope, agent_id, server_id) = capability_request();
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
 
     let mut canary_verdicts = Vec::new();

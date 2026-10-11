@@ -47,6 +47,10 @@ impl<'kernel> ToolRequestClaim<'kernel> {
         self.retained.clone()
     }
 
+    pub(super) fn guard_invocation_attempt(&self) -> GuardInvocationAttempt {
+        GuardInvocationAttempt::for_session_claim(&self.context)
+    }
+
     pub(super) fn disarm(&mut self) {
         self.armed = false;
     }

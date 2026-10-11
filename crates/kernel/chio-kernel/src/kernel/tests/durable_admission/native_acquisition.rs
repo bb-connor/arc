@@ -427,6 +427,7 @@ fn nested_native_join_only_hook_cannot_activate_dispatch() -> Result<(), Box<dyn
         &mut NoopNestedFlowClient,
         None,
         Some(&context),
+        None,
     )?;
     assert_eq!(response.verdict, Verdict::Deny);
     assert_eq!(

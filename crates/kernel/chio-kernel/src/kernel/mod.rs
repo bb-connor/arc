@@ -28,6 +28,8 @@ mod admission_terminal_receipt;
 mod approval_cleanup;
 mod credential_reservation;
 mod error;
+mod guard_invocation_attempt;
+pub(crate) use guard_invocation_attempt::GuardInvocationAttempt;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
@@ -965,6 +967,8 @@ pub struct GuardContext<'a> {
     pub matched_grant_index: Option<usize>,
     /// Trusted identity and isolation state, when supplied by the host.
     pub security_context: Option<&'a SecurityInvocationContext>,
+    /// Kernel-owned admission identity. Public construction grants no attempt authority.
+    invocation_attempt_id: Option<&'a str>,
 }
 
 impl<'a> GuardContext<'a> {
@@ -978,6 +982,7 @@ impl<'a> GuardContext<'a> {
             session_filesystem_roots: None,
             matched_grant_index: None,
             security_context: None,
+            invocation_attempt_id: None,
         }
     }
 
@@ -1008,6 +1013,18 @@ impl<'a> GuardContext<'a> {
     #[must_use]
     pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
         self.security_context
+    }
+
+    /// Identity selected once by the kernel for this evaluation's guard passes.
+    /// A retained operation or acquired session claim may preserve it across retries.
+    #[must_use]
+    pub const fn invocation_attempt_id(&self) -> Option<&'a str> {
+        self.invocation_attempt_id
+    }
+
+    pub(crate) const fn with_invocation_attempt_id(mut self, identity: &'a str) -> Self {
+        self.invocation_attempt_id = Some(identity);
+        self
     }
 }
 

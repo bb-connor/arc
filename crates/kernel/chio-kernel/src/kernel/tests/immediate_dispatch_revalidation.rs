@@ -294,15 +294,8 @@ fn guard_dispatch_revalidation_is_opt_in_and_opted_in_errors_fail_closed() {
         hook_revalidations,
         false,
     );
-    let context = GuardContext {
-        request: &request,
-        scope: &request.capability.scope,
-        agent_id: &request.agent_id,
-        server_id: &request.server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: Some(0),
-        security_context: None,
-    };
+    let context =
+        GuardContext::new(&request, &request.capability.scope).with_matched_grant_index(Some(0));
 
     let legacy = LegacyDefaultGuard;
     assert!(!legacy.requires_dispatch_revalidation());

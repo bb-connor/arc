@@ -830,12 +830,16 @@ impl ChioKernel {
                         // Pass the session_id so the evaluate path can resolve
                         // tenant_id from session.auth_context for every receipt
                         // signed during this tool call.
-                        self.evaluate_tool_call_sync_with_session_and_security_context(
+                        let claim = request_claim.as_ref().ok_or_else(|| {
+                            KernelError::Internal("session tool request claim is missing".into())
+                        })?;
+                        self.evaluate_tool_call_sync_with_session_guard_attempt(
                             &request,
                             Some(session_roots.as_slice()),
                             tool_call.extra_metadata.clone(),
                             Some(&context.session_id),
                             security_context.as_ref(),
+                            Some(claim.guard_invocation_attempt()),
                         )
                         .map(SessionOperationResponse::ToolCall)
                     })

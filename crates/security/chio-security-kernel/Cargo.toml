@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 [dev-dependencies]
 async-trait = { workspace = true }
 chio-guards = { workspace = true }
+chio-manifest = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 rusqlite = { workspace = true }

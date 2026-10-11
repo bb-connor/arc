@@ -147,6 +147,7 @@ fn nested_security_callbacks_preserve_the_effect_boundary() -> TestResult {
             &mut NoopNestedFlowClient,
             None,
             Some(&context),
+            None,
         );
         match fault {
             Fault::None => assert_eq!(result?.verdict, Verdict::Allow),

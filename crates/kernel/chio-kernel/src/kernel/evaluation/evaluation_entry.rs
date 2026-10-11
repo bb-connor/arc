@@ -518,6 +518,7 @@ impl ChioKernel {
             None,
             Some(matched_grant_index),
             None,
+            &GuardInvocationAttempt::fresh(),
         ) {
             // Attempt to extract the offending guard name from the
             // canonical `guard "<name>" denied the request` format

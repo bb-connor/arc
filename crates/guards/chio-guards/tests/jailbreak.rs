@@ -69,14 +69,11 @@ fn make_request(
 
 fn eval(guard: &JailbreakGuard, tool: &str, args: serde_json::Value) -> Verdict {
     let (request, scope, agent_id, server_id) = make_request(tool, args);
-    let ctx = GuardContext {
-        request: &request,
-        scope: &scope,
-        agent_id: &agent_id,
-        server_id: &server_id,
-        session_filesystem_roots: None,
-        matched_grant_index: None,
-        security_context: None,
+    let ctx = {
+        let mut constructed_guard_context = GuardContext::new(&request, &scope);
+        constructed_guard_context.agent_id = &agent_id;
+        constructed_guard_context.server_id = &server_id;
+        constructed_guard_context
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }

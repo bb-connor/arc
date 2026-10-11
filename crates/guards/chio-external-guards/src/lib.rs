@@ -371,14 +371,11 @@ mod tests {
             federated_origin_kernel_id: None,
             declassification_grant: None,
         };
-        let context = GuardContext {
-            request: &request,
-            scope: &scope,
-            agent_id: &agent_id,
-            server_id: &server_id,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let context = {
+            let mut constructed_guard_context = GuardContext::new(&request, &scope);
+            constructed_guard_context.agent_id = &agent_id;
+            constructed_guard_context.server_id = &server_id;
+            constructed_guard_context
         };
 
         let verdict = guard
@@ -400,14 +397,11 @@ mod tests {
 
         let (out_request, out_scope, out_agent, out_server) =
             revalidation_context_parts("read_file");
-        let out_context = GuardContext {
-            request: &out_request,
-            scope: &out_scope,
-            agent_id: &out_agent,
-            server_id: &out_server,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let out_context = {
+            let mut constructed_guard_context = GuardContext::new(&out_request, &out_scope);
+            constructed_guard_context.agent_id = &out_agent;
+            constructed_guard_context.server_id = &out_server;
+            constructed_guard_context
         };
         guard
             .revalidate_before_dispatch(&out_context)
@@ -415,14 +409,11 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         let (in_request, in_scope, in_agent, in_server) = revalidation_context_parts("send_email");
-        let in_context = GuardContext {
-            request: &in_request,
-            scope: &in_scope,
-            agent_id: &in_agent,
-            server_id: &in_server,
-            session_filesystem_roots: None,
-            matched_grant_index: None,
-            security_context: None,
+        let in_context = {
+            let mut constructed_guard_context = GuardContext::new(&in_request, &in_scope);
+            constructed_guard_context.agent_id = &in_agent;
+            constructed_guard_context.server_id = &in_server;
+            constructed_guard_context
         };
         let decision = guard
             .evaluate(&in_context)

@@ -76,6 +76,7 @@ pub(crate) enum DispatchMode {
 pub(crate) struct EvaluationDisposition {
     pub(crate) preflight_hold: PreflightHoldDisposition,
     pub(crate) dispatch: DispatchMode,
+    pub(crate) session_guard_attempt: Option<GuardInvocationAttempt>,
 }
 
 impl EvaluationDisposition {
@@ -85,6 +86,7 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::Kernel,
+            session_guard_attempt: None,
         }
     }
 
@@ -94,6 +96,7 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReserveForCaller,
             dispatch: DispatchMode::Kernel,
+            session_guard_attempt: None,
         }
     }
 
@@ -103,6 +106,7 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::ReserveForCaller,
+            session_guard_attempt: None,
         }
     }
 
@@ -111,6 +115,7 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::CallerReport(report),
+            session_guard_attempt: None,
         }
     }
 
@@ -118,7 +123,13 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::CallerStart,
+            session_guard_attempt: None,
         }
+    }
+
+    pub(crate) fn with_session_guard_attempt(mut self, attempt: GuardInvocationAttempt) -> Self {
+        self.session_guard_attempt = Some(attempt);
+        self
     }
 }
 
