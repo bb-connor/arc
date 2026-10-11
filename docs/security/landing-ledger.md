@@ -8,6 +8,31 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Published native recovery qualification (October 11 UTC)
+
+The [hosted native audit](audits/native-recovery-hosted-20261011.json) records
+successful installed recovery on public `36d77fe276`, executed as merge `273c39c26e5e`
+with an identical source tree. Job **114440578983**, run **38125088506**, passes
+native baseline, interrupted/recovered, unknown-outcome refusal, operator and
+repository-operator scenarios. Root independently verifies all **33 receipts**
+from the five trajectories against their recorded fixture signer pins.
+
+The operator qualifier, broker campaign and workflow are byte-identical to the
+failed `ddb7cad006` source. The model broker fence remains **10,000 ms**; the
+qualifier still requires first-attempt completion, three successful model calls,
+eight receipts, correct cost and replay without redispatch. Both operator export
+costs are **0.00108**. Failure diagnostics added to the native qualifier preserve
+its acceptance assertions. This closes the observed native-trajectory evidence
+gap on this published source. The old failed run remains failed.
+
+The ledger still preserves **2,014 requirements**. Two existing current states
+now point to this hosted evidence, retaining their prior states. This is not a
+latency-percentile or load qualification: archive/open-time capacity, cold-state
+activation, broader concurrency and trusted-controller evidence remain open.
+The conditional optimized-native job was skipped. Four required checks and
+relevant native renewal on the final replacement, answered threads and user
+merge authorization remain necessary. MSRV on public `36d77fe276` is still active.
+
 ## Required CI repair and terminal local preflight (October 11 UTC)
 
 The [required CI preflight audit](audits/required-ci-preflight-20261011.json)
