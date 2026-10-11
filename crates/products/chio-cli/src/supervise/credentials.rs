@@ -231,6 +231,9 @@ pub fn load_bindings(
     Ok(loaded)
 }
 
+#[cfg(all(test, target_vendor = "apple"))]
+mod darwin_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
