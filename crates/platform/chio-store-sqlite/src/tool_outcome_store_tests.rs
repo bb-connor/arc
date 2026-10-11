@@ -33,6 +33,8 @@ mod recovery_component;
 mod compaction_fixture;
 use compaction_fixture::completed_return;
 
+#[path = "tool_outcome_store_tests/compaction_cursor.rs"]
+mod compaction_cursor;
 #[path = "tool_outcome_store_tests/compaction_read_bounds.rs"]
 mod compaction_read_bounds;
 

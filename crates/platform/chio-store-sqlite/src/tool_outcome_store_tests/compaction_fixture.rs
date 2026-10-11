@@ -1,11 +1,12 @@
 //! Actual kernel dispatch and signed terminal projection on the joint store.
 use super::*;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
-use chio_core::Keypair;
+use chio_core::{capability::CapabilityToken, Keypair};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallChunk, ToolCallRequest,
     ToolCallStream, ToolServerConnection, ToolServerStreamResult, Verdict,
 };
+use chio_security_types::clock::{Clock, FixedClock};
 
 struct FixtureTool {
     stream: bool,
@@ -60,6 +61,36 @@ pub(super) fn completed_return_with_value(
     stream: bool,
     value: serde_json::Value,
 ) -> Result<(AdmissionOperationV1, ToolOutcomeRecordV1), Box<dyn std::error::Error>> {
+    completed_return_inner(fixture, name, stream, value, None)
+}
+
+/// Stable signed inputs and both clock domains make digest ordering reproducible.
+pub(super) fn deterministic_completed_return(
+    fixture: &Fixture,
+    name: &str,
+    stream: bool,
+    unix_seconds: u64,
+) -> Result<(AdmissionOperationV1, ToolOutcomeRecordV1), Box<dyn std::error::Error>> {
+    completed_return_inner(
+        fixture,
+        name,
+        stream,
+        serde_json::json!({"completed": true}),
+        Some(unix_seconds),
+    )
+}
+
+fn completed_return_inner(
+    fixture: &Fixture,
+    name: &str,
+    stream: bool,
+    value: serde_json::Value,
+    fixed_time: Option<u64>,
+) -> Result<(AdmissionOperationV1, ToolOutcomeRecordV1), Box<dyn std::error::Error>> {
+    let clock: Arc<dyn Clock> = match fixed_time {
+        Some(seconds) => Arc::new(FixedClock::new(seconds)),
+        None => chio_test_support::clock::clock(),
+    };
     let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
             keypair: Keypair::from_seed(&[42; 32]),
@@ -79,7 +110,7 @@ pub(super) fn completed_return_with_value(
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         },
-        chio_test_support::clock::clock(),
+        clock,
     );
     kernel.set_durable_admission_store(
         Arc::new(fixture.operations.clone()),
@@ -89,8 +120,12 @@ pub(super) fn completed_return_with_value(
     kernel.set_budget_store_handle(Arc::new(fixture.authority.budget_store()));
     kernel.set_revocation_store_handle(Arc::new(fixture.authority.revocation_store()));
     kernel.register_tool_server(Box::new(FixtureTool { stream }));
-    let agent = Keypair::generate();
-    let capability = kernel.issue_capability(
+    let agent = if fixed_time.is_some() {
+        Keypair::from_seed(&[43; 32])
+    } else {
+        Keypair::generate()
+    };
+    let mut capability = kernel.issue_capability(
         &agent.public_key(),
         ChioScope {
             grants: vec![ToolGrant {
@@ -107,6 +142,11 @@ pub(super) fn completed_return_with_value(
         },
         300,
     )?;
+    if fixed_time.is_some() {
+        let mut body = capability.body();
+        body.id = format!("{name}-capability");
+        capability = CapabilityToken::sign(body, &Keypair::from_seed(&[42; 32]))?;
+    }
     let request = ToolCallRequest {
         request_id: name.into(),
         capability,
