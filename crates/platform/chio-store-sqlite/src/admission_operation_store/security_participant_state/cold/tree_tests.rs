@@ -594,12 +594,24 @@ fn values_refuse_noncanonical_or_malformed_retained_images() -> TestResult {
 
 #[test]
 fn grant_values_refuse_duplicate_rows_and_noncanonical_row_order() -> TestResult {
+    let duplicate_vector = fixture()?.values.remove(4);
+    let valid_rows = rows(&duplicate_vector)?;
+    assert_eq!(
+        encode_value(Class::Grant, &valid_rows)?,
+        hex::decode(&duplicate_vector.encoded_hex)?
+    );
+    // Keep the valid five-row shape and per-table counts. Only duplicated
+    // identity or outbox content may reject either otherwise-valid value.
+    for (first, second) in [(0, 1), (2, 3)] {
+        let mut duplicate_rows = valid_rows.clone();
+        assert_eq!(duplicate_rows[first].table, duplicate_rows[second].table);
+        assert_ne!(duplicate_rows[first], duplicate_rows[second]);
+        duplicate_rows[second] = duplicate_rows[first].clone();
+        assert!(encode_value(Class::Grant, &duplicate_rows).is_err());
+    }
+
     let vector = fixture()?.values.remove(3);
     let mut rows = rows(&vector)?;
-    let first = rows[0].clone();
-    rows.push(first);
-    assert!(encode_value(Class::Grant, &rows).is_err());
-    rows.pop();
     rows.reverse();
     assert_eq!(
         encode_value(Class::Grant, &rows)?,
