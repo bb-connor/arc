@@ -1250,6 +1250,14 @@ fn map_open_error(path: &Path, source: io::Error) -> CageError {
 pub(crate) use chio_cage_plan::linux::descriptor_identity;
 
 #[cfg(test)]
+#[path = "linux/scan_bounds_tests.rs"]
+mod scan_bounds_tests;
+
+#[cfg(test)]
+#[path = "linux/runtime_open_tests.rs"]
+mod runtime_open_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
