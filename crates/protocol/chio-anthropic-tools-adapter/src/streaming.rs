@@ -90,17 +90,14 @@ impl<'a> StreamGate<'a> {
             return self.forward_or_buffer(frame);
         };
 
-        if event == "message_start" {
-            if self.started || self.phase.is_closed() {
-                return Err(ProviderError::Malformed("duplicate message start".into()));
-            }
-            self.started = true;
-        } else if event != "ping" && (!self.started || self.phase.is_closed()) {
+        if event != "message_start" && event != "ping" && (!self.started || self.phase.is_closed())
+        {
             return Err(ProviderError::Malformed(
                 "event outside the message lifetime".into(),
             ));
         }
         match event {
+            "message_start" => self.start_message(frame),
             "content_block_start" => self.start_content_block(frame),
             "content_block_delta" => self.delta_content_block(frame),
             "content_block_stop" => self.stop_content_block(frame),
@@ -110,6 +107,27 @@ impl<'a> StreamGate<'a> {
             )),
             _ => self.forward_or_buffer(frame),
         }
+    }
+
+    fn start_message(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+        if self.started || self.phase.is_closed() {
+            return Err(ProviderError::Malformed("duplicate message start".into()));
+        }
+        // Content enters only through content blocks, where every tool_use is
+        // evaluated before release.
+        if frame
+            .data
+            .as_ref()
+            .and_then(|data| data.pointer("/message/content"))
+            .is_some_and(|content| content.as_array().is_none_or(|items| !items.is_empty()))
+        {
+            return Err(ProviderError::Malformed(
+                "Anthropic message_start carried initial content".into(),
+            ));
+        }
+        self.started = true;
+        self.output.extend_from_slice(&frame.raw);
+        Ok(())
     }
 
     fn start_content_block(&mut self, frame: SseFrame) -> Result<(), ProviderError> {

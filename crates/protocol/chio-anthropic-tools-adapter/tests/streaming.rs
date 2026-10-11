@@ -468,3 +468,55 @@ fn invalid_message_tail_prevents_every_evaluator_call() {
         assert_eq!(calls, 0);
     }
 }
+
+fn message_start_stream(content: Value) -> Vec<u8> {
+    let start = json!({
+        "type": "message_start",
+        "message": {"id": "msg_initial", "type": "message", "role": "assistant", "content": content},
+    });
+    format!("event: message_start\ndata: {start}\n\nevent: message_stop\ndata: {{\"type\":\"message_stop\"}}\n\n")
+        .into_bytes()
+}
+
+#[test]
+fn message_start_with_initial_content_is_refused() {
+    let tool_use = json!([{
+        "type": "tool_use",
+        "id": "toolu_initial",
+        "name": "write_file",
+        "input": {"path": "/work/config", "content": "changed"},
+    }]);
+    let text = json!([{"type": "text", "text": "initial"}]);
+    for content in [tool_use, text, Value::Null] {
+        let mut calls = 0;
+        let err = adapter()
+            .gate_sse_stream(&message_start_stream(content), |_| {
+                calls += 1;
+                Ok(allow_verdict())
+            })
+            .expect_err("initial content must not be forwarded");
+
+        assert!(matches!(
+            err,
+            ProviderError::Malformed(ref message)
+                if message == "Anthropic message_start carried initial content"
+        ));
+        assert_eq!(calls, 0);
+    }
+}
+
+#[test]
+fn message_start_with_empty_content_is_forwarded() {
+    let stream = message_start_stream(json!([]));
+    let mut calls = 0;
+    let gated = adapter()
+        .gate_sse_stream(&stream, |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        })
+        .unwrap();
+
+    assert_eq!(calls, 0);
+    assert!(gated.invocations.is_empty());
+    assert_eq!(gated.bytes, stream);
+}
