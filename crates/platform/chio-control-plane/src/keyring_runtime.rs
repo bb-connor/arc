@@ -1729,9 +1729,89 @@ fn sync_parent_directory(path: &Path) -> Result<(), std::io::Error> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use chio_test_support::prelude::*;
+
+    /// A rotating backend whose current selector is unreadable while its
+    /// compatibility identity still names an earlier key.
+    pub(crate) struct UnreadableSelectorBackend(pub(crate) chio_core::crypto::Ed25519Backend);
+
+    impl SigningBackend for UnreadableSelectorBackend {
+        fn algorithm(&self) -> chio_core::SigningAlgorithm {
+            self.0.algorithm()
+        }
+
+        fn public_key(&self) -> chio_core::PublicKey {
+            self.0.public_key()
+        }
+
+        fn current_public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
+            Err(chio_core::Error::InvalidPublicKey(
+                "selector unavailable".to_string(),
+            ))
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+            self.0.sign_bytes(message)
+        }
+    }
+
+    #[test]
+    fn migration_guarded_backend_forwards_an_unreadable_current_key() {
+        use chio_security_types::EnterpriseMigrationTransitionBody;
+
+        let directory = tempfile::tempdir().test_unwrap();
+        let signer = Keypair::from_seed(&[0x41; 32]);
+        let deployment = RecordId::new("deployment.guard.forwarding").test_unwrap();
+        let key = EnterpriseMigrationKey {
+            deployment_id: deployment.clone(),
+            scope_kind: EnterpriseMigrationScopeKind::Deployment,
+            scope_id: deployment,
+            control: EnterpriseMigrationControl::KeyLogVerification,
+        };
+        let digest = Digest32::new([7; 32]);
+        let store = SqliteEnterpriseMigrationStateStore::open(
+            directory.path().join("migration.sqlite3"),
+            SqliteEnterpriseMigrationOpenPolicy::new(vec![signer.public_key()], Vec::new())
+                .test_unwrap(),
+        )
+        .test_unwrap();
+        let genesis = EnterpriseMigrationTransitionBody::genesis(
+            key.clone(),
+            digest,
+            digest,
+            digest,
+            digest,
+            1,
+            signer.public_key().to_hex(),
+        )
+        .test_unwrap();
+        store
+            .register(
+                &chio_store_sqlite::sign_enterprise_migration_transition(genesis, &signer)
+                    .test_unwrap(),
+            )
+            .test_unwrap();
+        let store: Arc<dyn EnterpriseMigrationStateStore> = Arc::new(store);
+        let binding = EnterpriseMigrationRuntimeBinding::load(
+            &store,
+            &key,
+            EnterpriseMigrationStage::Disabled,
+            digest,
+        )
+        .test_unwrap();
+        let guarded = MigrationGuardedSigningBackend {
+            inner: Arc::new(UnreadableSelectorBackend(
+                chio_core::crypto::Ed25519Backend::new(Keypair::from_seed(&[0x42; 32])),
+            )),
+            migration_binding: KeyLogMigrationBinding(binding),
+        };
+        assert!(matches!(
+            guarded.current_public_key(),
+            Err(chio_core::Error::InvalidPublicKey(message)) if message == "selector unavailable"
+        ));
+    }
 
     #[test]
     fn keyring_runtime_config_requires_complete_migration_and_service_topology() {

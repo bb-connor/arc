@@ -47,6 +47,19 @@ impl SigningBackend for BackendSpy {
 }
 
 #[test]
+fn shared_backend_forwards_an_unreadable_current_key() {
+    let shared = SharedSigningBackend(Arc::new(
+        crate::authority::tests::UnreadableSelectorBackend(Ed25519Backend::new(
+            chio_core::Keypair::from_seed(&[62; 32]),
+        )),
+    ));
+    assert!(matches!(
+        shared.current_public_key(),
+        Err(chio_core::Error::InvalidPublicKey(message)) if message == "selector unavailable"
+    ));
+}
+
+#[test]
 fn shared_backend_forwards_every_atomic_signing_entrypoint() -> Result<(), chio_core::Error> {
     let spy = Arc::new(BackendSpy {
         inner: Ed25519Backend::new(chio_core::Keypair::from_seed(&[61; 32])),

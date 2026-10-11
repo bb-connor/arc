@@ -701,7 +701,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use chio_core::capability::{
         aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
@@ -1206,7 +1206,7 @@ mod tests {
 
     /// A rotating backend whose current selector is unreadable while its
     /// compatibility identity still names an earlier key.
-    struct UnreadableSelectorBackend(chio_core::crypto::Ed25519Backend);
+    pub(crate) struct UnreadableSelectorBackend(pub(crate) chio_core::crypto::Ed25519Backend);
 
     impl SigningBackend for UnreadableSelectorBackend {
         fn algorithm(&self) -> chio_core::SigningAlgorithm {
