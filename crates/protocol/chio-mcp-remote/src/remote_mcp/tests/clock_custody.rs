@@ -585,3 +585,65 @@ async fn resume_persistence_fault_fallback_stays_visible_without_durable_claim()
     drop(lease);
     std::fs::remove_dir_all(store_directory).unwrap();
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn finalized_terminal_record_survives_repeated_retire_cleanup_and_close() {
+    let (store_directory, path) = private_test_session_database("terminal-immutable");
+    let lease = acquire_test_session_store(&path);
+    let keyring = test_resume_hmac_keyring();
+    let directory = tempfile::tempdir().unwrap();
+    let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+    let clock = RemoteClock::new(source.clone());
+    let init = session_init(clock.clone());
+    let sessions = Arc::new(
+        RemoteSessionLedger::new(
+            clock,
+            init.lifecycle_policy.clone(),
+            Some(path.clone()),
+            Some(keyring.clone()),
+        )
+        .unwrap(),
+    );
+    let session = Arc::new(RemoteSession::new(init).unwrap());
+    session
+        .mark_ready(None, json!({}), PeerCapabilities::default())
+        .unwrap();
+    let state = fallback_app_state(directory.path(), sessions.clone());
+    sessions.insert_active(session.clone()).await;
+    *source.0.lock().unwrap() = reading(2_000, 1_000_000_000);
+    sessions.mark_expired(&session).await.unwrap();
+
+    let terminal_record = || async {
+        match sessions.lookup(&session.session_id).await {
+            Some(RemoteSessionEntry::Terminal(record)) => record,
+            other => panic!("expected a terminal record: {other:?}"),
+        }
+    };
+    let finalized = terminal_record().await;
+    let finalized_bytes = serde_json::to_vec(finalized.as_ref()).unwrap();
+    let durable = load_terminal_session_records(&path, &keyring, 2_000).unwrap();
+    assert_eq!(
+        serde_json::to_vec(durable[&session.session_id].as_ref()).unwrap(),
+        finalized_bytes
+    );
+
+    sessions.retire_terminal(&session).await;
+    sessions.mark_closed(&session).await.unwrap();
+    session.worker_serving_closed.send_replace(true);
+    sessions.cleanup_due_sessions().await.unwrap();
+    session_worker::close(&state, &session).await;
+
+    let retained = terminal_record().await;
+    assert!(Arc::ptr_eq(&finalized, &retained));
+    assert_eq!(
+        serde_json::to_vec(retained.as_ref()).unwrap(),
+        finalized_bytes
+    );
+    assert_eq!(retained.lifecycle.state, RemoteSessionState::Expired);
+    let (active, terminal) = sessions.snapshot().await;
+    assert!(active.is_empty());
+    assert_eq!(terminal.len(), 1);
+    drop(lease);
+    std::fs::remove_dir_all(store_directory).unwrap();
+}
