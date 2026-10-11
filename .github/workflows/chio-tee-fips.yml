@@ -527,6 +527,7 @@ jobs:
           umask 022
           bash scripts/run-exact-cargo-test-inventory.sh \
             --label "Shared signing authority forwarding" --allow-filtered --expected \
+            kernel::signing_authority::forwarding_tests::shared_backend_forwards_an_unreadable_current_key \
             kernel::signing_authority::forwarding_tests::shared_backend_forwards_every_atomic_signing_entrypoint \
             -- cargo test --locked -p chio-kernel --features pq --lib signing_authority::forwarding_tests
 
