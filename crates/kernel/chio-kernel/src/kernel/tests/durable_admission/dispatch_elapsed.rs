@@ -13,6 +13,7 @@ const NOW_MS: u64 = 1_800_000_000_000;
 struct Script {
     reads: u64,
     monotonic_ms: u64,
+    step_ms: u64,
     fail_read: Option<u64>,
     regress_read: Option<u64>,
 }
@@ -48,6 +49,7 @@ impl Clock for ScriptedClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
         let mut script = self.script();
         script.reads += 1;
+        script.monotonic_ms += script.step_ms;
         if script.fail_read == Some(script.reads) {
             return Err(ClockError::Unavailable);
         }
@@ -119,7 +121,9 @@ fn fixture(
         on_invoke: Box::new(on_invoke),
     }));
     let agent = make_keypair();
-    let grants = vec![make_grant("durable-server", "mutate")];
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_invocations = Some(1);
+    let grants = vec![grant];
     let capability = make_capability(&kernel, &agent, make_scope(grants), 300);
     let request = make_request_with_arguments(
         request_id,
@@ -184,7 +188,10 @@ fn assert_outcome_unknown(
     response: Result<ToolCallResponse, KernelError>,
     effects: u64,
 ) -> TestResult {
-    assert_eq!(response?.verdict, Verdict::Deny);
+    let response = response?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.output.is_none());
+    assert!(response.receipt.verify_signature()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
     let operation = fixture.store.operation();
     assert!(operation.dispatch_commit().is_some());
@@ -193,6 +200,42 @@ fn assert_outcome_unknown(
         AdmissionOperationState::OutcomeUnknownAfterDispatch
     );
     assert_eq!(recorded_elapsed_millis(fixture)?, None);
+    let budget = fixture.store.budget_store();
+    let hold_id = operation
+        .budget_hold_id()
+        .ok_or("missing original hold ID")?;
+    let hold = budget
+        .get_budget_hold(hold_id.as_str())?
+        .ok_or("missing original hold")?;
+    assert_eq!(hold.hold_id, hold_id.as_str());
+    assert_eq!(hold.capability_id, fixture.request.capability.id);
+    assert_eq!(hold.grant_index, 0);
+    assert_eq!(
+        hold.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reconciled
+    );
+    // This grant reserves an invocation only; it makes no monetary-custody claim.
+    assert_eq!(hold.authorized_exposure_units, 0);
+    let quota_key = crate::budget_store::BudgetQuotaKey::grant(&fixture.request.capability.id, 0);
+    let quota = budget
+        .get_invocation_quota_usage(&quota_key)?
+        .ok_or("missing committed quota")?;
+    assert_eq!(
+        (quota.reserved_invocations, quota.captured_invocations),
+        (0, 1)
+    );
+    // An unknown outcome must not admit another effect or refund captured quota.
+    assert_eq!(
+        fixture
+            .kernel
+            .evaluate_tool_call_blocking(&fixture.request)?
+            .verdict,
+        Verdict::Deny
+    );
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
+    assert_eq!(fixture.store.operation(), operation);
+    assert_eq!(budget.get_budget_hold(hold_id.as_str())?, Some(hold));
+    assert_eq!(budget.get_invocation_quota_usage(&quota_key)?, Some(quota));
     Ok(())
 }
 
@@ -216,14 +259,18 @@ fn fixed_authority_clock_records_zero_elapsed(nested: bool) -> TestResult {
 
 fn start_read_failure_retains_the_committed_operation(nested: bool) -> TestResult {
     let probe_clock = Arc::new(ScriptedClock::default());
+    // Give every read a distinct instant. A one-step recorded duration proves
+    // the last pre-invocation read is the timer start, with no intervening read.
+    probe_clock.script().step_ms = 1_000;
     let at_invoke = Arc::new(AtomicU64::new(0));
     let (observed, observer) = (probe_clock.clone(), at_invoke.clone());
     let probe = fixture("elapsed-start-fault", probe_clock.clone(), move || {
         observer.store(observed.reads(), Ordering::SeqCst);
     })?;
     let before = probe_clock.reads();
-    evaluate(&probe, nested)?;
-    // The start read is the last authority read before the tool is invoked.
+    assert_eq!(evaluate(&probe, nested)?.verdict, Verdict::Allow);
+    assert_completed(&probe, 1_000)?;
+    // The checked calibration must fail if dispatch grows another clock read.
     let start_read_offset = at_invoke.load(Ordering::SeqCst) - before;
 
     let clock = Arc::new(ScriptedClock::default());

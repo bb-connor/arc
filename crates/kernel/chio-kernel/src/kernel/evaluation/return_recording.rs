@@ -24,7 +24,9 @@ impl ChioKernel {
     /// Callers own the dispatch through an armed, started drop guard first. The
     /// dispatch future runs only after the start reading succeeds. A failed or
     /// regressed reading reaches the caller's post-commit failure arm, which
-    /// keeps the operation and holds and records the outcome as unknown.
+    /// keeps the operation and holds and records the outcome as unknown. An end
+    /// reading failure discards the observed output without recording a successful
+    /// return; the original committed operation remains authoritative for recovery.
     pub(super) async fn timed_dispatch<T>(
         &self,
         dispatch: impl std::future::Future<Output = Result<T, KernelError>>,

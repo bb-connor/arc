@@ -1726,8 +1726,7 @@ impl ChioKernel {
             ));
         };
         let has_monetary = budget_mutation.charge_result().is_some();
-        // The guard owns the original dispatch snapshot while the live
-        // admission advances to its separately recorded return.
+        // Retain the original dispatch snapshot until its return is recorded.
         let guarded_dispatch_operation = durable_admission
             .as_ref()
             .map(|admission| admission.operation().clone());
