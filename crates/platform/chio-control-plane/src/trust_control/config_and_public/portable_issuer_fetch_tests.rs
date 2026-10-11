@@ -19,6 +19,8 @@ use std::sync::mpsc;
 
 use chio_test_support::prelude::*;
 
+use crate::bounded_worker_pool::tests::{drain, park_the_worker};
+
 const GLOBAL_IPV4: &str = "8.8.8.8";
 const HANG_GUARD: Duration = Duration::from_secs(30);
 
@@ -33,6 +35,14 @@ fn deadline_with(left: Duration) -> PortableFetchDeadline {
 
 fn test_dns_pool() -> BoundedWorkerPool {
     BoundedWorkerPool::new(1, 1)
+}
+
+fn strict_jwks_fetch_target() -> (Url, HttpEgressContract) {
+    let url = Url::parse("https://good.example/.well-known/jwks.json").test_unwrap();
+    let contract =
+        strict_portable_fetch_contract(url.as_str(), "control-plane.portable-issuer-jwks")
+            .test_unwrap();
+    (url, contract)
 }
 
 fn empty_config() -> TrustServiceConfig {
@@ -451,10 +461,7 @@ async fn offload_leaves_the_async_worker_free_while_the_remote_stalls() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn stalled_dns_returns_the_deadline_refusal_and_frees_the_fetch_permit() {
-    let url = Url::parse("https://good.example/.well-known/jwks.json").test_unwrap();
-    let contract =
-        strict_portable_fetch_contract(url.as_str(), "control-plane.portable-issuer-jwks")
-            .test_unwrap();
+    let (url, contract) = strict_jwks_fetch_target();
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel::<()>();
     // Stands in for a host resolver stuck inside getaddrinfo: it answers only
@@ -484,6 +491,40 @@ async fn stalled_dns_returns_the_deadline_refusal_and_frees_the_fetch_permit() {
     // The resolver is still parked, yet the fetch permit is already free.
     assert_eq!(lane.available_permits(), 1);
     release_tx.send(()).test_unwrap();
+}
+
+#[test]
+fn queued_dns_lookup_is_skipped_after_the_fetch_deadline() {
+    let (url, contract) = strict_jwks_fetch_target();
+    let dns = Arc::new(test_dns_pool());
+    let (release, caller) = park_the_worker(&dns);
+    let looked_up = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&looked_up);
+    let resolver = move |_host: &str, port: u16| {
+        observed.store(true, Ordering::SeqCst);
+        Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
+    };
+
+    let error = pin_checked_https_addrs(
+        &contract,
+        &url,
+        &dns,
+        &deadline_with(Duration::from_millis(250)),
+        resolver,
+    )
+    .test_unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        portable_fetch_deadline_exceeded().to_string()
+    );
+
+    release.send(()).test_unwrap();
+    caller.join().test_unwrap();
+    drain(&dns);
+    assert!(
+        !looked_up.load(Ordering::SeqCst),
+        "a lookup dequeued after the fetch deadline must not run"
+    );
 }
 
 #[test]

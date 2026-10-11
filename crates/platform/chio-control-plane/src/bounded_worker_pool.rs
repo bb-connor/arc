@@ -3,10 +3,10 @@
 
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// A job did not produce its outcome within the caller's budget, or the pool
-/// was saturated and refused it at once.
+/// refused it at once because it was saturated or the budget was empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BudgetElapsed;
 
@@ -20,9 +20,9 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 /// eventually exhaust process threads. This pool caps the number of
 /// concurrently parked jobs at a fixed worker count: once every worker is
 /// parked and the small queue is full, further submissions fail closed instead
-/// of spawning more threads. A job that outlives the caller's budget still runs
-/// to completion on its worker with its result discarded, since the caller has
-/// already failed closed.
+/// of spawning more threads. A job still queued at its deadline is dropped
+/// unrun. A job that started before its deadline runs to completion on its
+/// worker, and its result is discarded once the caller has failed closed.
 pub(crate) struct BoundedWorkerPool {
     submit: SyncSender<Job>,
 }
@@ -56,9 +56,11 @@ impl BoundedWorkerPool {
     }
 
     /// Run `job` under `budget`, returning its outcome or [`BudgetElapsed`].
-    /// Fails closed immediately when every worker is parked and the queue is
-    /// full, so a stalled dependency can never grow the pool past its fixed
-    /// worker count.
+    /// The budget becomes one absolute deadline at submission: the job starts
+    /// only before it and the caller waits only until it. Fails closed
+    /// immediately for an empty budget, or when every worker is parked and the
+    /// queue is full, so a stalled dependency can never grow the pool past its
+    /// fixed worker count.
     pub(crate) fn run_within_budget<F, T>(
         &self,
         budget: Duration,
@@ -68,13 +70,26 @@ impl BoundedWorkerPool {
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
     {
+        if budget.is_zero() {
+            return Err(BudgetElapsed);
+        }
+        let deadline = Instant::now().checked_add(budget).ok_or(BudgetElapsed)?;
         let (done, outcome) = sync_channel::<T>(1);
         let job: Job = Box::new(move || {
+            if Instant::now() >= deadline {
+                return;
+            }
             // The caller may have already failed closed and dropped `outcome`;
             // the send then fails and the completed job is simply discarded.
             let _ = done.send(job());
         });
         self.submit.try_send(job).map_err(|_| BudgetElapsed)?;
-        outcome.recv_timeout(budget).map_err(|_| BudgetElapsed)
+        outcome
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .map_err(|_| BudgetElapsed)
     }
 }
+
+#[cfg(test)]
+#[path = "bounded_worker_pool_tests.rs"]
+pub(crate) mod tests;
