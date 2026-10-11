@@ -191,7 +191,13 @@ all three halves:
    (`KeychainService` on iOS, `EncryptedSharedPreferences` on Android).
 2. **Gate** each tool call with `evaluate()` using the cached token
    and the device wall-clock (`MobileClock` is wired up automatically
-   when `now_secs <= 0`).
+   when `now_secs <= 0`). The offline gate checks signature, issuer
+   trust, time bounds, subject, scope, and the delegated budget split.
+   It denies a grant that needs a mediated kernel (DPoP proof of
+   possession, invocation or spend limits, cumulative approval, or an
+   aggregate invocation budget); route those calls through a connected
+   kernel. Revocation is not visible offline, so a cached token that
+   was revoked keeps evaluating until it expires.
 3. **Sign** a receipt for each gated call with `signReceipt()` and
    append the returned JSON to a local queue (SQLite or the
    platform's durable key-value store).
