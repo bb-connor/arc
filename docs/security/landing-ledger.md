@@ -30,8 +30,12 @@ approved both source changes. The full thirteen-command campaign belongs to
 still reports the same pre-existing unsupported permission on both workflow
 versions, so no global syntax pass is claimed.
 
-The exact-inventory sweep, one replacement publication and hosted qualification
-remain pending. Public `5f5e522aa5` has green Vet/Deny and running Build/MSRV at
+The subsequent [fixture audit](audits/workspace-ci-fixture-followup-20261011.json)
+records reviewed `cf8a092871`: two tuple additions restore the build/lint fixture
+assertion, with a genuine refusal failure and fifteen passing owner tests.
+Claude cleared the static delta sweep of 120 inventories across thirty files;
+Root also matched five inventories against the actual compiled kernel test list.
+Only replacement publication and hosted qualification remain pending. Public `5f5e522aa5` has green Vet/Deny and running Build/MSRV at
 the audit snapshot; its FIPS failure has this qualified repair and its three
 trusted-setup failures are classified. Earlier cancelled candidates supply no
 pass. All review threads were answered at the latest refresh. The explicit
