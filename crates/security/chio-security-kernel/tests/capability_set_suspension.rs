@@ -4,8 +4,8 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 use chio_kernel::{
-    Guard, GuardContext, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    Verdict,
+    Guard, GuardContext, GuardDecision, SecurityInvocationContext, SecurityInvocationContextV1,
+    ToolCallRequest, Verdict,
 };
 use chio_security_kernel::{CapabilitySetSuspensionGuard, MissingContextPolicy};
 use chio_security_types::ports::{
@@ -83,7 +83,7 @@ impl CapabilitySetSuspensionStore for FakeSuspensions {
             .lock()
             .unwrap_or_else(|error| panic!("queries poisoned: {error}"))
             .push(query.clone());
-        let denied = matches!(self.behavior, Behavior::Deny | Behavior::Tamper);
+        let denied = matches!(self.behavior, Behavior::Deny);
         let active_matches = if denied {
             CapabilitySetSuspensionMatches::new(vec![CapabilitySetSuspensionMatch {
                 affected_set_hash: Digest32::new([1_u8; 32]),
@@ -182,17 +182,24 @@ fn security_context() -> SecurityInvocationContext {
     ))
 }
 
-fn evaluate(
+fn decide(
     guard: &CapabilitySetSuspensionGuard,
     request: &ToolCallRequest,
     security: Option<&SecurityInvocationContext>,
-) -> Verdict {
+) -> GuardDecision {
     let context =
         GuardContext::new(request, &request.capability.scope).with_security_context(security);
     guard
         .evaluate(&context)
         .unwrap_or_else(|error| panic!("evaluate capability suspension guard: {error}"))
-        .verdict
+}
+
+fn evaluate(
+    guard: &CapabilitySetSuspensionGuard,
+    request: &ToolCallRequest,
+    security: Option<&SecurityInvocationContext>,
+) -> Verdict {
+    decide(guard, request, security).verdict
 }
 
 #[test]
@@ -213,10 +220,24 @@ fn exact_capability_and_tenant_are_queried_before_dispatch() {
 fn suspension_outage_and_tampered_decision_all_deny() {
     let request = request();
     let security = security_context();
-    for behavior in [Behavior::Deny, Behavior::Fail, Behavior::Tamper] {
+    for (behavior, reason) in [
+        (Behavior::Deny, "capability is in an active suspended set"),
+        (Behavior::Fail, "capability suspension lookup failed"),
+        (
+            Behavior::Tamper,
+            "capability suspension result failed validation",
+        ),
+    ] {
         let store: Arc<dyn CapabilitySetSuspensionStore> = Arc::new(FakeSuspensions::new(behavior));
         let guard = CapabilitySetSuspensionGuard::new(store, MissingContextPolicy::Deny);
-        assert_eq!(evaluate(&guard, &request, Some(&security)), Verdict::Deny);
+        let decision = decide(&guard, &request, Some(&security));
+        assert_eq!(decision.verdict, Verdict::Deny);
+        let details: Vec<_> = decision
+            .evidence
+            .iter()
+            .filter_map(|evidence| evidence.details.as_deref())
+            .collect();
+        assert_eq!(details, [reason]);
     }
 }
 
