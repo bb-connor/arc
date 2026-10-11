@@ -8,6 +8,39 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Final local replacement qualification (October 11 UTC)
+
+The [final clock and readiness audit](audits/final-clock-readiness-20261011.json)
+supersedes the in-progress statuses below. The ledger preserves **2,009
+requirements** and every earlier observation. All source repairs through
+`45aa2dd5a0` have independent review. This is local qualification; publication
+and exact-head hosted qualification remain pending.
+
+The final changed-boundary renewal passes ordinary clock controls **3**, durable
+timing controls **10**, writer seed controls **2**, runtime-harness owner **22**,
+CLI proof contracts **147**, and strict all-target affected-owner and all-feature
+broker lint. Formatting, file/clock/regression inventories, negative assertions,
+ledger and CI contracts pass. Locked Vet, Deny and dependency graph gates pass;
+the local graph preflight does not repeat the hosted fork cryptographic builds.
+
+The full predecessor kernel campaign remains **1,919 passed, one failed, two
+ignored**. Its only failure exposed an unnecessary clock read on a completed
+ordinary value. The reviewed repair preserves signed cost/receipt behavior and
+requires measured time for streams and durable outcomes. The unchanged durable
+timing path also passed the predecessor's required serial native **13** tests.
+
+Writer startup now uses the existing bounded readiness barrier. Its producer
+passed **48 concurrent generations**, with zero writer refusals and identical
+215-file output trees independently verified by Root. This source-backed race
+repair does not prove the historical uninstrumented refusal cause. C2/C6 owed
+Original evidence is complete with exact restored-source scopes and invalid
+earlier runs retained separately.
+
+One batched push, four required exact-head green checks, classified other
+failures, answered threads and the user merge go-ahead remain. Authorization,
+committed Linux evidence, open proof qualification, cold-state activation and
+native latency/concurrency acceptance remain disclosed post-merge obligations.
+
 ## Terminal owner evidence and clock repair (October 11 UTC)
 
 The [terminal owner audit](audits/terminal-owner-renewal-20261011.json) updates the

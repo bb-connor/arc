@@ -467,3 +467,17 @@ unnecessarily consumes a clock fault after the value has been observed.
 Publish one successor after changed-boundary renewal and remaining failure
 classification. Require the four exact-head hosted checks and answered threads,
 then report the head and disclosed post-merge obligations for merge authorization.
+
+### Terminal local renewal (2026-10-11)
+
+The final source `45aa2dd5a0` passes the planned changed-boundary renewal:
+ordinary3, durable10, seed2, harness22, CLI147, strict affected owners and broker
+all-features. All seven static gates and locked supply graph gates pass. The
+source-backed writer repair has producer48/0 and independently identical trees;
+the owed C2/C6 Originals are retained with their exact scopes. All source repairs
+have Claude review. The canonical ledger now preserves 2,009 requirements.
+
+This supersedes earlier active/pending local statuses, while retaining failed
+campaigns and their scope. Publish once, obtain exact-head hosted qualification,
+classify every additional failure, reconcile review threads and report readiness
+before the user merge go-ahead. No new proof/capacity campaign or policy waiver.
