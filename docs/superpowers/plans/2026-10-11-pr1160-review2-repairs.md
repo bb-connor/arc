@@ -481,3 +481,33 @@ This supersedes earlier active/pending local statuses, while retaining failed
 campaigns and their scope. Publish once, obtain exact-head hosted qualification,
 classify every additional failure, reconcile review threads and report readiness
 before the user merge go-ahead. No new proof/capacity campaign or policy waiver.
+
+## Required-check repair and remaining local preflight (2026-10-11)
+
+Published `36d77fe276` passes hosted Vet and Deny. Build job `114427678878`
+fails the formal-mirror guard before the later test steps. Preserve that failed
+run and its skipped steps. MSRV remains independently pending at this checkpoint.
+
+1. Retain the exact Original: eight abstraction-anchor entries drift. Claude's
+   source/model review finds each mapping preserved or strengthened. Renew those
+   reviewed fingerprints, add `ChioKernel::timed_dispatch` to the existing
+   post-admission return-recording anchor, and clarify the model header: after
+   `mark_dispatch_started`, even a pre-poll deadline or clock refusal retains
+   outcome-unknown custody. No model action, invariant, proof scope or budget changes.
+2. Regenerate proof-coverage metadata after the reviewed bindings. Run both
+   metadata checks locally; retain the original stale-input-digest failure.
+3. Exercise the later skipped release-script and product gates locally. The
+   first sweep passes 13 checks; two launch checks lack the dashboard artifact.
+   Build that prerequisite and rerun them. Claude owns isolated optional-feature
+   qualification. Keep local platform/tool differences explicit.
+4. Batch genuine failures into one replacement after the four required checks
+   report. Renew changed-source review and exact-head qualification. Do not
+   convert cancelled, skipped or source-specific results into hosted passes.
+
+The mandatory `public_weights_hash_of_determinism_and_shape` harness also times
+out at its unchanged 1,800-second budget on `36d77fe276` (job `114427953778`).
+This is an additional open proof obligation, not a counterexample or an accepted
+attestation residual. The older success predates changes to its transitive hex
+encoder; symbolic cost is not measured. Preserve the gate and permit the next
+ordinary candidate CI to supply evidence, without a new manual proof campaign.
+If still open, require explicit disposition in the user's merge authorization.
