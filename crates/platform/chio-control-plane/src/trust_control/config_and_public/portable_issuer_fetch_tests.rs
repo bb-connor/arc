@@ -19,7 +19,7 @@ use std::sync::mpsc;
 
 use chio_test_support::prelude::*;
 
-use crate::bounded_worker_pool::tests::{drain, park_the_worker};
+use crate::bounded_worker_pool::tests::drain;
 
 const GLOBAL_IPV4: &str = "8.8.8.8";
 const HANG_GUARD: Duration = Duration::from_secs(30);
@@ -33,8 +33,8 @@ fn deadline_with(left: Duration) -> PortableFetchDeadline {
     PortableFetchDeadline::starting_at(start).test_unwrap()
 }
 
-fn test_dns_pool() -> BoundedWorkerPool {
-    BoundedWorkerPool::new(1, 1)
+fn open_deadline() -> PortableFetchDeadline {
+    PortableFetchDeadline::start().test_unwrap()
 }
 
 fn strict_jwks_fetch_target() -> (Url, HttpEgressContract) {
@@ -157,12 +157,7 @@ fn serve_once(mut stream: TcpStream, status: &str, body: &str) {
 }
 
 fn loopback_fetch_agent(addr: std::net::SocketAddr) -> Agent {
-    build_portable_fetch_agent(
-        vec![addr],
-        false,
-        &PortableFetchDeadline::start().test_unwrap(),
-    )
-    .test_unwrap()
+    build_portable_fetch_agent(vec![addr], false, &open_deadline()).test_unwrap()
 }
 
 #[test]
@@ -245,14 +240,7 @@ fn pin_checked_addrs_refuses_private_resolution() {
     let url = Url::parse(&fetch.jwks_url).test_unwrap();
     let private =
         |_host: &str, port: u16| Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()]);
-    let error = pin_checked_https_addrs(
-        &fetch.contract,
-        &url,
-        &test_dns_pool(),
-        &PortableFetchDeadline::start().test_unwrap(),
-        private,
-    )
-    .test_unwrap_err();
+    let error = pin_checked_https_addrs(&fetch.contract, &url, private).test_unwrap_err();
     assert!(error.to_string().to_lowercase().contains("loopback"));
 }
 
@@ -283,14 +271,7 @@ fn dns_resolution_is_pinned_to_the_checked_addresses_once() {
             Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()])
         }
     };
-    let pinned = pin_checked_https_addrs(
-        &fetch.contract,
-        &url,
-        &test_dns_pool(),
-        &PortableFetchDeadline::start().test_unwrap(),
-        rebinding,
-    )
-    .test_unwrap();
+    let pinned = pin_checked_https_addrs(&fetch.contract, &url, rebinding).test_unwrap();
     assert_eq!(
         pinned,
         vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()]
@@ -459,71 +440,114 @@ async fn offload_leaves_the_async_worker_free_while_the_remote_stalls() {
     let _ = server.join();
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn stalled_dns_returns_the_deadline_refusal_and_frees_the_fetch_permit() {
+#[test]
+fn healthy_fetch_runs_dns_through_decode_on_a_single_worker() {
+    let issuer_keypair = Keypair::generate();
+    let server = RecordingServer::start(
+        "200 OK",
+        jwks_body(
+            "https://remote.issuer.example",
+            &issuer_keypair.public_key(),
+        ),
+    );
+    let server_addr = server.addr;
     let (url, contract) = strict_jwks_fetch_target();
+    let pool = BoundedWorkerPool::new(1, 1);
+
+    let keys = run_portable_fetch(&pool, open_deadline(), move |deadline| {
+        let pinned = pin_checked_https_addrs(&contract, &url, |_host: &str, port: u16| {
+            Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
+        })?;
+        assert_eq!(
+            pinned,
+            vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()]
+        );
+        let agent = build_portable_fetch_agent(vec![server_addr], false, &deadline)?;
+        fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
+    })
+    .test_unwrap();
+
+    assert_eq!(keys, vec![issuer_keypair.public_key()]);
+    assert_eq!(server.connections(), 1);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn stalled_fetch_holds_its_worker_but_not_the_fetch_permit() {
+    let pool = Arc::new(BoundedWorkerPool::new(1, 1));
+    let lane = Arc::new(tokio::sync::Semaphore::new(1));
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel::<()>();
-    // Stands in for a host resolver stuck inside getaddrinfo: it answers only
-    // once the test releases it, long after the fetch deadline.
-    let stalled = move |_host: &str, port: u16| {
-        entered_tx.send(()).test_unwrap();
-        let _ = release_rx.recv_timeout(HANG_GUARD);
-        Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
-    };
-    let dns = test_dns_pool();
-    let deadline = deadline_with(Duration::from_millis(100));
-    let lane = Arc::new(tokio::sync::Semaphore::new(1));
+    let fetch_pool = Arc::clone(&pool);
 
+    // Stands in for a peer trickling its TLS handshake: the fetch job keeps
+    // running until the test releases it, long after the fetch deadline.
     let outcome = run_portable_issuer_fetch_with_lane(Arc::clone(&lane), move || {
-        pin_checked_https_addrs(&contract, &url, &dns, &deadline, stalled)
+        run_portable_fetch(
+            &fetch_pool,
+            deadline_with(Duration::from_secs(2)),
+            move |_| {
+                entered_tx.send(()).test_unwrap();
+                release_rx.recv_timeout(HANG_GUARD).test_unwrap();
+                Ok(())
+            },
+        )
     })
     .await;
 
     let Ok(Err(error)) = outcome else {
-        panic!("a stalled resolver must end the fetch with a refusal");
+        panic!("a stalled fetch must end with a refusal at its deadline");
     };
     assert_eq!(
         error.to_string(),
         portable_fetch_deadline_exceeded().to_string()
     );
     entered_rx.recv_timeout(HANG_GUARD).test_unwrap();
-    // The resolver is still parked, yet the fetch permit is already free.
     assert_eq!(lane.available_permits(), 1);
+
+    // The stalled fetch still holds the only worker, so the next fetch reaches
+    // its deadline in the queue and never starts.
+    let started = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&started);
+    let queued = run_portable_fetch(
+        &pool,
+        deadline_with(Duration::from_millis(250)),
+        move |_| {
+            observed.store(true, Ordering::SeqCst);
+            Ok(())
+        },
+    )
+    .test_unwrap_err();
+    assert_eq!(
+        queued.to_string(),
+        portable_fetch_deadline_exceeded().to_string()
+    );
+
     release_tx.send(()).test_unwrap();
+    drain(&pool);
+    assert!(
+        !started.load(Ordering::SeqCst),
+        "a fetch dequeued after its deadline must not start"
+    );
 }
 
 #[test]
-fn queued_dns_lookup_is_skipped_after_the_fetch_deadline() {
-    let (url, contract) = strict_jwks_fetch_target();
-    let dns = Arc::new(test_dns_pool());
-    let (release, caller) = park_the_worker(&dns);
-    let looked_up = Arc::new(AtomicBool::new(false));
-    let observed = Arc::clone(&looked_up);
-    let resolver = move |_host: &str, port: u16| {
-        observed.store(true, Ordering::SeqCst);
-        Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
-    };
-
-    let error = pin_checked_https_addrs(
-        &contract,
-        &url,
-        &dns,
-        &deadline_with(Duration::from_millis(250)),
-        resolver,
+fn fetch_success_observed_after_the_deadline_is_refused() {
+    let pool = BoundedWorkerPool::new(1, 1);
+    let error = run_portable_fetch(
+        &pool,
+        deadline_with(Duration::from_millis(250)),
+        |deadline| {
+            // Succeed, but only once the original deadline has passed.
+            while deadline.remaining().is_ok() {
+                std::hint::spin_loop();
+            }
+            Ok(())
+        },
     )
     .test_unwrap_err();
     assert_eq!(
         error.to_string(),
         portable_fetch_deadline_exceeded().to_string()
-    );
-
-    release.send(()).test_unwrap();
-    caller.join().test_unwrap();
-    drain(&dns);
-    assert!(
-        !looked_up.load(Ordering::SeqCst),
-        "a lookup dequeued after the fetch deadline must not run"
     );
 }
 

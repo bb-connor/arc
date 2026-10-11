@@ -1,7 +1,7 @@
 use super::client::build_client;
 use super::errors::{into_receipt_store_error, into_revocation_store_error};
 use super::*;
-use crate::bounded_worker_pool::{BoundedWorkerPool, BudgetElapsed};
+use crate::bounded_worker_pool::{BoundedWorkerPool, DeadlinePassed};
 
 /// Worker threads a remote receipt store keeps for blocking control-plane
 /// writes. Receipt writes are serialized by the kernel-wide receipt write lock,
@@ -43,14 +43,16 @@ where
     F: FnOnce() -> Result<T, ReceiptStoreError> + Send + 'static,
     T: Send + 'static,
 {
+    let timeout = || ReceiptStoreError::Timeout {
+        operation: operation.to_string(),
+        timeout_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
+    };
+    let deadline = std::time::Instant::now()
+        .checked_add(budget)
+        .ok_or_else(timeout)?;
     writer
-        .run_within_budget(budget, write)
-        .unwrap_or_else(|BudgetElapsed| {
-            Err(ReceiptStoreError::Timeout {
-                operation: operation.to_string(),
-                timeout_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
-            })
-        })
+        .run_until(deadline, write)
+        .unwrap_or_else(|DeadlinePassed| Err(timeout()))
 }
 
 pub fn build_remote_revocation_store(

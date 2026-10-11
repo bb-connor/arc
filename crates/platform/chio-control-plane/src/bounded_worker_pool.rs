@@ -1,19 +1,19 @@
-//! A fixed pool of persistent worker threads that runs blocking jobs under a
-//! wall-clock budget.
+//! A fixed pool of persistent worker threads that runs blocking jobs against
+//! an absolute deadline.
 
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-/// A job did not produce its outcome within the caller's budget, or the pool
-/// refused it at once because it was saturated or the budget was empty.
+/// A job produced no outcome observed before its deadline, or the pool refused
+/// it at once because it was saturated or the deadline had already passed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct BudgetElapsed;
+pub(crate) struct DeadlinePassed;
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 /// A fixed-size pool of persistent worker threads for blocking jobs that must
-/// answer within a budget.
+/// answer before a deadline.
 ///
 /// Running each job on a fresh detached thread would let sustained traffic
 /// against a stalled dependency accumulate one parked thread per job and
@@ -55,38 +55,41 @@ impl BoundedWorkerPool {
         }
     }
 
-    /// Run `job` under `budget`, returning its outcome or [`BudgetElapsed`].
-    /// The budget becomes one absolute deadline at submission: the job starts
-    /// only before it and the caller waits only until it. Fails closed
-    /// immediately for an empty budget, or when every worker is parked and the
-    /// queue is full, so a stalled dependency can never grow the pool past its
-    /// fixed worker count.
-    pub(crate) fn run_within_budget<F, T>(
-        &self,
-        budget: Duration,
-        job: F,
-    ) -> Result<T, BudgetElapsed>
+    /// Run `job` against `deadline`, returning its outcome or
+    /// [`DeadlinePassed`]. The job starts only before the deadline, the caller
+    /// waits only until it, and an outcome is accepted only when observed
+    /// before it. Fails closed immediately for a passed deadline, or when every
+    /// worker is parked and the queue is full, so a stalled dependency can
+    /// never grow the pool past its fixed worker count.
+    pub(crate) fn run_until<F, T>(&self, deadline: Instant, job: F) -> Result<T, DeadlinePassed>
     where
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
     {
-        if budget.is_zero() {
-            return Err(BudgetElapsed);
-        }
-        let deadline = Instant::now().checked_add(budget).ok_or(BudgetElapsed)?;
+        observed_before(deadline, ())?;
         let (done, outcome) = sync_channel::<T>(1);
         let job: Job = Box::new(move || {
-            if Instant::now() >= deadline {
+            if observed_before(deadline, ()).is_err() {
                 return;
             }
             // The caller may have already failed closed and dropped `outcome`;
             // the send then fails and the completed job is simply discarded.
             let _ = done.send(job());
         });
-        self.submit.try_send(job).map_err(|_| BudgetElapsed)?;
-        outcome
+        self.submit.try_send(job).map_err(|_| DeadlinePassed)?;
+        let outcome = outcome
             .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-            .map_err(|_| BudgetElapsed)
+            .map_err(|_| DeadlinePassed)?;
+        observed_before(deadline, outcome)
+    }
+}
+
+/// Accept `outcome` only when it is observed strictly before `deadline`.
+fn observed_before<T>(deadline: Instant, outcome: T) -> Result<T, DeadlinePassed> {
+    if Instant::now() < deadline {
+        Ok(outcome)
+    } else {
+        Err(DeadlinePassed)
     }
 }
 

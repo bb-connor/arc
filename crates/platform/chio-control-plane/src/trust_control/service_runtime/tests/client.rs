@@ -892,7 +892,8 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
         let peak = Arc::clone(&peak);
         let worker_threads = Arc::clone(&worker_threads);
         let release = Arc::clone(&release);
-        let result = writer.run_within_budget(budget, move || {
+        let deadline = std::time::Instant::now().checked_add(budget).test_unwrap();
+        let result = writer.run_until(deadline, move || {
             worker_threads
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -907,7 +908,7 @@ fn bounded_receipt_writer_does_not_grow_threads_per_stalled_write() {
             concurrent.fetch_sub(1, Ordering::SeqCst);
         });
         assert!(
-            result == Err(crate::bounded_worker_pool::BudgetElapsed),
+            result == Err(crate::bounded_worker_pool::DeadlinePassed),
             "a write parked on a stalled control plane must fail closed at the budget, got {result:?}"
         );
     }
