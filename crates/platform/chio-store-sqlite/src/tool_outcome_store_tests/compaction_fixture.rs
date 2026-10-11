@@ -1,7 +1,7 @@
 //! Actual kernel dispatch and signed terminal projection on the joint store.
 use super::*;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
-use chio_core::{capability::CapabilityToken, Keypair};
+use chio_core::{capability::token::CapabilityToken, Keypair};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallChunk, ToolCallRequest,
     ToolCallStream, ToolServerConnection, ToolServerStreamResult, Verdict,
