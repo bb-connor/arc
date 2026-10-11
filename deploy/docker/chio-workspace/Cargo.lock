@@ -4522,6 +4522,7 @@ dependencies = [
  "chio-flow",
  "chio-guards",
  "chio-kernel",
+ "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",
