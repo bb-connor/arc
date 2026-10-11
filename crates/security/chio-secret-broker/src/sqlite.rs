@@ -672,9 +672,9 @@ fn attempt_file_grants_extended_acl_authority(file: &File) -> Result<bool> {
 
 #[cfg(target_vendor = "apple")]
 fn attempt_file_grants_extended_acl_authority(file: &File) -> Result<bool> {
-    chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file).map_err(
-        |error| BrokerError::Storage(format!("broker database ACL inspection failed: {error}")),
-    )
+    chio_file_custody::darwin_descriptor_grants_extended_acl_authority(file).map_err(|error| {
+        BrokerError::Storage(format!("broker database ACL inspection failed: {error}"))
+    })
 }
 
 #[cfg(all(

@@ -212,7 +212,7 @@ pub(super) fn credential_custody_is_private(
     // Darwin ACL authority is independent of the POSIX mode bits. A deny-only
     // ACL is safe, but every allow or unknown entry must refuse custody.
     #[cfg(target_vendor = "apple")]
-    if chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file)? {
+    if chio_file_custody::darwin_descriptor_grants_extended_acl_authority(file)? {
         return Ok(false);
     }
     let uid = rustix::process::geteuid().as_raw();

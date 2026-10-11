@@ -9,6 +9,7 @@ members = [
     "crates/core/chio-adversarial-suite",
     "crates/core/chio-arena",
     "crates/core/chio-bounded",
+    "crates/core/chio-file-custody",
     "crates/core/chio-supervisor",
     # Enterprise security
     "crates/security/chio-cage",
@@ -486,6 +487,7 @@ chio-autonomy = { version = "=0.1.0", path = "crates/economy/chio-autonomy" }
 chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-adapter" }
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { version = "=0.1.0", path = "crates/core/chio-bounded" }
+chio-file-custody = { version = "=0.1.0", path = "crates/core/chio-file-custody" }
 chio-cage = { path = "crates/security/chio-cage" }
 chio-cage-plan = { path = "crates/security/chio-cage-plan" }
 chio-cage-init = { path = "crates/security/chio-cage-init" }

@@ -710,14 +710,12 @@ fn validate_database_parent(path: &Path) -> Result<std::fs::File, MobileChalleng
 
 #[cfg(target_vendor = "apple")]
 fn validate_descriptor_acl(file: &std::fs::File) -> Result<(), MobileChallengeError> {
-    let grants_authority =
-        chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file).map_err(
-            |error| {
-                MobileChallengeError::StoreUnavailable(format!(
-                    "inspect mobile challenge descriptor ACL: {error}"
-                ))
-            },
-        )?;
+    let grants_authority = chio_file_custody::darwin_descriptor_grants_extended_acl_authority(file)
+        .map_err(|error| {
+            MobileChallengeError::StoreUnavailable(format!(
+                "inspect mobile challenge descriptor ACL: {error}"
+            ))
+        })?;
     if grants_authority {
         return Err(MobileChallengeError::StoreUnavailable(
             "mobile challenge descriptor grants extended ACL authority".to_string(),

@@ -131,7 +131,7 @@ uuid = { workspace = true, features = ["v4"] }
 rustix = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-chio-sqlite-file-identity = { workspace = true }
+chio-file-custody = { workspace = true }
 
 [dev-dependencies]
 chio-credit = { workspace = true }

@@ -574,7 +574,7 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
         )));
     }
     #[cfg(target_vendor = "apple")]
-    if chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(&file)
+    if chio_file_custody::darwin_descriptor_grants_extended_acl_authority(&file)
         .map_err(|error| {
             CliError::cli_other_error(format!(
                 "inspect remote MCP resume HMAC keyring ACL {}: {error}",

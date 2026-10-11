@@ -544,7 +544,7 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
 
 #[cfg(target_vendor = "apple")]
 fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
-    chio_sqlite_file_identity::darwin_descriptor_grants_extended_acl_authority(file)
+    chio_file_custody::darwin_descriptor_grants_extended_acl_authority(file)
         .map_err(KeyringError::Io)
 }
 

@@ -49,7 +49,7 @@ subtle = "2.6"
 zeroize = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-chio-sqlite-file-identity = { workspace = true }
+chio-file-custody = { workspace = true }
 
 [lints]
 workspace = true

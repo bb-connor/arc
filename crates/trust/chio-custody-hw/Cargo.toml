@@ -52,7 +52,12 @@ dev-fixtures = []
 # revocation, challenge, and counter state across issuer restarts. ON by
 # default (see the `default` feature); disable default features to fall back to the
 # in-memory stores for unit tests and single-process integration tests.
-sqlite-store = ["dep:chio-sqlite-file-identity", "dep:rusqlite", "dep:rustix"]
+sqlite-store = [
+    "dep:chio-file-custody",
+    "dep:chio-sqlite-file-identity",
+    "dep:rusqlite",
+    "dep:rustix",
+]
 
 [dependencies]
 chio-core-types = { workspace = true }
@@ -75,6 +80,9 @@ webauthn-rs-proto = { workspace = true, optional = true }
 x509-parser = { workspace = true, features = ["verify"] }
 url = { workspace = true }
 rusqlite = { workspace = true, optional = true }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+chio-file-custody = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
