@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Second review repair intake (October 11 UTC)
+
+The canonical ledger now records **1,997 requirements**. All 1,969 earlier
+requirements, source records and current states are preserved. The [intake audit](audits/review2-repairs-20261011.json)
+adds the 25 findings against frozen `974f22914b`, the sibling resume-key ACL
+finding, and two observed CI/native build prerequisites. Confirmed defects are
+assigned for repair, including those inherited from `main`; intake is not closure.
+The [repair plan](../superpowers/plans/2026-10-11-pr1160-review2-repairs.md) maps ownership
+and the required reproduction, implementation and verification boundaries.
+
+The Go size preflight, required MSRV command expectation and macOS CLI dependency
+are privately staged with their stated local evidence. Other repairs are in
+isolated lanes pending owning qualification and composition. The public branch
+remains `974f22914b`: Cargo Vet and Cargo Deny passed, MSRV failed on the repaired
+expectation, and Build/lint/test is still running at this checkpoint. Its receipt
+Kani timeout matches the unchanged harness passed by the private repair below.
+Broader proof, cold-state and native readiness remain separately open.
+
+The replacement still needs four green required checks on its exact head,
+classification of all other failures, answered review threads, and Connor's
+explicit merge go-ahead. No landing, production activation or release readiness
+is claimed by this checkpoint.
+
 ## Receipt mismatch proof repair (October 11 UTC)
 
 The private staging branch now contains encoder repair `2deed48089`, with
