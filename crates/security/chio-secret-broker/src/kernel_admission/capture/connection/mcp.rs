@@ -148,13 +148,68 @@ impl ToolServerConnection for BrokerMcpConnection {
     }
 }
 
+/// Aborts offloaded authority work when its awaiting future is dropped. A
+/// dropped `JoinHandle` only detaches the task, so a dispatch deadline or
+/// caller cancellation would otherwise let queued work start after the kernel
+/// stopped waiting; work that already started runs to completion.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> std::result::Result<T, KernelError> + Send + 'static,
 ) -> std::result::Result<T, KernelError> {
     if tokio::runtime::Handle::try_current().is_err() {
         return work();
     }
-    tokio::task::spawn_blocking(work)
-        .await
+    let task = tokio::task::spawn_blocking(work);
+    let _abort_on_drop = AbortOnDrop(task.abort_handle());
+    task.await
         .map_err(|_| KernelError::ToolServerError("broker authority task did not return".into()))?
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::Future;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::task::{Context, Waker};
+
+    use super::*;
+
+    #[test]
+    fn dropped_offload_never_starts_its_queued_authority_work(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .max_blocking_threads(1)
+            .build()?;
+        let started = Arc::new(AtomicBool::new(false));
+        let observed = Arc::clone(&started);
+        runtime.block_on(async move {
+            let (release, gate) = std::sync::mpsc::channel::<()>();
+            let occupied = tokio::task::spawn_blocking(move || {
+                let _ = gate.recv();
+            });
+            let mut offload = Box::pin(blocking(move || {
+                observed.store(true, Ordering::SeqCst);
+                Ok(())
+            }));
+            let mut context = Context::from_waker(Waker::noop());
+            assert!(offload.as_mut().poll(&mut context).is_pending());
+            drop(offload);
+            drop(release);
+            occupied.await?;
+            tokio::task::spawn_blocking(|| ()).await?;
+            Ok::<_, Box<dyn std::error::Error>>(())
+        })?;
+        assert!(
+            !started.load(Ordering::SeqCst),
+            "queued authority work started after its caller stopped waiting"
+        );
+        Ok(())
+    }
 }
