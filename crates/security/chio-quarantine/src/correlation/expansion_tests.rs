@@ -187,6 +187,7 @@ mod expansion_tests {
         assert_eq!(finding.ordered_event_ids.len(), 2);
         assert!(finding
             .ordered_event_ids
+            .as_slice()
             .iter()
             .all(|event_id| event_id.as_str() == "bounded-event"));
     }
