@@ -44,11 +44,12 @@ records both overflow Originals, 309 library/integration tests, Criterion smoke
 and strict owning lint. The initial benchmark-wrapper failure remains recorded.
 
 The [repair-delta review](../reviews/2026-10-11-pr1160-repair-delta/findings.md)
-found one new P2, R3-001: capacity refusal can be omitted from a relay capture
-that later reports complete. Its [intake](audits/review3-intake-20261011.json)
-assigns the bounded correction to Claude C4. Earlier relay resource tests remain
-valid; full capture closure stays pending until the refusal/finalization control
-and owning qualification pass.
+found one new P2, R3-001: capacity refusal could be omitted from a relay capture
+that later reported complete. Its [intake](audits/review3-intake-20261011.json)
+preserves that finding. The [repair audit](audits/review3-relay-qualified-20261011.json)
+records the genuine refusal/drain Original and a bounded sticky omission marker.
+The composed package passes 299 tests plus Ruff; four live-sidecar cases remain
+unavailable. Both R3-001 and the related R2-009 capture state are locally qualified.
 
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
