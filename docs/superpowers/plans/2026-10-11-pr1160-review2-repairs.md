@@ -511,3 +511,25 @@ attestation residual. The older success predates changes to its transitive hex
 encoder; symbolic cost is not measured. Preserve the gate and permit the next
 ordinary candidate CI to supply evidence, without a new manual proof campaign.
 If still open, require explicit disposition in the user's merge authorization.
+
+### Terminal preflight and additional CI repairs
+
+Source `0df8edfaa1` passes eight final changed-boundary checks, including the
+55-case market admission suite and strict owning lint. The committed
+[preflight audit](../../security/audits/required-ci-preflight-20261011.json)
+retains commands, hashes, failed originals, platform refusals and review evidence.
+
+- `ac99dbbf04`: reviewed model metadata renewal and unchanged model actions.
+- `6335dbc1c0`: existing model metadata checks run before expensive suites.
+- `336f65214a`: compose Claude's `c0cdc15bf4`; move the existing weak-owner
+  refusal before strict envelope verification. Tests and strict verification stay
+  unchanged. Producer owning suite passes 188; final composed admission passes 55.
+- `0df8edfaa1`: update two adapter targets and add the guard-attempt wrapper to
+  the exact mediation inventory. Run that existing check early as well as in the
+  full consumer gate. Claude approved the source chain and final diff.
+
+The canonical ledger preserves 2,013 requirements. Seven earlier repairs now
+explicitly record publication at `36d77fe276`, retaining their previous states.
+The public Build failure, pending MSRV and additional unaccepted weights proof
+remain distinct from the completed local repairs. Publish only after all four
+current required checks report and any further genuine failure is addressed.

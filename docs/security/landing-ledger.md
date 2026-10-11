@@ -8,6 +8,43 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## Required CI repair and terminal local preflight (October 11 UTC)
+
+The [required CI preflight audit](audits/required-ci-preflight-20261011.json)
+records reviewed source `0df8edfaa1` and preserves **2,013 requirements**.
+Seven earlier repair states now explicitly record their publication in
+`36d77fe276`; their previous values and all 2,009 earlier requirements remain.
+Public `36d77fe276` passes Vet and Deny, fails Build on stale model metadata,
+and still awaits MSRV. No replacement hosted pass is claimed.
+
+The staged batch renews eight reviewed model anchors, records the existing
+timing boundary, moves metadata checks early, restores the specific weak-owner
+refusal before strict signature verification, and refreshes the adapter
+mediation inventory. Model actions and strict signature verification are
+unchanged. Claude approved all four commits. Final composed renewal passes
+eight checks, including market admission **55**, strict all-target owning lint,
+adapter mediation, model mirrors **255**, coverage **65 rows / 179 artifacts**,
+formatting, CI contracts and Rust hygiene.
+
+The earlier local sweep also passes workspace build and strict lint, product
+launch checks after their prerequisites, portable consumer controls and optional
+feature phases. Failed originals remain failed. Local ARM cannot qualify the
+Linux x86 enforcing-host cases; five live conformance targets refused missing
+enforcing-host material. These require hosted evidence. The audit records local
+tool/platform differences and the interrupted supplemental run separately.
+
+The mandatory weights SHA-256 determinism/shape proof timed out in both automatic
+jobs at its unchanged budget. It remains **unproved and not owner-accepted**;
+the earlier attestation-only amendment does not cover it. The next ordinary
+candidate CI may supply evidence; otherwise explicit user disposition is needed
+for this additional residual. No manual proof campaign or waiver is introduced.
+
+Wait for all four current required checks, batch genuine failures into one
+replacement, obtain four exact-head green checks, classify other results and
+answer review threads before requesting merge authorization. Trusted workflow
+authorization/evidence, the accepted attestation residual, operational cold-state
+activation and native latency/concurrency remain separate post-merge obligations.
+
 ## Final local replacement qualification (October 11 UTC)
 
 The [final clock and readiness audit](audits/final-clock-readiness-20261011.json)
