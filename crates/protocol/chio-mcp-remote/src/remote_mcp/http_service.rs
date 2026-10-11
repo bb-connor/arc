@@ -239,7 +239,7 @@ async fn fail_closed_session_after_persistence_error(
                 RemoteSessionState::Closed,
                 session.lifecycle_snapshot().last_seen_at,
             );
-            state.sessions.remove_active(&session.session_id).await;
+            state.sessions.retire_terminal(session).await;
             if let Err(shutdown_error) = session.shutdown_upstream_transport() {
                 warn!(
                     session_id = %session.session_id,

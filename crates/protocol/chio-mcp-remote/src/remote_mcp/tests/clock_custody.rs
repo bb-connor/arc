@@ -292,26 +292,50 @@ fn persisted_transitions_use_one_fenced_observation() {
     std::fs::remove_dir_all(directory).unwrap();
 }
 
+const HANG_BOUND: std::time::Duration = std::time::Duration::from_secs(30);
+
+struct BlockingShutdownTransport {
+    entered: std::sync::mpsc::Sender<()>,
+    release: StdMutex<std::sync::mpsc::Receiver<()>>,
+}
+
+impl McpTransport for BlockingShutdownTransport {
+    fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+        TestSessionTransport.list_tools()
+    }
+    fn call_tool(
+        &self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
+        TestSessionTransport.call_tool(name, arguments)
+    }
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        let _ = self.entered.send(());
+        let _ = self.release.lock().unwrap().recv_timeout(HANG_BOUND);
+        Ok(())
+    }
+}
+
+fn ready_ledger_session(
+    init: RemoteSessionInit,
+    clock: RemoteClock,
+) -> (RemoteSessionLedger, Arc<RemoteSession>) {
+    let sessions =
+        RemoteSessionLedger::new(clock, init.lifecycle_policy.clone(), None, None).unwrap();
+    let session = Arc::new(RemoteSession::new(init).unwrap());
+    session
+        .mark_ready(None, json!({}), PeerCapabilities::default())
+        .unwrap();
+    (sessions, session)
+}
+
+fn is_terminal_entry(entry: &Option<RemoteSessionEntry>, state: RemoteSessionState) -> bool {
+    matches!(entry, Some(RemoteSessionEntry::Terminal(record)) if record.lifecycle.state == state)
+}
+
 #[test]
 fn terminal_transition_keeps_session_visible_while_upstream_shutdown_runs() {
-    struct BlockingShutdownTransport(Arc<std::sync::Barrier>);
-    impl McpTransport for BlockingShutdownTransport {
-        fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
-            TestSessionTransport.list_tools()
-        }
-        fn call_tool(
-            &self,
-            name: &str,
-            arguments: Value,
-        ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
-            TestSessionTransport.call_tool(name, arguments)
-        }
-        fn shutdown(&self) -> Result<(), AdapterError> {
-            self.0.wait();
-            self.0.wait();
-            Ok(())
-        }
-    }
     let runtime = || {
         tokio::runtime::Builder::new_current_thread()
             .build()
@@ -319,38 +343,245 @@ fn terminal_transition_keeps_session_visible_while_upstream_shutdown_runs() {
     };
     let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
     let clock = RemoteClock::new(source.clone());
-    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
     let mut init = session_init(clock.clone());
-    init.upstream_transport = Arc::new(BlockingShutdownTransport(barrier.clone()));
-    let sessions =
-        RemoteSessionLedger::new(clock, init.lifecycle_policy.clone(), None, None).unwrap();
+    init.upstream_transport = Arc::new(BlockingShutdownTransport {
+        entered: entered_tx,
+        release: StdMutex::new(release_rx),
+    });
+    let (sessions, session) = ready_ledger_session(init, clock);
+    runtime().block_on(sessions.insert_active(session.clone()));
+    *source.0.lock().unwrap() = reading(2_000, 1_000_000_000);
+
+    let (entered, during_shutdown, expired) = std::thread::scope(|scope| {
+        let expiry = scope.spawn(|| runtime().block_on(sessions.mark_expired(&session)));
+        let entered = entered_rx.recv_timeout(HANG_BOUND);
+        let entry = entered
+            .is_ok()
+            .then(|| runtime().block_on(sessions.lookup(&session.session_id)))
+            .flatten();
+        let _ = release_tx.send(());
+        (entered, entry, expiry.join().unwrap())
+    });
+
+    assert!(entered.is_ok(), "upstream shutdown never started");
+    expired.unwrap();
+    assert!(
+        is_terminal_entry(&during_shutdown, RemoteSessionState::Expired),
+        "session must stay visible as terminal while upstream shutdown runs: {during_shutdown:?}"
+    );
+    assert!(is_terminal_entry(
+        &runtime().block_on(sessions.lookup(&session.session_id)),
+        RemoteSessionState::Expired
+    ));
+}
+
+#[tokio::test]
+async fn cancelled_terminal_transition_at_a_contended_map_leaves_session_live() {
+    use std::{future::Future, task::Poll};
+    for hold_active in [true, false] {
+        let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+        let clock = RemoteClock::new(source.clone());
+        let (sessions, session) = ready_ledger_session(session_init(clock.clone()), clock);
+        sessions.insert_active(session.clone()).await;
+        *source.0.lock().unwrap() = reading(2_000, 1_000_000_000);
+
+        let active_guard = if hold_active {
+            Some(sessions.active.lock().await)
+        } else {
+            None
+        };
+        let terminal_guard = sessions.terminal.lock().await;
+        let mut expiry = Box::pin(sessions.mark_expired(&session));
+        std::future::poll_fn(|cx| {
+            assert!(expiry.as_mut().poll(cx).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+        drop(expiry);
+        drop(terminal_guard);
+        drop(active_guard);
+
+        assert_eq!(
+            session.lifecycle_snapshot().state,
+            RemoteSessionState::Ready,
+            "hold_active={hold_active}"
+        );
+        assert!(
+            matches!(
+                sessions.lookup(&session.session_id).await,
+                Some(RemoteSessionEntry::Active(_))
+            ),
+            "hold_active={hold_active}"
+        );
+        sessions.mark_expired(&session).await.unwrap();
+        assert!(is_terminal_entry(
+            &sessions.lookup(&session.session_id).await,
+            RemoteSessionState::Expired
+        ));
+        let (active, terminal) = sessions.snapshot().await;
+        assert!(active.is_empty());
+        assert_eq!(terminal.len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn cleanup_publishes_closed_sessions_before_leaving_active_lookup() {
+    for serving_closed in [false, true] {
+        let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+        let clock = RemoteClock::new(source.clone());
+        let (sessions, session) = ready_ledger_session(session_init(clock.clone()), clock);
+        sessions.insert_active(session.clone()).await;
+        session.mark_terminal(RemoteSessionState::Closed, 1_000);
+        session.worker_serving_closed.send_replace(serving_closed);
+
+        sessions.cleanup_due_sessions().await.unwrap();
+        assert!(
+            is_terminal_entry(
+                &sessions.lookup(&session.session_id).await,
+                RemoteSessionState::Closed
+            ),
+            "serving_closed={serving_closed}"
+        );
+        let (active, terminal) = sessions.snapshot().await;
+        assert!(active.is_empty(), "serving_closed={serving_closed}");
+        assert_eq!(terminal.len(), 1, "serving_closed={serving_closed}");
+
+        *source.0.lock().unwrap() = Err(ClockError::Unavailable);
+        assert!(matches!(
+            sessions.cleanup_due_sessions().await,
+            Err(CliError::Clock(ClockError::Unavailable))
+        ));
+    }
+}
+
+fn fallback_app_state(
+    directory: &std::path::Path,
+    sessions: Arc<RemoteSessionLedger>,
+) -> RemoteAppState {
+    let mut config = test_remote_config();
+    config.policy_path = directory.join("policy.yaml");
+    std::fs::write(&config.policy_path, "kernel:\n  allow_ephemeral_receipt_log: true\n  allow_ephemeral_revocation_store: true\n  durable_admission_mode: off\n  allow_unsafe_durable_admission_off: true\n").unwrap();
+    config.wrapped_args.clear();
+    config.test_transport = Some(Arc::new(TestSessionTransport));
+    configure_signed_manifest(&mut config, directory);
+    RemoteAppState {
+        sessions,
+        factory: Arc::new(RemoteSessionFactory::new(config).unwrap()),
+        auth_mode: Arc::new(RemoteAuthMode::StaticBearer {
+            token: "fallback-token".into(),
+        }),
+        enterprise_provider_registry: None,
+        admin_token: None,
+        protected_resource_metadata: None,
+        authorization_server_metadata: None,
+        local_auth_server: None,
+    }
+}
+
+fn assert_unpersisted_closed_diagnostic(
+    entry: Option<RemoteSessionEntry>,
+    session: &RemoteSession,
+    last_seen_at: u64,
+) {
+    let Some(RemoteSessionEntry::Terminal(record)) = entry else {
+        panic!("terminal fallback left the session invisible or active: {entry:?}");
+    };
+    assert_eq!(record.lifecycle.state, RemoteSessionState::Closed);
+    assert_eq!(record.terminal_at, last_seen_at);
+    assert!(matches!(
+        session.send(json!({"jsonrpc":"2.0", "id":1, "method":"tools/list"})),
+        Err(CliError::Kernel(
+            chio_kernel::KernelError::GovernedTransactionDenied(_)
+        ))
+    ));
+}
+
+#[tokio::test]
+async fn stopped_worker_clock_fault_fallback_stays_visible_as_terminal() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+    let clock = RemoteClock::new(source.clone());
+    let (sessions, session) = ready_ledger_session(session_init(clock.clone()), clock);
+    let sessions = Arc::new(sessions);
+    let state = fallback_app_state(directory.path(), sessions.clone());
+    sessions.insert_active(session.clone()).await;
+    *source.0.lock().unwrap() = Err(ClockError::Unavailable);
+    assert!(matches!(
+        sessions.mark_closed(&session).await,
+        Err(CliError::Clock(ClockError::Unavailable))
+    ));
+    assert!(matches!(
+        sessions.lookup(&session.session_id).await,
+        Some(RemoteSessionEntry::Active(_))
+    ));
+
+    session_worker::close(&state, &session).await;
+
+    assert_unpersisted_closed_diagnostic(
+        sessions.lookup(&session.session_id).await,
+        &session,
+        1_000,
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn resume_persistence_fault_fallback_stays_visible_without_durable_claim() {
+    let (store_directory, path) = private_test_session_database("terminal-fallback");
+    let lease = acquire_test_session_store(&path);
+    let keyring = test_resume_hmac_keyring();
+    let directory = tempfile::tempdir().unwrap();
+    let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
+    let clock = RemoteClock::new(source.clone());
+    let init = session_init(clock.clone());
+    let sessions = Arc::new(
+        RemoteSessionLedger::new(
+            clock,
+            init.lifecycle_policy.clone(),
+            Some(path.clone()),
+            Some(keyring.clone()),
+        )
+        .unwrap(),
+    );
     let session = Arc::new(RemoteSession::new(init).unwrap());
     session
         .mark_ready(None, json!({}), PeerCapabilities::default())
         .unwrap();
-    runtime().block_on(sessions.insert_active(session.clone()));
-    *source.0.lock().unwrap() = reading(2_000, 1_000_000_000);
-
-    let (during_shutdown, expired) = std::thread::scope(|scope| {
-        let expiry = scope.spawn(|| runtime().block_on(sessions.mark_expired(&session)));
-        barrier.wait();
-        let entry = runtime().block_on(sessions.lookup(&session.session_id));
-        barrier.wait();
-        (entry, expiry.join().unwrap())
-    });
-
-    expired.unwrap();
+    let state = fallback_app_state(directory.path(), sessions.clone());
+    sessions.insert_active(session.clone()).await;
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute_batch("CREATE TRIGGER refuse_terminal BEFORE INSERT ON remote_session_terminal_fences BEGIN SELECT RAISE(ABORT, 'injected fence outage'); END;")
+        .unwrap();
+    let fault = sessions.mark_closed(&session).await.unwrap_err();
     assert!(
-        matches!(
-            &during_shutdown,
-            Some(RemoteSessionEntry::Terminal(record))
-                if record.lifecycle.state == RemoteSessionState::Expired
-        ),
-        "session must stay visible as terminal while upstream shutdown runs: {during_shutdown:?}"
+        fault.to_string().contains("injected fence outage"),
+        "{fault}"
     );
     assert!(matches!(
-        runtime().block_on(sessions.lookup(&session.session_id)),
-        Some(RemoteSessionEntry::Terminal(record))
-            if record.lifecycle.state == RemoteSessionState::Expired
+        sessions.lookup(&session.session_id).await,
+        Some(RemoteSessionEntry::Active(_))
     ));
+
+    let response = fail_closed_session_after_persistence_error(
+        &state,
+        &session,
+        CliError::cli_other_error("injected resume persistence failure"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_unpersisted_closed_diagnostic(
+        sessions.lookup(&session.session_id).await,
+        &session,
+        1_000,
+    );
+    assert!(load_terminal_session_records(&path, &keyring, 1_000)
+        .unwrap()
+        .is_empty());
+    drop(connection);
+    drop(lease);
+    std::fs::remove_dir_all(store_directory).unwrap();
 }

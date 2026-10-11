@@ -65,7 +65,7 @@ pub(super) async fn close(state: &RemoteAppState, session: &Arc<RemoteSession>) 
             lifecycle.deadline = None;
             lifecycle.drain_deadline_at = None;
         }
-        state.sessions.remove_active(&session.session_id).await;
+        state.sessions.retire_terminal(session).await;
         if let Err(error) = session.shutdown_upstream_transport() {
             warn!(error = %error, session_id = %session.session_id,
                 "stopped MCP worker upstream shutdown failed");
