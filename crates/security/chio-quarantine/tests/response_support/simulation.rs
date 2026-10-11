@@ -202,26 +202,54 @@ pub fn fixture(
     let mut effects = specs
         .into_iter()
         .enumerate()
-        .map(
-            |(i, (kind, target, body))| -> TestResult<ResponseEffectSpec> {
-                let canonical = canonical_json_bytes(&body)?;
-                Ok(ResponseEffectSpec {
-                    kind,
-                    target,
-                    contribution_hash: Digest32::new(*sha256(&canonical).as_bytes()),
-                    canonical_contribution: CanonicalBody::new(canonical)?,
-                    observed_base_version_hash: if i < states.len() {
-                        states[i].version_hash()?
-                    } else {
-                        digest(7)
-                    },
-                })
-            },
-        )
+        .map(|(i, (kind, target, body))| {
+            let base = match states.get(i) {
+                Some(state) => state.version_hash()?,
+                None => digest(7),
+            };
+            effect_spec(kind, target, &body, base)
+        })
         .collect::<TestResult<Vec<_>>>()?;
     let freeze = effects.remove(4);
     effects.insert(0, freeze);
-    let plan = build_response_plan(ResponsePlanInput {
+    let plan = dry_run_plan(&tenant_id, action_id, &affected_ids, effects)?;
+    let scope = ResponseSimulationScope {
+        effect_id: plan.effects.as_slice()[0].effect_id.clone(),
+        result: scope,
+    };
+    let snapshot = ResponseSimulationSnapshot {
+        tenant_id,
+        plan_hash: plan.plan_hash,
+        captured_at_unix_ms: 1000,
+        states: BoundedVec::new(states)?,
+        scopes: BoundedVec::new(vec![scope])?,
+    };
+    Ok((plan, snapshot))
+}
+
+pub fn effect_spec(
+    kind: ResponseEffectKind,
+    target: ResponseTarget,
+    body: &serde_json::Value,
+    observed_base_version_hash: Digest32,
+) -> TestResult<ResponseEffectSpec> {
+    let canonical = canonical_json_bytes(body)?;
+    Ok(ResponseEffectSpec {
+        kind,
+        target,
+        contribution_hash: Digest32::new(*sha256(&canonical).as_bytes()),
+        canonical_contribution: CanonicalBody::new(canonical)?,
+        observed_base_version_hash,
+    })
+}
+
+pub fn dry_run_plan(
+    tenant_id: &TenantId,
+    action_id: ActionId,
+    affected_ids: &RecordIdSet,
+    effects: Vec<ResponseEffectSpec>,
+) -> TestResult<ResponsePlan> {
+    build_response_plan(ResponsePlanInput {
         execution: ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
         action_id,
         trigger_finding_id: id("finding"),
@@ -243,17 +271,6 @@ pub fn fixture(
         approval_requirement: ResponseApprovalRequirement::Automatic,
         submitter: id("submitter"),
         reason_hash: digest(4),
-    })?;
-    let scope = ResponseSimulationScope {
-        effect_id: plan.effects.as_slice()[0].effect_id.clone(),
-        result: scope,
-    };
-    let snapshot = ResponseSimulationSnapshot {
-        tenant_id,
-        plan_hash: plan.plan_hash,
-        captured_at_unix_ms: 1000,
-        states: BoundedVec::new(states)?,
-        scopes: BoundedVec::new(vec![scope])?,
-    };
-    Ok((plan, snapshot))
+    })
+    .map_err(Into::into)
 }
