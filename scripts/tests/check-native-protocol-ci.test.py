@@ -29,6 +29,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
 )
 CONSUMERS = (
+    (0, "build-lint", "Protocol peer-negotiation gate"),
     (0, "workspace-tests", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
