@@ -114,12 +114,18 @@ fn spawn_trust_service(
 
 fn wait_for_trust_service(client: &Client, base_url: &str) {
     for _ in 0..100 {
-        match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return,
-            Ok(_) | Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+        if let Ok(response) = client.get(format!("{base_url}/health")).send() {
+            if response.status() == reqwest::StatusCode::OK
+                && response
+                    .json::<serde_json::Value>()
+                    .is_ok_and(|health| health["receiptQuerySnapshot"]["state"] == "ready")
+            {
+                return;
+            }
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    panic!("trust service did not become ready");
+    panic!("trust service receipt query snapshot did not become ready");
 }
 
 fn capability_with_id(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
