@@ -95,9 +95,9 @@ fn run_sustained_rejects_over_resolution_rate() {
 
 #[test]
 fn run_sustained_rejects_unrepresentable_duration() {
-    let config = LoadgenConfig {
+    let mut config = LoadgenConfig {
         arrival_rate_hz: 100,
-        duration: Duration::from_secs(u64::MAX),
+        duration: Duration::from_secs(1),
         tool_latency: Duration::ZERO,
         store: StoreBacking::Memory,
         p99_budget: Duration::from_millis(50),
@@ -105,6 +105,9 @@ fn run_sustained_rejects_unrepresentable_duration() {
     };
 
     let harness = StackHarness::boot_smoke(&config).test_unwrap();
+    // Boot with a valid capability lifetime before exercising the runner's
+    // independent duration bound.
+    config.duration = Duration::from_secs(u64::MAX);
     let error = run_sustained(&harness, &config).test_unwrap_err();
     assert!(
         matches!(error, LoadgenError::DurationTooLong),
