@@ -38,7 +38,9 @@ fn review_legacy_settled_prepaid_quarantines_with_exact_legacy_amount_absent() -
                 Some(10)
             )
         );
-        journal.journal_version = 1;
+        // Match the settled legacy row in the budget12 migration control.
+        // This field is a journal revision counter, not a schema version.
+        journal.journal_version = 2;
         journal.authorization_attempt = None;
         journal.authorized_amount_units = None;
         journal.validate()?;
