@@ -6,6 +6,11 @@ use compaction_fixture::deterministic_completed_return;
 fn compaction_retained_prefix_resumes_replay_verification_under_same_byte_cap() {
     let initial = 1_700_000_000;
     let _time = chio_test_support::clock::scope_unix_secs(initial);
+    let _identity = crate::scope_fixed_authority_ids_for_current_thread(
+        "018bcfe5-6800-7000-8000-000000000001",
+        ["018bcfe5-6800-7000-8000-000000000002".to_owned()],
+    )
+    .expect("fixed authentic store namespace");
     let fixture = fixture();
     let (_, stream) = deterministic_completed_return(&fixture, "cursor-stream", true, initial)
         .expect("actual signed stream completion");
