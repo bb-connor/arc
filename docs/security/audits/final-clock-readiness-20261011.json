@@ -1,0 +1,803 @@
+{
+  "schema": "chio.security.final-clock-readiness.v1",
+  "observed_utc": "2026-10-11T08:30:16.244086+00:00",
+  "source_stage_head": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+  "public_head": "974f22914bd339a62933831650c3d55dbaf76987",
+  "scope": "Local changed-boundary qualification of the reviewed replacement. The earlier full kernel campaign remains failed. No hosted, merge, release, proof or operational readiness claim.",
+  "root_renewal": {
+    "path": "/tmp/pr1160-ci-batch-20261010/clock-readiness-successor/summary.json",
+    "sha256": "7d40ce48d54d3c50d5f3a9e5530451c3cbd7b639cec5cdbaeeaa3cc5a8f001d7",
+    "accepted": true,
+    "commands": [
+      {
+        "accepted": true,
+        "argv": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "authority-clock-gate",
+        "log_sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b",
+        "seconds": 28.580628329887986,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:04:33.229771+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "kernel::tests::budget::non_durable_financial_dispatch::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "ordinary-clock-contract",
+        "log_sha256": "f6ac9acea8feda2b2bf422d7b2c9f9ed18b6f8d228a5687e6f449d6f7b1b6f3c",
+        "seconds": 179.44146748725325,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:05:03.488200+00:00",
+        "test_summaries": [
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1679 filtered out; finished in 0.11s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "kernel::tests::durable_admission::dispatch_elapsed::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "clock-fault-matrix",
+        "log_sha256": "6dc26f1247dbe206492126f19aa9406195e79645d417a0fe81a2b2a50d186341",
+        "seconds": 1.6300705019384623,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:08:04.599059+00:00",
+        "test_summaries": [
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1672 filtered out; finished in 0.28s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-store-sqlite",
+          "--lib",
+          "writer_seed_wait_",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "writer-readiness-contract",
+        "log_sha256": "615259fd57693237db95610838c2218df82b9dc28c6cc49b86642a174271a494",
+        "seconds": 195.36034661531448,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:08:07.902267+00:00",
+        "test_summaries": [
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2417 filtered out; finished in 0.35s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-runtime-harness",
+          "--all-targets",
+          "--no-fail-fast"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "runtime-harness-owning",
+        "log_sha256": "3d9178ffe4ca8a203f66752d8b9088fff030daec24b275f6fa4bc342f9eb57a5",
+        "seconds": 128.79408472403884,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:11:24.938557+00:00",
+        "test_summaries": [
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.20s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--test",
+          "proof_cli_contract"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "cli-proof-contract",
+        "log_sha256": "f792fffbb389f2ef8c0aa09adc42f48752b5a42bc1c2ea1f7f6024bd6b7d6c32",
+        "seconds": 593.0737234982662,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:13:35.431217+00:00",
+        "test_summaries": [
+          "test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 165.84s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "-p",
+          "chio-runtime-harness",
+          "-p",
+          "chio-cli",
+          "-p",
+          "chio-store-sqlite",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "strict-clock-and-readiness-owners",
+        "log_sha256": "16037ff2112d2b7b2ad9719a21c50bdbc7d95a6335da699226c756508ac72929",
+        "seconds": 264.31441018823534,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:23:30.181181+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-secret-broker",
+          "--all-features",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "strict-broker-all-features",
+        "log_sha256": "0cf6fffa89ed1e45a1a7127f83dabbb06da511c664a905671555dcdf0dcd1cdb",
+        "seconds": 129.1438238993287,
+        "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:27:56.160698+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    ],
+    "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+    "source_stable": true
+  },
+  "retained_failed_predecessor": {
+    "path": "/tmp/pr1160-ci-batch-20261010/clock-repair-final/summary.json",
+    "sha256": "bb85378fbd35096230d79b7424b0c13c7e5c2efd517d0add42dd6f6cd14b65c6",
+    "accepted": false,
+    "commands": [
+      {
+        "accepted": true,
+        "argv": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "authority-clock-gate",
+        "log_sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b",
+        "seconds": 28.43325710715726,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:26:12.035038+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "python3",
+          "scripts/tests/check-security-clocks.test.py"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "authority-clock-calibration",
+        "log_sha256": "2c2cb7cefa7436b22639b84fe3b531d0ac392690cb7458c8b0c99b5ab62b930d",
+        "seconds": 0.5672512198798358,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:26:42.219478+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--lib",
+          "kernel::tests::durable_admission::dispatch_elapsed::",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "clock-fault-matrix",
+        "log_sha256": "75b6f7c313337ea35dcc5656758de48135f862e9943f3e754e73ea5909e311a6",
+        "seconds": 193.207938185893,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:26:44.542448+00:00",
+        "test_summaries": [
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1671 filtered out; finished in 0.34s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": false,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "--all-targets",
+          "--no-fail-fast"
+        ],
+        "elapsed_matrix_passed": [
+          "nested_dispatch_elapsed_follows_the_authority_clock",
+          "nested_end_read_failure_retains_the_executed_operation",
+          "nested_fixed_authority_clock_records_zero_elapsed",
+          "nested_monotonic_regression_retains_the_executed_operation",
+          "nested_start_read_failure_retains_the_committed_operation",
+          "ordinary_dispatch_elapsed_follows_the_authority_clock",
+          "ordinary_end_read_failure_retains_the_executed_operation",
+          "ordinary_fixed_authority_clock_records_zero_elapsed",
+          "ordinary_monotonic_regression_retains_the_executed_operation",
+          "ordinary_start_read_failure_retains_the_committed_operation"
+        ],
+        "exit": 101,
+        "inventory_accepted": true,
+        "label": "kernel-owning",
+        "log_sha256": "7b4fad86b27a0b0ff16fddf34393e739d8f92b93a4048bbaa60a2198d327ae31",
+        "seconds": 486.4555516173132,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:29:59.458711+00:00",
+        "test_summaries": [
+          "test result: FAILED. 1680 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 151.80s",
+          "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.34s",
+          "test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+          "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+          "test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.08s",
+          "test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 97.72s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+          "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.85s",
+          "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.03s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+          "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s",
+          "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+          "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s",
+          "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-runtime-harness",
+          "--all-targets",
+          "--no-fail-fast"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "runtime-harness-owning",
+        "log_sha256": "16f1d6371dad81ac8f681170574095f380db6f8687078db1c17d006d9248699f",
+        "seconds": 134.68279115157202,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:38:07.598124+00:00",
+        "test_summaries": [
+          "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.21s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-cli",
+          "--test",
+          "proof_cli_contract"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "cli-proof-contract",
+        "log_sha256": "cb695bbc41140a9159a6dbd62c58ac83c1db38705527c12d7359aac9bc43587d",
+        "seconds": 608.9914061869495,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:40:24.020035+00:00",
+        "test_summaries": [
+          "test result: ok. 147 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 174.13s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "chio-secret-broker",
+          "--features",
+          "native-mcp",
+          "--lib",
+          "process_boundary_tests::native",
+          "--",
+          "--test-threads=1",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "native-clock-confirmation",
+        "log_sha256": "b5cdfd8c3f760d9eea15ed18debeda94a577fda21fb07b2b6a1bd341a09ebd67",
+        "seconds": 460.1459158780053,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:50:34.754255+00:00",
+        "test_summaries": [
+          "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 287 filtered out; finished in 237.04s"
+        ],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-kernel",
+          "-p",
+          "chio-runtime-harness",
+          "-p",
+          "chio-cli",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "strict-clock-owners",
+        "log_sha256": "833e8342c28f207e8602113dec93c1d1ab5e85815265a0f9991328268a3bcc9e",
+        "seconds": 239.46588156512007,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T07:58:16.638914+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      },
+      {
+        "accepted": true,
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "chio-secret-broker",
+          "--all-features",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "inventory_accepted": true,
+        "label": "strict-broker-all-features",
+        "log_sha256": "2970a24a023294738e58973688991dda70ffc9dac9d750525a9b016184497dda",
+        "seconds": 129.19285195041448,
+        "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+        "source_stable": true,
+        "started_utc": "2026-10-11T08:02:17.786750+00:00",
+        "test_summaries": [],
+        "timed_out": false,
+        "timeout_seconds": 7200
+      }
+    ],
+    "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+    "source_stable": true
+  },
+  "ordinary_value_interaction": {
+    "original_evidence": {
+      "path": "/tmp/pr1160-ci-batch-20261010/c7-nondurable-clock-original.json",
+      "sha256": "d0bd6d3c6bbc1d6e6300cbd102ce2efca72295c5fd39b731a0c5f216c2bae24f",
+      "source": "66d4568ab7c846c706fde59c45bfb31ccd558b29",
+      "binary": "/var/tmp/pr1160-root-final-20261009/debug/deps/chio_kernel-5111d3fef074489d",
+      "binary_sha256": "eb9a71afe242858468807d237147766fe8fc9acdbf3d6a65faed118df9ed466a",
+      "argv": [
+        "/var/tmp/pr1160-root-final-20261009/debug/deps/chio_kernel-5111d3fef074489d",
+        "--exact",
+        "kernel::tests::budget::non_durable_financial_dispatch::non_durable_tool_keeps_its_signed_receipt_when_the_post_dispatch_clock_sample_fails",
+        "--nocapture"
+      ],
+      "log": "/tmp/pr1160-ci-batch-20261010/c7-nondurable-clock-regression.log",
+      "log_sha256": "aabe9f9f74fb29a8a21ee5d0c3b4f16142ae9cdc4ba8b0e967b5ad9baafc11e2",
+      "result": "0 passed; 1 failed; returned Deny where completed ordinary value must Allow (signature assertion was not reached)",
+      "full_kernel_result": "/tmp/pr1160-ci-batch-20261010/clock-repair-final/04-kernel-owning/result.json",
+      "scope": "Unchanged frozen66d compiled library, exact existing regression. Root94d successor runtime renewal pending."
+    },
+    "repair_commit": "94d7c3ae7413c2690fcb6d579cc9e14c8f9a5016",
+    "contract": "Skip the elapsed end read only for a non-durable Value whose elapsed duration is unused. Durable outcomes and streams require valid injected monotonic time. Preserve original signed cost/receipt assertions; pin the unused end read and both stream refusal paths.",
+    "review": "Claude approved 94d7c3ae74 at 2026-10-11T07:42:22Z after checking all elapsed consumers.",
+    "green": "45aa ordinary family 3/0, durable timing matrix 10/0, owning strict, harness 22/0 and CLI proof 147/0.",
+    "limits": "The Original observed a Deny after one effect; its receipt signature assertion was not reached. The full predecessor result was 1919 passed, one failed, two ignored and remains failed."
+  },
+  "writer_readiness": {
+    "producer": "ebbbacbeb5a4223917ac0704cc5ac37f6bcd413d",
+    "integration": "a7cedf21d9",
+    "contract": "Use the existing 30-second receipt-writer readiness barrier before runtime-harness admission; preserve fail-closed timeout and poisoned-seed refusal. Extend existing one-shot held/failed-seed owner tests without exposing or adding production hooks.",
+    "producer_manifest": {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/MANIFEST.md",
+      "sha256": "e02f2b28fff6536cba8fa299f92c3b614c8c9af3b3ccacce062fa48ecabdaadf"
+    },
+    "independent_verification": {
+      "path": "/tmp/pr1160-ci-batch-20261010/writer-readiness-independent-verification.json",
+      "sha256": "1b0e429a6e9bf93b07eda5bdb4149e59d2f67e4067f5e776c37e5b6c67919e42"
+    },
+    "binary_sha256": "136aad7e9a28e9c9ce72d06109c5e19918b2d55e3fc9b20ab6d1bb3e0afeba7b",
+    "generated": 48,
+    "failed": 0,
+    "writer_refusals": 0,
+    "parity_mismatches": 0,
+    "files_per_tree": 215,
+    "tree_sha256": "94514b4d9432787cbfcc354745eb5e374419bdd01fe1189903898601416d8fd3",
+    "actual_umask": "022",
+    "composed_files_byte_identical": {
+      "crates/kernel/chio-runtime-harness/src/lib.rs": "e8fd9a83054bc8540c91a43e3c49887a116014b96cf83795213c5e8eb7e6bbe5",
+      "crates/platform/chio-store-sqlite/src/receipt_store/tests/single_writer.rs": "5792ded16e25b67aeaead75e391b778b1d5fedf9b5d3e560426c8ad376e2f77a"
+    },
+    "producer_artifacts": {
+      "fmt.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "MANIFEST.md": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/MANIFEST.md",
+        "sha256": "e02f2b28fff6536cba8fa299f92c3b614c8c9af3b3ccacce062fa48ecabdaadf"
+      },
+      "harness-suite.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/harness-suite.log",
+        "sha256": "29a6311324927fe9ca97d85783db6b676d8fb937c0cab2edc2705d99a3b2757c"
+      },
+      "run.sh": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/run.sh",
+        "sha256": "4c303c68cf0b32573f5e76b9cec9ef726b7d45fff1693558b4f8d9ed72ead4f2"
+      },
+      "stress.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/stress.log",
+        "sha256": "f69e4f729f77e81f40f684bae56d22ce19c224c40f8585ab0db6304bf7238682"
+      },
+      "clocks.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/clocks.log",
+        "sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b"
+      },
+      "chio-build.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/chio-build.log",
+        "sha256": "df07e095b54eec5da43c05c67c3926bea99da2ee1eb0c26d70a67612ae845719"
+      },
+      "store-seed-tests.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/store-seed-tests.log",
+        "sha256": "f3b1023482d1ed58e90d329f047ec62197688847d3ffc2ec35bab845fdbc8acd"
+      },
+      "clippy.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/clippy.log",
+        "sha256": "cc53c6a57634c85ef17270f1ae84982a4d24c2c8ada3b8fbbc579cd860c67fec"
+      },
+      "hygiene.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/hygiene.log",
+        "sha256": "7cfafa6b731fa6ba5f4c57e612ce4b308e1ca1bc16c6ec49880559dc84b0f306"
+      },
+      "stress.sh": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/writer-ready/stress.sh",
+        "sha256": "03c38b2f91c38d33050be4d0435f3929ea0e9e6afbf5c7adf458029807e83fa1"
+      }
+    },
+    "root_green": "45aa owner seed 2/0, runtime-harness 22/0, CLI proof 147/0 and strict affected owners.",
+    "limits": "Source-backed startup-race repair, not a reproduced cause of the historical uninstrumented refusal. The pre-fix diagnostic had zero writer refusals in 208 attempts; 17 failures were the separate known clock-parity defect."
+  },
+  "owed_originals": {
+    "verification": {
+      "path": "/tmp/pr1160-ci-batch-20261010/c2-c6-original-verification.json",
+      "sha256": "2c0ff74147e3fe7a79af09266b118bc691501dbf4b00e0271bcf86ff12ffa28e"
+    },
+    "artifacts": {
+      "r2-c2-persistence/R2-023-EVIDENCE.md": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/R2-023-EVIDENCE.md",
+        "sha256": "9872b6e7876cce3eee61345ab1f6b94eb17d6f240cebf56c1ee4713312a0286c",
+        "test_summaries": []
+      },
+      "r2-c2-persistence/r2-023-witness-original.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-023-witness-original.log",
+        "sha256": "eb78f5996d3fce6c60e0f00211481ba4314935ce7d221a60af62701c7edb3a51",
+        "test_summaries": [
+          "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 76 filtered out; finished in 0.12s"
+        ]
+      },
+      "r2-c2-persistence/r2-023-witness-overlay.patch": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c2-persistence/r2-023-witness-overlay.patch",
+        "sha256": "b5d0d6eecc4c8fe915449874ddf9260e24db44b6e375f8ad50d061e6a5002fc6",
+        "test_summaries": []
+      },
+      "r2-c6-preexisting/run-owed.sh": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c6-preexisting/run-owed.sh",
+        "sha256": "3d573abaa0177263ac1f92283820b3d282d5b04b74580729ca89d4cdac70d871",
+        "test_summaries": []
+      },
+      "r2-c6-preexisting/r2-022-original-genuine.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c6-preexisting/r2-022-original-genuine.log",
+        "sha256": "d087f44f90f78fdf30e53622ff2156a560e73cb3bb201ab2f33669ce9199ab81",
+        "test_summaries": [
+          "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2392 filtered out; finished in 2.55s"
+        ]
+      },
+      "r2-c6-preexisting/check-store-sqlite.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c6-preexisting/check-store-sqlite.log",
+        "sha256": "7dc53f139f5e844403e97f8ba14e4e2d1ba49521cdf1e4b6d6519f8628bbfce7",
+        "test_summaries": []
+      },
+      "r2-c6-preexisting/r2-024-original.log": {
+        "path": "/home/connor/lanes/claude-pr1160-evidence/r2-c6-preexisting/r2-024-original.log",
+        "sha256": "9da227f745e3d274c69cfaaa85a6939faf36712afecf12082e7e88617109a05c",
+        "test_summaries": [
+          "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.02s"
+        ]
+      }
+    },
+    "r2_023_scope": "Genuine unchanged public-parent production plus old-API test overlay: 1024 retained 1024-byte child IDs and an existing retry succeed; 1025th child is incorrectly admitted, resulting in 2 passed and one failed. The prior 3/9 run is a mutant; stale-binary GREEN is invalid. Root core90 and kernel1909 successor coverage remain separately retained.",
+    "r2_022_scope": "Two complete actual-974f production files restored on the corrected fixture/dependency checkout, not an entire-974f checkout and not a hand-written mutant. Genuine 0/1 Conflict at the record-version fence; composed focused6/0 and strict retained. Invalid seed/HOME setup runs remain invalid."
+  },
+  "static_preflight": {
+    "path": "/tmp/pr1160-ci-batch-20261010/final-clock-static-45aa/result.json",
+    "sha256": "80e4f55db783a358fde8ed46c3dd96b5905bbdf2b8cbe74bc1f8b564e398c81e",
+    "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+    "source_stable": true,
+    "records": [
+      {
+        "label": "format",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 28.82,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "file-hygiene",
+        "argv": [
+          "python3",
+          "scripts/check-rust-file-hygiene.py"
+        ],
+        "exit": 0,
+        "seconds": 4.28,
+        "log_sha256": "7cfafa6b731fa6ba5f4c57e612ce4b308e1ca1bc16c6ec49880559dc84b0f306"
+      },
+      {
+        "label": "clock-inventory",
+        "argv": [
+          "python3",
+          "scripts/check-security-clocks.py"
+        ],
+        "exit": 0,
+        "seconds": 28.81,
+        "log_sha256": "80b0950ae1557cb43359db2665d45e8cc73e1455134e596ec6ca64e66f9cba8b"
+      },
+      {
+        "label": "regression-inventory",
+        "argv": [
+          "bash",
+          "scripts/check-regression-tests.sh"
+        ],
+        "exit": 0,
+        "seconds": 0.07,
+        "log_sha256": "381043b4993106657008ab3d06ac32c644f0669dfea30425780562559532b441"
+      },
+      {
+        "label": "negative-assertions",
+        "argv": [
+          "python3",
+          "scripts/check-negative-assertions.py"
+        ],
+        "exit": 0,
+        "seconds": 1.33,
+        "log_sha256": "5d096f1ed75dc8ced9733161cdfdd5c6df8308e63998ef6c8f39c9d05c9b43cd"
+      },
+      {
+        "label": "landing-ledger",
+        "argv": [
+          "python3",
+          "scripts/check-security-landing-ledger.py"
+        ],
+        "exit": 0,
+        "seconds": 6.2,
+        "log_sha256": "4e0f4b17bc9fb33693747e24ed6ef97ce425081b04f23df035a0e55ef6a3ddd2"
+      },
+      {
+        "label": "security-ci-contract",
+        "argv": [
+          "python3",
+          "scripts/check-security-ci-contract.py"
+        ],
+        "exit": 0,
+        "seconds": 2.55,
+        "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      }
+    ],
+    "accepted": true,
+    "observed_utc": "2026-10-11T08:25:13.244334+00:00"
+  },
+  "supply_graph": {
+    "path": "/tmp/pr1160-ci-batch-20261010/supply-graph-45aa/summary.json",
+    "sha256": "7dcaa282bce4fe32445113e2ddfa362cdb8f6d8765dde4ca770ca429a750e974",
+    "source": "45aa2dd5a0cb72917fd438682c10b59ad7ae6e64",
+    "source_stable": true,
+    "commands": [
+      {
+        "label": "vet-locked",
+        "argv": [
+          "cargo",
+          "vet",
+          "--locked"
+        ],
+        "exit": 0,
+        "seconds": 3.020343644078821,
+        "log_sha256": "d982dd4856191fc841563773161909836622aa495d51bb05baf7730483e8283c"
+      },
+      {
+        "label": "deny-locked",
+        "argv": [
+          "cargo",
+          "deny",
+          "--locked",
+          "check",
+          "advisories",
+          "licenses",
+          "sources",
+          "bans"
+        ],
+        "exit": 0,
+        "seconds": 3.6045907991938293,
+        "log_sha256": "f1a0fca39d4280363937aabd77783990ea6480bd9ca257816de3b68fc8efa845"
+      },
+      {
+        "label": "wildcards",
+        "argv": [
+          "python3",
+          "scripts/check-external-wildcard-deps.py"
+        ],
+        "exit": 0,
+        "seconds": 0.8261851803399622,
+        "log_sha256": "33fc6408caec5ce150f8bf3327dc9518a979461f99b6c8a290f84531f312ce65"
+      },
+      {
+        "label": "duplicate-baseline",
+        "argv": [
+          "python3",
+          "scripts/check-cargo-deny-duplicate-baseline.py"
+        ],
+        "exit": 0,
+        "seconds": 0.11695959093049169,
+        "log_sha256": "6535fb4fc6213d4dd4320f798dd7b219c458a43a13235c6b6196344df396f491"
+      }
+    ],
+    "accepted": true,
+    "observed_utc": "2026-10-11T08:08:59.984099+00:00",
+    "scope": "Changed dependency graph and current advisory/license/source/ban policy preflight. Fork and audit source bytes unchanged from public974f; no repeated fork cryptographic build here. This is not full hosted cargo-vet qualification."
+  },
+  "independent_source_review": {
+    "reviewer": "Claude",
+    "last_message_utc": "2026-10-11T08:15:23Z",
+    "scope": "All source commits through 45aa individually approved. Final pushed-tree equivalence and hosted failure triage reserved for Claude."
+  },
+  "remaining_acceptance": [
+    "Publish the reviewed replacement once with documentation-only evidence successors.",
+    "Require Build/lint/test, MSRV, Cargo Vet and Cargo Deny green on the exact public head; classify every other failure and answer review threads.",
+    "Report exact-head landing readiness and obtain the user merge go-ahead.",
+    "Stale controller/enterprise authorization and missing committed Linux evidence remain disclosed post-merge setup prerequisites; no authorization rotation or variable mutation.",
+    "KANI-PROOF-QUAL remains OPEN/UNPROVED, cold-state operational readiness remains open, and native mini-SWE latency/concurrency acceptance remains open. No new proof campaign, capacity campaign or limit waiver."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
