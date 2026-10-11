@@ -120,6 +120,9 @@ jobs:
       - name: proof coverage drift guard
         run: cargo xtask gen proof-coverage --check
 
+      - name: Static formal contract guard
+        run: python3 scripts/check-apalache-formal-slice.py
+
       - name: Adapter mediation inventory
         run: cargo xtask check adapter-no-bypass
 
