@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Forbid new ambient wall-clock reads and independent clock traits in the TCB.
+"""Forbid ambient authority-clock bypasses and independent clock traits in the TCB.
 
 The inventory includes fixtures as well as production. It pins existing debt
 by file and function; moving or adding a call requires a real migration. The
@@ -48,6 +48,9 @@ LEGACY_ROOTS = (
 )
 ADAPTER = "crates/security/chio-security-types/src/clock/system.rs"
 PORT = "crates/security/chio-security-types/src/clock.rs"
+# Evaluation elapsed time enters authenticated tool outcomes. Keep that whole
+# owner directory on the injected monotonic clock, including future helpers.
+RECEIPT_EVALUATION_ROOT = "crates/kernel/chio-kernel/src/kernel/evaluation/"
 
 
 def clock_roots(root):
@@ -137,6 +140,8 @@ def sites(path, source):
     scanned = lexer.blank_rust_noise(source)
     functions = [(m.start(), m.group(1)) for m in lexer.FN_ITEM.finditer(scanned)]
     names = {"SystemTime", "Utc", "Local", "OffsetDateTime"}
+    if path.startswith(RECEIPT_EVALUATION_ROOT):
+        names.add("Instant")
     adapters = {"SystemClock", "AdvancingSystemClock"}
     epochs = {"UNIX_EPOCH"}
     for group in (names, adapters, epochs):

@@ -26,6 +26,41 @@ class ClockGateTests(unittest.TestCase):
         self.assertEqual(found["owner.rs::admit"], 2)
         self.assertEqual(found["owner.rs::trait AnotherClock"], 1)
 
+    def test_receipt_evaluation_rejects_ambient_monotonic_clock(self):
+        paths = [
+            "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
+            "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs",
+            "crates/kernel/chio-kernel/src/kernel/evaluation/new_return_helper.rs",
+        ]
+        sources = [
+            "fn evaluate() { Instant::now(); }",
+            "fn evaluate() { std::time::Instant::now(); }",
+            "use std::time::{Instant as Host}; fn evaluate() { Host::now(); }",
+            "use std::time::Instant as Host; use Host as Alias; "
+            "fn evaluate() { Alias::now(); }",
+            "type Host = std::time::Instant; fn evaluate() { Host::now(); }",
+            "fn evaluate() { value.unwrap_or_else(Instant::now); }",
+        ]
+        for path in paths:
+            for source in sources:
+                with self.subTest(path=path, source=source):
+                    self.assertEqual(gate.sites(path, source)[f"{path}::evaluate"], 1)
+
+    def test_receipt_monotonic_scope_preserves_watchdogs_and_injected_clock(self):
+        path = "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs"
+        source = """
+            // Instant::now()
+            fn record() {
+                let description = "Instant::now()";
+                let start = self.authority_clock_reading()?.monotonic();
+                self.authority_clock_reading()?.monotonic().duration_since(start)?;
+            }
+        """
+        self.assertEqual(gate.sites(path, source), {})
+        self.assertEqual(
+            gate.sites("watchdog.rs", "fn poll() { Instant::now(); }"), {}
+        )
+
     def test_protocol_clock_aliases_are_caught(self):
         found = gate.sites(
             "protocol.rs",

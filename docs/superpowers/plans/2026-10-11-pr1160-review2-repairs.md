@@ -430,3 +430,13 @@ evidence are pending. Initial Tokio blocking-queue time is outside the fetch bud
 - R4-004 (Root): `9d07df2675` tests duplicate identity/outbox rows in an otherwise valid five-row Grant. Retain predecessor-oracle and removed-duplicate-guard controls, final cold-map tests and strict lint before acceptance.
 
 The canonical ledger now preserves 2,005 requirements, including the relay and snapshot fixtures and named issuer refusal-provenance follow-up. These rows extend the same replacement batch and do not open another landing PR.
+
+### CI proof parity follow-up (2026-10-11)
+
+The unchanged cf46 CLI reproduces intermittent package/report hash mismatch under 16 concurrent fixture generations. Retained outcome blobs identify nonzero `elapsed_millis` from ambient `Instant` reads in ordinary and nested kernel evaluation; the harness injects a fixed authority clock, but those elapsed observations bypass it. This is a production determinism defect exposed by the fixtures, not permission to weaken proof hashes.
+
+- Claude C7 owns the isolated Rust repair and both-path success, clock-failure and regression controls. Measure elapsed time through the injected monotonic clock with checked subtraction. Preserve committed operation custody before any fallible read and preserve recovery on post-dispatch error.
+- Root owns the existing clock gate and its calibration. Include ambient monotonic reads throughout the kernel evaluation directory, including aliases and new helper modules; retain existing watchdog scope and all inventory limits.
+- Root gate calibration: unchanged scanner misses 18 bounded subcases; the repaired scanner passes all 13 calibration tests and rejects both known unchanged production sites. The full source gate remains intentionally failing until the Rust repair is composed.
+- Require retained Original evidence, focused owning tests and strict lint, source review, complete CLI proof fixture suite, and a repeat of the same concurrent artifact-equality control before publication. Preserve partial parity-stage evidence separately from end-to-end fixture collection.
+- Classify and diagnose the separate commit-writer startup denial without weakening fail-closed admission. No new proof campaign or authorization mutation.
