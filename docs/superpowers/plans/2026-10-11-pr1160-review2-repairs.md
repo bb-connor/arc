@@ -440,3 +440,30 @@ The unchanged cf46 CLI reproduces intermittent package/report hash mismatch unde
 - Root gate calibration: unchanged scanner misses 18 bounded subcases; the repaired scanner passes all 13 calibration tests and rejects both known unchanged production sites. The full source gate remains intentionally failing until the Rust repair is composed.
 - Require retained Original evidence, focused owning tests and strict lint, source review, complete CLI proof fixture suite, and a repeat of the same concurrent artifact-equality control before publication. Preserve partial parity-stage evidence separately from end-to-end fixture collection.
 - Classify and diagnose the separate commit-writer startup denial without weakening fail-closed admission. No new proof campaign or authorization mutation.
+
+
+## Final clock interaction and writer readiness
+
+The full `66d4568ab7` kernel campaign produced 1,919 passes, one failure and two
+ignored tests. Preserve that failed campaign. The sole failure is the existing
+non-durable signed-value/cost contract from `5ead9f7d59`: the new elapsed end read
+unnecessarily consumes a clock fault after the value has been observed.
+
+- Root repair `94d7c3ae74` samples the end clock only for a durable admission or a
+  stream. Ordinary values have no elapsed consumer and keep their signed receipt
+  and cost. The existing assertions stay; new assertions prove the end clock was
+  not read, while both non-durable stream paths require measured duration.
+- Claude source review approves the repair. Renew the ordinary three-case family,
+  durable ten-case matrix, runtime-harness owner, CLI proof contracts and strict
+  affected-owner checks. Prior full and native campaigns retain their exact sources.
+- Writer readiness producer `ebbbacbeb5` is integrated as `a7cedf21d9`. The harness
+  uses the existing bounded readiness barrier before admission. Existing one-shot
+  held/failed-seed tests cover timeout, refusal and successful release. No test hook,
+  production store behavior, timeout allowance or gate is changed.
+- The old writer probe yielded zero writer refusals in 208 attempts and 17 known
+  pre-repair parity failures. This is a source-backed startup-race repair; do not
+  call it a reproduced explanation of the historical uninstrumented refusal.
+
+Publish one successor after changed-boundary renewal and remaining failure
+classification. Require the four exact-head hosted checks and answered threads,
+then report the head and disclosed post-merge obligations for merge authorization.
