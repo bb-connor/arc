@@ -5,8 +5,9 @@
 /// (or guard) after the kernel has already emitted a timed-out response and
 /// unwound its charges. Aborting cancels a not-yet-started task so it cannot
 /// execute side effects past the deadline; a task already running its blocking
-/// body cannot be interrupted, but its own inner deadline still frees it, and a
-/// task that already finished is aborted as a harmless no-op.
+/// body cannot be interrupted and must finish under its own transport bounds.
+/// Its outcome still needs reconciliation; aborting an already-finished task
+/// is a harmless no-op.
 pub(crate) struct AbortOnDrop(pub(crate) tokio::task::AbortHandle);
 
 impl Drop for AbortOnDrop {
