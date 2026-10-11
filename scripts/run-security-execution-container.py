@@ -478,10 +478,12 @@ def read_tree_listing(root: Path, head: str, timeout: int = 120) -> bytes:
         if status != 0:
             raise BoundaryError("Git candidate tree listing failed")
     finally:
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=5)
-        process.stdout.close()
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+        finally:
+            process.stdout.close()
     return bytes(raw)
 
 
