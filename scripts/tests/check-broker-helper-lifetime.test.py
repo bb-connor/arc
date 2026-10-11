@@ -80,7 +80,7 @@ class BrokerHelperLifetimeTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(
                 observations.read_text().splitlines(),
-                ["all five helpers available"] * 6,
+                ["all five helpers available"] * 8,
             )
             self.assertFalse(any((root / "transient").iterdir()))
 
