@@ -1724,6 +1724,9 @@ impl ChioKernel {
                 has_monetary_grant,
             );
             if let Some(deadline) = deadline {
+                if tokio::time::Instant::now() >= deadline {
+                    return Err(dispatch_deadline_exceeded(budget));
+                }
                 return match tokio::time::timeout_at(deadline, call).await {
                     Ok(result) => result,
                     Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
