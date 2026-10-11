@@ -249,8 +249,8 @@ for label, (expected_filtered, expected_inventory, expected_command) in expected
         )
 
 total = sum(len(inventory) for _, inventory, _ in calls.values())
-if total != 100:
-    raise SystemExit(f"deception exact inventory total changed: expected=100 observed={total}")
+if total != 104:
+    raise SystemExit(f"deception exact inventory total changed: expected=104 observed={total}")
 PY
 }
 
@@ -374,4 +374,4 @@ for mutant in "${work}"/*.sh; do
   fi
 done
 
-echo "Deception security gate contract passed (12 exact inventories, 100 tests)"
+echo "Deception security gate contract passed (12 exact inventories, 104 tests)"
