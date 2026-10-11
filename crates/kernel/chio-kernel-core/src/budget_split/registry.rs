@@ -221,13 +221,10 @@ impl InMemoryBudgetRegistry {
                 parent_token_id: parent_token_id.into(),
             });
         };
-        let edges_before = parent.split.child_count();
         parent.split.admit_child(child_token_id, share_bps, mode)?;
         if let Some(retained_id_bytes) = retained_id_bytes {
-            if parent.split.child_count() > edges_before {
-                self.child_edges = self.child_edges.saturating_add(1);
-                self.retained_id_bytes = retained_id_bytes;
-            }
+            self.child_edges = self.child_edges.saturating_add(1);
+            self.retained_id_bytes = retained_id_bytes;
         }
         Ok(())
     }
