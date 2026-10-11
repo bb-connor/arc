@@ -31,7 +31,8 @@ FIXTURES = {'host Docker resource lifetime and bounded stream': {'argv': ['test'
                                                                      'native-mcp',
                                                                      '--lib',
                                                                      'kernel_admission::'],
-                                                            'names': ['kernel_admission::registration::tests::registered_generation_cannot_sign_with_a_rotated_authority_key',
+                                                            'names': ['kernel_admission::capture::connection::mcp::tests::dropped_offload_never_starts_its_queued_authority_work',
+                                                                      'kernel_admission::registration::tests::registered_generation_cannot_sign_with_a_rotated_authority_key',
                                                                       'kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_hash_is_updated',
                                                                       'kernel_admission::tests::broker_admission_requires_bounded_exact_typed_canonical_json',
                                                                       'kernel_admission::tests::broker_admission_uses_installed_trust_and_live_clock',
@@ -53,6 +54,30 @@ FIXTURES = {'host Docker resource lifetime and bounded stream': {'argv': ['test'
                                                                       'kernel_admission::tests::routes::route_set_verifies_each_audience_and_rejects_cross_route_authority',
                                                                       'kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests',
                                                                       'kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota']}}
+
+
+FIXTURES["broker HTTPS preparation deadline and pinned dispatch"] = {
+    "argv": ["test", "--locked", "-p", "chio-secret-broker", "--lib", "generic_https::tests::"],
+    "names": [
+        "generic_https::tests::a_resolution_observed_at_or_after_its_deadline_is_refused",
+        "generic_https::tests::an_answer_after_the_absolute_resolution_deadline_fails_closed",
+        "generic_https::tests::dns_rebinding_tls_redirect_size_timeout_and_canary_responses_fail_closed",
+        "generic_https::tests::executor_counts_response_head_overhead_in_the_signed_combined_budget",
+        "generic_https::tests::forbidden_headers_provider_collisions_body_preview_and_options_deny_before_secret_use",
+        "generic_https::tests::ip_literal_requires_the_matching_exact_exception",
+        "generic_https::tests::local_adapter_pins_endpoint_and_tls_before_credential_delivery",
+        "generic_https::tests::not_modified_is_body_free_without_being_a_redirect",
+        "generic_https::tests::preparation_resolution_waits_for_the_shorter_of_the_signed_and_server_budgets",
+        "generic_https::tests::prepare_refuses_a_destination_other_than_its_pinned_resolution",
+        "generic_https::tests::prepared_dispatch_pins_dns_once_and_dispatch_never_resolves_again",
+        "generic_https::tests::response_header_names_cannot_echo_credentials",
+        "generic_https::tests::response_header_normalization_cannot_bypass_secret_header_stripping",
+        "generic_https::tests::response_headers_are_canonical_before_receipt_persistence",
+        "generic_https::tests::restricted_ranges_cover_ipv4_ipv6_and_mapped_forms",
+        "generic_https::tests::stalled_resolution_fails_closed_at_the_signed_request_timeout",
+        "generic_https::tests::stalled_resolutions_hold_the_in_flight_cap_and_further_lookups_fail_closed",
+    ],
+}
 
 
 # Release controls use independent source names and the real libtest substring
