@@ -346,7 +346,9 @@ class ModelRelay:
                 finally:
                     owner._evidence.finish(index)
 
-        self.server = BoundedRelayServer(("127.0.0.1", 0), Handler, limits)
+        self.server = BoundedRelayServer(
+            ("127.0.0.1", 0), Handler, limits, self._evidence.omit_refusal
+        )
         self.base_url = f"http://127.0.0.1:{self.server.server_port}/v1"
 
     def _assert_open(self) -> None:
