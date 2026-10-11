@@ -64,12 +64,16 @@ impl RemoteSessionLedger {
             .lock()
             .await
             .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let terminal = self.terminal.lock().await;
+        // A session mid-transition sits in both maps; it is reported once, as terminal.
+        let active = active
+            .iter()
+            .filter(|session| !terminal.contains_key(&session.session_id))
             .map(|session| session.diagnostic_record())
             .collect::<Vec<_>>();
-        let terminal = self
-            .terminal
-            .lock()
-            .await
+        let terminal = terminal
             .values()
             .map(|record| (*record.as_ref()).clone())
             .collect::<Vec<_>>();
@@ -252,6 +256,12 @@ impl RemoteSessionLedger {
             lifecycle.deadline = None;
             (terminal_at, durable_tombstone)
         };
+        // The session is published as a terminal diagnostic before it leaves
+        // active lookup, so lookup observes it in at least one map throughout.
+        self.terminal
+            .lock()
+            .await
+            .insert(session.session_id.clone(), Arc::new(record.clone()));
         self.active.lock().await.remove(&session.session_id);
 
         // The durable terminal intent and active-row deletion are committed
