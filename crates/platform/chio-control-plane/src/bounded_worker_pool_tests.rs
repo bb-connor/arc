@@ -15,6 +15,13 @@ fn deadline_in(budget: Duration) -> Instant {
     Instant::now().checked_add(budget).test_unwrap()
 }
 
+/// One worker runs jobs in submission order, and the spare queue slot lets
+/// [`drain`] queue behind a job left in the queue, so a completed drain proves
+/// that job was dequeued.
+pub(crate) fn single_worker_pool() -> BoundedWorkerPool {
+    BoundedWorkerPool::new(1, 2)
+}
+
 /// Occupy the pool's only worker with a job parked until the returned sender
 /// fires, returning once that job has started.
 pub(crate) fn park_the_worker(
@@ -68,7 +75,7 @@ fn ready_outcome_observed_at_the_deadline_is_refused() {
 
 #[test]
 fn queued_job_is_skipped_after_its_deadline() {
-    let pool = Arc::new(BoundedWorkerPool::new(1, 1));
+    let pool = Arc::new(single_worker_pool());
     let (release, caller) = park_the_worker(&pool);
     let ran = Arc::new(AtomicBool::new(false));
     let observed = Arc::clone(&ran);
