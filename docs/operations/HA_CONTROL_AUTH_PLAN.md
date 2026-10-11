@@ -53,7 +53,7 @@ This is not full consensus. It is a deterministic leader plus repair loop. The g
 
 ### 2. Leader rule
 
-The write leader is the lexicographically smallest healthy advertised URL in the cluster membership set.
+The write leader is the lexicographically smallest healthy advertised URL in the cluster membership set, ranking nodes that advertise signing custody first.
 
 Why:
 

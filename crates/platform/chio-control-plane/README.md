@@ -29,10 +29,12 @@ Clustered trust reads also require current quorum. The elected leader needs
 live signing custody of its authenticated head and enough authenticated peer
 chain agreements observed in its current term to reach quorum. Each agreement
 binds the configured peer's advertised self URL before and after its envelope;
-an alias for one logical node cannot supply another authority vote. Key possession
-and URL election alone cannot authorize a returning former custodian. Known
-authenticated newer or conflicting history prevents old-head serving even if
-its import refuses replay or that peer later becomes unreachable. A peer with
+an alias for one logical node cannot supply another authority vote. Election
+ranks nodes advertising signing custody ahead of lower URLs; the rank authorizes
+nothing. Key possession and URL election alone cannot authorize a returning
+former custodian. Known authenticated newer or conflicting history prevents
+old-head serving even if its import refuses replay or that peer later becomes
+unreachable. A peer with
 an authority error contributes no agreement; a fresh signed majority can still
 admit the leader after a minority's transport failure.
 Refused signed-history evidence retains the maximal authenticated chain within

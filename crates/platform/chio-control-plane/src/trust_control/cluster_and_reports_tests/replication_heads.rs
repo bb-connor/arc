@@ -57,6 +57,7 @@ fn status_advertises_contiguous_ack_heads() {
         quorum_size: 2,
         reachable_nodes: 2,
         election_term: 1,
+        signing_custody: false,
         authority_lease: None,
         replication: ClusterReplicationHeadsView::default(),
         peers: Vec::new(),

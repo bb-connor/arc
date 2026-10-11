@@ -16,6 +16,7 @@ pub(crate) async fn handle_internal_cluster_status(
             "cluster replication is not configured",
         );
     };
+    let signing_custody = super::authority_evidence::refresh_signing_custody_on_lane(&state).await;
     let (consensus, authority_lease) = cluster_consensus_and_authority_lease_view(&state)
         .unwrap_or_else(|| {
             (
@@ -115,6 +116,7 @@ pub(crate) async fn handle_internal_cluster_status(
         quorum_size: consensus.quorum_size,
         reachable_nodes: consensus.reachable_nodes,
         election_term: consensus.election_term,
+        signing_custody,
         authority_lease,
         replication,
         peers,
@@ -206,6 +208,7 @@ pub(crate) fn build_cluster_state(
                     "authority lease duration exceeds milliseconds field".to_owned(),
                 )
             })?,
+        signing_custody: false,
     }))))
 }
 
@@ -463,20 +466,21 @@ pub(crate) fn compute_cluster_consensus_locked(
     let now = clock_now;
     let lease_ttl_secs = Duration::from_millis(cluster.lease_ttl_ms).as_secs().max(1);
     let quorum_size = cluster.peers.len().div_ceil(2) + 1;
-    let mut candidates = vec![cluster.self_url.clone()];
+    // Signing custodians outrank lower URLs. Rank grants no serving authority.
+    let mut candidates = vec![(!cluster.signing_custody, cluster.self_url.clone())];
     for (peer_url, peer_state) in &cluster.peers {
         let contact_is_fresh = peer_state
             .last_contact_at
             .is_some_and(|last_contact_at| now <= last_contact_at.saturating_add(lease_ttl_secs));
         if peer_state.health.is_reachable() && !peer_state.partitioned && contact_is_fresh {
-            candidates.push(peer_url.clone());
+            candidates.push((!peer_state.signing_custody, peer_url.clone()));
         }
     }
     candidates.sort();
     let reachable_nodes = candidates.len();
     let has_quorum = reachable_nodes >= quorum_size;
     let leader_url = if has_quorum {
-        candidates.first().cloned()
+        candidates.into_iter().next().map(|(_, url)| url)
     } else {
         None
     };

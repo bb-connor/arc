@@ -166,10 +166,11 @@ not part of the Rust API) for `authority_handlers`, `budget_handlers`,
 ### Cluster replication
 
 1. `cluster::consensus::compute_cluster_consensus_locked` recomputes the
-   leader on every status check: the lowest-sorted URL among peers that are
-   reachable, unpartitioned, and inside the lease TTL. This is a deterministic
-   pick over the locally observed peer set, not a voted election - there is no
-   term voting, log replication, or election RPC.
+   leader on every status check: among peers that are reachable,
+   unpartitioned, and inside the lease TTL, nodes advertising signing custody
+   of their own authenticated head rank first, then the lowest-sorted URL.
+   This is a deterministic pick over the locally observed peer set, not a
+   voted election - there is no term voting, log replication, or election RPC.
 2. `cluster::deltas::run_cluster_sync_loop` runs a serial per-peer pull round
    (via `tokio::task::spawn_blocking` around a synchronous `ureq` client) for
    cluster status, budget/tool-receipt/child-receipt/lineage/revocation
