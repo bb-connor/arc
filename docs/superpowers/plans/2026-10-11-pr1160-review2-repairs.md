@@ -181,11 +181,11 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Use one backend size constant, serialize an isolated candidate including its newline, refuse before publishing oversized bytes, and publish live state only after successful persistence.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
-- [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
-- [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
-- [ ] Compose into the replacement batch and reconcile its ledger state.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Establish a bounded failing control on the unchanged predecessor.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
+- [x] Compose into the replacement batch and reconcile its ledger state.
 
 ### R2-012: Cage artifact opening can block on a FIFO before rejecting its type
 
@@ -294,6 +294,8 @@ For each row below: read its frozen source and verifier, establish an exact boun
 **Required correction:** Use one validated private internal staging directory on the same device. Tag the newly created inode before writing, then fsync and publish with no-replace semantics, syncing both parents. Authenticate non-empty staging objects before reclaiming; recover the empty create-before-tag state only within enforced internal-directory custody. Check descriptor ACL authority on Darwin. Preserve every unproven final object and test each interrupted-write stage.
 
 **Descriptor ownership:** The dependency gate forbids the decoy engine from reaching platform crates. Move the existing Darwin ACL inspector and its tests unchanged from `chio-sqlite-file-identity` into the small core `chio-file-custody` utility, depending only on `libc`. Existing consumers call that owner directly; SQLite VFS inspection remains in its original crate. Root owns workspace/lock updates and the decoy hook after Claude releases its staging repair. Verify unchanged inspector bytes, dependency layering, portable tests, strict lint and native Darwin controls before publication.
+
+**Concurrent retry:** Each materialization opens and locks a fresh validated staging-directory descriptor nonblockingly before touching the stage or verifying an existing final file. Keep that descriptor alive through file and directory syncs and receipt verification. Contention returns the existing typed `Io(WouldBlock)` error. Preserve the genuine two-caller Original, same-instance contention, unchanged stage inode/content, exact final receipt and descriptor-drop recovery controls.
 
 - [ ] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.

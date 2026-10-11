@@ -39,6 +39,10 @@ records 18 focused controls, 85 security-kernel tests, 1,668 kernel tests,
 58-name inventory refuses that output; the updated inventory accepts it.
 Temporary runner and initial test-fixture lint failures remain recorded.
 
+The [runtime JSON audit](audits/review2-runtime-json-qualified-20261011.json)
+records both overflow Originals, 309 library/integration tests, Criterion smoke
+and strict owning lint. The initial benchmark-wrapper failure remains recorded.
+
 Publication is held for the remaining confirmed repairs and local composition
 gates. Exact-head hosted qualification, documented readiness residuals and
 Connor's explicit merge go-ahead remain outstanding.
