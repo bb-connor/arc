@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,11 +16,11 @@ import (
 func TestManifestSizeRefusesBeforeAllowedFieldCopy(t *testing.T) {
 	// The allowed value would be copied before the missing-field check unless
 	// the public decoder refuses the whole artifact before preflight starts.
-	payload := []byte(`{"manifest":{"input_schema":"` + strings.Repeat("x", 1<<20) + `"}}`)
+	payload := []byte(`{"manifest":{"input_schema":"` + strings.Repeat("x", maxSecurityWireBytes) + `"}}`)
 	manifest := SecuritySignedToolManifestV2{SignerKey: "retained-key"}
 	want := manifest
 	err := manifest.UnmarshalJSON(payload)
-	if err == nil || err.Error() != "security wire artifact exceeds one MiB" {
+	if !errors.Is(err, errSecurityWireTooLarge) {
 		t.Fatalf("expected size refusal before field decoding, got %v", err)
 	}
 	if !reflect.DeepEqual(manifest, want) {
@@ -47,14 +48,14 @@ func TestManifestExactSizeBoundaryPreservesValidFields(t *testing.T) {
 		if err := json.Unmarshal(fixture.Instance, &want); err != nil {
 			t.Fatal(err)
 		}
-		padded := append(bytes.Clone(fixture.Instance), bytes.Repeat([]byte(" "), (1<<20)-len(fixture.Instance))...)
+		padded := append(bytes.Clone(fixture.Instance), bytes.Repeat([]byte(" "), (maxSecurityWireBytes)-len(fixture.Instance))...)
 		if err := manifest.UnmarshalJSON(padded); err != nil {
 			t.Fatalf("exact one MiB valid manifest was refused: %v", err)
 		}
 		if !reflect.DeepEqual(manifest, want) {
 			t.Fatal("size-boundary decoding changed manifest fields")
 		}
-		if err := manifest.UnmarshalJSON(append(padded, ' ')); err == nil || err.Error() != "security wire artifact exceeds one MiB" {
+		if err := manifest.UnmarshalJSON(append(padded, ' ')); !errors.Is(err, errSecurityWireTooLarge) {
 			t.Fatalf("expected exact size refusal above one MiB, got %v", err)
 		}
 		if !reflect.DeepEqual(manifest, want) {

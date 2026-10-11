@@ -3,6 +3,7 @@ package chio
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -119,8 +120,8 @@ func TestProtocolWireBoundsAndOpaqueDuplicatesReject(t *testing.T) {
 		}
 	}
 	var extension CapabilitySupplementalAuthorization
-	if err := json.Unmarshal([]byte(`{"signed_extension":"`+strings.Repeat("a", 1<<20)+`"}`), &extension); err == nil {
-		t.Fatal("accepted oversized security artifact")
+	if err := json.Unmarshal([]byte(`{"signed_extension":"`+strings.Repeat("a", maxSecurityWireBytes)+`"}`), &extension); !errors.Is(err, errSecurityWireTooLarge) {
+		t.Fatalf("expected oversized security artifact refusal, got %v", err)
 	}
 }
 

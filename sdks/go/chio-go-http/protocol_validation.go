@@ -8,6 +8,7 @@ package chio
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -15,6 +16,8 @@ import (
 )
 
 const maxSecurityWireBytes = 1 << 20
+
+var errSecurityWireTooLarge = errors.New("security wire artifact exceeds one MiB")
 
 // readProtocolValue retains exact numbers and rejects duplicate keys at every
 // depth, including otherwise opaque objects. The bounded profile permits up to
@@ -143,7 +146,7 @@ func checkProtocolShape(value any, shape reflect.Type) error {
 
 func decodeProtocolObject(data []byte, target any) error {
 	if len(data) > maxSecurityWireBytes {
-		return fmt.Errorf("security wire artifact exceeds one MiB")
+		return errSecurityWireTooLarge
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()

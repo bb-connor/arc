@@ -16,7 +16,7 @@ import (
 // the same decoder, while arbitrary input/output JSON Schemas remain opaque.
 func decodeManifestObject(data []byte, target any, required, optional []string) error {
 	if len(data) > maxSecurityWireBytes {
-		return fmt.Errorf("security wire artifact exceeds one MiB")
+		return errSecurityWireTooLarge
 	}
 	allowed := make(map[string]bool, len(required)+len(optional))
 	for _, name := range required {
