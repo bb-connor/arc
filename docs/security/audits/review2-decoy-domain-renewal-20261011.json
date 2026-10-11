@@ -1,0 +1,100 @@
+{
+  "schema": "chio.security.review2-decoy-domain-renewal.v1",
+  "observed_utc": "2026-10-11T03:33:50.384393+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-019"
+  ],
+  "source_checkpoint": "5c56c769d5f72c7a62254f254afc6246eba8827f",
+  "domain_commit": "75b5918b1af51e2a17181c54ed1b4180e00f00a6",
+  "source": {
+    "crates/security/chio-decoy/src/materialize.rs": "314a67bdd207fe4fd0e42d30523454c3974a170b8ee87a0063689261df3449b9"
+  },
+  "native_materialization": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/00-tree.txt",
+    "sha256": "9852ee99b57d0d27a7f04b5dd8bfbd9141a216bdd8c17a4625187820e9545156",
+    "scope": "Recorded ed76 base with one uncommitted production domain hunk; this is a source overlay, not a clean Git checkout."
+  },
+  "manifest": {
+    "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/SHA256SUMS",
+    "sha256": "252fb1122f86d8eac7dd10b453023ab6404b78f9bf93bb52890bf776a3f90dfc",
+    "scope": "Every file hash independently verified by Root."
+  },
+  "native_logs": [
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/10-decoy-all.log",
+      "sha256": "01e6a8f0ece515adb2612d3b2e95b1feb90490b47d87a24a127991e10a529c6d",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/11-decoy-all-rep1.log",
+      "sha256": "5e774f6fcad1a95b4356a075d8778c1a40c02b7c2211d8d63b457ef385b7db60",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/11-decoy-all-rep2.log",
+      "sha256": "347fbf53bfe085fc862571099acafa9966339ca108aeff84a7c7f86714407f0b",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/11-decoy-all-rep3.log",
+      "sha256": "60efbef057736fecd3e5beaa300f703fe73707f41ad377e270616c34ab1c99d8",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/11-decoy-all-rep4.log",
+      "sha256": "1d8c9df42f4569e2061e2f8daa0f1bef592323548c461028626a833677edde59",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/11-decoy-all-rep5.log",
+      "sha256": "ad5275e35648301e26325fb9448be479d82c363be9e1e9e56cd054ba6883f614",
+      "scope": "Native Darwin recorded execution.",
+      "passed": 70,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/12-clippy-strict.log",
+      "sha256": "5df458551ea9e37f855067e8e7e39aaceb0c6f8a73c415250415d472449755c8",
+      "scope": "Native Darwin recorded execution.",
+      "exit": 0
+    },
+    {
+      "path": "/home/connor/lanes/claude-pr1160-evidence/r2-darwin-native/75b5/13-fmt.log",
+      "sha256": "fba2a9606b9c82323f83308f5d477eaa9eb83a8709aaf642aa825f96ca6d9133",
+      "scope": "Native Darwin recorded execution.",
+      "exit": 0
+    }
+  ],
+  "summary": "Native macOS 26.4 arm64, Rust 1.95: full decoy suite 70/0/0, five further full parallel reruns each 70/0/0, strict all-target Clippy for decoy and file-custody, formatting passed.",
+  "composition_limit": "Current production materialize.rs matches the recorded overlay exactly. The only other decoy/file-custody difference from ed76 is a test comment clarifying inherited-descriptor lock lifetime; no test or production behavior differs there. No labeled before/after source manifest was provided.",
+  "prior_evidence": {
+    "path": "/home/connor/lanes/pr1160-landing-final/docs/security/audits/review2-decoy-qualified-20261011.json",
+    "sha256": "4480529e33ebfae091ebb2eb53c8a6d7108483e5c451a9e4a47a149497a669db",
+    "scope": "Historical pre-domain qualification and actual earlier failures remain unchanged."
+  },
+  "linux_renewed": false,
+  "native_domain_renewed": true,
+  "hosted_qualified": false,
+  "merged": false,
+  "remaining_acceptance": [
+    "Renew Linux owning/strict and actual deception boundary for the corrected domain.",
+    "Complete exact replacement hosted qualification and obtain Connor merge go-ahead."
+  ]
+}

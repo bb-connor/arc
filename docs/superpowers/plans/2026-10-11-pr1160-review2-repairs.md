@@ -311,11 +311,15 @@ For each row below: read its frozen source and verifier, establish an exact boun
 
 **Required correction:** Start one enforceable budget before DNS and carry remaining time into HTTP, using resolution whose lifetime is bounded. Keep checked-address pinning. Merely timing out the await does not reclaim the worker/permit.
 
-- [ ] Confirm current source and owning contract; record disputed scope precisely.
+- [x] Confirm current source and owning contract; record disputed scope precisely.
 - [ ] Establish a bounded failing control on the unchanged predecessor.
-- [ ] Implement and review the minimal correction; preserve healthy and denial paths.
+- [x] Implement and review the minimal correction; preserve healthy and denial paths.
 - [ ] Pass focused owner tests and strict lint; record native/unavailable evidence distinctly.
 - [ ] Compose into the replacement batch and reconcile its ledger state.
+
+Source is privately integrated with independent review; the fixed-pool contract
+bounds retained work without hard cancellation. Final Originals and owning/strict
+evidence are pending. Initial Tokio blocking-queue time is outside the fetch budget.
 
 ### R2-021: Candidate copy bounds ignore Git tree metadata and empty-file count
 

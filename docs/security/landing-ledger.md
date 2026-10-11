@@ -56,8 +56,12 @@ records independently reviewed repairs for R2-002, R2-003, R2-008, R2-018,
 R2-023 and R2-025. Their source is integrated privately; final owning tests,
 strict lint and retained Originals remain the acceptance boundary. The related
 signing-custody election correction is also staged with source approval and
-runtime evidence pending. R2-020 has only its receipt-preserving worker
-extraction integrated; its issuer DNS repair remains open.
+runtime evidence pending. The [issuer fetch composition](audits/review2-issuer-fetch-composition-20261011.json)
+now includes the reviewed DNS-through-decode deadline and bounded worker repair.
+Queued expired receipt jobs are refused under the recorded scope decision;
+started writes continue. Original/runtime and strict acceptance remain pending.
+The worker cap does not hard-cancel a stuck transport, and initial Tokio queue
+time remains outside the fetch deadline.
 
 The [second source composition audit](audits/review2-source-composition-wave2-20261011.json)
 adds reviewed custody reclamation, repeated-effect simulation, Anthropic ingress,
@@ -73,7 +77,10 @@ Native macOS passes 70 executions, ten full parallel reruns and strict lint.
 Earlier failures and the recorded-clean native source boundary remain explicit.
 A later structural check found the new staging domain outside the existing
 NUL-terminated naming convention. Its tag is corrected and the unchanged domain
-check passes; Linux and native qualification of those new bytes remains pending.
+check passes. The [native domain renewal](audits/review2-decoy-domain-renewal-20261011.json)
+verifies a matching source overlay with 70 passing executions, five additional
+full reruns and strict lint. Linux owning, strict and deception-boundary renewal
+of those new bytes remains pending.
 
 The [native cold-map preparation audit](audits/native-cold-map-preparation-20261011.json)
 records 26 passing controls, six runtime-killed mutants, strict lint and

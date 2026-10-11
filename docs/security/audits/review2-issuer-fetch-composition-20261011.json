@@ -1,0 +1,85 @@
+{
+  "schema": "chio.security.review2-issuer-fetch-composition.v1",
+  "observed_utc": "2026-10-11T03:33:50.384393+00:00",
+  "requirement_ids": [],
+  "evidence_requirement_ids": [
+    "incoming-pr1160-review2-20261011:R2-020"
+  ],
+  "source_checkpoint": "5c56c769d5f72c7a62254f254afc6246eba8827f",
+  "source_repair": {
+    "checkpoint": "5c56c769d5f72c7a62254f254afc6246eba8827f",
+    "commits": [
+      "8e961918edd201bab8ffe9cee1cda1fef20517a2",
+      "08866695b6e5d9d9dcefc4b28d39040f3e110bf0",
+      "ed44acbfbbe9b18a851502f12839c18ef28bfb6a",
+      "f48583a28134790c4685e29ef5e30a31bd1a9ba2",
+      "8708c44238ec899d6052a248c3a036bf1e51b583"
+    ],
+    "producer_commits": [
+      "8ca534a329c5ac969ab43a934dcdc116d3e2e8ea",
+      "4bd3cf910478343fa9993b69986ce0354e871dda",
+      "0674dcc370dc4b84bcb340a440f4a463ec1a579d",
+      "39bcbef87671d3f273fe6832694de9dd860bae32"
+    ],
+    "superseded_not_integrated": "2b02e22c7421a0f8dacc466268d96a06a71dc619",
+    "files": [
+      "crates/platform/chio-control-plane/src/bounded_worker_pool.rs",
+      "crates/platform/chio-control-plane/src/bounded_worker_pool_tests.rs",
+      "crates/platform/chio-control-plane/src/lib.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch_tests.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs",
+      "docs/security/trust-boundary-inventory.json"
+    ],
+    "file_sha256": {
+      "crates/platform/chio-control-plane/src/bounded_worker_pool.rs": "38d26f5f7781373bf94cae9dcb155e9d4038defadb107ff7a87acd2ef12854ee",
+      "crates/platform/chio-control-plane/src/bounded_worker_pool_tests.rs": "91989c11fc9232ae164ba79fc3058946893babb7fe2a133b0db4d3b5ad1d8a67",
+      "crates/platform/chio-control-plane/src/lib.rs": "6b5cfe84bf6f8cf2de411eedd5846110c4c745c91c1b354326fa57a9bb62c5ae",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs": "4a2759df2c700d4bd0345872ff1e35bfe447e0b5a304628edfb09dea7841a064",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch_tests.rs": "dc8db49bd810fcc99e8a700f76a6342911425033de4881cee0be31a390ac85ee",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs": "a3d3ceb86128dbabfbcbca31690cb055de22cc4bbb4e1ec1ac90e32512069e3e",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs": "44f13abcb05768ccf8f04aed7a9d20138981aa2fc430b809debe3c35e4bd68f0",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "b021166a62603bdf8df8e5cc41844537e1a0831b0af2171b1314802caf3abd88",
+      "docs/security/trust-boundary-inventory.json": "4cdd7f7aa0b18f6743b1668acec98a7f8dcdbe06f032e1dc36fc6b22b4030681"
+    }
+  },
+  "contract": [
+    "One checked absolute deadline bounds submission, queued callback admission and final observation of DNS, checked-address pinning, TLS, bounded body read and decoding.",
+    "A fixed pool retains at most sixteen physical workers and sixteen queued jobs. Expired unstarted jobs do not execute. A timed-out started job retains its physical worker until actual completion.",
+    "The outer fetch waiter releases its semaphore permit when the deadline wait returns. Initial Tokio blocking-queue time is outside this deadline; cancellation does not immediately release that waiter permit.",
+    "Root explicitly authorized queued receipt expiry. Started writes continue; unchanged Timeout mapping and traced failure propagation refuse dispatch or local success projection when the write or snapshot fails."
+  ],
+  "independent_source_review": {
+    "path": "/tmp/pr1160-final-review-20261009/final-candidate-v2/r2-020-final-source-review-39bcbef87671.md",
+    "sha256": "11a8a60222252cc7e74e70724cac38f14f4db8adc04a7ce58815f4884d08fa79",
+    "scope": "Bounded source approval of final producer; no runtime execution by reviewer."
+  },
+  "composition_notes": [
+    "Root comment-only follow-up describes bounded retained workers without claiming transport hard cancellation.",
+    "The shared state file also contains the separately reviewed signing-custody election fields. The trust inventory also includes independently verified reader relocation and cold-map test edges."
+  ],
+  "static_evidence": [
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/trust-boundaries-composed-39bc.log",
+      "sha256": "e8086932b2921312c8030f13c66704b798492939ce16ad2acf25c5ea5b420a53",
+      "scope": "Composed checker passed: 497 constructors, 88 tenant tables, 181 SQL contracts."
+    },
+    {
+      "path": "/tmp/pr1160-ci-batch-20261010/format-composed-39bc.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "Composed cargo fmt --all -- --check exited zero."
+    }
+  ],
+  "limits": [
+    "The stalled TLS control models blocked work; it is not a live TLS trickle probe.",
+    "The helper unit control verifies the final observation guard. The end-to-end late-success case does not independently demonstrate that guard because its receive may time out first.",
+    "Thread-spawn panic, job-panic worker loss and reclamation of stuck native workers are not repaired by this change.",
+    "Producer genuine Originals, runtime gates and composed owning/strict qualification remain pending."
+  ],
+  "source_reviewed": true,
+  "runtime_qualified": false,
+  "hosted_qualified": false,
+  "merged": false
+}
