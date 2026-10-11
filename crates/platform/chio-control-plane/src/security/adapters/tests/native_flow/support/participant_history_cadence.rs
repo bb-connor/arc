@@ -11,7 +11,7 @@ const CALLS: usize = 16;
 const EVENTS_PER_CALL: [u64; 4] = [1, 2, 1, 1];
 /// Declared checkpoint contract: when a call's flow resolution starts, the
 /// verified suffix retains at most this many completed calls past its seal.
-const CHECKPOINT_CADENCE_CALLS: u64 = 4;
+const CHECKPOINT_CADENCE_CALLS: u64 = 0;
 const FAMILIES: [&str; 4] = [
     "security_participant_state",
     "security_participant_egress",

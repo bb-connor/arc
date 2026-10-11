@@ -4,7 +4,7 @@ use super::*;
 use std::collections::BTreeSet;
 
 /// Head room above the steady state. Automatic maintenance seals the suffix
-/// every twenty events, and one invocation appends three (join, acquire,
+/// every five events, and one invocation appends three (join, acquire,
 /// commit) while creating one transition row and one fence row.
 const MARGIN: u64 = 24;
 /// Over twice the head room in finished rows: far beyond anything the budget could

@@ -1,9 +1,9 @@
 use super::*;
 use chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1;
 
-// A completed native call appends five family events. Maintenance runs before
-// the next invocation's fence, retaining at most four completed calls' suffix.
-const EVENTS_BETWEEN_CHECKPOINTS: u64 = 20;
+/// Most anchored family events one native call appends: nonce preflight,
+/// input join, egress acquisition and commitment, and output join.
+const MAX_EVENTS_PER_CALL: u64 = 5;
 
 pub(super) enum Selection<'a> {
     Initialization(&'a SecurityParticipantStateInitialization),
@@ -29,6 +29,9 @@ impl Selection<'_> {
     }
 }
 
+/// Maintenance runs before each invocation's fence. Sealing once the suffix
+/// holds a full call keeps every verification inside that fence replaying at
+/// most one call's events, whatever the session length.
 pub(super) fn due(events: i64) -> Result<bool, AdmissionOperationStoreError> {
-    Ok(u64::try_from(events).map_err(invalid)? >= EVENTS_BETWEEN_CHECKPOINTS)
+    Ok(u64::try_from(events).map_err(invalid)? >= MAX_EVENTS_PER_CALL)
 }
