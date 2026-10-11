@@ -18152,9 +18152,9 @@
       "handle_internal_cluster_partition::request-json::ClusterPartitionRequest"
     ],
     "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs": [
-      "fetch_portable_issuer_jwks::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
-      "resolve#1::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs::fetch_portable_issuer_jwks",
-      "resolve#2::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+      "fetch#1::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs::fetch_portable_issuer_jwks",
+      "fetch#2::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
+      "fetch_portable_issuer_jwks::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
     ],
     "crates/platform/chio-control-plane/src/trust_control/finding_admission_view.rs": [
       "current_admission_view::original-json-reader::UntrustedJsonText",
