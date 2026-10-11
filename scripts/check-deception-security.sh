@@ -38,13 +38,17 @@ run_exact_target --label "decoy materialization" --expected \
   foreign_existing_file_is_never_adopted_even_when_content_matches \
   hardlink_invalidates_retry_and_cleanup \
   identity_or_key_rebinding_cannot_adopt_an_existing_file \
+  interrupted_staging_is_recovered_by_exact_retry \
   materialize_creates_restrictive_tree_and_exact_retry_is_idempotent \
   materialize_rejects_empty_or_nul_operation_identity \
   materialize_rejects_unsafe_relative_paths_before_mutation \
   ordinary_cleanup_removes_only_the_proven_owned_file \
   ownership_key_debug_never_exposes_secret_bytes \
   ownership_receipt_round_trips_non_utf8_paths_and_remains_authoritative \
+  staging_directory_must_be_private \
+  staging_recovery_never_deletes_unproven_final_object \
   symlink_root_component_and_final_entry_are_rejected \
+  untagged_staging_object_is_refused_and_preserved \
   -- cargo test -p chio-decoy --test materialize
 
 run_exact_target --label "sealed decoy registry API" --expected \

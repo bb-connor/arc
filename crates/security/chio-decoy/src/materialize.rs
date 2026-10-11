@@ -278,6 +278,26 @@ mod unix {
     const QUARANTINE_DOMAIN: &[u8] = b"chio-decoy-quarantine-name-v1";
     const OWNERSHIP_XATTR: &str = "user.chio.decoy.owner.v1";
     const QUARANTINE_DIRECTORY: &[u8] = b".chio-decoy-quarantine";
+    /// Holds in-flight stages. A stage of an operation that is never retried
+    /// stays here; exact retry is the only reclamation path.
+    const STAGING_DIRECTORY: &[u8] = b".chio-decoy-stage";
+    const STAGING_DOMAIN: &[u8] = b"chio-decoy-staging-name-v1";
+    #[cfg(any(
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "dragonfly"
+    ))]
+    const MISSING_XATTR: rustix::io::Errno = rustix::io::Errno::NOATTR;
+    #[cfg(not(any(
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "dragonfly"
+    )))]
+    const MISSING_XATTR: rustix::io::Errno = rustix::io::Errno::NODATA;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct RootIdentity {
@@ -355,35 +375,64 @@ mod unix {
             &self,
             request: &MaterializationRequest<'_>,
         ) -> Result<MaterializationReceipt, MaterializeError> {
-            validate_identity(request.identity)?;
-            let parsed = parse_relative_path(request.relative_path)?;
-            let (parent, basename) = self
-                .walk_parent(&parsed, true)?
-                .ok_or(MaterializeError::MetadataMismatch)?;
+            let (parent, basename) = self.materialization_parent(request)?;
             let content_digest = digest_bytes(request.content);
+            if let EntryState::Present(file) = open_file_at(&parent, basename)? {
+                return self.verify_retry(file, request, content_digest);
+            }
 
-            match openat(
+            let staging = self
+                .open_internal_directory(STAGING_DIRECTORY, true)?
+                .ok_or(MaterializeError::MetadataMismatch)?;
+            let staging_name = self.staging_name(request)?;
+            let proof = self.stage_file(&staging, &staging_name, request, content_digest)?;
+            if let Err(error) = rename_no_replace(
+                &staging,
+                &staging_name,
                 &parent,
                 basename,
-                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-                Mode::RUSR | Mode::WUSR,
+                MaterializeError::ForeignExisting,
+                "publish materialized file",
             ) {
-                Ok(descriptor) => self.finish_created_file(
-                    &parent,
-                    File::from(descriptor),
-                    request,
-                    content_digest,
-                ),
-                Err(error) if error == rustix::io::Errno::EXIST => {
-                    let file = match open_file_at(&parent, basename)? {
-                        EntryState::Present(file) => file,
-                        EntryState::Missing => return Err(MaterializeError::MetadataMismatch),
-                    };
-                    self.verify_retry(file, request, content_digest)
-                }
-                Err(error) if error == rustix::io::Errno::LOOP => Err(MaterializeError::Symlink),
-                Err(error) => Err(errno_error("create materialized file", error)),
+                self.discard_staging(&staging, &staging_name, request, content_digest)?;
+                return Err(error);
             }
+            sync_file(&parent, "sync materialization parent")?;
+            sync_file(&staging, "sync materialization staging directory")?;
+
+            let parsed = parse_relative_path(request.relative_path)?;
+            let (rooted_parent, rooted_basename) = self
+                .walk_parent(&parsed, false)?
+                .ok_or(MaterializeError::MetadataMismatch)?;
+            let published = match open_file_at(&rooted_parent, rooted_basename)? {
+                EntryState::Present(published) => published,
+                EntryState::Missing => return Err(MaterializeError::MetadataMismatch),
+            };
+            let receipt = MaterializationReceipt {
+                identity: request.identity.clone(),
+                proof,
+            };
+            self.verify_receipt_file(&published, &receipt)?;
+            Ok(receipt)
+        }
+
+        #[cfg(test)]
+        pub fn stage_without_publish_for_test(
+            &self,
+            request: &MaterializationRequest<'_>,
+        ) -> Result<(), MaterializeError> {
+            self.materialization_parent(request)?;
+            let staging = self
+                .open_internal_directory(STAGING_DIRECTORY, true)?
+                .ok_or(MaterializeError::MetadataMismatch)?;
+            let staging_name = self.staging_name(request)?;
+            self.stage_file(
+                &staging,
+                &staging_name,
+                request,
+                digest_bytes(request.content),
+            )
+            .map(|_| ())
         }
 
         pub fn cleanup(
@@ -400,16 +449,18 @@ mod unix {
                     EntryState::Present(file) => {
                         self.verify_receipt_file(&file, request.receipt)?;
                         let quarantine = self
-                            .open_quarantine(true)?
+                            .open_internal_directory(QUARANTINE_DIRECTORY, true)?
                             .ok_or(MaterializeError::MetadataMismatch)?;
                         if entry_exists(&quarantine, &quarantine_name)? {
                             return Err(MaterializeError::QuarantineConflict);
                         }
-                        self.rename_to_quarantine(
+                        rename_no_replace(
                             &parent,
                             basename,
                             &quarantine,
                             &quarantine_name,
+                            MaterializeError::QuarantineConflict,
+                            "quarantine materialized file",
                         )?;
                         sync_file(&parent, "sync materialization parent")?;
                         sync_file(&quarantine, "sync cleanup quarantine")?;
@@ -438,7 +489,7 @@ mod unix {
             let quarantine_name = self.quarantine_name(request.receipt)?;
             let Some((parent, basename)) = self.walk_parent(&parsed, false)? else {
                 let quarantine = self
-                    .open_quarantine(false)?
+                    .open_internal_directory(QUARANTINE_DIRECTORY, false)?
                     .ok_or(MaterializeError::MetadataMismatch)?;
                 return self.verify_receipt_entry(&quarantine, &quarantine_name, request.receipt);
             };
@@ -446,50 +497,72 @@ mod unix {
                 EntryState::Present(file) => {
                     self.verify_receipt_file(&file, request.receipt)?;
                     let quarantine = self
-                        .open_quarantine(true)?
+                        .open_internal_directory(QUARANTINE_DIRECTORY, true)?
                         .ok_or(MaterializeError::MetadataMismatch)?;
                     if entry_exists(&quarantine, &quarantine_name)? {
                         return Err(MaterializeError::QuarantineConflict);
                     }
-                    self.rename_to_quarantine(&parent, basename, &quarantine, &quarantine_name)?;
+                    rename_no_replace(
+                        &parent,
+                        basename,
+                        &quarantine,
+                        &quarantine_name,
+                        MaterializeError::QuarantineConflict,
+                        "quarantine materialized file",
+                    )?;
                     sync_file(&parent, "sync materialization parent")?;
                     sync_file(&quarantine, "sync cleanup quarantine")?;
                     self.verify_receipt_entry(&quarantine, &quarantine_name, request.receipt)
                 }
                 EntryState::Missing => {
                     let quarantine = self
-                        .open_quarantine(false)?
+                        .open_internal_directory(QUARANTINE_DIRECTORY, false)?
                         .ok_or(MaterializeError::MetadataMismatch)?;
                     self.verify_receipt_entry(&quarantine, &quarantine_name, request.receipt)
                 }
             }
         }
 
-        fn finish_created_file(
+        fn materialization_parent<'a>(
             &self,
-            parent: &File,
-            mut file: File,
+            request: &MaterializationRequest<'a>,
+        ) -> Result<(File, &'a OsStr), MaterializeError> {
+            validate_identity(request.identity)?;
+            let parsed = parse_relative_path(request.relative_path)?;
+            self.walk_parent(&parsed, true)?
+                .ok_or(MaterializeError::MetadataMismatch)
+        }
+
+        /// Writes the complete, tagged and durable file under the staging name.
+        /// The staging directory shares the root's device, so the publish
+        /// rename preserves the inode and every attribute the proof binds.
+        fn stage_file(
+            &self,
+            staging: &File,
+            staging_name: &OsStr,
             request: &MaterializationRequest<'_>,
             content_digest: [u8; 32],
-        ) -> Result<MaterializationReceipt, MaterializeError> {
+        ) -> Result<FileOwnershipProof, MaterializeError> {
+            self.discard_staging(staging, staging_name, request, content_digest)?;
+            let mut file = match openat(
+                staging,
+                staging_name,
+                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::RUSR | Mode::WUSR,
+            ) {
+                Ok(descriptor) => File::from(descriptor),
+                Err(error) if error == rustix::io::Errno::LOOP => {
+                    return Err(MaterializeError::Symlink);
+                }
+                Err(error) => {
+                    return Err(errno_error("create materialization staging file", error))
+                }
+            };
             fchmod(&file, Mode::RUSR | Mode::WUSR)
                 .map_err(|error| errno_error("set materialized file mode", error))?;
-            file.write_all(request.content)
-                .map_err(|error| io_error("write materialized file", error))?;
-
-            let metadata = regular_file_metadata(&file, MaterializeError::MetadataMismatch)?;
-            validate_owned_file_metadata(&metadata)?;
-            if metadata.size != usize_as_u64(request.content.len())? {
-                return Err(MaterializeError::MetadataMismatch);
-            }
-
-            let mut proof = self.proof_from_metadata(
-                request.relative_path,
-                metadata,
-                content_digest,
-                [0_u8; 32],
-            );
-            proof.ownership_tag = self.ownership_tag(request.identity, &proof)?;
+            let created = regular_file_metadata(&file, MaterializeError::MetadataMismatch)?;
+            validate_owned_file_metadata(&created)?;
+            let proof = self.staged_proof(request, created, content_digest)?;
             fsetxattr(
                 &file,
                 OWNERSHIP_XATTR,
@@ -497,23 +570,72 @@ mod unix {
                 XattrFlags::CREATE,
             )
             .map_err(|error| errno_error("set materialized ownership proof", error))?;
-            sync_file(&file, "sync materialized file")?;
-            sync_file(parent, "sync materialization parent")?;
+            file.write_all(request.content)
+                .map_err(|error| io_error("write materialized file", error))?;
 
-            let parsed = parse_relative_path(request.relative_path)?;
-            let (rooted_parent, rooted_basename) = self
-                .walk_parent(&parsed, false)?
-                .ok_or(MaterializeError::MetadataMismatch)?;
-            let reopened = match open_file_at(&rooted_parent, rooted_basename)? {
-                EntryState::Present(reopened) => reopened,
-                EntryState::Missing => return Err(MaterializeError::MetadataMismatch),
+            let written = regular_file_metadata(&file, MaterializeError::MetadataMismatch)?;
+            if !metadata_matches_proof(&written, &proof) {
+                return Err(MaterializeError::MetadataMismatch);
+            }
+            sync_file(&file, "sync materialized file")?;
+            Ok(proof)
+        }
+
+        /// The tag binds dev, ino, nlink, mode, uid, gid, the expected size and
+        /// the content digest, so it is set before any content is written and
+        /// authenticates a torn stage.
+        fn staged_proof(
+            &self,
+            request: &MaterializationRequest<'_>,
+            metadata: FileMetadata,
+            content_digest: [u8; 32],
+        ) -> Result<FileOwnershipProof, MaterializeError> {
+            let expected = FileMetadata {
+                size: usize_as_u64(request.content.len())?,
+                ..metadata
             };
-            let receipt = MaterializationReceipt {
-                identity: request.identity.clone(),
-                proof,
+            let mut proof = self.proof_from_metadata(
+                request.relative_path,
+                expected,
+                content_digest,
+                [0_u8; 32],
+            );
+            proof.ownership_tag = self.ownership_tag(request.identity, &proof)?;
+            Ok(proof)
+        }
+
+        /// Reclaims a prior stage of this request: a singly linked regular file
+        /// whose tag verifies, or one that is untagged and empty. Only the
+        /// root owner can create entries in the validated private staging
+        /// directory, and a stage is tagged before any content is written, so
+        /// an untagged empty entry is a stage interrupted before its tag.
+        /// Non-empty, foreign and tag-invalid entries are left in place.
+        fn discard_staging(
+            &self,
+            staging: &File,
+            staging_name: &OsStr,
+            request: &MaterializationRequest<'_>,
+            content_digest: [u8; 32],
+        ) -> Result<(), MaterializeError> {
+            let EntryState::Present(file) = open_file_at(staging, staging_name)? else {
+                return Ok(());
             };
-            self.verify_receipt_file(&reopened, &receipt)?;
-            Ok(receipt)
+            let metadata = regular_file_metadata(&file, MaterializeError::ForeignExisting)?;
+            if metadata.link_count != 1 {
+                return Err(MaterializeError::Hardlink);
+            }
+            match stored_ownership_tag(&file)? {
+                Some(tag) => {
+                    let proof = self.staged_proof(request, metadata, content_digest)?;
+                    self.verify_ownership_tag(request.identity, &proof, &tag)?;
+                }
+                None if metadata.size == 0
+                    && metadata.owner_user_id == self.root_identity.owner_user_id => {}
+                None => return Err(MaterializeError::OwnershipMismatch),
+            }
+            unlinkat(staging, staging_name, AtFlags::empty())
+                .map_err(|error| errno_error("discard materialization staging file", error))?;
+            sync_file(staging, "sync materialization staging directory")
         }
 
         fn verify_retry(
@@ -699,14 +821,21 @@ mod unix {
             update_frame(&mut mac, &receipt.proof.ownership_tag)?;
             update_u64(&mut mac, receipt.proof.root_device_id)?;
             update_u64(&mut mac, receipt.proof.root_inode)?;
-            let digest = mac.finalize().into_bytes();
-            let mut name = Vec::with_capacity(2 + digest.len() * 2);
-            name.extend_from_slice(b"q-");
-            for byte in digest {
-                name.push(lower_hex(byte >> 4));
-                name.push(lower_hex(byte & 0x0f));
-            }
-            Ok(OsString::from_vec(name))
+            Ok(keyed_name(b"q-", mac))
+        }
+
+        fn staging_name(
+            &self,
+            request: &MaterializationRequest<'_>,
+        ) -> Result<OsString, MaterializeError> {
+            let mut mac = new_mac(&self.ownership_key)?;
+            update_frame(&mut mac, STAGING_DOMAIN)?;
+            update_frame(&mut mac, request.identity.operation_id.as_bytes())?;
+            update_frame(&mut mac, request.identity.tenant_id.as_bytes())?;
+            update_frame(&mut mac, request.identity.artifact_id.as_bytes())?;
+            update_frame(&mut mac, &request.identity.version_hash)?;
+            update_frame(&mut mac, request.relative_path.as_os_str().as_bytes())?;
+            Ok(keyed_name(b"s-", mac))
         }
 
         fn walk_parent<'a>(
@@ -776,8 +905,14 @@ mod unix {
             Ok(())
         }
 
-        fn open_quarantine(&self, create: bool) -> Result<Option<File>, MaterializeError> {
-            let name = OsStr::from_bytes(QUARANTINE_DIRECTORY);
+        /// Opens a materializer-owned directory directly under the root and
+        /// requires it to be private to the root owner on the root's device.
+        fn open_internal_directory(
+            &self,
+            name: &[u8],
+            create: bool,
+        ) -> Result<Option<File>, MaterializeError> {
+            let name = OsStr::from_bytes(name);
             match open_directory_at(&self.root, name) {
                 Ok(directory) => {
                     self.validate_private_directory(&directory)?;
@@ -789,16 +924,19 @@ mod unix {
                         Ok(()) => true,
                         Err(mkdir_error) if mkdir_error == rustix::io::Errno::EXIST => false,
                         Err(mkdir_error) => {
-                            return Err(errno_error("create cleanup quarantine", mkdir_error));
+                            return Err(errno_error(
+                                "create materializer internal directory",
+                                mkdir_error,
+                            ));
                         }
                     };
                     let directory = open_directory_at(&self.root, name)
                         .map_err(|open_error| path_entry_error(&self.root, name, open_error))?;
                     if created {
                         fchmod(&directory, Mode::RWXU).map_err(|chmod_error| {
-                            errno_error("set cleanup quarantine mode", chmod_error)
+                            errno_error("set materializer internal directory mode", chmod_error)
                         })?;
-                        sync_file(&directory, "sync cleanup quarantine")?;
+                        sync_file(&directory, "sync materializer internal directory")?;
                         sync_file(&self.root, "sync materialization root")?;
                     }
                     self.validate_private_directory(&directory)?;
@@ -808,37 +946,13 @@ mod unix {
             }
         }
 
-        fn rename_to_quarantine(
-            &self,
-            parent: &File,
-            basename: &OsStr,
-            quarantine: &File,
-            quarantine_name: &OsStr,
-        ) -> Result<(), MaterializeError> {
-            match renameat_with(
-                parent,
-                basename,
-                quarantine,
-                quarantine_name,
-                RenameFlags::NOREPLACE,
-            ) {
-                Ok(()) => Ok(()),
-                Err(error) if error == rustix::io::Errno::EXIST => {
-                    Err(MaterializeError::QuarantineConflict)
-                }
-                Err(error) if error == rustix::io::Errno::NOENT => {
-                    Err(MaterializeError::MetadataMismatch)
-                }
-                Err(error) => Err(errno_error("quarantine materialized file", error)),
-            }
-        }
-
         fn recover_quarantined_cleanup(
             &self,
             quarantine_name: &OsStr,
             receipt: &MaterializationReceipt,
         ) -> Result<CleanupOutcome, MaterializeError> {
-            let Some(quarantine) = self.open_quarantine(false)? else {
+            let Some(quarantine) = self.open_internal_directory(QUARANTINE_DIRECTORY, false)?
+            else {
                 return Ok(CleanupOutcome::AlreadyRemoved);
             };
             match open_file_at(&quarantine, quarantine_name)? {
@@ -915,7 +1029,9 @@ mod unix {
                     PathViolation::ParentDirectory,
                 ));
             }
-            if components.is_empty() && component == QUARANTINE_DIRECTORY {
+            if components.is_empty()
+                && (component == QUARANTINE_DIRECTORY || component == STAGING_DIRECTORY)
+            {
                 return Err(MaterializeError::InvalidPath(PathViolation::Reserved));
             }
             components.push(OsStr::from_bytes(component));
@@ -963,6 +1079,31 @@ mod unix {
             Ok(_) => Ok(true),
             Err(error) if error == rustix::io::Errno::NOENT => Ok(false),
             Err(error) => Err(errno_error("inspect cleanup quarantine entry", error)),
+        }
+    }
+
+    /// Atomically moves `from` to `to`, refusing to replace any existing entry.
+    fn rename_no_replace(
+        from_directory: &File,
+        from: &OsStr,
+        to_directory: &File,
+        to: &OsStr,
+        conflict: MaterializeError,
+        operation: &'static str,
+    ) -> Result<(), MaterializeError> {
+        match renameat_with(
+            from_directory,
+            from,
+            to_directory,
+            to,
+            RenameFlags::NOREPLACE,
+        ) {
+            Ok(()) => Ok(()),
+            Err(error) if error == rustix::io::Errno::EXIST => Err(conflict),
+            Err(error) if error == rustix::io::Errno::NOENT => {
+                Err(MaterializeError::MetadataMismatch)
+            }
+            Err(error) => Err(errno_error(operation, error)),
         }
     }
 
@@ -1024,10 +1165,13 @@ mod unix {
             && metadata.size == proof.size
     }
 
-    fn read_ownership_tag(file: &File) -> Result<[u8; 32], MaterializeError> {
+    fn stored_ownership_tag(file: &File) -> Result<Option<[u8; 32]>, MaterializeError> {
         let mut value = vec![0_u8; 33];
-        let initialized = fgetxattr(file, OWNERSHIP_XATTR, &mut value)
-            .map_err(|_| MaterializeError::OwnershipMismatch)?;
+        let initialized = match fgetxattr(file, OWNERSHIP_XATTR, &mut value) {
+            Ok(initialized) => initialized,
+            Err(error) if error == MISSING_XATTR => return Ok(None),
+            Err(_) => return Err(MaterializeError::OwnershipMismatch),
+        };
         if initialized != 32 {
             return Err(MaterializeError::OwnershipMismatch);
         }
@@ -1037,7 +1181,11 @@ mod unix {
                 .get(..initialized)
                 .ok_or(MaterializeError::OwnershipMismatch)?,
         );
-        Ok(tag)
+        Ok(Some(tag))
+    }
+
+    fn read_ownership_tag(file: &File) -> Result<[u8; 32], MaterializeError> {
+        stored_ownership_tag(file)?.ok_or(MaterializeError::OwnershipMismatch)
     }
 
     fn digest_bytes(bytes: &[u8]) -> [u8; 32] {
@@ -1099,6 +1247,17 @@ mod unix {
 
     fn usize_as_u64(value: usize) -> Result<u64, MaterializeError> {
         u64::try_from(value).map_err(|_| MaterializeError::MetadataMismatch)
+    }
+
+    fn keyed_name(prefix: &[u8], mac: HmacSha256) -> OsString {
+        let digest = mac.finalize().into_bytes();
+        let mut name = Vec::with_capacity(prefix.len() + digest.len() * 2);
+        name.extend_from_slice(prefix);
+        for byte in digest {
+            name.push(lower_hex(byte >> 4));
+            name.push(lower_hex(byte & 0x0f));
+        }
+        OsString::from_vec(name)
     }
 
     fn lower_hex(nibble: u8) -> u8 {

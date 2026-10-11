@@ -117,6 +117,7 @@ fn materialize_rejects_unsafe_relative_paths_before_mutation() {
         PathBuf::from("double//separator"),
         PathBuf::from("trailing/"),
         PathBuf::from(".chio-decoy-quarantine/foreign"),
+        PathBuf::from(".chio-decoy-stage/foreign"),
         nul,
     ];
 
@@ -182,6 +183,185 @@ fn foreign_existing_file_is_never_adopted_even_when_content_matches() {
     assert_eq!(
         fs::read(path).unwrap_or_else(|error| panic!("read foreign file: {error}")),
         b"same bytes"
+    );
+}
+
+#[cfg(unix)]
+fn staged_files(root: &Path, published: &[PathBuf]) -> Vec<PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut staged = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).test_expect("read materialization tree") {
+            let path = entry.test_expect("read materialization entry").path();
+            let file_type = fs::symlink_metadata(&path)
+                .test_expect("inspect materialization entry")
+                .file_type();
+            if file_type.is_dir() {
+                pending.push(path);
+            } else if !published.contains(&path) {
+                staged.push(path);
+            }
+        }
+    }
+    staged
+}
+
+#[cfg(unix)]
+#[test]
+fn interrupted_staging_is_recovered_by_exact_retry() {
+    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let materializer = materializer(directory.path());
+    let content = b"credential-shaped decoy";
+    let mut published = Vec::new();
+
+    for interruption in ["after-create", "after-tag", "mid-write", "before-publish"] {
+        let identity = identity(&format!("operation-{interruption}"));
+        let relative_path = PathBuf::from(format!("nested/{interruption}.txt"));
+        let request = MaterializationRequest {
+            identity: &identity,
+            relative_path: &relative_path,
+            content,
+        };
+        materializer
+            .stage_without_publish_for_test(&request)
+            .test_expect("stage before simulated interruption");
+        let staged = staged_files(directory.path(), &published);
+        assert_eq!(staged.len(), 1);
+        let stage = staged.first().test_expect("staged entry");
+        assert!(!directory.path().join(&relative_path).exists());
+        match interruption {
+            "after-create" => {
+                fs::remove_file(stage).test_expect("drop tagged stage");
+                fs::write(stage, b"").test_expect("leave untagged empty stage");
+            }
+            "after-tag" | "mid-write" => {
+                let length = if interruption == "after-tag" { 0 } else { 4 };
+                fs::OpenOptions::new()
+                    .write(true)
+                    .open(stage)
+                    .and_then(|file| file.set_len(length))
+                    .test_expect("truncate tagged stage");
+            }
+            _ => {}
+        }
+
+        let receipt = materialize(&materializer, &identity, &relative_path, content);
+        let final_path = directory.path().join(&relative_path);
+        assert_eq!(
+            fs::read(&final_path).test_expect("read published file"),
+            content
+        );
+        published.push(final_path);
+        assert!(staged_files(directory.path(), &published).is_empty());
+        assert_eq!(
+            materialize(&materializer, &identity, &relative_path, content),
+            receipt,
+            "retry after publish without registry commit must return the same receipt"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn untagged_staging_object_is_refused_and_preserved() {
+    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let materializer = materializer(directory.path());
+    let identity = identity("operation-untagged-stage");
+    let relative_path = Path::new("nested/untagged.txt");
+    let request = MaterializationRequest {
+        identity: &identity,
+        relative_path,
+        content: b"decoy bytes",
+    };
+    materializer
+        .stage_without_publish_for_test(&request)
+        .test_expect("stage before simulated interruption");
+    let staged = staged_files(directory.path(), &[])
+        .pop()
+        .test_expect("staged entry");
+    fs::remove_file(&staged).test_expect("drop tagged stage");
+    fs::write(&staged, b"unproven").test_expect("seed untagged stage");
+
+    let error = materializer
+        .materialize(&request)
+        .test_expect_err("untagged stage must not be reclaimed");
+    assert_eq!(error, MaterializeError::OwnershipMismatch);
+    assert_eq!(
+        fs::read(&staged).test_expect("read untagged stage"),
+        b"unproven"
+    );
+    assert!(!directory.path().join(relative_path).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn staging_directory_must_be_private() {
+    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let elsewhere = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    fs::set_permissions(elsewhere.path(), fs::Permissions::from_mode(0o700))
+        .test_expect("chmod symlink target");
+    let materializer = materializer(directory.path());
+    let identity = identity("operation-private-stage");
+    let relative_path = Path::new("nested/private.txt");
+    let request = MaterializationRequest {
+        identity: &identity,
+        relative_path,
+        content: b"decoy bytes",
+    };
+    let staging = directory.path().join(".chio-decoy-stage");
+
+    fs::create_dir(&staging).test_expect("create shared staging directory");
+    fs::set_permissions(&staging, fs::Permissions::from_mode(0o755))
+        .test_expect("chmod shared staging directory");
+    assert_eq!(
+        materializer.materialize(&request),
+        Err(MaterializeError::MetadataMismatch)
+    );
+    assert!(fs::read_dir(&staging)
+        .test_expect("read shared staging directory")
+        .next()
+        .is_none());
+
+    fs::remove_dir(&staging).test_expect("remove shared staging directory");
+    symlink(elsewhere.path(), &staging).test_expect("plant staging symlink");
+    assert!(matches!(
+        materializer.materialize(&request),
+        Err(MaterializeError::Symlink | MaterializeError::InvalidPath(PathViolation::Symlink))
+    ));
+    assert!(fs::read_dir(elsewhere.path())
+        .test_expect("read symlink target")
+        .next()
+        .is_none());
+    assert!(!directory.path().join(relative_path).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn staging_recovery_never_deletes_unproven_final_object() {
+    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let materializer = materializer(directory.path());
+    let identity = identity("operation-unproven-final");
+    let relative_path = Path::new("nested/unproven.txt");
+    let request = MaterializationRequest {
+        identity: &identity,
+        relative_path,
+        content: b"decoy bytes",
+    };
+    materializer
+        .stage_without_publish_for_test(&request)
+        .test_expect("stage before simulated interruption");
+    let final_path = directory.path().join(relative_path);
+    fs::write(&final_path, b"other bytes").test_expect("seed unrelated final file");
+    fs::set_permissions(&final_path, fs::Permissions::from_mode(0o600))
+        .test_expect("chmod unrelated final file");
+
+    let error = materializer
+        .materialize(&request)
+        .test_expect_err("unproven final file must not be adopted");
+    assert_eq!(error, MaterializeError::OwnershipMismatch);
+    assert_eq!(
+        fs::read(&final_path).test_expect("read unrelated final file"),
+        b"other bytes"
     );
 }
 
