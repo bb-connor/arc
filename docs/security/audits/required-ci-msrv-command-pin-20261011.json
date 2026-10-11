@@ -1,0 +1,55 @@
+{
+  "schema": "chio.security-ci-repair.v1",
+  "observed_utc": "2026-10-11T00:25:55.672741+00:00",
+  "published_predecessor": "974f22914bd339a62933831650c3d55dbaf76987",
+  "source_repair": "830e71a813e1e7d479af2c77b09d8efdabbc748f",
+  "producer": "03d7c9a766298fc756ce5dc1b830db9392fddc7a",
+  "integration": "5955d1cc6a",
+  "finding": "MSRV command-list regression omitted the approved --no-fail-fast argument and failed before any Cargo compilation.",
+  "hosted_original": {
+    "run": 38095788681,
+    "job": 114341282995,
+    "conclusion": "failure",
+    "log_sha256": "aa283dab00aa822d31aa4d39a543b2bf5ebb95478960f0946592e86a69a07bfd"
+  },
+  "local_original_and_green": {
+    "source_before": "b3d1734c1ec7734c134a3a8b06e64871ee106970",
+    "test_command": [
+      "python3",
+      "scripts/tests/msrv-cache-target.test.py"
+    ],
+    "original_exit": 1,
+    "green_exit": 0,
+    "original_sha256": "3d91195bbb7da2353fc128c17ea8862df2a0a70881c727bcb79041053b196830",
+    "repaired_sha256": "ce72ff59d50ea44ec96ce231ed8e4562a43a13c64e92bfa60dc6706d477dbd83",
+    "logs": {
+      "original.log": "34f731674d6b104977b99a6e421e4b87fe03269deea8ddf53aecd9e55d608719",
+      "green.log": "1f6419b93527d1caf58a1d2e636055df7962aff22afe8011c16022091062ec2f"
+    },
+    "observed_at": "2026-10-11T00:23:58.570714+00:00"
+  },
+  "additional_verification": {
+    "security_ci_contract": {
+      "exit_code": 0,
+      "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    "command_pin_search": "Searched scripts, workflow definitions and workflow documentation; only MSRV assertion and README needed the approved argument.",
+    "diff_check": "pass"
+  },
+  "source_files": {
+    "scripts/tests/msrv-cache-target.test.py": "ce72ff59d50ea44ec96ce231ed8e4562a43a13c64e92bfa60dc6706d477dbd83",
+    ".github/workflows/README.md": "cea44f6cf6e57fb1d82ad0586f6abc3c689091fc4b99484fee03a0195c7a2514"
+  },
+  "acceptance_preserved": [
+    "All four MSRV Cargo commands, exclusions, timeout, compiler flags and job limits remain required.",
+    "Build and MSRV keep --no-fail-fast so test-binary failures are accumulated.",
+    "Add msrv-cache-target.test.py with Node available to the local pre-push static set."
+  ],
+  "remaining_acceptance": [
+    "Exact replacement head must pass all four required hosted checks.",
+    "Classify every other check failure and refresh review-thread replies.",
+    "Obtain Connor merge go-ahead; no auto-merge."
+  ],
+  "hosted_qualified": false,
+  "merged": false
+}
