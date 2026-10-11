@@ -209,14 +209,17 @@ fi'''
 
 def correlation_mutation_names() -> list[str]:
     parent = Path("crates/security/chio-quarantine/src/correlation.rs")
-    child = Path("crates/security/chio-quarantine/src/correlation/expansion_tests.rs")
-    if parent.read_text().count('include!("correlation/expansion_tests.rs");') != 1:
-        raise SystemExit("temporal expansion tests must remain included exactly once")
-    if child.read_text().count("mod expansion_tests {") != 1:
-        raise SystemExit("temporal expansion test module declaration changed")
+    mutation = parent.parent / "correlation/mutation_tests.rs"
+    expansion = parent.parent / "correlation/expansion_tests.rs"
+    declaration = '#[cfg(test)]\n#[path = "correlation/mutation_tests.rs"]\nmod mutation_tests;'
+    if parent.read_text().count(declaration) != 1:
+        raise SystemExit("temporal mutation tests must remain declared exactly once")
+    declaration = '#[path = "expansion_tests.rs"]\nmod expansion_tests;'
+    if mutation.read_text().count(declaration) != 1:
+        raise SystemExit("temporal expansion tests must remain declared exactly once")
     prefix = "correlation::mutation_tests::"
-    return source_names(str(parent), prefix, prefix) + source_names(
-        str(child), prefix + "expansion_tests::"
+    return source_names(str(mutation), prefix) + source_names(
+        str(expansion), prefix + "expansion_tests::"
     )
 
 

@@ -5436,7 +5436,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Temporal security gate",
-        "02e7241415d3f546d8851bbe9afff5753ab3a6921feaf345047ec23891d7e6d4",
+        "51996c0758edef0663a95a28174039ae2714282fee7bc806dd0c12aefa2494d8",
         "1" * 64,
     ),
     "required CI test and Loom evidence changes mandatory step body",
