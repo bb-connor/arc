@@ -4,7 +4,7 @@ use serde_json::json;
 
 #[path = "response_support/simulation.rs"]
 mod support;
-use support::{fixture, TestResult};
+use support::{dry_run_plan, effect_spec, fixture, TestResult};
 fn digest(value: u8) -> Digest32 {
     Digest32::new([value; 32])
 }
@@ -120,6 +120,72 @@ fn rejects_live_mode_stale_scope_and_stale_effect_versions() -> TestResult {
     let error = evaluate_response_simulation(&plan, &snapshot)
         .err()
         .ok_or("stale state accepted")?;
+    assert_eq!(error.code().as_str(), "simulation.stale_state");
+    Ok(())
+}
+
+#[test]
+fn simulation_accepts_repeated_effects_against_one_captured_target() -> TestResult {
+    let tenant_id = TenantId::new("simulation-tenant")?;
+    let session_id = SessionId::new("session")?;
+    let affected_ids = RecordIdSet::new(vec![RecordId::new("root")?])?;
+    let captured =
+        ResponseSimulationState::Throttle(empty_session_throttle_snapshot(SessionThrottleKey {
+            tenant_id: tenant_id.clone(),
+            session_id: session_id.clone(),
+        })?);
+    let simulate = |bases: [Digest32; 2]| -> TestResult<_> {
+        let effects = [3, 5]
+            .into_iter()
+            .zip(bases)
+            .map(|(max_invocations, base)| {
+                effect_spec(
+                    ResponseEffectKind::ThrottleSession,
+                    ResponseTarget::Session {
+                        session_id: session_id.clone(),
+                    },
+                    &json!({"window_ms": 1000, "max_invocations": max_invocations}),
+                    base,
+                )
+            })
+            .collect::<TestResult<Vec<_>>>()?;
+        let plan = dry_run_plan(
+            &tenant_id,
+            ActionId::new("simulation-action")?,
+            &affected_ids,
+            effects,
+        )?;
+        let snapshot = ResponseSimulationSnapshot {
+            tenant_id: tenant_id.clone(),
+            plan_hash: plan.plan_hash,
+            captured_at_unix_ms: 1000,
+            states: BoundedVec::new(vec![captured.clone()])?,
+            scopes: BoundedVec::new(vec![])?,
+        };
+        Ok(evaluate_response_simulation(&plan, &snapshot))
+    };
+
+    let base = captured.version_hash()?;
+    let result = simulate([base, base])??;
+    assert!(result
+        .apply
+        .iter()
+        .all(|step| step.outcome == ResponseSimulationOutcome::WouldApply));
+    let [first, second] = result.apply.as_slice() else {
+        return Err("expected two apply steps".into());
+    };
+    assert_ne!(first.resulting_version_hash, second.resulting_version_hash);
+    let [ResponseSimulationState::Throttle(applied)] = result.after_apply.as_slice() else {
+        return Err("expected one throttle state".into());
+    };
+    assert_eq!(applied.contributions.len(), 2);
+
+    let rebased = first
+        .resulting_version_hash
+        .ok_or("throttle apply step carries a version")?;
+    let error = simulate([base, rebased])?
+        .err()
+        .ok_or("base differing from the captured state accepted")?;
     assert_eq!(error.code().as_str(), "simulation.stale_state");
     Ok(())
 }

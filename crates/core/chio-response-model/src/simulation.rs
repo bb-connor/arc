@@ -53,7 +53,14 @@ pub fn evaluate_response_simulation(
         if effect.kind == ResponseEffectKind::EscalateAlert {
             continue;
         }
-        state_index(initial, plan, effect)?;
+        let captured = initial
+            .get(state_index(initial, plan, effect)?)
+            .ok_or_else(|| refused("simulation.state_index", PortErrorKind::InvalidData))?;
+        // Every base names the captured state; ordered contributions to one
+        // target compose on the working copy without re-basing.
+        if captured.version_hash()? != effect.observed_base_version_hash {
+            return Err(refused("simulation.stale_state", PortErrorKind::Conflict));
+        }
         if effect.kind == ResponseEffectKind::FreezeIssuance {
             expected_scopes += 1;
             let spec: IssuanceFreezeSpec = decode(&effect.canonical_contribution)?;
@@ -86,9 +93,6 @@ pub fn evaluate_response_simulation(
             let state = states
                 .get_mut(index)
                 .ok_or_else(|| refused("simulation.state_index", PortErrorKind::InvalidData))?;
-            if state.version_hash()? != effect.observed_base_version_hash {
-                return Err(refused("simulation.stale_state", PortErrorKind::Conflict));
-            }
             *state = apply_effect(state, plan, effect)?;
             (
                 ResponseSimulationOutcome::WouldApply,
