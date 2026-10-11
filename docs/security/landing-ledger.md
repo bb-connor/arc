@@ -8,6 +8,28 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## MCP terminal handoff qualified privately (October 11 UTC)
+
+The [terminal handoff audit](audits/mcp-terminal-handoff-20261011.json)
+records source `7d08ffffc4` and all **2,024 requirements** remain preserved.
+The repair makes the active-to-terminal map transfer atomic, retains the
+same finalized diagnostic, and preserves denial and error reporting under
+real clock and SQLite faults. Five genuine Original controls and the
+separate overwritten-record Original fail as expected. The composed MCP
+library passes **198 tests**, strict all-target Clippy and affected static
+gates pass, and Root and Claude reviewed the source. The x86 enforcing
+HTTP suite still requires successor hosted evidence.
+
+Claude relayed the owner's October 11 20:38 UTC instruction to publish this
+combined census/MCP repair as soon as local qualification passes, without
+waiting for `07d780147c` Workspace/MSRV. This supersedes the earlier
+four-results-before-push hold for this batch only. Cancelled predecessor
+jobs remain incomplete evidence. The merge bar remains four green checks
+on the replacement, classified other failures, closed source blockers and
+answered review, followed by the agreed exact-head merge handshake.
+Trusted setup, open Kani obligations, cold activation and wider native
+latency/concurrency acceptance remain distinct from this source repair.
+
 ## Checkpoint reader census repaired privately (October 11 UTC)
 
 The [census repair audit](audits/trust-census-repair-20261011.json) records
