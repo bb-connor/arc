@@ -11,3 +11,10 @@
 
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# Bundled SQLite is built without global memory statistics. With them enabled,
+# every SQLite allocation in the process takes one shared mutex, serializing
+# independent connections. Nothing in the workspace reads sqlite3_memory_used,
+# the highwater mark or the heap limits, which depend on these statistics.
+[env]
+LIBSQLITE3_FLAGS = "-DSQLITE_DEFAULT_MEMSTATUS=0"
