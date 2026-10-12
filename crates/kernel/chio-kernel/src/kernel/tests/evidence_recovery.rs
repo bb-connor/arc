@@ -437,3 +437,54 @@ fn unavailable_signer_retains_unsigned_fault_until_idle_recovery() {
         .verify_signature()
         .unwrap());
 }
+
+#[test]
+fn unsigned_child_survives_clock_outage_and_kernel_teardown() {
+    use crate::kernel::effect_obligation::recovery::PendingChildReceipt;
+    let (mut kernel, _, state) = fixture();
+    let clock = Arc::new(RecoveringClock {
+        ready: AtomicBool::new(false),
+        reads: AtomicU64::new(0),
+    });
+    kernel.clock = clock.clone();
+    let body = crate::ChildRequestReceiptBody {
+        id: "unsigned-retained-child".into(),
+        timestamp: 0,
+        session_id: SessionId::new("retained-session"),
+        parent_request_id: RequestId::new("retained-parent"),
+        request_id: RequestId::new("retained-child-request"),
+        operation_kind: OperationKind::CreateMessage,
+        terminal_state: OperationTerminalState::Completed,
+        outcome_hash: chio_core::crypto::sha256_hex(b"completed child outcome"),
+        policy_hash: kernel.policy_hash().to_string(),
+        metadata: None,
+        kernel_key: kernel.config.keypair.public_key(),
+    };
+    let encoded = chio_core::canonical::canonical_json_bytes(&body)
+        .unwrap()
+        .len();
+    let slot = kernel
+        .acquire_post_effect_evidence_slot(NonZeroUsize::new(encoded + 256).unwrap())
+        .unwrap();
+    slot.buffer(PendingPostEffectRecord {
+        evidence: PendingPostEffectEvidence::ChildrenOnly,
+        child_receipts: vec![PendingChildReceipt::Unsigned(body.clone())],
+        unknown_child: None,
+    });
+    wait_until(|| clock.reads.load(Ordering::SeqCst) > 0);
+    assert_eq!(state.child_append_calls.load(Ordering::SeqCst), 0);
+    assert!(kernel.ensure_post_effect_evidence_latch_clear().is_err());
+    let child_log = Arc::clone(&kernel.child_receipt_log);
+    drop(kernel);
+    state.barrier_open.store(true, Ordering::SeqCst);
+    clock.ready.store(true, Ordering::SeqCst);
+    wait_until(|| child_log.lock().unwrap().len() == 1);
+    let child = child_log.lock().unwrap().get(0).unwrap().clone();
+    assert_eq!(child.id, body.id);
+    assert_eq!(child.outcome_hash, body.outcome_hash);
+    assert_eq!(child.terminal_state, OperationTerminalState::Completed);
+    assert!(child.timestamp > 0);
+    assert!(child.verify_signature().unwrap());
+    assert_eq!(state.child_append_calls.load(Ordering::SeqCst), 1);
+    assert!(state.receipts.lock().unwrap().is_empty());
+}
