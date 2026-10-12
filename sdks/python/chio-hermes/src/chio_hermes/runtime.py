@@ -129,9 +129,8 @@ def build_runtime_handle() -> RuntimeHandle:
         )
         return handle
 
-    # The operator CLI retains minted tokens in its private profile cache.
-    # Old ID-only entries remain usable for legacy evaluation, but cannot
-    # submit approvals. The service verifies the full token at submission.
+    # The operator CLI retains minted tokens in its private profile cache. The
+    # service verifies the full token at submission.
     from chio_hermes.cli import _load_cache
 
     for entry in reversed(_load_cache()):

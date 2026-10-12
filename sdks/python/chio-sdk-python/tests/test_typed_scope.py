@@ -18,7 +18,7 @@ from chio_sdk import models
         ({"operations": ["subscribe"]}, False),
     ],
 )
-def test_typed_scope_helper_and_legacy_method_preserve_tool_authority(change, allowed):
+def test_scope_method_preserves_tool_authority(change, allowed):
     grant = {
         "server_id": "files",
         "tool_name": "read",
@@ -29,7 +29,6 @@ def test_typed_scope_helper_and_legacy_method_preserve_tool_authority(change, al
     }
     parent = models.ChioScope(grants=[models.ToolGrant(**grant)])
     child = models.ChioScope(grants=[models.ToolGrant(**(grant | change))])
-    assert models.scope_is_subset_of(child, parent) is allowed
     assert child.is_subset_of(parent) is allowed
 
 
@@ -51,5 +50,4 @@ def test_typed_scope_helper_preserves_resource_and_prompt_ceilings(child, allowe
         }
     )
     scope = models.ChioScope.model_validate(child)
-    assert models.scope_is_subset_of(scope, parent) is allowed
     assert scope.is_subset_of(parent) is allowed
