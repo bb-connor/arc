@@ -1,4 +1,5 @@
 use super::*;
+use crate::trust_control::service_runtime::issuance::evaluate_federation_policy_request;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_core::federation::artifacts::{FederationArtifactKind, FederationArtifactReference};
@@ -178,7 +179,7 @@ impl Fixture {
         &self,
         subject_key: String,
     ) -> Result<FederationAdmissionEvaluationResponse, CliError> {
-        super::super::issuance::evaluate_federation_policy_request(
+        evaluate_federation_policy_request(
             &self.state,
             &FederationAdmissionEvaluationRequest {
                 policy_id: POLICY_ID.to_string(),
