@@ -19,6 +19,15 @@ mirror's default branch did not contain the process starter when checked on
 
 ## Download availability
 
+> **Deprecated artifacts.** The website installer, the `v0.1.0` GitHub release
+> and the `0.1.0` packages on npm (`@chio-protocol/*`), PyPI (`chio-sdk`) and
+> crates.io (`chio-*`) are stale. They were built in April 2026 or from the
+> public mirror, thousands of commits behind `main`, and do not match the
+> current protocol, receipt format or CLI. Do not use them. Build from source
+> as described above. The preview train (REL-1 in
+> [UNIFIED_ROADMAP.md](../operations/UNIFIED_ROADMAP.md)) replaces them with
+> signed `0.2.0-alpha.N` releases.
+
 The website installer was checked on 2026-09-08. Its macOS ARM and Linux x86_64
 downloads redirected to missing `backbay-labs/chio` release assets (HTTP 404).
 That repository had no GitHub Releases. An older `v0.1.0` binary release exists

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Superseded releases.** The `v0.1.0` GitHub release and the `0.1.0` npm and
+> PyPI packages were published on 2026-04-22 from a source tree far behind
+> `main`. They are deprecated. The first release built from current `main` will
+> be a signed `0.2.0-alpha.N` preview.
+
 The first public baseline, version 0.1.0, is in preparation and has not yet
 been tagged or released. It establishes the wire protocol, the policy and
 guard runtime, the receipt and attestation pipeline, the federation and
