@@ -1,123 +1,97 @@
 # chio-external-guards architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-external-guards` sits at the untrusted edge of Chio's guard pipeline:
-every adapter here issues an outbound HTTP call to a third-party service and
-turns the response into a kernel `Verdict`. The kernel's guard pipeline is
-synchronous, so the crate's second job is bridging that boundary:
-`ScopedAsyncGuard` drives the async HTTP path to completion on a Tokio
-runtime chosen at evaluation time. Provider-specific request and response
-handling live here; the generic retry/cache/circuit-breaker composition
-lives in `chio-guards`, and dispatch-time egress enforcement lives in
-`chio-egress-contract`.
+Concrete `ExternalGuard` implementations translate Chio call contexts into
+provider requests and provider responses into `Verdict`. Public adapters cover
+Bedrock guardrails, Azure Content Safety, Vertex safety, VirusTotal, Safe
+Browsing, and Snyk. Provider configuration holds credentials and thresholds.
+Evidence helpers create provider-specific decision records for callers.
 
-## Module map
+The crate owns HTTP request/response translation and `ScopedAsyncGuard`, the
+synchronous kernel bridge. `chio-guards` owns the generic async adapter, cache,
+retry, circuit breaker, and token bucket. The kernel owns authorization,
+pipeline composition, dispatch, and receipt signing.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | `ScopedAsyncGuard<E>`, the sync `Guard` bridge; tool-name wildcard matching; crate-root re-exports. |
-| `src/external/mod.rs` | Re-exports the `chio-guards` async-adapter infrastructure and declares the provider submodules. |
-| `src/external/endpoint_security.rs` | Scheme/host allow-deny checks (loopback, link-local, private, multicast, CGNAT, IPv4-mapped IPv6), with and without live DNS resolution. |
-| `src/external/http_egress.rs` | Builds a per-endpoint `HttpEgressContract` and a contract-scoped `reqwest::Client`, and dispatches through `chio_egress_contract::send_with_contract`. Crate-private. |
-| `src/external/azure_content_safety.rs` | Azure Content Safety `text:analyze` adapter. |
-| `src/external/bedrock.rs` | AWS Bedrock `ApplyGuardrail` adapter; also hosts `classify_status_error`, shared by every HTTP adapter. |
-| `src/external/vertex_safety.rs` | Vertex AI `generateContent` safety-rating adapter. |
-| `src/external/threat_intel/mod.rs` | Threat-intel submodule doc and re-exports. |
-| `src/external/threat_intel/safe_browsing.rs` | Google Safe Browsing v4 `threatMatches:find` adapter. |
-| `src/external/threat_intel/snyk.rs` | Snyk per-package vulnerability adapter. |
-| `src/external/threat_intel/virustotal.rs` | VirusTotal v3 hash/URL reputation adapter. |
+## Structure
 
-## Dispatch path
+`external/mod.rs` reexports infrastructure and concrete adapters.
+`bedrock`, `azure_content_safety`, and `vertex_safety` implement cloud checks.
+`threat_intel` contains `virustotal`, `safe_browsing`, and `snyk` modules.
+`endpoint_security` validates configured URLs and DNS results. `http_egress`
+constructs an egress contract, creates its client, and dispatches requests.
+`input` centralizes bounded original-JSON readers. `src/lib.rs` contains the
+kernel bridge and wildcard matcher.
 
-1. The kernel evaluates a `ScopedAsyncGuard<E>` as an ordinary sync `Guard`.
-   A `tool_name` matching none of its (normalized) glob patterns returns
-   `Allow` immediately; an empty pattern list matches every tool.
-2. Otherwise it builds a `GuardCallContext` from the kernel `GuardContext`
-   and calls `block_on`, which drives the async path to completion: via
-   `block_in_place` on a multi-thread runtime, on a spawned fallback thread
-   for a current-thread runtime, or on a fresh current-thread runtime when
-   none is active.
-3. `AsyncGuardAdapter` (`chio-guards`) applies caching, rate limiting, the
-   circuit breaker, and retry-with-jitter around the wrapped guard's
-   single-attempt `ExternalGuard::eval`.
-4. `eval` re-validates the endpoint with live DNS resolution
-   (`validate_external_guard_url`) and dispatches through the
-   `HttpEgressContract` built at guard construction, re-checked on every
-   redirect hop.
-5. Non-2xx responses are classified by `classify_status_error` into
-   transient (5xx, 429; retried by the adapter) or permanent errors; parse
-   and header failures are permanent. All surface as `ExternalGuardError`,
-   which the adapter maps to `Verdict::Deny`.
-6. A parsed response becomes a provider-specific `Verdict` (severity,
-   probability, action, or detection-count threshold), and
-   `ScopedAsyncGuard` converts it into a `GuardDecision`.
+## Data and control flow
 
-## Invariants and failure modes
+`AsyncGuardAdapter::evaluate` checks the circuit first, then cache, then token
+bucket. A cached verdict avoids a provider call and token consumption. An open
+circuit returns its configured verdict before checking cache. Rate exhaustion
+returns its configured verdict without recording a provider failure.
 
-- Endpoint validation runs twice: at construction
-  (`http_egress::contract_for_url` builds and pins the `HttpEgressContract`)
-  and again on every `eval` call (`validate_external_guard_url`, live DNS).
-  Address-level checks on a bare hostname are deferred to the per-call
-  path, so a target that later resolves to a private, loopback,
-  link-local, multicast, or CGNAT (`100.64.0.0/10`) address is rejected
-  even though construction succeeded.
-- `http://` is accepted only for `localhost` or a loopback IP literal (v4
-  or v6); every other target must be `https`. IPv4-mapped IPv6 addresses
-  are unwrapped and checked against the same IPv4 rules.
-- The per-endpoint `HttpEgressContract` pins the URL's own scheme and
-  normalized authority, denies loopback unless the host itself is
-  loopback, always denies link-local and IPv6 ULA, and caps redirects (4
-  hops) and response size (1 MiB).
-- `with_client` constructors discard the passed-in `reqwest::Client` and
-  rebuild one scoped to the egress contract, so automatic redirect
-  handling can never bypass per-hop contract validation.
-- `ScopedAsyncGuard` returns `Allow` outside its configured scope;
-  deny-by-default is the composing pipeline's job, not a single scoped
-  guard's. Blank and whitespace-only patterns are trimmed and dropped at
-  construction, and the resulting empty list matches every tool, not
-  none.
-- `VirusTotalGuard` fails closed on non-2xx status, including HTTP 404
-  (not indexed). An indexed result must include explicit malicious and
-  suspicious counts before it can allow the call.
-- Provider responses pass original duplicate-aware external JSON validation
-  before projection. Missing verdict evidence cannot become `Allow`; explicit
-  Vertex safety finish reasons and blocked ratings deny below local thresholds.
-  Safe Browsing's explicit empty no-match document remains valid.
-- `block_on` fails closed (`KernelError::GuardDenied`) on an unrecognized
-  runtime flavor or if the current-thread fallback thread panics.
+Provider calls run through the retry helper. Retryable errors can be retried;
+permanent errors end that loop immediately. Successful verdicts, including
+Denies, record circuit success and are cached when a key exists. Errors record
+circuit failure and return Deny. Threat-intelligence adapters return no cache key for invalid argument JSON.
+Cloud adapters hash the original argument text and submit it as content.
+
+Cloud adapters evaluate configured severity, action, or probability fields.
+Unknown required verdict values and absent required fields reject evaluation.
+Safe Browsing accepts an empty matches document as its no-threat response.
+VirusTotal compares malicious plus suspicious counts against its threshold;
+Snyk evaluates configured severity and upgrade policy.
+
+A VirusTotal 404 with a bounded parsed `NotFoundError` body becomes the
+configured unseen verdict. The default is Deny. This is a successful policy
+outcome, so it can be cached without increasing the failure circuit. Other
+404 shapes, malformed responses, and missing analysis fields remain failures.
+Unseen Allow can hide later changes until the configured cache TTL expires.
+
+`ScopedAsyncGuard` copies tool, agent, server, and serialized arguments into a
+call context. It blocks on Tokio, using `block_in_place` on multithread runtimes
+and a scoped fallback runtime thread for current-thread runtimes. Dispatch
+revalidation preserves the admission verdict without consuming adapter state
+again. Tool patterns outside the selected scope return Allow.
+
+## Trust and invariants
+
+Threat-intelligence arguments use the bounded signed-JSON reader; all provider
+responses use the external-JSON reader. These readers enforce a 1 MiB limit
+and duplicate-aware parsing before typed projection. Cloud adapters submit
+argument text as content without using the argument reader. These readers validate JSON shape; they do not sign provider data.
+Credentials use secret wrappers, and status errors omit provider body text.
+
+Endpoint validation requires HTTPS except explicit loopback HTTP endpoints.
+DNS validation rejects disallowed resolved addresses. The shared transport
+pins DNS and enforces a contract with one allowed authority, a redirect-chain
+ceiling of four, and a response ceiling of 1 MiB. The contract allows loopback
+only for a loopback-configured endpoint. `with_client` constructors rebuild a
+contract-bound client rather than using the supplied client's transport policy.
+
+HTTP 429 and server-error statuses are classified Transient; other unsuccessful
+statuses are Permanent, subject to VirusTotal's unseen exception. Contract
+send errors, including transport failures returned by the shared helper, map
+to Permanent here. URL DNS resolution errors are Transient. Callers must retain
+these distinctions when selecting retry and failure handling policies.
 
 ## Dependencies
 
-`chio-guards` supplies the `ExternalGuard` trait and `AsyncGuardAdapter`
-(cache, rate limit, circuit breaker, retry) every provider composes with,
-re-exported wholesale from `external::mod`. `chio-egress-contract` (feature
-`reqwest-egress`) supplies `HttpEgressContract`, `client_builder_with_contract`,
-and `send_with_contract`, enforcing scheme/authority pinning and
-redirect/response-size bounds at dispatch. `chio-kernel` supplies the
-synchronous `Guard`, `GuardContext`, `GuardDecision`, `KernelError`,
-`Verdict`, and `ToolCallRequest` contract that `ScopedAsyncGuard` implements
-against. `chio-core-types` supplies `receipt::metadata::GuardEvidence`, the
-record `evidence_from_decision` produces on each guard.
-
-`reqwest` (`json`, `rustls`), `tokio`, and `async-trait` provide HTTP
-transport and the async guard trait. `zeroize` wraps every credential in
-`Zeroizing<String>` so it is scrubbed from memory on drop. `sha2`, `base64`,
-and `url` support cache-key hashing, VirusTotal URL-lookup ids, and URL and
-host parsing.
-
-## Extension points
-
-- A new provider implements `external::ExternalGuard` (`name`, `cache_key`,
-  a single-attempt `eval`), reuses `external::validate_external_guard_url`
-  for its endpoint pre-flight check, and is wrapped in
-  `external::AsyncGuardAdapter::builder(...)` and then
-  `ScopedAsyncGuard::new(...)` to join the kernel's `Guard` pipeline.
-- `http_egress` (contract construction, client building, contract-scoped
-  dispatch) is crate-private. Providers added inside this crate reuse it
-  directly; out-of-crate implementers must build their own
-  `chio_egress_contract::HttpEgressContract` dispatch.
+`chio-egress-contract` owns contract-bound reqwest dispatch. `reqwest`, Tokio,
+URL parsing, and `async-trait` support transport and async interfaces.
+`chio-core-types` supplies original JSON validation and evidence types.
+SHA-256 and base64 derive lookup keys and URL identifiers. `secrecy` and
+`zeroize` support credential handling; tracing records adapter outcomes.
 
 ## Verification
 
-Unit tests exercise provider response decoding, fail-closed error handling and scoped async execution. The HTTP egress contract gate checks that outbound dispatch uses the shared bounded transport. Provider failures must never become an allow verdict.
+`cloud_guardrails.rs` checks local mocked cloud verdicts and evidence.
+`threat_intel.rs` checks mocked lookup outcomes, redirects, and cache reuse.
+`reader_boundaries.rs` checks duplicate responses, invalid arguments, unknown
+verdicts, and body-safe status errors. `threat_intel/virustotal_outcomes.rs`
+checks unseen policies, caching, and circuit behavior. Bridge unit tests cover
+current-thread fallback, blank scopes, and non-consuming revalidation.
+
+Run `cargo test -p chio-external-guards`. These are local HTTP mock and unit
+tests. Operational upstream compatibility and credential acceptance require
+separate verification against the configured services.

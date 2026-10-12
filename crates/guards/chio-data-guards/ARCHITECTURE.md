@@ -1,98 +1,88 @@
 # chio-data-guards architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-data-guards` runs inside the kernel's guard pipeline as part of the
-enforcement path, not an untrusted edge: its verdicts gate whether a tool call
-proceeds. Each pre-invocation guard is a narrow `chio_kernel::Guard`
-implementation that classifies the call via `chio_guards::extract_action_checked`,
-evaluates policy fail-closed, and returns `Allow` unconditionally for any
-action shape it does not recognize: guards in this crate are additive, and
-deny-by-default is enforced by the pipeline that composes them, not by an
-individual guard. `QueryResultGuard` is the exception: it runs after the tool
-responds and reshapes the response instead of denying it. No guard performs
-I/O of its own (`WarehouseCostGuard` reads a dry-run estimate the caller
-already attached to the arguments rather than contacting a warehouse), and the
-crate forbids unsafe code.
+The crate owns local data-access policy checks and result shaping.
+`SqlQueryGuard`, `VectorDbGuard`, and `WarehouseCostGuard` implement the
+kernel's pre-invocation `Guard` interface. `QueryResultGuard` supplies borrowed
+and owned post-invocation hooks. `StructuredClassifier` exposes byte-oriented
+classification with validated identities and findings.
 
-## Module map
+Capability issuance, database execution, receipt signing, and persistence
+belong to callers and the kernel. Warehouse cost checks consume supplied
+metadata; they do not issue provider dry runs. Returning a cost dimension
+requires the caller to record it in its metering workflow.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate facade: declares the seven modules and re-exports their public types. |
-| `src/config.rs` | `SqlGuardConfig`, `SqlDialect`, `SqlOperation`, and their allowlist/lookup helpers. |
-| `src/sql_parser.rs` | Wraps `sqlparser` to produce `SqlAnalysis` (operation class, tables, projected columns, `WHERE` presence) so the guard never sees parser types. |
-| `src/sql_guard.rs` | `SqlQueryGuard`: evaluates `SqlAnalysis` against `SqlGuardConfig`; the SQL `chio_kernel::Guard` impl. |
-| `src/error.rs` | `SqlGuardDenyReason`, the structured denial enum for the SQL guard. |
-| `src/vector_guard.rs` | `VectorDbGuard`: vendor-substring detection, configurable field-path argument extraction, collection/namespace/operation-class/`top_k` policy. |
-| `src/warehouse_cost_guard.rs` | `WarehouseCostGuard`: dry-run estimate extraction, decimal-string comparison, `CostDimension` emission. |
-| `src/result_guard.rs` | `QueryResultGuard`: row truncation, column redaction, PII regex redaction; `PostInvocationHook` and `chio_kernel::Guard` impls. |
+## Structure
 
-## Guard evaluation
+- `config` defines SQL dialects, operation classes, and policy fields.
+- `sql_parser` reduces one parsed statement to `SqlAnalysis`.
+- `sql_guard` enforces operation, table, projection, and predicate checks.
+- `error` supplies structured SQL denial reasons.
+- `vector_guard` reads configurable vector request fields and scope constraints.
+- `warehouse_cost_guard` extracts estimates and compares byte and decimal costs.
+- `result_guard` locates result rows and provides output hooks.
+- `structured_classification` validates findings and compiles regex classifiers.
 
-Common path for the three pre-invocation guards:
+## Data and control flow
 
-1. `chio_guards::extract_action_checked` classifies the request's tool name and
-   arguments into a `ToolAction`. A classification error denies immediately.
-2. The guard checks the action is its shape and, for the vector and warehouse
-   guards, that the database identifier or tool name matches a configured
-   vendor substring. A non-matching action or substring returns `Allow`
-   unconditionally, regardless of `allow_all`.
-3. The guard extracts a normalized view from the arguments: `SqlAnalysis` (via
-   `sqlparser`), a `VectorCall`, or a `DryRunEstimate`. Extraction failure
-   denies.
-4. The guard evaluates policy against that view. The vector and result guards
-   also read the matched grant's `Constraint`s from the capability scope via
-   `ctx.matched_grant_index`, falling back to the strictest constraint across
-   every grant in scope when no match is attributed. Any failing check denies
-   with a structured `*DenyReason`; an unconfigured policy denies unless
-   `allow_all` is set.
+Pre-invocation wrappers use `extract_action_checked`. Malformed action fields
+deny; unrelated actions pass through. Vector and warehouse guards additionally
+recognize configured substrings in database identifiers or tool names.
+Callers must choose markers and argument paths appropriate to their tools.
 
-`QueryResultGuard` runs after the tool responds instead of before it.
-`redact_result_for_request` locates the row array (or, if a constrained
-response is not row-shaped, replaces every value with the redaction marker),
-truncates it to the matched grant's (or scope-wide strictest)
-`MaxRowsReturned`, redacts `ColumnDenylist` matches, then applies configured
-PII regex patterns. Its `chio_kernel::Guard::evaluate` impl always returns
-`Allow`; `as_hook`/`into_owned_hook` build the real integration point, a
-`PostInvocationHook` for `chio_guards::post_invocation::PostInvocationPipeline`.
+SQL parsing rejects empty and multiple statements before policy evaluation.
+`analyze` then checks operations, tables, SELECT projections, normalized WHERE
+text, and required WHERE clauses for mutations. `allow_all` skips policy checks
+after parsing. Computed projections are rejected when a column policy exists;
+unlisted column-policy tables have no per-table column restriction.
 
-## Invariants and failure modes
+Vector collection enforcement applies when its allowlist is nonempty. An empty
+collection list alone does not deny a policy configured through other fields.
+Namespace enforcement is optional:
+`None` disables it and an empty list permits no named namespace. Kernel context
+selects the matched grant; standalone checks use the full scope constraints.
+Warehouse extraction requires both bytes and estimated USD fields even with
+`allow_all`, and limit checks compare supplied values.
 
-- Classification, parse, and extraction failures deny regardless of
-  `allow_all`; `allow_all` only widens the allowlist checks that run after a
-  successful parse.
-- An empty policy denies every matching request unless `allow_all` is set
-  (`SqlGuardConfig`/`VectorGuardConfig`/`WarehouseCostGuardConfig::is_empty`);
-  every guard constructor logs a warning when `allow_all` is true.
-- `sql_parser::parse` rejects multi-statement SQL outright, so a trailing
-  `DROP TABLE` cannot hide behind an allowed leading `SELECT`.
-- `SqlQueryGuard::enforce_columns` fails closed on unresolved (`"?"`)
-  projections whenever a column allowlist is active: a computed expression or
-  an unresolved join target could otherwise read any column from any table.
-- `VectorDbGuard` fails closed when a `top_k` ceiling is configured but the
-  call omits `top_k`, and when an `OperationClass` constraint is active but the
-  call omits an operation verb.
-- Operator-supplied regex (SQL predicate denylist, `QueryResultGuard` PII
-  patterns) is bounded by pattern count, length, and a complexity score before
-  compilation. `SqlQueryGuard::new` (infallible) falls back to a deny-all guard
-  on invalid regex; `SqlQueryGuard::try_new` and `QueryResultGuard::new` return
-  `Err` instead so policy loading can reject invalid configuration directly.
-- `QueryResultGuard` redacts fail-closed: a constrained response that does not
-  resolve to a recognized row shape has every value replaced by the marker
-  instead of passing through unredacted.
+Result hooks select matched-grant constraints when available, otherwise scope
+constraints. They truncate recognized row arrays, redact denied columns, then
+apply configured PII regexes to string values. Constrained unknown result shapes
+have their leaf values replaced. Installing only the pre-invocation guard
+interface does not apply these output transformations.
+
+## Trust and invariants
+
+Empty SQL policies deny unless explicitly opened. SQL predicate and output
+PII pattern constructors enforce count, length, complexity, and compiled-size
+bounds. `SqlQueryGuard::try_new` and `QueryResultGuard::new` expose load errors;
+the infallible SQL constructor substitutes a deny-all SQL configuration.
+Predicate matching uses normalized SQL text, not signed canonical JSON.
+
+Classification results bind SHA-256 and length of the original payload.
+Constructors validate classifier identity, categories, confidence, finding
+count, byte ranges, and JSON pointer locations. Field findings decode bounded,
+duplicate-aware signed JSON and require their locations to exist. Regex
+classification is pattern detection; confidence is supplied rule metadata.
+These objects do not independently authenticate the classifier or sign results.
 
 ## Dependencies
 
-Internal: `chio-core` supplies `ChioScope`, `Constraint`, and `ToolGrant`, the
-capability-scope types the vector and result guards read. `chio-kernel`
-supplies `Guard`, `GuardContext`, `GuardDecision`, and `KernelError`, the trait
-and types every guard here implements against. `chio-guards` supplies
-`extract_action_checked`, `ToolAction`, and the
-`PostInvocationHook`/`PostInvocationContext`/`PostInvocationVerdict` contract
-`QueryResultGuard` implements. `chio-metering` supplies `CostDimension`, which
-`WarehouseCostGuard::record_cost` produces. External: `sqlparser` backs
-`sql_parser.rs`; `regex` backs predicate and PII pattern matching;
-`serde`/`serde_json` (de)serialize guard configuration and inspect tool-call
-arguments; `thiserror` derives the deny-reason enums; `tracing` emits
-structured denial warnings. No dependency aliasing.
+`chio-kernel` supplies guard and hook interfaces; `chio-guards` supplies action
+extraction. `chio-core` and `chio-security-types` supply scopes, hashing, bounded
+JSON readers, and classification limits. `chio-metering` supplies cost types.
+`sqlparser` supplies dialect ASTs, while `regex` and `regex-syntax` support
+bounded pattern evaluation. Serde handles configuration and JSON values.
+
+## Verification
+
+Integration tests exercise SQL allowlists, dialects, projection restrictions,
+mutation checks, and pattern limits. Vector tests cover matched-grant selection,
+namespace checks, malformed arguments, and custom field paths. Warehouse tests
+cover missing estimates, cost ceilings, and cost dimensions. Result tests run
+post-invocation hooks and unknown-shape redaction. Classification tests cover
+shared payload limits; module tests cover validated findings and regex rules.
+
+Run `cargo test -p chio-data-guards` for the package suite. These tests use local
+requests and fixtures; they do not establish database-driver compatibility or
+the truth of external warehouse estimates.

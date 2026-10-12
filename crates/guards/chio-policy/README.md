@@ -1,132 +1,69 @@
 # chio-policy
 
-`chio-policy` is Chio's native HushSpec policy engine: it parses, validates,
-merges, evaluates, analyzes, and compiles the HushSpec YAML policy format that
-governs AI-agent tool access, egress, filesystem, shell, and computer-use
-actions.
-
-Invalid HushSpec documents reject at validation and compile time rather than
-silently compiling to a permissive default. The crate is a pure translator:
-it does not sign receipts, verify capabilities, or hold kernel state; those
-belong to `chio-kernel`.
-
-Automatic tool capabilities require an enabled `rules.tool_access` block.
-Missing `rules`, missing `tool_access`, and `enabled: false` produce an empty
-default scope. Guard-only policies remain valid and keep their guards, but
-do not grant tools merely because no tool restriction was configured. The
-pure reference evaluator still treats an absent tool rule as no additional
-restriction; its Allow result is not capability issuance authority.
-
-The `permissive` development builtin explicitly opts into `tool_access`
-with `default: allow`. The `remote-desktop` builtin supplies guards only;
-compose it with an enabled tool rule to authorize the intended tools. This
-changes the former implicit wildcard issuance behavior. Enabled tool-rule
-defaults and allowlist semantics remain unchanged, including the existing
-Allow schema default when `tool_access` is present.
-
-## Responsibilities
-
-- Define the versioned HushSpec YAML schema (`models`): 14 rule blocks, 5
-  extension blocks (posture, origins, detection, reputation, runtime
-  assurance, plus a Chio-specific passthrough slot), and governance metadata.
-- Parse HushSpec YAML with pre-checks that reject pathological input (a
-  non-mapping document root, unterminated double-quoted scalars, scalar-join
-  whitespace-run overflow) before handing off to `serde_yml`.
-- Validate a parsed policy (`validate`): regex safety, workload-identity
-  match shape, posture state/transition graphs, detection thresholds,
-  reputation tiers, and runtime-assurance tier/verifier bindings.
-- Resolve and merge `extends` inheritance chains, from the filesystem or a
-  caller-supplied loader, with cycle detection (`resolve`, `merge`).
-- Evaluate an action against a policy to an allow/warn/deny `Decision`
-  (`evaluate`, `evaluate_with_context`), including origin-profile selection,
-  posture transitions, and `when`-style conditional rule activation.
-- Analyze bounded rule relations and policy refinement, with explicit coverage
-  notices for semantics that cannot be compared soundly (`analyze`).
-- Compile a validated policy into a `chio_guards` `GuardPipeline`, a
-  `PostInvocationPipeline`, and a default `chio_core` capability scope
-  (`compiler::compile_policy`).
-- Produce timed, hashed audit receipts of evaluation decisions (`receipt`),
-  and hold the kernel-wide `crypto_floor` and `weights_card_required`
-  fail-closed enforcement enums.
-- Ship seven built-in rulesets (`default`, `strict`, `permissive`,
-  `ai-agent`, `cicd`, `remote-desktop`, `panic`) embedded at compile time as
-  `chio:<name>` extends targets (`rulesets`).
-
-## Public API
-
-- `HushSpec::parse`, `HushSpec::to_yaml`, `OriginMatch` - the policy document
-  and origin-match schema; the full schema tree (`Rules`, `Extensions`, every
-  rule/extension block) lives in `models`.
-- `validate`, `ValidationResult`, `ValidationError` - schema/semantic
-  validation.
-- `merge`, `resolve_from_path`, `resolve_with_loader`, `LoadedSpec`,
-  `ResolveError` - `extends` inheritance and chain resolution.
-- `evaluate`, `evaluate_with_context`, `Decision`, `EvaluationAction`,
-  `EvaluationResult`, `OriginContext`, `PostureContext`, `PostureResult`,
-  `selected_origin_profile_id` - action evaluation.
-- `activate_panic`, `deactivate_panic`, `is_panic_active` - process-wide
-  emergency deny-all switch consulted by every `evaluate` call.
-- `Condition`, `RuntimeContext`, `evaluate_condition` - conditional rule-block
-  activation (`conditions`).
-- `compile_policy`, `compile_policy_with_source`,
-  `compile_policy_with_memory_budget`, `CompiledPolicy`, `CompileError` - the
-  HushSpec-to-guard-pipeline compiler.
-- `evaluate_audited`, `AuditConfig`, `DecisionReceipt` - timed, hashed
-  evaluation receipts.
-- `analyze`, `analyze_against`, `AnalysisOptions`, `AnalysisReport`,
-  `RefinementStatus`, `Finding`, `Witness` - bounded static analysis and policy
-  refinement checks.
-- `builtin_yaml`, `load_builtin`, `list_builtin_names`, `BUILTIN_RULESETS`,
-  `RulesetError` - the embedded rulesets.
-- `CryptoFloor`, `CryptoFloorLoadError`, `WeightsCardConfig`,
-  `WeightsCardRequired`, `WeightsCardLoadError`, `HUSHSPEC_VERSION` -
-  kernel-wide policy enums.
-- `is_hushspec_format` - sniff whether a YAML string is a HushSpec document.
-
-Reached via their own module, not re-exported at the crate root:
-`detection::{Detector, DetectorRegistry, evaluate_with_detection}` (regex
-content scanners, independent of the `extensions.detection`-driven guards).
+Parse, validate, resolve, evaluate, and compile HushSpec policies for Chio.
+`CompiledPolicy` contains request guards, response hooks, a default capability
+scope, optional threshold approval requirements, and ordered guard names.
+The kernel owns admission, tool execution, and signed enforcement receipts.
 
 ## Usage
 
+Compile an explicit tool allowlist entirely in memory:
+
 ```rust
-use chio_policy::{compile_policy, evaluate, validate, Decision, EvaluationAction, HushSpec};
+use chio_policy::{compile_policy, HushSpec};
 
-let spec = HushSpec::parse(yaml_source)?;
-assert!(validate(&spec).is_valid());
-
-let result = evaluate(&spec, &EvaluationAction {
-    action_type: "tool_call".to_string(),
-    target: Some("mail.send".to_string()),
-    ..EvaluationAction::default()
-});
-assert_eq!(result.decision, Decision::Allow);
-
-// Or compile directly into a Chio guard pipeline and default capability scope:
-let compiled = compile_policy(&spec)?;
+let policy = HushSpec::parse(r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: ["files.read"]
+    default: block
+"#)?;
+let compiled = compile_policy(&policy)?;
+assert_eq!(compiled.default_scope.grants.len(), 1);
+assert_eq!(compiled.default_scope.grants[0].tool_name, "files.read");
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Testing
+The example uses existing dependencies and needs no files, services, or features.
+Register both compiled pipelines with the runtime and use the scope through the
+capability authority. The crate declares no Cargo features.
 
-`cargo test -p chio-policy`
+## Guarantees
 
-Mutation coverage runs against a focused module set:
-`cargo mutants --config crates/guards/chio-policy/mutants.toml --package chio-policy`.
+- `HushSpec::parse` checks YAML input hazards and rejects unknown schema fields.
+  Semantic validation is a separate operation.
+- `validate` checks version `0.1.0`, patterns, limits, and extension constraints.
+  `ValidationResult::is_valid` examines errors; warnings remain informational.
+- `compile_policy` runs validation and rejects unsupported execution semantics,
+  including origin-specific sender proof and unsupported approval fields.
+- `compile_scope` emits no default grants for missing or disabled tool rules.
+  Explicit default-allow rules can emit wildcard grants when representable.
+- `resolve_from_path_with_limits` bounds document bytes and inheritance depth;
+  the default limits are 4 MiB per document and depth 32. HTTP loading is rejected.
 
-## See also
+`evaluate` is a reference evaluator returning allow, warn, or deny. Unknown action
+types deny; an unrestricted recognized action can allow without issuing authority.
+`DecisionReceipt` records evaluation metadata and has no signature field.
 
-- [Policy Analysis](../../../docs/reference/POLICY_ANALYSIS.md) - operator
-  workflow and interpretation for `chio policy analyze`.
-- `chio-guards` - supplies `GuardPipeline`, `PostInvocationPipeline`, and
-  every guard type the compiler emits.
-- `chio-kernel` - supplies `MemoryBudgetConfig` and the `Guard` trait the
-  compiler targets.
-- `chio-core` - capability-scope, runtime-attestation, workload-identity, and
-  trust-policy types referenced by the schema and evaluator.
+## Status
 
-Time-conditioned and audited evaluation take an explicit `chio_security_types::Clock`
-and return `Result<_, ClockError>`. `evaluate_with_context` samples time once before
-rule filtering or condition composition, including `Not` and `Or`.
-`RuntimeContext` contains no caller-supplied time override. Audited evaluation
-rejects clock failure, regression, and timestamp/duration overflow; disabling
-audit details still requires a valid receipt timestamp.
+Implemented modules include embedded rulesets, inheritance, conditions,
+origin/posture evaluation, compilation, and bounded static analysis. Reference
+evaluation and compiled enforcement cover different rule surfaces. Analysis
+reports identify unsupported or inconclusive portions explicitly.
+
+The crate has no platform feature matrix or conditional platform API exports.
+Filesystem resolution and auxiliary detection assets require host file access;
+the in-memory example avoids those operations. Local tests cover parsing,
+compilation, validation, clock failures, approval, and scope authority boundaries.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol verification rules](../../../spec/PROTOCOL.md#53-verification-rules)
+- [Native guards](../chio-guards/README.md)
+- [Receipt semantics](../../../spec/PROTOCOL.md#61-receipt-semantics-and-decisions)
+
+[License](../../../LICENSE)

@@ -1,71 +1,57 @@
 # chio-data-guards-redactors-default
 
-Default implementation of the `chio:guards/redact@0.1.0` interface: regex-driven
-redaction of secrets, basic PII, and bearer-token bodies from a byte payload.
-Chio's tee runs it as the mandatory pass before a captured frame is buffered;
-`chio-log-redact` runs it against text, display, and tracing log output. The
-crate is nested under `crates/guards/chio-data-guards/` by path convention
-only - it shares no code or dependency with the parent `chio-data-guards`
-crate, which redacts query results through its own, unrelated regex path in
-`QueryResultGuard`.
-
-## Responsibilities
-
-- Implement `redact_payload`: a byte payload plus `RedactClass` flags in, a
-  `RedactedPayload` (redacted bytes plus manifest) or a fail-closed `Err` out.
-- Own the vetted regex patterns for each class: AWS access keys, JWTs, Stripe
-  live/test secret and publishable keys, OpenAI-style `sk-`/`sk-proj-` keys,
-  generic high-entropy runs, email, US phone, US SSN, Luhn-validated
-  credit-card numbers, and `Authorization: Bearer` bodies.
-- Resolve overlapping matches first-registered-wins, and apply replacements
-  without moving the manifest's byte offsets out of the original payload's
-  coordinate space.
-- Validate every vetted pattern compiles independently of the lazily
-  initialized hot-path regexes, so a caller can refuse to start on a broken
-  pattern instead of silently skipping a class.
-- Stamp every manifest with a `PASS_ID` tenants can pin against.
-
-## Public API
-
-- `redact_payload(payload: &[u8], classes: RedactClass) -> Result<RedactedPayload, RedactError>` -
-  primary entry point; mirrors the WIT `redact-payload` host call.
-- `redact(payload: &[u8]) -> Result<Vec<u8>, RedactError>` - convenience
-  wrapper over `RedactClass::default_full()` that drops the manifest.
-- `validate_default_redactor_compiles() -> Result<(), Vec<String>>` -
-  re-checks every vetted pattern at startup; returns the failing
-  `(label, pattern)` descriptions.
-- `RedactClass` - mirrors WIT `redact-class` flags (`secrets`, `pii_basic`,
-  `pii_extended`, `bearer_tokens`, `custom`); `RedactClass::all()` and
-  `RedactClass::default_full()` constructors. `pii_extended` and `custom` are
-  accepted but are no-ops in this implementation.
-- `RedactionMatch`, `RedactionManifest`, `RedactedPayload` - mirror WIT
-  records `redaction-match`, `redaction-manifest`, `redacted-payload`.
-- `RedactError::{Overflow, InvalidUtf8}` - fail-closed error variants.
-- `PASS_ID` - `"redactors@1.5.0+default"`, stamped into every
-  `RedactionManifest`.
+Byte-oriented redaction for the `chio:guards/redact@0.1.0` contract. The crate
+returns transformed bytes and a manifest of original-payload match locations
+for callers that scrub data before buffering or persistence.
 
 ## Usage
 
-```rust
-use chio_data_guards_redactors_default::{redact_payload, RedactClass};
+Validate the built-in patterns during startup and redact a local payload:
 
-let out = redact_payload(b"contact alice@example.com", RedactClass::default_full())?;
-assert!(out.manifest.matches.iter().any(|m| m.class == "pii.email"));
+```rust
+use chio_data_guards_redactors_default::{
+    redact_payload, validate_default_redactor_compiles, RedactClass, PASS_ID,
+};
+
+assert!(validate_default_redactor_compiles().is_ok());
+let output = redact_payload(b"contact alice@example.com", RedactClass::default_full())?;
+assert_eq!(output.bytes, b"contact [REDACTED-EMAIL]");
+assert_eq!(output.manifest.pass_id, PASS_ID);
+assert_eq!(output.manifest.matches.len(), 1);
+# Ok::<(), chio_data_guards_redactors_default::RedactError>(())
 ```
 
-## Testing
+This example needs no services or additional dependencies. `redact` is the
+convenience API when the caller needs only the output bytes.
 
-`cargo test -p chio-data-guards-redactors-default` runs the unit suite in
-`src/lib.rs` plus the realistic-payload integration suite in
-`tests/integration.rs`.
+## Guarantees
 
-## See also
+- `redact_payload` scans bytes and reports offsets in the original payload.
+- `collect_with_filter` rejects offsets or match lengths that overflow `u32`.
+- `luhn_ok` filters credit-card candidates by digit count and checksum.
+- `apply_spans` preserves bytes outside accepted spans; the manifest is sorted
+  by original offset and length and carries `PASS_ID` plus elapsed time.
+- `validate_default_redactor_compiles` recompiles the same pattern constants
+  used by the lazy runtime regexes so callers can reject startup failures.
 
-- `chio-tee` - `redact::DefaultRedactor` runs this crate's `redact_payload` as
-  the mandatory fail-closed pass before a captured frame is buffered.
-- `chio-log-redact` - runs this crate's `redact_payload` and
-  `validate_default_redactor_compiles` against text, display, and tracing log
-  output.
-- `chio-data-guards` - the parent directory's crate; a separate package with
-  its own independent redaction path (`QueryResultGuard`), not a dependency of
-  this crate.
+## Status
+
+Implemented patterns cover AWS access-key IDs, JWT-shaped strings, Stripe and
+OpenAI-style keys, long alphanumeric/underscore runs, basic email, US phone and
+SSN formats, Luhn-valid card candidates, and Bearer-shaped tokens.
+These heuristics can miss secrets and can redact ordinary matching text.
+`pii_extended` and `custom` are accepted flags with no transformation.
+`RedactClass::default()` enables no classes. Runtime regex compilation failure
+skips the affected pattern, so strict callers must use the startup validator.
+Callers own failure handling, persistence refusal, and manifest signing.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Data guards](../../README.md)
+- [Redaction WIT contract](../../../../../wit/chio-guards-redact/world.wit)
+- [Protocol safety properties](../../../../../spec/PROTOCOL.md#54-safety-properties-and-evidence-boundary)
+
+## License
+
+See [LICENSE](../../../../../LICENSE).
