@@ -79,11 +79,10 @@ fn decode(
     previous_digest: &str,
     payload: &[u8],
 ) -> Result<StoredRecord, StopChainError> {
-    let record: StopEpochV1 = serde_json::from_slice(payload)
-        .map_err(|error| StopChainError(format!("stop record does not decode: {error}")))?;
-    if record.canonical_bytes()? != payload {
-        return Err(StopChainError("stop record is not canonical".to_owned()));
-    }
+    let record: StopEpochV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(payload, MAX_STOP_RECORD_BYTES)
+            .and_then(|text| text.decode_canonical())
+            .map_err(|error| StopChainError(format!("stop record does not decode: {error}")))?;
     let digest = record.digest()?;
     if digest != record_digest
         || record.previous != previous_digest
