@@ -57,3 +57,21 @@ fn conflicting_begin_keeps_the_original_identity_terminal() {
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_disposition(&response, "terminal");
 }
+
+#[test]
+fn unconfirmed_broker_registration_retains_identity_without_dispatch() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("identity-broker-unknown");
+    store.lose_next_command_ack.store(true, Ordering::SeqCst);
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("injected command acknowledgement loss")));
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::BrokerAttemptRegistered
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert_disposition(&response, "retained");
+}

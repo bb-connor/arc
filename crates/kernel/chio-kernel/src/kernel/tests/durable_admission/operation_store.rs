@@ -794,6 +794,11 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         let result = operation.apply_command(command, trusted_now_unix_ms)?;
         state.operation = Some(result.clone().into_operation());
         state.claim = None;
+        if self.lose_next_command_ack.swap(false, Ordering::SeqCst) {
+            return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                "injected command acknowledgement loss".into(),
+            ));
+        }
         Ok(result)
     }
 
