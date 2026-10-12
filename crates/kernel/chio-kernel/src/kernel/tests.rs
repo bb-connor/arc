@@ -247,6 +247,8 @@ use dispatch_credentials::{
     post_dispatch_approval_commit_fixture, request_with_recording_execution_nonce_store,
     request_with_replayed_approval, CountingDispatchServer, PostDispatchApprovalCommitFailure,
 };
+#[path = "tests/budget_cleanup_custody.rs"]
+mod budget_cleanup_custody;
 #[path = "tests/compliance_score.rs"]
 mod compliance_score;
 #[path = "tests/immediate_dispatch_revalidation.rs"]
@@ -259,12 +261,12 @@ mod nested_url_side_effects;
 mod payment_ambiguity;
 #[path = "tests/payment_outcomes.rs"]
 mod payment_outcomes;
-#[path = "tests/prepay_custody.rs"]
-mod prepay_custody;
 #[path = "tests/post_payment_revalidation.rs"]
 mod post_payment_revalidation;
 #[path = "tests/prepared_dispatch_credentials.rs"]
 mod prepared_dispatch_credentials;
+#[path = "tests/prepay_custody.rs"]
+mod prepay_custody;
 #[path = "tests/session_nonce_binding.rs"]
 mod session_nonce_binding;
 use multi_tenant_receipt::oauth_auth_with_enterprise_tenant;

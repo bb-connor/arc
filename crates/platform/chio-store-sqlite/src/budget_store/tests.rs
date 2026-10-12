@@ -4,6 +4,9 @@ use chio_kernel::InMemoryBudgetStore;
 #[path = "tests/composite.rs"]
 mod composite_lifecycle;
 
+#[path = "tests/cleanup_custody.rs"]
+mod cleanup_custody;
+
 #[path = "tests/support.rs"]
 mod support;
 use support::*;

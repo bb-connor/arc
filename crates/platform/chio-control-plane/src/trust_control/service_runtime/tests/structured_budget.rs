@@ -350,6 +350,10 @@ fn remote_budget_store_round_trips_exact_structured_authorization(
     let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
         return Err(std::io::Error::other("structured authorization was not authorized").into());
     };
+    assert_eq!(
+        authorized.cleanup_custody,
+        chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh
+    );
     assert_eq!(authorized.invocation_quota_usages.len(), 1);
     assert_eq!(
         authorized
@@ -375,6 +379,39 @@ fn remote_budget_store_round_trips_exact_structured_authorization(
             "\"commitIndex\":11",
         ],
     );
+    Ok(())
+}
+
+#[test]
+fn remote_authorization_preserves_current_call_custody_and_defaults_to_unknown(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::budget_store::BudgetHoldCleanupCustody;
+
+    for custody in [Some(BudgetHoldCleanupCustody::Replayed), None] {
+        let request = composite_request()?;
+        let mut body: serde_json::Value =
+            serde_json::from_str(&structured_authorize_body(&request)?)?;
+        let fields = body
+            .as_object_mut()
+            .ok_or_else(|| std::io::Error::other("authorization response was not an object"))?;
+        if let Some(custody) = custody {
+            fields.insert("cleanupCustody".to_string(), serde_json::to_value(custody)?);
+        } else {
+            assert!(fields.remove("cleanupCustody").is_some());
+        }
+        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
+        let store = build_remote_budget_store(&server.url, "secret")?;
+        let BudgetAuthorizeHoldDecision::Authorized(authorized) =
+            store.authorize_budget_hold(request)?
+        else {
+            return Err(std::io::Error::other("structured authorization was denied").into());
+        };
+        assert_eq!(authorized.cleanup_custody, custody.unwrap_or_default());
+        assert_eq!(authorized.authorized_exposure_units, 100);
+        assert_eq!(authorized.committed_cost_units_after, 100);
+        assert_eq!(authorized.metadata.budget_commit_index, Some(7));
+        assert_eq!(server.requests().len(), 1);
+    }
     Ok(())
 }
 
