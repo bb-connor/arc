@@ -58,6 +58,30 @@ impl RetainedChildren {
 }
 
 #[test]
+fn live_child_lookup_misses_archived_children_and_keeps_live_children() -> TestResult {
+    let fixture = RetainedChildren::new()?;
+    let archive = rusqlite::Connection::open(&fixture.archive)?;
+    let archived: i64 = archive.query_row(
+        "SELECT COUNT(*) FROM chio_child_receipts WHERE receipt_id = ?1",
+        rusqlite::params![fixture.children[0].id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        archived, 1,
+        "retention preserved the original archived child"
+    );
+    assert!(fixture
+        .store
+        .load_child_receipt(&fixture.children[0].id)?
+        .is_none());
+    assert!(fixture
+        .store
+        .load_child_receipt(&fixture.children[2].id)?
+        .is_some());
+    Ok(())
+}
+
+#[test]
 fn retained_child_lookup_reads_an_uncheckpointed_live_append() -> TestResult {
     let directory = tempfile::tempdir()?;
     let store = SqliteReceiptStore::open(directory.path().join("live.sqlite3"))?;
