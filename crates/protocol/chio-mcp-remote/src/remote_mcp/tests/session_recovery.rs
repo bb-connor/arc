@@ -476,3 +476,7 @@ async fn tampered_pending_tombstone_keeps_the_store_unserved(
     std::fs::remove_dir_all(directory)?;
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/terminal_journal.rs"]
+mod terminal_journal;
