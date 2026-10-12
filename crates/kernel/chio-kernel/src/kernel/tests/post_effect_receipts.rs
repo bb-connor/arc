@@ -233,3 +233,130 @@ fn preparing_a_terminal_response_does_not_append_it() {
     assert_eq!(kernel.receipt_log().len(), 1);
     assert!(response.receipt.is_allowed());
 }
+
+struct PanicAfterCommitStore {
+    receipts: Arc<Mutex<Vec<ChioReceipt>>>,
+    panic_first: AtomicBool,
+    recovery_ready: Arc<AtomicBool>,
+}
+
+impl ReceiptStore for PanicAfterCommitStore {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.receipts.lock().unwrap().push(receipt.clone());
+        if self.panic_first.swap(false, Ordering::SeqCst) {
+            panic!("store panicked after its authoritative commit");
+        }
+        Ok(())
+    }
+
+    fn append_child_receipt(&self, _: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        unreachable!("this fixture has no children")
+    }
+
+    fn flush_receipt_writes(&self) -> Result<crate::ReceiptFlushReport, ReceiptStoreError> {
+        if self.recovery_ready.load(Ordering::SeqCst) {
+            Ok(crate::ReceiptFlushReport::default())
+        } else {
+            Err(ReceiptStoreError::Unsupported(
+                "readback is deliberately unavailable".into(),
+            ))
+        }
+    }
+
+    fn load_retained_chio_receipt(
+        &self,
+        id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        Ok(self
+            .receipts
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|receipt| receipt.id == id)
+            .cloned())
+    }
+
+    fn load_retained_chio_receipt_commitment(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::RetainedReceiptCommitment>, ReceiptStoreError> {
+        self.load_retained_chio_receipt(id)?
+            .map(|receipt| {
+                let canonical = chio_core::canonical::canonical_json_bytes(&receipt)
+                    .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+                Ok(crate::RetainedReceiptCommitment {
+                    entry_seq: 1,
+                    receipt_id: receipt.id,
+                    receipt_sha256: chio_core::crypto::sha256_hex(&canonical),
+                    kernel_key: receipt.kernel_key,
+                })
+            })
+            .transpose()
+    }
+}
+
+#[test]
+fn a_store_panic_after_commit_retains_identity_without_poisoning_publication() {
+    let (mut kernel, request, invocations) = fixture();
+    let receipts = Arc::new(Mutex::new(Vec::new()));
+    let recovery_ready = Arc::new(AtomicBool::new(false));
+    kernel
+        .set_receipt_store(Box::new(PanicAfterCommitStore {
+            receipts: Arc::clone(&receipts),
+            panic_first: AtomicBool::new(true),
+            recovery_ready: Arc::clone(&recovery_ready),
+        }))
+        .unwrap();
+    let first = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        kernel.evaluate_tool_call_blocking(&request)
+    }));
+    assert!(
+        first.is_ok(),
+        "an entered append panic must return retained evidence"
+    );
+    assert!(first.unwrap().is_err());
+    let original_id = receipts.lock().unwrap().first().unwrap().id.clone();
+    let mut next = request.clone();
+    next.request_id = "after-panicking-append".into();
+    let _ = kernel.evaluate_tool_call_blocking(&next);
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        1,
+        "the unresolved original must close new dispatch"
+    );
+    recovery_ready.store(true, Ordering::SeqCst);
+    for _ in 0..200 {
+        if kernel
+            .receipt_log()
+            .iter()
+            .any(|receipt| receipt.id == original_id)
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        kernel
+            .receipt_log()
+            .iter()
+            .any(|receipt| receipt.id == original_id),
+        "authoritative original must recover after readback"
+    );
+    let count = receipts
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|receipt| {
+            receipt
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.pointer("/receipt_context/request_id"))
+                .and_then(serde_json::Value::as_str)
+                == Some(request.request_id.as_str())
+        })
+        .count();
+    assert_eq!(
+        count, 1,
+        "a committed original must not acquire a competing fault terminal"
+    );
+}
