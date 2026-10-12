@@ -20,6 +20,13 @@ pub(super) fn resume_deadline(
     .map(Some)
 }
 
+/// First event id of a restored incarnation. Its generation `r + 1` occupies
+/// the high 32 bits, so every id an earlier incarnation issued falls below it.
+pub(super) fn restored_event_seed(resume_generation: u64) -> Option<u64> {
+    let generation = resume_generation.checked_add(1)?;
+    (generation <= u64::from(u32::MAX)).then_some(generation << 32)
+}
+
 pub(super) async fn restore_persisted_sessions(
     path: &FsPath,
     keyring: &RemoteSessionHmacKeyring,
@@ -77,6 +84,16 @@ pub(super) async fn restore_persisted_sessions(
                         .lock()
                         .map_err(|_| ClockError::Unavailable)?
                         .deadline = Some(deadline);
+                }
+                // A second restore must never reuse this incarnation's seed.
+                if let Err(error) = session.persist_restored_generation() {
+                    warn!(session_id = %record.session_id, error = %error,
+                        "retaining MCP session whose restored generation was not persisted");
+                    if let Err(error) = session.shutdown_upstream_transport() {
+                        warn!(session_id = %record.session_id, error = %error,
+                            "unserved restored MCP session upstream shutdown failed");
+                    }
+                    continue;
                 }
                 sessions.insert_active(session).await;
             }
