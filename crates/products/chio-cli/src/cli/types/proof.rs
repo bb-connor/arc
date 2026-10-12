@@ -225,7 +225,7 @@ pub(crate) enum ProofDoctorScenario {
     CommercePayments,
     DisclosureLineage,
     EnterpriseExport,
-    #[value(name = "proof-package", alias = "launch-package")]
+    #[value(name = "proof-package")]
     ProofPackage,
     PublicSettlement,
     RuntimeSecurity,

@@ -1485,6 +1485,33 @@ fn plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_
 }
 
 #[test]
+fn plan_authoritative_route_ignores_snake_case_control_plane_keys() {
+    let mut availability = BTreeMap::new();
+    availability.insert(
+        DiscoveryProtocol::Mcp,
+        RouteAvailabilityStatus::unavailable("mcp route unavailable"),
+    );
+    let executor = MockMcpExecutor;
+    let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
+    let planning = plan_authoritative_route(
+        "req-route-snake",
+        DiscoveryProtocol::A2a,
+        DiscoveryProtocol::Mcp,
+        Some(&governed_intent_with_control_plane(json!({
+            "allow_native_fallback": true
+        }))),
+        &registry,
+        &availability,
+    )
+    .unwrap();
+
+    assert_ne!(
+        planning.selected_target_protocol,
+        Some(DiscoveryProtocol::Native)
+    );
+}
+
+#[test]
 fn plan_authoritative_route_denies_when_projected_protocols_are_disallowed_without_native() {
     let executor = MockMcpExecutor;
     let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);

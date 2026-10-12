@@ -57,8 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Implemented orchestration with injected `SecurityEventStore`, response stores,
 `EffectPort`, receipt sinks, and alert ports. Durable transactions and actual
-host effects depend on those implementations. The re-exported simulation API
-models dry-run overlays from captured snapshots without executing live effects.
+host effects depend on those implementations. 
 
 ## Related
 
