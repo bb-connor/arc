@@ -259,6 +259,8 @@ mod nested_url_side_effects;
 mod payment_ambiguity;
 #[path = "tests/payment_outcomes.rs"]
 mod payment_outcomes;
+#[path = "tests/prepay_custody.rs"]
+mod prepay_custody;
 #[path = "tests/post_payment_revalidation.rs"]
 mod post_payment_revalidation;
 #[path = "tests/prepared_dispatch_credentials.rs"]
