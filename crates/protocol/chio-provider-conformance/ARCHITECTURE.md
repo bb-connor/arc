@@ -61,7 +61,7 @@ The shared original JSON reader rejects duplicate keys before typed projection.
 
 assert_canonical_json_eq serializes both inputs with canonical encoding and
 returns AssertionError on mismatch. assert_verdict_eq compares typed values.
-A captured Allow is replay data, not a newly admitted tool invocation.
+A captured Allow records a replay expectation and grants no execution authority.
 Provider features control adapter availability; disabled replay reports an error.
 No crate API certifies external-provider availability or operational policy.
 

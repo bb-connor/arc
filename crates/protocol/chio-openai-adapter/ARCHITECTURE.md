@@ -10,8 +10,8 @@ and model metadata. The caller owns the authenticity of this host context.
 
 The optional `OpenAiAdapter` owns Responses-to-fabric projection.
 `OpenAiHttpTransport` sends native requests through shared HTTP primitives.
-Kernel receipt authority belongs to admitted dispatch, not provider captures
-or syntactically valid function-call bytes.
+Kernel receipt authority requires admitted dispatch. Provider captures and
+syntactically valid function-call bytes establish no execution authority.
 
 ## Structure
 
