@@ -1,62 +1,94 @@
 # chio-binding-helpers architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-binding-helpers` is a pure, deterministic library: no I/O, no session
-state, no async runtime. It sits between `chio-core` and `chio-manifest`,
-which own the protocol's capability, receipt, manifest, and cryptography
-types, and the non-Rust Chio SDKs, which need the same verification results
-as the Rust kernel without re-implementing Ed25519 signing or RFC 8785
-canonical JSON. `chio-bindings-ffi` builds a C ABI on top of this crate for
-callers outside Rust.
+The public surface in `src/lib.rs` re-exports artifact parsers, canonical body
+serializers, verification reports, hashing, and signing functions. Inputs are
+borrowed Rust strings, byte slices, or typed artifacts; outputs are owned
+strings, artifacts, and serializable reports. The crate forbids unsafe code.
+Foreign pointer handling belongs to `chio-bindings-ffi`.
 
-## Module map
+`CapabilityVerification`, `ReceiptVerification`, and `ManifestVerification`
+retain individual check outcomes so SDKs can expose them without reproducing
+Rust cryptographic logic. These reports do not store policy or trust decisions
+between calls. Applications supply time and trusted receipt signers explicitly.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Declares the seven modules and re-exports their public items at the crate root. |
-| `src/canonical.rs` | `canonicalize_json_str`, wrapping `chio_core::canonicalize`. |
-| `src/hashing.rs` | `sha256_hex_bytes` / `sha256_hex_utf8`, wrapping `chio_core::sha256_hex`. |
-| `src/signing.rs` | Ed25519 sign/verify over UTF-8 messages and canonical JSON strings; hex public-key and signature format checks. |
-| `src/capability.rs` | `CapabilityToken` JSON parsing, canonical body JSON, and `verify_capability` (signature, delegation-chain shape, time status). |
-| `src/receipt.rs` | `ChioReceipt` JSON parsing, canonical body JSON, `verify_receipt*` (signature, parameter hash, receipt ID, decision, trusted-signer authorization), and the human-readable `result` label. |
-| `src/manifest.rs` | `SignedManifest` JSON parsing, canonical body JSON, and `verify_signed_manifest` (structure, signature, embedded-key-matches-signer). |
-| `src/error.rs` | `Error` (wraps `chio_core::Error`, `serde_json::Error`, `chio_manifest::ManifestError`) and the `ErrorCode` each variant maps to. |
+## Structure
 
-## Verification reports
+| Module | Responsibility |
+| --- | --- |
+| `canonical` | Parse raw JSON into a value and emit RFC 8785 canonical JSON. |
+| `hashing` | SHA-256 lowercase hex for byte slices and UTF-8 strings. |
+| `signing` | Seed-based Ed25519 signing, signature verification, and hex helpers. |
+| `capability` | Token parsing, body canonicalization, signature/chain-shape/time report. |
+| `receipt` | Strict signed-wire parsing, body canonicalization, identity/hash/trust report. |
+| `manifest` | Signed-manifest parsing, body canonicalization, structure and key report. |
+| `error` | `Error`, `ErrorCode`, and `Result` conversion across dependencies. |
 
-Every `verify_*` function follows the same shape: parse or accept the
-protocol type, run each check independently against `chio-core` /
-`chio-manifest` primitives, and return a plain `serde`-serializable struct
-with one field per check. Capability and manifest verification expose only
-the per-check fields; receipt verification additionally folds them into
-`authorized` and `ok` so a caller gets both the detail and one pass/fail bit.
-No per-check field is computed conditionally on another, so a caller sees
-every failure, not just the first.
+## Data and control flow
 
-## Invariants and failure modes
+JSON signing parses a `serde_json::Value`, constructs a `Keypair` from the seed,
+and invokes `sign_canonical`. The returned `CanonicalJsonSignature` carries the
+canonical bytes as UTF-8, the public key, and the hex signature. Verification
+reconstructs the value and key/signature objects before `verify_canonical`.
+UTF-8 signing and verification pass the input's bytes directly to the key APIs.
 
-- Receipt `id` is bound into the signed payload: mutating `id` alone (without
-  touching the body) invalidates both `receipt_id_valid` and `signature_valid`.
-- An untrusted or empty signer set makes `authorized` and `ok` false even when
-  signature, parameter hash, and receipt ID all check out; only an explicitly
-  trusted `kernel_key` authorizes a receipt.
-- `parse_trusted_signer_hex` fails closed on unparseable hex
-  (`ErrorCode::InvalidHex`) instead of dropping the bad entry silently.
-- `core_error_code` and the `ManifestError` arm in `Error::code` match every
-  upstream variant explicitly, with no wildcard arm: a new `chio_core::Error`
-  or `chio_manifest::ManifestError` variant is a compile error here until it
-  is given a code.
-- `tests/vector_fixtures.rs` treats the on-disk JSON under
-  `tests/bindings/vectors/` as ground truth; the in-Rust fixture builders are
-  regenerators, not the source of truth, and stay behind `#[ignore]`.
+Capability verification calls `validate_time(now)` and converts its expiry or
+not-yet-valid outcome to `CapabilityTimeStatus`. Signature verification remains
+fallible. `validate_delegation_chain` receives the optional maximum depth; its
+failure becomes a false `delegation_chain_shape_valid` field. The validator checks
+link signatures, adjacent delegator/delegatee continuity, timestamp order, and
+optional depth; authenticated scope-root binding is outside this helper.
+
+Receipt JSON takes a distinct ingress path through
+`UntrustedJsonText::decode_signed`. Verification recomputes the ID from the body,
+checks `action.verify_hash`, and verifies the signature. It compares the embedded
+kernel key to the supplied trusted signer slice, then combines those outcomes
+with the receipt's decision/kind/boundary semantics for `authorized`.
+
+Manifest verification calls `validate_manifest`, parses the manifest's embedded
+public key, and verifies the signature with `signer_key`. Structure and embedded
+key failures appear as report fields; decoding and cryptographic operation
+errors return `Err`. The body serializers expose unsigned bodies, while artifact
+signature verification uses the corresponding underlying signing contract.
+
+## Trust and invariants
+
+Generic canonicalization, JSON signing, capability parsing, and manifest parsing
+use ordinary Serde JSON decoding. Duplicate-aware signed-wire rejection is an
+explicit guarantee of receipt JSON ingress. Callers requiring strict admission
+of other raw signed artifacts must use the appropriate authoritative parser.
+
+`verify_capability` checks chain shape, signatures, and time. It has no trusted
+issuer parameter, trust-root resolver, request, or persistent budget registry.
+An application accepting delegated authority needs the kernel's full verifier
+and admission state. A successfully returned report may contain false fields.
+
+Receipt `ok` requires signature, parameter hash, ID, and signer trust. `authorized`
+also requires the semantic authorization predicate. An empty trusted signer list
+always makes both fields false. Output content is absent from this API, so it
+cannot recompute a receipt's content hash against the delivered output.
+
+`public_key_hex_matches` strips a lowercase `0x` prefix and compares text ignoring
+ASCII case; it performs no key parsing. Use `is_valid_public_key_hex` to check key
+encoding separately. Signing seeds and their handling remain caller concerns.
 
 ## Dependencies
 
-Internal: `chio-core` supplies `CapabilityToken`, `ChioReceipt`, the crypto
-primitives (`Keypair`, `PublicKey`, `Signature`), canonical JSON
-(`canonicalize`, `canonical_json_string`), and `sha256_hex`. `chio-manifest`
-supplies `SignedManifest`, `ToolManifest`, `validate_manifest`, and
-`sign_manifest`. External: `serde` / `serde_json` for parsing and the
-serializable report structs, `thiserror` for `Error`. Dev-only:
-`chio-test-support` (`TestUnwrap`) in the vector-fixture integration test.
+`chio-core` supplies artifact types, canonicalization, hash functions, signatures,
+receipt semantics, and delegation validation. `chio-manifest` supplies the signed
+manifest and structural validator. `serde` and `serde_json` provide report/wire
+serialization. `thiserror` preserves dependency error messages behind `Error`.
+`chio-test-support` supplies test assertion helpers.
+
+## Verification
+
+Run `cargo test -p chio-binding-helpers`. Module tests cover known hashes,
+canonical ordering, signature round trips, report construction, and error codes.
+`tests/vector_fixtures.rs` reads the cross-language corpus in
+`tests/bindings/vectors`, checks public API results, rejects duplicate receipt
+members at original bytes, and exercises full-width integers and nested values.
+
+Fixture generation and signature reblessing helpers are ignored tests with file
+write effects. Ordinary tests read the checked-in corpus. The obsolete manifest
+fixture test expects rejection under the current manifest admission shape.

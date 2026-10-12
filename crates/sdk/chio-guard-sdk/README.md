@@ -1,66 +1,65 @@
 # chio-guard-sdk
 
-Guest-side SDK for authoring Chio WASM guards. It defines the JSON ABI shared
-with the host runtime, safe wrappers for the host imports, the guest allocator,
-and the glue that decodes a request and encodes a verdict. A guard built with
-this crate compiles to a `.wasm` module that `chio-wasm-guards` loads into the
-kernel at runtime.
-
-## Responsibilities
-
-- Define `GuardRequest`, `GuardVerdict`, and `GuestDenyResponse` with serde
-  field shapes byte-compatible with the host-side ABI in `chio-wasm-guards`.
-- Provide safe wrappers for the `chio.log`, `chio.get_config`,
-  `chio.get_time_unix_secs`, and `chio:guard/host.fetch-blob` host imports, with
-  no-op or documented-default fallbacks on non-`wasm32` targets so guard logic
-  runs under `cargo test` without a WASM runtime.
-- Deserialize the request from guest linear memory (`read_request`), encode a
-  verdict into the ABI return code (`encode_verdict`), and export
-  `chio_deny_reason` for structured deny reasons.
-- Export `chio_alloc` / `chio_free`, a `Vec`-backed guest allocator the host
-  writes the request into.
-- Wrap the `policy-context.bundle-handle` resource (`PolicyContext`) for reading
-  host-owned content-bundle blobs via `fetch_blob`.
-
-## Public API
-
-- `types::{GuardRequest, GuardVerdict, GuestDenyResponse, VERDICT_ALLOW, VERDICT_DENY}`
-- `host::{log, log_level, get_config, get_time, fetch_blob, PolicyContext}`
-- `glue::{read_request, encode_verdict, chio_deny_reason}`
-- `alloc::{chio_alloc, chio_free}`
-- `prelude` - re-exports the full guard-author API for `use chio_guard_sdk::prelude::*;`
+Guest types, host-import wrappers, and memory glue for Rust WASM guards.
+The SDK carries tool context into a guard and encodes its allow or deny
+verdict for `chio-wasm-guards`. The host kernel owns capability admission
+and receipt signing.
 
 ## Usage
 
-```rust,ignore
-use chio_guard_sdk::prelude::*;
-use chio_guard_sdk_macros::chio_guard;
+Evaluate a deserialized request without a WASM runtime:
 
-#[chio_guard]
-fn evaluate(req: GuardRequest) -> GuardVerdict {
-    if req.tool_name == "dangerous_tool" {
-        GuardVerdict::deny("tool is blocked by policy")
-    } else {
-        GuardVerdict::allow()
-    }
-}
+```rust
+use chio_guard_sdk::{encode_verdict, GuardRequest, GuardVerdict, VERDICT_DENY};
+
+let request: GuardRequest = serde_json::from_str(r#"{
+    "tool_name": "delete_file",
+    "server_id": "files",
+    "agent_id": "agent-1",
+    "arguments": {"path": "/workspace/report.txt"}
+}"#)?;
+let verdict = if request.tool_name == "delete_file" {
+    GuardVerdict::deny("deletion is blocked")
+} else {
+    GuardVerdict::allow()
+};
+assert_eq!(encode_verdict(verdict), VERDICT_DENY);
+# Ok::<(), serde_json::Error>(())
 ```
 
-`#[chio_guard]` (from `chio-guard-sdk-macros`) generates the `evaluate`
-`extern "C"` entry point and the `chio_alloc` / `chio_free` / `chio_deny_reason`
-exports around this function. Without the macro, a guard author calls
-`read_request`, `encode_verdict`, and the allocator exports directly.
+For a guest module, compile a `cdylib` for `wasm32-unknown-unknown`.
+Wire its `evaluate(ptr, len)` export manually or use
+[`chio-guard-sdk-macros`](../chio-guard-sdk-macros/README.md).
+The host must provide the imports used by the guard and valid memory regions.
+Native host wrappers supply test fallbacks: logging does nothing, config
+returns `None`, time returns zero, and blob reads return an error.
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-guard-sdk`
+- `GuardVerdict::deny` and `encode_verdict` trim denial reasons and replace
+  whitespace-only reasons with `guard denied request`.
+- `read_request` rejects nonpositive pointers and negative lengths before
+  reading. Its unsafe contract still requires a live, readable memory region.
+- `chio_deny_reason` returns `-1` for absent reasons, invalid signed bounds,
+  serialization failure, or insufficient capacity. Positive bounds must
+  describe a valid writable region supplied by the host.
+- `chio_free` releases only a tracked allocation matching both pointer and
+  size. Unmatched frees leave tracked allocations untouched.
 
-## See also
+## Status
 
-- `chio-guard-sdk-macros` - the `#[chio_guard]` attribute macro that generates
-  the ABI exports around a plain `evaluate` function.
-- `chio-wasm-guards` - host-side runtime that loads the compiled `.wasm` guard,
-  writes requests through the allocator exports, and interprets the return code.
-- `chio-guard-sdk-compat` - re-exports this crate's API as a standalone Cargo
-  package outside the root workspace.
-- `chio-cli` - `guard new` scaffolds a new guard project against this crate.
+The guest ABI and native test fallbacks are implemented. The crate declares
+no Cargo features and is unpublished (`publish = false`). `PolicyContext`
+reads through a host handle; `close` consumes the wrapper without a host
+destructor call. Host runtimes must reclaim the bundle resource.
+Native tests exercise JSON and verdict logic; use the WASM host tests to
+exercise guest execution and imports.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [WASM host](../../guards/chio-wasm-guards/README.md)
+- [Tool-gate example](../../../examples/guards/tool-gate/src/lib.rs)
+
+Licensed under [Apache-2.0](../../../LICENSE).

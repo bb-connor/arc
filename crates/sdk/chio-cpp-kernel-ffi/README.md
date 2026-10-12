@@ -1,84 +1,103 @@
 # chio-cpp-kernel-ffi
 
-C ABI for the Chio C++ offline kernel SDK. `chio-cpp-kernel-ffi` wraps
-`chio-kernel-core`'s capability evaluation, capability verification, receipt
-signing, and passport verification behind a plain `extern "C"` surface: JSON
-strings in, JSON strings out, Rust-owned buffers the caller must free
-explicitly. It mirrors `chio-kernel-mobile`'s JSON-in/JSON-out shape but skips
-UniFFI, so the generated header carries no Rust or UniFFI concepts into C++.
+`chio-cpp-kernel-ffi` exposes offline capability evaluation and verification,
+receipt signing, and portable-passport verification to `sdks/cpp/chio-cpp-kernel`.
+It adapts `chio-kernel-core` to JSON C strings and Rust-owned result buffers.
+Its ABI version is 2; the library produces `staticlib`, `cdylib`, and `rlib`.
 
-Distinct from `chio-bindings-ffi`: that crate exposes `chio-binding-helpers`'
-stateless invariant checks (signature, manifest, and capability-shape
-validation) to `sdks/cpp/chio-cpp`. This crate exposes kernel *evaluation*
-(capability-scoped verdicts, receipt signing, chain-bound capability
-verification) to the separate offline kernel library
-`sdks/cpp/chio-cpp-kernel`.
+## Usage
 
-## Responsibilities
+Verify a signed direct capability through the exported Rust-accessible C ABI:
 
-- Evaluate a portable tool-call request against a capability token via
-  `chio_kernel_core::evaluate_with_full_floor`, returning an allow/deny
-  verdict as JSON (`chio_kernel_evaluate_json`).
-- Sign receipt bodies through the default WYSIWYS path, which recomputes
-  `content_hash` over a caller-supplied canonical preimage and refuses to
-  sign on mismatch (`chio_kernel_sign_receipt_json`), plus an explicit relay
-  seam for forwarding an already-minted trusted body
-  (`chio_kernel_sign_receipt_relaying_trusted_body_json`).
-- Verify capability tokens, either against a single trusted authority
-  (`chio_kernel_verify_capability_json`) or with full context: peer feature
-  negotiation, per-issuer trust roots, and parent-budget snapshots for
-  delegated tokens (`chio_kernel_verify_capability_with_context_json`).
-- Verify portable-passport envelopes (`chio_kernel_verify_passport_json`).
-- Validate every pointer, UTF-8 string, and hex field at the boundary, and
-  contain panics so nothing but a defined `ChioKernelFfiResult` ever crosses
-  back into C++.
+```rust
+use std::ffi::CString;
+use chio_core_types::capability::{
+    scope::{ChioScope, Operation, ToolGrant},
+    token::{CapabilityToken, CapabilityTokenBody},
+};
+use chio_core_types::crypto::Keypair;
+use chio_cpp_kernel_ffi::{
+    chio_kernel_buffer_free, chio_kernel_ffi_abi_version,
+    chio_kernel_verify_capability_json, CHIO_KERNEL_FFI_STATUS_OK,
+};
 
-## Public API
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(chio_kernel_ffi_abi_version(), 2);
+    let issuer = Keypair::from_seed(&[9; 32]);
+    let subject = Keypair::from_seed(&[10; 32]);
+    let token = CapabilityToken::sign(CapabilityTokenBody {
+        id: "example-cap".into(), issuer: issuer.public_key(),
+        subject: subject.public_key(), issued_at: 100, expires_at: 200,
+        delegation_chain: vec![], aggregate_invocation_budget: None,
+        scope: ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "echo-server".into(), tool_name: "echo".into(),
+                operations: vec![Operation::Invoke], constraints: vec![],
+                max_invocations: None, max_cost_per_invocation: None,
+                max_total_cost: None, dpop_required: None,
+            }],
+            resource_grants: vec![], prompt_grants: vec![],
+        },
+    }, &issuer)?;
+    let input = CString::new(serde_json::to_string(&token)?)?;
+    let authority = CString::new(issuer.public_key().to_hex())?;
+    let result = chio_kernel_verify_capability_json(
+        input.as_ptr(), authority.as_ptr(), 150,
+    );
+    // SAFETY: the live result buffer has exactly result.data.len bytes.
+    let output = unsafe {
+        std::slice::from_raw_parts(result.data.ptr, result.data.len).to_vec()
+    };
+    chio_kernel_buffer_free(result.data);
+    assert_eq!(result.status, CHIO_KERNEL_FFI_STATUS_OK);
+    let verified: serde_json::Value = serde_json::from_slice(&output)?;
+    assert_eq!(verified["id"], "example-cap");
+    Ok(())
+}
+```
 
-`extern "C"` functions (`#[no_mangle]`), all declared in `src/lib.rs`:
+The sample runs offline with existing dependencies. Fixed seeds are example
+keys. Foreign callers include [chio_kernel_ffi.h](include/chio/chio_kernel_ffi.h)
+and link the matching target library after checking the ABI version.
 
-| Function | Purpose |
-|----------|---------|
-| `chio_kernel_ffi_abi_version()` | Returns `CHIO_CPP_KERNEL_FFI_ABI_VERSION` (currently `2`). |
-| `chio_kernel_build_info()` | Crate name, crate version, ABI version, and target triple as JSON. |
-| `chio_kernel_buffer_free(buffer)` | Releases a `ChioKernelFfiBuffer` previously returned by this crate. |
-| `chio_kernel_evaluate_json(request_json)` | Evaluate a tool-call request; `PendingApproval` verdicts come back as `deny` (no async approval path over this ABI). |
-| `chio_kernel_sign_receipt_json(body_json, canonical_content_hex, signing_seed_hex)` | Default WYSIWYS signer. |
-| `chio_kernel_sign_receipt_relaying_trusted_body_json(body_json, signing_seed_hex)` | Relay signer; trusts `body.content_hash` as-is. |
-| `chio_kernel_verify_capability_json(token_json, authority_pub_hex, now_secs)` | Single-authority verification. |
-| `chio_kernel_verify_capability_with_context_json(request_json)` | Full-context verification (trust roots, peer profile, budget snapshots). |
-| `chio_kernel_verify_passport_json(envelope_json, issuer_pub_hex, now_secs)` | Passport envelope verification. |
+## Guarantees
 
-Every JSON-returning function returns `ChioKernelFfiResult { status,
-error_code, data: ChioKernelFfiBuffer }`. `status` is one of
-`CHIO_KERNEL_FFI_STATUS_{OK, ERROR, PANIC, NULL_ARGUMENT}`; `error_code` is
-one of `CHIO_KERNEL_FFI_ERROR_{NONE, INVALID_JSON, INVALID_HEX,
-INVALID_CAPABILITY, INVALID_PASSPORT, KEY_MISMATCH, SIGNING_FAILED,
-INTERNAL}`. The full set of exported names is enumerated in `cbindgen.toml`
-and the generated `include/chio/chio_kernel_ffi.h`.
+`chio_kernel_evaluate_json` uses `evaluate_with_full_floor_and_root` to check
+issuer trust, signature/time, negotiated capability features, chain binding,
+subject/request scope, and sibling-share admission against supplied snapshots.
+It uses `AllowClassical`, an empty guard list, and no session filesystem roots.
+`PendingApproval` maps to a deny verdict. Governed approval and supplemental
+authorization request fields reject before evaluation.
 
-## Testing
+`chio_kernel_sign_receipt_json(body, content_hex, seed)` recomputes the content
+hash from supplied bytes and checks the kernel key before signing. The explicit
+`chio_kernel_sign_receipt_relaying_trusted_body_json` trusts the body's content
+hash. Callers using the relay must establish trust in its upstream producer.
+Relay signing is permitted only when forwarding an upstream-trusted body
+without its content preimage. Paths holding evaluated content must use
+`chio_kernel_sign_receipt_json` with that preimage, as required by the
+protocol. The relay export cannot enforce this caller obligation.
 
-- `cargo test -p chio-cpp-kernel-ffi` runs `src/tests.rs`: pointer and UTF-8
-  handling, evaluation allow/deny paths, delegated-budget admission and
-  oversubscription rejection, malformed trust-root rejection, WYSIWYS
-  accept/refuse (including a simulated render-A/sign-B forgery), the relay
-  seam, and the ABI version regression check.
-- `crates/kernel/chio-kernel-mobile/tests/cross_ffi_parity.rs` includes this
-  crate's `src/lib.rs` directly and compares `chio_kernel_evaluate_json`
-  against `chio-kernel-mobile`'s `evaluate` for shared verdict cases.
-- `sdks/cpp/chio-cpp-kernel/scripts/check-with-ffi.sh` builds and tests this
-  crate, then configures, builds, and CTests the C++ SDK against the
-  resulting static library and `include/chio/chio_kernel_ffi.h`.
+Callers supply valid readable NUL-terminated UTF-8 inputs. Null and UTF-8 checks
+do not establish pointer validity. Results contain length-delimited UTF-8 and
+must be freed once with `chio_kernel_buffer_free`, preserving pointer and length.
+Independent calls have local state; callers synchronize shared buffers and frees.
+`run_ffi` catches unwinding panics during wrapped processing, after input reads.
 
-## See also
+## Status
 
-- `chio-kernel-core` - owns all evaluation, verification, and signing
-  semantics this crate calls into.
-- `chio-kernel-mobile` - the UniFFI (Swift/Kotlin) counterpart; cross-checked
-  against this crate by `cross_ffi_parity.rs`.
-- `chio-bindings-ffi` - a separate C ABI over `chio-binding-helpers`'
-  stateless invariant checks, consumed by `sdks/cpp/chio-cpp`. Not a kernel
-  and not interchangeable with this crate.
-- `sdks/cpp/chio-cpp-kernel` - the C++ wrapper that links this crate's static
-  library against its generated header.
+Implemented as an internal offline SDK bridge with `publish = false` and no
+Cargo features. Each call creates a fresh budget registry from caller snapshots.
+Tool dispatch, persistent invocation/spend accounting, revocation lookup, DPoP
+replay checks, receipt storage, and guards require the integrating runtime.
+Run `cargo test -p chio-cpp-kernel-ffi` for its focused Rust tests.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Capability verification contract](../../../spec/PROTOCOL.md#53-verification-rules)
+- [WYSIWYS signing contract](../../../spec/PROTOCOL.md#wysiwys-signing-invariant)
+- [Portable kernel core](../../kernel/chio-kernel-core/README.md)
+- [Invariant C ABI](../chio-bindings-ffi/README.md)
+- [C++ kernel consumer](../../../sdks/cpp/chio-cpp-kernel/README.md)
+- [License](../../../LICENSE)
