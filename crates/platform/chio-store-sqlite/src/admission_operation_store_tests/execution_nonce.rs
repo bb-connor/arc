@@ -8,6 +8,8 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[path = "execution_nonce/caller_dispatch_context.rs"]
 mod caller_dispatch_context;
+#[path = "execution_nonce/caller_share_isolation.rs"]
+mod caller_share_isolation;
 #[path = "execution_nonce/domain.rs"]
 mod domain;
 #[path = "execution_nonce/issuance.rs"]
@@ -52,7 +54,10 @@ fn nonce_fixture_with_approval_window(
 }
 
 fn prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
-    let mut fixture = unowned_prepared_nonce_fixture(approval_seconds)?;
+    own_prepared(unowned_prepared_nonce_fixture(approval_seconds)?)
+}
+
+fn own_prepared(mut fixture: NonceFixture) -> TestResult<NonceFixture> {
     fixture.operation =
         preflight::own_and_clean(&fixture.fixture, &fixture.operation, &fixture.key)?;
     Ok(fixture)
@@ -61,6 +66,15 @@ fn prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixt
 fn unowned_prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
     let fixture = fixture();
     let (base, original) = retained_request::original(&fixture.fence)?;
+    unowned_prepared_nonce_fixture_in(fixture, base, original, approval_seconds)
+}
+
+fn unowned_prepared_nonce_fixture_in(
+    fixture: Fixture,
+    base: AdmissionOperationV1,
+    original: RetainedToolAdmissionRequestV1,
+    approval_seconds: Option<u64>,
+) -> TestResult<NonceFixture> {
     let request = original.request_for_revalidation();
     let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
         "authority",
@@ -129,6 +143,24 @@ fn advance_nonce_fixture_with_transport(
     issue: bool,
     transport_id: Option<&str>,
 ) -> TestResult<NonceFixture> {
+    advance_nonce_fixture_with_budget_ids(
+        fixture,
+        real_budget,
+        approval_seconds,
+        issue,
+        transport_id,
+        ("nonce-hold", "nonce-authorize"),
+    )
+}
+
+fn advance_nonce_fixture_with_budget_ids(
+    fixture: NonceFixture,
+    real_budget: bool,
+    approval_seconds: Option<u64>,
+    issue: bool,
+    transport_id: Option<&str>,
+    (hold_id, event_id): (&str, &str),
+) -> TestResult<NonceFixture> {
     let NonceFixture {
         fixture,
         mut operation,
@@ -163,7 +195,7 @@ fn advance_nonce_fixture_with_transport(
         ),
         (
             AdmissionOperationState::BudgetAuthorized,
-            AdmissionAttachment::BudgetHoldId(identifier("hold", "nonce-hold")),
+            AdmissionAttachment::BudgetHoldId(identifier("hold", hold_id)),
         ),
     ] {
         let command = nonce_command(
@@ -180,7 +212,7 @@ fn advance_nonce_fixture_with_transport(
                 .authorize_budget_and_commit_admission(
                     &operation,
                     command.recovery_lease(),
-                    lifecycle::budget_request(&fixture, &operation),
+                    lifecycle::budget_request_with_ids(&fixture, &operation, hold_id, event_id),
                     None,
                     None,
                     &fixture.fence,
