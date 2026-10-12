@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::capability::scope::{Operation, ToolGrant};
 use crate::crypto::PublicKey;
 use crate::identity::SignedWeb3IdentityBinding;
 use crate::settlement::Web3SettlementExecutionReceiptArtifact;
@@ -392,4 +393,71 @@ pub struct PublicSettlementTrustMarketContext {
     pub guarantee_decision_ref: String,
     pub sla_remedy_ref: String,
     pub slash_authority_ref: String,
+}
+
+/// Decision on whether a tool call may proceed.
+///
+/// The authorized state is unrepresentable outside this module: `Default` and
+/// [`ToolCallAuthorization::denied`] yield DENY, and the only authorizing
+/// constructor is [`ToolCallAuthorization::from_capability_grant`]. The type has
+/// no `Deserialize` and no conversion from any settlement or payment verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ToolCallAuthorization {
+    granted: bool,
+}
+
+impl ToolCallAuthorization {
+    /// The fail-closed decision: the tool call is not authorized.
+    #[must_use]
+    pub const fn denied() -> Self {
+        Self { granted: false }
+    }
+
+    /// Authorize a tool call from a static capability grant.
+    ///
+    /// Authorizes only when the grant targets `server_id`/`tool_name` (`*`
+    /// matches any), carries `Invoke`, and has no field that needs request,
+    /// usage, cost, or proof context to evaluate: no constraints, no invocation
+    /// or monetary cap, and no required DPoP proof. Every other grant is DENY
+    /// here and must be evaluated by the kernel capability and budget lanes.
+    /// A new gating field on `ToolGrant` must be added here as a DENY term.
+    #[must_use]
+    pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
+        let server_ok = grant.server_id == "*" || grant.server_id == server_id;
+        let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
+        let can_invoke = grant.operations.contains(&Operation::Invoke);
+        let unconstrained = grant.constraints.is_empty();
+        let uncapped = grant.max_invocations.is_none()
+            && grant.max_cost_per_invocation.is_none()
+            && grant.max_total_cost.is_none();
+        let dpop_not_required = grant.dpop_required != Some(true);
+        Self {
+            granted: server_ok
+                && tool_ok
+                && can_invoke
+                && unconstrained
+                && uncapped
+                && dpop_not_required,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_authorized(&self) -> bool {
+        self.granted
+    }
+}
+
+impl PublicSettlementVerifierReport {
+    /// Always [`ToolCallAuthorization::denied`]. No field of the report is read,
+    /// so no verdict or claim can grant tool-call authority.
+    #[must_use]
+    pub const fn tool_call_authorization(&self) -> ToolCallAuthorization {
+        ToolCallAuthorization::denied()
+    }
+
+    /// Always `false`.
+    #[must_use]
+    pub const fn authorizes_tool_call(&self) -> bool {
+        self.tool_call_authorization().is_authorized()
+    }
 }

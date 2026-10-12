@@ -198,6 +198,9 @@ zeroize = { workspace = true }
 # state machine via the chio-anchor crate. tokio drives the async
 # trait surface; tiny_http stages the mock Rekor server.
 chio-anchor = { workspace = true }
+# Settlement-lane conformance tests drive the chio-web3 public settlement
+# verifier and anchor inclusion readback directly.
+chio-web3 = { workspace = true }
 async-trait = "0.1"
 # Negative conformance test: anchor_batch_witness_impersonation_rejected.rs
 # forges a Rekor SET

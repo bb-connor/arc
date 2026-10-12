@@ -36,4 +36,7 @@ mod settlement_identity_evidence_tests;
 mod settlement_proof_event_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
+mod settlement_proof_tool_call_tests;
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;

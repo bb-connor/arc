@@ -3207,6 +3207,7 @@ dependencies = [
  "chio-test-support",
  "chio-trace-validate",
  "chio-wasm-guards",
+ "chio-web3",
  "chio-weights",
  "chio-workflow",
  "chrono",
