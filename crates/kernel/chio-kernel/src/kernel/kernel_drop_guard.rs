@@ -11,10 +11,6 @@ use super::{
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
-const POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON: &str =
-    "dispatch credential commit failed after tool execution";
-const POST_DISPATCH_URL_ELICITATION_REASON: &str =
-    "tool server returned URL elicitation after dispatch; outcome is unknown";
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
     "tool evaluation future dropped before dispatch with cleanup fault";
 
@@ -156,66 +152,9 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// point a dropped future may correspond to an executed side effect, so
     /// the drop path attempts a cancellation receipt and fails closed on
     /// reservations. Clock, construction or append failures emit an audit fault.
+    #[cfg(test)]
     pub(crate) fn mark_dispatch_started(&mut self) {
         self.dispatch_started = true;
-    }
-
-    /// Classify a normal error return after the tool completed but before its
-    /// replay credentials could be committed. The guard remains armed so its
-    /// drop path attempts to record the executed-or-not outcome as a signed
-    /// terminal receipt. Failure to obtain trusted time, construct or append
-    /// that receipt emits an audit fault; signed evidence is not guaranteed.
-    pub(crate) fn mark_dispatch_credential_commit_failed(&mut self) {
-        self.post_dispatch_reason = POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON;
-    }
-
-    /// The caller durably terminalized the admission but still needs the
-    /// armed post-dispatch path to record its signed ambiguity receipt and
-    /// retain non-durable reservations.
-    /// Terminalize the durable operation as outcome unknown after a transport
-    /// failure that followed the dispatch commit, before the response that
-    /// reports the ambiguity is built. The caller disarms the guard afterwards.
-    pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
-        if let Some(operation) = self.durable_operation {
-            self.kernel.terminalize_dispatch_committed_admission(
-                operation,
-                self.kernel.read_authority_time()?.get(),
-            )?;
-            self.mark_durable_operation_terminalized();
-        }
-        Ok(())
-    }
-
-    pub(crate) fn mark_durable_operation_terminalized(&mut self) {
-        self.durable_operation = None;
-    }
-
-    /// Persist the terminal ambiguity receipt on a normal URL-error return.
-    /// The guard remains armed until the append succeeds, so a synchronous
-    /// persistence failure is returned to the caller and Drop still retries it
-    /// best-effort without terminalizing the durable operation twice.
-    pub(crate) fn persist_url_elicitation_cancellation(&mut self) -> Result<(), KernelError> {
-        self.post_dispatch_reason = POST_DISPATCH_URL_ELICITATION_REASON;
-        self.record_buffered_child_receipts()?;
-        let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
-            self.budget_mutation,
-            self.payment_authorization,
-            self.receipt_context.extra_metadata.clone(),
-        );
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            self.receipt_context.pre_invocation_guard_evidence.clone(),
-        );
-        self.kernel
-            .build_cancelled_response_with_metadata_and_payee_binding(
-                self.request,
-                self.post_dispatch_reason,
-                self.kernel.read_authority_time()?.as_secs(),
-                self.matched_grant_index,
-                receipt_metadata,
-                self.receipt_context.verified_payee_binding.as_ref(),
-            )?;
-        self.disarm();
-        Ok(())
     }
 
     pub(crate) fn disarm(&mut self) {
@@ -492,6 +431,17 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // completed child requests off the log and breaking receipt-completeness.
         self.flush_buffered_child_receipts_from_drop();
 
+        // An original durable admission is the terminal owner. Legacy guard
+        // callers never append a competing cancellation alongside its saga.
+        // Idle finalization requires a resource-owned durable driver; this Drop
+        // records the pending obligation without pretending to run that driver.
+        if let Some(operation) = self.durable_operation {
+            warn!(operation_id = %operation.binding().operation_id().as_str(),
+                audit_fault = "durable_post_effect_reconciliation_pending",
+                "dropped invocation remains owned by its original durable saga");
+            return;
+        }
+
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
         // admission reservations (releasing a single-use destructive lease
@@ -525,26 +475,6 @@ impl Drop for PostAdmissionDropGuard<'_> {
                 audit_fault = "post_admission_drop_receipt_unrecorded",
                 "failed to record cancellation receipt for dropped post-admission invocation"
             );
-        }
-
-        // The dispatch commit landed but the return never did, so the operation
-        // would stay non-terminal and reject every replay of this request id
-        // until the next startup sweep. Terminalization is best-effort and
-        // samples trusted time again; repeated clock failure leaves admission
-        // unreconciled and emits an audit fault. It refuses if a durable outcome
-        // exists, so it cannot overwrite a return that did complete.
-        if let Some(operation) = self.durable_operation {
-            if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
-                self.kernel
-                    .terminalize_dispatch_committed_admission(operation, now.get())
-            }) {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(&error),
-                    audit_fault = "post_admission_drop_admission_unterminalized",
-                    "failed to terminalize dropped post-dispatch admission"
-                );
-            }
         }
     }
 }

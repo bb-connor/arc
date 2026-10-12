@@ -1,0 +1,298 @@
+//! Inputs that must be valid and bounded before a non-durable effect starts.
+
+use super::*;
+use crate::kernel::responses::PreparedResponse;
+
+const FAULT_RESERVE_HEADROOM: usize = 64 * 1024;
+const FAULT_REASON: &str = "post-effect finalization failed; output withheld";
+
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct DischargeBinding {
+    pub evaluation_id: String,
+    pub namespace: String,
+    pub request_id: String,
+    pub operation_id: Option<String>,
+    pub capability_id: String,
+    pub parameter_hash: String,
+    pub grant_index: usize,
+}
+
+impl DischargeBinding {
+    pub(super) fn validate_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        let metadata = receipt.metadata.as_ref();
+        let text = |pointer| {
+            metadata
+                .and_then(|value| value.pointer(pointer))
+                .and_then(serde_json::Value::as_str)
+        };
+        let grant = metadata
+            .and_then(|value| value.pointer("/attribution/grant_index"))
+            .and_then(serde_json::Value::as_u64);
+        let terminal = matches!(
+            receipt.decision.as_ref(),
+            Some(
+                Decision::Allow
+                    | Decision::Deny { .. }
+                    | Decision::Cancelled { .. }
+                    | Decision::Incomplete { .. }
+            )
+        );
+        if self.operation_id.is_some()
+            || text("/receipt_context/request_id") != Some(self.request_id.as_str())
+            || text("/receipt_context/request_namespace_digest") != Some(self.namespace.as_str())
+            || receipt.capability_id != self.capability_id
+            || receipt.action.parameter_hash != self.parameter_hash
+            || grant != u64::try_from(self.grant_index).ok()
+            || !terminal
+        {
+            return Err(KernelError::Internal(
+                "terminal receipt does not match its post-effect owner".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(in crate::kernel) struct PreparedPostEffect {
+    pub(super) binding: DischargeBinding,
+    pub(super) fault: Option<PreparedFaultReceipt>,
+    pub(super) slot: Option<EvidenceSlot>,
+}
+
+pub(in crate::kernel) struct PostEffectPreparation<'a> {
+    pub request: &'a ToolCallRequest,
+    pub matched_grant_index: usize,
+    pub budget: &'a PreExecutionBudgetMutation,
+    pub payment: Option<&'a PaymentAuthorization>,
+    pub metadata: &'a Option<serde_json::Value>,
+    pub evidence: &'a [GuardEvidence],
+    pub payee: Option<&'a VerifiedGovernedPayeeBinding>,
+    pub admission: Option<&'a DurableToolAdmission>,
+    pub evaluation_started_at: u64,
+}
+
+impl ChioKernel {
+    pub(in crate::kernel) fn prepare_post_effect(
+        &self,
+        input: PostEffectPreparation<'_>,
+    ) -> Result<PreparedPostEffect, KernelError> {
+        let action = ToolCallAction::from_parameters(input.request.arguments.clone())
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+        let namespace = self.receipt_request_namespace_digest(&input.request.request_id)?;
+        if input.admission.is_some_and(|admission| {
+            admission
+                .operation()
+                .binding()
+                .request_namespace_digest()
+                .as_str()
+                != namespace
+        }) {
+            return Err(KernelError::Internal(
+                "durable admission namespace differs from its evaluation".into(),
+            ));
+        }
+        let binding = DischargeBinding {
+            evaluation_id: current_receipt_evaluation_scope_key().ok_or_else(|| {
+                KernelError::Internal("post-effect ownership requires an evaluation scope".into())
+            })?,
+            namespace,
+            request_id: input.request.request_id.clone(),
+            operation_id: input
+                .admission
+                .map(|admission| admission.operation_id().to_owned()),
+            capability_id: input.request.capability.id.clone(),
+            parameter_hash: action.parameter_hash.clone(),
+            grant_index: input.matched_grant_index,
+        };
+        if input.admission.is_some() {
+            return Ok(PreparedPostEffect {
+                binding,
+                fault: None,
+                slot: None,
+            });
+        }
+        // Keep mandatory authority and retention evidence. Caller extras and
+        // returned output do not belong in the reserved fault template.
+        let minimal = input
+            .metadata
+            .as_ref()
+            .and_then(|value| value.get("chio_runtime"))
+            .map(|runtime| serde_json::json!({ "chio_runtime": runtime }));
+        let metadata =
+            self.ambiguous_dispatch_receipt_metadata(input.budget, input.payment, minimal);
+        let metadata = merge_metadata_objects(
+            metadata,
+            Some(serde_json::json!({
+                "receipt_context": { "request_namespace_digest": binding.namespace },
+                "chio_runtime": {
+                    "identity_disposition": "terminal",
+                    "evaluation_started_at": input.evaluation_started_at,
+                    "post_effect_fault": { "step": "drop", "code": "CHIO-KERNEL-POST-EFFECT-DROP", "original_receipt_id": null }
+                }
+            })),
+        );
+        let request_metadata = request_receipt_metadata_with_payee_binding(
+            input.request,
+            self.attestation_trust_policy.as_ref(),
+            input.evaluation_started_at / 1_000,
+            metadata.as_ref(),
+            input.payee,
+        )?;
+        let canonical_content = b"null".to_vec();
+        let signing_identity = self.freeze_receipt_signing_identity()?;
+        let mut body = self.prepare_receipt_body(
+            ReceiptParams {
+                request_id: Some(&input.request.request_id),
+                capability_id: &input.request.capability.id,
+                tool_name: &input.request.tool_name,
+                server_id: &input.request.server_id,
+                decision: Decision::Cancelled {
+                    reason: FAULT_REASON.into(),
+                },
+                action,
+                content_hash: chio_core::crypto::sha256_hex(&canonical_content),
+                canonical_content: Vec::new(),
+                metadata: merge_metadata_objects(
+                    merge_metadata_objects(metadata, request_metadata),
+                    receipt_attribution_metadata(
+                        &input.request.capability,
+                        Some(input.matched_grant_index),
+                    )?,
+                ),
+                timestamp: 0,
+                trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+                tenant_id: None,
+            },
+            signing_identity.public_key().clone(),
+        )?;
+        body.evidence = input.evidence.to_vec();
+        let bytes = chio_core::canonical::canonical_json_bytes(&body)
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
+            .len()
+            .checked_add(FAULT_RESERVE_HEADROOM)
+            .ok_or(KernelError::PostEffectEvidenceCapacity)?;
+        if bytes > self.post_effect_fault_template_limit() {
+            return Err(KernelError::PostEffectEvidenceCapacity);
+        }
+        let bytes =
+            std::num::NonZeroUsize::new(bytes).ok_or(KernelError::PostEffectEvidenceCapacity)?;
+        let slot = self.acquire_post_effect_evidence_slot(bytes)?;
+        Ok(PreparedPostEffect {
+            binding,
+            fault: Some(PreparedFaultReceipt {
+                body,
+                canonical_content,
+            }),
+            slot: Some(slot),
+        })
+    }
+}
+
+pub(super) fn fault_response(receipt: ChioReceipt, request_id: &str) -> PreparedResponse {
+    let reason = match receipt.decision.as_ref() {
+        Some(Decision::Cancelled { reason } | Decision::Deny { reason, .. }) => reason.clone(),
+        _ => FAULT_REASON.into(),
+    };
+    PreparedResponse::terminal(
+        ToolCallResponse {
+            request_id: request_id.to_owned(),
+            verdict: Verdict::Deny,
+            output: None,
+            reason: Some(reason.clone()),
+            terminal_state: OperationTerminalState::Cancelled { reason },
+            receipt,
+            execution_nonce: None,
+        },
+        crate::kernel::responses::ReceiptRecordMode::WithFederation,
+    )
+}
+
+impl PreparedFaultReceipt {
+    /// Retain acknowledged economics without importing output, cost breakdowns,
+    /// oracle payloads or arbitrary caller metadata into the fault template.
+    pub(in crate::kernel) fn observe_economics(&mut self, metadata: Option<&serde_json::Value>) {
+        let Some(metadata) = metadata else {
+            return;
+        };
+        let mut observed = serde_json::Map::new();
+        if let Some(authority) = metadata.get("budget_authority") {
+            let mut authority = authority.clone();
+            if let Some(terminal) = authority
+                .get_mut("terminal")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                if let Some(event) = terminal.get("event_id").cloned() {
+                    retain_bounded_reference(terminal, "event_id", &event);
+                }
+            }
+            observed.insert("budget_authority".into(), authority);
+        }
+        if let Some(financial) = metadata
+            .get("financial")
+            .and_then(serde_json::Value::as_object)
+        {
+            let mut bounded = serde_json::Map::new();
+            for key in [
+                "grant_index",
+                "cost_charged",
+                "currency",
+                "budget_remaining",
+                "budget_total",
+                "delegation_depth",
+                "root_budget_holder",
+                "authorization_id",
+                "payment_reference",
+                "settlement_status",
+                "release_outcome",
+                "payment_authorization_retained",
+                "payment_capture_ambiguous",
+                "payment_capture_error_code",
+                "payment_capture_attempt_reference",
+                "capture_status",
+                "payment_release_attempt_reference",
+                "payment_release_reference",
+                "payment_release_confirmed",
+                "payment_release_error_code",
+            ] {
+                if let Some(value) = financial.get(key) {
+                    retain_bounded_reference(&mut bounded, key, value);
+                }
+            }
+            if bounded
+                .get("settlement_status")
+                .and_then(serde_json::Value::as_str)
+                == Some("settled")
+            {
+                bounded.insert(
+                    "payment_authorization_retained".into(),
+                    serde_json::Value::Bool(false),
+                );
+            }
+            observed.insert("financial".into(), serde_json::Value::Object(bounded));
+        }
+        self.body.metadata = merge_metadata_objects(
+            self.body.metadata.take(),
+            Some(serde_json::Value::Object(observed)),
+        );
+    }
+}
+
+fn retain_bounded_reference(
+    map: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    value: &serde_json::Value,
+) {
+    if let Some(text) = value.as_str().filter(|text| text.len() > 512) {
+        // A new rail/reference value is not predictable before execution. Keep
+        // its exact digest and explicitly omit raw bytes rather than retaining
+        // an unbounded value or inventing a shortened reference.
+        map.insert(key.into(), serde_json::Value::Null);
+        map.insert(
+            format!("{key}_sha256"),
+            serde_json::json!(chio_core::crypto::sha256_hex(text.as_bytes())),
+        );
+        map.insert(format!("{key}_omitted"), serde_json::Value::Bool(true));
+    } else {
+        map.insert(key.into(), value.clone());
+    }
+}

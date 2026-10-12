@@ -7,6 +7,15 @@ pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) cap: &'a CapabilityToken,
 }
 
+pub(in crate::kernel) struct PrepareToolOutputCostContext<'a> {
+    pub charge_result: Option<&'a BudgetChargeResult>,
+    pub reported_cost: Option<&'a ToolInvocationCost>,
+    pub payment_authorization: Option<&'a PaymentAuthorization>,
+    pub cap: &'a CapabilityToken,
+    pub fault_progress:
+        Option<&'a mut crate::kernel::effect_obligation::recovery::PreparedFaultReceipt>,
+}
+
 pub(crate) struct PostInvocationHandling {
     pub(crate) output: ToolServerOutput,
     pub(crate) extra_metadata: Option<serde_json::Value>,

@@ -65,6 +65,11 @@ fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_j
                     serde_json::Value::String(message.to_string()),
                 );
             }
+            for key in ["message_sha256", "message_truncated"] {
+                if let Some(value) = outcome_payload.get(key) {
+                    metadata.insert(key.into(), value.clone());
+                }
+            }
             serde_json::Value::Object(metadata)
         })
 }
@@ -79,10 +84,10 @@ pub(crate) fn child_terminal_state<T>(
             request_id: cancelled_request_id,
             reason,
         }) if cancelled_request_id == request_id => OperationTerminalState::Cancelled {
-            reason: reason.clone(),
+            reason: bounded_child_diagnostic(reason),
         },
         Err(KernelError::RequestIncomplete(reason)) => OperationTerminalState::Incomplete {
-            reason: reason.clone(),
+            reason: bounded_child_diagnostic(reason),
         },
         Err(_) => OperationTerminalState::Completed,
     }
@@ -108,9 +113,22 @@ pub(crate) fn child_outcome_payload<T: serde::Serialize>(
             );
             Ok(serde_json::Value::Object(payload))
         }
-        Err(error) => Ok(serde_json::json!({
-            "outcome": "error",
-            "message": error.to_string(),
-        })),
+        Err(error) => {
+            let message = error.to_string();
+            Ok(serde_json::json!({
+                "outcome": "error",
+                "message": bounded_child_diagnostic(&message),
+                "message_sha256": sha256_hex(message.as_bytes()),
+                "message_truncated": message.len() > 512,
+            }))
+        }
     }
+}
+
+fn bounded_child_diagnostic(message: &str) -> String {
+    let mut end = message.len().min(512);
+    while !message.is_char_boundary(end) {
+        end -= 1;
+    }
+    message[..end].to_owned()
 }

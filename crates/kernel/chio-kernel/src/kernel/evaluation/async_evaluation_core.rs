@@ -1,6 +1,6 @@
 use super::async_nonce_preflight::StrictNoncePreflight;
 use super::caller_execution::CallerReservation;
-use super::evaluation_helpers::{OrdinaryRecoveryFinalization, PreDispatchCleanupDeny};
+use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::invocation_capture::NonDurableInvocationCapture;
 use super::*;
 use crate::{finding_denial::denied_metadata, kernel::dispatch::dispatch_admission_error_reason};
@@ -1727,31 +1727,69 @@ impl ChioKernel {
             ));
         };
         let has_monetary = budget_mutation.charge_result().is_some();
-        // Retain the original dispatch snapshot until its return is recorded.
-        let guarded_dispatch_operation = durable_admission
-            .as_ref()
-            .map(|admission| admission.operation().clone());
-        let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
-            self,
-            request,
-            cap,
-            Some(matched_grant_index),
-            &budget_mutation,
-            payment_authorization.as_ref(),
-            PostAdmissionReceiptContext {
-                extra_metadata: extra_metadata.clone(),
-                pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
-                verified_payee_binding: verified_governed_payee_binding.clone(),
+        let prepared_post_effect = match self.prepare_post_effect(
+            crate::kernel::effect_obligation::PostEffectPreparation {
+                request,
+                matched_grant_index,
+                budget: &budget_mutation,
+                payment: payment_authorization.as_ref(),
+                metadata: &extra_metadata,
+                evidence: &pre_invocation_guard_evidence,
+                payee: verified_governed_payee_binding.as_ref(),
+                admission: durable_admission.as_ref(),
+                evaluation_started_at: now_unix_ms,
             },
-            budget_lease_acquired,
-        )
-        .with_durable_operation(guarded_dispatch_operation.as_ref());
-        post_admission_drop_guard.mark_dispatch_started();
-        if let Some(outcome) = security_dispatch_outcome.as_mut() {
-            outcome.mark_dispatch_started();
-        }
+        ) {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                if let Some(admission) = durable_admission.as_ref() {
+                    return Err(KernelError::DurableOutcomePending {
+                        operation_id: admission.operation_id().to_owned(),
+                    });
+                }
+                let reason = error.to_string();
+                return self.build_pre_commit_credential_rejection_response(
+                    PreDispatchCleanupDeny {
+                        request,
+                        reason: &reason,
+                        timestamp: now,
+                        matched_grant_index,
+                        cap,
+                        budget_mutation: &budget_mutation,
+                        payment_authorization: payment_authorization.as_ref(),
+                        durable_operation: None,
+                        runtime_admission_metadata: extra_metadata,
+                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                        budget_lease_acquired,
+                    },
+                    credential_reservation,
+                    &pre_invocation_guard_evidence,
+                );
+            }
+        };
+        let obligation = crate::kernel::effect_obligation::PostEffectObligation::enter(
+            self,
+            crate::kernel::effect_obligation::PostEffectInputs {
+                request,
+                matched_grant_index,
+                budget: budget_mutation,
+                payment: payment_authorization,
+                metadata: extra_metadata,
+                evidence: pre_invocation_guard_evidence,
+                payee: verified_governed_payee_binding,
+                admission: durable_admission,
+                return_context: durable_return_context,
+                credentials: credential_reservation,
+                security_outcome: security_dispatch_outcome,
+                security_lifecycle: security_request_lifecycle,
+                finding: verified_finding_admission,
+                security_context,
+                parent_context: None,
+                prepared: prepared_post_effect,
+            },
+        );
         #[cfg(feature = "admission-test-support")]
-        if let Some(admission) = durable_admission.as_ref() {
+        if let Some(admission) = obligation.admission() {
             self.reach_caller_execution_checkpoint(
                 super::super::CallerExecutionCheckpoint::DispatchCommitted,
                 admission.operation(),
@@ -1764,238 +1802,8 @@ impl ChioKernel {
             dispatch_context,
         );
         let dispatch_result = self
-            .timed_dispatch(durable_admission.as_ref(), dispatch)
+            .timed_dispatch(obligation.admission().is_some(), dispatch)
             .await;
-        if let Some(outcome) = security_dispatch_outcome.take() {
-            match &dispatch_result {
-                Ok(_) => outcome.record_released()?,
-                Err(_) => outcome.record_outcome_unknown_after_dispatch()?,
-            }
-        }
-        // Preserve outcome uncertainty through credential commitment and return recording.
-        let ((tool_output, reported_cost), tool_elapsed) = match dispatch_result {
-            Ok(timed) => {
-                if let Err(error) = credential_reservation.commit() {
-                    post_admission_drop_guard.mark_dispatch_credential_commit_failed();
-                    return Err(error);
-                }
-                timed
-            }
-            Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                if let Err(commit_error) = credential_reservation.commit() {
-                    post_admission_drop_guard.mark_dispatch_credential_commit_failed();
-                    return Err(commit_error);
-                }
-                if let Some(operation) = durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation)
-                {
-                    self.terminalize_dispatch_committed_admission(operation, now_unix_ms)?;
-                    post_admission_drop_guard.mark_durable_operation_terminalized();
-                }
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&error),
-                    "tool server returned URL elicitation after dispatch; outcome is unknown"
-                );
-                post_admission_drop_guard.persist_url_elicitation_cancellation()?;
-                drop(post_admission_drop_guard);
-                return Err(error);
-            }
-            Err(KernelError::RequestCancelled { reason, .. }) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
-                    &budget_mutation,
-                    payment_authorization.as_ref(),
-                    extra_metadata.clone(),
-                );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&reason),
-                    retained_hold = retained,
-                    "tool call cancelled"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_cancelled_response_with_metadata_and_payee_binding(
-                            request,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-            Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
-                    &budget_mutation,
-                    payment_authorization.as_ref(),
-                    extra_metadata.clone(),
-                );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&reason),
-                    retained_hold = retained,
-                    "tool call deadline expired"
-                );
-                // Runtime and financial reservations remain retained because
-                // the side effect is ambiguous.
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_cancelled_response_with_metadata_and_payee_binding(
-                            request,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-            Err(KernelError::RequestIncomplete(reason)) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
-                    &budget_mutation,
-                    payment_authorization.as_ref(),
-                    extra_metadata.clone(),
-                );
-                let retained = metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&reason),
-                    retained_hold = retained,
-                    "tool call incomplete"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_incomplete_response_with_output_metadata_and_payee_binding(
-                            request,
-                            None,
-                            &reason,
-                            now,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-            Err(e) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
-                let msg = e.to_string();
-                let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
-                    &budget_mutation,
-                    payment_authorization.as_ref(),
-                    extra_metadata.clone(),
-                );
-                let retained = deny_metadata.is_some() || payment_authorization.is_some();
-                self.note_retained_ambiguous_hold(retained);
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), retained_hold = retained, "tool server error");
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &msg,
-                            now,
-                            Some(matched_grant_index),
-                            deny_metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-        };
-        let durable_outcome = match self.record_evaluation_return(
-            durable_admission.as_mut(),
-            &mut post_admission_drop_guard,
-            super::return_recording::EvaluationReturnRecording {
-                request,
-                output: &tool_output,
-                reported_cost: reported_cost.clone(),
-                context: durable_return_context.as_ref(),
-                elapsed: tool_elapsed,
-                trusted_now_unix_ms: now_unix_ms,
-                timestamp: now,
-                matched_grant_index,
-                budget: &budget_mutation,
-                payment: payment_authorization.as_ref(),
-                metadata: extra_metadata.clone(),
-                evidence: &pre_invocation_guard_evidence,
-                payee: verified_governed_payee_binding.as_ref(),
-            },
-        )? {
-            std::ops::ControlFlow::Continue(outcome) => outcome,
-            std::ops::ControlFlow::Break(response) => return Ok(response),
-        };
-        drop(post_admission_drop_guard);
-        if let (Some(admission), Some(outcome)) =
-            (durable_admission.as_mut(), durable_outcome.as_ref())
-        {
-            self.reach_durable_finalization_cutpoint(
-                DurableFinalizationCutpoint::ToolReturnRecorded,
-            );
-            return self.finalize_durable_tool_return_with_security_release(
-                admission,
-                request,
-                outcome,
-                security_request_lifecycle,
-            );
-        }
-        let recovery_status = self.revalidate_ordinary_recovery_status(
-            matched_grant_index,
-            request,
-            &verified_finding_admission,
-        );
-        if let Err(denial) = recovery_status {
-            return self.deny_changed_ordinary_recovery_status(
-                request,
-                matched_grant_index,
-                &extra_metadata,
-                &pre_invocation_guard_evidence,
-                verified_governed_payee_binding.as_ref(),
-                &denial,
-            );
-        }
-        let response = self.finalize_ordinary_recovery_response(OrdinaryRecoveryFinalization {
-            request,
-            output: tool_output,
-            elapsed: tool_elapsed,
-            timestamp: now,
-            matched_grant_index,
-            cost: FinalizeToolOutputCostContext {
-                charge_result: budget_mutation.into_charge_result(),
-                reported_cost,
-                payment_authorization,
-                cap,
-            },
-            metadata: extra_metadata,
-            guard_evidence: &pre_invocation_guard_evidence,
-            payee_binding: verified_governed_payee_binding.as_ref(),
-            recovery: verified_finding_admission.recovery_binding(),
-            security_context,
-        });
-        SecurityRequestLifecycleHandle::finish_response(response, security_request_lifecycle)
+        crate::kernel::effect_obligation::run_post_effect(obligation, dispatch_result).deliver()
     }
 }

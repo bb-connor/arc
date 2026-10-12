@@ -15,7 +15,10 @@ struct AllowTail {
 }
 
 impl PreparedResponse {
-    pub(super) fn terminal(response: ToolCallResponse, record_mode: ReceiptRecordMode) -> Self {
+    pub(in crate::kernel) fn terminal(
+        response: ToolCallResponse,
+        record_mode: ReceiptRecordMode,
+    ) -> Self {
         Self {
             response,
             record_mode,

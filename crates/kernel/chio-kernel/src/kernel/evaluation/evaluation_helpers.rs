@@ -16,12 +16,32 @@ impl ChioKernel {
         payee: Option<&VerifiedGovernedPayeeBinding>,
         denial: &crate::finding_denial::FindingDenial,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_changed_ordinary_recovery_status(
+            request,
+            matched_grant_index,
+            metadata,
+            evidence,
+            payee,
+            denial,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    pub(in crate::kernel) fn prepare_changed_ordinary_recovery_status(
+        &self,
+        request: &ToolCallRequest,
+        matched_grant_index: usize,
+        metadata: &Option<serde_json::Value>,
+        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        payee: Option<&VerifiedGovernedPayeeBinding>,
+        denial: &crate::finding_denial::FindingDenial,
+    ) -> Result<crate::kernel::responses::PreparedResponse, KernelError> {
         let reason = format!(
             "finding recovery status changed before ordinary output finalization: {denial}"
         );
         tracing::warn!(request_id = %request.request_id, reason = %chio_log_redact::redacted!(&reason), "finding recovery output withheld");
         self.with_pre_invocation_guard_evidence(evidence, || {
-            self.build_deny_response_with_metadata_and_payee_binding(
+            self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 &reason,
                 self.read_authority_time()?.get() / 1_000,

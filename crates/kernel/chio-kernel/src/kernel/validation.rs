@@ -1617,22 +1617,32 @@ impl ChioKernel {
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
-    fn finalize_unmeasured_cost_provisional_allow(
+    fn prepare_unmeasured_cost_provisional_allow(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         elapsed: Duration,
         timestamp: u64,
-        charge: BudgetChargeResult,
+        charge: &BudgetChargeResult,
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-    ) -> Result<ToolCallResponse, KernelError> {
+        mut fault_progress: Option<
+            &mut crate::kernel::effect_obligation::recovery::PreparedFaultReceipt,
+        >,
+    ) -> Result<crate::kernel::responses::PreparedResponse, KernelError> {
         let cap = &request.capability;
         let reverse = if charge.invocation_capture.is_some() {
-            self.cancel_captured_monetary_before_dispatch(&cap.id, &charge)?
+            self.cancel_captured_monetary_before_dispatch(&cap.id, charge)?
         } else {
-            self.reverse_budget_charge(&cap.id, &charge)?
+            self.reverse_budget_charge(&cap.id, charge)?
         };
+        if let Some(progress) = fault_progress.as_deref_mut() {
+            progress.observe_economics(Some(&self.budget_execution_receipt_metadata(
+                charge,
+                Some(("reversed", &reverse)),
+                None,
+            )));
+        }
         let financial = FinancialReceiptMetadata {
             grant_index: crate::receipt_support::checked_receipt_count(
                 charge.grant_index,
@@ -1656,6 +1666,9 @@ impl ChioKernel {
             oracle_evidence: None,
             attempted_cost: None,
         };
+        if let Some(progress) = fault_progress.as_deref_mut() {
+            progress.observe_economics(Some(&serde_json::json!({ "financial": financial })));
+        }
         let limited_output = self.apply_stream_limits(output, elapsed)?;
         let tool_call_output = match &limited_output {
             ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
@@ -1665,7 +1678,7 @@ impl ChioKernel {
             }
         };
         let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reversed", &reverse)), None);
+            self.budget_execution_receipt_metadata(charge, Some(("reversed", &reverse)), None);
         let metadata = merge_metadata_objects(
             Some(serde_json::json!({ "financial": financial })),
             self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
@@ -1674,7 +1687,7 @@ impl ChioKernel {
         match limited_output {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+                .prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     tool_call_output,
                     timestamp,
@@ -1684,7 +1697,7 @@ impl ChioKernel {
                     AllowResponseNonce::Suppressed,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
-                .build_incomplete_response_with_output_metadata_and_payee_binding(
+                .prepare_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(tool_call_output),
                     &reason,
@@ -1708,15 +1721,52 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: usize,
         cost_context: FinalizeToolOutputCostContext<'_>,
-        mut extra_metadata: Option<serde_json::Value>,
+        extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let FinalizeToolOutputCostContext {
+        let prepared = self.prepare_budgeted_tool_output_with_cost_and_metadata(
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            crate::kernel::responses::PrepareToolOutputCostContext {
+                charge_result: cost_context.charge_result.as_ref(),
+                reported_cost: cost_context.reported_cost.as_ref(),
+                payment_authorization: cost_context.payment_authorization.as_ref(),
+                cap: cost_context.cap,
+                fault_progress: None,
+            },
+            extra_metadata,
+            verified_payee_binding,
+            security_context,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing finalization input contract."
+    )]
+    pub(in crate::kernel) fn prepare_budgeted_tool_output_with_cost_and_metadata(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        matched_grant_index: usize,
+        cost_context: crate::kernel::responses::PrepareToolOutputCostContext<'_>,
+        mut extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<crate::kernel::responses::PreparedResponse, KernelError> {
+        let crate::kernel::responses::PrepareToolOutputCostContext {
             charge_result,
             reported_cost,
             payment_authorization,
             cap,
+            mut fault_progress,
         } = cost_context;
         let Some(charge) = charge_result else {
             if let Some(authorization) = payment_authorization.as_ref() {
@@ -1753,7 +1803,10 @@ impl ChioKernel {
                                     &error,
                                 )),
                             );
-                            return self.build_deny_response_with_metadata(
+                            if let Some(progress) = fault_progress.as_deref_mut() {
+                                progress.observe_economics(metadata.as_ref());
+                            }
+                            return self.prepare_deny_response_with_metadata(
                                 request,
                                 &format!(
                                     "MustPrepay authorization could not be settled after execution: {}",
@@ -1768,26 +1821,49 @@ impl ChioKernel {
                         }
                     };
                     if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
-                        let mut financial = serde_json::json!({
-                            "authorization_id": authorization.authorization_id,
-                            "payment_reference": result.transaction_id,
-                            "capture_status": result.settlement_status,
-                            "settlement_status": result.settlement_status.to_receipt_status(),
-                            "payment_release_attempt_reference": request.request_id
-                        });
+                        let mut financial = serde_json::Map::from_iter([
+                            (
+                                "authorization_id".into(),
+                                serde_json::json!(authorization.authorization_id),
+                            ),
+                            (
+                                "payment_reference".into(),
+                                serde_json::json!(result.transaction_id),
+                            ),
+                            (
+                                "capture_status".into(),
+                                serde_json::json!(result.settlement_status),
+                            ),
+                            (
+                                "settlement_status".into(),
+                                serde_json::json!(result.settlement_status.to_receipt_status()),
+                            ),
+                            (
+                                "payment_release_attempt_reference".into(),
+                                serde_json::json!(request.request_id),
+                            ),
+                        ]);
                         match adapter.release(&authorization.authorization_id, &request.request_id)
                         {
                             Ok(release) => {
                                 let released = release.settlement_status
                                     == crate::payment::RailSettlementStatus::Released;
-                                financial["release_outcome"] =
-                                    serde_json::json!(release.settlement_status);
-                                financial["payment_release_reference"] =
-                                    serde_json::json!(release.transaction_id);
-                                financial["payment_release_confirmed"] =
-                                    serde_json::json!(released);
-                                financial["payment_authorization_retained"] =
-                                    serde_json::json!(!released);
+                                financial.insert(
+                                    "release_outcome".into(),
+                                    serde_json::json!(release.settlement_status),
+                                );
+                                financial.insert(
+                                    "payment_release_reference".into(),
+                                    serde_json::json!(release.transaction_id),
+                                );
+                                financial.insert(
+                                    "payment_release_confirmed".into(),
+                                    serde_json::json!(released),
+                                );
+                                financial.insert(
+                                    "payment_authorization_retained".into(),
+                                    serde_json::json!(!released),
+                                );
                                 if !released {
                                     warn!(
                                         request_id = %request.request_id,
@@ -1800,12 +1876,22 @@ impl ChioKernel {
                             }
                             Err(error) => {
                                 let error_code = payment_error_code(&error);
-                                financial["release_outcome"] = serde_json::json!("outcome_unknown");
-                                financial["payment_release_error_code"] =
-                                    serde_json::json!(error_code);
-                                financial["payment_release_confirmed"] = serde_json::json!(false);
-                                financial["payment_authorization_retained"] =
-                                    serde_json::json!(true);
+                                financial.insert(
+                                    "release_outcome".into(),
+                                    serde_json::json!("outcome_unknown"),
+                                );
+                                financial.insert(
+                                    "payment_release_error_code".into(),
+                                    serde_json::json!(error_code),
+                                );
+                                financial.insert(
+                                    "payment_release_confirmed".into(),
+                                    serde_json::json!(false),
+                                );
+                                financial.insert(
+                                    "payment_authorization_retained".into(),
+                                    serde_json::json!(true),
+                                );
                                 warn!(
                                     request_id = %request.request_id,
                                     authorization_id = %authorization.authorization_id,
@@ -1823,8 +1909,11 @@ impl ChioKernel {
                     }
                     ReceiptSettlement::from_payment_result(&result)
                 };
+                if let Some(progress) = fault_progress.as_deref_mut() {
+                    progress.observe_economics(extra_metadata.as_ref());
+                }
                 if settlement.settlement_status != SettlementStatus::Settled {
-                    return self.build_deny_response_with_metadata(
+                    return self.prepare_deny_response_with_metadata(
                         request,
                         "MustPrepay authorization could not be settled after execution",
                         timestamp,
@@ -1857,7 +1946,10 @@ impl ChioKernel {
                     extra_metadata,
                     Some(serde_json::json!({ "financial": financial })),
                 );
-                return self.finalize_tool_output_with_metadata_and_payee_binding(
+                if let Some(progress) = fault_progress.as_deref_mut() {
+                    progress.observe_economics(metadata.as_ref());
+                }
+                return self.prepare_tool_output_with_metadata_and_payee_binding(
                     request,
                     output,
                     elapsed,
@@ -1868,7 +1960,7 @@ impl ChioKernel {
                     security_context,
                 );
             }
-            return self.finalize_tool_output_with_metadata_and_payee_binding(
+            return self.prepare_tool_output_with_metadata_and_payee_binding(
                 request,
                 output,
                 elapsed,
@@ -1883,7 +1975,7 @@ impl ChioKernel {
         if payment_authorization.is_none()
             && !self.tool_server_measures_realized_cost(&request.server_id)
         {
-            return self.finalize_unmeasured_cost_provisional_allow(
+            return self.prepare_unmeasured_cost_provisional_allow(
                 request,
                 output,
                 elapsed,
@@ -1891,10 +1983,11 @@ impl ChioKernel {
                 charge,
                 extra_metadata,
                 verified_payee_binding,
+                fault_progress,
             );
         }
 
-        let reported_cost_ref = reported_cost.as_ref();
+        let reported_cost_ref = reported_cost;
         let mut oracle_evidence = None;
         let mut cross_currency_note = None;
         let (actual_cost, cross_currency_failed) = if let Some(cost) =
@@ -1966,7 +2059,14 @@ impl ChioKernel {
             } else {
                 actual_cost.min(charge.cost_charged)
             };
-        let reconcile = self.reconcile_budget_charge(&cap.id, &charge, realized_budget_units)?;
+        let reconcile = self.reconcile_budget_charge(&cap.id, charge, realized_budget_units)?;
+        if let Some(progress) = fault_progress.as_deref_mut() {
+            progress.observe_economics(Some(&self.budget_execution_receipt_metadata(
+                charge,
+                Some(("reconciled", &reconcile)),
+                None,
+            )));
+        }
         let running_committed_cost_units = reconcile.committed_cost_units_after;
 
         let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
@@ -1993,6 +2093,9 @@ impl ChioKernel {
             None
         };
 
+        if let Some(progress) = fault_progress.as_deref_mut() {
+            progress.observe_economics(extra_metadata.as_ref());
+        }
         let settlement = if cross_currency_failed || cost_overrun {
             ReceiptSettlement {
                 payment_reference: payment_authorization
@@ -2092,6 +2195,9 @@ impl ChioKernel {
             attempted_cost: None,
         };
 
+        if let Some(progress) = fault_progress.as_deref_mut() {
+            progress.observe_economics(Some(&serde_json::json!({ "financial": financial_meta })));
+        }
         let limited_output = self.apply_stream_limits(output, elapsed)?;
         let tool_call_output = match &limited_output {
             ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
@@ -2140,7 +2246,7 @@ impl ChioKernel {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
                 let budget_metadata = self.budget_execution_receipt_metadata(
-                    &charge,
+                    charge,
                     Some(("reconciled", &reconcile)),
                     preminted_execution_nonce
                         .as_deref()
@@ -2156,7 +2262,7 @@ impl ChioKernel {
                     financial_json,
                     self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
                 );
-                self.build_allow_response_with_metadata_and_payee_binding(
+                self.prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     tool_call_output,
                     timestamp,
@@ -2171,7 +2277,7 @@ impl ChioKernel {
             }
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
                 let budget_metadata = self.budget_execution_receipt_metadata(
-                    &charge,
+                    charge,
                     Some(("reconciled", &reconcile)),
                     None,
                 );
@@ -2179,7 +2285,7 @@ impl ChioKernel {
                     financial_json,
                     self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
                 );
-                self.build_incomplete_response_with_output_metadata_and_payee_binding(
+                self.prepare_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(tool_call_output),
                     &reason,

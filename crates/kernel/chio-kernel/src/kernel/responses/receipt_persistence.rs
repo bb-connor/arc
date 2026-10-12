@@ -397,6 +397,28 @@ impl ChioKernel {
     fn record_chio_receipt_during_trace_transition(
         &self,
         receipt: &ChioReceipt,
+        trace_transition: &std::sync::MutexGuard<'_, ()>,
+        settlement_eligible: bool,
+        suppress_exact_durable_replay: bool,
+    ) -> Result<ReceiptCommit, ReceiptAppendFailure> {
+        let committed = self.append_terminal_receipt_during_trace_transition(
+            receipt,
+            trace_transition,
+            settlement_eligible,
+            suppress_exact_durable_replay,
+        )?;
+        Ok(self.project_acknowledged_receipt_during_trace_transition(
+            receipt,
+            committed,
+            trace_transition,
+        ))
+    }
+
+    /// Return immediately after the authoritative append acknowledges. No
+    /// local projection or host callback runs before the owner can discharge.
+    pub(in crate::kernel) fn append_terminal_receipt_during_trace_transition(
+        &self,
+        receipt: &ChioReceipt,
         _trace_transition: &std::sync::MutexGuard<'_, ()>,
         settlement_eligible: bool,
         suppress_exact_durable_replay: bool,
@@ -454,25 +476,39 @@ impl ChioKernel {
                 })?;
             }
         }
-        if projected {
+        // An ephemeral kernel's local append is the authoritative commit.
+        if projected && self.receipt_store.is_none() {
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        // Allocate under the transition lock to preserve receipt/revocation
-        // ordering. Failure here is carried by an acknowledged commit.
-        let trace_source_sequence = if projected && self.runtime_trace_observer.is_some() {
-            self.allocate_runtime_trace_source_sequence().map(Some)
-        } else {
-            Ok(None)
-        };
         Ok(ReceiptCommit {
             receipt_id: receipt.id.clone(),
             projected,
-            trace_source_sequence,
+            trace_source_sequence: Ok(None),
             settlement_visible_at_ms,
         })
     }
 
-    fn finish_record_chio_receipt(
+    pub(in crate::kernel) fn project_acknowledged_receipt_during_trace_transition(
+        &self,
+        receipt: &ChioReceipt,
+        mut committed: ReceiptCommit,
+        _trace_transition: &std::sync::MutexGuard<'_, ()>,
+    ) -> ReceiptCommit {
+        if committed.projected && self.receipt_store.is_some() {
+            self.append_chio_receipt_to_local_log(receipt.clone());
+        }
+        // Allocate under the transition lock to preserve receipt/revocation
+        // ordering. Failure here is carried by an acknowledged commit.
+        committed.trace_source_sequence =
+            if committed.projected && self.runtime_trace_observer.is_some() {
+                self.allocate_runtime_trace_source_sequence().map(Some)
+            } else {
+                Ok(None)
+            };
+        committed
+    }
+
+    pub(in crate::kernel) fn finish_record_chio_receipt(
         &self,
         receipt: &ChioReceipt,
         committed: ReceiptCommit,
