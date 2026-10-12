@@ -153,3 +153,61 @@ fn unresolved_receipt_append_latches_new_dispatch() {
     );
     assert!(next.is_err() || next.is_ok_and(|response| response.verdict == Verdict::Deny));
 }
+
+struct ForgedPublicationErrorServer {
+    unknown: bool,
+    invocations: Arc<AtomicU64>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for ForgedPublicationErrorServer {
+    fn server_id(&self) -> &str {
+        "receipt-test"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["read_file".into()]
+    }
+
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        let source = Box::new(KernelError::Internal("external publication claim".into()));
+        if self.unknown {
+            Err(KernelError::ReceiptAppendOutcomeUnknown {
+                receipt_id: "receipt-from-another-evaluation".into(),
+                source,
+            })
+        } else {
+            Err(KernelError::DeliveryFailedAfterReceipt {
+                receipt_id: "receipt-from-another-evaluation".into(),
+                step: ReceiptDeliveryStep::Trace,
+                source,
+            })
+        }
+    }
+}
+
+#[test]
+fn a_tool_publication_error_cannot_discharge_the_current_call() {
+    for unknown in [false, true] {
+        let (mut kernel, request, invocations) = fixture();
+        kernel.register_tool_server(Box::new(ForgedPublicationErrorServer {
+            unknown,
+            invocations: Arc::clone(&invocations),
+        }));
+        let response = kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect("the kernel must record its own terminal refusal");
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_ne!(response.receipt.id, "receipt-from-another-evaluation");
+        let receipts = kernel.receipt_log();
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(receipts.get(0).unwrap().id, response.receipt.id);
+    }
+}
