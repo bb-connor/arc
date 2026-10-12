@@ -14,7 +14,7 @@ mod recovery;
 #[path = "durable_admission/unknown_incident_assertions.rs"]
 mod unknown_incident_assertions;
 use receipt_projection::AdmissionReceiptProjectionStore;
-use unknown_incident_assertions::assert_original_unknown_incident;
+use unknown_incident_assertions::{assert_original_unknown_incident, assert_unknown_replay};
 
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
@@ -89,6 +89,8 @@ pub(super) struct TestAdmissionOperationStore {
     runtime_recovery: runtime_participant::TestRuntimeRecovery,
     pub(super) fence: std::sync::Mutex<StoreMutationFence>,
     lose_next_begin_ack: std::sync::atomic::AtomicBool,
+    fail_next_replay_read: std::sync::atomic::AtomicBool,
+    capture_pending_failure: std::sync::atomic::AtomicU8,
     lose_next_command_ack: std::sync::atomic::AtomicBool,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
@@ -117,6 +119,8 @@ impl TestAdmissionOperationStore {
             runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
             lose_next_begin_ack: std::sync::atomic::AtomicBool::new(false),
+            fail_next_replay_read: std::sync::atomic::AtomicBool::new(false),
+            capture_pending_failure: std::sync::atomic::AtomicU8::new(0),
             lose_next_command_ack: std::sync::atomic::AtomicBool::new(false),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),

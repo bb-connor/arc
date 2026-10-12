@@ -383,6 +383,7 @@ fn reversed_budget() -> serde_json::Value {
 
 fn retained_credentials(unwind: Option<serde_json::Value>) -> serde_json::Value {
     let mut runtime = serde_json::json!({
+        "identity_disposition": "terminal",
         "dispatch_credential_disposition": "retained_after_authorization",
         "dispatch_credential_retention_outcome_unknown": false,
         "payment_credential_disposition": "retained_after_authorization",

@@ -222,13 +222,11 @@ fn assert_outcome_unknown(
         (0, 1)
     );
     // An unknown outcome must not admit another effect or refund captured quota.
-    assert_eq!(
-        fixture
-            .kernel
-            .evaluate_tool_call_blocking(&fixture.request)?
-            .verdict,
-        Verdict::Deny
+    assert_unknown_replay(
+        fixture.kernel.evaluate_tool_call_blocking(&fixture.request),
+        &operation,
     );
+    assert!(fixture.kernel.receipt_log().is_empty());
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
     assert_eq!(fixture.store.operation(), operation);
     assert_eq!(budget.get_budget_hold(hold_id.as_str())?, Some(hold));

@@ -44,3 +44,22 @@ pub(super) fn assert_original_unknown_incident(
     );
     operation
 }
+
+/// A retained incident may be observed but cannot mint another terminal receipt.
+pub(super) fn assert_unknown_replay(
+    result: Result<ToolCallResponse, KernelError>,
+    operation: &AdmissionOperationV1,
+) -> crate::admission_operation::AdmissionReceiptMetadataV1 {
+    let error = result.expect_err("retained incident must not mint another receipt");
+    let KernelError::DurableAdmissionRetained(metadata) = error else {
+        panic!("expected the original retained incident, got {error:?}");
+    };
+    let expected =
+        crate::admission_operation::AdmissionReceiptMetadataV1::retained_unknown_dispatch(
+            operation,
+            metadata.trusted_time_unix_ms,
+        )
+        .expect("valid retained incident projection");
+    assert_eq!(*metadata, expected);
+    *metadata
+}

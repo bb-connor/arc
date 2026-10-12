@@ -25,12 +25,20 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     assert_eq!(replay.output, response.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
+    let operation = store.operation();
+    let receipts = kernel.receipt_log().len();
     let mut conflict = request.clone();
     conflict.arguments = serde_json::json!({"record": "ledger-7", "value": "reopened"});
     let conflict = kernel
         .evaluate_tool_call_blocking(&conflict)
-        .expect("conflicting replay denial");
-    assert_eq!(conflict.verdict, Verdict::Deny);
+        .expect_err("conflicting replay must not mint another receipt");
+    assert!(
+        matches!(conflict, KernelError::DurableAdmission(ref reason)
+        if reason.contains("conflicts with retained operation")),
+        "{conflict:?}"
+    );
+    assert_eq!(store.operation(), operation);
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -209,14 +217,8 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
         "the original incident is the sole terminal"
     );
 
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("retained dispatch must produce a denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
+    assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &retained);
+    assert!(kernel.receipt_log().is_empty());
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
         store.operation(),

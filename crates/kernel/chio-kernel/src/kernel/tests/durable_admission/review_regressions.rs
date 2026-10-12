@@ -99,12 +99,9 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
             "unsafe observation time accepted: {time}"
         );
     }
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("signed replay refusal");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature().expect("signature"));
-    let metadata = &response.receipt.metadata.as_ref().expect("metadata")["admission_operation"];
+    let projection = assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &retained);
+    assert!(kernel.receipt_log().is_empty());
+    let metadata = &serde_json::to_value(projection).expect("retained projection");
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../../spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json"
@@ -113,7 +110,7 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
     jsonschema::validator_for(&schema)
         .expect("schema compiles")
         .validate(metadata)
-        .expect("signed projection validates against registered schema");
+        .expect("retained projection validates against registered schema");
     assert_eq!(
         metadata["projected_state"],
         "outcome_unknown_after_dispatch"
@@ -234,22 +231,14 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
         );
         kernel.dpop_authority = None;
         assert_eq!(kernel.can_redispatch_unknown_read(&request), !selected);
-        let refusal = kernel
-            .evaluate_tool_call_blocking(&request)
-            .expect("signed refusal");
-        assert_eq!(refusal.verdict, Verdict::Deny);
-        assert!(refusal.receipt.verify_signature().expect("signature"));
-        assert_eq!(
-            refusal
-                .receipt
-                .metadata
-                .as_ref()
-                .and_then(|metadata| metadata.get("admission_operation"))
-                .is_none(),
-            selected,
-            "{:?}",
-            refusal.reason
-        );
+        let result = kernel.evaluate_tool_call_blocking(&request);
+        if selected {
+            result.expect_err("removed authority cannot advertise a retained identity as reusable");
+            assert!(kernel.receipt_log().is_empty());
+        } else {
+            assert_unknown_replay(result, &retained);
+            assert!(kernel.receipt_log().is_empty());
+        }
         assert_eq!(store.operation(), retained);
         assert_eq!(store.state.lock().expect("state").claim, claim);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -291,10 +280,9 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         ledger.unknown_dispatch_finalizations(),
         vec![terminal.binding().operation_id().as_str().to_owned()]
     );
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("retained incident replay refusal");
-    assert_eq!(replay.verdict, Verdict::Deny);
+    let receipts = kernel.receipt_log().len();
+    assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &terminal);
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(
         store.operation(),
         terminal,
@@ -468,10 +456,16 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         kernel.receipt_log().is_empty(),
         "the original nested saga incident is the sole terminal"
     );
-    let replay = kernel
-        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
-        .expect("retained nested incident replay refusal");
-    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &request,
+            &mut client,
+            None,
+        ),
+        &retained,
+    );
+    assert!(kernel.receipt_log().is_empty());
     assert_eq!(
         store.operation(),
         retained,

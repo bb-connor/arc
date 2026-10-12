@@ -392,13 +392,17 @@ fn resumed_session_revalidates_current_threshold_policy() -> TestResult {
                 Ok(None)
             },
         ));
-    let response = session_tool_call(
-        fixture
-            .kernel
-            .evaluate_session_operation(&context, &operation(&fixture.request))?,
-    )
-    .ok_or("denial response missing")?;
-    assert_eq!(response.verdict, Verdict::Deny);
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
+        .kernel
+        .evaluate_session_operation(&context, &operation(&fixture.request))
+        .expect_err("changed policy cannot terminalize the pending approval");
+    assert!(
+        matches!(error, KernelError::GovernedTransactionDenied(ref reason)
+        if reason == "request has no matching threshold approval policy requirement"),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     fixture.assert_pending_unchanged(&proposal)
 }

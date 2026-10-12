@@ -1,6 +1,6 @@
 //! An output guard rejects the value a committed dispatch actually returned.
 //! The rejection happens before the return is recorded, so the operation must
-//! terminalize as outcome unknown with a signed denial and no redispatch.
+//! retain the original outcome-unknown incident without a second receipt or dispatch.
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -222,14 +222,8 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         "{entry:?}: the original incident is the sole terminal"
     );
 
-    let replay = evaluate(&kernel, &request, parent.as_ref())?;
-    assert_eq!(replay.verdict, Verdict::Deny, "{entry:?}: {replay:?}");
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
-    assert!(replay.output.is_none());
-    assert!(replay.receipt.verify_signature()?);
+    assert_unknown_replay(evaluate(&kernel, &request, parent.as_ref()), &retained);
+    assert!(kernel.receipt_log().is_empty(), "{entry:?}");
     assert_eq!(store.operation(), retained);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(observed(&seen)?.len(), 1, "{entry:?}");

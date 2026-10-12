@@ -88,14 +88,19 @@ fn cumulative_retry_cannot_backfill_missing_original_authority() -> TestResult {
         .lock()
         .map_err(|_| "test state poisoned")?
         .retained_request = None;
-    let response = fixture
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("original request")));
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("missing authority cannot create a terminal receipt");
+    assert!(
+        matches!(&error, KernelError::AdmissionRecovery(failure)
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Store(
+            crate::admission_operation::AdmissionOperationStoreError::Invariant(reason)
+        ) if reason == "original request is missing or changed")),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(
         fixture.store.operation().threshold_proposal(),
         Some(&proposal)
