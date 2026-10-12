@@ -100,6 +100,8 @@ pub enum ReceiptDeliveryStep {
     Federation,
     Provenance,
     ExecutionNonce,
+    SecurityOutcome,
+    SecurityRelease,
 }
 
 impl std::fmt::Display for ReceiptDeliveryStep {
@@ -110,6 +112,8 @@ impl std::fmt::Display for ReceiptDeliveryStep {
             Self::Federation => "federation",
             Self::Provenance => "provenance",
             Self::ExecutionNonce => "execution_nonce",
+            Self::SecurityOutcome => "security_outcome",
+            Self::SecurityRelease => "security_release",
         })
     }
 }
@@ -303,6 +307,18 @@ pub enum KernelError {
         #[source]
         source: Box<KernelError>,
     },
+
+    #[error("post-effect evidence capacity exhausted")]
+    PostEffectEvidenceCapacity,
+
+    #[error("post-effect evidence remains pending for {buffered} calls")]
+    PostEffectEvidencePending { buffered: usize },
+
+    #[error("post-effect terminal evidence is latched for request {request_id}")]
+    PostEffectFaultLatched { request_id: String },
+
+    #[error("durable outcome reconciliation remains pending for operation {operation_id}")]
+    DurableOutcomePending { operation_id: String },
 
     /// The receipt stands even though its subsequent delivery step failed.
     #[error("delivery failed after receipt {receipt_id} at {step}: {source}")]
@@ -739,6 +755,26 @@ impl KernelError {
                 "CHIO-KERNEL-RECEIPT-APPEND-OUTCOME-UNKNOWN",
                 serde_json::json!({ "receipt_id": receipt_id, "source": source.to_string() }),
                 "Drain the receipt writer and authenticate this receipt's retained record before considering replacement evidence.",
+            ),
+            Self::PostEffectEvidenceCapacity => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-EVIDENCE-CAPACITY",
+                serde_json::json!({}),
+                "Wait for retained evidence to flush before admitting another non-durable tool call.",
+            ),
+            Self::PostEffectEvidencePending { buffered } => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-EVIDENCE-PENDING",
+                serde_json::json!({ "buffered": buffered }),
+                "Restore evidence persistence. Recovery and session reporting remain available.",
+            ),
+            Self::PostEffectFaultLatched { request_id } => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-FAULT-LATCHED",
+                serde_json::json!({ "request_id": request_id }),
+                "Reconcile the retained evidence before permitting new dispatch. Do not repeat this tool call.",
+            ),
+            Self::DurableOutcomePending { operation_id } => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-OUTCOME-PENDING",
+                serde_json::json!({ "operation_id": operation_id }),
+                "Reconcile the original durable admission. Its saga remains the terminal owner.",
             ),
             Self::DeliveryFailedAfterReceipt { receipt_id, step, source } => self.report_with_context(
                 "CHIO-KERNEL-DELIVERY-FAILED-AFTER-RECEIPT",
