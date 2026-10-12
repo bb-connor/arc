@@ -36,6 +36,11 @@ mod issuance;
 mod issuer_trust;
 #[path = "validation/lineage.rs"]
 mod lineage;
+#[path = "validation/payment_outcome.rs"]
+mod payment_outcome;
+use payment_outcome::{
+    payment_error_code, release_unsettled_payment_metadata, retained_payment_capture_metadata,
+};
 #[path = "validation/payment_amount.rs"]
 mod payment_amount;
 #[path = "validation/portable.rs"]
@@ -1671,7 +1676,7 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: usize,
         cost_context: FinalizeToolOutputCostContext<'_>,
-        extra_metadata: Option<serde_json::Value>,
+        mut extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -1683,6 +1688,7 @@ impl ChioKernel {
         } = cost_context;
         let Some(charge) = charge_result else {
             if let Some(authorization) = payment_authorization.as_ref() {
+                let mut extra_metadata = extra_metadata;
                 let (quoted_units, quoted_currency) = Self::mustprepay_quoted_amount(request)
                     .ok_or_else(|| {
                         KernelError::GovernedTransactionDenied(
@@ -1705,22 +1711,41 @@ impl ChioKernel {
                     ) {
                         Ok(result) => result,
                         Err(error) => {
-                            let _ = adapter
-                                .release(&authorization.authorization_id, &request.request_id);
+                            // A capture error does not establish that no payment
+                            // happened and cannot authorize voiding a positive hold.
+                            let metadata = merge_metadata_objects(
+                                extra_metadata,
+                                Some(retained_payment_capture_metadata(
+                                    request,
+                                    authorization,
+                                    &error,
+                                )),
+                            );
                             return self.build_deny_response_with_metadata(
                                 request,
                                 &format!(
-                                    "MustPrepay authorization could not be settled after execution: {error}"
+                                    "MustPrepay authorization could not be settled after execution: {}",
+                                    payment_error_code(&error)
                                 ),
                                 timestamp,
                                 Some(matched_grant_index),
-                                extra_metadata,
+                                self.mark_runtime_admission_reservations_retained_fail_closed(
+                                    metadata,
+                                ),
                             );
                         }
                     };
                     if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
-                        let _ =
-                            adapter.release(&authorization.authorization_id, &request.request_id);
+                        let financial = release_unsettled_payment_metadata(
+                            adapter.as_ref(),
+                            request,
+                            authorization,
+                            &result,
+                        );
+                        extra_metadata = merge_metadata_objects(
+                            extra_metadata,
+                            Some(serde_json::json!({ "financial": financial })),
+                        );
                     }
                     ReceiptSettlement::from_payment_result(&result)
                 };
@@ -1908,11 +1933,22 @@ impl ChioKernel {
                 match payment_result {
                     Ok(result) => ReceiptSettlement::from_payment_result(result),
                     Err(error) => {
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&error),
-                            "post-execution payment settlement failed"
-                        );
+                        if actual_cost > 0 {
+                            extra_metadata = merge_metadata_objects(
+                                extra_metadata,
+                                Some(retained_payment_capture_metadata(
+                                    request,
+                                    authorization,
+                                    error,
+                                )),
+                            );
+                        } else {
+                            warn!(
+                                request_id = %request.request_id,
+                                reason = %redacted!(&error),
+                                "post-execution payment settlement failed"
+                            );
+                        }
                         ReceiptSettlement {
                             payment_reference: Some(authorization.authorization_id.clone()),
                             settlement_status: SettlementStatus::Failed,
