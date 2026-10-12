@@ -15,11 +15,14 @@ pub(super) fn run<'a>(
     }
     let known_return = returned.is_ok();
     if known_return || matches!(&returned, Err(KernelError::UrlElicitationsRequired { .. })) {
-        let parts = obligation
+        let committed = obligation
             .parts
             .as_mut()
-            .unwrap_or_else(|| unreachable!("live obligation parts"));
-        if let Err(error) = parts.inputs.credentials.commit() {
+            .ok_or_else(|| {
+                KernelError::Internal("post-effect owner lost its credential custody".into())
+            })
+            .and_then(|parts| parts.inputs.credentials.commit());
+        if let Err(error) = committed {
             return obligation.fail(failure("credential_commit", error), None);
         }
     }
@@ -37,10 +40,12 @@ pub(super) fn run<'a>(
 }
 
 fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostEffectError> {
-    let parts = obligation
-        .parts
-        .as_mut()
-        .unwrap_or_else(|| unreachable!("live obligation parts"));
+    let parts = obligation.parts.as_mut().ok_or_else(|| {
+        failure(
+            "child_receipt_flush",
+            KernelError::Internal("post-effect owner lost its child custody".into()),
+        )
+    })?;
     while !parts.children.is_empty() {
         if let Some(PendingChildReceipt::Unsigned(body)) = parts.children.first() {
             let now = obligation
@@ -140,10 +145,9 @@ fn record_durable_return<'a>(
         Ok(observed) => observed,
         Err(error) => return obligation.fail(failure("transport_return", error), None),
     };
-    let parts = obligation
-        .parts
-        .as_mut()
-        .unwrap_or_else(|| unreachable!("live obligation parts"));
+    let Some(parts) = obligation.parts.as_mut() else {
+        return obligation.ownership_failure("durable_return");
+    };
     let inputs = &mut parts.inputs;
     let Some(context) = inputs.return_context.as_ref() else {
         return obligation.fail(
@@ -160,10 +164,9 @@ fn record_durable_return<'a>(
         Ok(now) => now.get(),
         Err(error) => return obligation.fail(failure("authority_time", error.into()), None),
     };
-    let admission = inputs
-        .admission
-        .as_mut()
-        .unwrap_or_else(|| unreachable!("durable obligation"));
+    let Some(admission) = inputs.admission.as_mut() else {
+        return obligation.ownership_failure("durable_admission");
+    };
     let recorded = obligation.kernel.record_durable_tool_return(
         admission,
         DurableToolReturnInput {
@@ -181,26 +184,24 @@ fn record_durable_return<'a>(
     };
     // The atomic return commit now makes the original saga authoritative. Its
     // finalizer owns settlement, security release and the terminal outbox.
-    let mut parts = obligation
-        .parts
-        .take()
-        .unwrap_or_else(|| unreachable!("live obligation parts"));
+    let Some(mut parts) = obligation.parts.take() else {
+        return obligation.ownership_failure("durable_return_handoff");
+    };
     let binding = parts.inputs.prepared.binding.clone();
-    let admission = parts
-        .inputs
-        .admission
-        .take()
-        .unwrap_or_else(|| unreachable!("durable obligation"));
+    let Some(admission) = parts.inputs.admission.take() else {
+        obligation.parts = Some(parts);
+        return obligation.ownership_failure("durable_admission_handoff");
+    };
     let discharged = Discharged {
         kernel: obligation.kernel,
         binding,
-        delivery: Some(Delivery::Durable {
+        delivery: Some(Delivery::Durable(Box::new(DurableDelivery {
             request: parts.inputs.request,
             admission,
             returned,
             outcome: parts.inputs.security_outcome.take(),
             lifecycle: parts.inputs.security_lifecycle.take(),
-        }),
+        }))),
     };
     obligation
         .kernel
@@ -213,10 +214,12 @@ fn prepare_ordinary(
     observed: ObservedToolReturn,
 ) -> Result<(PreparedResponse, Option<KernelError>), PostEffectError> {
     let kernel = obligation.kernel;
-    let parts = obligation
-        .parts
-        .as_mut()
-        .unwrap_or_else(|| unreachable!("live obligation parts"));
+    let parts = obligation.parts.as_mut().ok_or_else(|| {
+        failure(
+            "ordinary_finalization",
+            KernelError::Internal("post-effect owner lost its preparation custody".into()),
+        )
+    })?;
     let inputs = &mut parts.inputs;
     let now = kernel
         .read_authority_time()

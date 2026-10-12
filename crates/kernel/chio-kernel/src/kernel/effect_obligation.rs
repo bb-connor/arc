@@ -54,7 +54,8 @@ struct ObligationParts<'a> {
 #[must_use = "an executed call must retain one terminal owner"]
 pub(in crate::kernel) struct PostEffectObligation<'a> {
     kernel: &'a ChioKernel,
-    parts: Option<ObligationParts<'a>>,
+    binding: DischargeBinding,
+    parts: Option<Box<ObligationParts<'a>>>,
     submitted: Option<UnknownAppend>,
 }
 
@@ -68,24 +69,29 @@ pub(in crate::kernel) struct Discharged<'a> {
 }
 
 enum Delivery<'a> {
-    Receipt {
-        parts: ObligationParts<'a>,
-        prepared: PreparedResponse,
-        committed: ReceiptCommit,
-        original: UnknownAppend,
-        transition: MutexGuard<'a, ()>,
-        returned: bool,
-        deferred_error: Option<KernelError>,
-    },
-    Durable {
-        request: &'a ToolCallRequest,
-        admission: DurableToolAdmission,
-        returned: DurableToolReturn,
-        outcome: Option<SecurityDispatchOutcomeHandle>,
-        lifecycle: Option<SecurityRequestLifecycleHandle>,
-    },
+    Receipt(Box<ReceiptDelivery<'a>>),
+    Durable(Box<DurableDelivery<'a>>),
     Buffered,
     Saga,
+    OwnershipFailure(Box<KernelError>),
+}
+
+struct ReceiptDelivery<'a> {
+    parts: Box<ObligationParts<'a>>,
+    prepared: PreparedResponse,
+    committed: ReceiptCommit,
+    original: UnknownAppend,
+    transition: MutexGuard<'a, ()>,
+    returned: bool,
+    deferred_error: Option<KernelError>,
+}
+
+struct DurableDelivery<'a> {
+    request: &'a ToolCallRequest,
+    admission: DurableToolAdmission,
+    returned: DurableToolReturn,
+    outcome: Option<SecurityDispatchOutcomeHandle>,
+    lifecycle: Option<SecurityRequestLifecycleHandle>,
 }
 
 struct PostEffectError {
@@ -102,6 +108,7 @@ impl PostEffectError {
     }
 }
 
+#[derive(Clone)]
 struct UnknownAppend {
     id: String,
     sha256: String,
@@ -124,11 +131,12 @@ impl<'a> PostEffectObligation<'a> {
         }
         Self {
             kernel,
-            parts: Some(ObligationParts {
+            binding: inputs.prepared.binding.clone(),
+            parts: Some(Box::new(ObligationParts {
                 inputs,
                 children: Vec::new(),
                 unknown_child: None,
-            }),
+            })),
             submitted: None,
         }
     }
@@ -141,12 +149,27 @@ impl<'a> PostEffectObligation<'a> {
 
     pub(in crate::kernel) fn nested_receipt_sinks(
         &mut self,
-    ) -> (&mut Vec<PendingChildReceipt>, &mut Option<EvidenceSlot>) {
-        let parts = self
-            .parts
-            .as_mut()
-            .unwrap_or_else(|| unreachable!("live obligation parts"));
-        (&mut parts.children, &mut parts.inputs.prepared.slot)
+    ) -> Result<(&mut Vec<PendingChildReceipt>, &mut Option<EvidenceSlot>), KernelError> {
+        let parts = self.parts.as_mut().ok_or_else(|| {
+            KernelError::Internal("post-effect owner has no live child custody".into())
+        })?;
+        Ok((&mut parts.children, &mut parts.inputs.prepared.slot))
+    }
+
+    fn ownership_failure(self, step: &'static str) -> Discharged<'a> {
+        let kernel = self.kernel;
+        let binding = self.binding.clone();
+        // Any still-live custody follows the same Drop handoff before this
+        // diagnostic can leave the typed region. No receipt or saga success is
+        // manufactured from an inconsistent internal state.
+        drop(self);
+        Discharged {
+            kernel,
+            binding,
+            delivery: Some(Delivery::OwnershipFailure(Box::new(KernelError::Internal(
+                format!("post-effect ownership invariant failed at {step}; output withheld"),
+            )))),
+        }
     }
 
     fn commit_terminal_receipt(
@@ -154,34 +177,39 @@ impl<'a> PostEffectObligation<'a> {
         prepared: PreparedResponse,
         returned: bool,
         deferred_error: Option<KernelError>,
-    ) -> Result<Discharged<'a>, Undischarged<'a>> {
+    ) -> Result<Discharged<'a>, Box<Undischarged<'a>>> {
         let kernel = self.kernel;
         let receipt = prepared.receipt();
-        let binding = &self
-            .parts
-            .as_ref()
-            .unwrap_or_else(|| unreachable!("live obligation parts"))
-            .inputs
-            .prepared
-            .binding;
+        let Some(parts) = self.parts.as_ref() else {
+            return Err(Box::new(Undischarged {
+                obligation: self,
+                error: PostEffectError::at(
+                    "receipt_binding",
+                    &KernelError::Internal("post-effect owner lost its live custody".into()),
+                ),
+                original: None,
+            }));
+        };
+        let capability = &parts.inputs.request.capability;
+        let binding = &self.binding;
         if let Err(error) = binding.validate_receipt(receipt) {
-            return Err(Undischarged {
+            return Err(Box::new(Undischarged {
                 obligation: self,
                 error: PostEffectError::at("receipt_binding", &error),
                 original: None,
-            });
+            }));
         }
         let canonical = match chio_core::canonical::canonical_json_bytes(receipt) {
             Ok(canonical) => canonical,
             Err(error) => {
-                return Err(Undischarged {
+                return Err(Box::new(Undischarged {
                     obligation: self,
                     error: PostEffectError::at(
                         "receipt_content",
                         &KernelError::ReceiptSigningFailed(error.to_string()),
                     ),
                     original: None,
-                })
+                }))
             }
         };
         let original = UnknownAppend {
@@ -192,28 +220,20 @@ impl<'a> PostEffectObligation<'a> {
         let transition = match kernel.lock_runtime_trace_transition() {
             Ok(transition) => transition,
             Err(error) => {
-                return Err(Undischarged {
+                return Err(Box::new(Undischarged {
                     obligation: self,
                     error: PostEffectError::at("append", &error),
                     original: None,
-                })
+                }))
             }
         };
         let appended = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             if receipt.is_allowed() {
                 kernel
-                    .check_revocation(
-                        &self
-                            .parts
-                            .as_ref()
-                            .unwrap_or_else(|| unreachable!("live obligation parts"))
-                            .inputs
-                            .request
-                            .capability,
-                    )
+                    .check_revocation(capability)
                     .map_err(ReceiptAppendFailure::Refused)?;
             }
-            self.submitted = Some(original);
+            self.submitted = Some(original.clone());
             kernel.append_terminal_receipt_during_trace_transition(
                 receipt,
                 &transition,
@@ -245,28 +265,31 @@ impl<'a> PostEffectObligation<'a> {
                         (source, self.submitted.take())
                     }
                 };
-                return Err(Undischarged {
+                return Err(Box::new(Undischarged {
                     obligation: self,
                     error: PostEffectError::at("append", &error),
                     original,
-                });
+                }));
             }
         };
         // Nothing fallible or extension-controlled runs between acknowledgement
         // and consuming this owner. Later projection and delivery cannot undo it.
-        let parts = self
-            .parts
-            .take()
-            .unwrap_or_else(|| unreachable!("live obligation parts"));
-        let original = self
-            .submitted
-            .take()
-            .unwrap_or_else(|| unreachable!("acknowledged append identity"));
+        let Some(parts) = self.parts.take() else {
+            return Err(Box::new(Undischarged {
+                obligation: self,
+                error: PostEffectError::at(
+                    "append_acknowledgement",
+                    &KernelError::Internal("acknowledged receipt lost its live custody".into()),
+                ),
+                original: Some(original),
+            }));
+        };
+        self.submitted = None;
         let binding = parts.inputs.prepared.binding.clone();
         Ok(Discharged {
             kernel,
             binding,
-            delivery: Some(Delivery::Receipt {
+            delivery: Some(Delivery::Receipt(Box::new(ReceiptDelivery {
                 parts,
                 prepared,
                 committed,
@@ -274,16 +297,18 @@ impl<'a> PostEffectObligation<'a> {
                 transition,
                 returned,
                 deferred_error,
-            }),
+            }))),
         })
     }
 
     fn fail(mut self, error: PostEffectError, original: Option<UnknownAppend>) -> Discharged<'a> {
-        if self.admission().is_some() {
-            let mut parts = self
-                .parts
-                .take()
-                .unwrap_or_else(|| unreachable!("live obligation parts"));
+        if original.is_some() {
+            self.submitted.clone_from(&original);
+        }
+        if self.binding.operation_id.is_some() {
+            let Some(mut parts) = self.parts.take() else {
+                return self.ownership_failure("durable_fault_handoff");
+            };
             let binding = parts.inputs.prepared.binding.clone();
             buffer_durable_children(self.kernel, &mut parts);
             tracing::warn!(request_id = %binding.request_id, step = error.step, code = %error.code,
@@ -294,16 +319,12 @@ impl<'a> PostEffectObligation<'a> {
                 delivery: Some(Delivery::Saga),
             };
         }
-        let parts = self
-            .parts
-            .as_mut()
-            .unwrap_or_else(|| unreachable!("live obligation parts"));
-        let fault = parts
-            .inputs
-            .prepared
-            .fault
-            .as_mut()
-            .unwrap_or_else(|| unreachable!("reserved fault template"));
+        let Some(parts) = self.parts.as_mut() else {
+            return self.ownership_failure("fault_preparation");
+        };
+        let Some(fault) = parts.inputs.prepared.fault.as_mut() else {
+            return self.ownership_failure("reserved_fault_template");
+        };
         fault.body.metadata = merge_metadata_objects(
             fault.body.metadata.take(),
             Some(serde_json::json!({
@@ -365,17 +386,18 @@ impl<'a> PostEffectObligation<'a> {
     }
 
     fn buffer(mut self, original: Option<UnknownAppend>) -> Discharged<'a> {
-        let mut parts = self
-            .parts
-            .take()
-            .unwrap_or_else(|| unreachable!("live obligation parts"));
+        if original.is_some() {
+            self.submitted.clone_from(&original);
+        }
+        let Some(mut parts) = self.parts.take() else {
+            return self.ownership_failure("buffer_handoff");
+        };
         let binding = parts.inputs.prepared.binding.clone();
-        let fault = parts
-            .inputs
-            .prepared
-            .fault
-            .take()
-            .unwrap_or_else(|| unreachable!("reserved fault template"));
+        let Some((slot, fault)) = take_reserved_fault(&mut parts) else {
+            self.parts = Some(parts);
+            self.submitted = original;
+            return self.ownership_failure("reserved_evidence_handoff");
+        };
         let evidence = match original {
             Some(original) => PendingPostEffectEvidence::Unknown {
                 receipt_id: original.id,
@@ -385,12 +407,6 @@ impl<'a> PostEffectObligation<'a> {
             },
             None => PendingPostEffectEvidence::Unsigned { fault },
         };
-        let slot = parts
-            .inputs
-            .prepared
-            .slot
-            .take()
-            .unwrap_or_else(|| unreachable!("reserved evidence slot"));
         self.kernel.buffer_post_effect_evidence(
             slot,
             PendingPostEffectRecord {
@@ -403,6 +419,19 @@ impl<'a> PostEffectObligation<'a> {
             kernel: self.kernel,
             binding,
             delivery: Some(Delivery::Buffered),
+        }
+    }
+}
+
+fn take_reserved_fault(
+    parts: &mut ObligationParts<'_>,
+) -> Option<(EvidenceSlot, PreparedFaultReceipt)> {
+    let fault = parts.inputs.prepared.fault.take()?;
+    match parts.inputs.prepared.slot.take() {
+        Some(slot) => Some((slot, fault)),
+        None => {
+            parts.inputs.prepared.fault = Some(fault);
+            None
         }
     }
 }
@@ -430,15 +459,12 @@ impl Drop for PostEffectObligation<'_> {
         // Transfer reserved capacity before invoking any infrastructure or host
         // callback. The supervised owner attempts the prebuilt fault receipt.
         let guarded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            if parts.inputs.admission.is_some() {
+            if self.binding.operation_id.is_some() {
                 buffer_durable_children(self.kernel, &mut parts);
                 tracing::warn!(request_id = %parts.inputs.request.request_id,
                     audit_fault = "durable_post_effect_reconciliation_pending",
                     "dropped evaluation retains its original durable saga and reservations");
-            } else if let (Some(slot), Some(fault)) = (
-                parts.inputs.prepared.slot.take(),
-                parts.inputs.prepared.fault.take(),
-            ) {
+            } else if let Some((slot, fault)) = take_reserved_fault(&mut parts) {
                 let evidence = match self.submitted.take() {
                     Some(original) => PendingPostEffectEvidence::Unknown {
                         receipt_id: original.id,
@@ -475,19 +501,25 @@ impl<'a> Discharged<'a> {
         tracing::warn!(request_id = %expected.request_id, audit_fault = "post_effect_discharge_binding_mismatch",
             "discharged output does not match its original evaluation");
         match self.delivery.take() {
-            Some(Delivery::Receipt {
-                mut parts,
-                original,
-                transition,
-                ..
-            }) => {
+            Some(Delivery::Receipt(delivery)) => {
+                let ReceiptDelivery {
+                    mut parts,
+                    original,
+                    transition,
+                    ..
+                } = *delivery;
                 drop(transition);
-                let slot = parts.inputs.prepared.slot.take().unwrap_or_else(|| {
-                    unreachable!("bound receipt keeps its evidence slot until delivery")
-                });
-                let mut fault = parts.inputs.prepared.fault.take().unwrap_or_else(|| {
-                    unreachable!("bound receipt keeps its fault template until delivery")
-                });
+                let Some((slot, mut fault)) = take_reserved_fault(&mut parts) else {
+                    let obligation = PostEffectObligation {
+                        kernel: self.kernel,
+                        binding: parts.inputs.prepared.binding.clone(),
+                        parts: Some(parts),
+                        submitted: Some(original),
+                    };
+                    let mut failed = obligation.ownership_failure("discharge_binding_custody");
+                    failed.binding = expected;
+                    return failed;
+                };
                 fault.body.metadata = merge_metadata_objects(
                     fault.body.metadata.take(),
                     Some(serde_json::json!({
@@ -514,45 +546,55 @@ impl<'a> Discharged<'a> {
                     delivery: Some(Delivery::Buffered),
                 }
             }
-            Some(Delivery::Durable { .. }) => Self {
+            Some(Delivery::Durable(_)) => Self {
                 kernel: self.kernel,
                 binding: expected,
                 delivery: Some(Delivery::Saga),
             },
-            Some(delivery @ (Delivery::Buffered | Delivery::Saga)) => {
+            Some(
+                delivery @ (Delivery::Buffered | Delivery::Saga | Delivery::OwnershipFailure(_)),
+            ) => {
                 // Non-receipt discharges already transferred their evidence to
                 // the buffer or durable saga. Withhold delivery on the mismatch.
                 self.delivery = Some(delivery);
                 self.binding = expected;
                 self
             }
-            None => {
-                unreachable!("a private discharge must retain its delivery custody until consumed")
-            }
+            None => Self {
+                kernel: self.kernel,
+                binding: expected,
+                delivery: Some(Delivery::OwnershipFailure(Box::new(KernelError::Internal(
+                    "discharge binding check lost its delivery custody; output withheld".into(),
+                )))),
+            },
         }
     }
 
     pub(in crate::kernel) fn deliver(mut self) -> Result<ToolCallResponse, KernelError> {
-        let delivery = self
-            .delivery
-            .take()
-            .unwrap_or_else(|| unreachable!("one-shot discharge delivery"));
+        let delivery = self.delivery.take().ok_or_else(|| {
+            KernelError::Internal("discharge has no remaining delivery custody".into())
+        })?;
         match delivery {
+            Delivery::OwnershipFailure(error) => Err(*error),
             Delivery::Buffered => Err(KernelError::PostEffectFaultLatched {
                 request_id: self.binding.request_id.clone(),
             }),
-            Delivery::Saga => Err(KernelError::DurableOutcomePending {
-                operation_id: self.binding.operation_id.clone().unwrap_or_default(),
+            Delivery::Saga => Err(match self.binding.operation_id.clone() {
+                Some(operation_id) => KernelError::DurableOutcomePending { operation_id },
+                None => {
+                    KernelError::Internal("durable discharge lost its operation binding".into())
+                }
             }),
-            Delivery::Receipt {
-                mut parts,
-                prepared,
-                committed,
-                original: _,
-                transition,
-                returned,
-                deferred_error,
-            } => {
+            Delivery::Receipt(delivery) => {
+                let ReceiptDelivery {
+                    mut parts,
+                    prepared,
+                    committed,
+                    original: _,
+                    transition,
+                    returned,
+                    deferred_error,
+                } = *delivery;
                 drop(parts.inputs.prepared.slot.take());
                 let request = parts.inputs.request;
                 let outcome = parts.inputs.security_outcome.take();
@@ -609,13 +651,14 @@ impl<'a> Discharged<'a> {
                 let response = prepared.finish_delivery(self.kernel, request)?;
                 deferred_error.map_or(Ok(response), Err)
             }
-            Delivery::Durable {
-                request,
-                mut admission,
-                returned,
-                outcome,
-                lifecycle,
-            } => {
+            Delivery::Durable(delivery) => {
+                let DurableDelivery {
+                    request,
+                    mut admission,
+                    returned,
+                    outcome,
+                    lifecycle,
+                } = *delivery;
                 let response = self
                     .kernel
                     .finalize_durable_tool_return_with_security_release(
@@ -653,16 +696,17 @@ impl<'a> Discharged<'a> {
 impl Drop for Discharged<'_> {
     fn drop(&mut self) {
         match self.delivery.take() {
-            Some(Delivery::Receipt {
-                transition, parts, ..
-            }) => {
+            Some(Delivery::Receipt(delivery)) => {
+                let ReceiptDelivery {
+                    transition, parts, ..
+                } = *delivery;
                 // Extension disposal may re-enter kernel APIs. The committed
                 // receipt stands; release ordering locks before any disposal.
                 drop(transition);
                 drop(parts);
             }
-            Some(Delivery::Durable { admission, .. }) => {
-                tracing::warn!(operation_id = %admission.operation_id(), audit_fault = "durable_post_effect_delivery_pending",
+            Some(Delivery::Durable(delivery)) => {
+                tracing::warn!(operation_id = %delivery.admission.operation_id(), audit_fault = "durable_post_effect_delivery_pending",
                     "undelivered return remains owned by its original durable saga");
             }
             _ => {}
@@ -674,13 +718,6 @@ pub(in crate::kernel) fn run_post_effect<'a>(
     obligation: PostEffectObligation<'a>,
     returned: ObservedToolReturn,
 ) -> Discharged<'a> {
-    let expected = obligation
-        .parts
-        .as_ref()
-        .unwrap_or_else(|| unreachable!("live obligation parts"))
-        .inputs
-        .prepared
-        .binding
-        .clone();
+    let expected = obligation.binding.clone();
     post_effect::run(obligation, returned).enforce_binding(expected)
 }

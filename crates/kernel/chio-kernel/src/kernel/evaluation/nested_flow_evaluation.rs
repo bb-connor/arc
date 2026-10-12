@@ -1487,7 +1487,7 @@ impl ChioKernel {
         let dispatch_call = async {
             let context = crate::ToolInvocationContext::from_request(request)?
                 .with_dispatch(dispatch_context.clone());
-            let (child_receipts, evidence_slot) = obligation.nested_receipt_sinks();
+            let (child_receipts, evidence_slot) = obligation.nested_receipt_sinks()?;
             let mut bridge = SessionNestedFlowBridge {
                 clock: self.authority_clock(),
                 sessions: &self.sessions,
