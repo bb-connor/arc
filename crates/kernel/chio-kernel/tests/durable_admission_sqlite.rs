@@ -32,6 +32,8 @@ use chio_kernel::{
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
+#[path = "durable_admission_sqlite/aggregate_budget.rs"]
+mod aggregate_budget;
 #[path = "durable_admission_sqlite/dpop_replay.rs"]
 mod dpop_replay;
 #[path = "durable_admission_sqlite/federation_context.rs"]
@@ -107,7 +109,7 @@ impl ToolServerConnection for MutationServer {
     }
 
     fn tool_names(&self) -> Vec<String> {
-        vec!["mutate".to_owned()]
+        vec!["mutate".to_owned(), "mutate-alt".to_owned()]
     }
 
     async fn invoke(
