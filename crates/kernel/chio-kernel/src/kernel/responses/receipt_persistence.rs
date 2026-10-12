@@ -128,6 +128,7 @@ impl ChioKernel {
 
         // The signing handle binds the canonical content to body.content_hash.
         // Body assembly and persistence are outside the portable signing boundary.
+        let handle = ReceiptSigningHandle::from_content_preimage(canonical_content);
         chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
             use chio_kernel_core::ReceiptSigningError;
             let message = match error {
