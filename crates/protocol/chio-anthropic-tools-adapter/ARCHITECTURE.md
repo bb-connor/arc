@@ -1,113 +1,88 @@
 # chio-anthropic-tools-adapter architecture
 
-## Overview
+## Responsibility and boundary
 
-The adapter is an untrusted edge component: it holds the live HTTP client to
-`api.anthropic.com` and produces `chio_tool_call_fabric` types
-(`ToolInvocation`, `ProviderResponse`) that a caller evaluates. Unlike
-`chio-mcp-adapter`, which implements `chio-kernel`'s `ToolServerConnection`
-trait directly, this crate has no dependency on `chio-kernel`: it implements
-`chio-tool-call-fabric`'s provider-agnostic `ProviderAdapter` trait, and
-callers supply their own verdict, either as a closure passed to the
-streaming path or as a value produced between `lift_batch` and
-`lower_tool_result_block` on the batch path. The crate is organized around
-two parallel request shapes, batch (`adapter.rs`) and streaming SSE
-(`adapter::streaming`), sharing wire types (`native.rs`), transport
-(`transport.rs`), and the server-tool gate (`manifest.rs`). It does not own
-kernel dispatch, manifest schema validation, generic HTTP/SSE parsing, or
-fixture replay; those live in `chio-kernel`, `chio-manifest`,
-`chio-provider-adapter-core`, and `chio-provider-conformance`.
+`AnthropicAdapter` converts Anthropic native traffic to the shared
+`ToolInvocation` representation. `AnthropicAdapterConfig` holds server metadata,
+the API identifier, and the configured workspace_id provenance label.
+The adapter owns parsing and projection. The host owns kernel evaluation,
+tool execution, credentials, and the lifecycle of authoritative receipts.
+Provider labels and captured verdicts do not independently establish authority.
 
-## Module map
+`send_messages` connects the configured transport to batch lifting.
+`lower_tool_result_block` converts an evaluator result into native output.
+The synchronous lift and lower APIs support recorded inputs without services.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public facade: `AnthropicAdapter`, `AnthropicAdapterConfig`, `AnthropicAdapterError`, the `chio_provider_adapter_core::Provider` impl, and re-exports of the transport, native, manifest, and streaming surfaces. |
-| `src/adapter.rs` | Batch `messages.create` lift/lower. Extracts `tool_use` blocks from a response payload (plain object, or a `body`/`response`/`payload`/`message` envelope), validates and builds `ToolInvocation`s, and lowers a verdict into a `tool_result` block. Implements `chio_tool_call_fabric::ProviderAdapter`. Declares `adapter::streaming` via `#[path = "streaming.rs"]`. |
-| `src/streaming.rs` (module `adapter::streaming`) | SSE gate. Buffers a `tool_use` block from `content_block_start` through `content_block_stop`, evaluates it, and releases its bytes only on allow. Drives the `chio_tool_call_fabric::StreamPhase` state machine. |
-| `src/native.rs` | Wire types: `ToolUseBlock`, `ToolResultBlock`, and (behind `computer-use`) `ServerToolName` / `SERVER_TOOL_WIRE_NAMES`. |
-| `src/manifest.rs` | `AnthropicServerToolGate`, the manifest-backed server-tool allowlist. |
-| `src/transport.rs` | Pinned Anthropic endpoint and header constants, `anthropic_transport(_from_env)` constructors, and `MockTransport`. Delegates HTTP mechanics to `chio_provider_adapter_core::http`. |
-| `src/loaded_weights.rs` | `chio_core_types::LoadedWeights` impl for `AnthropicAdapter` that always fails: the Messages API exposes no runtime model bytes. |
+## Structure
 
-## Request lifecycle
+adapter.rs owns lifting, lowering, and the ProviderAdapter implementation.
+manifest.rs owns the server-tool allowlist.
+streaming.rs implements the Messages content-block lifecycle.
+transport.rs owns outbound provider request wiring and mock transport support.
+loaded_weights.rs implements the explicit unavailable-model-bytes contract.
+Native wire types live in native.rs and are serialized with serde.
 
-Batch (`send_messages`):
+The adapter retains its configuration and an Arc-owned transport.
+Registry construction adds admitted bridge-security metadata for exposed tools.
+Cloned handles retain the configured transport and admission snapshot.
 
-1. `post_messages` POSTs `request_body` to `ANTHROPIC_MESSAGES_PATH`; a
-   non-2xx status or transport failure maps to a `ProviderError` via
-   `map_transport_error` and returns before any lifting happens.
-2. `lift_batch` unwraps a `body`/`response`/`payload`/`message` envelope if
-   present, extracts every `tool_use` content block, validates each
-   (`tool_use` type, non-empty trimmed `id`/`name`, object `input`), and
-   builds one `ToolInvocation` per block.
-3. The caller runs its own verdict per invocation and calls
-   `lower_tool_result_block`; allow applies redactions to the executed
-   `ToolResult`, deny emits an `is_error: true` block describing the
-   `DenyReason`.
+## Data and control flow
 
-Streaming (`send_messages_stream` / `gate_sse_stream`):
+tool_use blocks carry id, name, and object input. Results use tool_result blocks tied to tool_use_id.
 
-1. The transport POSTs and buffers the full `text/event-stream` body; the
-   shared SSE parser splits it into frames configured to reject unrecognized
-   field names.
-2. `StreamGate` walks the frames in order. `content_block_start` opens a
-   block: non-tool blocks forward immediately, tool blocks start buffering.
-   `content_block_delta` appends `input_json_delta` bytes for a buffering
-   tool block. `content_block_stop` reassembles the input JSON, builds the
-   `ToolInvocation`, and calls the caller's `evaluate` closure before
-   releasing any of that block's buffered bytes.
-3. Any failure, a deny verdict, an out-of-order frame, or a block buffer over
-   4096 raw frames or 1 MiB, fails the whole call closed: `gate_sse_stream`
-   returns `Err` and no bytes for any block, including already-processed
-   non-tool or allowed blocks, are returned.
+Original provider bytes pass through bounded JSON ingress before projection.
+Batch extraction constructs native tool-call values, validates required fields,
+canonicalizes object arguments, and stamps provider provenance.
+The resulting invocation carries registry metadata when admission is installed.
+A caller then routes it to evaluation and execution using the fabric contract.
 
-## Invariants and failure modes
+Buffered streaming assembles tool-call content before returning forwardable bytes.
+The evaluator receives a complete invocation rather than a partial argument delta.
+An error or denied verdict terminates the gate with no successful output value.
+Allow verdicts requesting stream redactions are rejected because original
+forwarded bytes cannot represent those requested modifications safely.
+Batch lowering can apply supported redactions to structured results.
 
-- `lift_batch` / `lift_one` fail closed on a non-`tool_use` block type, an
-  empty or whitespace-padded `id`/`name`, a non-object `input`, and (without
-  the `computer-use` feature) any name `ServerTool::from_anthropic_wire_name`
-  recognizes.
-- The server-tool gate fails closed unless both the `computer-use` feature is
-  compiled in and the manifest's `server_tools` lists the tool's stable
-  entry; names the mapping does not recognize skip the gate.
-- A streamed `tool_use` block that mixes a non-empty `content_block_start`
-  input with `input_json_delta` frames is rejected as `BadToolArgs`:
-  Anthropic's wire protocol starts a streamed tool block with an empty
-  `input: {}`.
-- Streaming allow verdicts must carry no redactions
-  (`ensure_streaming_allow_no_redactions`); redaction only applies on the
-  batch `lower_tool_result_block` path.
-- `lower_tool_result_block` requires a non-empty, non-whitespace-padded
-  `tool_use_id` and, on allow, a `ToolResult` that already carries `content`;
-  it never fabricates either.
-- `ANTHROPIC_VERSION` (`"2023-06-01"`) is asserted by unit tests in `lib.rs`
-  and `transport.rs`; changing it means updating the constant and
-  re-recording conformance fixtures in `chio-provider-conformance`.
+## Trust and invariants
+
+AnthropicAdapter::new and new_with_manifest do not install registry authority.
+Tool lifting requires new_with_registry, including for ordinary custom tools.
+
+Registry construction matches configured name, version, and public key to the
+admitted server. Native names and arguments remain untrusted provider input.
+Canonical JSON stabilizes argument bytes; it does not sign the invocation.
+The provider principal in provenance is distinct from Chio capability authority.
+
+Known hosted server-tool families require both computer-use and a manifest
+server_tools entry. AnthropicServerToolGate validates the manifest and
+matches stable families. This allowlist describes accepted provider traffic;
+the host must establish the actual dispatch and receipt authority.
+
+HTTP status 403 produces ContentPolicy through send_messages transport mapping.
+A successful stop_reason=refusal body without tool_use reaches the empty-call
+Malformed rejection; the batch converter does not classify that refusal field.
 
 ## Dependencies
 
-- `chio-core-types` (Cargo.toml aliases the dependency name to `chio_core`) -
-  supplies `canonical_json_bytes` (used in `adapter.rs`) and the
-  `LoadedWeightsUnavailable` type the `loaded_weights.rs` macro expansion
-  returns.
-- `chio-tool-call-fabric` - `ProviderAdapter`, `ToolInvocation`,
-  `VerdictResult`, `ProviderError`, and the `StreamPhase` / `BlockKind` /
-  `StreamEvent` state machine the streaming gate runs.
-- `chio-provider-adapter-core` - `http` transport primitives
-  (`HttpTransport`, `AuthScheme`, `MockHttpTransport`, `map_transport_error`),
-  the shared SSE frame parser, `ensure_streaming_allow_no_redactions`, the
-  `Provider` trait, and `impl_unavailable_loaded_weights!`.
-- `chio-manifest` - `ToolManifest`, `validate_manifest`, and
-  `ServerTool::from_anthropic_wire_name`.
-- `async-trait` - the `ProviderHttpTransport` impl on `MockTransport`.
-- `serde` / `serde_json` / `thiserror` - wire (de)serialization and
-  `AnthropicAdapterError`.
+chio-tool-call-fabric defines invocation, provenance, verdict, and error types.
+chio-provider-adapter-core supplies bounded ingress and shared transport or
+stream helpers. chio-core-types supplies canonical encoding and loaded-weight
+contracts. chio-manifest supplies admitted tool security and manifest validation.
+serde and serde_json handle native projection; thiserror defines local errors.
 
-## Extension points
+## Verification
 
-Callers supply the verdict evaluator themselves: `send_messages_stream` /
-`gate_sse_stream` take an `evaluate: FnMut(&ToolInvocation) ->
-Result<VerdictResult, ProviderError>` closure, and the batch path expects the
-caller to produce a `VerdictResult` between `lift_batch` and
-`lower_tool_result_block`. The crate has no built-in kernel call.
+Run `cargo test -p chio-anthropic-tools-adapter` for the package's default test surface.
+The source includes batch.rs, streaming.rs, server_tools.rs, and transport.rs.
+`tests/error_taxonomy_doctest.rs` reads README markers and native JSON examples.
+Preserve that table's four columns when editing error documentation.
+
+Local transport tests and captured streams exercise parser and conversion behavior.
+They do not establish hosted-provider reliability or production acceptance.
+Use the provider-conformance fixture feature for deterministic corpus replay.
+
+## Navigation
+
+- [Usage and status](README.md)
+- [Shared provider primitives](../chio-provider-adapter-core/ARCHITECTURE.md)
+- [Protocol authority boundary](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)

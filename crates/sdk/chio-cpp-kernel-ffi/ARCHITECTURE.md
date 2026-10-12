@@ -1,102 +1,133 @@
 # chio-cpp-kernel-ffi architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-cpp-kernel-ffi` is the trust boundary between an untrusted C++ caller
-and `chio-kernel-core`, which owns capability evaluation, verification, and
-receipt signing. It holds no evaluation or signing logic of its own: every
-verdict, signature, and verification result is produced by a `chio-kernel-core`
-call, and this crate's job is to validate the request on the way in and
-guarantee that no Rust panic or invalid buffer crosses the C ABI on the way
-out. It is a `staticlib`/`cdylib`/`rlib` (`crate-type` in `Cargo.toml`), built
-both to link into C++ and to be included as a Rust source module by
-`cross_ffi_parity.rs` for direct comparison against `chio-kernel-mobile`.
+Nine C symbols expose ABI/build information, buffer release, evaluation,
+capability verification with basic or full context, portable-passport verification,
+and two receipt signing paths. `ChioKernelFfiBuffer` and `ChioKernelFfiResult`
+carry Rust-owned bytes and numeric status/error fields with C layout.
+`sdks/cpp/chio-cpp-kernel` consumes the generated header and static library.
 
-## Module map
+This boundary accepts caller-selected authority keys, time, delegation roots,
+and parent budgets. The integrator must authenticate that context and decide
+how offline verdicts control execution. Evaluation and signing are independent
+exports: a caller with a seed can submit a body without first calling evaluate.
+The ABI has no evaluation handle connecting those operations.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | All exported C symbols, request/response envelopes, pointer and UTF-8 validation, panic containment, `chio-kernel-core` calls, and FFI error mapping. |
-| `src/tests.rs` (`#[cfg(test)]`) | Regression tests over both the internal `*_json_str` helpers and the public `extern "C"` symbols. |
-| `cbindgen.toml` | cbindgen config: C header, `pragma once`, C++-compatible style, and an explicit export allowlist. |
-| `include/chio/chio_kernel_ffi.h` | Checked-in header generated from this crate's exports; `sdks/cpp/chio-cpp-kernel` compiles against it directly. |
+## Structure
 
-## Request lifecycle
+`src/lib.rs` owns exported functions, Serde request/response envelopes, input
+conversion, snapshot validation, kernel invocation, and error mapping.
+`src/tests.rs` exercises internal string helpers and exported symbols.
+`cbindgen.toml` selects the surface emitted in `include/chio/chio_kernel_ffi.h`.
+There is no Cargo build script producing headers.
 
-1. A C caller passes NUL-terminated UTF-8 JSON (and hex) strings as `*const
-   c_char`. `read_c_str` rejects null pointers
-   (`CHIO_KERNEL_FFI_STATUS_NULL_ARGUMENT`) and invalid UTF-8
-   (`CHIO_KERNEL_FFI_ERROR_INVALID_JSON`) before any parsing happens.
-2. Each entry point's body runs inside `run_ffi`, which wraps it in
-   `catch_unwind`. A panic anywhere in the call becomes
-   `CHIO_KERNEL_FFI_STATUS_PANIC` instead of unwinding across the C ABI.
-3. The JSON envelope is deserialized and caller-supplied trust data is
-   validated before it can influence a verdict: `capability_trust_roots`
-   issuer keys must decode as hex public keys and their scope hashes must be
-   non-empty, unpadded, and control-character-free; `parent_budget_snapshots`
-   token IDs must be non-empty and unpadded.
-4. The validated request is handed to `chio-kernel-core`
-   (`evaluate_with_full_floor`, `verify_capability_full`, `sign_receipt`,
-   `sign_receipt_relaying_trusted_body`, `passport_verify::verify_passport`),
-   which owns all evaluation, chain-binding, budget-split, and cryptographic
-   semantics.
-5. The result is serialized to JSON, moved into a boxed byte slice, and
-   returned as a `ChioKernelFfiBuffer` the caller must pass to
-   `chio_kernel_buffer_free`. `chio-kernel-core` error types are mapped to a
-   `KernelFfiError` variant and a stable `error_code` integer.
+`EvaluateRequestEnvelope` includes capability, trusted issuers, request, optional
+clock and peer profile, optional direct-root capability, per-issuer scope roots,
+and parent-budget snapshots. `VerifyCapabilityRequestEnvelope` uses the same
+context with a `token` field. Verification returns an owned metadata snapshot
+including serialized scope and evaluated time.
 
-## Unsafe boundary
+## Evaluation and capability flow
 
-Two `unsafe` blocks in `src/lib.rs`, both `SAFETY`-commented:
+`evaluate_json_str` parses the envelope with Serde. Governed intent, approval
+token(s), threshold proposal, and supplemental authorization fields reject when
+present or nonempty because this bridge cannot authenticate those extensions.
+The capability and optional direct-root value then decode to typed tokens.
 
-- `read_c_str` calls `CStr::from_ptr(ptr)` on a caller-supplied pointer,
-  trusting the C caller's promise of a valid NUL-terminated string. This runs
-  only after the pointer has been checked non-null.
-- `chio_kernel_buffer_free` calls `Vec::from_raw_parts(buffer.ptr, buffer.len,
-  buffer.len)` to reclaim a buffer this crate previously leaked via
-  `Box::into_raw`-equivalent (`std::mem::forget` on a boxed slice) in
-  `ChioKernelFfiBuffer::from_string`. Passing a foreign or already-freed
-  buffer here is undefined behavior, as with any C ABI ownership handoff.
+Trusted issuer strings decode as public keys. Trust-root map keys also decode
+as public keys; their scope-hash strings must be nonempty, unpadded, and free of
+control characters. Snapshot parent and child IDs must be nonempty and unpadded.
+`seed_budget_registry` registers each parent share and admits its recorded
+children through `InMemoryBudgetRegistry`, rejecting invalid shares or conflicts.
 
-All request parsing, validation, JSON handling, and kernel-core calls are
-safe Rust; `unsafe` is confined to the two raw-pointer crossings above.
+A supplied evaluation `now_secs` selects `FixedClock`, including zero; omission
+selects `SystemClock`. Verification accepts signed time values: nonnegative
+values use `FixedClock`, while negative values or an omitted context timestamp
+use the system clock. The basic capability entrypoint supplies one trusted
+issuer, the default peer profile, no direct root, no trust roots, and no snapshots.
+Delegation requiring those inputs needs the context entrypoint.
 
-## Invariants and failure modes
+`evaluate_with_full_floor_and_root` receives `AllowClassical`, the peer profile
+(default `t1_default`), root resolver, and seeded registry. Kernel-core checks
+capability validity and bindings, then subject, portable scope, and sibling
+admission. The bridge passes zero guards and no session filesystem roots.
+The response carries `verdict`, optional reason, and matched grant index;
+`PendingApproval` becomes `deny`. A deny response still has ABI status OK because
+evaluation completed successfully. Invalid envelopes/context return error status.
 
-- Every exported function fails closed: malformed JSON, invalid hex, invalid
-  capability or passport shape, untrusted issuers, expired or not-yet-valid
-  tokens, oversubscribed sibling budgets, and internal panics all return a
-  non-OK `ChioKernelFfiResult` rather than a partial result.
-- `chio_kernel_sign_receipt_json` is the default signer and is WYSIWYS: it
-  recomputes `content_hash` over the caller-supplied canonical content
-  preimage and refuses to sign (`CHIO_KERNEL_FFI_ERROR_SIGNING_FAILED`) on a
-  mismatch. `chio_kernel_sign_receipt_relaying_trusted_body_json` is a
-  separate, explicitly named relay seam that trusts `body.content_hash`
-  as-is; it exists only to forward a body an upstream trusted producer
-  already minted.
-- `Verdict::PendingApproval` from `chio-kernel-core` has no representation in
-  this ABI's synchronous request/response shape; `chio_kernel_evaluate_json`
-  downgrades it to `deny` with an explanatory reason instead of exposing an
-  async approval flow.
-- A change to any exported symbol's argument shape must bump
-  `CHIO_CPP_KERNEL_FFI_ABI_VERSION`, so a client gating on
-  `chio_kernel_ffi_abi_version()` fails closed instead of calling a stale
-  symbol with mismatched arguments.
-- The ABI is synchronous and buffer-based only. There are no callbacks,
-  async handles, transport state, or kernel sessions crossing it, and no
-  async runtime dependency in `Cargo.toml`.
-- `chio_kernel_evaluate_json` always calls `evaluate_with_full_floor` with an
-  empty `guards` slice and `session_filesystem_roots: None`. Verdicts
-  returned over this ABI reflect capability scope, expiry, and chain-binding
-  only; no `Guard` pipeline plugin and no filesystem-root scoping run on this
-  path.
+Capability verification calls `verify_capability_full_with_root` and serializes
+its verified snapshot. Passport verification calls `passport_verify::verify_passport`
+with the original envelope bytes, trusted issuer, and selected clock. It returns
+subject/issuer/time metadata and the canonical payload bytes encoded as hex.
 
-## Dependencies
+## Signing and trust invariants
 
-`chio-kernel-core` supplies all evaluation, capability verification, budget
-registry, and receipt-signing/passport logic; this crate calls it but defines
-none of that logic itself. `chio-core-types` supplies the wire types
-(`CapabilityToken`, `Keypair`, `ChioReceiptBody`, `ScopeHash`, ...) the JSON
-envelopes deserialize into. `hex` and `serde`/`serde_json` handle encoding at
-the boundary. No dependency is aliased: `chio_core_types::` and
-`chio_kernel_core::` in source match their crate names directly.
+The public three-argument signer decodes a receipt body, hex content preimage,
+and Ed25519 seed. `core_sign_receipt` hashes the supplied bytes, rejects a content
+hash mismatch before key/signing work, and checks the body's kernel key against
+the backend key. Mismatch maps to SIGNING_FAILED or KEY_MISMATCH respectively.
+The FFI decodes bytes; it does not prove they came from an evaluation or validate
+that they are the canonical representation of some separately delivered content.
+The caller must bind the supplied preimage to its actual output.
+
+The relay signer invokes `sign_receipt_relaying_trusted_body` and checks the
+kernel key while trusting the supplied content hash. Its caller must establish
+upstream body trust and use the relay only to forward that body when its
+content preimage is unavailable. The protocol forbids relay signing on paths
+holding evaluated content; those callers must use
+`chio_kernel_sign_receipt_json` with its preimage so the recompute check runs.
+The relay does not enforce this restriction.
+Neither signing export persists the receipt or advances a
+Merkle log. Both use an Ed25519 backend created from caller seed input.
+
+JSON evaluation, capability, and receipt-body inputs use ordinary Serde parsing;
+these entrypoints do not add duplicate-aware raw signed-wire admission.
+Passport input passes directly to the core verifier's strict signed-wire decoder,
+which rejects duplicates and bounds envelope input at 16 MiB. Payload bytes remain
+opaque: native passport credentials and issuer-chain checks require their own
+validators.
+Every request creates a new budget registry, so snapshot admission does not
+persist across calls. Persistent revocation, invocation/spend enforcement, DPoP
+replay, transport dispatch, and receipt storage belong to the runtime integrator.
+Aggregate invocation and cumulative approval enforcement are rejected by the
+portable evaluation path when required by a token. Capabilities carrying an
+authenticated security binding also reject because the portable evaluator lacks
+the authoritative security context.
+
+## Pointer ownership, errors, and threading
+
+`read_c_str` rejects null and invalid UTF-8, then copies valid input to an owned
+`String`. The caller must keep readable NUL-terminated memory stable during that
+copy; arbitrary addresses cannot be validated by null checks. Interior NUL bytes
+truncate string input. All exports are synchronous with no retained foreign
+pointers, callbacks, or session handles. The exports have safe Rust `extern "C"`
+signatures; raw-pointer dereferences still impose the caller obligations above.
+
+Output is a boxed byte slice transferred with `Box::into_raw`; release reconstructs
+it with `Box::from_raw`. Preserve the pointer and length, read only within the
+range, and call `chio_kernel_buffer_free` exactly once for nonempty results,
+including error messages. There is no added NUL terminator. Cross-thread access
+requires caller synchronization, including the sole release owner.
+
+Status codes are OK 0, ERROR 1, PANIC 2, and NULL_ARGUMENT 3. Error codes distinguish
+JSON, hex, capability, passport, key mismatch, signing, and internal failures.
+Invalid UTF-8 maps to INVALID_JSON. `run_ffi` catches unwinding panics in the
+processing closure; reads and frees are outside it. Undefined behavior and
+aborting panics cannot be converted into these results. ABI 2 requires the
+three-argument signer declaration; clients must check the version before use.
+
+## Dependencies and verification
+
+`chio-core-types` provides capability/receipt types, keys, and Ed25519 backend.
+`chio-kernel-core` provides verification, clocks, scope evaluation, signing, and
+budget registry semantics. `hex` handles preimages and payload encoding;
+`serde`/`serde_json` handle envelopes and response serialization.
+
+Run `cargo test -p chio-cpp-kernel-ffi`. Tests cover matching/out-of-scope evaluation,
+unsupported authorization, delegated sibling budgets, trust-root errors, epoch
+zero and clock overflow, expiry, invalid JSON/null pointers, buffer release,
+content hash accept/refuse, trusted relay signing, and ABI 2.
+`crates/kernel/chio-kernel-mobile/tests/cross_ffi_parity.rs` compares shared
+verdict cases. `sdks/cpp/chio-cpp-kernel/scripts/check-with-ffi.sh` builds and tests
+the Rust library plus the C++ wrapper using its declared toolchain prerequisites.

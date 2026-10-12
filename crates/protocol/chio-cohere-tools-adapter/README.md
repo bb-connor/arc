@@ -1,105 +1,75 @@
 # chio-cohere-tools-adapter
 
-Provider-native adapter that mediates Cohere `/v2/chat` tool-use traffic
-through the Chio kernel. It forwards a native chat or streaming request to
-the upstream endpoint, lifts the response's tool calls into
-`chio-tool-call-fabric` types, and lowers a kernel verdict back into Cohere's
-wire shape.
+Converts Cohere v2 chat tool calls into Chio tool invocations and
+converts evaluator verdicts and tool results back to provider-native messages.
+It sits between provider traffic and the tool-call fabric; the host supplies
+kernel evaluation and actual tool dispatch. The API identifier is `2025-04`.
 
-The adapter pins the upstream API to version `2025-04`
-(`transport::COHERE_API_VERSION`). Every entry point checks both the
-configured and the transport-advertised version against the pin and fails
-closed on drift, before any request is sent or provenance is stamped.
+## Usage
 
-## Responsibilities
+Project a captured tool call offline. The example uses default dependencies
+and a mock transport; it makes no network request.
 
-- Forward a native `/v2/chat` request through `CohereTransport`
-  (`reqwest`-backed, bearer auth, via the shared `chio-provider-adapter-core`
-  HTTP transport) and lift `message.tool_calls` from the buffered response
-  into `chio_tool_call_fabric::ToolInvocation`.
-- Gate the SSE `/v2/chat` stream: buffer each `tool-call-end` frame, run the
-  caller-supplied verdict, and abort the whole response if any call is
-  denied or its allow verdict carries redactions.
-- Lower a kernel `VerdictResult` and `ToolResult` into a Cohere `tool` role
-  message, applying JSON-Pointer redactions and canonicalizing the result
-  text.
-- Stamp `ProvenanceStamp` with `Principal::CohereOrg` on every lifted
-  invocation.
-- Reject requests, verdicts, and lowering calls whenever the configured or
-  transport-advertised API version drifts from the `2025-04` pin.
-- Declare `chio_core::LoadedWeights` unavailable (the Cohere Chat API
-  exposes no runtime model weight bytes).
+```rust
+use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig, transport::MockTransport};
+use chio_tool_call_fabric::ProviderRequest;
+use std::sync::Arc;
 
-## Public API
+let config = CohereAdapterConfig::new("local", "Example", "1", "00", "example");
+let adapter = CohereAdapter::new(config, Arc::new(MockTransport::new()));
+let response = br#"{"message":{"tool_calls":[{"id":"call-1","type":"function","function":{"name":"weather","arguments":"{}"}}]}}"#;
+let calls = adapter.lift_batch(ProviderRequest(response.to_vec()))?;
+assert_eq!(calls[0].tool_name, "weather");
+assert_eq!(calls[0].arguments, b"{}");
+assert!(calls[0].bridge_security.is_none());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-- `CohereAdapter` - adapter handle. `chat` and `chat_stream` drive a request
-  end to end; `lift_batch` and `gate_sse_stream` lift tool calls without
-  sending a request; `lower_tool_message` lowers a verdict; `provider`,
-  `api_version`, `config`, `transport` are accessors.
-- `CohereAdapterConfig::new` - builds a config with `api_version` pinned to
-  `COHERE_API_VERSION`.
-- `CohereAdapterError` - local enum uniting `transport::TransportError` and
-  `ProviderError` via `From`; no `CohereAdapter` method returns it today.
-- `transport::{CohereTransport, MockTransport, Transport, TransportError,
-  COHERE_API_KEY_ENV, COHERE_API_VERSION, COHERE_CHAT_HOST,
-  COHERE_CHAT_PATH}` - re-exported at the crate root.
-- `native::{ToolCallBlock, ToolCallFunction, ToolResultMessage,
-  ToolResultContent}` - Cohere v2 wire types, re-exported at the crate root.
-- `streaming::GatedSseStream` - alias for
-  `chio_provider_adapter_core::GatedStream`; returned by `chat_stream` and
-  `gate_sse_stream`.
+## Guarantees
+
+`lift_batch` validates native tool-call fields and canonicalizes argument
+objects before returning invocations. Shared original JSON readers reject
+duplicate keys and enforce byte bounds before typed projection.
+`lower_tool_message` applies allow-verdict redactions or emits a denial result.
+
+The basic constructor produces projections without manifest authority.
+new_with_registry binds the admitted manifest and tool security sidecars.
+Streaming evaluation requires these registry coordinates before invoking the evaluator.
 
 ## Error taxonomy
 
-The adapter projects upstream Cohere failures onto
-`chio_tool_call_fabric::ProviderError`. The mapping is asserted by
-`tests/error_taxonomy_doctest.rs` against this README.
+Batch conversion validates selected tool calls; transport classification uses
+status or typed transport errors. Stream gates validate framing and lifecycle
+and propagate evaluator failures. SSE wrappers below describe event/data pairs.
 
 <!-- error-taxonomy:start -->
 | ProviderError class | Native envelope (inline JSON) | Source | Trigger |
 |---|---|---|---|
-| `ProviderError::RateLimited` | `{"status": 429, "body": {"message": "rate limit exceeded"}}` | HTTP transport boundary | Status 429 from the upstream API, mapped by `chio_provider_adapter_core::http::map_http_status`. `retry_after_ms` is hardcoded to `0`; no `Retry-After` header is read. |
-| `ProviderError::ContentPolicy` | `{"status": 200, "body": {"finish_reason": "ERROR_TOXIC", "message": "refusal"}}` | HTTP transport boundary | Status 403 from the upstream API, mapped by `chio_provider_adapter_core::http::map_http_status`. The adapter does not parse `finish_reason` or other body fields from a 2xx response; only the HTTP status triggers this class. |
-| `ProviderError::BadToolArgs` | `{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "[]"}}` | current adapter path | `tool_calls[].function.arguments` decodes as a non-object JSON value (`CohereAdapter::invocation_from_tool_call`); also 4xx statuses other than 429/403 from the upstream API. |
-| `ProviderError::Upstream5xx` | `{"status": 503, "body": {"message": "service unavailable"}}` | HTTP transport boundary | Any 5xx status from the upstream API. |
-| `ProviderError::TransportTimeout` | `{"transport": "timeout", "elapsed_ms": 5000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (`HttpTransportError::Timeout`, mapped to `ProviderError::TransportTimeout`). |
-| `ProviderError::VerdictBudgetExceeded` | `{"observed_ms": 300, "budget_ms": 250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
-| `ProviderError::Malformed` | `{"event": "tool-call-end", "frame": "missing-tool_call"}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-stream JSON payload bytes, an envelope field that is not a JSON object or string body, a malformed `tool_call` block, or a streamed `tool-call-end` frame missing `tool_call`. |
-| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original JSON, including nested argument strings; local parser source retained and public error text redacted. |
+| `ProviderError::RateLimited` | `{"status":429,"body":{"message":"rate limit exceeded"}}` | `CohereAdapter::chat` / `http::map_http_status` | HTTP 429; retry_after_ms is 0 and Retry-After is not parsed. |
+| `ProviderError::ContentPolicy` | `{"status":403,"body":{"message":"forbidden"}}` | `CohereAdapter::chat` / `http::map_http_status` | HTTP 403 maps to ContentPolicy; response-body error codes do not override status. |
+| `ProviderError::BadToolArgs` | `{"message":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"[]"}}]}}` | `CohereAdapter::lift_batch` / `input::arguments` | message.tool_calls[].function.arguments decodes to []; input::arguments requires an object. |
+| `ProviderError::Upstream5xx` | `{"status":503,"body":{"message":"service unavailable"}}` | `CohereAdapter::chat` / `http::map_http_status` | HTTP 5xx maps to Upstream5xx with the observed status. |
+| `ProviderError::TransportTimeout` | `{"transport":"timeout","elapsed_ms":5000}` | `http::map_transport_error` | HttpTransportError::Timeout becomes TransportTimeout with the configured timeout in ms. |
+| `ProviderError::VerdictBudgetExceeded` | `{"observed_ms":300,"budget_ms":250}` | `CohereAdapter::gate_sse_stream` evaluator callback | The evaluator returns VerdictBudgetExceeded; the gate propagates it. No gate-owned 250 ms timer is installed. |
+| `ProviderError::Malformed` | `{"event":"tool-call-end","data":{}}` | `CohereAdapter::gate_sse_stream` lifecycle validation | Representative SSE event/data: tool-call-end has no tool_call. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | `parse_sse_frames` / `input::json_bounded` | Representative SSE event/data contains non-JSON data; original ambiguous or oversized JSON also rejects. |
 <!-- error-taxonomy:end -->
 
-## API pin
+A successful finish_reason=ERROR_TOXIC body without tool calls reaches
+`lift_batch`'s empty-call rejection as Malformed. No native refusal classifier
+is installed for that field.
 
-| Field | Value |
-|---|---|
-| Pinned API version | `2025-04` |
-| Default endpoint | `https://api.cohere.com` |
-| ProviderId | `ProviderId::Cohere` |
+## Status
 
-Bumping `COHERE_API_VERSION` requires a deliberate PR with a fixture
-re-record (`Cargo.toml` `[package.metadata.chio] cohere_api_version`).
+Implemented native conversion and buffered stream gating, with local unit,
+fixture, and mock-transport coverage. These checks cover adapter behavior;
+external provider availability and deployment acceptance require operator evidence.
+`LoadedWeights` reports unavailable model bytes.
 
-## Testing
+## Related
 
-`cargo test -p chio-cohere-tools-adapter` runs the unit and integration
-suites, including `tests/live_transport.rs` (the real `reqwest` transport
-against a local `wiremock` server) and `tests/error_taxonomy_doctest.rs`
-(checks the table above against live `ProviderError` paths).
-`benches/verdict_latency.rs` is a `#[test]`-based budget check: cold-adapter
-SSE gate-and-verdict latency must stay under 500ms at p99 over 128 samples.
-No test requires a live Cohere API key.
-
-## See also
-
-- `chio-tool-call-fabric` - defines `ToolInvocation`, `VerdictResult`,
-  `ProviderError`, and the other kernel-facing types this adapter translates
-  to and from.
-- `chio-provider-adapter-core` - shared HTTP transport, SSE frame parsing,
-  and response-envelope validation this adapter wires to Cohere's host and
-  auth.
-- `chio-provider-conformance` - replays recorded Cohere fixtures through
-  this adapter under its `fixtures-cohere` feature.
-- `chio-anthropic-tools-adapter`, `chio-gemini-tools-adapter`,
-  `chio-groq-tools-adapter`, `chio-mistral-tools-adapter`,
-  `chio-ollama-tools-adapter` - sibling adapters for other providers built on
-  the same `chio-provider-adapter-core` foundation.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [Provider adapter core](../chio-provider-adapter-core/README.md)
+- [Provider replay tests](../chio-provider-conformance/README.md)
+- [License](../../../LICENSE)

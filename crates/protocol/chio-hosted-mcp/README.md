@@ -1,73 +1,49 @@
 # chio-hosted-mcp
 
-`chio-hosted-mcp` is the public compatibility surface for Chio's hosted MCP
-product path. It re-exports the Streamable HTTP MCP server from
-`chio-mcp-remote` and the operator primitives from `chio-control-plane` needed
-to configure and run it, so callers get one crate name instead of two. The
-crate defines no types or logic of its own; `src/lib.rs` is re-exports only.
+Provides a small facade over remote MCP serving and control-plane setup.
+The public surface reexports runtime functions; HTTP, session, and
+authentication implementation lives in `chio-mcp-remote`.
 
-Use it when you need the hosted MCP path (remote clients over HTTP with SSE
-delivery, OAuth 2.0 / DPoP, resumable sessions) rather than an adapted
-external server or the stdio-first `chio mcp serve` flow.
+## Usage
 
-## Responsibilities
+Pass an operator-configured `RemoteServeHttpConfig` to the blocking service
+entrypoint. This wrapper type-checks without starting a listener or subprocess.
 
-- Re-export the hosted MCP entrypoint and its configuration type from
-  `chio-mcp-remote`.
-- Re-export the control-plane primitives from `chio-control-plane` needed to
-  stand up a hosted deployment: kernel construction, store wiring, authority
-  keypair lifecycle, default capability issuance, policy loading,
-  trust-control, and enterprise federation.
-- Hold none of the HTTP, OAuth, session-lifecycle, or receipt-signing logic
-  itself.
+```rust
+use chio_hosted_mcp::{serve_http, CliError, RemoteServeHttpConfig};
 
-## Public API
+fn run_host(config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    serve_http(config)
+}
+let _entrypoint: fn(RemoteServeHttpConfig) -> Result<(), CliError> = run_host;
+```
 
-Re-exported from `chio-mcp-remote`:
+A live configuration needs policy and publisher-signed manifest files, a
+registered manifest key, authentication, listener transport, and a
+`NativeMcpLaunchFactory` authorizing the exact wrapped command. Configure
+persistent stores and a resume HMAC keyring when session recovery is required.
+The configuration has no default constructor.
 
-- `serve_http(RemoteServeHttpConfig) -> Result<(), CliError>` - runs the
-  hosted MCP HTTP/SSE server. Blocking; starts its own Tokio runtime.
-- `RemoteServeHttpConfig` - listen address, auth mode (static bearer, JWT,
-  introspection, local OAuth), store paths, wrapped-server command, and
-  server identity fields.
+## Guarantees
 
-Re-exported from `chio-control-plane`:
+- `serve_http` delegates to `chio-mcp-remote`, which validates transport,
+  authentication, admitted manifests, launch authority, and session stores.
+- Reexported store and authority helpers execute their control-plane checks.
+  The facade adds no validation or policy decisions of its own.
+- The facade's dependency test requires exactly `chio-control-plane` and
+  `chio-mcp-remote` as normal dependencies.
 
-- `build_kernel`, `configure_receipt_store`, `configure_revocation_store`,
-  `configure_capability_authority`, `configure_budget_store` - kernel
-  construction and persistent store wiring.
-- `load_or_create_authority_keypair`, `rotate_authority_keypair`,
-  `authority_public_key_from_seed_file` - authority keypair lifecycle.
-- `issue_default_capabilities` - default capability issuance.
-- `policy`, `trust_control`, `enterprise_federation` - policy loading,
-  trust-control service and clients, and enterprise identity provider
-  modules.
-- `CliError`, `JwtProviderProfile` - shared operator error type and JWT
-  provider enum (`Generic`, `Auth0`, `Okta`, `AzureAd`).
+## Status
 
-## Testing
+This crate implements a reexport boundary and has no independent server loop.
+The remote crate owns behavioral tests; the facade test checks dependency scope.
+Local authorization endpoint code exists; the protocol retains a separate
+acceptance boundary for a hosted OAuth authorization-server product.
+Operator custody and deployment acceptance require their own evidence.
 
-`cargo test -p chio-hosted-mcp`
+## Related
 
-The integration suite under `tests/` spins up a real `serve_http` instance
-per test and drives it over HTTP: auth admission (static bearer, JWT, local
-OAuth/PKCE), session lifecycle and idle expiry, cross-tenant session
-isolation, structured JSON-RPC error responses, and receipt export into
-`chio-siem`.
-
-## See also
-
-- `chio-mcp-remote` - implements the hosted HTTP/SSE server this crate
-  re-exports.
-- `chio-control-plane` - implements the operator primitives this crate
-  re-exports.
-- `chio-mcp-adapter` - wraps an external MCP server as a governed Chio tool
-  server; does not host.
-- `chio-mcp-edge` - hosts a Chio-native tool server over MCP transports; not
-  the remote HTTP path.
-
-HTTP/auth/session/receipt integration scenarios live under
-`chio-mcp-remote/src/remote_mcp/hosted_tests`, where test-only transports can
-exercise the implementation without creating native launch authority. This
-facade retains a reexport contract test. Production native launches require
-`CageRequiredLaunch`; inactive provisioning stages cannot launch processes.
+- [Architecture](ARCHITECTURE.md)
+- [Hosted wire format](../../../spec/PROTOCOL.md#43-hosted-wire-format)
+- [Remote runtime](../chio-mcp-remote/README.md)
+- [License](../../../LICENSE)

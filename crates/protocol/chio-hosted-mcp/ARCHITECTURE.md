@@ -1,59 +1,82 @@
-# chio-hosted-mcp architecture
+# Architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-hosted-mcp` is a facade crate with no runtime logic of its own:
-`src/lib.rs` holds two `pub use` statements and nothing else. Its production
-dependency surface is exactly the two crates it re-exports, `chio-mcp-remote`
-and `chio-control-plane`; everything used to exercise the hosted path in
-tests (HTTP client, JWT/PKCE signing, SIEM export, kernel test context) is a
-dev-dependency, not a production one. The crate holds no trust position of
-its own: every fail-closed guarantee on the request path belongs to the
-crates it re-exports.
+`chio-hosted-mcp` is a public facade for hosted MCP runtime setup.
+It reexports control-plane helpers and the remote HTTP service entrypoint.
+Its public surface is defined by `src/lib.rs`; there are no private service
+modules, transport implementations, or session state machines in this crate.
+The facade allows downstream hosts to import setup and serving APIs together.
 
-## Module map
+`serve_http` and `RemoteServeHttpConfig` come from `chio-mcp-remote`.
+`CliError` and `JwtProviderProfile` come from `chio-control-plane`.
+Authority, policy, storage, federation, and trust-control helpers also come
+from the control-plane dependency. Their implementations own their checks.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Re-exports `serve_http` and `RemoteServeHttpConfig` from `chio-mcp-remote`, and kernel/store construction, authority keypair lifecycle, policy, trust-control, enterprise federation, `CliError`, and `JwtProviderProfile` from `chio-control-plane`. |
+## Structure
 
-## Boundaries
+The library contains two explicit reexport groups.
+The control-plane group includes kernel construction, authority-key loading
+and rotation, capability issuance, budget/receipt/revocation store setup,
+enterprise federation, policy, and trust-control modules.
+The remote group includes the blocking server function and configuration type.
 
-- Owns no HTTP routing, OAuth 2.0/DPoP admission, session lifecycle, or
-  receipt signing. That is `chio-mcp-remote`.
-- Owns no authority, receipt, revocation, budget, policy, trust-control, or
-  federation implementation. That is `chio-control-plane`.
-- Defines no new types, traits, or functions; every re-exported name is
-  defined in one of those two crates.
-- Product-path verification (auth flows, session lifecycle, session
-  isolation, structured error responses, SIEM export) lives in this crate's
-  `tests/` directory even though the behavior under test is implemented
-  elsewhere.
+The Cargo manifest declares only these two normal dependencies.
+There are no declared Cargo features or facade-specific default feature effects.
+`tests/facade.rs` checks that the normal dependency list retains this boundary.
+The crate forbids unsafe code and uses the workspace lint configuration.
 
-## Invariants and failure modes
+## Data and control flow
 
-- The `pub use` set is a compatibility contract: `chio-cli` and external
-  hosted-MCP integrators depend on these names, so narrowing or removing one
-  is a breaking change.
-- This crate cannot weaken or strengthen the fail-closed behavior of what it
-  re-exports (auth admission, cross-session drift rejection, receipt-or-
-  nothing tool dispatch), because no request passes through code defined
-  here.
-- `#![allow(clippy::result_large_err)]` accommodates `CliError` (defined in
-  `chio-control-plane`) at the re-export boundary; it is not a functional
-  exception.
+A downstream host loads its policy and configures kernel/store authority using
+reexported control-plane APIs where those helpers fit its setup.
+It constructs `RemoteServeHttpConfig` with listener transport, authentication,
+publisher-signed manifest admission, and native launch authority.
+Calling `serve_http` enters the remote crate's implementation directly.
+The facade does not intercept the configuration or construct a default one.
+
+The remote implementation prepares listener transport, validates auth modes,
+loads its admitted manifest, creates session ownership, and restores configured
+persisted sessions before serving the installed HTTP routes.
+It owns POST initialization, GET/SSE notification replay, DELETE closure,
+and remote administrative routing.
+Tool dispatch uses remote session workers and kernel-backed MCP edges.
+Termination and shared-owner cleanup also remain in the remote implementation.
+
+## Trust and invariants
+
+This facade adds no validation or authority issuance of its own.
+The control-plane functions enforce their documented file custody, policy,
+store, key, and capability constraints at their own entrypoints.
+The remote runtime enforces its transport, auth, manifest, launch, and session
+checks when `serve_http` receives a fully configured service.
+Callers must supply every required configuration field and independent keys.
+
+A facade import does not establish a verified manifest or running kernel.
+Persistent receipt, revocation, budget, and session behavior depends on the
+configuration and successful setup in the owning implementations.
+Durable remote resume requires the remote runtime's dedicated HMAC keyring.
+Local authorization route code belongs to the remote implementation; the
+protocol retains a distinct acceptance boundary for an authorization-server product.
+The host owns operational credential custody and deployment acceptance.
 
 ## Dependencies
 
-Normal dependencies are re-export sources only: `chio-control-plane`
-(operator and trust-control primitives) and `chio-mcp-remote` (the hosted
-HTTP/SSE server, itself built on `chio-kernel`, `chio-mcp-adapter`,
-`chio-control-plane`, and `chio-egress-contract`).
+`chio-control-plane` supplies policy loading, kernel construction, capability
+authority, persistent-store setup, enterprise identity, and trust-control APIs.
+`chio-mcp-remote` supplies listener setup, HTTP routes, bearer verification,
+session workers, notification replay, and remote lifecycle persistence.
+The facade has no direct dependency on an HTTP framework, cryptographic
+implementation, database engine, or subprocess transport.
+Those dependencies remain behind the owning crate's public interfaces.
 
-Dev-dependencies support the `tests/` integration suite only and are not part
-of the library's production surface: `chio-kernel` and `chio-siem` (receipt
-export verification), `reqwest` (blocking HTTP/SSE client), `tokio` (async
-runtime for the SIEM exporter test), `base64`, `serde_json`, `sha2` (PKCE
-challenge), and `url`. `chio-core` is aliased: `chio-core = { package =
-"chio-core-types", ... }`, so `chio_core::` in the test code resolves to
-`chio-core-types`, not the `chio-core` facade crate.
+## Verification
+
+Run `cargo test -p chio-hosted-mcp` for the facade dependency assertion.
+`hosted_mcp_normal_dependencies_are_reexport_boundary_only` reads Cargo metadata
+and checks the exact normal dependency names and order.
+Run `cargo test -p chio-mcp-remote` to exercise the reexported service behavior.
+Run the relevant control-plane tests when validating its setup helpers.
+The facade test verifies dependency scope; it does not start an HTTP listener,
+exercise authentication, sign receipts, or establish store durability.
+The README wrapper compiles the public call pattern without starting services.

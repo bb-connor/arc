@@ -1,73 +1,76 @@
 # chio-eval-receipt
 
-Reference verifier and unsigned exporter for `chio.eval-report.bundle.v1`
-receipt bundles: partner-facing evidence packages that wrap signed Chio
-tool-call receipts from the verdict-matrix conformance corpus. The crate has
-no `chio-kernel` dependency and forbids `unsafe_code`; verification and
-export operate purely on JSON documents and the inner receipt type from
-`chio-core-types`.
+Unsigned export and reference verification for `chio.eval-report.bundle.v1`,
+which packages scenario receipts with eval-run and pinned corpus metadata.
+The crate uses `chio-core-types` to verify embedded receipts and re-exports
+its authoritative-spend predicates for consumers with admitted kernel keys
+and an execution nonce.
 
-## Responsibilities
+## Usage
 
-- Validate a bundle envelope against a closed `chio.eval-report.bundle.v1`
-  field set (unknown fields, missing required fields, and invalid enum
-  values are all rejected) before trusting any content.
-- Confirm the wrapped verdict-matrix corpus identity: `corpus.corpus_sha256`
-  and `corpus.scenario_count` must match the compiled-in constants.
-- Recompute each wrapped receipt's SHA-256 and verify its embedded
-  `ChioReceipt` signature.
-- Verify the outer bundle signature over the RFC 8785 canonical payload with
-  `signatures` removed.
-- Build an unsigned `Bundle` from validated scenario receipts and eval-run
-  metadata (`export_scenario_run`); the exporter never signs.
-- Expose the production verifier to Python via a PyO3 binding in `py/`.
+Verify the repository's offline golden fixture:
 
-## Public API
+```rust
+use chio_eval_receipt::verify_fixture_bundle;
 
-- `verify_bundle`, `verify_fixture_bundle` - parse and verify a bundle JSON
-  document into a `VerifiedBundle`. Fixture mode additionally accepts the
-  deterministic `test-sha256` outer signature and a closed set of local
-  fixture receipts.
-- `test_signature_for_bundle_json` - compute the deterministic fixture
-  signature for a bundle document.
-- `export_scenario_run` - build an unsigned `Bundle` from `Receipt`s and an
-  `EvalRunMeta`.
-- `EvalRunMeta::from_parts`, `Receipt::from_parts` - validate borrowed
-  `EvalRunMetaParts` / `ReceiptParts` into owned fields, rejecting empty or
-  padded identity fields via `ExportError`.
-- Bundle types: `Bundle`, `Producer`, `Corpus`, `ReceiptEntry`,
-  `ReceiptEvidence`, `VerifiedBundle`.
-- Errors: `BundleError`, `ExportError`.
-- Constants: `BUNDLE_SCHEMA_ID`, `BUNDLE_SCHEMA_PATH`,
-  `VERDICT_MATRIX_CORPUS_SHA256`, `VERDICT_MATRIX_SCENARIO_COUNT`,
-  `VERDICT_MATRIX_MANIFEST_PATH`.
+let json = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"), "/../../../tests/bindings/vectors/eval/v1.json"
+));
+let verified = verify_fixture_bundle(json)?;
+assert_eq!(verified.receipt_count, 3);
+assert_eq!(verified.signature_count, 1);
+# Ok::<(), chio_eval_receipt::BundleError>(())
+```
 
-`src/bin/cli.rs` builds the `chio-eval-receipt` binary:
+Fixture verification accepts deterministic `test-sha256` outer signatures
+and three exact local receipt fixtures. Select `verify_bundle` for
+production inputs; its outer-signature implementation currently rejects
+every signature kind, so production bundles cannot succeed.
 
-| Command | Effect |
-|---------|--------|
-| `verify <bundle-path>` | Production verification via `verify_bundle`. |
-| `verify-fixture <bundle-path>` | Fixture-mode verification via `verify_fixture_bundle`. |
-| `verify-memo <memo-path> <sig-path>` | Checks a detached `chio-memo-signature.v1` sig file against a memo file, using a self-generated SHA-256 scheme (`synthetic-test-sample`) that is explicitly not a real cryptographic attestation. |
+From the repository root, the same fixture can be checked with:
 
-## Testing
+```sh
+cargo run -p chio-eval-receipt -- verify-fixture tests/bindings/vectors/eval/v1.json
+```
 
-`cargo test -p chio-eval-receipt` runs the unit and integration tests
-(`tests/export_roundtrip.rs`, `tests/schema_lint.rs`), including a check that
-the golden vector `tests/bindings/vectors/eval/v1.json` still verifies.
+`export_scenario_run` preserves payload bytes and produces a typed `Bundle`
+with empty signatures. Use `EvalRunMeta::from_parts` and
+`Receipt::from_parts` to reject empty or padded identity inputs.
+The returned structures have public mutable fields; callers must preserve
+their validity and supply JSON serialization separately.
 
-`py/` is excluded from the default workspace; build it with `maturin
-develop` and run `pytest py/tests`.
+## Guarantees
 
-The `fuzz` workspace member fuzzes `verify_bundle`
-(`fuzz/fuzz_targets/eval_receipt_bundle.rs`).
+- `verify_schema_envelope` rejects unknown fields, missing required fields,
+  invalid enum values, and empty receipt or signature arrays.
+- `verify_corpus` matches the compiled digest and 48-scenario count.
+  It does not read or hash the corpus manifest.
+- `verify_receipts` hashes each payload's exact bytes.
+  `verify_chio_receipt_payload` rejects duplicate keys in embedded signed
+  JSON and calls `ChioReceipt::verify_signature`.
+- `is_authoritative_spend_receipt` separately checks admitted signer,
+  mediated allow semantics, reconciled hold, profile, and nonce bindings.
+  Call `receipt_meets_guarantee_floor` separately to enforce a store floor.
 
-## See also
+`PresentedNonceView` has no subject or request accessors, so the spend helper
+does not establish those protocol 6.2 bindings. Consumers requiring that
+authority must verify them through an authoritative nonce/admission path.
 
-- `chio-core-types` - supplies RFC 8785 canonicalization and the inner
-  `ChioReceipt` signature check this crate verifies against.
-- `chio-eval-receipt-py` (`py/`) - PyO3 binding over `verify_bundle`, built
-  separately via maturin.
-- `xtask` - regenerates the golden vector
-  `tests/bindings/vectors/eval/v1.json` through this crate's exporter
-  (`eval-receipt-regen`).
+## Status
+
+Unsigned export and fixture verification are implemented. Production outer
+signature verification remains disabled. `verify-memo` checks the synthetic
+SHA-256 sample scheme; it provides no partner identity attestation.
+Bundle verification does not admit signer keys or validate scenario verdicts
+against receipt decisions. No Cargo features are declared; the crate is
+unpublished (`publish = false`).
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Export contract](EXPORT-CONTRACT.md)
+- [Core types](../../core/chio-core-types/README.md)
+- [Protocol receipt semantics](../../../spec/PROTOCOL.md#61-receipt-semantics-and-decisions)
+- [Python binding](py/README.md)
+
+Licensed under [Apache-2.0](../../../LICENSE).

@@ -1,67 +1,52 @@
 # chio-a2a-edge
 
-Edge crate that exposes Chio-governed tools as A2A (Agent-to-Agent) skills to
-external clients. It builds an A2A Agent Card and dispatches `message/send`,
-`message/stream`, `task/get`, and `task/cancel` through the Chio kernel, which
-evaluates each call and signs a receipt into the response metadata. This is
-the inbound counterpart to `chio-a2a-adapter`, which consumes a remote A2A
-agent instead of hosting one; the split mirrors `chio-mcp-adapter` (wraps an
-upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
+Exposes admitted Chio tools as A2A skills, builds an Agent Card, and dispatches calls through the kernel and cross-protocol orchestrator.
 
-## Responsibilities
+This crate sits at Chio's protocol boundary. Its embedding application
+chooses the surrounding runtime and transport wiring.
 
-- Turn a set of Chio `ToolManifest`s into an A2A Agent Card: resolve each
-  tool's target protocol, evaluate `BridgeFidelity`, assign collision-safe
-  skill ids, and publish only skills whose fidelity resolves to
-  publish-by-default.
-- Route blocking `message/send` and the deferred `message/stream` /
-  `task/get` / `task/cancel` lifecycle through `chio-kernel` via
-  `chio-cross-protocol`'s `CrossProtocolOrchestrator`, mapping kernel
-  verdicts to A2A `TaskResponse`s.
-- Bound and prune the deferred task table by capacity and TTL, and restrict
-  polling or cancelling a task to its owning `agent_id`. Retained terminal
-  results count toward capacity; expiry uses the shared wall and monotonic clock.
-- Parse and validate the inbound JSON-RPC envelope, method params, and
-  identifier fields before any skill resolution or kernel dispatch runs.
-- Record per-outcome receipt-write counters and render them as Prometheus
-  text (`metrics` module).
+## Usage
 
-## Public API
+The example runs locally without opening a listener or spawning an agent.
 
-- `ChioA2aEdge::new_with_registry(config, registry)` -
-  construct the edge from admitted signed manifests and validate the Agent Card config.
-- `ChioA2aEdge::{agent_card, agent_card_json, skill_ids, skill,
-  bridge_fidelity}` - Agent Card and skill-catalog introspection.
-- `ChioA2aEdge::{handle_send_message, handle_stream_message, handle_jsonrpc}` -
-  kernel-mediated blocking send, deferred stream start, and raw JSON-RPC
-  dispatch. `handle_jsonrpc` accepts original bytes (up to 1 MiB), rejects
-  duplicate keys before dispatch, and returns `Result<A2aJsonRpcResponse, A2aEdgeError>`.
-  Responses expose `local_error()` for typed dispatch diagnostics; wire output
-  and notification suppression never serialize that cause.
-- `A2aEdgeConfig`, `A2aEdgeError`, `A2aKernelExecutionContext` - Agent Card
-  config, error type, and per-call kernel execution context.
-- Wire types: `AgentCard`, `A2aSkillEntry`, `SendMessageRequest`,
-  `A2aMessage`, `A2aPart`, `TaskResponse`, `TaskStatus`,
-  `A2aJsonRpcResponse`.
-- `metrics::{render_a2a_edge_metrics_prometheus, receipt_write_total,
-  receipt_write_outcome_for_verdict, CHIO_RECEIPT_WRITE_TOTAL,
-  RECEIPT_WRITE_OUTCOME_*}` - receipt-write metrics.
-- `otel::a2a_tool_call_span` (`feature = "otel"`) - GenAI tool-call span
-  helper.
+```rust
+use chio_a2a_edge::{A2aEdgeConfig, ChioA2aEdge};
+use chio_manifest::VerifiedManifestRegistry;
 
-## Feature flags
+let registry = VerifiedManifestRegistry::default();
+let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), &registry)?;
+assert!(edge.skill_ids().is_empty());
+assert!(edge.agent_card().capabilities.streaming);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-| Flag | Effect |
-|------|--------|
-| `otel` | Enables the `otel` module and its GenAI span helpers (`chio-kernel/otel`, `chio-mcp-edge/otel`). |
+## Features
 
-## Testing
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Yes | Empty; telemetry integration is disabled. |
+| `otel` | No | Enables the OTel module and kernel/MCP-edge telemetry features. |
 
-`cargo test -p chio-a2a-edge`
+## Guarantees
 
-## See also
+`ChioA2aEdge::new` requires a `VerifiedManifestRegistry` and validates Agent Card configuration. `handle_jsonrpc` validates original JSON bytes with a 1 MiB limit before dispatch. Kernel execution supplies capability enforcement and receipts.
 
-- `chio-a2a-adapter` - the reverse direction: mediates calls to a remote A2A agent instead of hosting Chio tools as one.
-- `chio-cross-protocol` - supplies the `CapabilityBridge` trait, orchestrator, target-protocol registry, and fidelity/lifecycle contracts this crate implements against.
-- `chio-kernel` - mediates every authoritative skill invocation and signs receipts.
-- `chio-mcp-edge` - registered as a cross-protocol target executor; also the MCP hosting runtime that pairs with `chio-mcp-adapter` the way this crate pairs with `chio-a2a-adapter`.
+Use the request-ID entrypoints for request-bound authorization artifacts.
+Deferred task queries and cancellation retain host-authenticated owner checks.
+
+## Status
+
+Implemented library entrypoints cover blocking sends and deferred task execution. Streaming creates a task; `task/get` resolves it and `task/cancel` can cancel pending work. The embedding host supplies authenticated execution context and HTTP routing.
+
+The crate is workspace-internal (`publish = false`). Its tests exercise
+library behavior; deployment configuration needs its own verification.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol contract](../../../spec/PROTOCOL.md#11-a2a-adapter-contract)
+- [chio-a2a-adapter](../chio-a2a-adapter/README.md)
+
+## License
+
+See the workspace [license](../../../LICENSE).

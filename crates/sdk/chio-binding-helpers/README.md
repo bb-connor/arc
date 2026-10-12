@@ -1,63 +1,70 @@
 # chio-binding-helpers
 
-`chio-binding-helpers` is a narrow Rust facade over `chio-core` and
-`chio-manifest` that gives non-Rust Chio SDKs one byte-stable implementation
-of the checks bindings must not re-derive: canonical JSON, SHA-256 hashing,
-Ed25519 signing, and capability, receipt, and signed-manifest verification.
-Each `verify_*` function returns a `serde`-serializable report struct rather
-than a bare bool, so a binding can see exactly which check failed.
+`chio-binding-helpers` provides Rust functions that language bindings share for
+canonical JSON, SHA-256, Ed25519 signing, and artifact verification. It wraps
+`chio-core` and `chio-manifest`; `chio-bindings-ffi` exports these operations to
+C callers. The crate owns no session, transport, revocation store, or tool
+execution state.
 
-The crate holds no session, transport, auth, or orchestration state; that
-stays in each language-native SDK under `sdks/`. `chio-bindings-ffi` exposes
-this crate's surface over a C ABI for callers outside Rust.
+## Usage
 
-## Responsibilities
+Sign a JSON value and verify the signature over the same canonical value:
 
-- Canonicalize a raw JSON string to its RFC 8785 form (`canonicalize_json_str`).
-- Parse and verify `CapabilityToken`s: signature, delegation-chain shape, and
-  time status.
-- Parse and verify `ChioReceipt`s: signature, action parameter hash,
-  content-addressed receipt ID, decision/kind/boundary semantics, and
-  (optionally) a trusted-signer set.
-- Parse and verify `SignedManifest`s: structural validation, signature, and
-  embedded-public-key-matches-signer.
-- Provide SHA-256 hex digests and Ed25519 sign/verify over UTF-8 messages and
-  canonical JSON strings, plus hex public-key/signature format checks.
-- Own a stable, serializable `ErrorCode` enum so bindings can match on error
-  kind instead of parsing Rust error strings.
+```rust
+use chio_binding_helpers::{
+    sign_json_str_ed25519, verify_json_str_signature_ed25519,
+};
 
-## Public API
+fn main() -> chio_binding_helpers::Result<()> {
+    // Fixed seeds are useful for examples; applications must protect real keys.
+    let signed = sign_json_str_ed25519(r#"{"z":1,"a":2}"#, &"09".repeat(32))?;
+    assert_eq!(signed.canonical_json, r#"{"a":2,"z":1}"#);
+    assert!(verify_json_str_signature_ed25519(
+        r#"{"a":2,"z":1}"#,
+        &signed.public_key_hex,
+        &signed.signature_hex,
+    )?);
+    Ok(())
+}
+```
 
-- `canonical::canonicalize_json_str`
-- `capability::{parse_capability_json, verify_capability, verify_capability_json,
-  capability_body_canonical_json}` - returns `CapabilityVerification` /
-  `CapabilityTimeStatus`.
-- `receipt::{parse_receipt_json, verify_receipt, verify_receipt_json,
-  verify_receipt_with_trusted_signers, verify_receipt_with_trusted_signer_hex,
-  verify_receipt_json_with_trusted_signer_hex, receipt_body_canonical_json}` -
-  returns `ReceiptVerification` / `ReceiptDecisionKind`.
-- `manifest::{parse_signed_manifest_json, verify_signed_manifest,
-  verify_signed_manifest_json, signed_manifest_body_canonical_json}` - returns
-  `ManifestVerification`.
-- `hashing::{sha256_hex_bytes, sha256_hex_utf8}`
-- `signing::{sign_utf8_message_ed25519, verify_utf8_message_ed25519,
-  sign_json_str_ed25519, verify_json_str_signature_ed25519,
-  is_valid_public_key_hex, is_valid_signature_hex, public_key_hex_matches}` -
-  returns `Utf8MessageSignature` / `CanonicalJsonSignature`.
-- `error::{Error, ErrorCode, Result}`
+The sample uses the crate's existing dependencies and runs offline. UTF-8
+message signing uses the exact message bytes; JSON signing canonicalizes a
+`serde_json::Value` first. Seed input is a hex-encoded Ed25519 seed.
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-binding-helpers` runs the per-module unit tests plus
-`tests/vector_fixtures.rs`, which checks this crate's output against the
-cross-language vector corpus in `tests/bindings/vectors/`. Fixture-regenerating
-tests are `#[ignore]`d; run them with `-- --ignored` and refreeze the checksum
-manifest with `cargo xtask freeze-vectors`.
+| API | Enforced check or returned evidence |
+| --- | --- |
+| `canonicalize_json_str` | Parses JSON with Serde and canonicalizes the resulting value through `chio_core::canonicalize`. |
+| `verify_capability` | Returns signature validity, delegation-chain shape validity, and validity at the caller's `now` timestamp. |
+| `parse_receipt_json` | Uses `UntrustedJsonText::decode_signed` to reject duplicate members and number tokens that change representation. |
+| `verify_receipt_with_trusted_signers` | Recomputes receipt ID and action parameter hash, verifies signature, and checks membership in the supplied signer set. |
+| `verify_signed_manifest` | Reports manifest structure, signature validity, embedded-key validity, and equality with the signing key separately. |
+| `Error::code` | Maps core, JSON, and manifest errors to the serializable `ErrorCode` vocabulary. |
 
-## See also
+`ReceiptVerification::ok` requires all cryptographic/hash checks and a trusted
+signer. `authorized` additionally requires receipt semantics that authorize the
+decision. `verify_receipt` supplies an empty trust set, so both fields remain
+false. The `result` label alone is insufficient for an authorization decision.
 
-- `chio-core` - supplies the capability, receipt, and crypto types this crate
-  parses and verifies.
-- `chio-manifest` - supplies `SignedManifest` and the validation/signing
-  functions this crate wraps.
-- `chio-bindings-ffi` - C ABI over this crate's surface for non-Rust callers.
+Capability verification supplies evidence about the token. The caller must
+establish issuer trust, request scope, subject binding, revocation, and durable
+budgets through the appropriate kernel path. Manifest reports likewise require
+the caller to examine every relevant validity field and establish signer trust.
+
+## Status
+
+Implemented as an internal library with `publish = false`. Its manifest declares
+no Cargo features. Module tests exercise canonicalization, signing, key matching,
+and reports; `tests/vector_fixtures.rs` checks shared vector cases and receipt
+JSON rejection. Run `cargo test -p chio-binding-helpers` for these checks.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Canonical JSON contract](../../../spec/PROTOCOL.md#41-canonical-json)
+- [Receipt contract](../../../spec/PROTOCOL.md#6-receipt-contract)
+- [C ABI facade](../chio-bindings-ffi/README.md)
+- [Core types and cryptography](../../core/chio-core/README.md)
+- [License](../../../LICENSE)

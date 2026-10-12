@@ -16,7 +16,6 @@ const README: &str = include_str!("../README.md");
 #[derive(Debug)]
 struct TaxonomyRow {
     class: String,
-    #[allow(dead_code)]
     envelope: Value,
 }
 
@@ -273,5 +272,45 @@ fn require_provider_error<T>(
         ));
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn documented_forbidden_status_and_bad_arguments_use_reachable_boundaries(
+) -> Result<(), String> {
+    let rows = taxonomy_rows()?;
+    let forbidden = rows
+        .iter()
+        .find(|row| row.class == "ContentPolicy")
+        .ok_or_else(|| "missing ContentPolicy row".to_string())?;
+    let code = u16::try_from(
+        forbidden.envelope["status"]
+            .as_u64()
+            .ok_or_else(|| "missing status".to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    assert_eq!(code, 403);
+    let mock = Arc::new(MockTransport::new());
+    mock.push_error(chio_provider_adapter_core::http::HttpTransportError::Status { code });
+    let transport_adapter = CohereAdapter::new(
+        CohereAdapterConfig::new("local", "Example", "1", "00", "org"),
+        mock,
+    );
+    require_provider_error(transport_adapter.chat(b"{}").await, "ContentPolicy")?;
+    let adapter = adapter()?;
+    require_provider_error(
+        adapter.lift_batch(raw(json!({
+            "finish_reason":"ERROR_TOXIC", "message":{"role":"assistant","content":[]}
+        }))?),
+        "Malformed",
+    )?;
+    let bad_arguments = rows
+        .iter()
+        .find(|row| row.class == "BadToolArgs")
+        .ok_or_else(|| "missing BadToolArgs row".to_string())?;
+    require_provider_error(
+        adapter.lift_batch(raw(bad_arguments.envelope.clone())?),
+        "BadToolArgs",
+    )?;
     Ok(())
 }

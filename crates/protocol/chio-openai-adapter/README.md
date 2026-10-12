@@ -1,132 +1,76 @@
 # chio-openai-adapter
 
-OpenAI tool-call adapter for Chio. The default surface intercepts Chat
-Completions and Responses API tool calls and dispatches them through the Chio
-kernel for capability validation and signed receipts. The `provider-adapter`
-feature adds a second, independent surface: lift/lower into the shared
-`chio-tool-call-fabric` `ToolInvocation` shape, SSE streaming verdict gating,
-and an outbound HTTP transport that forwards native requests to the OpenAI
-API.
+Exposes Chio manifest tools as OpenAI function definitions and routes tool calls
+through cross-protocol planning and the Chio kernel. The optional native provider
+surface converts Responses API traffic into tool-call fabric invocations and
+provides outbound HTTP transport and buffered SSE gating.
 
-The crate publishes the library `chio_openai` (package `chio-openai-adapter`).
-The default build never pulls in `chio-tool-call-fabric` or
-`chio-provider-adapter-core`; enabling `provider-adapter` does not change
-default-surface behavior. The crate forbids `unsafe` code.
+## Usage
 
-## Responsibilities
+Extract a Responses API call offline using the default public surface.
+The returned call still requires capability-bound kernel execution.
 
-- Convert Chio `ToolManifest`s into OpenAI Chat Completions tool definitions
-  and extract tool calls back out of Chat Completions messages or Responses
-  API output (`ChioOpenAiAdapter`).
-- Dispatch each extracted tool call through the kernel
-  (`ChioKernel::evaluate_tool_call_blocking_with_metadata`), planning an
-  authoritative route via `chio-cross-protocol` first, and return a signed
-  `ChioReceipt` for every call that reaches kernel evaluation.
-- (`provider-adapter`) Implement `chio_tool_call_fabric::ProviderAdapter`:
-  lift Responses API `function_call` items into `ToolInvocation`, lower a
-  kernel `VerdictResult` into OpenAI `tool_outputs` JSON.
-- (`provider-adapter`) Gate Responses API SSE streams so a buffered
-  tool-call block reaches the caller only after its verdict allows it.
-- (`provider-adapter`) Forward native `/v1/responses` and
-  `/v1/chat/completions` requests to the OpenAI API over the shared
-  `chio-provider-adapter-core` HTTP transport, with a `MockHttpTransport`
-  seam for hermetic tests.
+```rust
+use chio_openai::ChioOpenAiAdapter;
+use serde_json::json;
 
-## Public API
+let response = json!({"output": [{
+    "type": "function_call", "call_id": "call-1",
+    "name": "weather", "arguments": "{\"city\":\"Boston\"}"
+}]});
+let calls = ChioOpenAiAdapter::extract_responses_api_calls(&response)?;
+assert_eq!(calls[0].id, "call-1");
+assert_eq!(calls[0].function.name, "weather");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-Default surface, always compiled (superseded by `provider-adapter` for
-provider-native mediation, see `CHANGELOG.md`, but still fully compiled and
-tested):
+## Features
 
-- `ChioOpenAiAdapter` - `new`, `manifest`, `openai_tools`,
-  `openai_tools_json`, `function_names`, `function_def`, `execute_tool_call`,
-  `execute_tool_calls`, `results_to_messages`, `results_to_responses_api`,
-  `extract_tool_calls`, `extract_responses_api_calls`.
-- `OpenAiAdapterConfig` - manifest-generation config (`server_id`,
-  `server_name`, `server_version`, `public_key`).
-- `OpenAiExecutionContext` - per-batch execution input: capability token,
-  agent id, DPoP proof, execution nonces keyed by OpenAI tool-call id,
-  governed intent/approval token, model metadata.
-- `OpenAiToolDef`, `OpenAiFunctionDef`, `OpenAiToolCall`, `OpenAiFunctionCall`,
-  `ResponsesApiOutput`, `ToolCallResult`, `OpenAiAdapterError`.
+| Feature | Default | Effect |
+|---|---|---|
+| `default` | Yes | Empty feature set; manifest export and kernel execution remain available. |
+| `provider-adapter` | Off | Adds fabric lift/lower, provider HTTP transport, and Responses SSE gating. |
 
-`provider-adapter` feature also exposes:
+## Guarantees
 
-- `OpenAiAdapter` (re-exported from `adapter`) - implements `ProviderAdapter`
-  (`lift`, `lower`); also `lift_batch`, which lifts every `function_call`
-  item in one payload, and `gate_sse_stream` for the streaming path.
-- `OpenAiProviderAdapterConfig` - `adapter::OpenAiAdapterConfig` (`org_id`,
-  `api_version`) re-exported under this alias because the plain name would
-  collide with the default surface's `OpenAiAdapterConfig` above.
-- `OPENAI_RESPONSES_API_VERSION` - the pinned Responses API snapshot
-  (`"responses.2026-04-25"`). Every provider-adapter entry point rejects a
-  configured `api_version` that does not match it.
-- `streaming::{GatedSseStream, OpenAiSseTransport}` - not re-exported at the
-  crate root; reach them through the `streaming` module.
-- `transport::{OpenAiTransport, ChatCompletionsOutcome, OPENAI_API_BASE_URL,
-  OPENAI_API_KEY_ENV, OPENAI_RESPONSES_PATH, OPENAI_CHAT_COMPLETIONS_PATH}` -
-  also re-exported at the crate root.
+`ChioOpenAiAdapter::new` validates its combined manifest, rejects an empty tool
+set, and rejects tools requiring declared flows on this constructor path.
+Duplicate function names retain the first manifest binding.
+`execute_tool_call` binds host execution context and routes admission through
+the kernel. Invalid input can reject before an authorization receipt exists.
+The provider surface can project without sidecars; callers must bind registry
+admission before using those projections for authoritative execution.
 
-## Feature flags
+## Error taxonomy
 
-| Flag | Effect |
-|------|--------|
-| `provider-adapter` | Adds the `adapter`, `streaming`, and `transport` modules (the `ProviderAdapter` implementation, SSE verdict gating, and the outbound HTTP client). Pulls in `chio-tool-call-fabric` and `chio-provider-adapter-core`. |
-
-## Error taxonomy (`provider-adapter`)
-
-`ProviderError` classes an OpenAI provider-adapter caller can observe, with a
-representative native or HTTP-boundary envelope for each. The classes and
-envelopes are registered under `urn:chio:error:provider:openai`
-(`CHIO-PROVIDER-OPENAI`) in `spec/errors/registry.yaml`.
-`tests/error_taxonomy_doctest.rs` parses this table out of the README at test
-time and checks it against live adapter behavior, so it cannot drift from the
-code silently.
+The provider-adapter surface classifies HTTP status before parsing response
+bodies. Batch call extraction, SSE lifecycle validation, and evaluator callbacks
+have separate rejection paths. SSE wrappers describe event/data pairs.
 
 <!-- error-taxonomy:start -->
 | ProviderError class | Native or boundary envelope | Source | Adapter-visible behavior |
 | ------------------- | --------------------------- | ------ | ------------------------ |
-| `ProviderError::RateLimited` | `{"status":429,"headers":{"retry-after-ms":"1000"},"body":{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached","code":"rate_limit_exceeded","param":null},"request_id":"req_openai_rate"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Preserve the retry hint as `retry_after_ms` when the OpenAI response carries one. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::ContentPolicy` | `{"status":400,"body":{"error":{"type":"invalid_request_error","message":"Request rejected by content policy","code":"content_policy_violation","param":null},"request_id":"req_openai_policy"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Surface provider refusal or policy rejection as content-policy denial rather than a tool execution error. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::UntrustedInput` | `{"type":"function_call","call_id":"call_bad_args","name":"get_weather","arguments":"{not json"}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Fail closed when OpenAI emits function-call arguments that cannot become canonical JSON arguments. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::Upstream5xx` | `{"status":500,"body":{"error":{"type":"server_error","message":"Internal server error","code":"server_error","param":null},"request_id":"req_openai_500"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Keep upstream 5xx bodies visible for retry and audit policy. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.openai.com/v1/responses","elapsed_ms":30000}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + HTTP transport boundary | OpenAI provider adapter returned a normalized provider error. Classify local transport timeout separately from OpenAI 5xx envelopes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::VerdictBudgetExceeded` | `{"provider":"openai","event":"response.output_item.done","observed_ms":300,"budget_ms":250}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Preserve the fabric verdict-budget error when the evaluator misses the 250ms gate. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
-| `ProviderError::Malformed` | `{"event":"response.function_call_arguments.delta","data":{"type":"response.function_call_arguments.delta","output_index":0,"call_id":"call_orphan","delta":"{}"}}` | `urn:chio:error:provider:openai` (`CHIO-PROVIDER-OPENAI`) + current adapter path | OpenAI provider adapter returned a normalized provider error. Fail closed for impossible or out-of-order native SSE/Responses shapes. Registry help: Inspect the provider error details and retry only when the adapter marks the failure transient. |
+| `ProviderError::RateLimited` | `{"status":429,"headers":{"retry-after-ms":"1000"},"body":{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached","code":"rate_limit_exceeded","param":null},"request_id":"req_openai_rate"}}` | `OpenAiTransport::send_responses` / `http::map_http_status` | HTTP 429; retry_after_ms is 0 and Retry-After is not parsed. |
+| `ProviderError::ContentPolicy` | `{"status":403,"body":{"error":{"type":"invalid_request_error","message":"Request rejected by content policy","code":"content_policy_violation","param":null},"request_id":"req_openai_policy"}}` | `OpenAiTransport::send_responses` / `http::map_http_status` | HTTP 403 maps to ContentPolicy; response-body error codes do not override status. |
+| `ProviderError::BadToolArgs` | `{"status":400,"body":{"error":{"code":"content_policy_violation"}}}` | `OpenAiTransport::send_responses` / `http::map_http_status` | HTTP 400 maps to BadToolArgs even when the body names content_policy_violation. |
+| `ProviderError::UntrustedInput` | `{"type":"function_call","call_id":"call_bad_args","name":"get_weather","arguments":"{not json"}` | `OpenAiAdapter::lift_batch` / `input::arguments` | A selected function_call has invalid JSON argument text; original duplicate or oversized JSON also rejects. |
+| `ProviderError::Upstream5xx` | `{"status":500,"body":{"error":{"type":"server_error","message":"Internal server error","code":"server_error","param":null},"request_id":"req_openai_500"}}` | `OpenAiTransport::send_responses` / `http::map_http_status` | HTTP 5xx maps to Upstream5xx with the observed status. |
+| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://api.openai.com/v1/responses","elapsed_ms":30000}` | `http::map_transport_error` | HttpTransportError::Timeout becomes TransportTimeout with the configured timeout in ms. |
+| `ProviderError::VerdictBudgetExceeded` | `{"provider":"openai","event":"response.output_item.done","observed_ms":300,"budget_ms":250}` | `OpenAiAdapter::gate_sse_stream` evaluator callback | The evaluator returns VerdictBudgetExceeded; the gate propagates it. No gate-owned 250 ms timer is installed. |
+| `ProviderError::Malformed` | `{"event":"response.function_call_arguments.delta","data":{"type":"response.function_call_arguments.delta","output_index":0,"call_id":"call_orphan","delta":"{}"}}` | `OpenAiAdapter::gate_sse_stream` lifecycle validation | Representative SSE event/data: argument delta arrives without an active output item. |
 <!-- error-taxonomy:end -->
 
-`ProviderError::Other` is intentionally absent: a native OpenAI envelope must
-map to a concrete class above, or fail closed as `UntrustedInput` for invalid original JSON and `Malformed` for a protocol shape violation.
+## Status
 
-## Testing
+Implemented manifest export, kernel routing, provider projection, and buffered
+stream handling with local unit, fixture, and HTTP mock coverage. The native
+Responses snapshot identifier is `2026-04-25`. Local evidence covers these code
+paths; external provider reliability and deployment acceptance remain operational concerns.
 
-```
-cargo test -p chio-openai-adapter
-cargo test -p chio-openai-adapter --features provider-adapter
-```
+## Related
 
-CI builds and tests both feature combinations; the default build must stay
-free of the `provider-adapter` dependencies.
-`cargo bench -p chio-openai-adapter --features provider-adapter` runs
-`verdict_latency`, which panics before recording a Criterion sample if the
-SSE gate's p99 latency exceeds a 250ms budget over 128 iterations.
-
-## See also
-
-- `chio-tool-call-fabric` - defines `ProviderAdapter` and the
-  `ToolInvocation`/`VerdictResult` types the `provider-adapter` feature
-  implements against.
-- `chio-provider-adapter-core` - shared SSE parsing, HTTP transport, and
-  error classification reused by every provider adapter.
-- `chio-kernel` - evaluates every tool call the default surface dispatches.
-- `chio-cross-protocol` - plans the authoritative route before each
-  default-surface dispatch.
-- `chio-provider-conformance` - replays fixtures against this adapter.
-
-Peer JSON is limited to 16 MiB, individual SSE frames to 1 MiB, and complete
-streams to 16,384 frames. Tool arguments must be I-JSON objects of at most
-1 MiB. Duplicate keys and unsafe integers reject before canonicalization.
-`UntrustedInput` retains a local parser source and exposes only a registered
-rejection code. `Clock` refuses unavailable or regressing trusted time;
-`StreamCapacityExceeded` reports the whole-stream frame quota. Per-tool stream
-buffer and verdict-latency limits also apply.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol capability contract](../../../spec/PROTOCOL.md#5-capability-contract)
+- [Cross-protocol routing](../chio-cross-protocol/README.md)
+- [Provider core](../chio-provider-adapter-core/README.md)
+- [License](../../../LICENSE)

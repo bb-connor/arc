@@ -1,81 +1,101 @@
 # chio-eval-receipt architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-eval-receipt` is an SDK-layer crate, not a kernel component: its only
-`chio-*` dependency is `chio-core-types`, and it forbids `unsafe_code`. It
-owns both directions of a `chio.eval-report.bundle.v1` bundle: an unsigned
-exporter that wraps verdict-matrix scenario receipts, and a fail-closed
-verifier that admits, corpus-checks, hash-checks, and signature-checks a
-bundle document end to end.
+This crate owns unsigned eval-report bundle construction and reference
+verification. `Bundle` wraps receipt payload text, scenario labels, eval-run
+metadata, and the compiled verdict-matrix corpus identity.
+`VerifiedBundle` returns an id and receipt/signature counts after verification.
+There is no kernel dependency, receipt signing, or persistence layer.
 
-It does not own the verdict-matrix corpus itself
-(`crates/tooling/chio-conformance`), partner trace ingestion, or the inner
-Chio receipt schema (`chio-core-types`). Real partner cryptographic
-attestation is not implemented: production signature verification
-(`verify_bundle`) currently accepts no signature `kind`, including the
-fixture scheme.
+The root also re-exports authoritative-spend checks from `chio-core-types`.
+They are separate from bundle verification: consumers supply admitted kernel
+keys and a `PresentedNonceView` to check spend authority.
 
-## Module map
+## Structure and dependencies
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Declares `export` and `verify` as public modules, re-exports their public items at the crate root, and defines `BUNDLE_SCHEMA_ID` / `BUNDLE_SCHEMA_PATH`. |
-| `src/export.rs` | Typed, validated construction of `EvalRunMeta` and `Receipt` inputs; `export_scenario_run` assembles an unsigned `Bundle`; crate-shared `sha256_hex` helper. |
-| `src/verify.rs` | JSON parsing, closed-schema envelope admission, corpus pin check, receipt hash and inner-signature check, partner-review check, outer-signature check. |
-| `src/bin/cli.rs` | `chio-eval-receipt` binary: `verify`, `verify-fixture`, `verify-memo` subcommands. |
-| `py/src/lib.rs` | PyO3 module `chio_eval_receipt_py` wrapping `verify_bundle`. |
+| Path | Role |
+|------|------|
+| `src/lib.rs` | Module exports, schema constants, spend-contract re-exports, and contract tests. |
+| `src/export.rs` | Input constructors, bundle types, payload SHA-256, and unsigned export. |
+| `src/verify.rs` | Envelope, corpus, receipt, review, and outer-signature checks. |
+| `src/bin/cli.rs` | `verify`, `verify-fixture`, and synthetic `verify-memo` commands. |
+| `tests/` | Export preservation, schema pin, and golden fixture checks. |
 
-## Bundle lifecycle
+`chio-core-types` supplies RFC 8785 canonicalization, signed JSON decoding,
+receipt signature verification, and spend predicates. `serde_json` parses
+outer bundle JSON. `sha2` hashes payload bytes and synthetic signatures.
+No Cargo features are declared. The separate `py/` package uses PyO3 to
+call `verify_bundle` and translate errors into Python `ValueError`.
 
-1. **Export** - `export_scenario_run` copies validated `EvalRunMeta` and
-   per-scenario `Receipt`s into a `Bundle`, hashing each preserved receipt
-   payload into `receipt_sha256` and pinning `corpus` to the compiled-in
-   verdict-matrix constants. `signatures` is always empty; the exporter
-   never signs.
-2. **Sign** (external to this crate) - a caller attaches one or more outer
-   signatures over the RFC 8785 canonical form of the bundle with
-   `signatures` removed. `test_signature_for_bundle_json` computes the
-   deterministic `test-sha256` variant used by fixtures and the golden
-   vector.
-3. **Verify** - `verify_bundle` / `verify_fixture_bundle` parse the JSON, run
-   `verify_schema_envelope` (closed field sets, required fields, enum and
-   SHA-256-shape checks) before trusting any content, then check the corpus
-   pin, every receipt's hash and embedded `ChioReceipt` signature, the
-   optional `partner_review` block, and finally the outer signature(s).
+## Export and verification flow
 
-## Invariants and failure modes
+`EvalRunMeta::from_parts` and `Receipt::from_parts` own borrowed strings,
+rejecting empty or padded identity fields. Payloads need only contain
+non-whitespace text and are copied exactly. `export_scenario_run` hashes
+those bytes, pins the corpus metadata, and leaves signatures empty.
+It accepts an empty receipt slice. The public fields can bypass or undo
+constructor validation; export does not revalidate them or inner signatures.
+Bundle types have no Serde derives or built-in JSON writer.
 
-- Schema admission runs before signature trust: `verify_schema_envelope`
-  rejects unknown fields, missing required fields, and invalid enum values
-  (`eval_run.pipeline_language`, `receipts[].verdict`,
-  `partner_review.disposition`) before any hash or signature is checked, so
-  a valid fixture signature cannot bless a field the schema forbids.
-- `corpus.corpus_sha256` and `corpus.scenario_count` must equal
-  `VERDICT_MATRIX_CORPUS_SHA256` / `VERDICT_MATRIX_SCENARIO_COUNT`; any other
-  verdict-matrix corpus is rejected.
-- Every `receipts[]` entry must reproduce its declared `receipt_sha256` and
-  carry an inner payload that verifies under
-  `ChioReceipt::verify_signature`. Fixture mode additionally allows a closed,
-  hardcoded set of three `(scenario_id, payload sha256)` pairs
-  (`LOCAL_TEST_RECEIPT_FIXTURE_HASHES`) to skip that check; tampering with a
-  fixture payload changes its hash and drops it out of the allowlist.
-- Outer signature verification requires `signed_payload ==
-  "bundle_without_signatures:rfc8785"` and recomputes the RFC 8785 canonical
-  hash itself rather than trusting a caller-supplied one. Production mode
-  (`verify_bundle`) accepts no signature `kind` today, including
-  `test-sha256`; that kind only verifies under `verify_fixture_bundle`.
-- `export_scenario_run`'s typed constructors (`EvalRunMeta::from_parts`,
-  `Receipt::from_parts`) reject empty or whitespace-padded identity fields at
-  construction time. `receipt_payload` is checked only for emptiness, so its
-  bytes are preserved exactly, padding included.
-- The crate forbids `unsafe_code` (`#![forbid(unsafe_code)]`).
+Both verifier entry points parse the outer JSON into `serde_json::Value`,
+check the schema id and closed envelope, then check corpus identity,
+receipts, optional partner review, and signatures in that order.
+Receipt and signature arrays must be nonempty. Pipeline language is one of
+`python`, `go`, or `rust`; receipt verdict is `allow` or `deny`.
+Partner review, when present, requires a window of 1 through 7 days and
+one of the three accepted disposition strings.
 
-## Dependencies
+Each receipt wrapper's SHA-256 must match its exact payload text.
+`UntrustedJsonText::decode_signed` parses embedded `ChioReceipt` bytes with
+duplicate-key rejection before signature verification. Fixture mode can
+accept a failing embedded receipt check only for one of three fixed
+scenario-id/payload-hash pairs.
 
-`chio-core-types` supplies RFC 8785 canonicalization (`canonicalize`) and the
-inner receipt type and signature check (`receipt::body::ChioReceipt`); it is
-a direct, unaliased dependency (`chio_core_types::`, not a `chio_core`
-facade). `serde_json` parses and canonicalizes bundle documents. `sha2`
-computes payload and signature hashes. `py/` (`chio-eval-receipt-py`) depends
-on this crate by path and adds `pyo3`.
+Outer signatures cover RFC 8785 JSON after removing `signatures`.
+`test_signature_for_bundle_json` computes its deterministic SHA-256 and
+does not validate the envelope. Fixture mode compares `test-sha256`
+values and requires `signed_payload = bundle_without_signatures:rfc8785`.
+Production mode accepts no outer signature kind, including that fixture kind.
+
+## Trust and invariants
+
+The corpus check compares constants; it does not recompute the digest from
+files or require one receipt for every corpus scenario. Wrapper scenario
+ids and verdicts are not cross-checked against embedded receipt decisions.
+Embedded signature verification uses the receipt's key; bundle verification
+does not check that key against an operator trust set.
+
+Outer JSON uses ordinary `serde_json` parsing, so its duplicate object keys
+collapse before envelope checking. The CLI reads whole files without a
+size limit. Input size limits and authoritative signer admission remain
+caller responsibilities. The library forbids unsafe code.
+
+`is_authoritative_spend_receipt` checks the receipt signature, admitted
+kernel key, mediated prevent/allow semantics, reconciled budget metadata,
+positive exposure, frozen spend profile, and nonce links. It matches
+capability, server, tool, parameter hash, and an optional reserved hold,
+then verifies the nonce under the receipt key. The supplied nonce trait
+owns its signature-verification behavior. `PresentedNonceView` exposes no
+subject or request accessors, so this helper does not establish the subject
+and request bindings required by protocol 6.2. Consumers requiring that
+authority must verify them through an authoritative nonce/admission path.
+`receipt_meets_guarantee_floor` checks recognized levels and their ordering
+separately; it does not verify a receipt signature or inspect the backing store.
+
+The memo CLI accepts only `synthetic-test-sample`, checks a hash of memo
+bytes and signer text, and rejects duplicate or unknown signature-file
+fields. Its deterministic hash does not authenticate partner identity.
+
+## Verification
+
+Run `cargo test -p chio-eval-receipt`. Unit tests cover payload preservation,
+constructor errors, canonical ordering, envelope mutations, forged receipts,
+production rejection of fixture signatures, embedded duplicate keys, and
+receipt binding vectors with full-width integer fields.
+
+`tests/export_roundtrip.rs` checks three wrapped payloads and empty outer
+signatures. `tests/schema_lint.rs` pins schema identifiers and verifies the
+three-receipt golden fixture. CLI tests check memo scheme labels and reject
+duplicate fields, unknown fields, comments, and unsupported schemes.
+The [README](README.md) runs that fixture through the public verifier.

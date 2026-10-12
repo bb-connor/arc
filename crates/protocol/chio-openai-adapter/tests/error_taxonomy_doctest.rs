@@ -54,6 +54,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
     for required in [
         "RateLimited",
         "ContentPolicy",
+        "BadToolArgs",
         "UntrustedInput",
         "Upstream5xx",
         "TransportTimeout",
@@ -83,6 +84,10 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
                 require_error_code(&row, "rate_limit_exceeded")?;
             }
             "ContentPolicy" => {
+                require_status(&row, 403)?;
+                require_error_code(&row, "content_policy_violation")?;
+            }
+            "BadToolArgs" => {
                 require_status(&row, 400)?;
                 require_error_code(&row, "content_policy_violation")?;
             }
@@ -349,5 +354,31 @@ fn require_provider_error<T>(
         ));
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn documented_policy_error_code_does_not_override_http_status() -> Result<(), String> {
+    for row in taxonomy_rows()?
+        .into_iter()
+        .filter(|row| matches!(row.class.as_str(), "ContentPolicy" | "BadToolArgs"))
+    {
+        let status = u16::try_from(status(&row).ok_or_else(|| "missing status".to_string())?)
+            .map_err(|error| error.to_string())?;
+        let body = serde_json::to_vec(&row.envelope["body"]).map_err(|error| error.to_string())?;
+        let mock = std::sync::Arc::new(chio_provider_adapter_core::http::MockHttpTransport::new(
+            "mock://openai",
+        ));
+        mock.push_response(chio_provider_adapter_core::http::HttpResponse {
+            status,
+            body,
+            content_type: Some("application/json".into()),
+        });
+        let transport = chio_openai::transport::OpenAiTransport::with_transport(
+            mock,
+            chio_openai::adapter::OpenAiAdapterConfig::new("org_taxonomy"),
+        );
+        require_provider_error(transport.send_responses(b"{}").await, &row.class)?;
+    }
     Ok(())
 }

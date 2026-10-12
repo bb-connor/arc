@@ -1,84 +1,63 @@
 # chio-verdict-matrix-driver-lambda
 
-Lambda deployment-shape driver for the Chio verdict matrix. The crate loads
-the shared verdict-matrix scenario corpus, relays each scenario to an
-operator-supplied Chio sidecar over `POST /chio/evaluate`, and reports a
-pass/fail/unsupported verdict tuple per scenario. `chio-conformance` owns the
-scenario corpus and registers this crate in its manifest as the
-`lambda-deployment-shape` driver, representing the
-`sdks/lambda/chio-lambda-extension` package in the deployment-shape registry.
-
-## Responsibilities
-
-- Resolve and load the canonical verdict-matrix scenario corpus, rejecting
-  symlinked roots/files and scenarios with an unrecognized `schema`
-  (`resolve_scenario_root`, `load_scenarios`).
-- Translate each scenario into a `chio-http-core::ChioHttpRequest`-shaped
-  wire body, mirroring the `typescript-node-http` driver's contract
-  (`scenario_to_http_request`).
-- Relay each request to the sidecar over blocking HTTP and derive the
-  verdict tuple from the response's `verdict` and
-  `receipt.metadata.verdict_matrix` fields (`run_driver`,
-  `tuple_from_evaluate_response`).
-- Gate `capability` and `revocation` scenarios to `unsupported` before any
-  network call: this relay has no signed `CapabilityToken` builder, so it
-  cannot produce a faithful verdict for those categories
-  (`sidecar_unsupported_reason`).
-- Fail closed on ambiguous states: no sidecar configured reports every
-  scenario `unsupported` with a diagnostic; a set-but-unreachable sidecar
-  reports `fail`, never a silent skip or pass.
-
-## Public API
-
-- `resolve_scenario_root() -> Result<PathBuf, String>` - locate the scenario
-  corpus by walking upward for a `Cargo.toml` + verdict-matrix directory pair.
-- `load_scenarios(root: &Path) -> Result<Vec<Scenario>, String>` - parse and
-  validate the scenario corpus.
-- `run_driver(scenario_root: &Path, sidecar_url: Option<&str>) -> Result<DriverReport, String>`
-  - run the full scenario set and build a report.
-- `scenario_to_http_request`, `tuple_from_evaluate_response`,
-  `expected_tuple_map` - wire-shape and verdict-tuple helpers.
-- `Scenario`, `ScenarioScript`, `VerdictTuple`, `ScenarioOutcome`,
-  `DriverReport` - the scenario and report data model.
-- `DRIVER_NAME`, `MATRIX_ROLE`, `UNDERLYING_DRIVER`, `SIDECAR_ENV`,
-  `SIDECAR_FALLBACK_ENV`, `SCENARIO_SCHEMA` - driver identity and wiring
-  constants.
-- Binary `chio-verdict-matrix-driver-lambda` - resolves the scenario root,
-  runs the driver against `CHIO_VERDICT_MATRIX_SIDECAR_URL` (or
-  `CHIO_SIDECAR_URL`), and prints the `DriverReport` as JSON to stdout.
+A Lambda deployment-shape client for the Chio verdict matrix. It loads the
+shared scenario corpus, sends supported cases to an operator-supplied Chio
+sidecar, and compares `(verdict, reason_code, scope_set)` tuples.
+The matrix registry associates this driver with the Lambda extension package.
 
 ## Usage
 
+Extract a tuple from an evaluation response without contacting a sidecar.
+The helper reads response fields; this example uses a local JSON fixture.
+
 ```rust
-use chio_verdict_matrix_driver_lambda::{resolve_scenario_root, run_driver};
+use chio_verdict_matrix_driver_lambda::tuple_from_evaluate_response;
+use serde_json::json;
 
-fn main() -> Result<(), String> {
-    let root = resolve_scenario_root()?;
-    let sidecar = std::env::var("CHIO_VERDICT_MATRIX_SIDECAR_URL").ok();
-    let report = run_driver(&root, sidecar.as_deref())?;
-    println!("{}/{} scenarios passed", report.passed, report.total);
-    Ok(())
-}
+let response = json!({
+    "verdict": { "verdict": "deny", "reason": "urn:chio:error:capability:revoked" },
+    "receipt": { "metadata": {} }
+});
+let tuple = tuple_from_evaluate_response(&response).normalized();
+assert_eq!(tuple.verdict, "deny");
+assert_eq!(tuple.reason_code, "urn:chio:error:capability:revoked");
+assert!(tuple.scope_set.is_empty());
 ```
 
-## Testing
+`run_driver(root, sidecar_url)` loads the corpus and produces a `DriverReport`.
+The binary finds the corpus by walking upward from its working directory and
+prints the report as JSON. It reads `CHIO_VERDICT_MATRIX_SIDECAR_URL`, falling
+back to `CHIO_SIDECAR_URL`. Neither variable is needed for the example above.
+This package declares no Cargo features.
 
-```bash
-cargo test -p chio-verdict-matrix-driver-lambda --quiet
-cargo run -p chio-verdict-matrix-driver-lambda --quiet
-```
+## Guarantees
 
-Set `CHIO_VERDICT_MATRIX_SIDECAR_URL` (or the `CHIO_SIDECAR_URL` fallback) to
-a live Chio sidecar to exercise the HTTP relay path; without it, every
-scenario reports `unsupported`.
+`load_scenarios` rejects symlinked roots and encountered symlinks, parses JSON,
+and checks `chio.verdict-matrix.scenario.v1`. `run_driver` reports every case as
+`unsupported` without a nonempty sidecar URL. Capability and revocation cases
+remain unsupported because the relay cannot construct signed tokens.
 
-## See also
+Attempted requests have a five-second timeout. Transport errors, unsuccessful
+HTTP statuses, malformed JSON responses, and tuple mismatches produce `fail`.
+`VerdictTuple::normalized` sorts scopes and preserves duplicates.
+The binary exits 2 for setup errors, 1 for failed cases, and 0 otherwise;
+a zero exit can therefore represent an entirely unsupported corpus.
 
-- `chio-conformance` - owns the verdict-matrix scenario corpus and manifest
-  (`verdict_matrix/manifest.toml`) and the `deployment_shape_smoke`
-  integration test that asserts this driver is registered and wire-compatible
-  with the Rust kernel reference.
-- `sdks/lambda/chio-lambda-extension` - the deployment-shape package this
-  driver's registry entry represents.
-- `drivers/jvm`, `drivers/dotnet`, `drivers/k8s` - sibling deployment-shape
-  drivers on the same scenario corpus and sidecar contract.
+## Status
+
+Test transport client with publication disabled. It builds synthetic request
+metadata and unsigned capability headers. Tuple extraction reads receipt
+metadata without checking a receipt signature. The registry smoke test checks
+driver registration and file presence. A real sidecar run, Lambda invocation,
+and runtime security acceptance need their own execution evidence.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Conformance crate](../../../README.md)
+- [Matrix manifest](../../manifest.toml)
+- [Lambda extension](../../../../../../sdks/lambda/chio-lambda-extension/README.md)
+- [Protocol evidence boundary](../../../../../../spec/PROTOCOL.md#54-safety-properties-and-evidence-boundary)
+- [Kubernetes driver](../k8s/README.md)
+
+Licensed under [Apache-2.0](../../../../../../LICENSE).

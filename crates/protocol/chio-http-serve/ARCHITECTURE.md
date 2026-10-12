@@ -1,93 +1,84 @@
 # chio-http-serve architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-http-serve` is a leaf infrastructure crate: it depends on no other
-`chio-*` crate and holds no protocol, capability, or authorization logic. It
-sits underneath every Chio process that terminates HTTP connections via
-`axum::serve`, wrapping the site's own `Router` and `Listener` in a shared
-shutdown-drain-hygiene stack. It never inspects a request's meaning; it only
-governs when the process stops accepting work and how much concurrent load
-one site admits before it denies more.
+The crate owns serving helpers and transport preparation. The host owns routes,
+application authorization, acknowledged-write durability, and the flush hook. A
+configuration value takes effect only through the corresponding helper.
 
-## Module map
+Provides shared Axum request hygiene, connection caps, TLS transport preparation,
+shutdown signaling, and bounded drain with a flush hook.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate doc, `#![forbid(unsafe_code)]`, module wiring, public re-exports. |
-| `src/signal.rs` | `shutdown_signal` (SIGTERM/Ctrl-C future), `ShutdownController` (`watch`-channel fan-out), `pub(crate) wait_for_shutdown`. |
-| `src/drain.rs` | `run_until_drained`, built on `signal::wait_for_shutdown`: bounds only the post-signal drain, then runs the flush hook. `DrainOutcome`, `ServeError`. |
-| `src/hygiene.rs` | `ServeHygieneConfig`, `apply_server_hygiene`, `DEFAULT_*` constants: request timeout, concurrency limit fronted by load shedding, optional body cap. |
-| `src/listener.rs` | `MaxConnListener`, `CappedPeerAddr`, `PermittedIo`: semaphore-backed connection cap at the accept loop. |
-| `src/tests.rs` (`cfg(test)`) | Integration tests against real ephemeral TCP listeners: drain, hygiene denials, connection cap. |
+## Structure
 
-## Composition and drain lifecycle
+`hygiene` builds router layers, `listener` wraps accepted I/O, `signal` fans
+shutdown through watch channels, and `drain` bounds teardown. `transport` prepares
+TLS and listeners; `private_pem` validates private-key framing.
 
-A serve site wires four independent pieces around its own `Router` and
-`Listener`; nothing in this crate calls the others automatically.
+`ServeHygieneConfig` holds request timeout, concurrent request and connection
+limits, an optional body-extractor ceiling, and post-signal drain timeout.
+`ShutdownController` shares a watch-channel signal across serving and drain.
+`DrainOutcome` distinguishes Clean from Forced; ServeError distinguishes serve I/O
+failures from post-drain flush failures.
 
-1. `ServeHygieneConfig` is one struct read by three call sites.
-   `apply_server_hygiene` reads only `max_body_bytes`, `request_timeout`, and
-   `max_concurrent_requests`; `max_connections` goes to `MaxConnListener::new`
-   and `drain_timeout` goes to `run_until_drained` directly, as
-   `chio-proof-room`'s `serve_proof_room` does.
-2. `ShutdownController::install` spawns a task awaiting `shutdown_signal` and
-   publishes on a `watch` channel; `manual` builds the same controller without
-   the OS task, for tests or an embedding with its own signal source.
-   `controller.signalled()` feeds `with_graceful_shutdown`; `subscribe()`
-   hands a receiver to `run_until_drained` and any other cooperating loop.
-3. `run_until_drained` runs the serve future unbounded until it exits on its
-   own or the signal fires. Only then does a `drain_timeout` deadline arm
-   around the remaining in-flight requests.
-4. A deadline that elapses yields `DrainOutcome::Forced` and drops the serve
-   future to release the accept loop and listener; axum still finishes each
-   already-dispatched connection on its own detached task in the background.
-5. The `on_drained` flush hook always runs last, on both outcomes. A forced
-   drain can race a still-finishing straggler connection, so the hook must
-   tolerate a concurrent writer; call sites keep this safe by committing each
-   acknowledged unit of work synchronously in the request handler, never in
-   the flush hook.
+## Data and control flow
 
-## Invariants and failure modes
+Prepare and validate transport configuration before binding. Wrap the listener with
+`MaxConnListener`, apply router hygiene, and pass the same shutdown controller to
+graceful serving and drain handling. The drain timer starts after shutdown, and the
+flush hook runs after a clean or forced outcome.
 
-- Fail-closed signal install: a handler that cannot be installed logs and
-  parks on `pending()` rather than resolving, so a missing handler degrades to
-  the platform default kill instead of crash-looping or firing a spurious
-  shutdown at startup.
-- `DEFAULT_REQUEST_TIMEOUT` (20s) is strictly below `DEFAULT_DRAIN_TIMEOUT`
-  (25s), asserted by a dedicated test, so a request admitted just before a
-  stop signal reaches its own 408 inside the drain window instead of a
-  forced-close severance.
-- Hygiene denials are explicit and typed, never silent queuing: `TimeoutLayer`
-  denies with 408, `LoadShedLayer`-in-front-of-`GlobalConcurrencyLimitLayer`
-  denies over-concurrency with 503 through a `HandleErrorLayer`, and
-  `DefaultBodyLimit` denies an oversized body with 413.
-- `MaxConnListener::accept` acquires a semaphore permit before pulling the
-  next connection off the OS queue, so a saturated server back-pressures the
-  accept loop instead of buffering sockets it cannot serve. The permit
-  releases only when the connection's IO drops; the semaphore is never
-  closed, so a drain never revokes a still-finishing connection's permit.
-- `MaxConnListener::new` clamps `max_connections` to `Semaphore::MAX_PERMITS`,
-  so `usize::MAX` is a valid "uncapped" sentinel rather than a startup panic.
-- Capping the listener changes its accepted IO type (`PermittedIo<L::Io>`),
-  moving the site out of axum's built-in `Connected<_> for SocketAddr`; a site
-  needing the peer address serves
-  `into_make_service_with_connect_info::<CappedPeerAddr>()` instead.
-- `#![forbid(unsafe_code)]` at the crate root.
+`apply_server_hygiene` installs DefaultBodyLimit first, then timeout, then
+HandleError(LoadShed(GlobalConcurrencyLimit(router))) as the outer stack. Load
+shedding returns 503 for excess concurrent work; request timeout returns 408. Other
+errors in the fallible load-shed stack map to 500. DefaultBodyLimit constrains
+compatible extractors instead of every arbitrary body-consuming handler. Connection
+permits live with the wrapped I/O object.
+
+## Trust and invariants
+
+Default limits are 20-second request timeout, 1,024 concurrent requests, 2,048
+connections, and 25-second drain. Global body cap defaults to absent; Axum
+DefaultBodyLimit governs compatible extractors. Forced drain drops the serve future
+while detached handlers may continue, so flush must tolerate concurrent writers.
+Transport config validation is explicit; default prepared transport can bind
+plaintext directly.
+
+`apply_server_hygiene` installs configured timeout and concurrency layers.
+`MaxConnListener` holds a permit for each connection lifetime. `run_until_drained`
+bounds post-signal waiting and propagates serve/flush errors.
+
+SIGTERM handling is Unix-specific; Ctrl-C handling is available across platforms.
+Signal-install failures log and leave the affected branch pending. TLS handshakes
+have a five-second deadline and never downgrade to plaintext.
+
+`run_until_drained` serves without a drain timer until shutdown arrives. A clean
+completion yields Clean; a post-signal deadline yields Forced and drops the owned
+serve future before flushing. Serve I/O errors return immediately. After either
+successful outcome the flush hook can still fail with ServeError::Flush. Forced
+drain cannot join detached connection handlers, so acknowledged-write durability
+must be established in the handler and flush must permit concurrent writers.
 
 ## Dependencies
 
-No internal `chio-*` crates. External: `axum` (`Router`, `serve::Listener`,
-`DefaultBodyLimit`) and `tower` / `tower-http` (`GlobalConcurrencyLimitLayer`,
-`LoadShedLayer`, `TimeoutLayer`, `HandleErrorLayer`) build the hygiene stack;
-`tokio` (`sync::watch`, `sync::Semaphore`, `signal`) supplies the runtime
-primitives; `tracing` logs signal and drain events; `thiserror` derives
-`ServeError`. `axum` and `tower-http` are version-pinned directly in
-`[dependencies]` rather than through the workspace table that `tokio`,
-`tracing`, `thiserror`, and `tower` use.
+Axum supplies Router and Listener traits. Tower supplies load shedding and
+concurrency control; tower-http supplies timeouts. Tokio supplies signals, channels,
+sockets, and timers. Rustls with AWS-LC and tokio-rustls supply server TLS.
 
-## Extension points
+## Verification
 
-`MaxConnListener<L>` is generic over any `L: Listener` (for example
-`tokio::net::TcpListener`, a Unix-socket listener, or a TLS-terminating
-listener), so the connection cap applies regardless of transport.
+`src/tests.rs` covers timeout, overload, body extraction, connection permits, manual
+shutdown, and drain outcomes. `src/transport_tests.rs` covers TLS identity,
+handshake behavior, and transport configuration.
+
+Run focused library tests from the workspace root:
+
+```bash
+cargo test -p chio-http-serve
+```
+
+`load_shed_returns_503_over_concurrency_limit` checks the layer ordering.
+`drain_deadline_forces_close_and_still_flushes` checks forced-drain cleanup.
+`flush_error_surfaces_as_serve_error` checks post-drain error propagation.
+`slow_request_times_out_cleanly_inside_the_drain_window` checks compatible
+timeout/drain defaults. TLS fixtures test malformed identities and handshakes.

@@ -1,61 +1,71 @@
 # chio-edge-metrics architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-edge-metrics` is a pure, synchronous library: no I/O, no async runtime,
-no shared global state of its own. It exists to deduplicate one thing across
-Chio's protocol edges: the receipt-write counter and its Prometheus rendering.
-Each edge (`chio-mcp-edge`, `chio-acp-edge`, `chio-a2a-edge`) sits at an
-untrusted boundary and must expose the same `chio_receipt_write_total` series
-after every kernel-mediated response; rather than three copies of the same
-atomic-counter and rendering code, the logic lives here once and each edge
-supplies its own storage.
+`ReceiptWriteCounters` owns four atomic counters. `ReceiptWriteSnapshot` and
+`ReceiptWriteSample` expose copied observations. The hosting edge owns counter
+lifetime, recording placement, exporter routing, and health data.
 
-## Module map
+Provides per-instance receipt-write counters and Prometheus formatting shared by
+protocol edges. Each hosting edge chooses its own counter instance.
 
-Single-file crate. `src/lib.rs` holds the outcome taxonomy,
-`ReceiptWriteCounters`, the snapshot/sample types, the verdict mapping, and
-the Prometheus renderers for both the receipt-write counters and the
-writer-liveness gauges.
+## Structure
 
-## Recording and rendering path
+A single `lib.rs` contains metric constants, typed outcome taxonomy, verdict
+mapping, counter storage, snapshots, rendering, and unit tests. There are no
+transport or storage modules.
 
-1. An edge crate declares `static COUNTERS: ReceiptWriteCounters =
-   ReceiptWriteCounters::new();` in its own `metrics` module.
-2. On each kernel response the edge calls `COUNTERS.record_verdict(verdict)`
-   (mapping a `chio_kernel::Verdict`) or `record_outcome`/`record` directly.
-   Recording increments one of four `AtomicU64` fields via `fetch_update` with
-   `saturating_add`, so a counter caps at `u64::MAX` instead of wrapping.
-3. The edge's own metrics endpoint calls `COUNTERS.render_prometheus()` for
-   the `chio_receipt_write_total` series, and separately
-   `render_receipt_writer_liveness(label, healthy)` for the
-   `chio_receipt_writer_healthy` / `chio_receipt_writer_liveness` gauges,
-   passing its serving kernel or store's own liveness state.
-4. Rendering walks `ReceiptWriteSnapshot::samples()`, which returns all four
-   outcomes in the fixed order `[Allow, Deny, PendingApproval, Error]`, so
-   exposition output is deterministic across scrapes.
+`ReceiptWriteOutcome` defines Allow, Deny, PendingApproval, and Error.
+`ReceiptWriteSnapshot` stores one copied total per outcome; `ReceiptWriteSample`
+pairs a typed outcome with its total. The metric name comes from chio-metrics-spec
+as the shared registry identifier.
 
-## Invariants and failure modes
+## Data and control flow
 
-- `record` and `total` fail closed on an unrecognized outcome label:
-  `ReceiptWriteOutcome::from_label` returns `None`, and both fall back to the
-  error bucket rather than silently dropping the sample.
-- Counters saturate at `u64::MAX`; they never wrap.
-- This crate holds no counter state of its own (no `static`, no global
-  registry): per-edge isolation is a property of each edge declaring its own
-  `ReceiptWriteCounters` instance. This crate's test suite proves two
-  instances stay independent (`counters_are_isolated_per_instance`);
-  `chio-conformance`'s `metrics_registry_consumed.rs` proves the same holds
-  for real MCP/ACP/A2A dispatches (an ACP or A2A call does not advance the
-  MCP counter, and vice versa).
-- `#![forbid(unsafe_code)]`.
+A caller records a typed outcome, string label, or kernel verdict. The counter
+increments without wrapping. Reads use relaxed atomics, and snapshots read each
+outcome independently. Prometheus rendering emits a HELP/TYPE block and the four
+stable labeled samples.
+
+`record_verdict` maps kernel Allow, Deny, and PendingApproval to the corresponding
+receipt-write outcome. Error must be recorded explicitly for writer failures or
+unknown string labels. `total` returns the current error counter for an unknown
+label, and `record` increments that same error counter for an unknown label.
+
+## Trust and invariants
+
+These observations do not validate or write receipts. Separate instances isolate
+edges. A snapshot is not an atomic transaction across all counters. Unknown string
+labels increment error so emissions remain visible. Liveness formatting accepts the
+caller-provided label verbatim; hosts supply a trusted bounded label vocabulary.
+
+`ReceiptWriteCounters` uses saturating atomic increments. `record` maps unknown
+labels to error. `ReceiptWriteSnapshot::samples` returns allow, deny, pending
+approval, and error in stable order.
+
+`increment_saturating` uses fetch_update with relaxed ordering and saturating_add. A
+counter stays at u64::MAX rather than wrapping to zero. Snapshots perform four
+separate relaxed loads, so simultaneous updates can appear in different observations
+within one snapshot.
 
 ## Dependencies
 
-`chio-kernel` supplies the `Verdict` enum this crate maps to outcomes.
-`chio-metrics-spec` owns `CHIO_RECEIPT_WRITE_TOTAL`'s registered name and
-shape; this crate re-exports the constant rather than redeclaring the string.
-`chio-metrics-spec` documents receipt-write metrics as declared there for name
-and shape only, with the owning crate storing samples; `chio-edge-metrics` is
-that owning implementation, shared by the MCP, ACP, and A2A edges instead of
-duplicated across them. No other dependencies.
+`chio-kernel` supplies the verdict enum used by mapping helpers. `chio-metrics-spec`
+supplies the registry metric name. Standard-library atomics supply thread-safe
+counters without a runtime or network client.
+
+## Verification
+
+Inline tests cover registry naming, label round trips, stable sample order, instance
+isolation, unknown outcomes, saturation, snapshots, and liveness formatting.
+
+Run focused library tests from the workspace root:
+
+```bash
+cargo test -p chio-edge-metrics
+```
+
+`unknown_outcome_records_under_error` checks fallback accounting.
+`receipt_write_counters_saturate_instead_of_wrapping` checks overflow behavior.
+`verdict_maps_to_expected_outcome` checks kernel-to-metric classification.
+`counters_are_isolated_per_instance` checks independent edge sinks.
