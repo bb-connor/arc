@@ -7,6 +7,24 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## F060 reconciled with its newer landed repair (October 12 UTC)
+
+The original F060 argument-tripwire finding is addressed by the newer
+`FINAL-REVIEW-TRIPWIRE-INPUT` implementation already present on `main` at
+`28d826e3e6`. The [source reconciliation](audits/f060-source-reconciliation-20261012.json)
+verifies that all five source and test files exactly match the retained component
+qualification, including the padded-delimiter correction and real-registry controls.
+The older follow-up patch must not be reapplied over this implementation.
+
+The canonical F060 current state now links that repair, its original failures,
+78 passing owning tests and strict Clippy evidence. Claude independently
+confirmed the source mapping. Guard argument tests and real-registry port tests
+provide compositional coverage; they are not one full-path real-registry test.
+Those are historical scoped results, not a new run. Source landing is recorded separately from incomplete
+requirement acceptance: required hosted CI and the disclosed operational
+obligations remain open. All **2,029 original requirement records** are preserved;
+only the F060 current mapping advances.
+
 ## Release and nightly dependency repair qualified locally (October 12 UTC)
 
 The [repair audit](audits/release-drogon-ci-repair-20261012.json) binds reviewed

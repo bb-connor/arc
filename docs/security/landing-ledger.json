@@ -2169,7 +2169,8 @@
       "evidence_requirement_ids": [
         "postmerge-20261012:RELEASE-DROGON"
       ]
-    }
+    },
+    {"path":"docs/security/audits/f060-source-reconciliation-20261012.json","commit":"050cfa50660ada910109c38a6b34b06ddb98b51f","sha256":"b1ded13b5e2c7d3fe06cf7534e827ef2c4a4a45011287777b0e7d80701d24072","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-review-20261006:F060","incoming-pr1160-github-final-review-20261010:FINAL-REVIEW-TRIPWIRE-INPUT"]}
   ],
   "pull_requests": [
     {
@@ -123761,24 +123762,54 @@
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
       "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
-      "source_repair": null,
-      "source_integrated": null,
-      "focused_green": null,
+      "landing_pr": 1160,
+      "landing_unit": "foundation",
+      "current_state": "source-present-on-main-scoped-local-evidence-preserved-acceptance-open",
+      "source_repair": {
+        "checkpoint": "274d5a6eeffc22c0e52e98d962f641e46b40c7a9",
+        "commits": [
+          "f53b7e7119b0e323145e231e33b051eabddfb592",
+          "74e17cd71530fc70f6cc478f6f0491aeddc83c6e",
+          "208e29500275ca87825e19ced2de133ea7ee6fac"
+        ],
+        "files": [
+          "crates/security/chio-security-kernel/src/tripwire.rs",
+          "crates/security/chio-security-kernel/src/tripwire/arguments.rs",
+          "crates/security/chio-security-kernel/tests/adapters.rs",
+          "crates/security/chio-security-kernel/tests/adapters/tripwire_arguments.rs",
+          "crates/security/chio-security-kernel/tests/decoy_argument_port.rs"
+        ]
+      },
+      "source_integrated": true,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/github-final-review-repairs-20261010.json",
+          "sha256": "fde8d5b624f7bda94e4dee5e789f721b79dee02b774abe261502fde6701408cc",
+          "scope": "11 argument failures; real registry 8 passes/3 genuine failures; independent padded-delimiter residual 0 passes/1 genuine failure. Final owning 78 passes, zero failures/ignored; strict all-target Clippy passes. Independent final review pending."
+        },
+        {
+          "path": "docs/security/audits/ci-repair-checkpoint-20261010.json",
+          "sha256": "63db1ffc614119c1a754ba63bb2920fa9fa2d9637b472d45a99ec4b09e1b621b",
+          "scope": "At b9a,385 Rust and469 Python tests,44 mandatory controls, four-crate all-target strict lint and scoped independent review passed. Hosted campaign failed; those bounded local results remain separate from replacement hosted qualification."
+        },
+        {
+          "path": "docs/security/audits/f060-source-reconciliation-20261012.json",
+          "sha256": "b1ded13b5e2c7d3fe06cf7534e827ef2c4a4a45011287777b0e7d80701d24072",
+          "scope": "Exact five source/test files match the retained qualified component and landed source. No new execution or retroactive hosted qualification."
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Current exact-head required CI must reach terminal results; historical local results are not hosted acceptance.",
+        "Trusted authorization/evidence and broader native, cold-state and operational acceptance retain their separate obligations.",
+        "The foundation was merged before four required checks passed. This reconciliation does not retroactively qualify that landing.",
+        "Do not reapply the old F060 follow-up proposal: the newer foundation implementation addresses the original argument-feed requirement."
       ],
       "historical_source_claim": {
         "source": {
@@ -123811,6 +123842,24 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "observed_utc": "2026-10-12T02:16:54.799414+00:00",
+      "observed_source_head": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
+      "replacement_requirement": "incoming-pr1160-github-final-review-20261010:FINAL-REVIEW-TRIPWIRE-INPUT",
+      "source_landing": {
+        "main_commit": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+        "archived_source": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
+        "tree": "9000ce6bb655ebb9be185190cad8ac4ecb53949d",
+        "binding": "Verified identical source/main tree and exact five-file component hashes; original commits remain ancestors of the archived source, not of the squash.",
+        "source_merged": true,
+        "merged_flag_scope": "The top-level merged flag retains incomplete requirement acceptance; source landing is recorded separately."
+      },
+      "independent_source_reconciliation": {
+        "reviewer": "Claude/C7",
+        "mailbox": "/home/connor/lanes/pr1160-coord/to-codex.md",
+        "scope": "All six original finding elements source-addressed; current native/trusted/hosted and combined-source qualification remain open.",
+        "coverage_limit": "Guard argument tests use a fake detector; real-registry matching is tested separately through the port. Their coverage is compositional, not one literal end-to-end real-registry argument test.",
+        "mailbox_utc": "2026-10-12T02:16:06Z"
       }
     },
     "incoming-pr1160-review-20261006:F061": {
