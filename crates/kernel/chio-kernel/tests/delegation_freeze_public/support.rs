@@ -9,7 +9,7 @@ use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::{Keypair, PublicKey, ResourceContent, ResourceDefinition, SessionId};
 use chio_kernel::{
     CapabilityIssuanceAdmissionAuthority, ChioKernel, KernelConfig, KernelError,
-    MemoryBudgetConfig, ReceiptStore, ResourceProvider, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    MemoryBudgetConfig, ResourceProvider, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_types::ports::{IssuanceFreezeAdmissionQuery, PortError, PortResult};

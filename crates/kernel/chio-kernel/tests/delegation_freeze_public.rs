@@ -9,7 +9,7 @@ use chio_core::PublicKey;
 use chio_kernel::{
     CapabilityAuthority, CapabilityAuthorityWorkloadBinding, KernelError, NestedFlowBridge,
     ReceiptStore, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    ToolServerConnection, Verdict,
+    ToolServerConnection,
 };
 use chio_security_types::ports::{
     CapabilityIssuanceOperation, IsolationEpochId, LineageId, SessionId, TenantId,
@@ -267,13 +267,16 @@ fn public_tool_invocation_preserves_the_bound_delegation_ban_after_exact_binding
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    let response = fixture
+    let result = fixture
         .kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context)?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        response.reason.as_deref(),
-        Some("security-bound remote capabilities cannot be delegated")
+        .evaluate_tool_call_blocking_with_security_context(&request, &context);
+    assert!(
+        matches!(
+            &result,
+            Err(KernelError::GuardDenied(reason))
+                if reason == "security-bound remote capabilities cannot be delegated"
+        ),
+        "the public evaluator must refuse the exactly bound delegation: {result:?}"
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert!(
