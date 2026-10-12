@@ -1416,7 +1416,8 @@ impl ChioKernel {
                             trusted_now_unix_ms,
                         )?;
                         let charge = BudgetChargeResult {
-                            cleanup_custody: authorized.cleanup_custody,
+                            // Approval attachment does not prove acquisition of the hold.
+                            cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody::Unknown,
                             grant_index: matching.index,
                             cost_charged: cost_units,
                             currency,
