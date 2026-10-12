@@ -13,15 +13,10 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
     second_grant.tool_name = "mutate-alt".into();
     second_grant.max_invocations = Some(1);
     let temp = tempfile::tempdir()?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    let mut directories = std::fs::DirBuilder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        directories.mode(0o700);
-    }
-    directories.create(&lock_root)?;
+    create_private_directory(&lock_root)?;
     chio_store_sqlite::SqliteAuthorityStore::provision(&database, &lock_root)?;
     let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
         &database,
@@ -56,12 +51,9 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
         max_invocations: 1,
         root_binding: None,
     });
-    first.capability =
-        CapabilityToken::sign(body, &keypair).expect("aggregate capability must sign");
+    first.capability = CapabilityToken::sign(body, &keypair)?;
 
-    let first_response = kernel
-        .evaluate_tool_call_blocking(&first)
-        .expect("first aggregate invocation");
+    let first_response = kernel.evaluate_tool_call_blocking(&first)?;
     assert_eq!(
         first_response.verdict,
         Verdict::Allow,
@@ -78,18 +70,13 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
     let mut second = first.clone();
     second.request_id = "aggregate-second".to_string();
     second.tool_name = "mutate-alt".to_string();
-    let second_response = kernel
-        .evaluate_tool_call_blocking(&second)
-        .expect("aggregate exhaustion must produce a signed denial");
+    let second_response = kernel.evaluate_tool_call_blocking(&second)?;
     assert_eq!(second_response.verdict, Verdict::Deny);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
-    let second_grant_usage = budget
-        .get_invocation_quota_usage(&chio_kernel::budget_store::BudgetQuotaKey::grant(
-            first.capability.id.clone(),
-            1,
-        ))
-        .expect("second grant quota lookup");
+    let second_grant_usage = budget.get_invocation_quota_usage(
+        &chio_kernel::budget_store::BudgetQuotaKey::grant(first.capability.id.clone(), 1),
+    )?;
     assert!(second_grant_usage.is_none());
     assert!(second_response.receipt.verify_signature()?);
     assert_eq!(
