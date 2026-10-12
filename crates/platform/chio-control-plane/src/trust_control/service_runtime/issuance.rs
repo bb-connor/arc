@@ -629,13 +629,17 @@ pub(crate) fn evaluate_federation_policy_request(
 
     if let Some(minimum_score) = record.minimum_reputation_score {
         let read_context = chio_kernel::ReceiptReadContext::admin_service();
-        let trusted_kernel_keys = trusted_kernel_keys_from_service_config(&state.config)
-            .map_err(|error| {
+        let trusted_kernel_keys = admitted_authority_signers(state)
+            .map_err(|response| {
                 CliError::cli_other_error(format!(
-                    "trust service authority material is configured but could not be loaded for federation admission: {error}"
+                    "federation reputation requires an admitted trust-control authority: {}",
+                    response_status_text(&response)
                 ))
             })?
-            .unwrap_or_default();
+            .trusted()
+            .iter()
+            .map(PublicKey::to_hex)
+            .collect::<Vec<_>>();
         let inspection = match state.receipt_store.as_deref() {
             Some(receipt_store) => crate::issuance::inspect_local_reputation_with_store(
                 &request.subject_key,

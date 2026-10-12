@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+
+## Federation reputation uses admitted verification keys (October 12 UTC)
+
+`FEDERATION-RAW-SIGNER` is repaired on `fix/federation-reputation-trust`.
+Original `3d58fded9a` rejected recovered-authority receipts, accepted displaced
+custody receipts, and accepted a reputation requirement without an authority.
+Repair `374dd2b820` selects the admitted public verification set. Rotation grace
+is preserved; retired and revoked keys are excluded. A policy without a
+reputation requirement retains its existing behavior.
+
+The [repair record](../superpowers/plans/2026-10-12-federation-reputation-trust.md)
+records the Original, 27 focused passes, strict control-plane Clippy and exact
+log hashes. Claude approved the current-trust contract. Source landing and
+hosted qualification remain distinct; historical scoring beyond retirement is
+separate work. All 2,029 original requirement objects are preserved.
+
 ## Final source wave through #1230 (October 12 UTC)
 
 The preserved control-plane wave is merged in [#1230](https://github.com/bb-connor/arc/pull/1230)
