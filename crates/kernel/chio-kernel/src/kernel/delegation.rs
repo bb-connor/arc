@@ -27,7 +27,9 @@
 use std::sync::Arc;
 
 use chio_core_types::capability::token::CapabilityToken;
-use chio_kernel_core::{RevocationSnapshot, RevocationView, RevocationViewSubject};
+use chio_kernel_core::{
+    RevocationSnapshot, RevocationSnapshotFreshnessError, RevocationView, RevocationViewSubject,
+};
 
 use crate::kernel::KernelError;
 use chio_security_types::clock::UnixMillis;
@@ -93,13 +95,12 @@ fn verify_snapshot_freshness(
     now_unix_ms: u64,
     max_staleness_ms: u64,
 ) -> Result<(), KernelError> {
-    let age_ms = now_unix_ms
-        .checked_sub(snapshot.issued_at_unix_ms)
-        .ok_or(KernelError::RevocationSnapshotFuture)?;
-    if age_ms > max_staleness_ms {
-        return Err(KernelError::RevocationSnapshotStale);
-    }
-    Ok(())
+    snapshot
+        .verify_freshness(now_unix_ms, max_staleness_ms)
+        .map_err(|error| match error {
+            RevocationSnapshotFreshnessError::Future => KernelError::RevocationSnapshotFuture,
+            RevocationSnapshotFreshnessError::Stale => KernelError::RevocationSnapshotStale,
+        })
 }
 
 #[cfg(test)]
@@ -202,6 +203,36 @@ mod tests {
     fn no_view_installed_returns_ok() {
         let token = build_token("cap-leaf", &["cap-root"]);
         assert!(consult_revocation_view(&token, None, UnixMillis::new(1_000)).is_ok());
+    }
+
+    #[test]
+    fn consultation_accepts_500_ms_and_denies_501_ms() {
+        let token = build_token("cap-leaf", &["cap-root"]);
+        let view = install_view_at(1, &[], NOW_MS - 500);
+
+        assert!(consult_revocation_view(&token, Some(&view), UnixMillis::new(NOW_MS)).is_ok());
+        assert!(matches!(
+            consult_revocation_view(&token, Some(&view), UnixMillis::new(NOW_MS + 1)),
+            Err(KernelError::RevocationSnapshotStale)
+        ));
+    }
+
+    #[test]
+    fn snapshot_freshness_maps_full_width_boundary_errors() {
+        let mut snapshot = RevocationSnapshot::empty();
+        snapshot.issued_at_unix_ms = u64::MAX;
+
+        assert!(verify_snapshot_freshness(&snapshot, u64::MAX, 0).is_ok());
+        assert!(matches!(
+            verify_snapshot_freshness(&snapshot, u64::MAX - 1, u64::MAX),
+            Err(KernelError::RevocationSnapshotFuture)
+        ));
+        snapshot.issued_at_unix_ms = 0;
+        assert!(verify_snapshot_freshness(&snapshot, u64::MAX, u64::MAX).is_ok());
+        assert!(matches!(
+            verify_snapshot_freshness(&snapshot, u64::MAX, u64::MAX - 1),
+            Err(KernelError::RevocationSnapshotStale)
+        ));
     }
 
     #[test]

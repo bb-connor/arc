@@ -307,6 +307,18 @@ lane = "pr"
 [[harness]]
 crate = "chio-kernel-core"
 features = ["kani"]
+harness = "verify_revocation_snapshot_timestamp_freshness"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+unwinding_checks = true
+require_cover = true
+primary_rust_symbol = "chio_kernel_core::revocation_view::RevocationSnapshot::verify_freshness"
+notes = "Production freshness over all three u64 inputs against independent u128 arithmetic, with one named joint witness from concrete boundary calls. No epoch installation or concurrent store proof."
+
+[[harness]]
+crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_inclusion_step_equivalence"
 default_unwind = 8
 timeout_secs = 1800

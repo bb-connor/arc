@@ -141,7 +141,8 @@ pub use receipts::{
 };
 #[cfg(feature = "revocation-view")]
 pub use revocation_view::{
-    RevocationSnapshot, RevocationView, RevocationViewError, RevocationViewSubject,
+    RevocationSnapshot, RevocationSnapshotFreshnessError, RevocationView, RevocationViewError,
+    RevocationViewSubject,
 };
 pub use rng::{NullRng, Rng};
 pub use scope::{MatchedGrant, ScopeMatchError};

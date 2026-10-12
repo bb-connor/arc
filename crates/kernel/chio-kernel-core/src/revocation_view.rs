@@ -115,7 +115,46 @@ impl RevocationSnapshot {
     pub fn is_revoked(&self, subject: &RevocationViewSubject) -> bool {
         self.revoked.contains(subject)
     }
+
+    /// Check the issue time against the verifier's current time and maximum age.
+    ///
+    /// Future issuance is refused before comparing the age. An age equal to the
+    /// maximum is accepted. The empty sentinel follows the same arithmetic;
+    /// this check does not add an epoch or signed-root policy.
+    pub fn verify_freshness(
+        &self,
+        now_unix_ms: u64,
+        max_staleness_ms: u64,
+    ) -> Result<(), RevocationSnapshotFreshnessError> {
+        let age_ms = now_unix_ms
+            .checked_sub(self.issued_at_unix_ms)
+            .ok_or(RevocationSnapshotFreshnessError::Future)?;
+        if age_ms > max_staleness_ms {
+            return Err(RevocationSnapshotFreshnessError::Stale);
+        }
+        Ok(())
+    }
 }
+
+/// Freshness refusals for a supplied revocation snapshot and verifier time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevocationSnapshotFreshnessError {
+    /// The snapshot was issued after the supplied current time.
+    Future,
+    /// The snapshot's age exceeds the supplied maximum staleness.
+    Stale,
+}
+
+impl core::fmt::Display for RevocationSnapshotFreshnessError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Future => f.write_str("revocation snapshot was issued in the future"),
+            Self::Stale => f.write_str("revocation snapshot exceeds maximum staleness"),
+        }
+    }
+}
+
+impl core::error::Error for RevocationSnapshotFreshnessError {}
 
 /// Errors surfaced by the revocation-view cache. Every variant is
 /// fail-closed: the embedding kernel MUST refuse to install a snapshot that
@@ -243,6 +282,102 @@ mod tests {
             root_hash: [(epoch as u8); 32],
             issued_at_unix_ms: 1_700_000_000_000 + epoch,
             revoked: revoked_set,
+        }
+    }
+
+    #[test]
+    fn snapshot_freshness_rejects_future_issuance_even_with_maximum_age() {
+        let mut snapshot = RevocationSnapshot::empty();
+        snapshot.issued_at_unix_ms = 1;
+
+        assert_eq!(
+            snapshot.verify_freshness(0, u64::MAX),
+            Err(RevocationSnapshotFreshnessError::Future)
+        );
+    }
+
+    #[test]
+    fn snapshot_freshness_accepts_the_age_limit_and_rejects_the_next_millisecond() {
+        let mut snapshot = RevocationSnapshot::empty();
+        snapshot.issued_at_unix_ms = 1_000;
+
+        assert_eq!(snapshot.verify_freshness(1_500, 500), Ok(()));
+        assert_eq!(
+            snapshot.verify_freshness(1_501, 500),
+            Err(RevocationSnapshotFreshnessError::Stale)
+        );
+    }
+
+    #[test]
+    fn snapshot_freshness_preserves_the_empty_sentinel_near_zero() {
+        let snapshot = RevocationSnapshot::empty();
+
+        assert_eq!(snapshot.verify_freshness(0, 0), Ok(()));
+        assert_eq!(snapshot.verify_freshness(500, 500), Ok(()));
+        assert_eq!(
+            snapshot.verify_freshness(501, 500),
+            Err(RevocationSnapshotFreshnessError::Stale)
+        );
+    }
+
+    #[test]
+    fn snapshot_freshness_preserves_full_width_time_boundaries() {
+        let cases = [
+            (0, u64::MAX, u64::MAX, Ok(())),
+            (
+                0,
+                u64::MAX,
+                u64::MAX - 1,
+                Err(RevocationSnapshotFreshnessError::Stale),
+            ),
+            (u64::MAX, u64::MAX, 0, Ok(())),
+            (
+                u64::MAX,
+                u64::MAX - 1,
+                u64::MAX,
+                Err(RevocationSnapshotFreshnessError::Future),
+            ),
+            (0, 1, 0, Err(RevocationSnapshotFreshnessError::Stale)),
+        ];
+
+        for (issued_at, now, maximum_age, expected) in cases {
+            let mut snapshot = RevocationSnapshot::empty();
+            snapshot.issued_at_unix_ms = issued_at;
+            assert_eq!(snapshot.verify_freshness(now, maximum_age), expected);
+        }
+    }
+
+    #[test]
+    fn install_if_newer_preserves_payload_and_previous_arc_at_maximum_epoch() {
+        let view = RevocationView::new();
+        let mut initial = snapshot(1, &["old"]);
+        initial.epoch = u64::MAX - 1;
+        initial.issued_at_unix_ms = u64::MAX;
+        view.install_if_newer(initial.clone()).unwrap();
+        let retained = view.load();
+
+        let mut candidate = snapshot(2, &["new"]);
+        candidate.epoch = u64::MAX;
+        candidate.issued_at_unix_ms = 0;
+        let previous = view.install_if_newer(candidate.clone()).unwrap();
+
+        assert!(Arc::ptr_eq(&previous, &retained));
+        assert_eq!(*retained, initial);
+        let installed = view.load();
+        assert_eq!(*installed, candidate);
+
+        for rejected_epoch in [u64::MAX, u64::MAX - 1, 0] {
+            let mut rejected = snapshot(3, &["rejected"]);
+            rejected.epoch = rejected_epoch;
+            assert_eq!(
+                view.install_if_newer(rejected).unwrap_err(),
+                RevocationViewError::NonMonotoneEpoch {
+                    candidate: rejected_epoch,
+                    installed: u64::MAX,
+                }
+            );
+            assert!(Arc::ptr_eq(&view.load(), &installed));
+            assert_eq!(*retained, initial);
         }
     }
 

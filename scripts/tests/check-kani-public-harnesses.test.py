@@ -166,6 +166,43 @@ def test_attest_profile_is_standalone() -> None:
         )
 
 
+def test_freshness_is_checked_reachable() -> None:
+    name = "verify_revocation_snapshot_timestamp_freshness"
+    enrolled = [
+        row
+        for row in tomllib.loads(MULTI_MANIFEST.read_text())["harness"]
+        if row["crate"] == "chio-kernel-core" and row["harness"] == name
+    ]
+    if len(enrolled) != 1:
+        raise AssertionError("production snapshot freshness is not enrolled exactly once")
+    for field, public_field, message in (
+        (
+            "unwinding_checks",
+            "unwinding_checks",
+            "proof must enable unwinding checks",
+        ),
+        (
+            "require_cover",
+            "cover_required",
+            "proof must require a reachable witness",
+        ),
+    ):
+        with tempfile.TemporaryDirectory(prefix="chio-kani-freshness-") as raw:
+            source, multi, public, trusts = copied_fixture(Path(raw))
+            document = tomllib.loads(multi.read_text())
+            row = next(row for row in document["harness"] if row["harness"] == name)
+            row[field] = False
+            write_toml(multi, document)
+            public_document = tomllib.loads(public.read_text())
+            public_document[public_field].remove(name)
+            write_toml(public, public_document)
+            require_failure(
+                invoke(source, multi, public, trust_sources=trusts),
+                f"coordinated freshness {field} downgrade",
+                message,
+            )
+
+
 def main() -> int:
     baseline = invoke(
         SOURCE, MULTI_MANIFEST, PUBLIC_MANIFEST, trust_sources=TRUST_SOURCES
@@ -178,6 +215,7 @@ def main() -> int:
         )
 
     test_attest_profile_is_standalone()
+    test_freshness_is_checked_reachable()
 
     with tempfile.TemporaryDirectory(prefix="chio-kani-public-harnesses-") as raw:
         work = Path(raw)
