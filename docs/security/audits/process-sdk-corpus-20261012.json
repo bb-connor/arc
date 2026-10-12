@@ -2,7 +2,7 @@
   "schema": "chio.process-sdk-corpus.qualification.v1",
   "base": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
   "rust_candidate": "6c357bf64cb162e6b9ead6093a4e84f453b9379d",
-  "status": "private-local-qualification; qualification-delta review pending",
+  "status": "private-local-qualification-and-independent-source-review-complete",
   "producer_integration": [
     {
       "producer": "78326bfd3c461d87905b578840cf55b0f6f10e1d",
@@ -80,10 +80,10 @@
       "Document invalid_argument fixture mapping to client exceptions.",
       "Narrow prepareInvocation return declaration.",
       "Convert Python request-side RecursionError."
-    ]
+    ],
+    "qualification_delta": "Claude APPROVE 6c357..9ba85d9be4; P2-1 and CORPUS-SKIP closed. No additional P0/P1/P2. Mailbox records exact source and scoped evidence."
   },
   "remaining_acceptance": [
-    "Independent review of qualification-only delta.",
     "Rebase onto actual main after current two-PR landing queue advances; no third PR created.",
     "Exact future-head hosted qualification.",
     "Full native installed starter/recovery qualification on this future candidate; installed behavioral checks alone are not that evidence."
@@ -92,5 +92,6 @@
     "No production Rust changes after qualified 6c357 inputs.",
     "No manual formal engines, authority rotation, repository-variable changes or ratchet waiver.",
     "Not published, merged, or operationally accepted."
-  ]
+  ],
+  "qualification_candidate": "9ba85d9be4f8b6fbb9ca3f0df2c75f8e341d9e1d"
 }

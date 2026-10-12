@@ -72,9 +72,9 @@ and the existing corpus's unknown-intent-member case.
 
 - [x] Check formatting and schema compatibility, inspect exact source deltas,
   and record producer-to-integration identities and evidence hashes.
-- [ ] Obtain Claude's independent whole-composition review, address concrete
+- [x] Obtain Claude's independent whole-composition review, address concrete
   findings, and record remaining native/hosted acceptance separately.
-- [ ] Update the coordination board with the private candidate. Do not open a
+- [x] Update the coordination board with the private candidate. Do not open a
   third PR or publish this branch before the current two-PR queue advances.
 
 ## Rulings
