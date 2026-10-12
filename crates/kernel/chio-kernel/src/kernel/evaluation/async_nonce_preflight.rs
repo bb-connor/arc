@@ -3,6 +3,7 @@
 use super::evaluation_helpers::{ExecutionNonceReservingResponse, PreDispatchCleanupDeny};
 use super::*;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 use crate::kernel::responses::PreflightNonceSource;
 use crate::kernel::validation::ReservedPrepaymentFailure;
 
@@ -326,6 +327,7 @@ impl ChioKernel {
                     metadata,
                     credential_disposition,
                 );
+                let metadata = with_identity_disposition(metadata, IdentityDisposition::Retained);
                 return self.with_pre_invocation_guard_evidence(
                     pre_invocation_guard_evidence,
                     || {
