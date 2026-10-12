@@ -24,6 +24,7 @@ use std::sync::Arc;
 
 use chio_kernel::{ChioKernel, KernelError};
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 use crate::routes::{
     EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH,
@@ -190,10 +191,14 @@ impl EmergencyAdmin {
             return Err(EmergencyHandlerError::Unauthorized);
         }
         match admin_token {
-            Some(token) if token == self.expected_admin_token => Ok(()),
+            Some(token) if admin_token_matches(token, &self.expected_admin_token) => Ok(()),
             _ => Err(EmergencyHandlerError::Unauthorized),
         }
     }
+}
+
+fn admin_token_matches(presented: &str, expected: &str) -> bool {
+    presented.as_bytes().ct_eq(expected.as_bytes()).into()
 }
 
 fn admin_token_usable(token: &str) -> bool {
