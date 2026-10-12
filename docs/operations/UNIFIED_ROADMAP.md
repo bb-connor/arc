@@ -1,6 +1,6 @@
 # Chio unified roadmap
 
-**Status:** design approved by the owner on 2026-10-08, section by section. Decisions D1 to D7 were recorded on 2026-10-09 (section 8). The Computer lane (COMP) and decisions D21 to D23 were added on 2026-10-09. Nothing in this document starts work. Execution begins only on an explicit start.
+**Status:** design approved by the owner on 2026-10-08, section by section. Decisions D1 to D7 were recorded on 2026-10-09 (section 8). The Computer lane (COMP) and decisions D21 to D23 were added on 2026-10-09. Re-grounded on 2026-10-12 against main `b6ad31043`, after #1160 and the landings that followed it (sections 2 and 13). Nothing in this document starts work. Execution begins only on an explicit start.
 
 **Chio is a Rust kernel for agentic operating systems that coordinate work, share resources, and cooperate across organizational boundaries.**
 
@@ -25,19 +25,19 @@ This roadmap works backwards from one result: outside teams running Chio under t
 - the public plugin repositories;
 - package registries and the public installer.
 
-| Ref | Pin |
-| --- | --- |
-| main | `002b4d14e` |
-| #1160 | `fd8bfdc94` |
-| #1173 | `cafdc970e` |
-| #1174 | `8dffff3da` |
-| #1177 | `620c703d8` |
-| #1179 | `491bd01b5` (research); head moved to `f217de1fb` later on 2026-10-08, and the #1179 schema and conflict figures below were re-checked there on 2026-10-09 |
-| #1172 | `de84fc306` |
-| #1170 | `666274bae` |
-| #1171 | `ad9df87a5` |
+| Ref | Research pin (2026-10-08) | State on 2026-10-12 |
+| --- | --- | --- |
+| main | `002b4d14e` | `b6ad31043` |
+| #1160 | `fd8bfdc94` | Squash-merged as `28d826e3e` from reviewed head `29327c5d7` |
+| #1173 | `cafdc970e` | Open, same head |
+| #1174 | `8dffff3da` | Squash-merged as `7b293ab37` |
+| #1177 | `620c703d8` | Merged as `3af65d2d2` (merge commit, 2026-10-09) |
+| #1179 | `491bd01b5` (research); head moved to `f217de1fb` later on 2026-10-08, and the #1179 schema figures below were re-checked there on 2026-10-09 | Open, head `4b9229dca`, no longer a draft |
+| #1172 | `de84fc306` | Open, same head |
+| #1170 | `666274bae` | Squash-merged as `344a9bc58` |
+| #1171 | `ad9df87a5` | Merged as `3e5f45307` (merge commit, 2026-10-09) |
 
-Every line citation in this file must be re-verified after #1160 merges (section 13).
+The KDEF rows this document cites, the schema version and section 2 were re-verified against main `b6ad31043` on 2026-10-12 (section 13). Other line citations still carry their research pin.
 
 **Rules.**
 
@@ -101,13 +101,14 @@ A run qualifies only if all of the following hold.
 
 | Program | PRs | State | What blocks it |
 | --- | --- | --- | --- |
-| Security and process foundation | #1160 | Mergeable and blocked. On head `fd8bfdc94`, two of the four required checks failed (build/lint/test and MSRV); cargo-vet and cargo-deny passed. KDEF-GT1 (one whole hosted CI run passes) is therefore not met. It merges into main without conflicts. | The failing required checks; review-thread dispositions. It must land as a **merge commit**. |
-| Recovery | #1172 (architecture and lab), #1179 (runtime, draft) | #1172 merges onto #1160 with 0 conflicts. #1179 is not qualified, and its P1s are open (including `NATIVE-FUNDING-AVAILABILITY-01` and the command-pool P1). | At head `f217de1fb`, #1179 has 280 conflicted paths with #1160 (273 content, 5 modify/delete, 2 add/add; 159 of them generated SDK files) and 265 with #1173. It sits on #1160's old startup sweep. It declares admission schema v35 to v40 on a v34 base and checks for v41 in code, while #1160 already uses v35 and v36; it takes its slots through the ledger lock (G0.2). |
-| Verifiable work | #1173 (contains #1161, #1159; supersedes #1158; carries #1162's code) | Dynamic delegation, swarm evolution, the A2A v1 edge, execution evidence and unknown-payment release are qualified locally on one host. **WORK-W1 to WORK-W4 have no code.** | 113 conflicted paths with #1160; schema collisions |
-| Kernel program | #1174 (docs) | Proposed, revision 4: eleven specs plus a defect register (KDEF-D1 to D12, N1 to N30) | Its baseline: #1160, #1172, #1173, #1179 |
-| Strategy | #1170 (docs) | Every founder decision STRAT-F1 to F17 is open. | F-1 publication split; ADR-0023 and ADR-0028 scoping |
-| Native host program | #1177 (docs; #1178 folded in) | ADR-0038 is accepted for planning. NORTH-STAR-FLOWS (HOST-M1 to M3) was approved 2026-10-08. The restructure and M1 plans are written but not executed. | Server-first re-cut (section 4) |
-| Protocol draft | #1171 | IETF -00 draft, not yet posted | Decision U8; 1 conflict |
+| Security and process foundation | #1160 | **On main.** Landed on 2026-10-11 as squash commit `28d826e3e` from reviewed head `29327c5d7`; the two trees are identical (`9000ce6bb`), and the reviewed head is kept on `archive/pr1160-reviewed-29327c5d7c`. It merged on the owner's instruction to bypass required CI: cargo-vet and cargo-deny were green, while build/lint/test and MSRV were still incomplete. The landing ledger records the state `merged-qualification-incomplete` (`docs/security/audits/foundation-postmerge-20261011.json`) and infers no requirement closure from the merge. KDEF-GT1 (one whole hosted CI run passes) is not met. The follow-up landings #1201 to #1232 repaired residual findings, CI and the ledger (G0.1). | Its post-merge, pre-release obligations (Lane REL) |
+| Recovery | #1172 (architecture and lab), #1179 (runtime) | Both open. #1179 is no longer a draft (head `4b9229dca`, based on #1172's branch), is not qualified, and its P1s are open (including `NATIVE-FUNDING-AVAILABILITY-01` and the command-pool P1). | Both were cut from pre-squash #1160 history that main does not contain. Merged directly onto main `b6ad31043`, #1172 conflicts on 1,572 paths (1,140 add/add) and #1179 on 1,673 (1,195 add/add), so both must be rebased onto main rather than merged. #1179 sits on #1160's old startup sweep. It declares admission schema v35 to v40 on a v34 base and checks for v41 in code, while main is at v37; it takes its slots through the ledger lock (G0.2). |
+| Verifiable work | #1173 (contains #1161, #1159; supersedes #1158; carries #1162's code) | Dynamic delegation, swarm evolution, the A2A v1 edge, execution evidence and unknown-payment release are qualified locally on one host. **WORK-W1 to WORK-W4 have no code.** | Also cut from pre-squash #1160 history: 1,357 conflicted paths against main (877 add/add); schema collisions |
+| Kernel program | #1174 (docs) | **On main** (2026-10-12, `7b293ab37`), revision 4: eleven specs plus the defect register (KDEF-D1 to D12, N1 to N30) in `docs/superpowers/specs/2026-10-04-ftl-lessons-program-design.md` section 3. Its north-star research document now carries the historical banner. | Its baseline still names #1172, #1173 and #1179, which are open |
+| Strategy | #1170 (docs) | **On main** (2026-10-12, `344a9bc58`). Every founder decision STRAT-F1 to F17 is open. F-17's Clawdstrike portfolio-boundary framing is still in `docs/research/nvidia/README.md` and `06-strategy-and-roadmap.md` (U2). | F-1 publication split; ADR-0023 and ADR-0028 scoping |
+| Native host program | #1177 (docs; #1178 folded in) | **On main** (2026-10-09, merge commit `3af65d2d2`). ADR-0038 is accepted for planning. NORTH-STAR-FLOWS (HOST-M1 to M3) is approved. The macOS Clawdstrike review is a prior-art note. The restructure and M1 plans are written but not executed. | Server-first re-cut (section 4) |
+| Protocol draft | #1171 | **On main** (2026-10-09, merge commit `3e5f45307`). The IETF -00 is not yet posted. | Decision U8 |
+| Computer | #1200 (roadmap amendment), #1199 (design) | **On main** (2026-10-12): #1200 as squash `d9ecdfe2d`, then #1199 as `ee0f29134`. #1216 re-pinned #1199's source evidence from the #1200 branch head to `d9ecdfe2d`. | Lane COMP |
 | Workbench | #1164 (draft) | Never built or tested since it was written; 12 findings open | Closes (section 7) |
 
 **Distribution today.** No outside team can install a current Chio.
@@ -119,7 +120,19 @@ A run qualifies only if all of the following hold.
 - **Stray tags:** `v3.20.0-trj4`, `v3.18.1-trj3.1` and `v0.0.0-m03-probe` sit beside `v0.1.0` on the development repo.
 - **Plugins and bridge:** the harness plugins and `chio-bridge` are unpublished.
 
-**Merged since the previous draft:** #1194 (lane-test CI). Already on main: #1025 (cognition market design) and #966 (four-direction roadmap, including the governed x402 rail).
+**Merged since the previous draft:**
+
+- 2026-10-09: #1196 (this document), #1171, #1177.
+- 2026-10-11: #1160.
+- 2026-10-12, programs and documents: #1174, #1170, #1200, #1199, #1197 (agent swarm design), #1056 (mirror sync script, REL-1), #1203 to #1206 (crate documentation).
+- 2026-10-12, follow-ups to #1160:
+  - CI: #1201, #1209, #1213, #1222, #1223, #1224;
+  - landing ledger and auditor, including the squash landing model: #1202, #1225, #1231, #1232;
+  - security, kernel and store fixes: #1207, #1208, #1210, #1211, #1212, #1214, #1215, #1217 to #1221, #1226 to #1230. #1215 raised the admission schema to v37; #1221 carries #1046's MCP `nextCursor` fix.
+
+Earlier: #1194 (lane-test CI), #1025 (cognition market design) and #966 (four-direction roadmap, including the governed x402 rail).
+
+No CI or Release Qualification run on main has completed since #1160 landed; every run for the 2026-10-12 landings was still queued when this was re-grounded.
 
 ## 3. Gate 0: foundation and frozen contracts
 
@@ -127,13 +140,18 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 ### G0.1 Land #1160
 
-- Merge as a **merge commit**. The landing ledger binds evidence to exact source identity, and squash or rebase would break that binding.
-- Before merging (the merge requirements in #1160's `foundation-landing-boundary-20261008.json`):
-  - pass the four required checks on the exact candidate;
-  - record dispositions for every review thread.
-- After merging:
-  - record `main_ancestry_verified`;
-  - close #1136, whose patch #1160 contains.
+**Done, on 2026-10-11, by a different route than planned.** This step prescribed a merge commit, because the landing ledger binds evidence to exact source identity. #1160 landed instead as squash commit `28d826e3e`, with sole parent `2b1d467e1`.
+
+- **Source identity.** The squash tree equals the reviewed head's tree (`29327c5d7`, tree `9000ce6bb`). The reviewed head stays reachable on `archive/pr1160-reviewed-29327c5d7c`.
+- **Squash landing model.** #1202 taught the post-merge auditor this model (`docs/security/audits/landing-auditor-repair-20261012.json`), and #1232 reconciled the ledger. A one-parent landing passes only if:
+  - its sole parent is the qualified base;
+  - its tree equals both the reviewed head's tree and the qualified tree;
+  - the reviewed head is strictly ahead of that base.
+
+  Two-parent merges keep their ordered-parent check. All CI, App-authority and attribution requirements are unchanged.
+- **`main_ancestry_verified`.** Main does not contain the reviewed commit, so ancestry cannot be recorded. The landing-event record (`foundation-postmerge-20261011.json`) carries tree equality to the reviewed head (`identical_source_and_merge_tree`) instead. Per-requirement `main_ancestry_verified` values in the ledger stay `false`, and no requirement closure is inferred from the squash.
+- **Merge requirements not met at merge.** #1160's `foundation-landing-boundary-20261008.json` required the four required checks to pass on the exact candidate. They had not: build/lint/test and MSRV were incomplete when the owner instructed the merge. The ledger records `merged-qualification-incomplete` for #1160, and #1201 also landed unqualified. Neither is relabelled verified.
+- #1136 was closed on 2026-10-12 as superseded; main carries its `chio-sqlite-file-identity` fix through #1160.
 
 **#1160's post-merge, pre-release obligations** are scheduled in Lane REL, not left open:
 
@@ -160,7 +178,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
   - **Process ABI v3.** There are two incompatible v3s (#1160 and #1179), so their union is v4 (CT-ABI).
   - **Dead v41 check.** #1179 requires v41 in code (`original_owner.rs`) while declaring v40.
   - **Unreserved bumps.** The planned bumps for KSPEC-08 phase 1, WORK-W1.2, KSPEC-10 and KSPEC-11 are allocated through the same lock.
-- **One merge queue.** Merge commits are used wherever evidence is bound to source.
+- **One merge queue.** Where evidence is bound to source, a landing is either a merge commit or a squash whose tree equals the reviewed head's tree under the auditor's squash model (G0.1). Evidence pinned to a branch head is re-pinned to the squash commit, as #1216 did for #1199.
 - **ID prefixes and crosswalk:** section 12.
 
 ### G0.3 Contracts
@@ -203,7 +221,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 **Gate 0 exit evidence:**
 
-- #1160 is on main;
+- #1160 is on main (done on 2026-10-11, G0.1);
 - every contract is merged with schemas and vectors;
 - the ledger lock is live;
 - decisions D1 to D7 are recorded (done on 2026-10-09, section 8).
@@ -339,7 +357,7 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - KSPEC-08 phase 0 (AC6).
   - KSPEC-08 phase 1 (KDEF-D2, N22, N23): a durable, restart-safe stop with an allocated schema slot.
   - The stop is reachable from the process-host socket and the CLI.
-  - Today the emergency stop is a process-local flag, its routes are unmounted, and its token comparison is not constant-time.
+  - Today (main `b6ad31043`) the emergency stop is a process-local flag, its routes are unmounted, and its token comparison is not constant-time (KDEF-D2, N22, N23; section 13).
   - **Exit:** one hosted run stops the kernel through a mounted route, restarts into a stopped state that still denies, and resumes; the process-host socket and the CLI reach the same stop, and the admin token is compared in constant time.
 - **KERN-2: exactly one terminal receipt per executed call.**
   - KSPEC-03 phase 1 (KDEF-D1, N2, N28, N29), together with the M20 identity-disposition delta.
@@ -355,8 +373,8 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - COMP-3 requires both KERN-3a and KERN-3b. Sealed permits remain outstanding until their native disposition is known; closing issuance does not cancel them or refund their exposure.
   - **Exit:** the phase-3 conformance cases pass, including retained-capacity accounting. Race graph extension, continuation consumption and WORK-D1 issuance against their canonical fences, then restart/migrate: a winning admission stays in closure membership, a losing admission commits nothing, fence generations survive, and sealed outstanding work remains accounted for until its required native disposition is known. COMP-3 consumes this evidence in its composed join cases; KERN-3b qualification does not depend on Computer.
 - **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26), because doors serve over `chio mcp serve-http`.
-  - KDEF-N30 is already fixed on #1160: the GET stream subscribes before it snapshots the replay window.
-  - KDEF-D3 changed shape on #1160: a lagged consumer now closes the session and reports an uncertain effect instead of hanging. Part A re-checks it against that behaviour.
+  - KDEF-N30 is fixed on main by #1160 (`28d826e3e`): the GET stream subscribes before it snapshots the replay window.
+  - KDEF-D3 changed shape on main: a lagged consumer, POST or initialize, now closes the session and reports an uncertain effect instead of hanging. What remains is the per-session POST lock: an SSE stream holds it until a terminal response, so an upstream that never answers still blocks later POSTs, with no request timeout. Part A re-checks D3 against that behaviour.
   - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: responses route without loss on live streams and eligible retries replay by request identity without redispatching the effect (with KSPEC-05 section 4.6's disconnect exceptions), a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
   - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.
@@ -443,7 +461,8 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Retarget `release-tagged.yml`, which checks out `project/roadmap-04-25-2026`, a branch section 7 archives.
   - Signed binaries for Linux x86_64 and arm64 and macOS arm64.
   - A container image with the dashboard embedded. Today the dashboard is in no release artifact.
-  - Fix `CHANGELOG.md` and the install docs, and sync the distribution mirror.
+  - Carry #1046's workspace dependency versions so that `cargo package` works; #1046 closed without them (section 7).
+  - Fix `CHANGELOG.md` and the install docs, and sync the distribution mirror with `scripts/mirror-to-chio.sh` (#1056).
   - Mark v0.1.0 superseded and resolve crates.io (decision D10), the npm and PyPI 0.1.0 packages, and the stray tags (section 2).
   - Publish the format-stability note.
   - **Exit:** a signed `0.2.0-alpha.N` tag whose commit has Release Qualification green; the published installer verifies and installs it on Linux x86_64 and arm64 and macOS arm64; the distribution mirror carries the tag; the GitHub release is a prerelease, not Latest.
@@ -640,15 +659,15 @@ G2 and G3 run in parallel with the WORK, REC, COOP-3 and KERN-4 branches, but G4
 
 ## 6. Start now
 
-None of these depend on #1160.
+None of these depended on #1160, which is now on main. Status is as of main `b6ad31043`.
 
 | # | Action |
 | --- | --- |
 | U1 | **STRAT-F1:** decide which #1170 documents stay public. |
-| U2 | **Void STRAT-F17** and remove Clawdstrike-as-peer framing from #1170 and #1177. Rewrite `research/clawdstrike.md` in #1177 as a prior-art note: Tetragon and Hubble observation on Linux, Endpoint Security and Network Extension on macOS. |
+| U2 | **Void STRAT-F17** and remove Clawdstrike-as-peer framing. #1177's part is done: its macOS Clawdstrike review landed as a prior-art note (`docs/superpowers/specs/2026-10-07-macos-integration/research/clawdstrike.md`). #1170 merged without it, so F-17's portfolio-boundary row is still in `docs/research/nvidia/README.md` and `06-strategy-and-roadmap.md` on main. |
 | U3 | **Positioning PR** (section 9). It covers every stale surface on main. |
-| U4 | **KDEF-N23:** constant-time comparison of the admin token (`crates/platform/chio-http-core/src/emergency.rs`, the `token == self.expected_admin_token` match arm), plus the AC6 stop-scope document. |
-| U5 | **x402 fails open.** `X402AuthorizeResponse.settled` defaults to `true` when the field is absent (`crates/kernel/chio-kernel/src/payment.rs`, `default_true`). Default to not settled, failing closed. |
+| U4 | **In progress.** **KDEF-N23:** constant-time comparison of the admin token (`crates/platform/chio-http-core/src/emergency.rs:193`, the `token == self.expected_admin_token` match arm, still present on main), plus the AC6 stop-scope document. |
+| U5 | **In progress.** **x402 fails open.** `X402AuthorizeResponse.settled` defaults to `true` when the field is absent (`crates/kernel/chio-kernel/src/payment.rs:496`, `default_true` at `:958`, still present on main). Default to not settled, failing closed. |
 | U6 | **`backbay-labs/chio-bridge#3`:** `approval-decide` does not check the recorded decision or the approval ID. The scope is that utility; the gateway resume path honours the signed decision. |
 | U7 | **Recruiting:** a named owner, trial terms and legal groundwork. |
 | U8 | **IETF -00:** decide whether to submit by the cutoff (section 10). If it is submitted, fix or flag the single-key multi-hop rule first: step 7 of the draft's Delegated Issuance section (the delegation policy's signer must be a key the issuing authority itself trusts), read with the one-link limit in its Chain Binding section. |
@@ -663,8 +682,8 @@ None of these depend on #1160.
 - 27 on #956;
 - 15 on #1159;
 - 12 on #1164;
-- 5 on #1171;
-- 2 on #1046;
+- 5 on #1171 (merged on 2026-10-09);
+- 2 on #1046 (closed on 2026-10-12; one carried, one not, see its row);
 - 2 on #1172;
 - 1 on #1073;
 - 1 on #1158;
@@ -673,25 +692,26 @@ None of these depend on #1160.
 
 | PR | Disposition |
 | --- | --- |
-| #1160 | Land at Gate 0 as a merge commit. |
-| #1196 | This document. |
-| #1172 | Land after #1160 (Lane REC). |
+| #1160 | **Merged** on 2026-10-11 as squash `28d826e3e`, tree-equal to reviewed head `29327c5d7`, with qualification recorded as incomplete (G0.1). |
+| #1196 | **Merged** on 2026-10-09 (`fe62a6b39`). This document. |
+| #1172 | Rebase onto main, then land (Lane REC). It was cut from pre-squash #1160 history, so it no longer merges cleanly (section 2). |
 | #1173 | Split by path into slices α, β, γ, c, d and δ; re-derive or drop ε and ζ. Close when the slices land. Before closing, tag the paper's pinned source commits (`71e5cbc3b`, `7755d3762`, `611660eb2`), which main does not contain and only unmerged branches reach; otherwise `paper-artifact-check` loses them when those branches go. |
-| #1179 | Stays a draft until it is re-scoped and rebased (Lane REC). |
-| #1174 | Merge this PR as the KSPEC program (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Fix its north-star research document on the PR branch first; it still carries a superseded north star and the retired tagline. |
-| #1177 | Merge this PR after the restructure and the server-first HOST-M1 re-cut (owner decision 2026-10-09: it lands by merging the PR, not by importing its documents elsewhere). Mark NORTH-STAR-FLOWS approved. Apply the ADR-0038 amendment. Rewrite the Clawdstrike material as prior art (U2). Move macOS HOST-M2 after the test. HOST-M1 code no longer waits on the docs restructure. |
-| #1170 | Split private material per U1. Void F-17. Scope ADR-0023 to ADR-0038 (thin OS adapters allowed; broker, cage and launchers not frozen). Scope ADR-0028 to "where an IdP exists". Replace the review criterion with section 1. Drop the capacity model. Merge the public remainder. |
-| #1171 | Rebase and merge this PR (owner decision 2026-10-09: it lands by merging the PR, not by importing the draft elsewhere). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
+| #1179 | No longer marked draft, but not ready to land until it is re-scoped and rebased onto main (Lane REC). |
+| #1174 | **Merged** on 2026-10-12 (`7b293ab37`) as the KSPEC program, by merging the PR (owner decision 2026-10-09). Its north-star research document carries a historical banner pointing to the approved north star. |
+| #1177 | **Merged** on 2026-10-09 (`3af65d2d2`) by merging the PR (owner decision 2026-10-09), before the restructure and the server-first HOST-M1 re-cut. NORTH-STAR-FLOWS is marked approved, ADR-0038 carries its 2026-10-08 amendment, and the macOS Clawdstrike review is a prior-art note (U2). The restructure, the HOST-M1 re-cut and moving macOS HOST-M2 after the test are follow-ups on main. HOST-M1 code does not wait on the docs restructure. |
+| #1170 | **Merged** on 2026-10-12 (`344a9bc58`). F-17 was not voided before the merge (U2). The other steps now apply to the merged documents on main: split private material per U1; scope ADR-0023 to ADR-0038 (thin OS adapters allowed; broker, cage and launchers not frozen); scope ADR-0028 to "where an IdP exists"; replace the review criterion with section 1; drop the capacity model. |
+| #1171 | **Merged** on 2026-10-09 (`3e5f45307`) by merging the PR (owner decision 2026-10-09). Submit the -00 if U8 says so. Federation material goes to companion drafts later. |
 | #1164 | Close. Salvage its MCP adoption, activation and preview-distribution machinery into Lane REL, and its worktree and patch-review machinery into COMP-2. |
-| #1200 | This amendment. Merge it with a merge commit, before #1199. Preserve the exact #1200 commit recorded in #1199's `research/source-evidence.json` as a reachable ancestor of main. If another merge strategy is used, re-pin and revalidate #1199's evidence against the resulting main before it lands. |
-| #1199 | Land revision 5 as the Computer design (Lane COMP; D21 to D23), with explicit Computer-0 prerequisites and acceptance profiles. Merge it after #1200. A merge commit preserves the pinned ancestor without a further re-pin; re-pin and revalidate if the merge strategy or intended evidence baseline changes. |
-| #1197 | Internal development tooling. COMP-6 runs its lanes on Computer after COMP-2 and COMP-3. |
+| #1200 | **Merged** on 2026-10-12 as squash `d9ecdfe2d`, before #1199. Because it was squashed, #1216 re-pinned #1199's `research/source-evidence.json` and crosswalk from the #1200 branch head to `d9ecdfe2d` and regenerated `validation.json` with no errors. |
+| #1199 | **Merged** on 2026-10-12 (`ee0f29134`), after #1200, as the Computer design (Lane COMP; D21 to D23), with explicit Computer-0 prerequisites and acceptance profiles. Its evidence is pinned to the #1200 squash commit (#1216). |
+| #1197 | **Merged** on 2026-10-12 (`17c6a4bc4`). Internal development tooling. COMP-6 runs its lanes on Computer after COMP-2 and COMP-3. |
 | #1161, #1159, #1158 | Close as contained in #1173. #1161's peer transport is example-only and does not satisfy STRAT-F15. |
 | #1162 | Archive its evidence and `examples/repair-machine-proof`, then close. Its outcome-continuation code, carried in #1173, needs a slice or a drop (D19). |
 | #1163 | Decide whether the paper's bilateral-admission benchmark must be regenerated, then close. |
-| #1136 | Close after #1160 (patch contained). |
-| #1046 | **Salvage into REL-1.** Its workspace dependency versions make `cargo package` work. |
-| #1056 | **Salvage into REL-1** as the distribution mirror sync. |
+| #1136 | **Closed** on 2026-10-12 as superseded: main carries its `chio-sqlite-file-identity` fix through #1160. |
+| #1046 | **Closed** on 2026-10-12. Its MCP `nextCursor` fix landed separately as #1221. Its empty-roots allowlist change was deliberately not carried, because main fails closed. **Its workspace dependency versions, which make `cargo package` work, were not carried:** workspace packaging stays `publish = false`, and that salvage remains open in REL-1. |
+| #1056 | **Merged** on 2026-10-12 (`cecea4ccf`) as `scripts/mirror-to-chio.sh`, the distribution mirror sync REL-1 uses. |
+| #1201 to #1232 | **Merged** on 2026-10-12 as follow-ups to #1160: CI, the landing ledger and auditor, security, kernel and store fixes, and crate documentation (section 2). |
 | #1155 | **Salvage into REL-1** as the preview install path. |
 | #1073 | **Salvage into REL-1** (release qualification budget). |
 | #1043 | Owner review: archive or close. |
@@ -742,7 +762,7 @@ None of these depend on #1160.
 - accept ADR-0016;
 - ADR-0035 at full scope.
 
-ADR-0023, ADR-0028, ADR-0035 and ADR-0036 are candidate numbers inside #1170's strategy documents; none of those files exists yet. ADR-0038 arrives with #1177. On main the ADRs run to ADR-0022, and main's ADR-0018 (Radicle carrier) is the number that #1029 and `research/genesis-program` collide with.
+ADR-0023, ADR-0028, ADR-0035 and ADR-0036 are candidate numbers inside #1170's strategy documents; none of those files exists yet. ADR-0038 is on main with #1177. Otherwise the ADRs on main run to ADR-0022, and main's ADR-0018 (Radicle carrier) is the number that #1029 and `research/genesis-program` collide with.
 
 ## 9. Positioning
 
@@ -768,7 +788,7 @@ Platform and vendor audiences, channels and messaging are in the private GTM pla
 
 **Stale surfaces on main to fix (U3):**
 
-- **README.md** (line numbers are against main `002b4d14e`; #1160 shifts them, so U3 matches on the text):
+- **README.md** (line numbers are against main `002b4d14e`; #1160 shifted them, so U3 matches on the text):
   - line 16: "The kernel your agents answer to";
   - line 22 and `docs/assets/subhead.svg` / `subhead-mobile.svg`: "Agents that pay each other" and the unscoped "every call";
   - lines 78 and 156: "pay each other";
@@ -854,17 +874,43 @@ Dates are calendar dates only; a bare "Q2" is never used.
 
 ## 13. Re-grounding after #1160 merges
 
-- **Re-verify every KDEF row against post-merge main.** `chio-kernel/src` changed in 162 files since #1174's pin. KDEF-D1's site changed shape. KDEF-D6 only drifted lines (`kernel/mod.rs:882` to `:901`). KDEF-N30 is fixed and KDEF-D3 changed shape (KERN-4).
-- **#1177:** its PROGRAM-MAP foundation pin becomes main. "In F" becomes "main (experimental; broker Linux-only)". `chio-ipc` mailboxes become `crates/kernel/chio-process/src/mailboxes`.
-- **#1174:** its pin becomes main, and the acceptance statistics are recomputed from the ledger. KSPEC-08 section 2 is already stale on three facts:
-  - the admission schema version is 36 on #1160, not 34;
+#1160 merged on 2026-10-11 (G0.1). The items below were re-checked on 2026-10-12 against main `b6ad31043` by reading current source; nothing was built.
+
+- **KDEF rows this document cites.** The register is section 3 of `docs/superpowers/specs/2026-10-04-ftl-lessons-program-design.md`, on main since #1174. Its "M:" citations predate #1160. Paths below are relative to `crates/kernel/chio-kernel/src` unless they name a crate.
+
+  | Row | Verdict on `b6ad31043` | Where it is now |
+  | --- | --- | --- |
+  | D1 | Still present; moved | The non-durable disarm moved to `kernel/evaluation/return_recording.rs:55-57`, called from `async_evaluation_core.rs:1929`. The receipt is built, signed and appended afterwards (`:1980`), and `:1970` can return before it. Nested: `nested_flow_evaluation.rs:1722`, `:1773`. Durability gate: `admission_operation/identity.rs:384-391`. |
+  | D2 | Still present | Stop state is in-memory atomics (`kernel/construction.rs:369-371`; stop and resume at `:1677-1707`). Unchecked by `validation/issuance.rs:10` and `:51`, the api-protect sidecar mint (`crates/products/chio-api-protect/src/proxy/sidecar.rs:205`, signing at `:265`), trust-control passport issuance (now `chio-control-plane/src/trust_control/passport_handlers.rs:187`, `:238`, `:268`) and governed active response. |
+  | D3 | Changed shape; partly fixed by #1160 | A lagged POST stream or initialize now closes the session and reports an uncertain effect (`crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs:572-585`, `:667-677`). Still open: the SSE stream holds the per-session lock (`:457`, `:521`) until a terminal response, and there is no request timeout (`:170`), so an upstream that never answers still blocks later POSTs and initialize. |
+  | D4 | Still present | Restore still starts event ids at 0 (`chio-mcp-remote/src/remote_mcp/session_core/factory.rs:689`; fresh spawn `:469`), and ids carry no restore generation. |
+  | D5 | Still present; moved | Delegate handling is at `crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs:1246`. Production queries use only `Issue` (`validation/issuance.rs:76`, `:123`); `Delegate` is constructed only in tests. |
+  | D6 | Still present; moved | The `Guard` defaults are at `kernel/mod.rs:917` (`requires_dispatch_revalidation` returns `false`) and `:933` (`revalidate_before_dispatch` returns `Ok(())`). Dispatch runs a revalidation loop (`kernel/dispatch.rs:781-787`), but `ContainmentGuard` and `CapabilitySetSuspensionGuard` in `chio-security-kernel` override neither method. |
+  | D7 | Still present | `approval.rs:15` still links the nonexistent `evaluate_tool_call_with_hitl`; `ApprovalGuard::new` has only test callers. |
+  | D11 | Still present | `chio-kernel/Cargo.toml:92` takes `chio-settle` with default `web3` (alloy, reqwest); `:106` takes `ureq`; `:53` takes `chio-core`. Sigstore arrives through `chio-weights` (`:81`) and `chio-attest-verify`, not `chio-core` as the register says. |
+  | D12 | Still present | `crates/security/chio-security-types/src/ports/lineage.rs:294`; only test implementations exist. |
+  | N2 | Still present; moved | `outcome.record_released()` runs right after dispatch, before finalization (`async_evaluation_core.rs:1768-1773`; nested `nested_flow_evaluation.rs:1517-1521`). |
+  | N4 | Still present | No Mechanism D gate exists in `scripts`, `xtask` or `.github`; the landing ledger keeps it `open-acceptance`. |
+  | N5 (GT1) | Not met | #1160 merged with build/lint/test and MSRV incomplete; no whole CI run on main has completed since (section 2). |
+  | N6 | Still present | `crates/products/chio-api-protect/src/proxy/state.rs:445` builds the collector only with a context resolver, which defaults to `None` and is set only in a test. |
+  | N22 | Still present | `crates/platform/chio-http-core/src/routes.rs:33`; `emergency_route_registrations` (`:114-124`) and `handle_emergency_*` have no consumer outside `chio-http-core` and its tests. |
+  | N23 | Still present | `crates/platform/chio-http-core/src/emergency.rs:193` compares with `==` (U4, in progress). |
+  | N26 | Still present | `RemoteSessionResumeRecord` has no subscription set (`chio-mcp-remote/src/remote_mcp/session_core.rs:270-288`); the kernel drops unsubscribed updates (`session.rs:1129-1133`). |
+  | N28 | Still present; changed shape | Moved to `kernel/evaluation/return_recording.rs:80-102`. The evaluator now terminalizes the operation as outcome-unknown itself and returns `Ok` with a signed `Deny`, so the two contradictory terminal records land together. |
+  | N29 | Still present; lines drifted | `kernel/validation.rs:1700-1733`: both `adapter.release` results are still discarded and the executed call is denied. #1229 did not change this path. |
+  | N30 | Fixed by #1160 (`28d826e3e`) | GET subscribes before it snapshots the retained window and drops duplicates (`chio-mcp-remote/src/remote_mcp/http_service.rs:795-802`, `:835`). |
+
+  N1, N15, N16 and N24 cite branch code ("V:" or "W:") that main does not carry; they are checked at the #1173 and #1179 rebases (KERN-6). N13 still holds: main's `chio-process/src/lib.rs:65` is `chio.process.abi.v3`, so the union with #1179's v3 is still v4 (CT-ABI). Outside this document's citations, N3 is still present (long-lived `AdaptedMcpServer` receipts carry no `native_launch`), and D8 is partly fixed by #1160 (ids are unique within one Gemini response but repeat across responses).
+- **#1177:** merged on 2026-10-09. Its PROGRAM-MAP foundation pin becomes main. "In F" becomes "main (experimental; broker Linux-only)". `chio-ipc` mailboxes become `crates/kernel/chio-process/src/mailboxes`.
+- **#1174:** merged on 2026-10-12. Its pin becomes main, and the acceptance statistics are recomputed from the ledger. KSPEC-08 section 2 is stale on three facts:
+  - the admission schema version on main is 37 (`ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION` in `crates/platform/chio-store-sqlite/src/admission_operation_store.rs:230`), not 34. #1160 brought it to 36, and #1215 (F038) raised it to 37 to index delegated caller-share accounting by parent;
   - #1160 already reserves the `chio_runtime` receipt-metadata key;
   - #1160's startup sweep already defers per item instead of aborting.
 - **The M1 plan** is re-cut per COOP-1:
   - extend `signing_custody` instead of rewriting loaders;
   - handle the fallible `unix_timestamp_now()`;
   - remove "needs nothing from #1160".
-- **This document:** refresh section 2 and every pin.
+- **This document:** section 2 and the pins were refreshed on 2026-10-12 against `b6ad31043`. Line citations outside the KDEF rows above still carry their research pin.
 
 ## 14. What this document does not do
 
