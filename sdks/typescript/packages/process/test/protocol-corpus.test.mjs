@@ -19,14 +19,16 @@ function locateCorpus() {
   for (let directory = dirname(fileURLToPath(import.meta.url)); ; directory = dirname(directory)) {
     const candidate = join(directory, "spec/fixtures/chio-process-v1.json");
     if (existsSync(candidate)) return candidate;
-    if (dirname(directory) === directory) return undefined;
+    if (dirname(directory) === directory) {
+      throw new Error("shared protocol corpus is required; set CHIO_PROCESS_PROTOCOL_CORPUS");
+    }
   }
 }
 
 const corpusPath = locateCorpus();
-const corpus = corpusPath === undefined ? undefined : JSON.parse(readFileSync(corpusPath, "utf8"));
-const marker = corpus?.fill_marker;
-const credential = corpus?.fixture_credential;
+const corpus = JSON.parse(readFileSync(corpusPath, "utf8"));
+const marker = corpus.fill_marker;
+const credential = corpus.fixture_credential;
 
 function filled(value, fill) {
   if (fill === undefined) return value;
@@ -103,18 +105,14 @@ async function checkOutcome(entry, operation) {
   }
 }
 
-if (corpus === undefined) {
-  test("shared protocol corpus", { skip: "the shared corpus is outside this copy of the tests" }, () => {});
-}
-
-test("limits and identifiers match the corpus", { skip: corpus === undefined }, () => {
+test("limits and identifiers match the corpus", () => {
   assert.equal(PROTOCOL, corpus.protocol);
   assert.equal(MAX_REQUEST_BYTES, corpus.limits.max_request_bytes);
   assert.equal(MAX_RESPONSE_BYTES, corpus.limits.max_response_bytes);
   assert.equal(MAX_STATE_BLOB_BYTES, corpus.limits.max_state_blob_bytes);
 });
 
-for (const entry of corpus?.client.cases ?? []) {
+for (const entry of corpus.client.cases) {
   test(`corpus client case ${entry.name}`, async () => {
     const spec = filled(entry.call, entry.fill);
     if (entry.sent === false) {

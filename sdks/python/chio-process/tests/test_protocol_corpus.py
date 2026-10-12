@@ -28,15 +28,14 @@ def locate_corpus():
     for parent in Path(__file__).resolve().parents:
         if (parent / CORPUS_FILE).is_file():
             return parent / CORPUS_FILE
-    return None
+    raise FileNotFoundError("shared protocol corpus is required; set CHIO_PROCESS_PROTOCOL_CORPUS")
 
 
 CORPUS_PATH = locate_corpus()
-CORPUS = None if CORPUS_PATH is None else json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
-ROOT = None if CORPUS_PATH is None else CORPUS_PATH.parents[2]
-MARKER = None if CORPUS is None else CORPUS["fill_marker"]
-CREDENTIAL = None if CORPUS is None else CORPUS["fixture_credential"]
-NO_CORPUS = "the shared corpus is outside this copy of the tests"
+CORPUS = json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
+ROOT = CORPUS_PATH.parents[2]
+MARKER = CORPUS["fill_marker"]
+CREDENTIAL = CORPUS["fixture_credential"]
 
 
 def filled(value, fill):
@@ -113,7 +112,6 @@ class StubHost:
                 pass
 
 
-@unittest.skipIf(CORPUS is None, NO_CORPUS)
 class ClientCorpusTests(unittest.TestCase):
     def test_limits_and_identifiers_match_the_corpus(self):
         limits = CORPUS["limits"]
@@ -177,10 +175,13 @@ try:
     from jsonschema import Draft202012Validator
     from referencing import Registry, Resource
 except ImportError:
+    if os.environ.get("CHIO_PROCESS_REQUIRE_SCHEMA_VALIDATION") == "1":
+        raise RuntimeError(
+            "jsonschema and referencing are required for schema validation"
+        ) from None
     Draft202012Validator = None
 
 
-@unittest.skipIf(CORPUS is None, NO_CORPUS)
 @unittest.skipIf(Draft202012Validator is None, "jsonschema is not installed")
 class SchemaCorpusTests(unittest.TestCase):
     @classmethod
