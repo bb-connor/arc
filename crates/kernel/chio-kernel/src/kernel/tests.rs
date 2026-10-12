@@ -298,6 +298,8 @@ use invocation_context::CallerContextProbe;
 mod chio_runtime_url_elicitation;
 #[path = "tests/drop_guard_proptest.rs"]
 mod drop_guard_proptest;
+#[path = "tests/post_effect_receipts.rs"]
+mod post_effect_receipts;
 #[path = "tests/formal_closure.rs"]
 mod formal_closure;
 #[path = "tests/invocation_dispatch.rs"]
