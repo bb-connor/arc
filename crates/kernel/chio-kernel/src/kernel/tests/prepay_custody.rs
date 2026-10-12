@@ -158,8 +158,18 @@ struct Fixture {
 
 impl Fixture {
     fn new(mode: Mode) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::with_dpop(mode, false)
+    }
+
+    fn with_dpop(mode: Mode, dpop_required: bool) -> Result<Self, Box<dyn std::error::Error>> {
         let mut kernel = make_kernel(make_monetary_config());
         install_strict_nonce_store(&mut kernel);
+        if dpop_required {
+            kernel.set_dpop_store(
+                dpop::DpopNonceStore::new(1024, Duration::from_secs(300))?,
+                dpop::DpopConfig::default(),
+            )?;
+        }
         let counters = Counters::default();
         kernel.set_payment_adapter(Box::new(PrepaymentAdapter {
             mode,
@@ -170,13 +180,9 @@ impl Fixture {
             invocations: Arc::clone(&counters.invocations),
         }));
         let agent = make_keypair();
-        let cap = kernel.issue_capability(
-            &agent.public_key(),
-            make_scope(vec![make_governed_monetary_grant(
-                "cost-srv", "compute", 100, 1000, "USD", 50,
-            )]),
-            300,
-        )?;
+        let mut grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+        grant.dpop_required = dpop_required.then_some(true);
+        let cap = kernel.issue_capability(&agent.public_key(), make_scope(vec![grant]), 300)?;
         let mut intent = super::sim_payment::make_mustprepay_intent(
             "prepay-custody-intent",
             "cost-srv",
@@ -199,6 +205,16 @@ impl Fixture {
             &request.request_id,
         ));
         request.governed_intent = Some(intent);
+        if dpop_required {
+            request.dpop_proof = Some(make_dpop_proof(
+                &agent,
+                &cap,
+                &request.server_id,
+                &request.tool_name,
+                &request.arguments,
+                "prepay-custody-dpop-proof",
+            ));
+        }
         Ok(Self {
             kernel,
             request,
@@ -311,6 +327,52 @@ fn captured_then_lost_ack_retains_custody_without_execution_nonce() -> TestResul
     let response = fixture.reserve()?;
     assert!(fixture.counters.externally_captured.load(Ordering::SeqCst));
     fixture.assert_capture_failure_retained(&response, "unavailable")
+}
+
+#[test]
+fn replayed_prepayment_hold_survives_approval_and_dpop_denial() -> TestResult {
+    for dpop_required in [false, true] {
+        let fixture =
+            Fixture::with_dpop(Mode::CaptureError(ErrorKind::Unavailable), dpop_required)?;
+        let first = fixture.reserve()?;
+        assert_eq!(first.verdict, Verdict::Deny);
+        assert_eq!(fixture.exposure()?, 100);
+        let retry = fixture.reserve()?;
+        assert_eq!(retry.verdict, Verdict::Deny);
+        assert!(retry.execution_nonce.is_none());
+        assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            fixture.exposure()?,
+            100,
+            "credential denial cannot reverse a prior hold (DPoP={dpop_required})"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn settled_prepayment_hold_survives_replayed_reservation_cleanup() -> TestResult {
+    let fixture = Fixture::new(Mode::Settled)?;
+    let first = fixture.reserve()?;
+    assert_eq!(first.verdict, Verdict::Allow);
+    assert!(first.execution_nonce.is_some());
+    assert_eq!(fixture.exposure()?, 100);
+    let retry = fixture.reserve()?;
+    assert_eq!(retry.verdict, Verdict::Deny);
+    assert!(retry.execution_nonce.is_none());
+    assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        fixture.exposure()?,
+        100,
+        "a retry cannot reverse the earlier prepaid nonce's hold"
+    );
+    Ok(())
 }
 
 #[test]
