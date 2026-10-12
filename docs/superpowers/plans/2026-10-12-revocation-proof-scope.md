@@ -98,14 +98,18 @@ and CBMC 6.11.0 on source `ae6322aa64fb58cc4ba0e323612f28495deb2acb`:
   was refused by `check-kani-cover.py`: nested names and multiple covers do not
   satisfy its contract. Do not claim that run qualified the required gate.
 
-- [ ] Run the replacement top-level freshness harness through the unchanged
-  strict cover wrapper. Retain terminal JSON and logs showing enabled unwind
-  assertions, successful proof and its exact single satisfied joint witness.
+- [x] The replacement top-level freshness harness passed the unchanged strict
+  cover wrapper on x86 with Kani 0.68.0 at `dbae4a2de96146375f47cb9becbd27d153434776`.
+  Zero of 398 checks failed (seven unreachable); one of one cover properties
+  satisfied. Log `freshness-ci-dbae4a2de9.log` in the directory above has SHA-256
+  `174c725e0b7ac977353fccb22d87e494f3153701779434d4921a2e52d96c5ca3`.
+  The rebase preserves the production method and both harness files byte for byte.
 - [ ] Confirm freshness regression sensitivity with controlled arithmetic
   mutations and retain exact source, commands, terminal logs and domain identity.
 - [ ] Resolve direct ArcSwap backend feasibility before epoch qualification.
   Unsupported TLS remains open; no toy store or disabled check discharges it.
-- [ ] Obtain Claude's source/evidence review before publication.
+- [x] Claude reviewed the scope and authorized freshness enrollment/publication
+  at 2026-10-12T19:29:59Z. Installation remains open and unenrolled.
 
 Even a future sequential installation pass excludes racing-writer linearizability,
 failed-CAS retries, memory reclamation and starvation freedom. If the accepted
