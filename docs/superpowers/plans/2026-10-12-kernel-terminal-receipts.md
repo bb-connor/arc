@@ -159,3 +159,24 @@
   file hygiene, and Claude's exact-source review. Generic durable idle
   finalization and crash durability of the memory buffer remain outside this
   source unit; neither is claimed complete.
+
+## Identity disposition at receipt producers
+
+The response builders require a typed disposition supplied by the producing row. They insert the kernel-reserved metadata before signing. Callers cannot supply this namespace. No builder infers identity from the absence of metadata or from an error message.
+
+| Producer | Disposition |
+| --- | --- |
+| Validation, negotiation, overload and persistence refusal before admission | Reusable |
+| Resource read refused without a persisted operation or effect | Reusable |
+| Submitted durable Begin without an authoritative outcome | Retained |
+| Confirmed operation, replay conflict or completed compensation | Terminal |
+| Explicit unconfirmed dispatch commit | Retained |
+| Effect already executed, including cancellation or output refusal | Terminal |
+| Successful cleanup without a durable operation or remaining custody | Reusable |
+| Cleanup that leaves custody bound to the request | Terminal |
+
+Durable admission must return a typed failure carrying the disposition selected at its storage boundary: before submission, after submission without acknowledgement, or after an authoritative result. Plain `KernelError` currently conflates these stages. Preserve the underlying error and existing signed rejection metadata.
+
+Original controls use the actual ordinary and nested entrypoints: expired signed capabilities must produce Reusable with no invocation; a missing session root after durable admission must produce Terminal after compensation. Keep healthy Allow and approval-required controls, and the existing CommitUnconfirmed Retained control. Approval-required is a distinct response state even when its signed wire decision is Deny.
+
+No caller gains retry authority from a Terminal or Retained response. The remaining recovery-driver and historical model limitations remain open.
