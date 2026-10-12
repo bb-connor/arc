@@ -96,7 +96,7 @@ unmapped_dst="$(LC_ALL=C comm -23 <(printf '%s\n' "${dst_harness_list}") <(print
 extra_dst_mapping="$(LC_ALL=C comm -13 <(printf '%s\n' "${dst_harness_list}") <(printf '%s\n' "${dst_mapping_list}"))"
 
 # --- Required model leaf invariants -----------------------------------------
-# These leaves are part of the release evidence contract. Unlike the legacy
+# These leaves are part of the release evidence contract. Unlike the
 # whitelists below, they are mandatory: deleting a definition or dropping it
 # from SafetyInv must fail even if the mapping row remains.
 safety_inv_contains() {
