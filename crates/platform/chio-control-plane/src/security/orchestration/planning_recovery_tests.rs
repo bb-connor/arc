@@ -102,7 +102,9 @@ fn composed(
 
 /// Every recovery error other than a terminal cleanup backlog: global store,
 /// integrity and clock faults, and declassification outbox failures.
-fn fatal_recovery_errors() -> Vec<(&'static str, fn() -> ResponseWorkerTickError)> {
+type RecoveryFailureCase = (&'static str, fn() -> ResponseWorkerTickError);
+
+fn fatal_recovery_errors() -> Vec<RecoveryFailureCase> {
     vec![
         ("store unavailable", || {
             ResponseWorkerTickError::Port(PortError::unavailable())

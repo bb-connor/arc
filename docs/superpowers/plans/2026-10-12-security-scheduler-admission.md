@@ -24,10 +24,10 @@ ingress-error independence of planning, and bounded pass sizes.
 Files: `security/orchestration.rs`, its new `planning_recovery_tests.rs`, and
 `security/active_defense_host_tests/producer_tenant.rs`.
 
-- [ ] Port the three F045 controls (two tenant mismatches, one valid setup).
-- [ ] Extract the private admission seam without changing current tick behavior.
+- [x] Port the three F045 controls (two tenant mismatches, one valid setup).
+- [x] Extract the private admission seam without changing current tick behavior.
   Review its equivalence before adding T12 controls. No public abstraction.
-- [ ] Commit the behavior-preserving seam and regression tests. Run genuine
+- [x] Commit the behavior-preserving seam and regression tests. Run genuine
   runtime Originals: mismatched hosts start, cleanup ticks skip admission.
   Preserve positive/error/readiness controls and compile refusals separately.
 
@@ -35,19 +35,33 @@ Files: `security/orchestration.rs`, its new `planning_recovery_tests.rs`, and
 
 Files: `security/orchestration.rs` and the owning regression tests.
 
-- [ ] Add scheduler-tenant checks for both producer classes.
-- [ ] Continue admission only for terminal cleanup backlog, retaining its error
+- [x] Add scheduler-tenant checks for both producer classes.
+- [x] Continue admission only for terminal cleanup backlog, retaining its error
   even when admission also fails. Propagate admission errors on a clean tick.
-- [ ] Explicitly skip admission on every shutdown outcome. Preserve stop,
+- [x] Explicitly skip admission on every shutdown outcome. Preserve stop,
   clock, storage, integrity and declassification error behavior.
-- [ ] Run regression controls to green, including actual worker degradation
+- [x] Run regression controls to green, including actual worker degradation
   and continued progress through repeated backlog ticks.
 
 ## Task 3: Qualification and independent review
 
-- [ ] Run owning orchestration/host/worker tests, strict all-target Clippy,
+- [x] Run owning orchestration/host/worker tests, strict all-target Clippy,
   formatting, Rust hygiene, negative assertions and security CI contracts.
-- [ ] Obtain Claude's review of the complete source, address confirmed findings,
+- [x] Obtain Claude's review of the complete source, address confirmed findings,
   and retain exact source hashes plus Original and repaired evidence.
-- [ ] Commit the bounded repair and audit; update mailbox, board and claims.
+- [x] Commit the bounded repair and audit; update mailbox, board and claims.
   Local qualification remains distinct from future actual-base CI and landing.
+
+## Local completion
+
+Current Originals at `5f371a7da2` produced six intended runtime failures and
+five positive/error passes. The repaired controls passed 11/11, and the owning
+host, orchestration, worker and simulation suite passed 143/143. Strict Clippy
+first found a preserved test-helper type-complexity warning. A private type alias
+fixed it without changing production; the final focused 11/11 and strict Clippy
+passed. Static gates passed. Claude approved the complete source and alias
+amendment with no P0/P1/P2 findings.
+
+The audit in `docs/security/audits/security-scheduler-admission-20261012.json`
+binds the source, review, retained failures and local evidence. This private
+batch still needs actual-base hosted qualification and landing.

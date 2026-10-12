@@ -795,9 +795,29 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         // expiry, rollback and receipt recovery before admitting new response
         // work, so a failed ingress or planner cannot strand an active overlay.
         // Planning errors still reach the worker and keep host readiness closed.
-        let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
-        self.admission.run_once()?;
-        Ok(tick)
+        let recovery = self.inner.tick(tick_sequence, shutdown_requested);
+        if shutdown_requested {
+            return recovery;
+        }
+        match recovery {
+            Ok(tick) => {
+                self.admission.run_once()?;
+                Ok(tick)
+            }
+            // This bounded cleanup pass committed; only its terminal-lease
+            // backlog remains. Admit durable work for a later claim, while
+            // retaining the pending error to keep worker readiness closed.
+            Err(error @ ResponseWorkerTickError::TerminalSchedulerCleanupPending) => {
+                if let Err(admission_error) = self.admission.run_once() {
+                    tracing::warn!(
+                        error = %admission_error,
+                        "active-defense response admission failed during terminal scheduler cleanup"
+                    );
+                }
+                Err(error)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     fn shutdown(&self) -> Result<(), ResponseWorkerTickError> {
@@ -891,6 +911,19 @@ impl ProductionActiveDefenseOrchestrator {
                 .trusted_event_receipt_producers
                 .iter()
                 .any(|producer| !rule_policy_versions.contains(&producer.policy_version))
+        {
+            return Err(PortError::invalid_data().into());
+        }
+        // The worker claims and expires work only for the scheduler tenant.
+        let scheduler_tenant_id = &config.scheduler.tenant_id;
+        if config
+            .trusted_event_producers
+            .iter()
+            .any(|producer| &producer.tenant_id != scheduler_tenant_id)
+            || config
+                .trusted_event_receipt_producers
+                .iter()
+                .any(|producer| &producer.tenant_id != scheduler_tenant_id)
         {
             return Err(PortError::invalid_data().into());
         }
