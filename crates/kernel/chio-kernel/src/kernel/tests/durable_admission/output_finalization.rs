@@ -89,7 +89,10 @@ fn durable_redaction_cannot_upgrade_incomplete_transport_and_replay_is_exactly_o
     assert_eq!(replay.output, response.output);
     assert_eq!(replay.receipt.id, response.receipt.id);
     assert_eq!(replay.terminal_state, response.terminal_state);
-    assert_eq!(replay.receipt, response.receipt);
+    assert_eq!(
+        serde_json::to_value(&replay.receipt).unwrap(),
+        serde_json::to_value(&response.receipt).unwrap()
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -229,6 +232,9 @@ fn durable_delivery_denial_binds_terminal_identity_and_replays_one_receipt() {
     assert_terminal_identity(&response, &store.operation());
     let replay = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(replay.verdict, Verdict::Deny);
-    assert_eq!(replay.receipt, response.receipt);
+    assert_eq!(
+        serde_json::to_value(&replay.receipt).unwrap(),
+        serde_json::to_value(&response.receipt).unwrap()
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
