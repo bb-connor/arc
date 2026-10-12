@@ -19,6 +19,7 @@ compile_error!("enforcement-mutants is test-only and cannot be built for release
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+mod confinement;
 mod enforcement;
 mod environment;
 mod error;
@@ -28,6 +29,7 @@ pub mod linux;
 mod model;
 mod seccomp_plan;
 pub use chio_core_types::{canonical_json_bytes, sha256_hex};
+pub use confinement::{ConfinementBackendKind, ConfinementDisclosure, UnconfinedReason};
 pub use enforcement::{
     CageEnforcementFailure, CageEnforcementFailureCode, CageEnforcementRecord,
     CageEnforcementState, EnforcementEvidenceError, EnforcementPrepared, ExecTransitionObserved,

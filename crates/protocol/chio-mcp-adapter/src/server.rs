@@ -178,6 +178,10 @@ impl ToolServerConnection for AdaptedMcpServer {
             .collect()
     }
 
+    fn prepared_native_launch_receipt(&self) -> Option<chio_core::receipt::body::ChioReceipt> {
+        self.native_enforcement_receipt().cloned()
+    }
+
     async fn invoke(
         &self,
         tool_name: &str,

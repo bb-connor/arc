@@ -30,6 +30,8 @@ mod channel_roots;
 mod request_identity;
 #[path = "runtime_tests/roots_refresh_invalidation.rs"]
 mod roots_refresh_invalidation;
+#[path = "runtime_tests/subscription_observer.rs"]
+mod subscription_observer;
 #[path = "runtime_tests/swarm_required.rs"]
 mod swarm_required;
 

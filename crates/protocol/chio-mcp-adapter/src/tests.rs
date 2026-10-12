@@ -756,6 +756,17 @@ fn adapted_server_exposes_manifest_tool_names() {
     );
 }
 
+#[test]
+fn adapted_server_without_native_launch_claims_no_launch() {
+    let transport = MockTransport::simple(
+        vec![text_tool_info("read_file")],
+        MockCallBehavior::Success(success_result("called read_file")),
+    );
+    let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
+        .unwrap_or_else(|e| panic!("adapted server: {e}"));
+    assert!(adapted.prepared_native_launch_receipt().is_none());
+}
+
 #[tokio::test]
 async fn adapted_server_rejects_manifest_unknown_tool_without_contacting_upstream() {
     let transport = MockTransport::simple(

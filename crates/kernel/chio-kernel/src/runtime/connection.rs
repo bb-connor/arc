@@ -180,8 +180,9 @@ pub trait ToolServerConnection: Send + Sync {
         Ok(None)
     }
 
-    /// The exact persisted enforcement receipt for the prepared invocation.
-    /// This is trusted transport evidence, never caller-provided metadata.
+    /// The exact persisted enforcement receipt for the prepared invocation, or
+    /// for a long-lived server once `prepare_delivery` has succeeded. This is
+    /// trusted transport evidence, never caller-provided metadata.
     fn prepared_native_launch_receipt(&self) -> Option<chio_core::receipt::body::ChioReceipt> {
         None
     }
