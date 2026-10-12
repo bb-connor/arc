@@ -103,6 +103,11 @@ impl Drop for EvidenceProducer {
 
 impl EvidenceQueue {
     fn request_stop(&self) {
+        // Serialize the predicate change with the worker's atomic wait entry.
+        let _records = self
+            .records
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         self.stopping.store(true, Ordering::Release);
         self.wake.notify_all();
     }
