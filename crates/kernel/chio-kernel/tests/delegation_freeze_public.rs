@@ -1,8 +1,20 @@
 #[path = "delegation_freeze_public/support.rs"]
 mod support;
 
-use chio_kernel::{KernelError, ReceiptStore};
-use chio_security_types::ports::CapabilityIssuanceOperation;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
+use chio_core::PublicKey;
+use chio_kernel::{
+    CapabilityAuthority, CapabilityAuthorityWorkloadBinding, KernelError, NestedFlowBridge,
+    ReceiptStore, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
+    ToolServerConnection, Verdict,
+};
+use chio_security_types::ports::{
+    CapabilityIssuanceOperation, IsolationEpochId, LineageId, SessionId, TenantId,
+};
+use chio_security_types::PrincipalId;
 use support::*;
 
 #[test]
@@ -154,6 +166,119 @@ fn frozen_bound_delegation_cannot_be_registered_as_a_parent() -> TestResult {
     assert_eq!(
         query.parent_capability_id.as_ref().map(|id| id.as_str()),
         Some(fixture.root.id.as_str())
+    );
+    Ok(())
+}
+
+struct PinnedWorkloadAuthority {
+    key: PublicKey,
+    workload: CapabilityAuthorityWorkloadBinding,
+}
+
+impl CapabilityAuthority for PinnedWorkloadAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.key.clone()
+    }
+
+    fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
+        Some(self.workload.clone())
+    }
+
+    fn issue_capability(
+        &self,
+        _subject: &PublicKey,
+        _scope: ChioScope,
+        _ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        Err(KernelError::CapabilityIssuanceDenied(
+            "this test authority only pins already issued capabilities".into(),
+        ))
+    }
+}
+
+struct CountingEchoServer(Arc<AtomicUsize>);
+
+#[async_trait::async_trait]
+impl ToolServerConnection for CountingEchoServer {
+    fn server_id(&self) -> &str {
+        SERVER
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["echo".into()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Ok(arguments)
+    }
+}
+
+#[test]
+fn public_tool_invocation_preserves_the_bound_delegation_ban_after_exact_binding() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let token = fixture.delegated("child-public-tool-binding", Some(SIBLING))?;
+    let _session = fixture.open_for(&token)?;
+    let binding = token.security_binding()?.ok_or("missing signed binding")?;
+    let invocations = Arc::new(AtomicUsize::new(0));
+    fixture
+        .kernel
+        .register_tool_server(Box::new(CountingEchoServer(invocations.clone())));
+    fixture
+        .kernel
+        .set_capability_authority(Box::new(PinnedWorkloadAuthority {
+            key: fixture.issuer.public_key(),
+            workload: CapabilityAuthorityWorkloadBinding {
+                tenant_id: binding.tenant_id.clone(),
+                workload_id: binding.workload_id.clone(),
+                server_id: binding.server_id.clone(),
+                signer_public_key: fixture.issuer.public_key(),
+            },
+        }));
+    let authority = fixture.install()?;
+    let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+        TenantId::new(binding.tenant_id)?,
+        SessionId::new(binding.session_id)?,
+        PrincipalId::new(binding.principal_id)?,
+        IsolationEpochId::new(binding.isolation_epoch_id)?,
+        LineageId::new(binding.lineage_id)?,
+        binding.context_generation,
+    ));
+    let request = ToolCallRequest {
+        request_id: "public-bound-delegation-tool".into(),
+        agent_id: token.subject.to_hex().into(),
+        capability: token,
+        tool_name: "echo".into(),
+        server_id: SERVER.into(),
+        arguments: serde_json::json!({"message": "checked public tool path"}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&request, &context)?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("security-bound remote capabilities cannot be delegated")
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert!(
+        authority.queries()?.is_empty(),
+        "the explicit tool binding ban precedes delegation freeze admission"
     );
     Ok(())
 }
