@@ -334,23 +334,15 @@ fn assert_durable_read_priced(
     started_at: u64,
 ) -> TestResult {
     let completed_at = started_at + ORACLE_IO_SECS;
-    let quote = assert_single_read(&fx.timeline, &fx.kernel, started_at, completed_at)?;
-    assert!(matches!(quote.ensure_fresh(completed_at), Ok(())));
-    assert_durable_settlement(fx, response, completed_at)
-}
-
-fn assert_durable_settlement(
-    fx: &DurableFx,
-    response: &ToolCallResponse,
-    quoted_at: u64,
-) -> TestResult {
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(fx.invocations.load(Ordering::SeqCst), 1);
+    let quote = assert_single_read(&fx.timeline, &fx.kernel, started_at, completed_at)?;
+    assert!(matches!(quote.ensure_fresh(completed_at), Ok(())));
     assert_eq!(
         fx.store.operation().state(),
         AdmissionOperationState::Completed
     );
-    assert_eq!(fx.pricing(response)?, fx.converted(quoted_at, 1));
+    assert_eq!(fx.pricing(response)?, fx.converted(completed_at, 1));
     assert_eq!(
         fx.store
             .payment_journal()
@@ -477,44 +469,13 @@ fn durable_recovery_prices_a_quote_stamped_during_oracle_io() -> TestResult {
         fx.store.operation().state(),
         AdmissionOperationState::Finalizing
     );
-    // Prefetch runs before journal mutation and cannot authorize a capture
-    // when beginning that mutation fails. Recovery must price a fresh read.
-    let first_completed = fx.timeline.start + ORACLE_IO_SECS;
-    assert_single_read(&fx.timeline, &fx.kernel, fx.timeline.start, first_completed)?;
-    assert!(fx.captures()?.is_empty());
+    assert_eq!(fx.timeline.reads()?.len(), 0);
+    assert_eq!(fx.captures()?.len(), 0);
     let recovery_start = fx.timeline.start + CLAIM_EXPIRY_SECS;
     fx.timeline.clock.set_secs(recovery_start)?;
     assert_eq!(fx.kernel.reconcile_recoverable_admissions()?, 1);
     let replay = fx.kernel.evaluate_tool_call_blocking(&fx.request)?;
-    let recovery_completed = recovery_start + ORACLE_IO_SECS;
-    assert_eq!(
-        fx.timeline.reads()?,
-        [
-            (
-                fx.timeline.start,
-                first_completed,
-                "ETH/USD".to_owned(),
-                first_completed
-            ),
-            (
-                recovery_start,
-                recovery_completed,
-                "ETH/USD".to_owned(),
-                recovery_completed
-            ),
-        ]
-    );
-    assert_eq!(
-        fx.kernel.read_authority_time().map(UnixMillis::get),
-        Ok(recovery_completed * 1_000)
-    );
-    let quote = fx.timeline.last_quote()?;
-    assert!(matches!(
-        quote.ensure_fresh(recovery_start),
-        Err(PriceOracleError::InvalidFeed(detail)) if detail == FUTURE_QUOTE
-    ));
-    assert!(matches!(quote.ensure_fresh(recovery_completed), Ok(())));
-    assert_durable_settlement(&fx, &replay, recovery_completed)
+    assert_durable_read_priced(&fx, &replay, recovery_start)
 }
 
 #[test]

@@ -973,15 +973,6 @@ impl ChioKernel {
         stored_outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
-        // Never consult the price oracle under the mutation lock. The
-        // disposition binds this quote to the reported cost and checks its
-        // freshness at trusted time under the lock; a resolved replay keeps
-        // its retained pricing and asks for no quote.
-        let prefetched_rate = if finalization_resolved || delivery_evaluation.denial.is_some() {
-            None
-        } else {
-            self.prefetch_durable_payment_rate(admission, runtime, &tool_return.raw)?
-        };
         let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = self
             .read_authority_time()?
@@ -1045,6 +1036,23 @@ impl ChioKernel {
                 evaluation.validate_replay_contract(&plan.frozen_steps, &normalized_context)
             })
             .map_err(tool_outcome_error)?;
+        let mut mutation_lock = ExternalCallLock::new(
+            runtime,
+            mutation_guard,
+            &admission.operation,
+            trusted_now_unix_ms,
+        )?;
+        // Begin evaluation durably before oracle I/O. Relocking validates the
+        // original claim and samples fresh trusted time before pricing uses
+        // the quote. Resolved replays retain their committed pricing.
+        let prefetched_rate = if finalization_resolved || delivery_evaluation.denial.is_some() {
+            None
+        } else {
+            mutation_lock.call_unlocked(&admission.operation, &lease, || {
+                self.prefetch_durable_payment_rate(admission, runtime, &tool_return.raw)
+            })??
+        };
+        let trusted_now_unix_ms = mutation_lock.trusted_now_unix_ms();
         if !finalization_resolved && delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
@@ -1295,12 +1303,6 @@ impl ChioKernel {
             coordinator_lease_epoch: lease.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
-        let mut mutation_lock = ExternalCallLock::new(
-            runtime,
-            mutation_guard,
-            &admission.operation,
-            trusted_now_unix_ms,
-        )?;
         let payment_terminal = payment_plan
             .map(|plan| {
                 self.settle_durable_payment(

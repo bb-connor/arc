@@ -39,7 +39,7 @@ pub(super) struct DurablePaymentDispositionInput<'a> {
     pub(super) prefetched_rate: Option<DurablePrefetchedRate>,
 }
 
-/// A price oracle answer obtained before the mutation lock, bound to the
+/// A price oracle answer obtained outside the mutation lock, bound to the
 /// exact reported cost and journal currency it was requested for.
 pub(super) struct DurablePrefetchedRate {
     units: u64,
