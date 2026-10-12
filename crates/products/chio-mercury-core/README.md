@@ -1,83 +1,75 @@
 # chio-mercury-core
 
-Typed MERCURY evidence contracts layered on Chio receipt truth. MERCURY targets
-AI-assisted execution workflow release control: business identifiers such as
-`desk_id` and `strategy_id`, and the `contains_market_data` sensitivity flag,
-scope it to trading-desk operations. This crate owns the data shapes and
-fail-closed validation; command orchestration, storage, and file export live in
-`chio-mercury`.
-
-## Responsibilities
-
-- Define `MercuryReceiptMetadata`, the schema-tagged envelope that rides inside a
-  signed Chio receipt's `metadata.mercury` field: workflow identifiers, decision
-  context, chronology, provenance, sensitivity, disclosure, and approval state.
-- Define bundle manifests (`bundle.rs`) with canonical-JSON sha256 digests for the
-  artifact sets a receipt's metadata can reference.
-- Build and verify `MercuryProofPackage` / `MercuryInquiryPackage` against a Chio
-  `EvidenceExportBundle`: receipt and checkpoint signatures, inclusion proofs, and
-  checkpoint-transparency publication claims.
-- Define 17 schema-versioned "lane" packages, from `governance_workbench` through
-  `portfolio_revenue_boundary`, that model an escalating customer-adoption and
-  account-expansion chain; each lane's package validates `fail_closed = true` and
-  points by file-path reference to its upstream lane's package.
-- Provide fixture builders and a scripted pilot / supervised-live scenario
-  (`fixtures.rs`, `pilot.rs`, `supervised_live.rs`) used by this crate's own tests.
-
-## Public API
-
-Evidence primitives:
-- `receipt_metadata::{MercuryReceiptMetadata, MercuryWorkflowIdentifiers,
-  MercuryDecisionContext, MercuryChronology, MercuryProvenance, MercurySensitivity,
-  MercuryDisclosurePolicy, MercuryApprovalState, MercuryContractError}`
-- `bundle::{MercuryBundleManifest, MercuryArtifactReference, MercuryBundleReference}`
-- `proof_package::{MercuryProofPackage, MercuryInquiryPackage,
-  MercuryPublicationProfile, MercuryVerificationReport}`
-- `query::{MercuryReceiptQuery, MercuryReceiptIndexRecord}` - filter and index
-  shapes; this crate does no storage or lookups itself.
-
-Fixtures and scenarios:
-- `fixtures::{sample_mercury_receipt_metadata, sample_mercury_bundle_manifest}`
-- `pilot::MercuryPilotScenario::gold_release_control()` - a scripted
-  propose/approve/release/inquiry path plus a rollback variant.
-- `supervised_live::{MercurySupervisedLiveCapture, MercurySupervisedLiveControlState}`
-
-Review, governance, and trust packages:
-- `governance_workbench::{MercuryGovernanceDecisionPackage, MercuryGovernanceReviewPackage}`
-- `assurance_suite::{MercuryAssuranceSuitePackage, MercuryAssuranceReviewPackage,
-  MercuryAssuranceInvestigationPackage, MercuryAssuranceReviewerPopulation}`
-- `downstream_review::{MercuryAssurancePackage, MercuryDownstreamReviewPackage}`
-- `embedded_oem::MercuryEmbeddedOemPackage`
-- `trust_network::MercuryTrustNetworkPackage`
-
-Motion-lane packages (each a `<Name>Profile` + `<Name>Package` pair, schema
-`chio.mercury.<name>_{profile,package}.v1`), in escalation order:
-`release_readiness`, `controlled_adoption`, `reference_distribution`,
-`broader_distribution`, `selective_account_activation`, `delivery_continuity`,
-`renewal_qualification`, `second_account_expansion`, `portfolio_program`,
-`second_portfolio_program`, `third_program`, `program_family`,
-`portfolio_revenue_boundary`.
+`chio-mercury-core` defines workflow metadata, bundle manifests, proof packages,
+and review contracts for Mercury. It layers business identifiers and disclosure
+projections on Chio receipts; `chio-mercury` supplies file loading and exports.
 
 ## Usage
 
-```rust
-use chio_mercury_core::{sample_mercury_receipt_metadata, MercuryReceiptMetadata};
+This example validates the public fixture, embeds it under the receipt metadata
+key, and derives an index record. It performs no signing or persistent writes.
 
-let metadata = sample_mercury_receipt_metadata();
-let value = metadata.into_receipt_metadata_value()?; // {"mercury": {...}}
-let restored = MercuryReceiptMetadata::from_metadata_value(Some(&value))?;
-assert_eq!(restored, Some(metadata));
+```rust
+use chio_mercury_core::{
+    sample_mercury_receipt_metadata, MercuryContractError,
+    MercuryReceiptIndexRecord, MercuryReceiptMetadata,
+};
+
+fn main() -> Result<(), MercuryContractError> {
+    let metadata = sample_mercury_receipt_metadata();
+    let value = metadata.into_receipt_metadata_value()?;
+    let restored = MercuryReceiptMetadata::from_metadata_value(Some(&value))?;
+    assert_eq!(restored, Some(metadata.clone()));
+
+    let record = MercuryReceiptIndexRecord::from_metadata("receipt-1", &metadata);
+    assert_eq!(record.workflow_id.as_deref(), Some("workflow-release-control"));
+    assert_eq!(record.decision_type, "release");
+    Ok(())
+}
 ```
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-mercury-core`
+`MercuryReceiptMetadata::validate` checks the schema, workflow identifiers,
+chronology, provenance, disclosure, and each supplied bundle reference.
+Optional business identifiers must be nonempty and unpadded when present.
+`from_receipt` extracts and validates metadata; signature verification is a
+separate operation.
 
-## See also
+`MercuryBundleManifest::canonical_bytes` validates the manifest before RFC 8785
+serialization. `manifest_sha256` hashes those bytes. Artifact digest strings
+are required fields; this contract has no artifact-file reader.
 
-- `chio-mercury` - CLI that builds, exports, and writes these packages to files;
-  depends on this crate's builders and fixtures.
-- `chio-core-types` - canonical JSON, hashing, and receipt types, imported here as
-  `chio_core` (dependency aliased in `Cargo.toml`).
-- `chio-kernel` - checkpoint and evidence-export verification consumed by
-  `proof_package.rs`.
+`MercuryProofPackage::build` emits `chio.mercury.proof_package.v2`.
+`validate` also accepts legacy v1 identities and checks receipt summaries,
+workflow and action bindings, manifests, derived coverage, and package identity.
+Tool receipts must be mediated allow decisions with mediated trust targeting
+`mercury`; observation receipts fail this acceptance check.
+
+`verify` checks bundled signatures and inclusion evidence. Use
+`verify_with_trusted_kernel_keys` to require trusted receipt and checkpoint
+signers, exact selected receipt proof coverage or bundled checkpoint-prefix
+coverage, and signed manifest references. Both methods return
+`verifier_equivalent: false`: portable exports do not authenticate the source
+query or current source-log boundary.
+
+## Status
+
+Implemented typed contracts and in-memory verification. The crate owns no
+receipt database, file export, or live tool mediation. `MercuryReceiptQuery`
+is a filter shape; `MercuryReceiptIndexRecord` copies fields without validating
+the input. Pilot and supervised-live builders supply test and CLI fixtures.
+Review and distribution packages validate declared scope and artifact references;
+their names do not certify an operational release or partner integration.
+
+There are no package-defined Cargo features. Unit tests cover contract rejection,
+identity tampering, receipt authority, checkpoint coverage, and inquiry projection;
+`tests/integration_smoke.rs` checks public fixture shapes.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Receipt contract](../../../spec/PROTOCOL.md#6-receipt-contract)
+- [Mercury CLI](../chio-mercury/README.md)
+- [Core types](../../core/chio-core-types/README.md)
+- [License](../../../LICENSE)

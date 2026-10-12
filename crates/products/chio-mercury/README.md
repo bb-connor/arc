@@ -1,77 +1,73 @@
 # chio-mercury
 
-MERCURY is a Chio-based release-control and go-to-market evidence workflow. `chio-mercury` is
-its product CLI: a single `mercury` binary that turns Chio evidence exports and receipt history
-into a chain of signed proof, inquiry, reviewer, and adoption packages for one workflow at a
-time. The typed package and profile contracts it assembles live in `chio-mercury-core`; this
-crate owns command parsing, package chaining, and the on-disk export layout only.
-
-## Responsibilities
-
-- Parse the `mercury` command tree (`clap`) and dispatch each subcommand to one export or
-  validate function.
-- Assemble typed `chio-mercury-core` packages from a Chio evidence export
-  (`chio_control_plane::evidence_export`), a SQLite receipt store (`chio-store-sqlite`), and
-  kernel checkpoints (`chio_kernel::build_checkpoint`).
-- Write a fixed, path-safe on-disk layout: profiles, copied upstream evidence, manifests, and
-  `*-summary.json` files under the requested output directory.
-- For every bounded product lane's `validate` command, additionally write a
-  `validation-report.json` and a fixed-content decision record (`approved_scope`,
-  `deferred_scope`, `rationale`).
-- Verify `Proof Package v1` and `Inquiry Package v1` artifacts (`mercury verify`).
-
-## Public API
-
-This is a binary crate (`mercury`); there is no library surface. Base commands:
-
-| Command | Purpose |
-|---|---|
-| `proof export` | Wrap a verified Chio evidence package into a `Proof Package v1`. |
-| `inquiry export` | Derive an audience-redacted `Inquiry Package v1` from a proof package. |
-| `pilot export` | Export the design-partner pilot corpus for the gold MERCURY workflow. |
-| `supervised-live export` / `qualify` | Export a live/mirrored capture; generate the canonical qualification and reviewer package. |
-| `verify --input <file> [--explain]` | Verify a `Proof Package v1` or `Inquiry Package v1`. |
-
-Bounded product lanes: each exposes `export` (write the package to `<output>`) and `validate`
-(nest the export under `<output>/<lane>/`, then write a validation report and decision record).
-Lanes chain in this order; each one rebuilds every lane before it from `chio-mercury-core` sample
-fixtures:
-
-`downstream-review`, `governance-workbench` (both built from supervised-live qualification) ->
-`assurance-suite` -> `embedded-oem` -> `trust-network` -> `release-readiness` ->
-`controlled-adoption` -> `reference-distribution` -> `broader-distribution` ->
-`selective-account-activation` -> `delivery-continuity` -> `renewal-qualification` ->
-`second-account-expansion` -> `portfolio-program` -> `second-portfolio-program` ->
-`third-program` -> `program-family` -> `portfolio-revenue-boundary`
+`chio-mercury` provides the `mercury` binary for packaging release-control
+workflow evidence. It loads Chio evidence exports, adds the contracts from
+`chio-mercury-core`, and writes proof, inquiry, reviewer, and distribution
+artifacts to local files.
 
 ## Usage
 
-```sh
-mercury proof export \
-  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY" \
-  --input evidence-package/ \
-  --bundle-manifest bundle-manifest.json \
-  --output proof-package.json
+Run this offline example from the workspace root with Bash. The built-in
+`MercuryPilotScenario::gold_release_control()` fixture supplies the workflow;
+all generated databases and JSON files stay in a fresh temporary directory.
 
-mercury --json verify --input proof-package.json
-
-mercury broader-distribution validate --output broader-distribution-run/
+```bash
+mercury_example_dir="$(mktemp -d "${TMPDIR:-/tmp}/chio-mercury-example.XXXXXX")"
+trap 'rm -rf -- "$mercury_example_dir"' EXIT
+cargo run -p chio-mercury -- pilot export \
+  --output "$mercury_example_dir/pilot"
+cargo run -p chio-mercury -- --json verify \
+  --input "$mercury_example_dir/pilot/primary/proof-package.json"
 ```
 
-## Testing
+The export includes primary and rollback receipt databases, evidence exports,
+proof packages, and a primary inquiry package. The JSON verification report
+has `verifierEquivalent: false`.
 
-`cargo test -p chio-mercury`
+| Command | Inputs and result |
+| --- | --- |
+| `proof export` | Evidence directory, bundle manifests, and explicit trusted kernel keys; writes proof-package v2. |
+| `inquiry export` | Proof package and audience; writes inquiry-package v1 with a deterministic rendered projection. |
+| `verify` | Current proof or inquiry JSON; prints integrity checks, optionally with `--explain`. |
+| `pilot export` | Built-in scenario; creates signed synthetic receipts and checkpoints. |
+| `supervised-live export` | Typed capture JSON; requires export-ready control state. |
+| `supervised-live qualify` | Built-in capture and pilot; writes fixture qualification artifacts. |
 
-`tests/cli.rs` builds the `mercury` binary and drives it through `CARGO_BIN_EXE_mercury`,
-exercising every export and validate command end-to-end against real filesystem output (one
-export test and one validate test per lane, plus proof/inquiry/pilot/supervised-live coverage).
+Review and distribution subcommands also expose `export` and `validate`.
+They assemble local packages through the shared workflow, including governance,
+assurance, OEM, trust-network, account, and portfolio contracts. `validate`
+writes a validation report and a decision record with predefined scope text.
+These records describe the fixture exercise.
 
-## See also
+## Guarantees
 
-- `chio-mercury-core` - typed MERCURY package, profile, and artifact contracts this CLI
-  assembles and validates; also supplies the sample fixtures the chain bootstraps from.
-- `chio-control-plane` - `evidence_export` for Chio evidence packages; `CliError` is reused as
-  this crate's error type throughout.
-- `chio-kernel` - `build_checkpoint` for the synthetic receipt store used by pilot and
-  supervised-live exports.
-- `chio-store-sqlite` - `SqliteReceiptStore` backing that synthetic receipt population.
+- `build_proof_package` loads evidence through
+  `load_verified_evidence_package_summary` with an explicit verification policy.
+- `cmd_mercury_verify` calls the core package's `verify` method. This method
+  checks receipt signatures and package bindings without selecting an external
+  trusted kernel-key set. Authority-sensitive consumers should use the core
+  `verify_with_trusted_kernel_keys` API.
+- `read_json_file` rejects duplicate keys through `decode_signed`; its file
+  read itself is unbounded.
+- `ensure_empty_directory` rejects nonempty export directories.
+  `write_json_file` creates parent directories and can overwrite an individual
+  file selected by the caller.
+
+## Status
+
+Implemented as a local evidence CLI with synthetic pilot and capture exports.
+`populate_mercury_receipt_store` signs modeled events directly; it does not run
+an external trading tool through kernel admission. The supervision mode and
+release gates are supplied capture data. Product package names and generated
+qualification decisions do not establish deployment acceptance.
+
+There are no package-defined Cargo features. CLI tests exercise filesystem
+exports, verification, duplicate-key rejection, and package validation.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Receipt contract](../../../spec/PROTOCOL.md#6-receipt-contract)
+- [Mercury core](../chio-mercury-core/README.md)
+- [Control plane](../../platform/chio-control-plane/README.md)
+- [License](../../../LICENSE)

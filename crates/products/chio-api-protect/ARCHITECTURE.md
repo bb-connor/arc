@@ -1,178 +1,143 @@
 # chio-api-protect architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-api-protect` is a self-contained edge service. It embeds its own
-`chio_kernel::ChioKernel` instance (via `chio_http_core::HttpAuthority`) and
-Ed25519 signer rather than calling out to a separately hosted kernel, so it
-is the trust boundary for whatever HTTP API it fronts. Every request is
-matched against an OpenAPI-derived route table, projected as a synthetic
-`authorize_http_request` tool call through the embedded guard pipeline, and
-receipted regardless of outcome; only an allow verdict proceeds to the
-upstream. The crate composes `chio_http_core`'s authority and
-egress-contract primitives with an Axum server, SQLite-backed
-receipt/revocation persistence, and sidecar control routes for capability
-lifecycle and human-approval operations.
+The public surface exports `ProtectProxy`, `ProtectConfig`, `RequestEvaluator`,
+`RouteEntry`, `EvaluationResult`, approval and retention configuration, spec
+loaders, and `ProtectError`. `ProtectProxy` owns startup, the Axum router, shared
+state, maintenance tasks, and upstream dispatch. `RequestEvaluator` maps a
+method/path to an `HttpAuthorityPolicy` and evaluates it through `HttpAuthority`.
+Its ephemeral constructors explicitly select in-memory receipt and revocation
+state. Durable constructors require supplied stores unless their explicit
+`allow_ephemeral` argument permits memory-backed state.
 
-## Diagram
+The upstream API remains responsible for its application behavior. Sidecar
+control authority belongs to the operator or trusted tool server. Capability
+subjects retain their signing keys. Caller execution needs a separately pinned
+executor; installing an ordinary approval configuration also installs that
+identity. Budget and receipt custody are local deployment resources.
 
-```mermaid
-flowchart TD
-    client["HTTP client and SDK"]
-    auth["Bearer or loopback gate"]
+## Structure
 
-    subgraph sgRoutes["Axum sidecar routes"]
-        proxy["ANY catch all proxy_handler"]
-        evaluate["POST /chio/evaluate"]
-        mint["POST /v1/capabilities/mint"]
-        validate["POST /v1/capabilities/validate"]
-        verifyrec["POST /v1/receipts/verify"]
-        approvals["/approvals human review"]
-    end
+- `lib.rs` re-exports the supported library entrypoints; `error.rs` defines errors.
+- `evaluator.rs` wraps HTTP authority. `evaluator/route_matching.rs` selects local
+  routes and rejects ambiguous encoding; `diagnostics.rs` records parse categories.
+- `spec_discovery.rs` provides public text acquisition and upstream egress policy.
+- `proxy/state.rs` builds stores, kernels, transport, and task ownership.
+  `proxy/config.rs` declares operator settings; `spec_authority.rs` binds policy
+  to document bytes, local pin status, anonymous-read policy, and guard profile.
+- `proxy/router.rs` mounts helper endpoints and the catch-all upstream handler.
+  `sidecar.rs`, `control.rs`, `input.rs`, `http.rs`, and `receipts.rs` implement
+  helper routes, credential gates, bounded decoding, HTTP projection, and signing.
+- `proxy/mediated.rs` builds the retained pre-execution kernel; its `authenticated`
+  module handles trusted caller start/report and `budget_configuration` chooses
+  available budget authority. `approval.rs` and `approval_authority.rs` handle
+  execution-bound approval workflows. `attenuation.rs` refuses server-side delegation.
+- `proxy/evidence.rs` writes the shared receipt sink; `retention.rs` owns explicit
+  archive maintenance. Admission maintenance under `proxy/state/` reaps abandoned
+  reservations and reports worker health.
 
-    subgraph sgCore["Embedded trust core"]
-        evaluator["RequestEvaluator route table"]
-        authority["HttpAuthority embeds ChioKernel guard"]
-        signer["Ed25519 signer"]
-    end
+## Startup and policy flow
 
-    subgraph sgStores["SQLite backed stores"]
-        receipts["Receipt store"]
-        revocation["Revocation store"]
-        approvalstore["Approval store"]
-    end
+`run_with_observer` prepares listener transport, validates mutually exclusive spec
+sources and any SHA-256 pin, checks control-token syntax, and rejects absent or
+in-memory receipt stores unless explicitly permitted. Durable signing requires
+an existing custody file; an inline seed conflicts with that file and is accepted
+only for ephemeral embedding. Durable admission opens a sibling authority DB
+under `<receipt-path>.authority-locks`, with a private lock directory. The serving
+owner gate requires Unix support for file identity and locking. Signing custody
+is loaded separately through the control-plane existing-key loader.
 
-    upstream["Upstream API"]
+Startup reads a local spec through a byte-bounded loader or discovers it through
+four upstream probes. It parses routes and `x-chio-*` extensions before binding
+the listener. Policy-relaxing side-effect overrides require a local exact-byte
+pin. `routes_from_spec` always uses unpinned policy. The public
+`load_spec_from_file` helper uses `read_to_string` directly; parsing and bounds
+are supplied by its caller. Auto-discovery collects at most `MAX_OPENAPI_BYTES`
+through the HTTP egress contract and returns unparsed text.
 
-    client -->|"data plane"| proxy
-    client -->|"unauthenticated"| evaluate
-    client -->|"unauthenticated"| verifyrec
-    client -->|"bearer or loopback"| auth
-    auth --> mint
-    auth --> validate
-    auth --> approvals
+The HTTP evaluator independently matches method and path, including when a
+sidecar caller supplies a route pattern. Anonymous reads require local opt-in on
+matched `SessionAllow` routes. Unmatched paths deny. Route specificity favors
+exact segments; equally specific overlaps favor restrictive policy. Encoded and
+decoded paths must select the same route, with separators, nested escapes,
+controls, and dot segments rejected.
 
-    proxy -->|"revocation preflight"| revocation
-    proxy -->|"evaluate"| evaluator
-    evaluate -->|"evaluate"| evaluator
-    evaluator --> authority
-    authority -->|"sign receipt"| signer
-    authority -->|"allow forward"| upstream
-    proxy -->|"persist"| receipts
-    evaluate -->|"persist"| receipts
+## Requests, execution, and evidence
 
-    mint --> signer
-    validate --> revocation
-    verifyrec --> signer
-    approvals --> approvalstore
-```
+The upstream handler first scans original headers for the reserved control
+credential. It rejects duplicate decoded query keys and bounds request bodies
+at 10 MiB. It projects caller credentials and a presented capability, consults
+revocation state, then evaluates. Only `Verdict::is_allowed` enters dispatch.
+The authority contract pins the upstream scheme and authority, bounds redirects
+at four and responses at 64 MiB, and applies address restrictions with pinned DNS.
+Loopback upstreams require an explicitly loopback upstream host.
 
-## Module map
+The upstream client has a configurable full-hop timeout, defaulting to 20
+seconds, with no application retry. Successful responses and upstream failures
+finalize signed HTTP status and record evidence before returning. Early invalid
+input and authentication failures can terminate before receipt creation.
+The shared receipt sink converts HTTP receipts into signed `ChioReceipt` records
+with a 5-second append budget. Store failure produces an error response.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public crate boundary: `ProtectConfig`, `ProtectProxy`, `RequestEvaluator`, `EvaluationResult`, `RouteEntry`, `ProtectError`, spec-loading functions. `#![forbid(unsafe_code)]`. |
-| `src/error.rs` | `ProtectError`, the product error surface. |
-| `src/evaluator.rs` | `RequestEvaluator`: route-table matching, caller-identity extraction, and the call into `chio_http_core::HttpAuthority`. |
-| `src/spec_discovery.rs` | OpenAPI spec discovery/loading and `default_upstream_egress_contract`. |
-| `src/proxy.rs` | Declares the `proxy/*` submodules via `#[path]`, re-exports their crate-internal items, and hosts the `#[cfg(test)]` integration suites `tests` and `nonce_tests`. |
-| `src/proxy/config.rs` | `ProtectConfig`, `DEFAULT_UPSTREAM_REQUEST_TIMEOUT`; `Debug` redacts the control token, signer seed, and spec content. |
-| `src/proxy/state.rs` | `ProxyState`, the product-local `SqliteReceiptStore` (`http_receipts`/`tool_receipts`/`revoked_capabilities` tables), and `ProtectProxy` startup. |
-| `src/proxy/router.rs` | `build_app`, `proxy_handler` (evaluate, forward, receipt), revocation preflight, receipt persistence helpers. |
-| `src/proxy/sidecar.rs` | Sidecar control-route handlers: evaluate, verify, mint, release, validate, receipt submit/verify, advisory tool-call evaluation, bearer/loopback gating. |
-| `src/proxy/approval.rs` | Human-approval routes: submit, list pending, get, respond, batch respond, operator-respond. |
-| `src/proxy/attenuation.rs` | `/v1/capabilities/attenuate`, always `403`. |
-| `src/proxy/http.rs` | Query/header parsing, advisory response shaping, forwarded-header filtering, execution-nonce header extraction. |
-| `src/proxy/decision.rs` | Decision-label and verdict-to-HTTP-status mapping. |
-| `src/proxy/errors.rs` | JSON error-response builders. |
-| `src/proxy/receipts.rs` | `build_manual_receipt`, the signer for hand-built receipts that bypass `HttpAuthority` (revocation denials, submitted receipts). |
-| `src/proxy/scope_subset.rs` | `is_scope_subset`, used by `/v1/capabilities/validate`. |
+`POST /chio/evaluate` evaluates HTTP authority without forwarding upstream.
+`POST /v1/evaluate` uses one retained kernel with default runtime guards, approval
+and DPoP replay state, strict execution nonces, and budget holds. It authorizes
+pre-execution reservation without dispatch. A hold-capable local authority and
+control credential are required. Remote budget configuration cannot supply the
+reservation hold API. Durable admission also rejects external budget authorities
+at startup so reservations share the local authority transaction.
 
-## Request lifecycle
+Authenticated `/v1/caller/start` and `/v1/caller/report` bind durable reservations
+to the pinned executor. Control-gated `/v1/reconcile` records trusted execution
+results. Durable approved retries may present their operation-bound nonce;
+legacy reservations reject presented nonces. Ordinary approvals pin an already
+activated replay source and approver roster. Loading configuration activates no
+source. Threshold collection requires an operator context resolver; direct
+threshold tokens and proposals remain rejected on `/v1/evaluate`, as does
+supplemental authorization without a verifier. Prepayment remains denied until
+a payment adapter is installed.
 
-1. `proxy_handler` (or a sidecar evaluate route) reads method, path, query,
-   headers, and body, rejecting a duplicate query key or malformed
-   execution-nonce header before evaluation.
-2. A revocation preflight runs first (`revoked_proxy_response` /
-   `revoked_sidecar_evaluate_response`): a revoked capability short-circuits
-   to a signed deny receipt without calling `HttpAuthority`.
-3. `RequestEvaluator::evaluate*` matches the path against the OpenAPI route
-   table using the actual request path and method. Paths that URL parsing
-   would rewrite are denied. Literal segments outrank `{param}` wildcards;
-   equally specific overlaps choose the restrictive policy. Unmatched routes
-   always deny. Anonymous access to registered read routes requires the local
-   `allow_anonymous_reads` opt-in. The matched policy and request go to
-   `HttpAuthority::evaluate`, which runs the embedded kernel guard pipeline
-   and returns a decision `HttpReceipt`.
-4. A denial returns immediately with a finalized deny receipt. An allow
-   proxies the request upstream (`send_with_contract`, under the upstream
-   `HttpEgressContract`), then finalizes the receipt with the real upstream
-   response status (`RequestEvaluator::finalize_receipt`) before returning
-   the response.
-5. Every finalized receipt is cached in-process and, when `receipt_db` is
-   configured, persisted to SQLite (`record_receipt` / `record_tool_receipt`).
+## Trust and lifecycle invariants
 
-## Invariants and failure modes
+Control credentials authenticate capability lifecycle, approval workflows,
+receipt submission, reconciliation, and metrics independently of peer address.
+Nonempty configured credentials use RFC 6750 token syntax with a 512-byte limit.
+The proxy's 64 KiB aggregate header scan rejects control-token bytes before
+mediation and egress. Public liveness, verification, and independently authorized
+evaluation routes do not acquire operator authority.
 
-- Fail-closed durability: `ProtectProxy::run_with_observer` refuses to start
-  without a durable `receipt_db` unless `allow_ephemeral_receipts` is set. An
-  in-memory SQLite path (`:memory:`, `mode=memory`) does not count as
-  durable.
-- Fail-closed revocation: `ProxyState::capability_is_revoked` treats a
-  durable revocation-store query error as revoked, not as not-revoked.
-- Every route requires capability authority by default. Registered read routes
-  can be opened with `--allow-anonymous-reads`; unknown routes still deny.
-  An OpenAPI extension can relax side-effect classification only when `--spec`
-  names a local file and `--spec-sha256` matches the exact bounded bytes loaded.
-  Inline and discovered specs may tighten policy but cannot relax it.
-- Chio transport headers (`x-chio-capability`, `x-chio-execution-nonce`) and
-  hop-by-hop headers are stripped before a request reaches upstream
-  (`should_forward_request_header`).
-- `/v1/capabilities/attenuate` always returns `403`: the sidecar never holds
-  the parent subject's signing key, so it cannot mint an attenuated child.
-- `/v1/evaluate` is a kernel-mediated pre-execution reservation gate. It
-  requires a local hold-capable budget store and a configured control token
-  for downstream reconciliation. It mints execution nonces, never dispatches
-  or settles a tool. `/v1/evaluate/advisory` performs local revocation and
-  parameter-hash checks only and is explicitly not kernel authorization.
-- Sidecar control routes (approvals, mint, release, validate, receipts,
-  reconciliation, `/metrics`) require a configured token and one matching
-  bearer header, compared in constant time (`subtle::ConstantTimeEq`).
-  Missing or blank configuration disables control access, including loopback.
-  Duplicate headers deny. The shared gate lives in `proxy/control.rs`.
-- Nonempty control tokens are validated before startup I/O against Bearer-token
-  syntax and a 512-byte bound. Before body reads or kernel admission, the proxy
-  rejects their raw bytes in any request header value. A 64 KiB name/value budget
-  bounds the scan, including duplicates. Ordinary upstream credentials stay
-  byte-preserved; this is not body, URL or encoded-secret inspection.
-- The upstream egress contract denies redirect chains beyond 4 hops, caps
-  response bodies at 64 MiB, and denies loopback/link-local/IPv6-ULA
-  destinations unless the configured upstream host is itself loopback.
-- Two independent trusted-issuer checks exist: `HttpAuthority` (mediated
-  evaluation) always trusts its own signer key in addition to the configured
-  list; `ProxyState.trusted_capability_issuers` (`/v1/capabilities/validate`
-  only) is built separately in `run_with_observer` and also adds the signer
-  key explicitly.
+Capability issuers and receipt signers use separate trust sets. Token validation
+checks trusted issuer, signature, validity window, revocation of the token and
+chain ancestors, and optional subject matching; concrete-call policy and scope
+checks happen at mediation. Receipt verification pins the local signer and checks
+signed receipt semantics. Advisory evaluation checks revocation and parameter
+hashes, then emits an observation with `TrustLevel::Advisory` and
+`authorization: false`. Attenuation returns 403 because the subject signer is absent.
 
-## Dependencies
+A configured additional revocation DB is read at startup; external changes to
+that loaded set require restart or an in-process release channel. Readiness
+consults durable receipt-writer health while liveness reports process health.
+Shutdown drains for the upstream timeout plus 5 seconds, stops owned maintenance,
+and flushes accepted receipt writes. Retention is disabled unless configured;
+its validator requires a durable live DB, positive days, a 1-to-86400-second
+interval, and a distinct archive destination.
 
-- `chio-http-core` (`reqwest-egress` feature) - `HttpAuthority` (embeds a
-  `ChioKernel`; this crate evaluates every request through it),
-  `HttpEgressContract` and its dispatch helpers, and the shared sidecar types
-  (`ChioHttpRequest`, `HttpReceipt`, `ApprovalAdmin`, `EvaluateResponse`).
-- `chio-kernel` - `ApprovalStore`, `ReceiptStore`, `RevocationStore`,
-  `SignedExecutionNonce`, and their in-memory implementations; also the
-  Prometheus guard-metrics renderer mounted at `/metrics`.
-- `chio-openapi` - OpenAPI parsing, Chio policy extensions, and
-  `DefaultPolicy` derivation per route.
-- `chio-store-sqlite` - durable receipt, revocation, and approval store
-  implementations backing `chio_kernel`'s traits.
-- `chio-core-types` - capability tokens, scopes, receipts, crypto
-  primitives, canonical JSON.
-- `chio-http-serve` - server hygiene (drain timeout, connection cap,
-  `CappedPeerAddr`) applied to the Axum listener.
-- `chio-metrics-spec` - alert-pack Prometheus family rendering for
-  `/metrics`.
-- External: `axum`/`tokio` (server), `reqwest` (upstream client), `rusqlite`
-  (the product's own receipt/revocation tables), `subtle` (constant-time
-  bearer-token comparison), `sha2`/`hex`/`uuid`/`chrono`.
+## Dependencies and verification
+
+`chio-openapi` parses documents and classifies routes; `chio-http-core` supplies
+HTTP authority, receipts, and contracted egress; `chio-kernel` supplies admission,
+guards, replay, budgets, and caller delivery. `chio-store-sqlite` persists receipt,
+approval, revocation, and admission state. `chio-control-plane` and
+`chio-http-serve` supply custody loading, listener transport, hygiene, and drain.
+Axum, Tokio, and reqwest provide routing, task ownership, and upstream I/O.
+
+`cargo test -p chio-api-protect` exercises the crate's tests.
+`tests/openapi_extension_policy.rs` checks restrictive classification, invalid
+extensions, and rejection before listener activation. Proxy test modules cover
+control credentials and containment, encoded routes, signer trust, receipt
+redelivery, readiness, upstream errors/timeouts, and producer numbers. Mediated
+tests cover authorization, approvals, authenticated caller delivery, reconciliation,
+and default guards. These tests exercise local authority and loopback fixtures;
+production composition needs deployed custody, TLS, persistent stores, and an
+independently configured execution site.

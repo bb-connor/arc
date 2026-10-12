@@ -1,72 +1,94 @@
 # chio-wall-core architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-wall-core` is a pure contract crate: serde-derived types, enums, and
-fail-closed validation, built with `#![forbid(unsafe_code)]`, no I/O, no async
-runtime, and no dependency on `chio-core`, `chio-kernel`, or `chio-guards`. It
-defines the JSON shape of the seven-artifact evidence bundle that the
-`chio-wall` CLI builds when it runs its bounded control-path workflow. The
-crate does not evaluate guards, sign receipts, or write files; it only defines
-what a valid artifact looks like and rejects everything else.
+`chio-wall-core` owns the data contracts for Chio-Wall control-path packages.
+The public surface is `control_path` plus root re-exports of its artifact types,
+enums, schema constants, and `ChioWallContractError`. The crate implements no
+listener, policy engine, kernel, signer, receipt store, or filesystem loader.
+Consumers supply JSON acquisition, explicit validation, and enforcement.
 
-## Module map
+`ChioWallBuyerMotion` has the `ControlRoomBarrierReview` variant and
+`ChioWallControlSurface` has `ToolAccessDomainBoundary`. Information domains
+are `Research` and `Execution`; guard decisions are `Allow` and `Deny`.
+These closed enums constrain the representable vocabulary of the artifact.
+They do not authenticate a caller or establish what a runtime actually did.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public API surface. Re-exports every type, enum, error, and schema constant from `control_path`. |
-| `src/control_path.rs` | The seven artifact schemas, `ChioWallContractError`, `REQUIRED_CONTROL_PACKAGE_ARTIFACTS`, and the shared field-level validation helpers (`ensure_non_empty`, `ensure_non_empty_list`, `ensure_unique_strings`, `ensure_fail_closed`). |
+## Structure and artifact relationships
 
-## Boundaries
+`src/lib.rs` forbids unsafe code, declares `control_path`, and re-exports the
+contracts. `src/control_path.rs` contains all schemas, types, validators, shared
+field helpers, and unit tests. `tests/integration_smoke.rs` exercises the exported
+profile API with a valid boundary and an invalid same-domain profile.
 
-- The crate performs no I/O and holds no runtime or kernel state. It does not
-  call `chio-core`, `chio-kernel`, `chio-guards`, or `chio-store-sqlite`; those
-  are `chio-wall`'s dependencies, not this crate's. It only defines the JSON
-  shapes those systems' outputs are projected into.
-- Validation is per-artifact and structural. `ChioWallControlPackage::validate`
-  checks that the required artifact-kind set is complete and non-duplicated and
-  that each artifact's own fields are well-formed; it does not read the files
-  named by `relative_path`, and it does not cross-check `workflow_id` or other
-  fields for equality across sibling artifacts.
-- File writing, Chio evidence export, guard-pipeline execution, and receipt
-  signing all live in `chio-wall`. See `docs/chio-wall/VALIDATION_PACKAGE.md`
-  for the CLI's output layout, which is a superset of what this crate models:
-  it also writes a `control-path-summary.json` that has no corresponding type
-  here.
+| Artifact | Data it describes |
+| --- | --- |
+| `ChioWallControlProfile` | Workflow, domain boundary, retained-artifact policy, and intended use. |
+| `ChioWallPolicySnapshot` | Policy identifier, source domain, and allowed tool names. |
+| `ChioWallAuthorizationContext` | Request, workflow, actor label, requested domain, tool, and policy reference. |
+| `ChioWallGuardOutcome` | Decision, guard and pipeline labels, matched policy, evaluated tool, and allowlist. |
+| `ChioWallDeniedAccessRecord` | Denied request context and escalation/support owners. |
+| `ChioWallBuyerReviewPackage` | Review package identity, owners, and file references. |
+| `ChioWallControlPackage` | Package identity, same-system boundary, owners, and artifact inventory. |
 
-## Invariants and failure modes
+`ChioWallArtifact` pairs an artifact-kind enum with a path string. Its seven
+kinds include the six supporting JSON artifacts and `ChioEvidenceExport`.
+The control package is the inventory owner, so its own file is outside that
+seven-kind inventory. Schema constants cover each schema-bearing package type.
 
-- The seven schema-tagged types (`ChioWallControlProfile`, `ChioWallPolicySnapshot`,
-  `ChioWallAuthorizationContext`, `ChioWallGuardOutcome`, `ChioWallDeniedAccessRecord`,
-  `ChioWallBuyerReviewPackage`, `ChioWallControlPackage`) each fail closed on a
-  schema-tag mismatch (`InvalidSchema`) before checking any other field.
-  `ChioWallArtifact`, the artifact-reference type embedded in
-  `ChioWallControlPackage.artifacts`, carries no schema field and only
-  validates `relative_path`.
-- `ChioWallBuyerMotion` and `ChioWallControlSurface` are each single-variant
-  enums, so the one-buyer-motion, one-control-surface scope is enforced by the
-  type system rather than by a runtime check.
-- String fields fail closed on empty, whitespace-padded, or control-character
-  content (`EmptyField`, `PaddedField`, or a `Validation` error); string lists
-  additionally fail closed on any element with those defects.
-- `fail_closed` fields (on `ChioWallControlProfile`, `ChioWallPolicySnapshot`,
-  `ChioWallGuardOutcome`, `ChioWallBuyerReviewPackage`, `ChioWallControlPackage`)
-  must be `true`; `ensure_fail_closed` rejects `false` even though the struct
-  itself allows constructing one.
-- Domain-pair fields must differ: `ChioWallControlProfile.source_domain` /
-  `protected_domain`, and `requested_domain` / `source_domain` on both
-  `ChioWallAuthorizationContext` and `ChioWallDeniedAccessRecord`.
-- `ChioWallGuardOutcome` rejects a `Deny` decision whose `evaluated_tool` also
-  appears in `allowed_tools`. Both `ChioWallPolicySnapshot.allowed_tools` and
-  `ChioWallGuardOutcome.allowed_tools` must be non-empty with no duplicates.
-- `ChioWallControlPackage::validate` requires exactly the seven
-  `REQUIRED_CONTROL_PACKAGE_ARTIFACTS` kinds present with no duplicate
-  `ChioWallArtifactKind`.
-- `serde_json::Error` converts into `ChioWallContractError::Json` via `From`,
-  so JSON parse failures surface through the same error type as validation.
+## Data and control flow
 
-## Dependencies
+A caller constructs an artifact or deserializes it through Serde, then invokes
+its `validate()` method. Public fields remain mutable, so a consumer must repeat
+validation after edits that affect the contract. Successful Serde decoding alone
+performs no semantic validation. Structs serialize fields in camelCase; enum
+values use snake_case. The structs do not declare `deny_unknown_fields`, so
+ordinary Serde decoding may accept additional fields.
 
-No internal `chio-*` dependencies; this is a workspace leaf crate. External:
-`serde` / `serde_json` for the artifact schemas (`camelCase` fields,
-`snake_case` enum variants) and `thiserror` for `ChioWallContractError`.
+Each validator checks its own artifact. Schema checks precede required field
+checks. Package validation loops over inventory entries, validates their path
+strings, rejects repeated kinds, then checks that every required kind appeared.
+It does not open referenced files or compare the request identifiers across
+separately validated artifacts. The CLI performs those package-level joins.
+
+## Trust and invariants
+
+Schema-bearing types require an exact schema string. Required scalar strings
+must be nonempty after trimming, have no surrounding whitespace, and contain no
+control characters. Tool lists must be nonempty and each entry must obey those
+string rules. Both policy and outcome lists reject exact duplicate tool names.
+Fields named `fail_closed` must be true in profiles, policy snapshots, outcomes,
+review packages, and control packages.
+
+Profiles require differing source/protected domains. Authorization contexts and
+denied-access records require differing source/requested domains. A denied guard
+outcome must evaluate a tool absent from its allowlist. An allowed outcome may
+name a tool absent from that list; callers seeking allowlist enforcement must
+run their actual guard instead of treating this validator as an evaluator.
+
+Path fields receive the required-string checks only. `ChioWallArtifact::validate`
+does not reject absolute paths or traversal components, enforce containment,
+inspect symlinks, or require file existence. `ChioWallControlPackage::validate`
+requires each artifact kind exactly once but does not verify its contents.
+Consumer filesystem policy must resolve and constrain paths before use.
+
+`ChioWallContractError` distinguishes invalid schema, missing list fields, empty
+and padded scalar fields, other validation failures, and JSON errors converted
+from `serde_json::Error`. Validators establish local consistency. No signing,
+canonicalization, receipt verification, or operational fail-closed enforcement
+is implemented in this crate.
+
+## Dependencies and verification
+
+Serde supplies JSON representations; `serde_json` supplies the error conversion;
+`thiserror` supplies typed error display. There are no Cargo features or async
+runtime requirements. Serialization and validation work entirely in memory.
+
+`cargo test -p chio-wall-core` runs unit and integration tests. Unit cases cover
+padded and control-bearing identifiers, duplicate and invalid allowlist entries,
+same-domain boundaries, denial contradictions, false fail-closed settings,
+missing artifact paths, duplicate artifact kinds, and incomplete inventories.
+One test explicitly accepts an allowed outcome whose tool is absent from the
+allowlist. The README example exercises public profile validation on both sides
+of the domain inequality. Receipt authenticity and runtime enforcement require
+separate application verification.
