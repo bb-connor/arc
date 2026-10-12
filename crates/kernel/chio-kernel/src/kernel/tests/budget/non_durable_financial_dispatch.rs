@@ -2,14 +2,14 @@ use super::*;
 
 #[test]
 fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
-    // A non-durable monetary kernel must reverse the provisional budget hold and
-    // deny before dispatch. It therefore cannot reach RequestIncomplete or add
-    // an unrecoverable retained-hold sample.
     let mut kernel =
         ChioKernel::new_with_clock(make_monetary_config(), chio_test_support::clock::clock());
     assert!(kernel.durable_admission_runtime.is_none());
-    kernel.register_tool_server(Box::new(IncompleteServer {
+    let invocations = Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer {
         id: "broken".to_string(),
+        tools: vec!["drop_stream".to_string()],
+        invocations: invocations.clone(),
     }));
     let agent_kp = Keypair::generate();
     let grant = make_monetary_grant("broken", "drop_stream", 100, 1000, "USD");
@@ -17,7 +17,6 @@ fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let before = ambiguous_retained_hold_none_sample();
     let response = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-ambiguous-incomplete".to_string(),
@@ -48,11 +47,8 @@ fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
         response.reason
     );
 
-    let after = ambiguous_retained_hold_none_sample();
-    assert_eq!(
-        after, before,
-        "pre-dispatch denial must not record an ambiguous retained hold"
-    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert!(response.receipt.verify_signature().unwrap());
     let usage = kernel
         .budget_store
         .get_usage(&response.receipt.capability_id, 0)
