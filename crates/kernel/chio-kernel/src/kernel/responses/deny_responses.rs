@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 
 impl ChioKernel {
     pub(crate) fn build_monetary_deny_response_with_metadata(
@@ -379,7 +380,7 @@ impl ChioKernel {
             reason,
             timestamp,
             matched_grant_index,
-            extra_metadata,
+            with_identity_disposition(extra_metadata, IdentityDisposition::Reusable),
             "kernel",
         )
     }
