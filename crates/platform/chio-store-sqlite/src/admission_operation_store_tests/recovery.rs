@@ -15,6 +15,7 @@ mod terminal_chronology;
 
 #[test]
 fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let first = prepared_operation(
         &fixture.fence,
@@ -143,6 +144,7 @@ fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
 
 #[test]
 fn recovery_claim_retry_returns_the_persisted_lease_when_expiry_changes() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -295,6 +297,7 @@ fn qualified_recovery_rechecks_history_version_fence_and_expiry() {
 
 #[test]
 fn recovery_claim_rolls_forward_only_for_the_same_claimant() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -365,6 +368,7 @@ fn recovery_claim_rolls_forward_only_for_the_same_claimant() {
 
 #[test]
 fn decision_time_can_arrive_out_of_order_across_operations() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let first = prepared_operation(
         &fixture.fence,
@@ -548,6 +552,7 @@ fn broker_transition(operation: &AdmissionOperationV1, attempt: &str) -> Claimed
 
 #[test]
 fn fused_active_claim_noop_preserves_expiry_commit_head_and_anchor() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let at = now_ms();
     let operation = prepared_operation(
@@ -649,6 +654,7 @@ fn fused_active_claim_noop_preserves_expiry_commit_head_and_anchor() {
 
 #[test]
 fn fused_noop_commit_refusal_is_not_an_uncertain_write() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     use rusqlite::hooks::{AuthAction, AuthContext, Authorization, TransactionOperation};
     for writes in [false, true] {
         let fixture = fixture();
@@ -741,6 +747,7 @@ fn fused_noop_commit_refusal_is_not_an_uncertain_write() {
 /// and the anchor advances once where the two-step path advances it twice.
 #[test]
 fn claimed_transition_persists_the_claim_and_the_command_in_one_write() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let fused = prepared_operation(
         &fixture.fence,
@@ -841,6 +848,7 @@ fn claimed_transition_persists_the_claim_and_the_command_in_one_write() {
 /// rejected transition, which is the lease this write no longer strands.
 #[test]
 fn refused_or_rejected_claimed_transition_leaves_no_claim_behind() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let fused = prepared_operation(
         &fixture.fence,
