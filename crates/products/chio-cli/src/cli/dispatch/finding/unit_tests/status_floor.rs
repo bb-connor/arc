@@ -171,13 +171,13 @@ fn status_floor_keeps_retractions_sticky_per_finding() {
 }
 
 #[test]
-fn status_floor_rejects_obsolete_schema_without_mutating_retained_state() {
+fn status_floor_rejects_unknown_schema_without_mutating_retained_state() {
     let dir = tempfile::tempdir().unwrap();
     let floor_path = dir.path().join("status-floor.json");
     advance(&floor_path, &response("non_inclusion")).unwrap();
     let mut floor: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&floor_path).unwrap()).unwrap();
-    floor["schema"] = serde_json::json!("chio.finding.status-cli-floor.v1");
+    floor["schema"] = serde_json::json!("chio.finding.status-cli-floor.v0");
     let bytes = canonical_json_bytes(&floor).unwrap();
     std::fs::write(&floor_path, &bytes).unwrap();
     let error = advance(&floor_path, &response("non_inclusion")).unwrap_err();
@@ -185,6 +185,29 @@ fn status_floor_rejects_obsolete_schema_without_mutating_retained_state() {
         error.to_string().contains("schema is unsupported"),
         "{error}"
     );
+    assert_eq!(std::fs::read(&floor_path).unwrap(), bytes);
+}
+
+#[test]
+fn status_floor_rejects_unbound_shape_under_the_current_schema() {
+    let dir = tempfile::tempdir().unwrap();
+    let floor_path = dir.path().join("status-floor.json");
+    advance(&floor_path, &response("non_inclusion")).unwrap();
+    let mut floor: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&floor_path).unwrap()).unwrap();
+    assert_eq!(floor["schema"], "chio.finding.status-cli-floor.v1");
+    let object = floor.as_object_mut().unwrap();
+    for field in [
+        "rotation_policy_ref",
+        "operator_key_epoch",
+        "operator_key",
+        "operator_authorization_sha256",
+    ] {
+        assert!(object.remove(field).is_some(), "{field}");
+    }
+    let bytes = canonical_json_bytes(&floor).unwrap();
+    std::fs::write(&floor_path, &bytes).unwrap();
+    assert!(advance(&floor_path, &response("non_inclusion")).is_err());
     assert_eq!(std::fs::read(&floor_path).unwrap(), bytes);
 }
 
