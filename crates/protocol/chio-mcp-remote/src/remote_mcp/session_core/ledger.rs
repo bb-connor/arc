@@ -81,7 +81,7 @@ impl RemoteSessionLedger {
     }
 
     pub(super) async fn mark_deleted(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
-        self.transition_to_terminal(session, RemoteSessionState::Deleted)
+        self.transition_to_terminal(session, TerminalReason::Deleted)
             .await
     }
 
@@ -90,12 +90,12 @@ impl RemoteSessionLedger {
     }
 
     pub(super) async fn mark_closed(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
-        self.transition_to_terminal(session, RemoteSessionState::Closed)
+        self.transition_to_terminal(session, TerminalReason::Closed)
             .await
     }
 
     pub(super) async fn mark_expired(&self, session: &Arc<RemoteSession>) -> Result<(), CliError> {
-        self.transition_to_terminal(session, RemoteSessionState::Expired)
+        self.transition_to_terminal(session, TerminalReason::Expired)
             .await
     }
 
@@ -188,21 +188,9 @@ impl RemoteSessionLedger {
     pub(super) async fn transition_to_terminal(
         &self,
         session: &Arc<RemoteSession>,
-        state: RemoteSessionState,
+        reason: TerminalReason,
     ) -> Result<(), CliError> {
-        match state {
-            RemoteSessionState::Deleted
-            | RemoteSessionState::Expired
-            | RemoteSessionState::Closed => {}
-            RemoteSessionState::Initializing
-            | RemoteSessionState::Ready
-            | RemoteSessionState::Draining => {
-                return Err(CliError::cli_other_error(format!(
-                    "unsupported terminal MCP session state: {}",
-                    state.as_str()
-                )));
-            }
-        }
+        let state = reason.state();
         // Every await precedes the first state change, so cancelling this
         // future leaves the session untouched. Map guards are always taken
         // active then terminal.
@@ -255,9 +243,12 @@ impl RemoteSessionLedger {
                 let (tombstone, fence) = sign_terminal_session_records(
                     keyring,
                     record.clone(),
+                    reason,
+                    session.resume_envelope.current(),
                     terminal_epoch,
                     terminal_epoch,
                 )?;
+                record.terminal_reason = tombstone.record.terminal_reason;
                 prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
                 Some((path, keyring, tombstone))
             } else {

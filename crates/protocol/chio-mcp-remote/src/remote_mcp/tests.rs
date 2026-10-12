@@ -29,6 +29,8 @@ mod resume_envelope;
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
 mod session_runtime;
+#[path = "tests/terminal_reason.rs"]
+mod terminal_reason;
 
 #[derive(Clone)]
 pub(crate) struct TestNativeLaunchFactory;
@@ -997,9 +999,17 @@ fn terminal_transition_deletes_active_state_and_retains_replay_fence() {
         protocol_version: active_record.protocol_version.clone(),
         ownership: RemoteSessionOwnershipSnapshot::default(),
         terminal_at: 13,
+        terminal_reason: None,
     };
-    let (tombstone, fence) = sign_terminal_session_records(&keyring, terminal_record, 2, 2)
-        .expect("sign terminal transition");
+    let (tombstone, fence) = sign_terminal_session_records(
+        &keyring,
+        terminal_record,
+        TerminalReason::Deleted,
+        RemoteSessionEnvelope::V2,
+        2,
+        2,
+    )
+    .expect("sign terminal transition");
     persist_terminal_session_transition(&path, &tombstone, &fence, &keyring, session_now_millis())
         .expect("persist terminal transition");
 
