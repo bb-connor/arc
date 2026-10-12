@@ -1848,11 +1848,11 @@ rust_symbols = [
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "7cb099f57b5305f49e805380723ae2f928af261ef8ee092c4a9844c3582bd104"
+normalized_sha256 = "b0c432bc047d6a1c3c48ce94dff395b856f6bc79ea98d4f4aa6a2eb2f5799a1b"
 symbol_sha256 = [
   { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "c5eca031da75b34e0504e5103fffc4edb9a4fd02b2982a5f60a0bdb3722e2ce8" },
   { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "38a3e2a698263515b702a8321ce7d4b1c3898515da4f65be41d728bd2ee19112" },
-  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "ef6bf7b1b8ade3cf1aed082df551008760be2887a80309ca6becdbbe7369858b" },
+  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "6dc84984cc8a659807081b5992028f06a4c8f5ce4741a54505fd8800ad5bf184" },
 ]
 
 [[mirror]]
