@@ -493,7 +493,7 @@ struct X402AuthorizeResponse {
         alias = "transactionId"
     )]
     authorization_id: String,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     settled: bool,
     #[serde(default)]
     metadata: serde_json::Value,
@@ -955,10 +955,6 @@ fn normalize_http_path(path: &str) -> String {
     }
 }
 
-fn default_true() -> bool {
-    true
-}
-
 fn map_http_payment_error(error: ureq::Error) -> PaymentError {
     match error {
         ureq::Error::Status(402, _response) => PaymentError::InsufficientFunds,
@@ -1326,6 +1322,28 @@ mod tests {
         assert_eq!(authorization.metadata["adapter"], "x402");
         assert_eq!(authorization.metadata["network"], "base");
 
+        handle.join().expect("server thread should exit cleanly");
+    }
+
+    #[test]
+    fn x402_response_without_settled_deserializes_as_unsettled() {
+        let response: X402AuthorizeResponse =
+            serde_json::from_value(serde_json::json!({"authorizationId": "x402_txn_absent"}))
+                .expect("response without settled should deserialize");
+        assert!(!response.settled);
+    }
+
+    #[test]
+    fn x402_adapter_rejects_response_without_settled() {
+        let (url, _request_rx, handle) = spawn_once_json_server(
+            200,
+            serde_json::json!({"authorizationId": "x402_txn_absent"}),
+        );
+        let error = X402PaymentAdapter::new(url)
+            .with_timeout(Duration::from_secs(2))
+            .authorize(&test_payment_authorize_request())
+            .expect_err("a response without settled must not complete prepayment");
+        assert!(matches!(error, PaymentError::RailError(_)));
         handle.join().expect("server thread should exit cleanly");
     }
 
