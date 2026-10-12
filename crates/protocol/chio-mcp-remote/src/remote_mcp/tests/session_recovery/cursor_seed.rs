@@ -78,7 +78,7 @@ fn publish_notifications(
         .clone())
 }
 
-async fn restore_with_factory(
+pub(super) async fn restore_with_factory(
     path: &FsPath,
     factory: &RemoteSessionFactory,
     session_id: &str,
@@ -218,9 +218,11 @@ async fn restore_retains_records_it_cannot_serve() -> Result<(), Box<dyn std::er
     let mut record = fresh.resume_record()?.ok_or("fresh record")?;
 
     record.resume_generation = u64::from(u32::MAX) - 1;
-    let last = factory
-        .restore_session(&sign_test_resume_record(record.clone(), &keyring))?
-        .ok_or("the last seedable generation was not restorable")?;
+    let Some(RestoredSession::Serve(last)) =
+        factory.restore_session(&sign_test_resume_record(record.clone(), &keyring))?
+    else {
+        return Err("the last seedable generation was not restorable".into());
+    };
     let first_id = publish_notifications(&last, 1)?;
     assert_eq!(
         parse_session_event_id(&first_id, &last.session_id)?,
@@ -243,7 +245,10 @@ async fn restore_retains_records_it_cannot_serve() -> Result<(), Box<dyn std::er
     }];
     subscribed.resume_integrity.tag =
         compute_resume_record_integrity_tag(&keyring.current, &subscribed)?;
-    assert!(factory.restore_session(&subscribed)?.is_none());
+    assert!(matches!(
+        factory.restore_session(&subscribed)?,
+        Some(RestoredSession::SubscriptionNotRestored(_))
+    ));
 
     drop((fresh, last, factory));
     std::fs::remove_dir_all(directory)?;

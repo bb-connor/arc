@@ -305,7 +305,7 @@ async fn restored_transport_obeys_original_deadline_and_stops_even_if_fencing_fa
                 resume_generation: record.resume_generation,
                 upstream_transport: transport.clone(),
             })?;
-            Ok(Some(Arc::new(session)))
+            Ok(Some(RestoredSession::Serve(Arc::new(session))))
         })
         .await;
         assert_eq!(result.is_err(), persistence_fails);
@@ -484,3 +484,7 @@ mod terminal_journal;
 #[cfg(target_os = "linux")]
 #[path = "session_recovery/subscription_persistence.rs"]
 mod subscription_persistence;
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/subscription_restore.rs"]
+mod subscription_restore;

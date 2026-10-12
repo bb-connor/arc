@@ -261,6 +261,38 @@ impl ChioMcpEdge {
         self.upstream_transport = Some(transport);
     }
 
+    /// Re-registers a persisted subscription on a restored session through
+    /// the ordinary subscribe checks, bound to the capability that authorized
+    /// it. No client is answered and no observer is called.
+    pub fn restore_resource_subscription(
+        &mut self,
+        uri: &str,
+        capability_id: &str,
+    ) -> Result<(), AdapterError> {
+        let EdgeState::Ready { session_id } = &self.state else {
+            return Err(AdapterError::ParseError(
+                "restore_resource_subscription requires a restored ready session".to_string(),
+            ));
+        };
+        if !self.config.resources_subscribe {
+            return Err(AdapterError::ConnectionFailed(
+                "the upstream no longer supports resource subscriptions".to_string(),
+            ));
+        }
+        let capability = self
+            .capabilities
+            .iter()
+            .find(|capability| capability.id == capability_id)
+            .ok_or_else(|| {
+                AdapterError::ConnectionFailed(format!(
+                    "subscription capability {capability_id} is no longer held"
+                ))
+            })?;
+        self.kernel
+            .subscribe_session_resource(session_id, capability, &self.agent_id, uri)
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
+    }
+
     pub fn observe_resource_subscriptions(
         &mut self,
         observer: Arc<dyn ResourceSubscriptionObserver>,

@@ -521,7 +521,7 @@ impl RemoteSessionFactory {
     pub(super) fn restore_session(
         &self,
         record: &RemoteSessionResumeRecord,
-    ) -> Result<Option<Arc<RemoteSession>>, CliError> {
+    ) -> Result<Option<RestoredSession>, CliError> {
         let resume_hmac_keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
             CliError::cli_other_error(format!(
                 "stored MCP session {} cannot be restored without a dedicated resume HMAC keyring",
@@ -535,11 +535,6 @@ impl RemoteSessionFactory {
         )?;
         // Validate the session window before creating the upstream or edge worker.
         resume_deadline(record, self.config.clock.read()?)?;
-        if !record.subscriptions.is_empty() {
-            warn!(session_id = %record.session_id,
-                "retaining MCP session whose subscriptions cannot be restored");
-            return Ok(None);
-        }
         let Some(event_seed) = restored_event_seed(record.resume_generation) else {
             warn!(session_id = %record.session_id,
                 "retaining MCP session whose resume generation exhausts the event-id space");
@@ -692,6 +687,17 @@ impl RemoteSessionFactory {
             restored_kernel_session_id(&record.session_id),
             restored_peer_capabilities.clone(),
         )?;
+        let subscriptions_restored = record.subscriptions.iter().all(|subscription| {
+            let PersistedSubscription::Standard { uri, capability_id } = subscription;
+            match edge.restore_resource_subscription(uri, capability_id) {
+                Ok(()) => true,
+                Err(error) => {
+                    warn!(session_id = %record.session_id, uri = %uri, error = %error,
+                        "persisted resource subscription failed re-authorization");
+                    false
+                }
+            }
+        });
 
         let approval_redemption =
             remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
@@ -728,6 +734,14 @@ impl RemoteSessionFactory {
             upstream_transport: upstream_notification_source,
         })?);
         session.resume_envelope.raise(record.resume_integrity.envelope);
+        if !subscriptions_restored {
+            return Ok(Some(RestoredSession::SubscriptionNotRestored(session)));
+        }
+        session.restore_subscriptions(&record.subscriptions)?;
+        for subscription in &record.subscriptions {
+            let PersistedSubscription::Standard { uri, .. } = subscription;
+            edge.notify_resource_updated(uri);
+        }
         edge.observe_resource_subscriptions(Arc::new(
             super::session_core_session::SubscriptionPersistence(Arc::downgrade(&session)),
         ));
@@ -747,7 +761,7 @@ impl RemoteSessionFactory {
                 error!(error = %error, "remote MCP edge session worker exited with error");
             }
         });
-        Ok(Some(session))
+        Ok(Some(RestoredSession::Serve(session)))
     }
 }
 

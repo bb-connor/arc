@@ -302,6 +302,26 @@ impl RemoteSession {
         self.persist_record(path, &record, self.clock.millis()?)
     }
 
+    /// Installs the subscriptions a restored record carried. Persisting them is
+    /// left to the restored-generation write.
+    pub(super) fn restore_subscriptions(
+        &self,
+        subscriptions: &[PersistedSubscription],
+    ) -> Result<(), CliError> {
+        let mut current = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        *current = subscriptions
+            .iter()
+            .map(|subscription| {
+                let PersistedSubscription::Standard { uri, capability_id } = subscription;
+                (uri.clone(), capability_id.clone())
+            })
+            .collect();
+        Ok(())
+    }
+
     pub(super) fn persisted_subscriptions(&self) -> Result<Vec<PersistedSubscription>, CliError> {
         let subscriptions = self
             .subscriptions
