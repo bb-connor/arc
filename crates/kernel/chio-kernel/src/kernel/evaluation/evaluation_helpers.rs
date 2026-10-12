@@ -120,7 +120,7 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) nonce: PreflightNonceSource,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "finding-market"))]
 pub(crate) struct OrdinaryRecoveryFinalization<'a> {
     pub(crate) request: &'a ToolCallRequest,
     pub(crate) output: ToolServerOutput,
@@ -248,7 +248,7 @@ pub(crate) fn delivery_commitment_denial(
 }
 
 impl ChioKernel {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "finding-market"))]
     pub(crate) fn finalize_ordinary_recovery_response(
         &self,
         finalization: OrdinaryRecoveryFinalization<'_>,

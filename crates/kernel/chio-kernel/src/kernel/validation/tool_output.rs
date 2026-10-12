@@ -5,7 +5,7 @@ use super::payment_outcome::{
 };
 use super::*;
 use crate::kernel::responses::AllowResponseNonce;
-#[cfg(test)]
+#[cfg(any(test, feature = "finding-market"))]
 use crate::kernel::responses::FinalizeToolOutputCostContext;
 
 impl ChioKernel {
@@ -115,7 +115,7 @@ impl ChioKernel {
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "finding-market"))]
     pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,
