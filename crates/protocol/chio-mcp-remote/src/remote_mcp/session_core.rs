@@ -668,6 +668,8 @@ struct RemoteSession {
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: AtomicU64,
     resume_envelope: ResumeEnvelopeRatchet,
+    /// Standard resource subscriptions by URI, mapped to their capability id.
+    subscriptions: StdMutex<BTreeMap<String, String>>,
     terminalization: Mutex<()>,
     upstream_transport: RemoteSessionUpstreamTransport,
 }

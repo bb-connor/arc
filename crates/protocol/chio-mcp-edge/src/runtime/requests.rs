@@ -580,12 +580,24 @@ impl ChioMcpEdge {
             }
         };
 
-        match self
+        let newly_subscribed = match self
             .kernel
-            .subscribe_session_resource(&session_id, &capability, &self.agent_id, &uri)
+            .session_has_resource_subscription(&session_id, &uri)
         {
-            Ok(()) => jsonrpc_result(id, json!({})),
-            Err(error) => match error {
+            Ok(subscribed) => !subscribed,
+            Err(error) => {
+                return jsonrpc_error(
+                    id,
+                    JSONRPC_INTERNAL_ERROR,
+                    &format!("failed to subscribe to resource: {error}"),
+                )
+            }
+        };
+        if let Err(error) =
+            self.kernel
+                .subscribe_session_resource(&session_id, &capability, &self.agent_id, &uri)
+        {
+            return match error {
                 chio_kernel::KernelError::OutOfScopeResource { .. }
                 | chio_kernel::KernelError::ResourceNotRegistered(_) => {
                     jsonrpc_error(id, -32002, "Resource not found")
@@ -595,8 +607,20 @@ impl ChioMcpEdge {
                     JSONRPC_INTERNAL_ERROR,
                     &format!("failed to subscribe to resource: {error}"),
                 ),
-            },
+            };
         }
+        if let (true, Some(observer)) = (newly_subscribed, &self.resource_subscription_observer) {
+            if let Err(error) = observer.subscribed(&uri, &capability.id) {
+                let message = match self.kernel.unsubscribe_session_resource(&session_id, &uri) {
+                    Ok(()) => format!("failed to persist resource subscription: {error}"),
+                    Err(rollback) => format!(
+                        "failed to persist resource subscription: {error}; rollback failed: {rollback}"
+                    ),
+                };
+                return jsonrpc_error(id, JSONRPC_INTERNAL_ERROR, &message);
+            }
+        }
+        jsonrpc_result(id, json!({}))
     }
 
     pub(super) fn handle_resources_unsubscribe(&mut self, id: Value, params: Value) -> Value {
@@ -619,6 +643,23 @@ impl ChioMcpEdge {
             }
         };
 
+        if let Some(observer) = &self.resource_subscription_observer {
+            let persisted = match self
+                .kernel
+                .session_has_resource_subscription(&session_id, &uri)
+            {
+                Ok(true) => observer.unsubscribed(&uri),
+                Ok(false) => Ok(()),
+                Err(error) => Err(AdapterError::ConnectionFailed(error.to_string())),
+            };
+            if let Err(error) = persisted {
+                return jsonrpc_error(
+                    id,
+                    JSONRPC_INTERNAL_ERROR,
+                    &format!("failed to persist resource unsubscription: {error}"),
+                );
+            }
+        }
         match self.kernel.unsubscribe_session_resource(&session_id, &uri) {
             Ok(()) => jsonrpc_result(id, json!({})),
             Err(error) => jsonrpc_error(

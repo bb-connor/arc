@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::ingress::{
     mcp_inbox, AccountedMessage, ClientInbound, InboxAdmission, McpInboxReceiver,
 };
-use crate::{AdapterError, McpTransport};
+use crate::{AdapterError, McpTransport, ResourceSubscriptionObserver};
 use chio_core::capability::{
     governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::{ModelMetadata, Operation},
@@ -165,6 +165,7 @@ pub struct ChioMcpEdge {
     tasks: BTreeMap<String, EdgeTask>,
     pending_background_tasks: Vec<String>,
     upstream_transport: Option<Arc<dyn McpTransport>>,
+    resource_subscription_observer: Option<Arc<dyn ResourceSubscriptionObserver>>,
 }
 
 impl ChioMcpEdge {
@@ -252,11 +253,51 @@ impl ChioMcpEdge {
             tasks: BTreeMap::new(),
             pending_background_tasks: Vec::new(),
             upstream_transport: None,
+            resource_subscription_observer: None,
         })
     }
 
     pub fn attach_upstream_transport(&mut self, transport: Arc<dyn McpTransport>) {
         self.upstream_transport = Some(transport);
+    }
+
+    /// Re-registers a persisted subscription on a restored session through
+    /// the ordinary subscribe checks, bound to the capability that authorized
+    /// it. No client is answered and no observer is called.
+    pub fn restore_resource_subscription(
+        &mut self,
+        uri: &str,
+        capability_id: &str,
+    ) -> Result<(), AdapterError> {
+        let EdgeState::Ready { session_id } = &self.state else {
+            return Err(AdapterError::ParseError(
+                "restore_resource_subscription requires a restored ready session".to_string(),
+            ));
+        };
+        if !self.config.resources_subscribe {
+            return Err(AdapterError::ConnectionFailed(
+                "the upstream no longer supports resource subscriptions".to_string(),
+            ));
+        }
+        let capability = self
+            .capabilities
+            .iter()
+            .find(|capability| capability.id == capability_id)
+            .ok_or_else(|| {
+                AdapterError::ConnectionFailed(format!(
+                    "subscription capability {capability_id} is no longer held"
+                ))
+            })?;
+        self.kernel
+            .subscribe_session_resource(session_id, capability, &self.agent_id, uri)
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
+    }
+
+    pub fn observe_resource_subscriptions(
+        &mut self,
+        observer: Arc<dyn ResourceSubscriptionObserver>,
+    ) {
+        self.resource_subscription_observer = Some(observer);
     }
 
     pub fn set_initial_session_id(&mut self, session_id: SessionId) -> Result<(), AdapterError> {
