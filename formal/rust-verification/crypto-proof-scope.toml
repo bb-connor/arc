@@ -1,10 +1,11 @@
 schema = "chio.crypto-proof-scope.v1"
 # Noncollision is an audited assumption. These obligations have no successful proof.
 
+# chio-weights rebind: the mandatory harness checks the 64 hex bytes; the String transfer is unit-tested.
 [[obligation]]
 crate = "chio-weights"
-mandatory_source_sha256 = "955fcf9b793ea69b72a9b16f85bfb1361b2912792e45f745239a77349c64ba9d"
-mandatory_harness = "public_weights_hash_of_determinism_and_shape"
+mandatory_source_sha256 = "b055d915be35bf948b2c66c03caf2f5deb5e350a430c95876a3b11236b9ead13"
+mandatory_harness = "public_weights_hash_hex_bytes_determinism_and_shape"
 research_harness = "public_weights_hash_of_determinism_and_tampering"
 assumption_id = "ASSUME-SHA256"
 status = "unproved"

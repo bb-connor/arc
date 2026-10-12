@@ -16,7 +16,7 @@ FUNCTIONS = {
 MAX_DIAGNOSTIC_BYTES = 16 * 1024 * 1024
 ENCODER = "chio_core_types::crypto::encoding::fill_prefixed_hex"
 ENCODER_SOURCE = ("crates", "core", "chio-core-types", "src", "crypto", "encoding.rs")
-ENCODER_BOUNDS = {67: 6, 70: 66}
+ENCODER_BOUNDS = {53: 6, 54: 66}
 SHA256 = "sha2::sha256::soft::compress"
 SHA256_SOURCE = ("sha2-0.10.9", "src", "sha256", "soft.rs")
 # Each 135-byte P256 key update passes at most two 64-byte blocks;

@@ -119,7 +119,7 @@ class CryptoScopeTests(unittest.TestCase):
     def test_research_cannot_be_mandatory(self):
         self.replace(
             ".kani/harnesses.toml",
-            "public_weights_hash_of_determinism_and_shape",
+            "public_weights_hash_hex_bytes_determinism_and_shape",
             "public_weights_hash_of_determinism_and_tampering",
         )
         self.check(False)
