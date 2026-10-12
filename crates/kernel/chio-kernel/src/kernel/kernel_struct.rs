@@ -404,14 +404,17 @@ pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 pub const DEFAULT_RETENTION_DAYS: u64 = 90;
 pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 
-/// Per-process memory budget: bounded-structure capacities plus a process RSS
+/// Per-kernel bounded-structure capacities plus a process RSS
 /// soft ceiling. The soft ceiling is the in-process analog of the cgroup hard
 /// limit: the kernel sheds (Overloaded) before the OS OOM-kills it.
 #[derive(Debug, Clone)]
 pub struct MemoryBudgetConfig {
-    /// Maximum unresolved non-durable calls retained by this kernel. Must be nonzero.
+    /// Maximum concurrent or unresolved non-durable reservations. Must be nonzero.
     pub post_effect_evidence_slots: usize,
-    /// Aggregate bytes reserved for retained fault and child evidence.
+    /// Aggregate bytes reserved for fault and child evidence. Defaults to 128 MiB
+    /// for 1024 ordinary reservations, each allowing 64 KiB of fault body plus
+    /// 64 KiB of fault headroom. Large templates or children can reach this
+    /// byte limit before the slot limit. Independent explicit limits stay bounded.
     pub post_effect_evidence_bytes: usize,
     /// Size of a prepared fault template admitted before a non-durable dispatch.
     pub max_post_effect_fault_template_bytes: usize,
@@ -448,8 +451,8 @@ pub struct MemoryBudgetConfig {
 impl MemoryBudgetConfig {
     pub fn defaults() -> Self {
         Self {
-            post_effect_evidence_slots: 1024,
-            post_effect_evidence_bytes: 16 * 1024 * 1024,
+            post_effect_evidence_slots: super::effect_obligation::evidence::DEFAULT_KERNEL_SLOTS,
+            post_effect_evidence_bytes: super::effect_obligation::evidence::DEFAULT_KERNEL_BYTES,
             max_post_effect_fault_template_bytes: 1024 * 1024,
             max_post_effect_child_receipts: 256,
             receipt_mirror_capacity: 4096,

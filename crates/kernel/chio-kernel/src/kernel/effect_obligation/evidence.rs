@@ -9,25 +9,38 @@ use super::recovery::{EvidenceProducer, EvidenceQueue, PendingPostEffectRecord};
 use crate::KernelError;
 
 const DEFAULT_HOST_SLOTS: usize = 4096;
-const DEFAULT_HOST_BYTES: usize = 64 * 1024 * 1024;
-#[cfg(test)]
-const DEFAULT_KERNEL_BYTES: usize = 16 * 1024 * 1024;
+pub(in crate::kernel) const DEFAULT_KERNEL_SLOTS: usize = 1024;
+/// Ordinary fault body allowance plus the mandatory post-effect fault headroom.
+const DEFAULT_BYTES_PER_SLOT: usize = 64 * 1024 + super::preparation::FAULT_RESERVE_HEADROOM;
+const DEFAULT_HOST_BYTES: usize = DEFAULT_HOST_SLOTS * DEFAULT_BYTES_PER_SLOT;
+pub(in crate::kernel) const DEFAULT_KERNEL_BYTES: usize =
+    DEFAULT_KERNEL_SLOTS * DEFAULT_BYTES_PER_SLOT;
+
+fn bounded_default_host_bytes(ceiling: usize) -> usize {
+    DEFAULT_HOST_BYTES.min(ceiling)
+}
 
 /// Shared evidence capacity for every kernel hosted by one process.
 ///
 /// Keep one instance for the host and install it on each kernel before serving
 /// requests. A pending record holds its permit until its append is resolved.
+/// The process default has 4096 slots and 512 MiB on 64-bit targets, capped by
+/// the platform semaphore ceiling. Large templates and child receipts can use
+/// more bytes per slot and reach the byte limit before the slot limit.
 pub struct PostEffectEvidenceBudget {
     permits: Arc<Semaphore>,
     bytes: Arc<Semaphore>,
 }
 
 impl PostEffectEvidenceBudget {
+    /// Allow 128 KiB per ordinary slot; custom byte limits can be set separately.
     pub fn new(slots: NonZeroUsize) -> Result<Self, KernelError> {
-        Self::with_byte_limit(
-            slots,
-            NonZeroUsize::new(DEFAULT_HOST_BYTES).ok_or_else(capacity_error)?,
-        )
+        let bytes = slots
+            .get()
+            .checked_mul(DEFAULT_BYTES_PER_SLOT)
+            .and_then(NonZeroUsize::new)
+            .ok_or_else(capacity_error)?;
+        Self::with_byte_limit(slots, bytes)
     }
 
     pub fn with_byte_limit(slots: NonZeroUsize, bytes: NonZeroUsize) -> Result<Self, KernelError> {
@@ -47,7 +60,9 @@ impl PostEffectEvidenceBudget {
         Arc::clone(BUDGET.get_or_init(|| {
             Arc::new(Self {
                 permits: Arc::new(Semaphore::new(DEFAULT_HOST_SLOTS)),
-                bytes: Arc::new(Semaphore::new(DEFAULT_HOST_BYTES)),
+                bytes: Arc::new(Semaphore::new(bounded_default_host_bytes(
+                    Semaphore::MAX_PERMITS,
+                ))),
             })
         }))
     }
@@ -172,6 +187,24 @@ mod tests {
 
     fn capacity(value: usize) -> NonZeroUsize {
         NonZeroUsize::new(value).unwrap()
+    }
+
+    #[test]
+    fn process_defaults_fit_platform_semaphore_bounds() {
+        let thirty_two_bit_ceiling = usize::try_from(u32::MAX >> 3).unwrap();
+        assert_eq!(
+            bounded_default_host_bytes(thirty_two_bit_ceiling),
+            thirty_two_bit_ceiling
+        );
+        let kernel_limits = crate::kernel::MemoryBudgetConfig::defaults();
+        assert!(kernel_limits.post_effect_evidence_slots <= Semaphore::MAX_PERMITS);
+        assert!(kernel_limits.post_effect_evidence_bytes <= Semaphore::MAX_PERMITS);
+        assert!(bounded_default_host_bytes(Semaphore::MAX_PERMITS) <= Semaphore::MAX_PERMITS);
+        let host = PostEffectEvidenceBudget::process_default();
+        assert!(host.permits.available_permits() <= Semaphore::MAX_PERMITS);
+        assert!(
+            host.bytes.available_permits() <= bounded_default_host_bytes(Semaphore::MAX_PERMITS)
+        );
     }
 
     #[test]

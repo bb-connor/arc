@@ -3,7 +3,7 @@
 use super::*;
 use crate::kernel::responses::PreparedResponse;
 
-const FAULT_RESERVE_HEADROOM: usize = 64 * 1024;
+pub(super) const FAULT_RESERVE_HEADROOM: usize = 64 * 1024;
 const FAULT_REASON: &str = "post-effect finalization failed; output withheld";
 
 #[derive(Clone, PartialEq, Eq)]

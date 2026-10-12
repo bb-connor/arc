@@ -78,7 +78,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
         if self.evidence_slot.is_none() {
             let bytes = std::num::NonZeroUsize::new(bytes)
                 .ok_or(KernelError::PostEffectEvidenceCapacity)?;
-            *self.evidence_slot = Some(self.kernel.acquire_post_effect_evidence_slot(bytes)?);
+            *self.evidence_slot = Some(self.kernel.acquire_dispatched_child_evidence_slot(bytes)?);
         } else if let Some(slot) = self.evidence_slot.as_mut() {
             slot.reserve_bytes(bytes)?;
         }

@@ -255,12 +255,34 @@ impl EvidenceRecovery {
         slot
     }
 
+    pub(in crate::kernel) fn acquire_for_dispatched_child(
+        &self,
+        bytes: std::num::NonZeroUsize,
+    ) -> Result<EvidenceSlot, KernelError> {
+        let records = self
+            .queue
+            .records
+            .lock()
+            .map_err(|_| KernelError::Internal("post-effect evidence queue poisoned".into()))?;
+        self.ensure_worker_running()?;
+        let slot = self.pool.acquire(Arc::clone(&self.queue), bytes);
+        drop(records);
+        slot
+    }
+
     pub(in crate::kernel) fn ensure_clear(&self) -> Result<(), KernelError> {
         if self.queue.pending() != 0 {
             return Err(KernelError::PostEffectEvidencePending {
                 buffered: self.queue.pending(),
             });
         }
+        self.ensure_worker_running()
+    }
+
+    // A panic outside the per-record retry boundary ends automatic recovery.
+    // Dispatch stays closed and retained records remain unresolved in memory;
+    // process exit loses that memory evidence.
+    fn ensure_worker_running(&self) -> Result<(), KernelError> {
         if self.worker.as_ref().is_none_or(JoinHandle::is_finished) {
             return Err(KernelError::Internal(
                 "post-effect evidence worker stopped".into(),

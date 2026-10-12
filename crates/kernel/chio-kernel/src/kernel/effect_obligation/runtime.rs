@@ -8,6 +8,11 @@ use super::recovery::{EvidenceRecovery, EvidenceRecoveryResources, PendingPostEf
 use crate::kernel::ChioKernel;
 use crate::KernelError;
 
+enum EvidenceReservation {
+    NewDispatch,
+    DispatchedChild,
+}
+
 impl ChioKernel {
     /// Install the host's shared budget before this kernel admits any effects.
     /// The default is shared across all kernels constructed by this process.
@@ -39,6 +44,21 @@ impl ChioKernel {
     pub(in crate::kernel) fn acquire_post_effect_evidence_slot(
         &self,
         bytes: NonZeroUsize,
+    ) -> Result<EvidenceSlot, KernelError> {
+        self.acquire_post_effect_evidence_slot_for(bytes, EvidenceReservation::NewDispatch)
+    }
+
+    pub(in crate::kernel) fn acquire_dispatched_child_evidence_slot(
+        &self,
+        bytes: NonZeroUsize,
+    ) -> Result<EvidenceSlot, KernelError> {
+        self.acquire_post_effect_evidence_slot_for(bytes, EvidenceReservation::DispatchedChild)
+    }
+
+    fn acquire_post_effect_evidence_slot_for(
+        &self,
+        bytes: NonZeroUsize,
+        reservation: EvidenceReservation,
     ) -> Result<EvidenceSlot, KernelError> {
         let resources = EvidenceRecoveryResources {
             clock: self.authority_clock(),
@@ -86,7 +106,11 @@ impl ChioKernel {
             )?;
             *state = Some(EvidenceRecovery::new(pool, slots.get(), resources)?);
         }
-        state.as_ref().ok_or_else(invalid_capacity)?.acquire(bytes)
+        let worker = state.as_ref().ok_or_else(invalid_capacity)?;
+        match reservation {
+            EvidenceReservation::NewDispatch => worker.acquire(bytes),
+            EvidenceReservation::DispatchedChild => worker.acquire_for_dispatched_child(bytes),
+        }
     }
 
     pub(in crate::kernel) fn post_effect_fault_template_limit(&self) -> usize {
