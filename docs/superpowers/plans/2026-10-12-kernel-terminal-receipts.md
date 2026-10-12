@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `9de7cb4823`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
+- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `61bb9eb715`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
 - Non-durable acceptance is one committed terminal receipt OR one buffered evidence obligation with dispatch latched. Persistence eventually requires a healthy clock, signer and store. The in-memory buffer is not crash-durable.
 - A durable call leaves terminal truth to its saga. Never append a competing cancellation or deny after handing off that operation.
 - Unknown append outcomes retain the original receipt identity. Absence on an early read cannot establish that an in-flight write will never commit.
@@ -44,7 +44,7 @@
 
 - [x] Run the new evaluator controls on Original: malformed redaction leaves zero receipts after one actual invocation; caller `receipt_context` is accepted. Keep a successful one-receipt control.
 - [ ] Add producing-row controls: early reusable denial, persisted compensated terminal, unknown submitted-commit retained denial, post-effect terminal, Allow and pending-approval exceptions. Include duplicate request ids in distinct authenticated namespaces.
-- [ ] Implement the typed helper, reserve `receipt_context`, and derive namespace metadata from the existing authenticated replay binding. Do not classify by error text or infer Terminal from the verdict alone.
+- [x] Implement the typed helper, reserve `receipt_context`, and derive namespace metadata from the existing authenticated replay binding. Do not classify by error text or infer Terminal from the verdict alone.
 - [ ] Run focused identity tests. Expected: correct disposition and unchanged existing metadata; caller forgery denied before invocation. Commit the task without publishing the incomplete unit.
 
 ### Task 2: Make append acknowledgement explicit
@@ -53,9 +53,9 @@
 
 **Interfaces:** Produce an internal publication result distinguishing `Refused`, `OutcomeUnknown { receipt_id }`, and `Committed { receipt_id }`. Only the post-effect obligation can consume the committed result into `Discharged`. Post-commit errors carry the original receipt id as `DeliveryFailedAfterReceipt`.
 
-- [ ] Add a store fixture that commits then returns a timeout, plus a fixture whose queued append commits after timeout. Assert no replacement terminal is appended while original completion is unresolved.
-- [ ] Separate the append acknowledgement from trace allocation, settlement observation, federation co-signing, provenance and nonce creation. Keep all existing ordering and authority checks before the append.
-- [ ] Return post-commit delivery failures without re-entering fault-receipt construction. Unknown writes require completion/readback; unsupported authoritative readback keeps the obligation latched.
+- [x] Add a store fixture that commits then returns a timeout, plus a fixture whose queued append commits after timeout. Assert no replacement terminal is appended while original completion is unresolved.
+- [x] Separate the append acknowledgement from trace allocation, settlement observation, federation co-signing, provenance and nonce creation. Keep all existing ordering and authority checks before the append.
+- [x] Return post-commit delivery failures without re-entering fault-receipt construction. Unknown writes require completion/readback; unsupported authoritative readback keeps the obligation latched.
 - [ ] Run publication, federation, settlement and nonce-focused controls. Expected: one persisted terminal id for every acknowledged/late commit. Commit.
 
 ### Task 3: Reserve and recover non-durable evidence
@@ -64,9 +64,9 @@
 
 **Interfaces:** Produce move-only `EvidenceSlot`, `acquire_evidence_slot()`, `ensure_post_effect_evidence_latch_clear()`, bounded pending-record storage, and a supervised single-flight recovery owner. Recovery owns only the shared clock, signing and receipt-persistence resources it needs, never a borrowed kernel or a raw pointer.
 
-- [ ] Add slot-exhaustion and shared-host two-slot/three-session controls. Assert refusal before invocation and permit retention while buffering.
-- [ ] Add failing-clock/signer/store controls plus recovery while no new requests arrive. Assert cleanup and session reports remain usable while dispatch is latched.
-- [ ] Implement fixed capacity, reserved-slot ownership, bounded fault templates, single-flight flushing with backoff and controlled shutdown. Preserve the original append identity until its outcome is settled.
+- [x] Add slot-exhaustion and shared-host two-slot/three-session controls. Assert refusal before invocation and permit retention while buffering.
+- [x] Add failing-clock/signer/store controls plus recovery while no new requests arrive. Assert cleanup and session reports remain usable while dispatch is latched.
+- [x] Implement fixed capacity, reserved-slot ownership, bounded fault templates, single-flight flushing with backoff and controlled shutdown. Preserve the original append identity until its outcome is settled.
 - [ ] Add latch/dispatch and worker-exit races to existing concurrency tests. Run focused tests, including no-progress and recovery cases. Commit.
 
 ### Task 4: Own both evaluators through discharge
@@ -76,8 +76,8 @@
 **Interfaces:** `post_effect(obligation, returned) -> Discharged`; private discharge construction; `Discharged::deliver(self) -> Result<ToolCallResponse, KernelError>`. Ownership includes charge, admission, child receipts, security handles and the reserved evidence slot. Bind discharge to authenticated namespace, request id, operation id when present, and matched grant.
 
 - [ ] Extend Originals across transport failures, child flush, credential commitment and durable return-recording failure. Retain the existing pre-dispatch compensation controls.
-- [ ] Move the post-dispatch half of each evaluator under the obligation. Keep pre-dispatch Drop compensation unchanged. Durable Drop queues supervised reconciliation and never writes a competing receipt.
-- [ ] Move `record_released` and final lifecycle release after discharge; signed terminal truth survives either callback failing. Contain callback and destructor panics.
+- [ ] Move the post-dispatch half of each evaluator under the obligation. Keep pre-dispatch Drop compensation unchanged. Durable Drop retains the original saga for the existing recovery driver and never writes a competing receipt. A generic kernel-independent idle driver remains open under the ruling below.
+- [x] Move `record_released` and final lifecycle release after discharge; signed terminal truth survives either callback failing. Contain callback and destructor panics.
 - [ ] Add binding mismatch and compile-fail controls for forgeable/cloneable discharge and early return. Run evaluator failure matrix and existing durable/drop/security suites. Expected: one terminal owner, no premature release. Commit.
 
 ### Task 5: Preserve payment outcomes and qualify the whole unit
@@ -86,8 +86,8 @@
 
 **Interfaces:** Settlement metadata records actual `release_outcome`; capture error records `not_released`, authorization identity and a stable error code, with an audit fault.
 
-- [ ] Add a real evaluator control with a failing capture adapter: invocation happened, capture attempted, release was never attempted, positive authorization retained and terminal metadata truthful. Add rejected/non-settled release success/failure controls.
-- [ ] Remove release on capture error; preserve the current denial of non-settled output. Resolve the spec's Pending/Captured open decision with Claude before changing that policy.
+- [x] Add a real evaluator control with a failing capture adapter: invocation happened, capture attempted, release was never attempted, positive authorization retained and terminal metadata truthful. Add rejected/non-settled release success/failure controls.
+- [x] Remove release on capture error; preserve the current denial of non-settled output. Resolve the spec's Pending/Captured open decision with Claude before changing that policy.
 - [ ] Run the final post-effect matrix, durable admission, security dispatch, payment and receipt-focused suites, then strict owning Clippy. Reconcile touched formal-source anchors without claiming proof execution.
 - [ ] Send exact source SHA, commands, outcomes and remaining acceptance to Claude. Rebase once on actual main, verify composition, then publish one KERN-2 PR.
 
@@ -118,3 +118,12 @@
 - Retained-child readback uses complete authenticated live/archive history with an unsupported default. Original `b0b6ce674c` and repair `f8696157fc` are awaiting the corrected SQLite qualification. The two earlier wrong-import attempts are compile refusals, not runtime evidence.
 - The prepayment retry repair remains separate. Its first GREEN run exposed cleanup of a replayed hold (four passing controls, one failing); the next repair derives Fresh/Replayed/Unknown cleanup custody atomically from the authorizing store. Unknown or replayed custody cannot authorize compensation.
 - The historical PostAdmissionDropGuard abstraction does not prove the new retained-child recovery transitions. Source-anchor reconciliation preserves that distinction. Generic durable idle finalization also remains open; the original admission saga remains the durable owner.
+
+## Current acceptance checkpoint
+
+- Source candidate `69894cc084` includes main `61bb9eb715`. The full kernel library suite and strict all-target Clippy are running on this immutable source; the prior broad run (`b8a17e218a`) had 1687 passing and 61 failing tests. Those failures exposed masked original errors, original-saga incident recovery and old synchronous Drop expectations. They are not a passing qualification result.
+- `b7fff5109d` retains original post-effect errors and records unknown durable outcomes through the original saga only. `69894cc084` requires the same operation, dispatch binding and incident identity across replay. Cancelled futures retain DispatchCommitted until the real recovery driver runs; no second frontdoor receipt is allowed.
+- `d446f43d2e` reproduced contradictory economic metadata: a later short payment reference retained the earlier omitted reference's digest. `a7e8cde180` replaces companion fields with the observed value and preserves unrelated authority fields. Controls also cover null references and large-to-safe integer replacements. Focused GREEN is part of the active composed run.
+- Retained-child #1256 merged as `df30bfd62c`. Original `b0b6ce674c`: kernel unsupported-default control passed, SQLite live control passed and five retained-history cases failed. Repair `f8696157fc`: kernel control and all six SQLite cases passed, as did strict Clippy for both owners.
+- Prepayment cleanup is a separate candidate. Original `8146595f2a` has two passing controls and five runtime failures. Complete repair `9cad87bd0d`, followed by the original-saga cancellation control `0fdaefa7e8`, is under x86 qualification. The earlier `032c689803` attempt did not compile and is not GREEN evidence.
+- Formal review adds mandatory source anchors for the actual fault observation and saga incident helpers. Historical model transitions and evidence remain unchanged. Source-drift acceptance does not prove retained recovery liveness, strict production timestamp order or a generic durable idle finalizer.

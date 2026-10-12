@@ -15,6 +15,47 @@ struct RequiredSource {
 // checks. Keep their callers: a forwarding wrapper cannot cover a helper body.
 const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/receipt_namespace.rs",
+        symbols: &[
+            "ChioKernel::authenticated_receipt_namespace",
+            "ChioKernel::receipt_request_namespace_digest",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/clock.rs",
+        symbols: &[
+            "read_fenced",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs",
+        symbols: &[
+            "ChioKernel::prepare_receipt_body",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs",
+        symbols: &[
+            "PostEffectError",
+            "PostEffectError::at",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs",
+        symbols: &[
+            "PreparedFaultReceipt::observe_fault_timestamp",
+            "PreparedFaultReceipt::observe_economics",
+            "PreparedFaultReceipt::observe_payment_result",
+            "retain_bounded_reference",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
+        symbols: &[
+            "ChioKernel::terminalize_dispatch_committed_admission",
+        ],
+    },
+    RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
         symbols: &[
             "DispatchCredentialReservation::commit_approval_marker",
@@ -479,6 +520,10 @@ const REQUIRED_SOURCES: &[RequiredSource] = &[
 
 const REVOCATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs",
+        symbols: &["PostEffectObligation::commit_terminal_receipt"],
+    },
+    RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs",
         symbols: &["ChioKernel::revoke_capability"],
     },
@@ -491,6 +536,7 @@ const REVOCATION_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "ChioKernel::record_chio_receipt",
             "ChioKernel::record_chio_receipt_with_federation",
+            "ChioKernel::append_terminal_receipt_during_trace_transition",
         ],
     },
 ];
@@ -1815,7 +1861,7 @@ mod tests {
             (
                 "crates/kernel/chio-kernel/src/kernel/clock.rs",
                 "read",
-                "Ok(fence.observe(clock.read()?)?.unix_millis())",
+                "Ok(read_fenced(clock, fence)?.unix_millis())",
                 "Ok(UnixMillis::new(0))",
             ),
             (

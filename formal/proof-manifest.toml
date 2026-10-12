@@ -246,7 +246,7 @@ notes = [
   "The cognition-market challenge slash allocator is covered by its registered public Kani harness in the multi-crate PR lane.",
   "Release-facing formal claims must name this manifest, the theorem inventory, and the audited assumptions.",
   "ReceiptBeforeAllow retains abstract persist-before-publish ordering. Current anchors separate PreparedResponse construction, the obligation-owned append and Discharged delivery. Buffered evidence and durable-saga custody do not establish a persisted allow receipt. Earlier production replay is bounded historical evidence; current recovery, exact identity/readback and cross-row crash refinement remain unproved.",
-  "KERN2 anchor remaps record source review, not a renewal of model proofs. New or remapped zero digests are explicit pending final-source records and keep formal-mirrors failing until reviewed hash renewal. MonotoneLogApalache remains a bounded model-clock example; deferred or prebuilt receipts and ASSUME-OS-CLOCK do not establish strict production timestamp order.",
+  "KERN2 anchor remaps record source review, not a renewal of model proofs. New and remapped digests record reviewed source boundaries, including deciding-error, economic-observation and original-saga incident helpers. MonotoneLogApalache remains a bounded model-clock example; deferred or prebuilt receipts and ASSUME-OS-CLOCK do not establish strict production timestamp order.",
   "Manual Rust-to-model hashes are enforced by cargo xtask check formal-mirrors; transliteration and abstraction-anchor records require review, but matching hashes do not prove semantic equivalence or modeled properties.",
   "The Rust relying-party inclusion walk is bound to the symbolic Lean walk by paired manual-mirror hashes, an authenticated generated-output Aeneas theorem for the scalar step, bounded Kani parity with unwinding assertions over runtime-cross-checked fixtures for every size from 1 through 8, and required Rust-TypeScript tamper differentials. Hash collision resistance remains ASSUME-SHA256.",
   "The treaty PredicateLang is a bounded post-validation abstraction over production-shaped federation inputs. Its Lean abstraction anchors are drift tripwires, not a Rust refinement proof.",
@@ -774,9 +774,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "d9479b8db57ee5363e0a15611694ba72fc671be184c1abb493b01fbe734e7eb8"
+normalized_sha256 = "af480ff91221389cbf626886d245e4935bce1574d54b64432a524827447f63ca"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "e380f082583511c35704a8cc5c2762c75143ebd47b5ebc46879caff3ec498dee" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "c95314655bcbbd336336fdd382ca57908dd183382d51151fc8aa0801798c4bb6" },
 ]
 
 [[mirror]]
@@ -789,11 +789,11 @@ rust_symbols = [
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context",
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped",
 ]
-normalized_sha256 = "7d354c7d52567b1075b862a8cb03818dbbabeec7250fe1f5c445c80dcddefdd9"
+normalized_sha256 = "5fe5a287ae7a9e1824ec7b86ae0ca130a91e6e508969c0f6228f7097843f5f4f"
 symbol_sha256 = [
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async", sha256 = "2b718840c22c2cf0684add7681a7fe75950b4cc09027a3059c98d6d8a8bc8cd3" },
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context", sha256 = "a8b0030ed16f5bd5f09dad61839f7a0737c8a25f24b3affe433cce35b2c895e8" },
-  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "9bb5a5ef7d0ec2641ea431191de62b7d4924a54647a64335198b8ca795cc646e" },
+  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "7ca146731c201d8aec880b91c551fafa2c662ecf2e13351cef1992291d3ea76c" },
 ]
 
 [[mirror]]
@@ -824,9 +824,9 @@ rust_symbols = [
   "ChioKernel::revalidate_immediately_before_dispatch",
   "ChioKernel::wait_for_runtime_admission_dispatch_readiness",
 ]
-normalized_sha256 = "9b0cd93322121cc79d6c97509743a78dad3d60692f62e197b968245fd3d3c5c4"
+normalized_sha256 = "d24515b623734deb1bb6c0ece9c54836955f1c3dc72442ff3a648706522e5a73"
 symbol_sha256 = [
-  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "bac2f9f7f000beedf795c3af5379712918242d1ef2154a091a48e671826fe046" },
+  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "390827dacae450c2492d32f2d860338265cccd2c8a7df71f672557aedaac31fc" },
   { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "e8d294dbcf7a17f8bebd651898723bc3ea799562b29cc39f6e6752b364d7b843" },
 ]
 
@@ -835,11 +835,16 @@ model_file = "formal/tla/RevocationPropagation.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs"
-rust_symbols = ["ChioKernel::record_chio_receipt", "ChioKernel::record_chio_receipt_with_federation"]
-normalized_sha256 = "edc149b9217b9b9c335d2a961a3d6807b806c0f19bb5925a825f587e8db2b923"
+rust_symbols = [
+  "ChioKernel::record_chio_receipt",
+  "ChioKernel::record_chio_receipt_with_federation",
+  "ChioKernel::append_terminal_receipt_during_trace_transition",
+]
+normalized_sha256 = "e3e0ecbbd6b56dbe68f998f53a0193f7bf16e50b4f2620dd6b27be859728a96b"
 symbol_sha256 = [
   { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
   { symbol = "ChioKernel::record_chio_receipt_with_federation", sha256 = "46f119d784a14e3bd7ff476d1b28125f8001dfca6dff90650ee3155da6154323" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "d2016f7491c1390bf361609caca68a16ed44f2c1d845982e89bf52871f0fccc2" },
 ]
 
 [[mirror]]
@@ -946,11 +951,10 @@ rust_symbols = [
   "ChioKernel::record_chio_receipt",
   "ChioKernel::append_terminal_receipt_during_trace_transition",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "ba2370fd68d9d5e5c54208acd78831fdfa6b5ad8f0737e046fb8f7af682b7a8c"
 symbol_sha256 = [
-  { symbol = "ChioKernel::record_chio_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "d2016f7491c1390bf361609caca68a16ed44f2c1d845982e89bf52871f0fccc2" },
 ]
 [[mirror]]
 model_file = "formal/apalache/MonotoneLogApalache.tla"
@@ -1019,11 +1023,10 @@ rust_symbols = [
   "ChioKernel::prepare_allow_response_with_metadata_and_payee_binding",
   "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "62976b27cdaff4d73cbafb180664137724ab297043dc022fc55d66712f3eb7a7"
 symbol_sha256 = [
-  { symbol = "ChioKernel::prepare_allow_response_with_metadata_and_payee_binding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::prepare_allow_response_with_metadata_and_payee_binding", sha256 = "6ea9b99d180fb2ffd25a6f83c429c24e2c1b66ca6a6f14c07d7db36b677d1a6b" },
+  { symbol = "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata", sha256 = "a4eac7d9ee6e4b4b4a1926a055d912e131b252bb0134aee20783974104a833c2" },
 ]
 [[mirror]]
 model_file = "formal/apalache/ReceiptBeforeAllow.tla"
@@ -1036,13 +1039,12 @@ rust_symbols = [
   "ChioKernel::append_terminal_receipt_during_trace_transition",
   "ChioKernel::project_acknowledged_receipt_during_trace_transition",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "17879af425fd94113134087e9baeefa51e7ea3924f51c7962b11c651ff44adf9"
 symbol_sha256 = [
-  { symbol = "ChioKernel::record_chio_receipt_with_federation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::record_chio_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::project_acknowledged_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::record_chio_receipt_with_federation", sha256 = "46f119d784a14e3bd7ff476d1b28125f8001dfca6dff90650ee3155da6154323" },
+  { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "d2016f7491c1390bf361609caca68a16ed44f2c1d845982e89bf52871f0fccc2" },
+  { symbol = "ChioKernel::project_acknowledged_receipt_during_trace_transition", sha256 = "b8e6cc5f842db5254a208d9d294dad967ba153be44d1ae63b0a5752185e1a01d" },
 ]
 [[mirror]]
 model_file = "formal/apalache/KernelTransitionCancelSafe.tla"
@@ -1058,15 +1060,15 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "33a5edf2fd4763a6ef465bf7573e9056d07f16cd18ac7a73df05d78af1b4c562"
+normalized_sha256 = "5efc4b3db4e65ee9848e8d43812dff44d9b818f23f1f5728d12a1a3f8db67aa9"
 symbol_sha256 = [
-  { symbol = "PostAdmissionDropGuard", sha256 = "40f01e0464d243c87700e9751b8bd44283c3b58ff886d5a1a323fd5037c5bc80" },
-  { symbol = "PostAdmissionDropGuard::new", sha256 = "85e078915fc85ba889499526e3998adf7ed687a9212d7fc42f0fb8e9846e54f4" },
-  { symbol = "PostAdmissionDropGuard::mark_dispatch_started", sha256 = "ddf846b1fd9df7b56e38061cef9c9513b037d75bd9635a2a7004ac2c00940b93" },
+  { symbol = "PostAdmissionDropGuard", sha256 = "ecdcaa0b5da7f49de41575f1f1caf7435807c4781f1979b582266ee5c488d38a" },
+  { symbol = "PostAdmissionDropGuard::new", sha256 = "29487da88a8ac4e6f663370823d148b7f11a898b6fca1b132132f5790e7788c6" },
+  { symbol = "PostAdmissionDropGuard::mark_dispatch_started", sha256 = "576227841b59ff010c30ace530f1a39760275ed07f05ab5225346f7ab8c158fa" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
   { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "1ee920b401ffec48a1aaa329050f265ada92298a4c3321cc2f55a9d2a5a347e5" },
   { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "ed39a4785d10067d698766bd199665597354e85efa45151e1feb0b3cae8b2c32" },
-  { symbol = "PostAdmissionDropGuard::drop", sha256 = "2f97e0416af6170dcf8dc9be9451c430cc8e243973c7c9279b25946bb99f696d" },
+  { symbol = "PostAdmissionDropGuard::drop", sha256 = "fb15c27cc6e56ae2719c319424c7e3fa1b418b09a48b33181abc4d4db68b443d" },
 ]
 
 [[mirror]]
@@ -1095,17 +1097,16 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "8afcc84db14548de0010bf111946dd58aa93d297467eea4e7e4d02a8b6217205"
 symbol_sha256 = [
-  { symbol = "PostAdmissionReceiptContext", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::disarm", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostAdmissionDropGuard::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionReceiptContext", sha256 = "84155728c35fa1783115e17afdf15eed7941dec248d0f059a62f4cdfe5523c5f" },
+  { symbol = "PostAdmissionDropGuard", sha256 = "ecdcaa0b5da7f49de41575f1f1caf7435807c4781f1979b582266ee5c488d38a" },
+  { symbol = "PostAdmissionDropGuard::new", sha256 = "29487da88a8ac4e6f663370823d148b7f11a898b6fca1b132132f5790e7788c6" },
+  { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "075ee346bdcb7602fd9396c62e115ac78fb0ada7fbac6731d6a5ff4086c37ce3" },
+  { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
+  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "1ee920b401ffec48a1aaa329050f265ada92298a4c3321cc2f55a9d2a5a347e5" },
+  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "ed39a4785d10067d698766bd199665597354e85efa45151e1feb0b3cae8b2c32" },
+  { symbol = "PostAdmissionDropGuard::drop", sha256 = "fb15c27cc6e56ae2719c319424c7e3fa1b418b09a48b33181abc4d4db68b443d" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -1115,9 +1116,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "d9479b8db57ee5363e0a15611694ba72fc671be184c1abb493b01fbe734e7eb8"
+normalized_sha256 = "af480ff91221389cbf626886d245e4935bce1574d54b64432a524827447f63ca"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "e380f082583511c35704a8cc5c2762c75143ebd47b5ebc46879caff3ec498dee" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "c95314655bcbbd336336fdd382ca57908dd183382d51151fc8aa0801798c4bb6" },
 ]
 
 [[mirror]]
@@ -1130,11 +1131,11 @@ rust_symbols = [
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context",
   "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped",
 ]
-normalized_sha256 = "7d354c7d52567b1075b862a8cb03818dbbabeec7250fe1f5c445c80dcddefdd9"
+normalized_sha256 = "5fe5a287ae7a9e1824ec7b86ae0ca130a91e6e508969c0f6228f7097843f5f4f"
 symbol_sha256 = [
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async", sha256 = "2b718840c22c2cf0684add7681a7fe75950b4cc09027a3059c98d6d8a8bc8cd3" },
   { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context", sha256 = "a8b0030ed16f5bd5f09dad61839f7a0737c8a25f24b3affe433cce35b2c895e8" },
-  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "9bb5a5ef7d0ec2641ea431191de62b7d4924a54647a64335198b8ca795cc646e" },
+  { symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped", sha256 = "7ca146731c201d8aec880b91c551fafa2c662ecf2e13351cef1992291d3ea76c" },
 ]
 
 [[mirror]]
@@ -1145,10 +1146,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/mod.rs"
 rust_symbols = [
   "SecurityPreDispatchHook",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "280426e7ab47b209ab318b75374bdf41c07db77fc7b1e0cfa88710576bbdfdd2"
 symbol_sha256 = [
-  { symbol = "SecurityPreDispatchHook", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityPreDispatchHook", sha256 = "32b36922d126b7536812fd523eba08d4f3bd45634cec7ef2ea4ad008fcebb500" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -1201,13 +1201,12 @@ rust_symbols = [
   "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed",
   "ChioKernel::wait_for_runtime_admission_dispatch_readiness",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "191b5c7decd2b6496309d54d8a180e1b6deb5269dad20bb236d2270eef77348b"
 symbol_sha256 = [
-  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::release_runtime_admission_reservations", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "390827dacae450c2492d32f2d860338265cccd2c8a7df71f672557aedaac31fc" },
+  { symbol = "ChioKernel::release_runtime_admission_reservations", sha256 = "8bd9f0694609edd241bb6b970bc6b74a9d00b01471f7e487772a78acbc30e757" },
+  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "e9097e16d978d4faf00ab5d131a60be98f0ac5079e80201385e33c51d1db0ff1" },
+  { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "e8d294dbcf7a17f8bebd651898723bc3ea799562b29cc39f6e6752b364d7b843" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -1231,13 +1230,22 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs"
-rust_symbols = ["ChioKernel::record_chio_receipt_with_mode", "ChioKernel::record_chio_receipt", "ChioKernel::build_and_sign_receipt_for_identity", "ChioKernel::build_and_sign_receipt_with_authority"]
-normalized_sha256 = "37f7e5b15dadb0c4766c393ebe93c1059ab75828a40d3adc43381d0c95714fa5"
+rust_symbols = [
+  "ChioKernel::prepare_receipt_body",
+  "ChioKernel::record_chio_receipt_with_mode",
+  "ChioKernel::record_chio_receipt",
+  "ChioKernel::build_and_sign_receipt_for_identity",
+  "ChioKernel::build_and_sign_receipt_with_authority",
+  "ChioKernel::append_terminal_receipt_during_trace_transition",
+]
+normalized_sha256 = "0415850a7c1117643699de5fb5b6c439573b45f20c729a00a5b93cf725867c37"
 symbol_sha256 = [
+  { symbol = "ChioKernel::prepare_receipt_body", sha256 = "93c3ed7dd6658a0bdcc3aa3d3bab5b94ce7688f3fd6a63897c7febde5dd3f3e9" },
   { symbol = "ChioKernel::record_chio_receipt_with_mode", sha256 = "86f665f450e6986b355925428255655919a06f02b3a88fed0be931c84d8776e4" },
   { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
   { symbol = "ChioKernel::build_and_sign_receipt_for_identity", sha256 = "ca16b910e176e91bd607077e4097035a158e806c7cca5691b59006687e4ff0d9" },
-  { symbol = "ChioKernel::build_and_sign_receipt_with_authority", sha256 = "541e18377542c3ac0347d0d26aa2c3b6e6a225db12fcd4fe1d504007fe18a7bb" },
+  { symbol = "ChioKernel::build_and_sign_receipt_with_authority", sha256 = "e35031ac59f4c1db759659724e5f54933da9a8c4a1d41eac799f1afb9d1140d0" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "d2016f7491c1390bf361609caca68a16ed44f2c1d845982e89bf52871f0fccc2" },
 ]
 
 [[mirror]]
@@ -1296,10 +1304,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/finalization.rs"
 rust_symbols = ["ChioKernel::prepare_tool_output_with_metadata_and_payee_binding"]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "d41623a49c4a4874ba993c2b2d35080afc810fdc2510680e02bb3544360ef790"
 symbol_sha256 = [
-  { symbol = "ChioKernel::prepare_tool_output_with_metadata_and_payee_binding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::prepare_tool_output_with_metadata_and_payee_binding", sha256 = "8a5e00b2241384bebc7e9e4b66482642ee0067c01037e4c224e8c385f0f65249" },
 ]
 
 [[mirror]]
@@ -1563,10 +1570,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
 rust_symbols = ["ChioKernel::capture_and_commit_durable_dispatch","ChioKernel::begin_durable_tool_admission_for_transport","ChioKernel::native_security_authority_binding","immutable_tool_admission_request_hash"]
-normalized_sha256 = "babc7be420b375525e034e76ad10924f2e5b4718c4acf06a7b0719771e3b13cf"
+normalized_sha256 = "e60dcef0b9e52ae087138741da2d897290b69caedfd34a675cce9e903ce29208"
 symbol_sha256 = [
   { symbol = "ChioKernel::capture_and_commit_durable_dispatch", sha256 = "2635594043d1fe8f02fd56099d3bc52b2277aae6f4b921210ca7af647dbaaf2d" },
-  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "0eeb6c587dad6c7efd1ed451f1c8d528ba704ee994a65e08a35e248d473002fb" },
+  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "75faf99b4240e8f3a292b0bb0ef0eaeb016afc45d2e365dc47946d963b351dd7" },
   { symbol = "ChioKernel::native_security_authority_binding", sha256 = "db50adade9669310b59adce0cd240a97fa3daa22ed31d8cb4278576b74cefcb2" },
   { symbol = "immutable_tool_admission_request_hash", sha256 = "2223fc6166bfa3bee87a1917c2cac027781b898493de814f27cd7cb2371d06a0" },
 ]
@@ -2070,25 +2077,24 @@ rust_symbols = [
   "SecurityRequestLifecycleHandle::validate_release_context",
   "SecurityRequestLifecycleHandle::drop",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "d77a8fc17057c17f076d008674d34f0f6d2189e9cdd08e1e7e594afda4026310"
 symbol_sha256 = [
-  { symbol = "callback", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "record_outcome", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::mark_dispatch_started", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::record", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_released", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_dispatch_failed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_outcome_unknown_after_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityDispatchOutcomeHandle::validate_context", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release_for", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle::validate_release_context", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SecurityRequestLifecycleHandle::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "callback", sha256 = "1ce4cd889d8893c5191026667fc496edef1a994b06e236567a294aba14b8a3f2" },
+  { symbol = "record_outcome", sha256 = "44072ca6d22fb3e8e9bf83dddc82bcf31c809aef8b62026cef343b1425103128" },
+  { symbol = "SecurityDispatchOutcomeHandle::new", sha256 = "e86490cf57e036257c929713c131048c3bf9dd35b5c0eeaf46abcb5a44600d59" },
+  { symbol = "SecurityDispatchOutcomeHandle::mark_dispatch_started", sha256 = "097b6b9e36822fdeb106cde85a671bea06e3f63cc147233a5dc614cbf229a0d0" },
+  { symbol = "SecurityDispatchOutcomeHandle::record", sha256 = "ef35dae7673e49f7a1ef159a8d6966a19512ecd9a3a43f6d84d6bfb6dff8c2eb" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_released", sha256 = "41163ad88ebb5a425a1957e3192bc8cf06c6d442cbd8781c3de310f10ca4f41e" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_dispatch_failed", sha256 = "aa33e59071364465aa2efbd74d08db3b7099bfa605496e3b18ff95a614b5ceba" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_outcome_unknown_after_dispatch", sha256 = "00fd2a40406e65394c21490484f3b57eb3f3a27918cb903824827593bfba9e89" },
+  { symbol = "SecurityDispatchOutcomeHandle::drop", sha256 = "7d8a9f556555d8823266d90f1df4eddf1a1dc3904d77edd99ea47c4e92f2be29" },
+  { symbol = "SecurityDispatchOutcomeHandle::validate_context", sha256 = "a189ed6484b0a5d6f04265114433b1cfc50e884017eb9623b5efe0746c01e116" },
+  { symbol = "SecurityRequestLifecycleHandle", sha256 = "fc0107049e7ee5a7229d2f9babd8789c4bd2e716ad05e87fd1ebdedf2659253b" },
+  { symbol = "SecurityRequestLifecycleHandle::new", sha256 = "4916868babe3adc3b09b452480950321e1caa0b60909027e9f2591b840a17fde" },
+  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release", sha256 = "ce0e2d05ef075dcc6cbc95195a9b83c7cfa8c797b03d00aa0ab3001b0b0822c5" },
+  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release_for", sha256 = "181c2bf411a49bb998fce2f7621fe76c6d5d3c946ee6d8384e83a930867ccaef" },
+  { symbol = "SecurityRequestLifecycleHandle::validate_release_context", sha256 = "7f1d33e9e1b046e2bc2ae2baab4173683bc8970655c86cfe028f54ef25fa6ca3" },
+  { symbol = "SecurityRequestLifecycleHandle::drop", sha256 = "6062fa97976082932f327c157e9173750857adea9e0d3d7a8df919077654f8f3" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -3572,11 +3578,10 @@ rust_symbols = [
   "ChioKernel::prepare_changed_ordinary_recovery_status",
   "ChioKernel::build_execution_nonce_authorization_reserving_response",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "0a10d081e46c76e0b63d35228c9d9b339a68e62d6c08b1e0f95b8cfe33d95180"
 symbol_sha256 = [
-  { symbol = "ChioKernel::prepare_changed_ordinary_recovery_status", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::build_execution_nonce_authorization_reserving_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::prepare_changed_ordinary_recovery_status", sha256 = "58c57102fe379e918738e2ef6a00e8f49ae4c0fe786b44ddcf8d43d672ab6b3b" },
+  { symbol = "ChioKernel::build_execution_nonce_authorization_reserving_response", sha256 = "503335637f275fe531ab5934f4a6359034ca00c75420a1d744cce3d8264b7aa4" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4093,9 +4098,11 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs"
-rust_symbols = ["ChioKernel::reconcile_recoverable_admissions"]
-normalized_sha256 = "7f70df07606f182869cd5e3d0b08454b6c96daea84d02507c345d29fe8c2e137"
+rust_symbols = [
+  "ChioKernel::terminalize_dispatch_committed_admission","ChioKernel::reconcile_recoverable_admissions"]
+normalized_sha256 = "e1bb652041c8e77916592bd9f48e99c76aee996da096697a73c3e73a41dd8008"
 symbol_sha256 = [
+  { symbol = "ChioKernel::terminalize_dispatch_committed_admission", sha256 = "b021eacb5a630157ddbaa5b1ed7fa4c2408cea474da952fe8d1471913adca4e6" },
   { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "00d1496160a2fb5ceddd46b5cc4ef5f8757efa6637a22c6f74e1f10c93c53144" },
 ]
 
@@ -4151,10 +4158,12 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/clock.rs"
-rust_symbols = ["read", "ChioKernel::read_authority_time", "ChioKernel::trusted_now_millis"]
-normalized_sha256 = "ffd651444794e624d19038efa3fb2bb661470372543486434592612d74ca2bbc"
+rust_symbols = [
+  "read_fenced","read", "ChioKernel::read_authority_time", "ChioKernel::trusted_now_millis"]
+normalized_sha256 = "ce4860ad61ce9807a34acd6eb26ac3dc1545527320e4b909acd6f51682f6a87a"
 symbol_sha256 = [
-  { symbol = "read", sha256 = "63854af18068c8e793e296a65339166b3ba0900bed1c1e0559cdb02293d0bdfb" },
+  { symbol = "read_fenced", sha256 = "1503f39a8c247daa3874a3c86773b4b11d0a97becadfb61453ffdd7dd89e88f1" },
+  { symbol = "read", sha256 = "62128c8cfaf84c37055f76f7ab0565b4cfd4de9314cb814ba5606ca5fcd751dd" },
   { symbol = "ChioKernel::read_authority_time", sha256 = "2d599609f757003d63b7d0b4b3f0dd97bb6f67a5802e733ab002d3a1ff3fcdb1" },
   { symbol = "ChioKernel::trusted_now_millis", sha256 = "ab8122d3d1594a3141c54818610e67f03b6e1711146f0b812a900e1bd620a579" },
 ]
@@ -4167,10 +4176,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.
 rust_symbols = [
   "ChioKernel::timed_dispatch",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "946fffc345c9dfa4f52aabac035aff4ca1ab2464d3685e5928e28a094be9bdfd"
 symbol_sha256 = [
-  { symbol = "ChioKernel::timed_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::timed_dispatch", sha256 = "36a3c1730e63c692c9cb663ef1e5f0aaa9b56a4ef22b317f0d5f2b041f11f272" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4569,17 +4577,16 @@ rust_symbols = [
   "SessionNestedFlowBridge::notify_resource_updated",
   "SessionNestedFlowBridge::notify_resources_list_changed",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "bd3b517bd4d0578e8c1e44a87683f70b26b0b3226b4d7477c1cfac43882e6db9"
 symbol_sha256 = [
-  { symbol = "SessionNestedFlowBridge", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::complete_child_request_with_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::list_roots", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::create_message", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::create_elicitation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::notify_elicitation_completed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::notify_resource_updated", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "SessionNestedFlowBridge::notify_resources_list_changed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge", sha256 = "e3644076111ec20d534ba5931469e973f0c76d083e1c1c5701b70b31991c8321" },
+  { symbol = "SessionNestedFlowBridge::complete_child_request_with_receipt", sha256 = "c5549a3b9d294b545b96c9e301d99f1f7b0505f5a640dbc04a0eca25fbab16eb" },
+  { symbol = "SessionNestedFlowBridge::list_roots", sha256 = "1285c914ee3962a6214b17661948f8b3196571831f624ace3e3f5e6bea194a94" },
+  { symbol = "SessionNestedFlowBridge::create_message", sha256 = "d9350f4b63bb1b896ff56b63112d016f0f9a2c885cf7882ad38d422e9ad93d7e" },
+  { symbol = "SessionNestedFlowBridge::create_elicitation", sha256 = "bbde5c4db7c1b1a0e2369d986faf325ffbc27c2669028c2d972c11f333bf372a" },
+  { symbol = "SessionNestedFlowBridge::notify_elicitation_completed", sha256 = "1928b74be1a09f8de7636bc0ff2eaa25e55b69b3c68e3db7217865073610a05f" },
+  { symbol = "SessionNestedFlowBridge::notify_resource_updated", sha256 = "e4c4bf3de4a2e70c0d6b505cd3b8efdedbe048a1bdfb8b3c19b63a1c0f51e632" },
+  { symbol = "SessionNestedFlowBridge::notify_resources_list_changed", sha256 = "2e5619de0749629c1ef39aa3f119694a31fd81f80877ce1b0e5a7d455bd63d93" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4587,6 +4594,8 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
 rust_symbols = [
+  "PostEffectError",
+  "PostEffectError::at",
   "PostEffectInputs",
   "PostEffectObligation",
   "Discharged",
@@ -4601,22 +4610,23 @@ rust_symbols = [
   "Discharged::drop",
   "run_post_effect",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "4b2946c9295267362c73ec1e3909538dee9e310d50219e7b46186bfdf0755cde"
 symbol_sha256 = [
-  { symbol = "PostEffectInputs", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "Discharged", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "Delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::enter", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::nested_receipt_sinks", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::fail", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::buffer", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectObligation::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "Discharged::deliver", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "Discharged::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "run_post_effect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectError", sha256 = "580fdad417efb5965bfd3118c466e412f7f108bbcc0e1ff4f265f0da468e21ef" },
+  { symbol = "PostEffectError::at", sha256 = "c6ba9b349f124ef688ed041b544de1a96ee9fffd81eb6f9dbf5b1a92fe07fe5e" },
+  { symbol = "PostEffectInputs", sha256 = "92d09206f4565396010b94c98cc76e5598d7b6daf414478837481baf72a13b7d" },
+  { symbol = "PostEffectObligation", sha256 = "e3f060477b552af2c5828af92b570bcac49ae8484183a8bbfbdd7135d082884f" },
+  { symbol = "Discharged", sha256 = "51c7f2a01dbf9dd13eedf64a329d1b998c09b665c02744e30dcc3e4b6fdae7f4" },
+  { symbol = "Delivery", sha256 = "2581c980f09618ddbab788c8d7bcdeb716db8d606820e57502955c761b0989ea" },
+  { symbol = "PostEffectObligation::enter", sha256 = "afc090d2ded6a515df90611f3b2bebc81d25d3d292a4a932acdc30cd216fc5f2" },
+  { symbol = "PostEffectObligation::nested_receipt_sinks", sha256 = "7cdb0480893005ba5eeb33edcda24cd51ce756813b471ec16c39b80c0ee58057" },
+  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "2c0baf6d6dffc2aed01c5dc5ddcbd116982bf16d2da96abf12632e586178d00e" },
+  { symbol = "PostEffectObligation::fail", sha256 = "5160f90353c25ee8f3792fd74d34e25314de94cf8bd0aea2d361102de1d0e1ec" },
+  { symbol = "PostEffectObligation::buffer", sha256 = "d4b511672f42bb645a4c22c6af40b6f929d8fe0ab33e10961ecb6b7b1c59d909" },
+  { symbol = "PostEffectObligation::drop", sha256 = "f0b8dfdf16ff046ac28abb981f651dccc429e02905744f798f7c607901a7da71" },
+  { symbol = "Discharged::deliver", sha256 = "c5dbad2babc739de3fc1ded5326a3f5c3a97fe76066e3c975ad00cc768db3b1a" },
+  { symbol = "Discharged::drop", sha256 = "ac66e16e95ee3bdbd04c6d1879ce31c556ccc44cd85535345510cae7a32031b7" },
+  { symbol = "run_post_effect", sha256 = "9d6439f222f9201f531ef2595dbdd4a97450f6561a1ff53eb0bb7ebb6359d871" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4629,13 +4639,12 @@ rust_symbols = [
   "record_durable_return",
   "prepare_ordinary",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "294d92d8215e746b13e94b72a3e21c23554a3e9c7037b2984f728f8f2e75edb2"
 symbol_sha256 = [
-  { symbol = "run", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "flush_children", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "record_durable_return", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "prepare_ordinary", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "run", sha256 = "46513508ea95a557b20a3ed7132054a64f3487d252bfcd5e8548c534eab2b5b9" },
+  { symbol = "flush_children", sha256 = "795f6a5145cbdd2bec48d9b765257a33d89a6034917b76494c3929896bbc2d8a" },
+  { symbol = "record_durable_return", sha256 = "694eac358ca6f00b38c511c07b251f513114f7727cb799a32c0649940a3d4d22" },
+  { symbol = "prepare_ordinary", sha256 = "1290a17e53cacacae1916febf954b96a3acf56ab114008ffdf9e632b555a8fd2" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4643,6 +4652,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs"
 rust_symbols = [
+  "PreparedFaultReceipt::observe_fault_timestamp",
+  "PreparedFaultReceipt::observe_economics",
+  "PreparedFaultReceipt::observe_payment_result",
+  "retain_bounded_reference",
   "DischargeBinding",
   "DischargeBinding::validate_receipt",
   "PreparedPostEffect",
@@ -4650,15 +4663,18 @@ rust_symbols = [
   "ChioKernel::prepare_post_effect",
   "fault_response",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "132610baf98bed7d5fb58920be8341d52550f4b19a81764061a16f68d6ce262d"
 symbol_sha256 = [
-  { symbol = "DischargeBinding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "DischargeBinding::validate_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedPostEffect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PostEffectPreparation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::prepare_post_effect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "fault_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedFaultReceipt::observe_fault_timestamp", sha256 = "1db5fbee129980baba4e975911432e6effdbcb6f6d3d760af9ad46361ccd0787" },
+  { symbol = "PreparedFaultReceipt::observe_economics", sha256 = "566996166aae0fe72b21b6c6883224afb9fbcebc690a8215ae7cd963b79b9bba" },
+  { symbol = "PreparedFaultReceipt::observe_payment_result", sha256 = "f061af3d2f1d8f424d5d481654b1076e675d5396f81e7afbbb99130f79a8f1c1" },
+  { symbol = "retain_bounded_reference", sha256 = "d3213f407b81a680664cbb22c51b10e954708e6c190dfd80c008efd674779626" },
+  { symbol = "DischargeBinding", sha256 = "6054628e00ad90a200219ae85dbfba9b2be15e816753334f63c22354ed27a8ce" },
+  { symbol = "DischargeBinding::validate_receipt", sha256 = "af013d8a665e10bab267f0c1aea744215d1cae54fdaff6b9aec2b7e8c0143deb" },
+  { symbol = "PreparedPostEffect", sha256 = "71261edebfea10b075c687faca1d0fbcdc2675d292becc3513f35d197538637e" },
+  { symbol = "PostEffectPreparation", sha256 = "5093025fe02704fe3bf651719f95cb91a2fff1734098ed0649452a05be7d2d5c" },
+  { symbol = "ChioKernel::prepare_post_effect", sha256 = "0c735395cfccf14adebb024c860af8ffb04179615280592e91b82a2baf4788df" },
+  { symbol = "fault_response", sha256 = "972befe98f910a9e5cda44cb042cf2cd989ea04318560a801772e31982249c33" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4669,11 +4685,10 @@ rust_symbols = [
   "ReceiptAppendFailure",
   "ReceiptCommit",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "c12b8726a40a246f538976c130505a15c8d2f398ff78c169542ad529b9c667d0"
 symbol_sha256 = [
-  { symbol = "ReceiptAppendFailure", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ReceiptCommit", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ReceiptAppendFailure", sha256 = "687f6795b35c813e9912e2b4af1e49e7c88f434ca81406ee561cb47f2a8c7c31" },
+  { symbol = "ReceiptCommit", sha256 = "6d04738eb65a5c141856b12b8404a62d86dc8461404efd69742fe0e0755505fb" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4695,22 +4710,21 @@ rust_symbols = [
   "EvidenceRecoveryResources::resolve_submitted",
   "EvidenceRecoveryResources::flush_children",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "2ee1f93b6b18db9880081a154a3e724e384d28515f06ea7780ff1e78c5703bc6"
 symbol_sha256 = [
-  { symbol = "PendingPostEffectEvidence", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PendingChildReceipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "UnknownChildAppend", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PendingPostEffectRecord", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceQueue::buffer", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecovery::ensure_clear", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecovery::matches_resources", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecovery::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "recover", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::flush", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::flush_children", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PendingPostEffectEvidence", sha256 = "89d362c291139d4195141e68db99e562fb43a0cf15918857e63c66ac29f5ca3d" },
+  { symbol = "PendingChildReceipt", sha256 = "483a55ec2a5f593638ad4b52c466fddad0818e33ce2beb8c909c116dd948002e" },
+  { symbol = "UnknownChildAppend", sha256 = "f09c2041dfe3a3559cf6a79ba2c503ffb8ac009e3de58ca80437ea63101b8f52" },
+  { symbol = "PendingPostEffectRecord", sha256 = "3a991b3b8331009d14ca622f5e023bde686e7d340ce102722110cf0dfc54b421" },
+  { symbol = "EvidenceQueue::buffer", sha256 = "74cdcdd9fa03c68b7ff3027475e0f986c4eb069105b24b5f5fd6e5f8928b2229" },
+  { symbol = "EvidenceRecovery::ensure_clear", sha256 = "d52a914b5faeb0b3244a2ea21878c4e20bd6b9e13617d5733104184b19a8cc10" },
+  { symbol = "EvidenceRecovery::matches_resources", sha256 = "a747989a52139228c35777831ce89a8082c233eb5e3c485484c59fefa318b3b1" },
+  { symbol = "EvidenceRecovery::drop", sha256 = "f48d06bfa19c9881b8b88197533f695f33acdfafe39157de698d84a533d30a5f" },
+  { symbol = "recover", sha256 = "71c9aae801766b169c57853d07bfbeefdbc9b806b94147f0c915318ea4c80f4c" },
+  { symbol = "EvidenceRecoveryResources::flush", sha256 = "55d9e98bc5802878c5b0e8d2c28cf4efbf1af03c3fe7396407bd1de6d7ca7280" },
+  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "7845d21edb43c87856aeb924c9a05a79286fd8b0cf8a3365393b4b3187d7ec5c" },
+  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "a633b065431db5ded16f5f1251a01d00549b9563837829bade4aa38abe0ad48a" },
+  { symbol = "EvidenceRecoveryResources::flush_children", sha256 = "7034caa1f80886766948f4bcf09ffd128dc59099eb6b845794af4b57756fc125" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4722,12 +4736,11 @@ rust_symbols = [
   "ChioKernel::buffer_post_effect_evidence",
   "ChioKernel::ensure_post_effect_evidence_latch_clear",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "44e545303d0d250b0d3b9751ce2a627fd68a995c1d737125ac863afd85c728b6"
 symbol_sha256 = [
-  { symbol = "ChioKernel::acquire_post_effect_evidence_slot", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::buffer_post_effect_evidence", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::ensure_post_effect_evidence_latch_clear", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::acquire_post_effect_evidence_slot", sha256 = "63e8d68d29b03ed99e6d8c8264201dddd3e9b55d93a2428604e37a406c969305" },
+  { symbol = "ChioKernel::buffer_post_effect_evidence", sha256 = "07bf2398ae70cedda692e25401495cd2bdaa0ce7d7cd00a4f8494302394efa54" },
+  { symbol = "ChioKernel::ensure_post_effect_evidence_latch_clear", sha256 = "2643bd1d410e8c75c0e53cddd5dd43f5e807ae52a21e3214ad845488dbb05f89" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4741,14 +4754,13 @@ rust_symbols = [
   "PreparedResponse::finish_delivery",
   "ChioKernel::publish_prepared_response",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "00204323e7a59241e4b5fc2d0315bc7c62416c94e72a92032c3e90cc1982c3dd"
 symbol_sha256 = [
-  { symbol = "PreparedResponse", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::terminal", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::allow", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::finish_delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::publish_prepared_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse", sha256 = "f5df5ba463be4e63063552d54ecbe5552eece2755dd6a188a839c9e1f977fa22" },
+  { symbol = "PreparedResponse::terminal", sha256 = "b56d928dda79ea84d26b942f5881c0dc6fafed6c27dc0242df3234f4b447d370" },
+  { symbol = "PreparedResponse::allow", sha256 = "ddde3aa6761100d72647c7e53f8dfa344e468cee86d01a2eeb35d4d54f6f5cbf" },
+  { symbol = "PreparedResponse::finish_delivery", sha256 = "49ca9334db877272fab5f567992f8fb5e281e1dc223b3d12b9349f2c1d6fc5c8" },
+  { symbol = "ChioKernel::publish_prepared_response", sha256 = "dccd5bbaa4d7d95de5445e30058cb0322cfa3048fd637d6075aad32d68dfa307" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4758,10 +4770,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/validation/tool_output.rs"
 rust_symbols = [
   "ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "c9b7ea383ceadf1c0339b01362117f754da1024926dbde39759217991febb4ec"
 symbol_sha256 = [
-  { symbol = "ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata", sha256 = "7d0f7c9aa68af30ca0a97b55dce1c5a12aa507f5a396bff6bd7d467cade78ad4" },
 ]
 [[mirror]]
 model_file = "formal/apalache/ReceiptBeforeAllow.tla"
@@ -4772,11 +4783,10 @@ rust_symbols = [
   "PostEffectObligation::commit_terminal_receipt",
   "Discharged::deliver",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "0da2a097c3dad7170f659c89319bdd463a875e8759b8e0c6f2382f2c0819a0a3"
 symbol_sha256 = [
-  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "Discharged::deliver", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "2c0baf6d6dffc2aed01c5dc5ddcbd116982bf16d2da96abf12632e586178d00e" },
+  { symbol = "Discharged::deliver", sha256 = "c5dbad2babc739de3fc1ded5326a3f5c3a97fe76066e3c975ad00cc768db3b1a" },
 ]
 [[mirror]]
 model_file = "formal/apalache/ReceiptBeforeAllow.tla"
@@ -4790,14 +4800,13 @@ rust_symbols = [
   "PreparedResponse::finish_delivery",
   "ChioKernel::publish_prepared_response",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "00204323e7a59241e4b5fc2d0315bc7c62416c94e72a92032c3e90cc1982c3dd"
 symbol_sha256 = [
-  { symbol = "PreparedResponse", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::terminal", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::allow", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "PreparedResponse::finish_delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "ChioKernel::publish_prepared_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse", sha256 = "f5df5ba463be4e63063552d54ecbe5552eece2755dd6a188a839c9e1f977fa22" },
+  { symbol = "PreparedResponse::terminal", sha256 = "b56d928dda79ea84d26b942f5881c0dc6fafed6c27dc0242df3234f4b447d370" },
+  { symbol = "PreparedResponse::allow", sha256 = "ddde3aa6761100d72647c7e53f8dfa344e468cee86d01a2eeb35d4d54f6f5cbf" },
+  { symbol = "PreparedResponse::finish_delivery", sha256 = "49ca9334db877272fab5f567992f8fb5e281e1dc223b3d12b9349f2c1d6fc5c8" },
+  { symbol = "ChioKernel::publish_prepared_response", sha256 = "dccd5bbaa4d7d95de5445e30058cb0322cfa3048fd637d6075aad32d68dfa307" },
 ]
 [[mirror]]
 model_file = "formal/apalache/MonotoneLogApalache.tla"
@@ -4809,10 +4818,31 @@ rust_symbols = [
   "EvidenceRecoveryResources::resolve_submitted",
   "EvidenceRecoveryResources::project",
 ]
-# Pending final-source digest review; zero hashes keep the drift gate failing.
-normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+normalized_sha256 = "1a1c38f7d8993cec5bb46e23cf34089bf106d377175129f10406604bceb4d21f"
 symbol_sha256 = [
-  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
-  { symbol = "EvidenceRecoveryResources::project", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "7845d21edb43c87856aeb924c9a05a79286fd8b0cf8a3365393b4b3187d7ec5c" },
+  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "a633b065431db5ded16f5f1251a01d00549b9563837829bade4aa38abe0ad48a" },
+  { symbol = "EvidenceRecoveryResources::project", sha256 = "6df17258f521017b21106fd668c335afcea1035ac205f5b0043875036bb1bb9e" },
+]
+[[mirror]]
+model_file = "formal/tla/RevocationPropagation.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
+rust_symbols = ["PostEffectObligation::commit_terminal_receipt"]
+normalized_sha256 = "db377324b7f8d5af83f6827d98ac002a3c03b96bbc0ca1b843c163d9137f0f9c"
+symbol_sha256 = [
+  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "2c0baf6d6dffc2aed01c5dc5ddcbd116982bf16d2da96abf12632e586178d00e" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/receipt_namespace.rs"
+rust_symbols = ["ChioKernel::authenticated_receipt_namespace", "ChioKernel::receipt_request_namespace_digest"]
+normalized_sha256 = "de1c065f1ae303ea18222405d5da1056067e97d10687437e6031c6b0ae2297d9"
+symbol_sha256 = [
+  { symbol = "ChioKernel::authenticated_receipt_namespace", sha256 = "d182a80d82fd583533d7421b312a5d5042c10582df43785e0ea55028a1325418" },
+  { symbol = "ChioKernel::receipt_request_namespace_digest", sha256 = "fbb22f0f1ad6ff7213e678d8c3509aa79916c5c1415ab0cd7e6109aa8888adfd" },
 ]
