@@ -360,3 +360,139 @@ fn a_store_panic_after_commit_retains_identity_without_poisoning_publication() {
         "a committed original must not acquire a competing fault terminal"
     );
 }
+
+struct PanickingRootsClient(Arc<AtomicU64>);
+
+impl NestedFlowClient for PanickingRootsClient {
+    fn list_roots(
+        &mut self,
+        _: &OperationContext,
+        _: &OperationContext,
+    ) -> Result<Vec<RootDefinition>, KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        panic!("child client panicked after its observable action");
+    }
+    fn create_message(
+        &mut self,
+        _: &OperationContext,
+        _: &OperationContext,
+        _: &CreateMessageOperation,
+    ) -> Result<CreateMessageResult, KernelError> {
+        unreachable!("this fixture lists roots")
+    }
+    fn create_elicitation(
+        &mut self,
+        _: &OperationContext,
+        _: &OperationContext,
+        _: &CreateElicitationOperation,
+    ) -> Result<CreateElicitationResult, KernelError> {
+        unreachable!("this fixture lists roots")
+    }
+    fn notify_elicitation_completed(
+        &mut self,
+        _: &OperationContext,
+        _: &str,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+    fn notify_resource_updated(
+        &mut self,
+        _: &OperationContext,
+        _: &str,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+    fn notify_resources_list_changed(&mut self, _: &OperationContext) -> Result<(), KernelError> {
+        Ok(())
+    }
+}
+
+#[test]
+fn a_panicking_child_client_retains_its_original_attempt() {
+    let kernel = make_kernel(make_config());
+    let agent = make_keypair();
+    let session_id = kernel
+        .open_session(agent.public_key().to_hex(), Vec::new())
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+    kernel
+        .set_session_peer_capabilities(
+            &session_id,
+            PeerCapabilities {
+                authorization: None,
+                supports_progress: false,
+                supports_cancellation: false,
+                supports_subscriptions: false,
+                supports_chio_tool_streaming: false,
+                supports_roots: true,
+                roots_list_changed: false,
+                supports_sampling: false,
+                sampling_context: false,
+                sampling_tools: false,
+                supports_elicitation: false,
+                elicitation_form: false,
+                elicitation_url: false,
+            },
+        )
+        .unwrap();
+    let parent = make_operation_context(
+        &session_id,
+        "panicking-child-parent",
+        &agent.public_key().to_hex(),
+    );
+    kernel
+        .begin_session_request(&parent, OperationKind::ToolCall, true)
+        .unwrap();
+    kernel
+        .mark_session_request_dispatch_started(Some(&session_id), &parent.request_id)
+        .unwrap();
+    let actions = Arc::new(AtomicU64::new(0));
+    let mut client = PanickingRootsClient(Arc::clone(&actions));
+    let mut children = Vec::new();
+    let mut slot = None;
+    let observed = AtomicBool::new(false);
+    {
+        let mut bridge = SessionNestedFlowBridge {
+            clock: kernel.authority_clock(),
+            sessions: &kernel.sessions,
+            child_receipts: &mut children,
+            evidence_slot: &mut slot,
+            kernel: &kernel,
+            started_children: 0,
+            max_child_receipts: 1,
+            nested_interaction_observed: &observed,
+            parent_context: &parent,
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            policy_hash: &kernel.config.policy_hash,
+            kernel_keypair: &kernel.config.keypair,
+            client: &mut client,
+        };
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.list_roots())).is_err()
+        );
+    }
+    assert_eq!(actions.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        children.len(),
+        1,
+        "an entered child call must retain its attempt across a client panic"
+    );
+    let crate::kernel::effect_obligation::recovery::PendingChildReceipt::Unsigned(body) =
+        children.first().unwrap()
+    else {
+        panic!("unknown child outcome must await supervised signing");
+    };
+    assert_eq!(body.parent_request_id, parent.request_id);
+    assert!(matches!(
+        body.terminal_state,
+        OperationTerminalState::Incomplete { .. }
+    ));
+    assert_eq!(
+        body.metadata
+            .as_ref()
+            .and_then(|value| value.get("execution_outcome")),
+        Some(&serde_json::json!("unknown"))
+    );
+}
