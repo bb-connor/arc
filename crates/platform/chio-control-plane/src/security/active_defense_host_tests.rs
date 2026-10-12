@@ -1311,3 +1311,5 @@ mod teardown_overlay_wait;
 mod terminal_response_refusal;
 
 mod siem_delivery;
+
+mod producer_tenant;
