@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
-use chio_core::session::*;
+use chio_core::session::{
+    CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
+    CreateMessageResult, OperationContext, RequestId, RootDefinition, ToolCallOperation,
+};
 use chio_core::Keypair;
 use chio_kernel::*;
 use chio_security_types::ports::*;
