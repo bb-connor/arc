@@ -6,8 +6,8 @@ use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel,
-    PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
+    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, IdentityDisposition,
+    PreExecutionBudgetMutation, RefusalReceiptMetadata, VerifiedGovernedPayeeBinding,
 };
 
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =

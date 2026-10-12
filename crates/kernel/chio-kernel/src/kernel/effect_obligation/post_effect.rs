@@ -279,7 +279,7 @@ fn prepare_ordinary(
                         .map(|response| (response, None)),
                     KernelError::RequestIncomplete(reason) => kernel
                         .prepare_incomplete_response_with_output_metadata_and_payee_binding(inputs.request, None, &reason, now,
-                            Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
+                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
                         .map(|response| (response, None)),
                     error => kernel.prepare_deny_response_with_metadata_and_payee_binding(inputs.request,
                         &error.to_string(), now, Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())

@@ -103,7 +103,10 @@ impl ChioKernel {
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    self.mark_runtime_admission_reservations_retained_fail_closed(metadata),
+                    RefusalReceiptMetadata::new(
+                        self.mark_runtime_admission_reservations_retained_fail_closed(metadata),
+                        IdentityDisposition::Terminal,
+                    ),
                     verified_payee_binding,
                 ),
         }
@@ -624,8 +627,11 @@ impl ChioKernel {
                     Some(charge.grant_index),
                     // An incomplete stream retains any consumed runtime lease
                     // because tool effects may have committed.
-                    self.mark_runtime_admission_reservations_retained_fail_closed(
-                        merged_extra_metadata,
+                    RefusalReceiptMetadata::new(
+                        self.mark_runtime_admission_reservations_retained_fail_closed(
+                            merged_extra_metadata,
+                        ),
+                        IdentityDisposition::Terminal,
                     ),
                     verified_payee_binding,
                 )
