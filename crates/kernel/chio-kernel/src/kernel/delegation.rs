@@ -27,7 +27,9 @@
 use std::sync::Arc;
 
 use chio_core_types::capability::token::CapabilityToken;
-use chio_kernel_core::{RevocationSnapshot, RevocationView, RevocationViewSubject};
+use chio_kernel_core::{
+    RevocationSnapshot, RevocationSnapshotFreshnessError, RevocationView, RevocationViewSubject,
+};
 
 use crate::kernel::KernelError;
 use chio_security_types::clock::UnixMillis;
@@ -93,13 +95,12 @@ fn verify_snapshot_freshness(
     now_unix_ms: u64,
     max_staleness_ms: u64,
 ) -> Result<(), KernelError> {
-    let age_ms = now_unix_ms
-        .checked_sub(snapshot.issued_at_unix_ms)
-        .ok_or(KernelError::RevocationSnapshotFuture)?;
-    if age_ms > max_staleness_ms {
-        return Err(KernelError::RevocationSnapshotStale);
-    }
-    Ok(())
+    snapshot
+        .verify_freshness(now_unix_ms, max_staleness_ms)
+        .map_err(|error| match error {
+            RevocationSnapshotFreshnessError::Future => KernelError::RevocationSnapshotFuture,
+            RevocationSnapshotFreshnessError::Stale => KernelError::RevocationSnapshotStale,
+        })
 }
 
 #[cfg(test)]

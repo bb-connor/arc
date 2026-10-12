@@ -115,7 +115,46 @@ impl RevocationSnapshot {
     pub fn is_revoked(&self, subject: &RevocationViewSubject) -> bool {
         self.revoked.contains(subject)
     }
+
+    /// Check the issue time against the verifier's current time and maximum age.
+    ///
+    /// Future issuance is refused before comparing the age. An age equal to the
+    /// maximum is accepted. The empty sentinel follows the same arithmetic;
+    /// this check does not add an epoch or signed-root policy.
+    pub fn verify_freshness(
+        &self,
+        now_unix_ms: u64,
+        max_staleness_ms: u64,
+    ) -> Result<(), RevocationSnapshotFreshnessError> {
+        let age_ms = now_unix_ms
+            .checked_sub(self.issued_at_unix_ms)
+            .ok_or(RevocationSnapshotFreshnessError::Future)?;
+        if age_ms > max_staleness_ms {
+            return Err(RevocationSnapshotFreshnessError::Stale);
+        }
+        Ok(())
+    }
 }
+
+/// Freshness refusals for a supplied revocation snapshot and verifier time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevocationSnapshotFreshnessError {
+    /// The snapshot was issued after the supplied current time.
+    Future,
+    /// The snapshot's age exceeds the supplied maximum staleness.
+    Stale,
+}
+
+impl core::fmt::Display for RevocationSnapshotFreshnessError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Future => f.write_str("revocation snapshot was issued in the future"),
+            Self::Stale => f.write_str("revocation snapshot exceeds maximum staleness"),
+        }
+    }
+}
+
+impl core::error::Error for RevocationSnapshotFreshnessError {}
 
 /// Errors surfaced by the revocation-view cache. Every variant is
 /// fail-closed: the embedding kernel MUST refuse to install a snapshot that
