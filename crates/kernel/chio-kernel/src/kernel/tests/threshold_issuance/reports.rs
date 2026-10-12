@@ -9,9 +9,24 @@ fn conflict_preserves_wait(entry: EntryPoint) -> TestResult {
     fixture.request.threshold_approval_proposal = None;
     let response = evaluate(&fixture, &context, entry)?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        matches!(response.receipt.decision.as_ref(), Some(Decision::Deny { guard, .. }) if guard == "session_authorization")
+    assert!(response.receipt.decision.is_none());
+    assert_eq!(
+        response.receipt.receipt_kind,
+        chio_core::receipt::kinds::ReceiptKind::TraceObservation
     );
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("report metadata missing")?;
+    assert_eq!(metadata["session_report"]["kind"], "authorization_conflict");
+    assert_eq!(
+        metadata["session_report"]["reason"].as_str(),
+        response.reason.as_deref()
+    );
+    assert!(metadata
+        .pointer("/chio_runtime/identity_disposition")
+        .is_none());
     assert_eq!(
         response.receipt.kernel_key,
         fixture.kernel.receipt_signing_public_key()
