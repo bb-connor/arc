@@ -161,14 +161,14 @@ class TestChioRequires:
         set_chio_client(None)
 
     def test_metadata_attached(self) -> None:
-        @chio_requires("srv", "tool", ["Invoke", "ReadResult"])
+        @chio_requires("srv", "tool", ["invoke", "read_result"])
         async def handler(request: Request) -> dict:
             return {}
 
         assert handler._chio_requires == {
             "server_id": "srv",
             "tool_name": "tool",
-            "operations": ["Invoke", "ReadResult"],
+            "operations": ["invoke", "read_result"],
         }
 
     def test_capability_from_query_param(self) -> None:

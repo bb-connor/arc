@@ -30,7 +30,7 @@ import logging
 import pathlib
 import threading
 from collections import deque
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 DEFAULT_RECEIPT_BUFFER_MAX: int = 1000
@@ -202,13 +202,6 @@ class ReceiptBuffer:
         """Total pending entries across all ``task_id`` queues."""
         with self._lock:
             return sum(len(q) for q in self._pending.values())
-
-    # Iterator-style alias kept for chio-hermes parity. The chio-hermes
-    # signature returns ``Iterator[dict]``; the new spec asks for a
-    # list. Provide both via this helper.
-    def iter_drain_pending(self) -> Iterator[dict[str, Any]]:
-        """Backwards-compatible iterator over ``drain_pending()``."""
-        yield from self.drain_pending()
 
 
 __all__ = [

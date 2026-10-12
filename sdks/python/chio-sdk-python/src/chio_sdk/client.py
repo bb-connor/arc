@@ -636,7 +636,6 @@ class ChioClient:
         parameters: dict,
         request_id: str | None = None,
         governed_intent: dict[str, Any] | None = None,
-        approval_token: dict[str, Any] | None = None,
         approval_id: str | None = None,
         dpop_proof: dict[str, Any] | None = None,
     ) -> dict:
@@ -652,7 +651,7 @@ class ChioClient:
 
         A reservation requires ``start_mediated_execution`` followed by an
         authenticated durable executor claim before any effect. A nonce or
-        incomplete receipt is not execution permission. Legacy ``authorized``
+        incomplete receipt is not execution permission. ``authorized``
         responses are rejected. Unsupported credential profiles fail closed.
 
         Parameters
@@ -666,9 +665,6 @@ class ChioClient:
         governed_intent:
             Governed context for calls without ``approval_id``. Approved calls
             use the retained intent and reject an additional caller envelope.
-        approval_token:
-            Legacy parameter rejected by the server. Use ``approval_id`` for
-            reservation, then supply the token to authenticated execution start.
         dpop_proof:
             Forward this for a ``dpop_required`` grant; without it the grant is
             denied.
@@ -685,8 +681,6 @@ class ChioClient:
             body["governed_intent"] = governed_intent
         if approval_id is not None:
             body["approval_id"] = approval_id
-        if approval_token is not None:
-            body["approval_token"] = approval_token
         if dpop_proof is not None:
             body["dpop_proof"] = dpop_proof
         data = await self._post("/v1/evaluate", body)
@@ -852,15 +846,8 @@ class ChioClient:
         ``count`` field is dropped to match the documented signature
         from the chio-hermes integration plan.
         """
-        data = await self._get("/approvals/pending", allow_array=True, headers=self._approval_headers())
-        # The sidecar response is `{"approvals": [...], "count": N}`.
-        # Tolerate a bare list response for forward compatibility.
-        payload = (
-            {"approvals": data, "count": len(data)}
-            if isinstance(data, list)
-            else data
-        )
-        listing = PendingApprovalList.model_validate(payload)
+        data = await self._get("/approvals/pending", headers=self._approval_headers())
+        listing = PendingApprovalList.model_validate(data)
         return list(listing.approvals)
 
     async def get_approval(self, approval_id: str) -> Approval:
@@ -977,9 +964,8 @@ class ChioClient:
         return {"Authorization": f"Bearer {self._control_token}"} if self._control_token else None
 
     async def _get(
-        self, path: str, *, allow_array: bool = False,
-        headers: dict[str, str] | None = None,
-    ) -> dict[str, Any] | list[Any]:
+        self, path: str, *, headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         try:
             resp = await self._http.get(path, headers=headers)
         except httpx.ConnectError as exc:
@@ -990,7 +976,7 @@ class ChioClient:
             raise ChioTimeoutError(
                 f"Request to {path} timed out"
             ) from exc
-        return self._handle_response(resp, allow_array=allow_array)
+        return self._handle_response(resp)
 
     async def _post(
         self,
@@ -1012,9 +998,7 @@ class ChioClient:
         return self._handle_response(resp)
 
     @staticmethod
-    def _handle_response(
-        resp: httpx.Response, *, allow_array: bool = False
-    ) -> dict[str, Any] | list[Any]:
+    def _handle_response(resp: httpx.Response) -> dict[str, Any]:
         if resp.status_code == 403:
             try:
                 data = resp.json()
@@ -1049,8 +1033,6 @@ class ChioClient:
                 "Chio sidecar returned malformed JSON response",
                 code="INVALID_RESPONSE",
             ) from exc
-        if allow_array and isinstance(data, list):
-            return data
         if not isinstance(data, dict):
             raise ChioError(
                 f"Chio sidecar returned invalid JSON response: {data!r}",

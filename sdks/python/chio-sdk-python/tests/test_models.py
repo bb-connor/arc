@@ -142,15 +142,24 @@ class TestOperation:
         assert Operation.READ_RESULT.value == "read_result"
         assert Operation.DELEGATE.value == "delegate"
 
-    def test_legacy_input_aliases_serialize_snake_case(self) -> None:
+    def test_pascal_case_names_are_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ToolGrant.model_validate(
+                {
+                    "server_id": "s",
+                    "tool_name": "t",
+                    "operations": ["Invoke", "ReadResult"],
+                }
+            )
+
+    def test_operations_serialize_snake_case(self) -> None:
         grant = ToolGrant.model_validate(
             {
                 "server_id": "s",
                 "tool_name": "t",
-                "operations": ["Invoke", "ReadResult"],
+                "operations": ["invoke", "read_result"],
             }
         )
-        assert grant.operations == [Operation.INVOKE, Operation.READ_RESULT]
         data = json.loads(grant.model_dump_json())
         assert data["operations"] == ["invoke", "read_result"]
 

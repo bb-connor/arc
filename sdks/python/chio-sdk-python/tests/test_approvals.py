@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 from chio_sdk.client import ChioClient
-from chio_sdk.errors import ChioValidationError
+from chio_sdk.errors import ChioError, ChioValidationError
 from chio_sdk.models_approvals import (
     ApprovalVerdict,
     PendingApproval,
@@ -94,15 +94,14 @@ async def test_list_pending_approvals_parses_array_payload():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_list_pending_approvals_tolerates_bare_list():
+async def test_list_pending_approvals_rejects_bare_list():
     respx.get(f"{BASE}/approvals/pending").mock(
         return_value=httpx.Response(200, json=[_pending_dict("ap-9")])
     )
     client = ChioClient(BASE)
-    rows = await client.list_pending_approvals()
+    with pytest.raises(ChioError):
+        await client.list_pending_approvals()
     await client.close()
-    assert len(rows) == 1
-    assert rows[0].approval_id == "ap-9"
 
 
 @pytest.mark.asyncio
