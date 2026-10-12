@@ -40,6 +40,15 @@ pub(in crate::runtime) fn paginate_response(
     paginate_named_response(id, start, page_size, "resources", values)
 }
 
+pub(in crate::runtime) fn insert_next_cursor(
+    result: &mut serde_json::Map<String, Value>,
+    next_cursor: Option<String>,
+) {
+    if let Some(next_cursor) = next_cursor {
+        result.insert("nextCursor".to_string(), Value::String(next_cursor));
+    }
+}
+
 pub(in crate::runtime) fn paginate_named_response(
     id: Value,
     start: usize,
@@ -60,10 +69,7 @@ pub(in crate::runtime) fn paginate_named_response(
         field_name.to_string(),
         Value::Array(values[start..end].to_vec()),
     );
-    result.insert(
-        "nextCursor".to_string(),
-        next_cursor.map(Value::String).unwrap_or(Value::Null),
-    );
+    insert_next_cursor(&mut result, next_cursor);
 
     jsonrpc_result(id, Value::Object(result))
 }
