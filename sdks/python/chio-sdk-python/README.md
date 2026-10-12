@@ -11,6 +11,11 @@ the sidecar and returns typed results.
 
 ## Install
 
+> **Deprecated release.** The `chio-sdk` 0.1.0 package on PyPI was published on
+> 2026-04-22 and does not match the current protocol or receipt format. Install
+> from this checkout until the `0.2.0-alpha.N` preview is published. The PyPI
+> name `chio` belongs to an unrelated project.
+
 ```bash
 uv pip install chio-sdk-python
 # or

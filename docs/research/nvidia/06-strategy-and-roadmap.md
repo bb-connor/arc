@@ -391,7 +391,7 @@ Each is about one small task. They are the first candidates when a phase finishe
 - Model-path routing, reasoning-trace inspection and hardware enforcement. Sentry, an optional reference design, and DOCA Argus hold that ground (VERIFIED, [NVIDIA developer blog, 2026-09-28](https://developer.nvidia.com/blog/nvidia-open-agent-safety-platform-a-reference-for-continuous-in-silicon-agent-monitoring/); [DOCA Argus guide, 2026-09-11](https://networking-docs.nvidia.com/doca/archive/3-5-0/doca-argus-service-guide)).
 - SIEM as a system of record. Chio feeds Splunk, Falcon, XSIAM and Sentinel with correct OCSF.
 - Attestation appraisal as a product. CNCF Trustee already ships NVIDIA GPU and BlueField-3 verifiers (VERIFIED, [confidential-containers/trustee, 2026-09-18](https://github.com/confidential-containers/trustee)).
-- EDR, sensing and quarantine. Clawdstrike and the security vendors own them, and Chio's active-defense crates join the ADR-0023 freeze.
+- EDR, sensing and quarantine. The security vendors own them, and Chio's active-defense crates join the ADR-0023 freeze.
 - Payment rails, custody, tokens and the cognition market in NVIDIA-, bank- or healthcare-facing material.
 - Hooks, Relay plugins and NAT middleware sold as enforcement. They fail open and ship as coverage paired with a chokepoint.
 - AWS-native governance against AgentCore on AWS's own ground, and a hosted multi-tenant governance SaaS before SOC 2, a DPA and a BAA exist.
@@ -796,7 +796,7 @@ Facts in this section carry labels where they are first stated in sections 1 to 
 | F-14 | No Sentry, DOCA or BlueField code before a published interface; NVIDIA evidence through CNCF Trustee. | Yes. | Yes | No artifact, signer or API is published, and appraisal already exists in Trustee. |
 | F-15 | Backbay never hosts both co-signers. Treaty lanes enter the bounded gate with the two-keys wording, and the relay or mTLS lane lands before 2026-12-31. | Yes. | Yes | Two keys under one custodian collapse bilateral independence. |
 | F-16 | Kill-or-continue on 2027-03-26 for the relying-party and cross-organization seats. | Yes. | Yes | Those seats hold the moat and the least-proven demand. |
-| F-17 | Portfolio boundary, written by day 14: Chio owns delegated authority and evidence; Clawdstrike owns sensing, EDR, response and any Sentry or DOCA detection relationship; HushSpec is the policy specification. | Yes. | Yes | Clawdstrike overlaps Sentry more directly than Chio does, and no written boundary exists. |
+| F-17 | Voided on 2026-10-12. Clawdstrike is prior art that Chio absorbs, not a peer, so no portfolio boundary with it is written. | Not applicable. | Not applicable | The overlap with Sentry is addressed by the F-14 rule of no code before NVIDIA publishes an interface. |
 
 ## 15. Claim-boundary cautions
 
