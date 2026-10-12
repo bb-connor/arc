@@ -82,8 +82,8 @@ pub use canonical::{
     canonical_json_string_from_str, canonicalize, CanonicalBytes, CanonicalJsonWitness,
 };
 pub use crypto::{
-    sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-    SigningOutcome,
+    sha256_hex, sha256_hex_bytes, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend, SigningOutcome,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};

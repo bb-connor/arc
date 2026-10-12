@@ -24,10 +24,10 @@ HEX_LISTING = f"{HEX_FUNCTION} /* {HEX_SYMBOL} */\n"
 ENCODER_FUNCTION = "chio_core_types::crypto::encoding::fill_prefixed_hex"
 ENCODER_SYMBOL = "_RNvNtNtCsFresh_15chio_core_types6crypto8encoding17fill_prefixed_hex"
 ENCODER_LOOPS = f"""Loop {ENCODER_SYMBOL}.9:
-  file crates/core/chio-core-types/src/crypto/encoding.rs line 70 column 5 function {ENCODER_FUNCTION}
+  file crates/core/chio-core-types/src/crypto/encoding.rs line 54 column 5 function {ENCODER_FUNCTION}
 
 Loop {ENCODER_SYMBOL}.2:
-  file crates/core/chio-core-types/src/crypto/encoding.rs line 67 column 5 function {ENCODER_FUNCTION}
+  file crates/core/chio-core-types/src/crypto/encoding.rs line 53 column 5 function {ENCODER_FUNCTION}
 
 """
 ENCODER_BOUNDS = f"{ENCODER_SYMBOL}.2:6,{ENCODER_SYMBOL}.9:66"
@@ -315,7 +315,7 @@ sys.exit(int(os.environ['KANI_TEST_PROOF_EXIT']))
             "",
             ENCODER_LOOPS.split("Loop " + ENCODER_SYMBOL + ".2:")[0],
             ENCODER_LOOPS + ENCODER_LOOPS,
-            ENCODER_LOOPS.replace("line 67", "line 55"),
+            ENCODER_LOOPS.replace("line 53", "line 55"),
             ENCODER_LOOPS.replace(
                 "crates/core/chio-core-types", "crates/trust/chio-core-types"
             ),
@@ -324,11 +324,11 @@ sys.exit(int(os.environ['KANI_TEST_PROOF_EXIT']))
             ENCODER_LOOPS.replace(".2:", ".02:"),
             ENCODER_LOOPS.replace(".2:", ".4294967296:"),
             ENCODER_LOOPS.replace(".2:", ".2,memcmp.0:0:"),
-            ENCODER_LOOPS.replace("line 67 column 5", "line unknown column 5"),
+            ENCODER_LOOPS.replace("line 53 column 5", "line unknown column 5"),
             ENCODER_LOOPS.replace(".2:", "OtherEncoder.2:"),
             ENCODER_LOOPS.replace(
-                f"line 67 column 5 function {ENCODER_FUNCTION}",
-                f"line 67 column 5 function {ENCODER_FUNCTION}\n  file other.rs line unknown function {ENCODER_FUNCTION}",
+                f"line 53 column 5 function {ENCODER_FUNCTION}",
+                f"line 53 column 5 function {ENCODER_FUNCTION}\n  file other.rs line unknown function {ENCODER_FUNCTION}",
             ),
             ENCODER_LOOPS
             + f"Loop {ENCODER_SYMBOL}.3:\n  file crates/core/chio-core-types/src/crypto/encoding.rs line 60 function {ENCODER_FUNCTION}\n",

@@ -82,7 +82,7 @@ p256_encoder_bounds = true
         self.assertNotIn(PAIR, result.stdout)
         self.assertIn("OPEN/UNPROVED", result.stderr)
         self.assertIn("KANI-ATTEST-DECOMP", result.stderr)
-        self.assertIn("chio-weights::public_weights_hash_of_determinism_and_shape", result.stdout)
+        self.assertIn("chio-weights::public_weights_hash_hex_bytes_determinism_and_shape", result.stdout)
 
     def test_residual_only_list_is_empty_not_a_proof_pass(self):
         result = self.run_manifest(self.fixture(), "--list")
@@ -174,8 +174,8 @@ timeout_secs = 10
         self.assertIn(MARKER, source)
         variants = (
             source.replace(MARKER, ""),
-            source.replace('harness = "public_weights_hash_of_determinism_and_shape"',
-                           'harness = "public_weights_hash_of_determinism_and_shape"\n' + MARKER),
+            source.replace('harness = "public_weights_hash_hex_bytes_determinism_and_shape"',
+                           'harness = "public_weights_hash_hex_bytes_determinism_and_shape"\n' + MARKER),
         )
         for body in variants:
             with tempfile.TemporaryDirectory() as raw:

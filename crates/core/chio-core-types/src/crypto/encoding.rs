@@ -70,8 +70,9 @@ fn hex_byte_pair(byte: u8) -> Option<(u8, u8)> {
 
 #[cfg(test)]
 mod tests {
-    use super::prefixed_hex;
+    use super::{fill_prefixed_hex, prefixed_hex};
     use alloc::format;
+    use alloc::vec;
     use alloc::vec::Vec;
 
     #[test]
@@ -79,10 +80,15 @@ mod tests {
         let bytes: Vec<u8> = (u8::MIN..=u8::MAX).collect();
         for prefix in ["", "p256:", "p384:", "\u{3bb}:"] {
             for len in [0, 1, 31, 32, 64, 65, 97, 127, 128, 255, 256] {
-                assert_eq!(
-                    prefixed_hex(prefix, &bytes[..len]),
-                    format!("{prefix}{}", hex::encode(&bytes[..len]))
-                );
+                let expected = format!("{prefix}{}", hex::encode(&bytes[..len]));
+                assert_eq!(prefixed_hex(prefix, &bytes[..len]), expected);
+                let mut filled = vec![0; expected.len()];
+                let fill = fill_prefixed_hex(prefix, &bytes[..len], &mut filled);
+                if prefix.is_ascii() {
+                    assert_eq!((fill, &filled[..]), (Some(()), expected.as_bytes()));
+                } else {
+                    assert_eq!(fill, None);
+                }
             }
         }
     }

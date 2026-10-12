@@ -513,13 +513,13 @@ notes = "Truth table over the public settlement_state_id helper used by the prod
 [[harness]]
 crate = "chio-weights"
 features = ["kani"]
-harness = "public_weights_hash_of_determinism_and_shape"
+harness = "public_weights_hash_hex_bytes_determinism_and_shape"
 unwinding_checks = true
 require_cover = true
 default_unwind = 66
 timeout_secs = 1800
 lane = "pr"
-notes = "Real SHA-256 determinism and lowercase shape (noncollision is ASSUME-SHA256, original inequality retained as unproved research) checks for chio_weights::weights_hash_of over the original symbolic four-byte input domain."
+notes = "Real SHA-256 determinism and lowercase shape (noncollision is ASSUME-SHA256, original inequality retained as unproved research) checks for the 64 hex bytes of chio_weights::weights_hash_of (chio_core_types::sha256_hex_bytes) over the original symbolic four-byte input domain. The bytes-to-String step is covered by the encoder unit tests, not by Kani."
 
 [[harness]]
 crate = "chio-weights"

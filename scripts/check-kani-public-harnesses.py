@@ -46,7 +46,7 @@ KEY_COMPARISON_HARNESSES = (
 )
 TRUST_REACHABLE_HARNESSES = {
     "chio-weights": (
-        "public_weights_hash_of_determinism_and_shape",
+        "public_weights_hash_hex_bytes_determinism_and_shape",
         "public_model_card_require_live_fail_closed",
         "public_weights_error_urn_is_stable",
         "public_model_card_new_pins_schema_version",
