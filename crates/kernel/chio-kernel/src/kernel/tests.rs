@@ -268,10 +268,10 @@ use multi_tenant_receipt::oauth_auth_with_enterprise_tenant;
 mod federation_cosign;
 #[path = "tests/memory_provenance.rs"]
 mod memory_provenance;
-#[path = "tests/receipt_scope_isolation.rs"]
-mod receipt_scope_isolation;
 #[path = "tests/receipt_identity.rs"]
 mod receipt_identity;
+#[path = "tests/receipt_scope_isolation.rs"]
+mod receipt_scope_isolation;
 use federation_cosign::{handshake_and_pin, CountingRejectingCosigner, FailingAppendReceiptStore};
 #[path = "tests/durable_admission.rs"]
 mod durable_admission;
