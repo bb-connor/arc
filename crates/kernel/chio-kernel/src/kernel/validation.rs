@@ -55,6 +55,36 @@ pub(crate) struct ReservedPrepayment {
     pub(crate) payment_reference: Option<String>,
 }
 
+pub(crate) enum ReservedPrepaymentFailure {
+    Denied(KernelError),
+    CaptureOutcomeUnknown(ReservedCaptureFailure),
+}
+
+pub(crate) struct ReservedCaptureFailure {
+    authorization: Box<PaymentAuthorization>,
+    error: PaymentError,
+}
+
+impl ReservedCaptureFailure {
+    pub(crate) fn authorization(&self) -> &PaymentAuthorization {
+        &self.authorization
+    }
+
+    pub(crate) fn error(&self) -> &PaymentError {
+        &self.error
+    }
+
+    pub(crate) fn error_code(&self) -> &'static str {
+        payment_error_code(&self.error)
+    }
+}
+
+impl From<KernelError> for ReservedPrepaymentFailure {
+    fn from(error: KernelError) -> Self {
+        Self::Denied(error)
+    }
+}
+
 impl ChioKernel {
     pub(crate) fn resolve_security_invocation_context(
         &self,
@@ -2389,7 +2419,7 @@ impl ChioKernel {
         durable_admission: Option<&DurableToolAdmission>,
         trusted_now_unix_ms: u64,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-    ) -> Result<Option<ReservedPrepayment>, KernelError> {
+    ) -> Result<Option<ReservedPrepayment>, ReservedPrepaymentFailure> {
         if !Self::is_governed_mustprepay_request(request) {
             return Ok(None);
         }
@@ -2430,25 +2460,30 @@ impl ChioKernel {
                 "MustPrepay reservation omitted its payment adapter".to_string(),
             )
         })?;
-        let result = match adapter.capture(
-            &authorization.authorization_id,
-            amount_units,
-            &currency,
-            &request.request_id,
-        ) {
+        let result = match run_payment_adapter_operation("capture", || {
+            adapter.capture(
+                &authorization.authorization_id,
+                amount_units,
+                &currency,
+                &request.request_id,
+            )
+        }) {
             Ok(result) => result,
             Err(error) => {
-                let _ = adapter.release(&authorization.authorization_id, &request.request_id);
-                return Err(KernelError::GovernedTransactionDenied(format!(
-                    "MustPrepay prepayment capture failed before reserving an execution nonce: {error}"
-                )));
+                return Err(ReservedPrepaymentFailure::CaptureOutcomeUnknown(
+                    ReservedCaptureFailure {
+                        authorization: Box::new(authorization),
+                        error,
+                    },
+                ));
             }
         };
         if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
             let _ = adapter.release(&authorization.authorization_id, &request.request_id);
             return Err(KernelError::GovernedTransactionDenied(
                 "MustPrepay prepayment capture was not confirmed settled".to_string(),
-            ));
+            )
+            .into());
         }
         Ok(Some(ReservedPrepayment {
             authorization: PaymentAuthorization {
