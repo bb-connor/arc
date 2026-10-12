@@ -30,6 +30,8 @@ mod qualified_finding_pool;
 mod query;
 #[path = "tests/receipt_batch.rs"]
 mod receipt_batch;
+#[path = "tests/retained_children.rs"]
+mod retained_children;
 #[path = "tests/retained_commitments.rs"]
 mod retained_commitments;
 #[path = "tests/retention.rs"]

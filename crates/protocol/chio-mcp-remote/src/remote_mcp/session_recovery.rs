@@ -163,7 +163,7 @@ async fn expire_record(
         epoch,
         epoch,
     )?;
-    prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
+    prepare_terminal_session_transition(path, &fence, &tombstone, keyring, terminal_at)?;
     finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)?;
     sessions
         .terminal
