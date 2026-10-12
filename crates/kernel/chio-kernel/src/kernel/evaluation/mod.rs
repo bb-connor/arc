@@ -6,8 +6,6 @@
 use chio_log_redact::redacted;
 
 use self::delivery_preparation::PreparedToolDelivery;
-#[cfg(any(test, feature = "finding-market"))]
-use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 
 mod async_evaluation_core;

@@ -1,6 +1,6 @@
 use super::*;
 
-#[cfg(any(test, feature = "finding-market"))]
+#[cfg(test)]
 pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) charge_result: Option<BudgetChargeResult>,
     pub(crate) reported_cost: Option<ToolInvocationCost>,

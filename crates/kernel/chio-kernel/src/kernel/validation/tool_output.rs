@@ -5,8 +5,6 @@ use super::payment_outcome::{
 };
 use super::*;
 use crate::kernel::responses::AllowResponseNonce;
-#[cfg(any(test, feature = "finding-market"))]
-use crate::kernel::responses::FinalizeToolOutputCostContext;
 
 impl ChioKernel {
     pub(crate) fn tool_server_measures_realized_cost(&self, server_id: &str) -> bool {
@@ -109,43 +107,6 @@ impl ChioKernel {
                     verified_payee_binding,
                 ),
         }
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    #[cfg(any(test, feature = "finding-market"))]
-    pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
-        &self,
-        request: &ToolCallRequest,
-        output: ToolServerOutput,
-        elapsed: Duration,
-        timestamp: u64,
-        matched_grant_index: usize,
-        cost_context: FinalizeToolOutputCostContext<'_>,
-        extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-        security_context: Option<&SecurityInvocationContext>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let prepared = self.prepare_budgeted_tool_output_with_cost_and_metadata(
-            request,
-            output,
-            elapsed,
-            timestamp,
-            matched_grant_index,
-            crate::kernel::responses::PrepareToolOutputCostContext {
-                charge_result: cost_context.charge_result.as_ref(),
-                reported_cost: cost_context.reported_cost.as_ref(),
-                payment_authorization: cost_context.payment_authorization.as_ref(),
-                cap: cost_context.cap,
-                fault_progress: None,
-            },
-            extra_metadata,
-            verified_payee_binding,
-            security_context,
-        )?;
-        self.publish_prepared_response(request, prepared)
     }
 
     #[allow(

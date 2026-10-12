@@ -239,9 +239,7 @@ fn prepare_ordinary(
                     ).map(|response| (response, None));
                 }
                 let metadata = crate::kernel::delivery_contract::attach_finding_recovery_metadata(metadata, inputs.finding.recovery_binding());
-                if inputs.finding.recovery_binding().is_some() {
-                    return Err(KernelError::DurableAdmission("finding recovery requires an atomic durable admission terminal projection".into()));
-                }
+                crate::kernel::evaluation::evaluation_helpers::require_durable_finding_recovery(inputs.finding.recovery_binding())?;
                 kernel.prepare_budgeted_tool_output_with_cost_and_metadata(
                     inputs.request, output, elapsed, now, inputs.matched_grant_index,
                     PrepareToolOutputCostContext {

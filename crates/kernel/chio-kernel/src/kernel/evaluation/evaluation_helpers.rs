@@ -4,6 +4,17 @@ use crate::budget_store::BudgetReverseHoldDecision;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
+pub(in crate::kernel) fn require_durable_finding_recovery(
+    recovery: Option<&crate::finding_recovery::VerifiedFindingRecovery>,
+) -> Result<(), KernelError> {
+    if recovery.is_some() {
+        return Err(KernelError::DurableAdmission(
+            "finding recovery requires an atomic durable admission terminal projection".into(),
+        ));
+    }
+    Ok(())
+}
+
 impl ChioKernel {
     pub(in crate::kernel) fn prepare_changed_ordinary_recovery_status(
         &self,
@@ -120,21 +131,6 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) nonce: PreflightNonceSource,
 }
 
-#[cfg(any(test, feature = "finding-market"))]
-pub(crate) struct OrdinaryRecoveryFinalization<'a> {
-    pub(crate) request: &'a ToolCallRequest,
-    pub(crate) output: ToolServerOutput,
-    pub(crate) elapsed: Duration,
-    pub(crate) timestamp: u64,
-    pub(crate) matched_grant_index: usize,
-    pub(crate) cost: FinalizeToolOutputCostContext<'a>,
-    pub(crate) metadata: Option<serde_json::Value>,
-    pub(crate) guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
-    pub(crate) payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
-    pub(crate) recovery: Option<&'a crate::finding_recovery::VerifiedFindingRecovery>,
-    pub(crate) security_context: Option<&'a SecurityInvocationContext>,
-}
-
 struct CleanupReleaseOutcome {
     metadata: Option<serde_json::Value>,
     confirmed: bool,
@@ -248,36 +244,6 @@ pub(crate) fn delivery_commitment_denial(
 }
 
 impl ChioKernel {
-    #[cfg(any(test, feature = "finding-market"))]
-    pub(crate) fn finalize_ordinary_recovery_response(
-        &self,
-        finalization: OrdinaryRecoveryFinalization<'_>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let metadata = crate::kernel::delivery_contract::attach_finding_recovery_metadata(
-            finalization.metadata,
-            finalization.recovery,
-        );
-        if finalization.recovery.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "finding recovery requires an atomic durable admission terminal projection"
-                    .to_owned(),
-            ));
-        }
-        self.with_pre_invocation_guard_evidence(finalization.guard_evidence, || {
-            self.finalize_budgeted_tool_output_with_cost_and_metadata(
-                finalization.request,
-                finalization.output,
-                finalization.elapsed,
-                finalization.timestamp,
-                finalization.matched_grant_index,
-                finalization.cost,
-                metadata,
-                finalization.payee_binding,
-                finalization.security_context,
-            )
-        })
-    }
-
     pub(crate) fn compensate_durable_admission_after_pre_dispatch_cleanup(
         &self,
         operation: Option<&AdmissionOperationV1>,
