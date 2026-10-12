@@ -1,0 +1,6 @@
+tree 3958efe22b159c1ec0e21da8d7160fc7dd7061ee
+parent 85112ca9cf4dc62a0260a199c61b2a2c8244e209
+author Sertonix <sertonix@posteo.net> 1730911858 +0100
+committer Natanael Copa <ncopa@alpinelinux.org> 1735217780 +0100
+
+main/libpsl: split makedepends for cross compilation

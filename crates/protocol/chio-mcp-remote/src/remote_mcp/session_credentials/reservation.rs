@@ -121,6 +121,7 @@ mod tests {
                 drain_grace_millis: DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
                 reaper_interval_millis: DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
                 tombstone_retention_millis: DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
+                request_response_timeout_millis: DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
             },
             protocol_version: None,
             peer_capabilities: None,

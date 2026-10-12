@@ -1,0 +1,190 @@
+# chio.attribution-lines.v8 origin=nghttp2 files=1231 files_with_lines=446 binary_heads=1 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/version.rc.in	\tVALUE "LegalCopyright",   "The MIT License"\r
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tasks/mrbgems.rake	          f.puts "Copyright (c) #{Time.now.year} #{authors}"
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mrbc/tools/mrbc/mrbc.c	          mrb_show_copyright(mrb);
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	        /^Copyright /!{
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/Makefile.msvc	        VALUE "LegalCopyright",   "The MIT License"\r
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mrbc/tools/mrbc/mrbc.c	        else if (strcmp(argv[i] + 2, "copyright") == 0) {
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mirb/tools/mirb/mirb.c	        mrb_show_copyright(mrb);
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mirb/tools/mirb/mirb.c	      else if (strcmp((*argv) + 2, "copyright") == 0) {
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mruby/tools/mruby/mruby.c	      mrb_show_copyright(mrb);
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/rubydomain.py	    :copyright: Copyright 2010 by SHIBUKAWA Yoshiki
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-dir/src/Win/dirent.c	    Copyright Kevlin Henney, 1997, 2003, 2012. All rights reserved.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mruby/tools/mruby/mruby.c	    else if (strcmp(opt, "copyright") == 0) {
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-dir/src/Win/dirent.c	    that this copyright and permissions notice appear in all copies and
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/template/bison/yacc.h	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-bin-mirb/tools/mirb/mirb.c	  "--copyright  print the copyright",
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/nghttp2_gzip_test.c	  "NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE "
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/include/mruby/version.h	  "mruby - Copyright (c) "             \\
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/lib/lrama/parser.rb	  Copyright = 'Copyright (c) 1999-2006 Minero Aoki'
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/src/version.c	  mrb_define_global_const(mrb, "MRUBY_COPYRIGHT", mrb_str_new_lit(mrb, MRUBY_COPYRIGHT));
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/src/print.c	  printstrln(mrb, mrb_const_get(mrb, mrb_obj_value(mrb->object_class), MRB_SYM(MRUBY_COPYRIGHT)), stdout);
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/munit.c	 *   copyright and related or neighboring rights to this code.  For
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/neverbleed/neverbleed.c	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/bpf/reuseport_kern.c	 * Copyright (C) 2006. Bob Jenkins (bob_jenkins@burtleburtle.net)
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/bpf/reuseport_kern.c	 * Copyright (C) 2009-2010 Jozsef Kadlecsik (kadlec@blackhole.kfki.hu)
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/sfparse.c	 * Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+line	84	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_http2_session.cc	 * Copyright (c) 2012 Tatsuhiro Tsujikawa
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_alpn_test.h	 * Copyright (c) 2012 Twist Inc.
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_map_test.h	 * Copyright (c) 2012 nghttp2 contributors
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/nghttp2_version.c	 * Copyright (c) 2012, 2013 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/failmalloc_test.c	 * Copyright (c) 2012, 2014 Tatsuhiro Tsujikawa
+line	34	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_downstream_test.cc	 * Copyright (c) 2013 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/includes/nghttp2/nghttp2.h	 * Copyright (c) 2013, 2014 Tatsuhiro Tsujikawa
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/munit.h	 * Copyright (c) 2013-2017 Evan Nemerson <evan@nemerson.com>
+line	31	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_connect_blocker.cc	 * Copyright (c) 2014 Tatsuhiro Tsujikawa
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/h2load_http1_session.cc	 * Copyright (c) 2015 British Broadcasting Corporation
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/neverbleed/neverbleed.c	 * Copyright (c) 2015 Kazuho Oku, DeNA Co., Ltd.
+line	35	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_mruby.cc	 * Copyright (c) 2015 Tatsuhiro Tsujikawa
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/sfparse.c	 * Copyright (c) 2015 nghttp2 contributors
+line	31	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_live_check.h	 * Copyright (c) 2016 Tatsuhiro Tsujikawa
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_map_test.h	 * Copyright (c) 2017 ngtcp2 contributors
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/h2load_quic.cc	 * Copyright (c) 2019 nghttp2 contributors
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/sfparse.c	 * Copyright (c) 2019 nghttp3 contributors
+line	13	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_null_downstream_connection.h	 * Copyright (c) 2021 Tatsuhiro Tsujikawa
+line	6	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_http_test.h	 * Copyright (c) 2022 nghttp2 contributors
+line	6	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_http_test.h	 * Copyright (c) 2022 nghttp3 contributors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/munitxx.h	 * Copyright (c) 2023 munit contributors
+line	6	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_ratelim_test.h	 * Copyright (c) 2023 nghttp2 contributors
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/sfparse.c	 * Copyright (c) 2023 sfparse contributors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/nghttp2_assertion.h	 * Copyright (c) 2024 nghttp2 contributors
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/urlparse/urlparse.c	 * Copyright (c) 2024 urlparse contributors
+line	7	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/siphash_test.cc	 * Copyright (c) 2025 nghttp2 contributors
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/allocator_test.cc	 * Copyright (c) 2026 nghttp2 contributors
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/munit.h	 * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+line	272	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_http2_session.cc	 * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	276	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/shrpx_http2_session.cc	 * The above copyright notice and this permission notice shall be
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/neverbleed/neverbleed.c	 * The above copyright notice and this permission notice shall be included in
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/siphash.cc	 * copyright notice and this permission notice appear in all copies.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/include/mruby/version.h	 * mruby's copyright information.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/README.md	"mruby developers" but contributors will keep their copyright.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/lib/lrama/parser.rb	#          [--version] [--copyright] [--help] <var>grammarfile</var>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	#      /^# Copyright /
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_check_compile_flag.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2008 Benjamin Kosnik <bkoz@redhat.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_check_compile_flag.m4	#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_check_compile_flag.m4	#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2012 Zack Weinberg <zackw@panix.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2014, 2015 Google Inc.; contributed by Alexey Sokolov <sokolov@google.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2015 Moritz Klammler <moritz@klammler.eu>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2015 Paul Norman <penorman@mac.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2016, 2018 Krzesimir Nowak <qdlacz@gmail.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2019 Enji Cooper <yaneurabeya@gmail.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2020 Jason Merrill <jason@redhat.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   Copyright (c) 2021 Jörn Heusipp <osmanx@problemloesungsmaschine.de>
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/lib/lrama/parser.rb	#   Print copyright and quit.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ax_cxx_compile_stdcxx.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/install-sh	# Copyright (C) 1994 X Consortium
+line	13	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/testdata/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	6	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/depcomp	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	6	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/lib/lrama/parser.rb	# Copyright (c) 1999-2006 Minero Aoki
+line	16	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/Makefile.in	# Copyright (c) 2012 Tatsuhiro Tsujikawa
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/Makefile.in	# Copyright (c) 2012, 2013 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/CMakeLists.txt	# Copyright (c) 2012, 2013, 2014, 2015 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/android-config	# Copyright (c) 2013 Tatsuhiro Tsujikawa
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/contrib/Makefile.in	# Copyright (c) 2014 Tatsuhiro Tsujikawa
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/integration-tests/Makefile.in	# Copyright (c) 2015 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/CMakeLists.txt	# Copyright (c) 2016 Peter Wu <peter@lekensteyn.nl>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/mkapiref.py	# Copyright (c) 2020 nghttp2 contributors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/mkapiref.py	# Copyright (c) 2020 ngtcp2 contributors
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/bpf/Makefile.in	# Copyright (c) 2021 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/android-env	# Copyright (c) 2022 nghttp2 contributors
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/testdata/Makefile.in	# Copyright (c) 2023 Tatsuhiro Tsujikawa
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/cmake/PickyWarningsCXX.cmake	# Copyright (c) 2023 nghttp2 contributors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/conf.py.in	# If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
+line	34	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/android-env	# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-enum-chain/mrblib/chain.rb	# See Copyright Notice in mruby.h
+line	34	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/android-env	# The above copyright notice and this permission notice shall be
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/lib/lrama/parser.rb	# [--copyright]
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/install-sh	# following copyright and license.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/include/mruby/version.h	#define MRUBY_COPYRIGHT                \\
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/conf.py.in	#html_show_copyright = True
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/README.md	(We did not intend for contributors to transfer or waive their copyrights,
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain	* Redistributions in binary form must reproduce the above copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain	* Redistributions of source code must retain the above copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-sleep/src/sleep.c	** Copyright (c) mod_mruby developers 2012-
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/include/mruby.h	** Copyright (c) mruby developers 2010-
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-sleep/src/sleep.c	** Copyright (c) mruby developers 2018
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-sleep/src/sleep.c	** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	77	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/src/numeric.c	** See Copyright Notice in mruby.h
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-sleep/src/sleep.c	** The above copyright notice and this permission notice shall be
+line	4	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/nghttpx.1	.SH Copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/lib/sfparse.c	/* Copyright (c) 2008-2010 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/munit.c	/* Copyright (c) 2013-2018 Evan Nemerson <evan@nemerson.com>
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/src/siphash.cc	/* Copyright 2019 The BoringSSL Authors
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/contrib/tlsticketupdate.go	// Copyright (c) 2015 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/contrib/tlsticketupdate.go	// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/contrib/tlsticketupdate.go	// The above copyright notice and this permission notice shall be
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LEGAL	1. Redistributions of source code must retain the above copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LEGAL	2. Redistributions in binary form must reproduce the above copyright
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/template/bison/yacc.h	<%# b4_copyright -%>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	8	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/MIT	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tasks/mrbgems.rake	Copyright (c) #{Time.now.year} mruby developers
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LEGAL	Copyright (c) 2008-2016, Wojciech Muła
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain	Copyright (c) 2010 by the contributors (see AUTHORS file).
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LICENSE	Copyright (c) 2010- mruby developers
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-pack/README.md	Copyright (c) 2012 Internet Initiative Japan Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/COPYING	Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/COPYING	Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-socket/README.md	Copyright (c) 2013 Internet Initiative Japan Inc.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/COPYING	Copyright (c) 2013-2016 Evan Nemerson <evan@nemerson.com>
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-pack/README.md	Copyright (c) 2017 mruby developers
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/MIT	Copyright (c) 2023 Yuichiro Kaneko
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-set/LICENSE	Copyright (c) yui-knk 2016
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-dir/README.md	Copyright Kevlin Henney, 1997, 2003, 2012. All rights reserved.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/README.md	However, the license requires the display of the copyright notice and license
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-set/LICENSE	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/include/mruby.h	MRB_API void mrb_show_copyright(mrb_state *mrb);
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/COPYING	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LEGAL	PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/_exts/rubydomain/LICENSE.rubydomain	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/LEGAL	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+line	3	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/tests/munit/COPYING	The above copyright notice and this permission notice shall be
+line	8	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/tools/lrama/MIT	The above copyright notice and this permission notice shall be included in
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-random/src/random.c	To the extent possible under law, the author has dedicated all copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/README.rst	When changing existing source code, do not alter the copyright of
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/sources/contribute.rst	When changing existing source code, you do not alter the copyright of
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/README.md	actual copyright holder name (contributors) will be listed in the [AUTHORS](AUTHORS)
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/doc/guides/debugger.md	copyright (c) 2014 Specified Non-Profit Corporation mruby Forum
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/doc/conf.py.in	copyright = u'2012, 2015, 2016, Tatsuhiro Tsujikawa'
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/README.md	developers" as the copyright name to make it simple conventionally.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure.ac	dnl Copyright (c) 2012, 2013, 2014, 2015 Tatsuhiro Tsujikawa
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/aclocal.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure.ac	dnl NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/configure.ac	dnl The above copyright notice and this permission notice shall be
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/src/print.c	mrb_show_copyright(mrb_state *mrb)
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/README.rst	original creator(s) or those who have been assigned copyright by the
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/mrbgems/mruby-dir/README.md	that this copyright and permissions notice appear in all copies and
+line	1	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/README.rst	the case may be) agree to assign the copyright of your submission to us.
+line	2	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/README.rst	the original file(s).  The copyright will still be owned by the
+binary-head	nghttp2-1.69.0.tar.xz:nghttp2-1.69.0/third-party/mruby/doc/mruby_logo_red_icon.png

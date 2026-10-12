@@ -1,0 +1,45 @@
+# chio.attribution-lines.v8 origin=gtest files=247 files_with_lines=190 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/LICENSE	    * Redistributions of source code must retain the above copyright
+line	38	gtest-1.16.0.tar.gz:googletest-1.16.0/BUILD.bazel	#     * Redistributions of source code must retain the above copyright
+line	38	gtest-1.16.0.tar.gz:googletest-1.16.0/BUILD.bazel	# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-filter-unittest.py	# Copyright 2005 Google Inc. All Rights Reserved.
+line	7	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/test/gmock_test_utils.py	# Copyright 2006, Google Inc.
+line	6	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/test/gmock_output_test.py	# Copyright 2008, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-shuffle-test.py	# Copyright 2009 Google Inc. All Rights Reserved.
+line	3	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/test/gmock_leak_test.py	# Copyright 2009, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-catch-exceptions-test.py	# Copyright 2010 Google Inc.  All Rights Reserved.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-param-test-invalid-name1-test.py	# Copyright 2015 Google Inc. All rights reserved.
+line	3	gtest-1.16.0.tar.gz:googletest-1.16.0/BUILD.bazel	# Copyright 2017 Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/gtest_testbridge_test.py	# Copyright 2018 Google LLC. All rights reserved.
+line	3	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-json-outfiles-test.py	# Copyright 2018, Google Inc.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/gtest_skip_check_output_test.py	# Copyright 2019 Google LLC.  All Rights Reserved.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-setuptestsuite-test.py	# Copyright 2019, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-failfast-unittest.py	# Copyright 2020 Google Inc. All Rights Reserved.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/ci/linux-presubmit.sh	# Copyright 2020, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-global-environment-unittest.py	# Copyright 2021 Google Inc. All Rights Reserved.
+line	3	gtest-1.16.0.tar.gz:googletest-1.16.0/MODULE.bazel	# Copyright 2024 Google Inc.
+line	38	gtest-1.16.0.tar.gz:googletest-1.16.0/BUILD.bazel	# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	38	gtest-1.16.0.tar.gz:googletest-1.16.0/BUILD.bazel	# copyright notice, this list of conditions and the following disclaimer
+line	151	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-actions.h	//     * Redistributions of source code must retain the above copyright
+line	151	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-actions.h	// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	31	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/include/gtest/gtest-assertion-result.h	// Copyright 2005, Google Inc.
+line	12	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/include/gtest/gtest_pred_impl.h	// Copyright 2006, Google Inc.
+line	32	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-actions.h	// Copyright 2007, Google Inc.
+line	13	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/include/gtest/gtest-typed-test.h	// Copyright 2008 Google Inc.
+line	32	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-nice-strict.h	// Copyright 2008, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/gtest-unittest-api_test.cc	// Copyright 2009 Google Inc.  All rights reserved.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/samples/sample10_unittest.cc	// Copyright 2009 Google Inc. All Rights Reserved.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-listener-test.cc	// Copyright 2009 Google Inc. All rights reserved.
+line	9	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/test/gmock_all_test.cc	// Copyright 2009, Google Inc.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/googletest-catch-exceptions-test_.cc	// Copyright 2010, Google Inc.
+line	4	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-more-matchers.h	// Copyright 2013, Google Inc.
+line	8	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/internal/custom/gmock-matchers.h	// Copyright 2015, Google Inc.
+line	2	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/test/gmock-pp-string_test.cc	// Copyright 2018, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/gtest_testbridge_test_.cc	// Copyright 2018, Google LLC.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/googletest/test/gtest_skip_in_environment_setup_test.cc	// Copyright 2019, Google LLC.
+line	151	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-actions.h	// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	151	gtest-1.16.0.tar.gz:googletest-1.16.0/googlemock/include/gmock/gmock-actions.h	// copyright notice, this list of conditions and the following disclaimer
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/LICENSE	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/LICENSE	Copyright 2008, Google Inc.
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	gtest-1.16.0.tar.gz:googletest-1.16.0/LICENSE	copyright notice, this list of conditions and the following disclaimer

@@ -1,0 +1,17 @@
+tree 9186cd22055e161a8669782efe55ea5d9efb6870
+parent 38babe89a0189fbd084bab82d73175f8329eaa35
+author Moritz Haase <Moritz.Haase@bmw.de> 1735806438 +0100
+committer Natanael Copa <ncopa@alpinelinux.org> 1742370127 +0000
+
+main/file: Import patch file instead of downloading it from GitHub
+
+As noted by Celeste at [0], it's in general not recommended to use URL-based
+patches. Back when the patch was merged, that was deemed OK for 'master' though.
+As the download of the patch file is now indeed failing due to a changed
+checksum, use the opportunity to import the patch into the repo (as was done on
+the stable branches via e89c62d8 for example).
+
+Please note that the checksum has changed because the patch was downloaded with
+the '?full_index=1' option.
+
+[0]: https://gitlab.alpinelinux.org/alpine/aports/-/merge_requests/77814#note_470256

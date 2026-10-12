@@ -1,0 +1,677 @@
+# chio.attribution-lines.v8 origin=ncurses files=1251 files_with_lines=1135 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t  (caveat - its maintainer put 2010 copyright date on files dated 2009)
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t  copyright patch (patch by Juergen Pfeifer).
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t  of the copyright noticed to be omitted (reported by Peter
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add copyright notices (and rcs id's) on remaining man-pages.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add copyright notices to configuration scripts (written by Thomas
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add copyright notices to files other than those that are generated,
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add copyright notices to test-programs as needed (report by William
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add missing copyright notice for cursesw.h
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ add some notes regarding copyright to terminfo.src -TD
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ change copyright notices to Free Software Foundation
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ cleanup format of debian/copyright files
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ corrected form of recent copyright dates.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ eliminate clause 3 from the UCB copyrights in read_termcap.c and
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ fix some old copyright dates (cf: 20031025).
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ minor copyright fixes.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ modify manhtml rule in dist.mk to preserve copyright notice on the
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ reassert copyright on ncurses, per discussion in ncurses FAQ:
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	\t+ update copyright notices in test-packages.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKterm.h.awk.in	\tprint  " * Copyright 1998-2013,2017 Free Software Foundation, Inc.                  *"
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKterm.h.awk.in	\tprint  " * Copyright 2018-2023,2024 Thomas E. Dickey                                *"
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKterm.h.awk.in	\tprint  " * Except as contained in this notice, the name(s) of the above copyright   *"
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKterm.h.awk.in	\tprint  " * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *"
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKterm.h.awk.in	\tprint  " * The above copyright notice and this permission notice shall be included  *"
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_attr.3x.html	              copyright began in 1996.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	            <dt>1.9. <a href="#COPYRIGHT">Copyright</a></dt>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	            <td align="left" colspan="3">Added copyright notices to
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/scr_dump.5.html	           According  to  its  copyright  notice,  this  <EM>xcurses</EM>  library  was
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_util.3x.html	           Interestingly  enough,  according to the copyright dates in Solaris
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        <h3 class="SECT2"><a name="COPYRIGHT" id="COPYRIGHT">1.9.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        <p>Copyright &copy; 2001 by Pradeep Padala.</p>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        <p>The above copyright notice and this permission notice
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        Copyright</a></h3>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	        above copyright holders shall not be used in advertising or
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/clear.1.html	       The remainder of the script in each case is a copyright notice.
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/package/debian-mingw64/copyright	    1. Redistributions of source code must retain the above copyright
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/package/debian-mingw64/copyright	    2. Redistributions in binary form must reproduce the above copyright
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	    Except as contained in this notice, the name(s) of the above copyright
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	    IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	    The above copyright notice and this permission notice shall be included
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	    The above copyright notice and this permission notice shall be included in
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/ncurses-intro.doc	   copyright to support this.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ANNOUNCE	   held  a  copyright  on ncurses for releases 4.2 through 6.1. Following
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ANNOUNCE	   the release of ncurses 6.1, effective as of release 6.2, copyright for
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/NCURSES-Programming-HOWTO.html	   |----&gt; COPYING        -- copyright notice</pre>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  "@HOMEPAGE@/ncurses-license.html">copyright on ncurses</a> for
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/announce.html	  "https://invisible-island.net/ncurses/ncurses-license.html">copyright on ncurses</a> for
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/mitem_visible.3x.html	  * Copyright 1998,2010 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_beep.3x.html	  * Copyright 1998-2005,2010 Free Software Foundation, Inc.                  *
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_scroll.3x.html	  * Copyright 1998-2006,2010 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_deleteln.3x.html	  * Copyright 1998-2007,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/form_field.3x.html	  * Copyright 1998-2010,2012 Free Software Foundation, Inc.                  *
+line	26	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/form_field_new.3x.html	  * Copyright 1998-2010,2015 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_refresh.3x.html	  * Copyright 1998-2010,2016 Free Software Foundation, Inc.                  *
+line	16	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_insch.3x.html	  * Copyright 1998-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/term.7.html	  * Copyright 1998-2011,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/menu_items.3x.html	  * Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_addstr.3x.html	  * Copyright 1998-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_overlay.3x.html	  * Copyright 1998-2013,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/form_field_opts.3x.html	  * Copyright 1998-2014,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/menu.3x.html	  * Copyright 1998-2014,2017 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/menu_format.3x.html	  * Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/ncurses.3x.html	  * Copyright 1998-2015,2017 Free Software Foundation, Inc.                  *
+line	19	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_kernel.3x.html	  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/infocmp.1m.html	  * Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/keybound.3x.html	  * Copyright 1999-2008,2010 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/infotocap.1m.html	  * Copyright 1999-2010,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/Ada95.html	  * Copyright 2000-2010,2013 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/default_colors.3x.html	  * Copyright 2000-2011,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/index.html	  * Copyright 2000-2013,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_trace.3x.html	  * Copyright 2000-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/index.html	  * Copyright 2001-2013,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_add_wch.3x.html	  * Copyright 2001-2015,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_in_wch.3x.html	  * Copyright 2002-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_border_set.3x.html	  * Copyright 2002-2011,2012 Free Software Foundation, Inc.                  *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_ins_wstr.3x.html	  * Copyright 2002-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_bkgrnd.3x.html	  * Copyright 2002-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_get_wch.3x.html	  * Copyright 2002-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/key_defined.3x.html	  * Copyright 2003-2006,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/legacy_coding.3x.html	  * Copyright 2005-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_opaque.3x.html	  * Copyright 2007-2014,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_legacy.3x.html	  * Copyright 2007-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_memleaks.3x.html	  * Copyright 2008-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_threads.3x.html	  * Copyright 2008-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/tabs.1.html	  * Copyright 2008-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/ncursesw6-config.1.html	  * Copyright 2010 Free Software Foundation, Inc.                            *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/form_variables.3x.html	  * Copyright 2010-2013,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/adacursesw6-config.1.html	  * Copyright 2010-2014,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_sp_funcs.3x.html	  * Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/user_caps.5.html	  * Copyright 2017 Free Software Foundation, Inc.                            *
+line	50	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  * Copyright 2018-2023,2024 Thomas E. Dickey                                *
+line	64	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_insch.3x.html	  * Copyright 2018-2024,2025 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/index.html	  * Copyright 2019-2020,2022 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/index.html	  * Copyright 2019-2020,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/Ada95.html	  * Copyright 2019-2021,2022 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ncurses-intro.html	  * Copyright 2019-2022,2024 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_memleaks.3x.html	  * Copyright 2019-2023,2024 Thomas E. Dickey                                *
+line	14	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_insstr.3x.html	  * Copyright 2019-2024,2025 Thomas E. Dickey                                *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/legacy_coding.3x.html	  * Copyright 2020-2023,2024 Thomas E. Dickey                                *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_opaque.3x.html	  * Copyright 2020-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/man/curs_threads.3x.html	  * Copyright 2021-2024,2025 Thomas E. Dickey                                *
+line	143	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  * Except as contained in this notice, the name(s) of the above copyright   *
+line	143	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	143	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  * The above copyright notice and this permission notice shall be included  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/tclock.c	  This program is copyright Howard Jones, September 1994
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/announce.html.in	  effective as of release 6.2, copyright for ncurses reverted to
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/tclock.c	  long as this copyright message remains intact, and any
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ncurses-intro.html	  specifically exempted from the package copyright to support
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/curses.wide	 * (see that file for the relevant copyright).
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/read_termcap.c	 * 1. Redistributions of source code must retain the above copyright
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/read_termcap.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/tset.c	 * Copyright (c) 1980, 1991, 1993
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/read_termcap.c	 * Copyright (c) 1980, 1993
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/read_termcap.c	 * Copyright (c) 1992, 1993
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/ncurses_tst.hin	 * Copyright 1998 Free Software Foundation, Inc.                            *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/cleantic.cmd	 * Copyright 1998,2006 Free Software Foundation, Inc.                       *\r
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/termcap.h.in	 * Copyright 1998-2000,2001 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/capdefaults.c	 * Copyright 1998-2000,2008 Free Software Foundation, Inc.                  *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_nl.c	 * Copyright 1998-2000,2009 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/unctrl.h.in	 * Copyright 1998-2001,2009 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/eti.h	 * Copyright 1998-2002,2003 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/testscanw.c	 * Copyright 1998-2002,2006 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/doalloc.c	 * Copyright 1998-2002,2012 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursslk.h	 * Copyright 1998-2003,2005 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/lib_termname.c	 * Copyright 1998-2003,2009 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_move.c	 * Copyright 1998-2004,2009 Free Software Foundation, Inc.                  *
+line	18	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fld_opts.c	 * Copyright 1998-2004,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/vsscanf.c	 * Copyright 1998-2004,2012 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_slkatrset.c	 * Copyright 1998-2005,2009 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/m_items.c	 * Copyright 1998-2005,2010 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesf.cc	 * Copyright 1998-2005,2011 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursslk.cc	 * Copyright 1998-2005,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/keynames.c	 * Copyright 1998-2006,2008 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fty_ipv4.c	 * Copyright 1998-2006,2009 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/m_pattern.c	 * Copyright 1998-2006,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesapp.cc	 * Copyright 1998-2007,2008 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_slkclear.c	 * Copyright 1998-2007,2009 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesmain.cc	 * Copyright 1998-2007,2013 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/comp_hash.c	 * Copyright 1998-2008,2009 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/panel/p_move.c	 * Copyright 1998-2008,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/internal.h	 * Copyright 1998-2008,2012 Free Software Foundation, Inc.                  *
+line	27	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fty_alnum.c	 * Copyright 1998-2009,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_scanw.c	 * Copyright 1998-2009,2011 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/trace/lib_tracechr.c	 * Copyright 1998-2009,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/lib_has_cap.c	 * Copyright 1998-2009,2013 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/define_key.c	 * Copyright 1998-2009,2014 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_erase.c	 * Copyright 1998-2009,2016 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_panel.h	 * Copyright 1998-2009,2017 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/wresize.c	 * Copyright 1998-2010,2011 Free Software Foundation, Inc.                  *
+line	21	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fld_just.c	 * Copyright 1998-2010,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_data.c	 * Copyright 1998-2010,2013 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/llib-lmenu	 * Copyright 1998-2010,2015 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fld_attr.c	 * Copyright 1998-2010,2016 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/lrtest.c	 * Copyright 1998-2010,2017 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/lib_print.c	 * Copyright 1998-2011,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/make_keys.c	 * Copyright 1998-2011,2015 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesm.cc	 * Copyright 1998-2011,2017 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_opts.c	 * Copyright 1998-2012,2013 Free Software Foundation, Inc.                  *
+line	8	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesf.h	 * Copyright 1998-2012,2014 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_req_name.c	 * Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_hook.c	 * Copyright 1998-2012,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/demo.cc	 * Copyright 1998-2012,2017 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/testaddch.c	 * Copyright 1998-2013,2014 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/name_match.c	 * Copyright 1998-2013,2016 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_alloc.h	 * Copyright 1998-2013,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/gen.c	 * Copyright 1998-2014,2016 Free Software Foundation, Inc.                  *
+line	15	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesw.h	 * Copyright 1998-2014,2017 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_getch.c	 * Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/llib-lform	 * Copyright 1998-2015,2017 Free Software Foundation, Inc.                  *
+line	57	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/form.h	 * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test.priv.h	 * Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/version.c	 * Copyright 1999-2004,2005 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/keybound.c	 * Copyright 1999-2009,2011 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/init_keytry.c	 * Copyright 1999-2010,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/trace/trace_tries.c	 * Copyright 1999-2011,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/free_ttype.c	 * Copyright 1999-2011,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursespad.cc	 * Copyright 1999-2012,2013 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/dots.c	 * Copyright 1999-2013,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/cardfile.c	 * Copyright 1999-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/lib_tgoto.c	 * Copyright 2000-2008,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/strings.c	 * Copyright 2000-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/railroad.c	 * Copyright 2000-2013,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/trace/varargs.c	 * Copyright 2001-2008,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_wunctrl.c	 * Copyright 2001-2011,2012 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_cchar.c	 * Copyright 2001-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/demo_keyok.c	 * Copyright 2002-2006,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_in_wchnstr.c	 * Copyright 2002-2007,2009 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_box_set.c	 * Copyright 2002-2009,2011 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_in_wch.c	 * Copyright 2002-2009,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_erasewchar.c	 * Copyright 2002-2010,2014 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/llib-lmenuw	 * Copyright 2002-2010,2015 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_vline_set.c	 * Copyright 2002-2010,2016 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_unget_wch.c	 * Copyright 2002-2011,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_vid_attr.c	 * Copyright 2002-2014,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_wacs.c	 * Copyright 2002-2015,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/llib-lformw	 * Copyright 2002-2015,2017 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/inserts.c	 * Copyright 2002-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/wcwidth.h	 * Copyright 2002-2023,2024 by Thomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/charable.c	 * Copyright 2003-2005,2008 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/key_defined.c	 * Copyright 2003-2006,2009 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_slk_wset.c	 * Copyright 2003-2011,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/color_set.c	 * Copyright 2003-2012,2014 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/edit_field.h	 * Copyright 2003-2013,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/background.c	 * Copyright 2003-2014,2017 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/demo_panels.c	 * Copyright 2003-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_pecho_wchar.c	 * Copyright 2004,2009 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_insnstr.c	 * Copyright 2004-2009,2016 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/f_trace.c	 * Copyright 2004-2010,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_add_wch.c	 * Copyright 2004-2011,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/legacy_coding.c	 * Copyright 2005,2009 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/trim_sgr0.c	 * Copyright 2005-2012,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/demo_altkeys.c	 * Copyright 2005-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_cfg.hin	 * Copyright 2005-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/hashed_db.c	 * Copyright 2006-2011,2013 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_tparm.h	 * Copyright 2006-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/movewindow.c	 * Copyright 2006-2013,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/hashed_db.h	 * Copyright 2006-2014,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/foldkeys.c	 * Copyright 2006-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/savescreen.c	 * Copyright 2006-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_opaque.c	 * Copyright 2007-2008,2009 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/lib_key_name.c	 * Copyright 2007-2008,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/use_screen.c	 * Copyright 2007-2009,2016 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_inwstr.c	 * Copyright 2007-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_get_wstr.c	 * Copyright 2007-2011,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/inchs.c	 * Copyright 2007-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/dots_mvcur.c	 * Copyright 2007-2013,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/key_names.c	 * Copyright 2007-2014,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/win32con/gettimeofday.c	 * Copyright 2008-2010,2014 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_win32.h	 * Copyright 2008-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fty_generic.c	 * Copyright 2008-2012,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/win32_curses.h	 * Copyright 2008-2014,2017 Free Software Foundation, Inc.                  *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/clip_printw.c	 * Copyright 2008-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/ncurses_dll.h.in	 * Copyright 2009,2014 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/transform.c	 * Copyright 2009-2010,2011 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/linedata.h	 * Copyright 2009-2010,2012 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_driver.c	 * Copyright 2009-2012,2014 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/make_hash.c	 * Copyright 2009-2013,2017 Free Software Foundation, Inc.                  *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_addwstr.c	 * Copyright 2009-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/win32con/wcwidth.c	 * Copyright 2010 Free Software Foundation, Inc.                            *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/build.priv.h	 * Copyright 2010,2012 Free Software Foundation, Inc.                       *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/llib-lmenut	 * Copyright 2010,2015 Free Software Foundation, Inc.                       *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/llib-lformt	 * Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/c_varargs_to_ada.c	 * Copyright 2011,2014 Free Software Foundation, Inc.                       *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/ncurses_compat.c	 * Copyright 2011,2015 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/color_name.h	 * Copyright 2011-2012,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_termios.h	 * Copyright 2011-2014,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/widechars.h	 * Copyright 2012 Free Software Foundation, Inc.                            *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/widechar/widechars.c	 * Copyright 2012,2013 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_string.h	 * Copyright 2012-2013,2016 Free Software Foundation, Inc.                  *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/llib-ltinfo	 * Copyright 2012-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/obsolete.c	 * Copyright 2013-2014,2016 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/dots_termcap.c	 * Copyright 2013-2014,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/llib-ltict	 * Copyright 2013-2016,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/c_threaded_variables.c	 * Copyright 2014 Free Software Foundation, Inc.                            *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/c_threaded_variables.h	 * Copyright 2014,2015 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/dots_curses.c	 * Copyright 2014,2017 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_setupterm.c	 * Copyright 2015,2016 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_sgr.c	 * Copyright 2015-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/reset_cmd.h	 * Copyright 2016 Free Software Foundation, Inc.                            *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/list_keys.c	 * Copyright 2016,2017 Free Software Foundation, Inc.                       *
+line	12	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/dots_xcurses.c	 * Copyright 2017 Free Software Foundation, Inc.                            *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/picsmap.c	 * Copyright 2017,2018 Free Software Foundation, Inc.                       *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/internal.h	 * Copyright 2018,2020 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/clear_cmd.c	 * Copyright 2018,2020,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_scanw.c	 * Copyright 2018-2019,2020 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/form.h	 * Copyright 2018-2019-2020,2021 Thomas E. Dickey                           *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fld_ftchoice.c	 * Copyright 2018-2020,2021 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/extended_color.c	 * Copyright 2018-2020,2022 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/ncurses_dll.h.in	 * Copyright 2018-2020,2023 Thomas E. Dickey                                *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fld_arg.c	 * Copyright 2018-2020,2024 Thomas E. Dickey                                *
+line	11	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fty_generic.c	 * Copyright 2018-2021,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/tic.h	 * Copyright 2018-2022,2023 Thomas E. Dickey                                *
+line	8	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/knight.c	 * Copyright 2018-2022,2024 Thomas E. Dickey                                *
+line	27	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_mingw.h	 * Copyright 2018-2023,2024 Thomas E. Dickey                                *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/demo.cc	 * Copyright 2018-2023,2025 Thomas E. Dickey                                *
+line	39	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/etip.h.in	 * Copyright 2018-2024,2025 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesmain.cc	 * Copyright 2019,2020 Thomas E. Dickey                                     *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesapp.h	 * Copyright 2019-2020,2021 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/firework.c	 * Copyright 2019-2020,2022 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/build.priv.h	 * Copyright 2019-2020,2024 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesapp.cc	 * Copyright 2019-2020,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/hanoi.c	 * Copyright 2019-2021,2022 Thomas E. Dickey                                *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursslk.h	 * Copyright 2019-2021,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_alloc.h	 * Copyright 2019-2021,2025 Thomas E. Dickey                                *
+line	16	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/railroad.c	 * Copyright 2019-2022,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesp.h	 * Copyright 2019-2022,2025 Thomas E. Dickey                                *
+line	18	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursslk.cc	 * Copyright 2019-2023,2024 Thomas E. Dickey                                *
+line	20	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/cursesf.cc	 * Copyright 2019-2024,2025 Thomas E. Dickey                                *
+line	49	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/ncurses_compat.c	 * Copyright 2020 Thomas E. Dickey                                          *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/cleantic.cmd	 * Copyright 2020 Thomas E. Dickey                                          *\r
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/color_set.c	 * Copyright 2020,2020,2022 Thomas E. Dickey                                *
+line	53	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/llib-lform	 * Copyright 2020,2021 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/makedef.cmd	 * Copyright 2020,2021 Thomas E. Dickey                                     *\r
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/fty_enum.c	 * Copyright 2020,2021,2024 Thomas E. Dickey                                *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/c_threaded_variables.c	 * Copyright 2020,2022 Thomas E. Dickey                                     *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/win32con/gettimeofday.c	 * Copyright 2020,2023 Thomas E. Dickey                                     *
+line	48	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_cfg.hin	 * Copyright 2020,2024 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/report_hashing.c	 * Copyright 2020,2025 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/lib_chgat.c	 * Copyright 2020-2015,2025 Thomas E. Dickey                                *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/llib-ltict	 * Copyright 2020-2021,2023 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_win.c	 * Copyright 2020-2021,2024 Thomas E. Dickey                                     *
+line	23	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/frm_req_name.c	 * Copyright 2020-2021,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/free_ttype.c	 * Copyright 2020-2022,2023 Thomas E. Dickey                                *
+line	20	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/m_post.c	 * Copyright 2020-2022,2024 Thomas E. Dickey                                *
+line	26	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/m_global.c	 * Copyright 2020-2023,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/vsscanf.c	 * Copyright 2020-2023,2025 Thomas E. Dickey                                *
+line	17	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/gen.c	 * Copyright 2020-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/nc_access.h	 * Copyright 2021,2023 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/back_ground.c	 * Copyright 2021-2022,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/term.priv.h	 * Copyright 2021-2023,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_mouse.c	 * Copyright 2022 Leonid S. Usov <leonid.s.usov at gmail.com>               *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_unget_wch.c	 * Copyright 2022 Thomas E. Dickey                                          *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_delwin.c	 * Copyright 2022,2023 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_mouse.c	 * Copyright 2022-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/test_endwin.c	 * Copyright 2023,2024 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/wcwidth.h	 * Except as contained in this notice, the name(s) of the above copyright
+line	459	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_cfg.hin	 * Except as contained in this notice, the name(s) of the above copyright   *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/cleantic.cmd	 * Except as contained in this notice, the name(s) of the above copyright   *\r
+line	460	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_cfg.hin	 * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/cleantic.cmd	 * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *\r
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/wcwidth.h	 * IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE LIABLE FOR ANY
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/wcwidth.h	 * The above copyright notice and this permission notice shall be included
+line	460	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_cfg.hin	 * The above copyright notice and this permission notice shall be included  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/cleantic.cmd	 * The above copyright notice and this permission notice shall be included  *\r
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/tset.c	 * University of California copyright applies to some portions of the
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	#\t* Added COPYRIGHTS AND OTHER DELUSIONS.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	#\t* add some notes regarding copyright to terminfo.src -TD
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	#       Copyright (c) 1989 BULL SA
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/config.guess	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# COPYRIGHTS AND OTHER DELUSIONS
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# California copyright with dates from 1980 to 1993.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/install-sh	# Copyright (C) 1994 X Consortium
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure	# Copyright 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/makellib	# Copyright 1998,2000 Free Software Foundation, Inc.                         #
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/headers	# Copyright 1998,2006 Free Software Foundation, Inc.                         #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Makefile.os2	# Copyright 1998-2000,2006 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/edit_cfg.sh	# Copyright 1998-2001,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/emx.src	# Copyright 1998-2003,2006 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/MKterminfo.sh	# Copyright 1998-2003,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/mk-2nd.awk	# Copyright 1998-2004,2005 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/shlib	# Copyright 1998-2005,2007 Free Software Foundation, Inc.                    #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/make_sed.sh	# Copyright 1998-2005,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKcaptab.awk	# Copyright 1998-2006,2007 Free Software Foundation, Inc.                    #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/menu/modules	# Copyright 1998-2006,2010 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/modules	# Copyright 1998-2006,2013 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/edit_cfg.sh	# Copyright 1998-2007,2008 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKnames.awk	# Copyright 1998-2008,2009 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/modules	# Copyright 1998-2008,2010 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/mk-0th.awk	# Copyright 1998-2010,2012 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/Makefile.in	# Copyright 1998-2010,2015 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/capconvert	# Copyright 1998-2011,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/headers	# Copyright 1998-2012,2013 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/base/MKunctrl.awk	# Copyright 1998-2012,2017 Free Software Foundation, Inc.                    #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Makefile.in	# Copyright 1998-2013,2015 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/modules	# Copyright 1998-2013,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Makefile.in	# Copyright 1998-2014,2015 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/modules	# Copyright 1998-2014,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKparametrized.sh	# Copyright 1998-2014,2017 Free Software Foundation, Inc.                    #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/Makefile.in	# Copyright 1998-2015,2016 Free Software Foundation, Inc.                    #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/man_db.renames.in	# Copyright 1998-2015,2017 Free Software Foundation, Inc.                    #
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/Makefile.in	# Copyright 1998-2015,2018 Free Software Foundation, Inc.                    #
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/mk-1st.awk	# Copyright 1998-2016,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/progs/Makefile.in	# Copyright 1998-2016,2018 Free Software Foundation, Inc.                    #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/dist.mk	# Copyright 1998-2017,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKfallback.sh	# Copyright 1998-2019,2020 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/Makefile.in	# Copyright 1999-2016,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKncurses_def.sh	# Copyright 2000,2003 Free Software Foundation, Inc.                         #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manlinks.sed	# Copyright 2000-2003,2008 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/run_tic.in	# Copyright 2000-2012,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/ncurses_defs	# Copyright 2000-2016,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKkeys_list.sh	# Copyright 2001-2003,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKkey_defs.sh	# Copyright 2001-2013,2017 Free Software Foundation, Inc.                    #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Caps.aix4	# Copyright 2001-2015,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/csort	# Copyright 2002 Free Software Foundation, Inc.                              #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Caps.hpux11	# Copyright 2002-2015,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/MKncurses_def.sh	# Copyright 2003 Free Software Foundation, Inc.                              #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/listused.sh	# Copyright 2003-2006,2010 Free Software Foundation, Inc.                    #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure	# Copyright 2003-2022,2023\tThomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/linux-color.dat	# Copyright 2004,2006 Free Software Foundation, Inc.                         #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/xterm-16color.dat	# Copyright 2004-2006,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/gen_edit.sh	# Copyright 2004-2011,2012 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/xterm-88color.dat	# Copyright 2005-2009,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncurses-config.in	# Copyright 2006-2015,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/programs	# Copyright 2006-2016,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/mk-test.awk	# Copyright 2006-2017,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKcodes.awk	# Copyright 2007-2009,2010 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/savescreen.sh	# Copyright 2007-2009,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKcaptab.sh	# Copyright 2007-2010,2011 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/mk-hdr.awk	# Copyright 2007-2010,2013 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/adacurses-config.in	# Copyright 2007-2014,2016 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncurses.supp	# Copyright 2008 Free Software Foundation, Inc.                              #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/ncurses_defs	# Copyright 2008-2012,2013 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/xterm-256color.dat	# Copyright 2009,2016 Free Software Foundation, Inc.                         #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/gen-pkgconfig.in	# Copyright 2009-2015,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/modules	# Copyright 2010 Free Software Foundation, Inc.                              #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/mk-1st.awk	# Copyright 2010,2011 Free Software Foundation, Inc.                         #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/make-tar.sh	# Copyright 2010-2015,2017 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/Makefile.in	# Copyright 2010-2015,2018 Free Software Foundation, Inc.                    #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/doc/Makefile.in	# Copyright 2011-2015,2018 Free Software Foundation, Inc.                    #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manhtml.externs	# Copyright 2013,2017 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/magic	# Copyright 2015,2018 Free Software Foundation, Inc.                         #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/tput-initc	# Copyright 2016 Free Software Foundation, Inc.                              #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/library-cfg.sh	# Copyright 2016,2018 Free Software Foundation, Inc.                         #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/tracemunch	# Copyright 2018-2020,2021 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/library-cfg.sh	# Copyright 2018-2020,2022 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Makefile.in	# Copyright 2018-2021,2022 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/Makefile.in	# Copyright 2018-2021,2024 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncurses-config.in	# Copyright 2018-2022,2024 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/mk-1st.awk	# Copyright 2018-2023,2024 Thomas E. Dickey                                  #
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/Makefile.in	# Copyright 2018-2024,2025 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/MKterminfo.sh	# Copyright 2018-2024,2025 Thomas E. Dickey                                *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/MKhashsize.sh	# Copyright 2019,2020 Thomas E. Dickey                                       #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/mk-test.awk	# Copyright 2019-2020,2021 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/adacurses-config.in	# Copyright 2019-2020,2022 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/MKcodes.awk	# Copyright 2019-2020,2024 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/make-tar.sh	# Copyright 2019-2021,2022 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/doc/Makefile.in	# Copyright 2019-2021,2024 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Caps-ncurses	# Copyright 2019-2022,2023 Thomas E. Dickey                                  #
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/Makefile.in	# Copyright 2019-2022,2024 Thomas E. Dickey                                  #
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Caps.aix4	# Copyright 2019-2023,2024 Thomas E. Dickey                                  #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/Caps.uwin	# Copyright 2019-2024,2025 Thomas E. Dickey                                  #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manhtml.externs	# Copyright 2019-2024,2025 Thomas E. Dickey                                *
+line	16	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/mk-1st.awk	# Copyright 2020 Thomas E. Dickey                                            #
+line	12	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/Makefile.in	# Copyright 2020,2021 Thomas E. Dickey                                       #
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/include/MKncurses_def.sh	# Copyright 2020,2022 Thomas E. Dickey                                       #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/include/headers	# Copyright 2020,2023 Thomas E. Dickey                                       #
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/modules	# Copyright 2020,2024 Thomas E. Dickey                                       #
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/listused.sh	# Copyright 2020-2021,2022 Thomas E. Dickey                                  #
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/Makefile.in	# Copyright 2020-2021,2024 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/Makefile.in	# Copyright 2020-2022,2024 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/edit_cfg.sh	# Copyright 2020-2022,2025 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manlinks.sed	# Copyright 2020-2023,2024 Thomas E. Dickey                                  #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/make_sed.sh	# Copyright 2020-2023,2025 Thomas E. Dickey                                  #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncu2openbsd	# Copyright 2021,2023 by Thomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/mk-pkg.awk	# Copyright 2022 Thomas E. Dickey                                            #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncu2openbsd	# Except as contained in this notice, the name(s) of the above copyright
+line	98	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/make-tar.sh	# Except as contained in this notice, the name(s) of the above copyright     #
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manhtml.externs	# Except as contained in this notice, the name(s) of the above copyright   *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manhtml.externs	# IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncu2openbsd	# IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE LIABLE FOR ANY
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# It has an obnoxious boilerplate copyright which I'm ignoring because they
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# Not that anyone should care.  However many valid functions copyrights may
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/rules	# Sample debian/rules that uses debhelper. GNU copyright 1997 by Joey Hess.
+line	98	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/make-tar.sh	# THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER      #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/ncu2openbsd	# The above copyright notice and this permission notice shall be included
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/manhtml.externs	# The above copyright notice and this permission notice shall be included  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/install-sh	# The above copyright notice and this permission notice shall be included in
+line	98	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/make-tar.sh	# The above copyright notice and this permission notice shall be included in #
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# This file deliberately has no copyright.  It belongs to no one and everyone.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# USL and SCO (see COPYRIGHTS AND OTHER DELUSIONS below).  Much information
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# and didn't attribute it, thereby violating the BSD Regents' copyright.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# comprising the escape-sequence parsing.  The copyright notice on that
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# contributors makes about as much sense as copyrighting a wall-full of
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# copyright dates in the sources.  A comment in charproc.c notes "MIT bogus
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/install-sh	# following copyright and license.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# https://invisible-island.net/personal/copyrights.html#removing_notes
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# maintenance of ncurses (since 1996) are generally conceded to be copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# reuse common chunks also is creative (and subject to copyright).  Finally,
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/misc/terminfo.src	# there is no explicit copyright notice on the file itself.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/lib_cur_term.c	,* Copyright 2020-2022,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/tinfo/comp_scan.c	,* Copyright 2020-2023,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/combine.c	,* Copyright 2021-2022,2024 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-getopt.adb	--  copyright Free Software Foundtion
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/README	-- Copyright 1998,2006 Free Software Foundation, Inc.                        --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/TODO	-- Copyright 1998-1999,2006 Free Software Foundation, Inc.                   --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/README	-- Copyright 1998-2002,2003 Free Software Foundation, Inc.                   --
+line	16	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-keyboard_handler.ads	-- Copyright 1998-2002,2003 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/form/READ.ME	-- Copyright 1998-2003,2006 Free Software Foundation, Inc.                   --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-my_field_type.ads	-- Copyright 1998-2003,2006 Free Software Foundation, Inc.                  --
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-forms-field_user_data.ads.m4	-- Copyright 1998-2003,2009 Free Software Foundation, Inc.                  --
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-form_demo-aux.adb	-- Copyright 1998-2004,2009 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-curses_demo.adb	-- Copyright 1998-2004,2011 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/c++/README-first	-- Copyright 1998-2006,2007 Free Software Foundation, Inc.                   --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-curses_demo-mouse.adb	-- Copyright 1998-2006,2008 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/README	-- Copyright 1998-2006,2009 Free Software Foundation, Inc.                   --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-menus-item_user_data.ads.m4	-- Copyright 1998-2006,2009 Free Software Foundation, Inc.                  --
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-form_demo.adb	-- Copyright 1998-2006,2011 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/README.emx	-- Copyright 1998-2006,2018 Free Software Foundation, Inc.                   --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/rain.adb	-- Copyright 1998-2007,2008 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-menu_demo.adb	-- Copyright 1998-2008,2011 Free Software Foundation, Inc.                  --
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-function_key_setting.adb	-- Copyright 1998-2009,2011 Free Software Foundation, Inc.                  --
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-menus.ads.m4	-- Copyright 1998-2009,2014 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/TO-DO	-- Copyright 1998-2010,2011 Free Software Foundation, Inc.                   --
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-forms-field_types.ads.m4	-- Copyright 1998-2011,2014 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/README	-- Copyright 1998-2012,2018 Free Software Foundation, Inc.                   --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-mouse.ads.m4	-- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	-- Copyright 1998-2017,2018 Free Software Foundation, Inc.                   --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-forms-field_types-enumeration-ada.ads	-- Copyright 1999-2002,2003 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface.ads	-- Copyright 1999-2003,2006 Free Software Foundation, Inc.                  --
+line	24	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-text_io-float_io.adb	-- Copyright 1999-2003,2009 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-panels.adb	-- Copyright 1999-2004,2009 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-forms-field_types-enumeration-ada.adb	-- Copyright 1999-2004,2011 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-text_io-aux.adb	-- Copyright 1999-2006,2009 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-forms-field_types-user-choice.ads	-- Copyright 1999-2008,2011 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-forms-field_types-user.ads	-- Copyright 1999-2009,2011 Free Software Foundation, Inc.                  --
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-menus-item_user_data.adb	-- Copyright 1999-2009,2014 Free Software Foundation, Inc.                  --
+line	13	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-forms-field_types-regexp.adb	-- Copyright 1999-2011,2014 Free Software Foundation, Inc.                  --
+line	19	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-getch.ads	-- Copyright 2000 Free Software Foundation, Inc.                            --
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-attr_test.ads	-- Copyright 2000,2006 Free Software Foundation, Inc.                       --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-trace.ads.m4	-- Copyright 2000,2014 Free Software Foundation, Inc.                       --
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-termcap.ads	-- Copyright 2000-2002,2003 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-acs_display.adb	-- Copyright 2000-2006,2008 Free Software Foundation, Inc.                  --
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-color_edit.adb	-- Copyright 2000-2006,2009 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-menu_test.adb	-- Copyright 2000-2006,2011 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-attr_test.adb	-- Copyright 2000-2007,2008 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-genericputs.adb	-- Copyright 2000-2008,2009 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-getopt.adb	-- Copyright 2000-2008,2011 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-util.adb	-- Copyright 2000-2008,2014 Free Software Foundation, Inc.                  --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-acs_and_scroll.adb	-- Copyright 2000-2009,2011 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-getch_test.adb	-- Copyright 2000-2009,2014 Free Software Foundation, Inc.                  --
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-demo_pad.adb	-- Copyright 2000-2011,2014 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-overlap_test.adb	-- Copyright 2000-2014,2015 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-trace.adb_p	-- Copyright 2001-2011,2014 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/ncurses/README.IZ	-- Copyright 2002,2006 Free Software Foundation, Inc.                        --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/AUTHORS	-- Copyright 2006,2017 Free Software Foundation, Inc.                        --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses.adb.m4	-- Copyright 2007-2011,2014 Free Software Foundation, Inc.                  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/README.MinGW	-- Copyright 2008-2011,2012 Free Software Foundation, Inc.                   --
+line	13	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-forms-field_types.ads.m4	-- Copyright 2018,2020 Thomas E. Dickey                                     --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses.adb.m4	-- Copyright 2018-2020,2024 Thomas E. Dickey                                --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-menus.adb	-- Copyright 2018-2020,2025 Thomas E. Dickey                                --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/README	-- Copyright 2018-2023,2024 Thomas E. Dickey                                 --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	-- Copyright 2018-2024,2025 Thomas E. Dickey                                 --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/library.gpr.in	-- Copyright 2019,2020 Thomas E. Dickey                                     --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-explanation.adb_p	-- Copyright 2019-2020,2025 Thomas E. Dickey                                --
+line	8	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/README	-- Copyright 2020 Thomas E. Dickey                                           --
+line	130	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-mouse.ads.m4	-- Copyright 2020 Thomas E. Dickey                                          --
+line	8	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/TODO	-- Copyright 2020,2021 Thomas E. Dickey                                      --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-demo_forms.adb	-- Copyright 2020,2021 Thomas E. Dickey                                     --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/sample-menu_demo-aux.adb	-- Copyright 2020,2023 Thomas E. Dickey                                     --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses.ads.m4	-- Copyright 2020,2024 Thomas E. Dickey                                     --
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/src/terminal_interface-curses-panels-user_data.adb	-- Copyright 2020,2025 Thomas E. Dickey                                     --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/README	-- Copyright 2020-2021,2023 Thomas E. Dickey                                 --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/AUTHORS	-- Copyright 2020-2021,2024 Thomas E. Dickey                                 --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/samples/ncurses2-overlap_test.adb	-- Copyright 2020-2021,2024 Thomas E. Dickey                                --
+line	21	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/TODO	-- Except as contained in this notice, the name(s) of the above copyright    --
+line	154	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-mouse.ads.m4	-- Except as contained in this notice, the name(s) of the above copyright   --
+line	154	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-mouse.ads.m4	-- IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   --
+line	21	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/TODO	-- NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,       --
+line	21	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/TODO	-- The above copyright notice and this permission notice shall be included   --
+line	154	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/terminal_interface-curses-mouse.ads.m4	-- The above copyright notice and this permission notice shall be included  --
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./Ada95/package/debian/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./package/debian-mingw/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./package/debian-mingw64/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./package/debian/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./test/package/debian-mingw/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./test/package/debian-mingw64/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/MANIFEST	./test/package/debian/copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/bs.6	.\\" Copyright 1998,2006 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/mitem_visible.3x	.\\" Copyright 1998,2010 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_beep.3x	.\\" Copyright 1998-2005,2010 Free Software Foundation, Inc.                  *
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_scroll.3x	.\\" Copyright 1998-2006,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/gdc.6	.\\" Copyright 1998-2006,2017 Free Software Foundation, Inc.                  *
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/menu_hook.3x	.\\" Copyright 1998-2007,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/form_field.3x	.\\" Copyright 1998-2010,2012 Free Software Foundation, Inc.                  *
+line	26	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/form_data.3x	.\\" Copyright 1998-2010,2015 Free Software Foundation, Inc.                  *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_clear.3x	.\\" Copyright 1998-2010,2016 Free Software Foundation, Inc.                  *
+line	16	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_instr.3x	.\\" Copyright 1998-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/term.7	.\\" Copyright 1998-2011,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/menu_items.3x	.\\" Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_addstr.3x	.\\" Copyright 1998-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_overlay.3x	.\\" Copyright 1998-2013,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/form_field_opts.3x	.\\" Copyright 1998-2014,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/menu.3x	.\\" Copyright 1998-2014,2017 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/menu_opts.3x	.\\" Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+line	10	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_mouse.3x	.\\" Copyright 1998-2015,2017 Free Software Foundation, Inc.                  *
+line	20	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/tput.1	.\\" Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/infocmp.1m	.\\" Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/keybound.3x	.\\" Copyright 1999-2008,2010 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_extend.3x	.\\" Copyright 1999-2010,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/default_colors.3x	.\\" Copyright 2000-2011,2016 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_trace.3x	.\\" Copyright 2000-2016,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_getcchar.3x	.\\" Copyright 2001-2015,2017 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_in_wch.3x	.\\" Copyright 2002-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_border_set.3x	.\\" Copyright 2002-2011,2012 Free Software Foundation, Inc.                  *
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_addwstr.3x	.\\" Copyright 2002-2012,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_bkgrnd.3x	.\\" Copyright 2002-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_get_wch.3x	.\\" Copyright 2002-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/key_defined.3x	.\\" Copyright 2003-2006,2010 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/legacy_coding.3x	.\\" Copyright 2005-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_opaque.3x	.\\" Copyright 2007-2014,2015 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_legacy.3x	.\\" Copyright 2007-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_memleaks.3x	.\\" Copyright 2008-2010,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_threads.3x	.\\" Copyright 2008-2015,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/tabs.1	.\\" Copyright 2008-2016,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/MKncu_config.in	.\\" Copyright 2010 Free Software Foundation, Inc.                            *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/form_variables.3x	.\\" Copyright 2010-2013,2017 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/MKada_config.in	.\\" Copyright 2010-2014,2016 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_sp_funcs.3x	.\\" Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/new_pair.3x	.\\" Copyright 2017 Free Software Foundation, Inc.                            *
+line	48	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/form_data.3x	.\\" Copyright 2018-2023,2024 Thomas E. Dickey                                *
+line	65	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_mouse.3x	.\\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_memleaks.3x	.\\" Copyright 2019-2023,2024 Thomas E. Dickey                                *
+line	14	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_addwstr.3x	.\\" Copyright 2019-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/gdc.6	.\\" Copyright 2020,2024 Thomas E. Dickey                                     *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/bs.6	.\\" Copyright 2020-2021,2024 Thomas E. Dickey                                *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/MKncu_config.in	.\\" Copyright 2020-2023,2024 Thomas E. Dickey                                *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_getyx.3x	.\\" Copyright 2020-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_threads.3x	.\\" Copyright 2021-2024,2025 Thomas E. Dickey                                *
+line	139	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_mouse.3x	.\\" Except as contained in this notice, the name(s) of the above copyright   *
+line	139	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_mouse.3x	.\\" IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_termcap.3x	.\\" Observe the copyright notice in
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/user_caps.5	.\\" The AIX 4 file has copyright dates starting in 1984;
+line	139	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_mouse.3x	.\\" The above copyright notice and this permission notice shall be included  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/user_caps.5	.\\" for 1988, and UCB copyright for 1982, 1986, 1988.  That 1982 is interesting
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/user_caps.5	.\\" illumos-gate has related source, with a "caps" file having AT&T copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/user_caps.5	.\\" the Solaris file cites 1988 (the others have no copyright comments).
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/terminal.xbm	/**       Copyright 1988 by Evans & Sutherland Computer Corporation,        **/
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/terminal.xbm	/**    copies and that both  that  copyright  notice  and  this  permis-    **/
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/terminal.xbm	/**    granted, provided that the above copyright notice appear  in  all    **/
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	2) Pavel Curtis has renounced his copyright to the public domain.
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-form_user_data__ads.htm	<span class="comment"><em>-- Copyright 1998-2003,2009 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-menus-item_user_data__ads.htm	<span class="comment"><em>-- Copyright 1998-2006,2009 Free Software Foundation, Inc.                  --</em></span>
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-panels__ads.htm	<span class="comment"><em>-- Copyright 1998-2009,2014 Free Software Foundation, Inc.                  --</em></span>
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types__ads.htm	<span class="comment"><em>-- Copyright 1998-2011,2014 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-mouse__ads.htm	<span class="comment"><em>-- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-enumeration-ada__ads.htm	<span class="comment"><em>-- Copyright 1999-2002,2003 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface__ads.htm	<span class="comment"><em>-- Copyright 1999-2003,2006 Free Software Foundation, Inc.                  --</em></span>
+line	24	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-ipv4_address__ads.htm	<span class="comment"><em>-- Copyright 1999-2003,2009 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-panels__adb.htm	<span class="comment"><em>-- Copyright 1999-2004,2009 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-enumeration-ada__adb.htm	<span class="comment"><em>-- Copyright 1999-2004,2011 Free Software Foundation, Inc.                  --</em></span>
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-text_io-aux__ads.htm	<span class="comment"><em>-- Copyright 1999-2006,2009 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-user-choice__ads.htm	<span class="comment"><em>-- Copyright 1999-2008,2011 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-user__ads.htm	<span class="comment"><em>-- Copyright 1999-2009,2011 Free Software Foundation, Inc.                  --</em></span>
+line	5	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_user_data__adb.htm	<span class="comment"><em>-- Copyright 1999-2009,2014 Free Software Foundation, Inc.                  --</em></span>
+line	13	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types-user-choice__adb.htm	<span class="comment"><em>-- Copyright 1999-2011,2014 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-trace__ads.htm	<span class="comment"><em>-- Copyright 2000,2014 Free Software Foundation, Inc.                       --</em></span>
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-putwin__ads.htm	<span class="comment"><em>-- Copyright 2000-2002,2003 Free Software Foundation, Inc.                  --</em></span>
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-termcap__adb.htm	<span class="comment"><em>-- Copyright 2000-2006,2009 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-trace__adb.htm	<span class="comment"><em>-- Copyright 2001-2011,2014 Free Software Foundation, Inc.                  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses__adb.htm	<span class="comment"><em>-- Copyright 2007-2011,2014 Free Software Foundation, Inc.                  --</em></span>
+line	8	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-field_types__ads.htm	<span class="comment"><em>-- Copyright 2018,2020 Thomas E. Dickey                                     --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses__adb.htm	<span class="comment"><em>-- Copyright 2018-2020,2024 Thomas E. Dickey                                --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-menus__adb.htm	<span class="comment"><em>-- Copyright 2018-2020,2025 Thomas E. Dickey                                --</em></span>
+line	58	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-form_user_data__ads.htm	<span class="comment"><em>-- Copyright 2020 Thomas E. Dickey                                          --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses__ads.htm	<span class="comment"><em>-- Copyright 2020,2024 Thomas E. Dickey                                     --</em></span>
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms__adb.htm	<span class="comment"><em>-- Copyright 2020,2025 Thomas E. Dickey                                     --</em></span>
+line	71	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-form_user_data__ads.htm	<span class="comment"><em>-- Except as contained in this notice, the name(s) of the above copyright   --</em></span>
+line	71	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-form_user_data__ads.htm	<span class="comment"><em>-- IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   --</em></span>
+line	71	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/doc/html/ada/terminal_interface-curses-forms-form_user_data__ads.htm	<span class="comment"><em>-- The above copyright notice and this permission notice shall be included  --</em></span>
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/scr_dump.5	According to its copyright notice,
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure	Copyright 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/config.guess	Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/COPYING	Copyright 1998-2017,2018 Free Software Foundation, Inc.
+line	6	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure	Copyright 2003-2022,2023\tThomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/COPYING	Copyright 2018-2024,2025 Thomas E. Dickey
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	Copyright:  1994 X Consortium
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/package/debian-mingw64/copyright	Copyright: 1980,1991,1992,1993 The Regents of the University of California.
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/package/debian-mingw64/copyright	Copyright: 1996-2024,2025 by Thomas E. Dickey
+line	7	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	Copyright: 1998-2016,2017 Free Software Foundation, Inc.
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/package/debian-mingw64/copyright	Copyright: 2001 by Pradeep Padala
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/package/debian-mingw64/copyright	Copyright: 2003-2024,2025 by Thomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	Copyright: 2010-2024,2025 by Thomas E. Dickey
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/package/debian-mingw64/copyright	Copyright: 2017-2024,2025 Thomas E. Dickey
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/package/debian/copyright	Copyright: 2017-2024,2025 by Thomas E. Dickey
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/COPYING	Except as contained in this notice, the name(s) of the above copyright
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/COPYING	IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/NEWS	NOT in the public domain, they are copyrighted by me.  I'm
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_attr.3x	Sun's copyright began in 1996.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/COPYING	The above copyright notice and this permission notice shall be included
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/clear.1	The remainder of the script in each case is a copyright notice.
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/man/curs_util.3x	according to the copyright dates in Solaris source,
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/normal.m4	dnl Copyright 1998,2006 Free Software Foundation, Inc.                       *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/configure.in	dnl Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/table.m4	dnl Copyright 2000,2006 Free Software Foundation, Inc.                       *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/html.m4	dnl Copyright 2000-2006,2007 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/test/aclocal.m4	dnl Copyright 2003-2017,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure.in	dnl Copyright 2010-2016,2018 Free Software Foundation, Inc.                  *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/aclocal.m4	dnl Copyright 2010-2017,2018 Free Software Foundation, Inc.                  *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure.in	dnl Copyright 2018-2023,2024 Thomas E. Dickey                                *
+line	4	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/aclocal.m4	dnl Copyright 2018-2024,2025 Thomas E. Dickey                                *
+line	1	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/html.m4	dnl Copyright 2019,2020 Thomas E. Dickey                                     *
+line	2	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/gen/table.m4	dnl Copyright 2020 Thomas E. Dickey                                          *
+line	9	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure.in	dnl Except as contained in this notice, the name(s) of the above copyright   *
+line	9	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure.in	dnl IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	9	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/configure.in	dnl The above copyright notice and this permission notice shall be included  *
+line	3	ncurses-6.5-20250503.tgz:ncurses-6.5-20250503/Ada95/aclocal.m4	dnl These macros are maintained separately from NCURSES.  The copyright on

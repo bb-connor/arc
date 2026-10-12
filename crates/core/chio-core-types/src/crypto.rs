@@ -1329,6 +1329,14 @@ pub fn sha256_hex(data: &[u8]) -> String {
     encoding::prefixed_hex("", &hasher.finalize())
 }
 
+/// Write the exact lowercase ASCII bytes of [`sha256_hex`] into a fixed buffer.
+#[must_use]
+pub fn sha256_hex_bytes(data: &[u8]) -> Option<[u8; 64]> {
+    let mut encoded = [0; 64];
+    encoding::fill_prefixed_hex("", &Sha256::digest(data), &mut encoded)?;
+    Some(encoded)
+}
+
 /// Serialize a value to canonical JSON bytes (RFC 8785 / JCS).
 ///
 /// Uses the full RFC 8785 implementation from `crate::canonical`. Object keys
@@ -1545,6 +1553,17 @@ mod tests {
         let z_pos = s.find("\"z\"").unwrap();
         assert!(a_pos < m_pos);
         assert!(m_pos < z_pos);
+    }
+
+    #[test]
+    fn sha256_hex_bytes_are_the_sha256_hex_wire_bytes() {
+        for data in [&b""[..], b"hello", &[0xff; 200]] {
+            let encoded = sha256_hex_bytes(data);
+            assert_eq!(
+                encoded.as_ref().map(|bytes| &bytes[..]),
+                Some(sha256_hex(data).as_bytes())
+            );
+        }
     }
 
     #[test]

@@ -1,0 +1,7 @@
+# chio.attribution-lines.v8 origin=fortify-headers files=16 files_with_lines=12 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	9	recipe:0001-add-initial-clang-support.patch	  * Copyright (C) 2015-2016 Dimitris Papastamos <sin@2f30.org>
+line	1	recipe:0001-add-initial-clang-support.patch	  * Copyright (C) 2015-2017 Dimitris Papastamos <sin@2f30.org>
+line	9	fortify-headers-1.1.tar.gz:fortify-headers-1.1/include/fortify-headers.h	 * Copyright (C) 2015-2016 Dimitris Papastamos <sin@2f30.org>
+line	1	fortify-headers-1.1.tar.gz:fortify-headers-1.1/include/wchar.h	 * Copyright (C) 2015-2017 Dimitris Papastamos <sin@2f30.org>
+line	10	recipe:0001-add-initial-clang-support.patch	+ * Copyright (C) 2022 q66 <q66@chimera-linux.org>
+line	1	fortify-headers-1.1.tar.gz:fortify-headers-1.1/LICENSE	Copyright (C) 2015-2019 Dimitris Papastamos <sin@2f30.org>

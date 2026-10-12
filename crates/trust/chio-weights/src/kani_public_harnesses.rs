@@ -4,15 +4,20 @@
 //! surfaces of `chio-weights` that are tractable for symbolic
 //! execution under the explicitly checked loop bounds below:
 //!
-//! - `weights_hash_of` (free `pub fn` at `src/card.rs:274`).
+//! - `weights_hash_of` (free `pub fn` at `src/card.rs:274`), through its
+//!   fixed-buffer encoding `chio_core_types::sha256_hex_bytes`.
 //! - `ModelCard::require_live` (`pub fn` at `src/card.rs:236`).
 //! - `ModelCard::new` schema-version pinning (`pub fn` at `src/card.rs:172`).
 //! - `WeightsError::urn` (`pub fn` at `src/error.rs:75`).
 //!
 //! # What these harnesses model and what they do not
 //!
-//! `weights_hash_of` exercises the real portable SHA-256 implementation over
-//! every four-byte input. It checks determinism and lowercase encoding.
+//! The `weights_hash_of` harness exercises the real portable SHA-256
+//! implementation over every four-byte input and checks determinism and
+//! lowercase encoding of the 64 hex bytes that `weights_hash_of` renders.
+//! Kani does not prove the final transfer of those bytes into a `String`:
+//! symbolic `String` construction exceeds the PR budget. The encoder unit
+//! tests in `chio-core-types` check that step over every byte value.
 //! Noncollision is the audited ASSUME-SHA256 assumption, not a concrete proof.
 //! The original input and flip-position domain and inequality are preserved
 //! as an unproved opt-in obligation in `kani_crypto_research`.
@@ -41,12 +46,12 @@
 //! proved. Bounds retain unwinding checks
 //! (a loop running `k` times needs bound `k + 1`):
 //!
-//! - `weights_hash_of` over 4 bytes: one 64-byte SHA-256 block.
+//! - `sha256_hex_bytes` over 4 bytes: one 64-byte SHA-256 block.
 //!   `GenericArray::<u8, U64>::default` (64), the padding zero fill
 //!   (64 - 4 - 1 = 59), `soft::compress` word load (16) and block loop
 //!   (1), digest output words (8), the 32-byte output defaults (32),
-//!   the 64-byte hex buffer and UTF-8 scan (65), and a 64-byte `memcmp` for the
-//!   `String` comparisons. Largest: 65.
+//!   the 64-byte hex buffer (64), its 32 digit pairs (33) and the
+//!   64-byte comparison. Largest: 65.
 //! - `ModelCard::new` and `validate`: `is_lowercase_sha256_hex` runs
 //!   `.all` over 64 bytes (65); the `trim` comparisons are `memcmp`
 //!   over 26 (`issuer`) and 15 (`training_data_class`) equal bytes.
@@ -82,7 +87,9 @@ use alloc::string::{String, ToString};
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use crate::card::{weights_hash_of, ModelCard, StringSet, CARD_VERSION_V1};
+use chio_core_types::sha256_hex_bytes;
+
+use crate::card::{ModelCard, StringSet, CARD_VERSION_V1};
 use crate::error::WeightsError;
 
 /// Construct a deterministic `ModelCard` fixture suitable for symbolic
@@ -110,41 +117,43 @@ fn fixture_card(issued_at: DateTime<Utc>, expires_at: DateTime<Utc>) -> ModelCar
     }
 }
 
-/// Real SHA-256 determinism and lowercase digest shape over every four-byte input.
+/// Real SHA-256 determinism and lowercase hex shape over every four-byte input,
+/// checked on the 64 wire bytes that `weights_hash_of` renders. The bytes-to-`String`
+/// step is covered by the `chio-core-types` encoder unit tests, not by this proof.
 /// Noncollision relies on ASSUME-SHA256; the original inequality is unproved research.
-/// Production entry: `chio_weights::card::weights_hash_of`.
+/// Production entry: `chio_core_types::sha256_hex_bytes`, the fixed-buffer encoding of
+/// `chio_weights::card::weights_hash_of`.
 #[kani::proof]
 #[kani::solver(kissat)]
 #[kani::unwind(66)]
-pub fn public_weights_hash_of_determinism_and_shape() {
+pub fn public_weights_hash_hex_bytes_determinism_and_shape() {
     // A 4-byte message plus the 0x80 delimiter and the 8-byte length
-    // fits one 64-byte SHA-256 block. The tampered position ranges over
-    // every byte of the message (the original noncollision domain).
+    // fits one 64-byte SHA-256 block.
     let bytes: [u8; 4] = kani::any();
-    let flip_index: u8 = kani::any();
-    kani::assume((flip_index as usize) < bytes.len());
 
-    // (1) Determinism. Two calls with identical inputs MUST agree
+    // (1) Determinism. Two encodings of identical inputs MUST agree
     // byte-for-byte. The kernel binding refusal path relies on this
     // when it recomputes `weights_hash_of(loaded_bytes)` and
     // byte-compares against the card's `weights_hash`.
-    let first = weights_hash_of(&bytes);
-    let second = weights_hash_of(&bytes);
+    let first = sha256_hex_bytes(&bytes);
+    let second = sha256_hex_bytes(&bytes);
     assert_eq!(first, second);
 
-    // (2) Output shape. The output is always a 64-character lowercase
-    // hex string. The card's `validate()` predicate refuses any
-    // candidate that does not match this shape, so a `weights_hash_of`
-    // implementation that drifted to uppercase or shortened the
-    // digest would silently break every binding.
-    assert_eq!(first.len(), 64);
-    for byte in first.as_bytes() {
-        assert!(matches!(*byte, b'0'..=b'9' | b'a'..=b'f'));
+    // (2) Output shape. The encoding always succeeds with 64 lowercase
+    // hex bytes. The card's `validate()` predicate refuses any
+    // candidate that does not match this shape, so an encoding that
+    // drifted to uppercase or refused a digest would silently break
+    // every binding.
+    assert!(first.is_some());
+    if let Some(encoded) = first {
+        for byte in encoded {
+            assert!(matches!(byte, b'0'..=b'9' | b'a'..=b'f'));
+        }
     }
 
     // Noncollision is ASSUME-SHA256, not an assertion proved by this harness.
     // The original four-byte noncollision obligation remains in kani_crypto_research.
-    kani::cover!(true, "public_weights_hash_of_determinism_and_shape");
+    kani::cover!(true, "public_weights_hash_hex_bytes_determinism_and_shape");
 }
 
 /// Real public surface exercised symbolically: `ModelCard::require_live`

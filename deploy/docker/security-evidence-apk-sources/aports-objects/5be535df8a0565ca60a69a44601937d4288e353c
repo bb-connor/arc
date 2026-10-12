@@ -1,0 +1,6 @@
+tree e62a5e42d6835a0716b0807085dc416c0cc4c5bb
+parent 89fb886d1c491a61b135f5dcc1e6ad3ef9d3ab05
+author Ariadne Conill <ariadne@ariadne.space> 1741394311 -0800
+committer Ariadne Conill <ariadne@ariadne.space> 1741394311 -0800
+
+main/pkgconf: upgrade to 2.4.3

@@ -1,0 +1,14 @@
+# chio.attribution-lines.v8 origin=ca-certificates files=13 files_with_lines=3 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/c_rehash.c	 * Copyright (c) 2013-2014 Timo Teräs <timo.teras@iki.fi>
+line	1	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/mk-ca-bundle.pl	# * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/mk-ca-bundle.pl	# * are also available at https://curl.se/docs/copyright.html.
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Issuer: CN=Entrust Root Certification Authority - EC1,OU="(c) 2012 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Issuer: CN=Entrust Root Certification Authority - G2,OU="(c) 2009 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Issuer: CN=Entrust Root Certification Authority - G4,OU="(c) 2015 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Issuer: CN=Entrust.net Certification Authority (2048),OU=(c) 1999 Entrust.net Limited,OU=www.entrust.net/CPS_2048 incorp. by ref. (limits liab.),O=Entrust.net
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Issuer: CN=OISTE WISeKey Global Root GA CA,OU=OISTE Foundation Endorsed,OU=Copyright (c) 2005,O=WISeKey,C=CH
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Subject: CN=Entrust Root Certification Authority - EC1,OU="(c) 2012 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Subject: CN=Entrust Root Certification Authority - G2,OU="(c) 2009 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Subject: CN=Entrust Root Certification Authority - G4,OU="(c) 2015 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Subject: CN=Entrust.net Certification Authority (2048),OU=(c) 1999 Entrust.net Limited,OU=www.entrust.net/CPS_2048 incorp. by ref. (limits liab.),O=Entrust.net
+line	2	ca-certificates-20260611.tar.bz2:ca-certificates-20260611/certdata.txt	# Subject: CN=OISTE WISeKey Global Root GA CA,OU=OISTE Foundation Endorsed,OU=Copyright (c) 2005,O=WISeKey,C=CH

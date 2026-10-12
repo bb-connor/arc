@@ -1,0 +1,10 @@
+tree 156497b1a659ee3e6f508593f7cef8d35ac917a8
+parent 0c3c75c8e83bca90dcd630983ddc73b467026759
+author Pablo Correa Gómez <ablocorrea@hotmail.com> 1726144951 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1726500216 +0000
+
+main/attr: move library from /lib to /usr/lib
+
+And in the process use the standard configure calls. The programs that
+use libattr as a dependency, are already installed under /usr. So
+there's no point in having this one directly under /lib

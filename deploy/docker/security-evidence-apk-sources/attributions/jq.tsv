@@ -1,0 +1,99 @@
+# chio.attribution-lines.v8 origin=jq files=311 files_with_lines=120 binary_heads=1 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/regversion.c	            "Oniguruma %d.%d.%d : Copyright (C) 2002-2018 K.Kosako",
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	        /^Copyright /!{
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/src/parser.h	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2016 Free Software
+line	62	jq-1.8.2.tar.gz:jq-1.8.2/src/util.c	 * 1. Redistributions of source code must retain the above copyright
+line	62	jq-1.8.2.tar.gz:jq-1.8.2/src/util.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/jv.c	 * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/jv_dtoa.c	 * Copyright (c) 1991, 1996 by Lucent Technologies.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/jv_dtoa.c	 * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+line	8	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/reggnu.c	 * Copyright (c) 2002-2019  K.Kosako
+line	27	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/iso8859_13.c	 * Copyright (c) 2002-2020  K.Kosako
+line	4	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/regposix.c	 * Copyright (c) 2002-2022  K.Kosako
+line	9	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/regexec.c	 * Copyright (c) 2002-2024  K.Kosako
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/gb18030.c	 * Copyright (c) 2005-2023  KUBO Takehiro <kubo AT jiubao DOT org>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/cp1251.c	 * Copyright (c) 2006-2020  Byte      <byte AT mail DOT kna DOT ru>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/onig_init.c	 * Copyright (c) 2016-2019  K.Kosako
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/unicode_property_data.c	 * Copyright (c) 2016-2024  K.Kosako
+line	6	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/unicode_fold_data.c	 * Copyright (c) 2017-2024  K.Kosako
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/test/test_regset.c	 * Copyright (c) 2019  K.Kosako
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/test/testc.c	 * Copyright (c) 2019-2021  K.Kosako
+line	3	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/unicode_wb_data.c	 * Copyright (c) 2019-2024  K.Kosako
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/test/testp.c	 * Copyright (c) 2020-2021  K.Kosako
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/test/test_back.c	 * Copyright (c) 2020-2024  K.Kosako
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/doc/onig_syn_md.c	 * Copyright (c) 2024  K.Kosako
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/util.c	 * Parts (strptime()) Copyright (c) 1997, 1998, 2005, 2008 The NetBSD Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/jv.c	 * Portions Copyright (c) 2016 Kungliga Tekniska Högskolan
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/src/jv.c	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	#      /^# Copyright /
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_pthread.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_pthread.m4	#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_compare_version.m4	#   Copyright (c) 2008 Tim Toolan <toolan@ele.uri.edu>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_prog_bison_version.m4	#   Copyright (c) 2009 Francesco Salvestrini <salvestrini@users.sourceforge.net>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_pthread.m4	#   Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_pthread.m4	#   Copyright (c) 2019 Marc Stevens <marc.stevens@cwi.nl>
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/config.guess	#   Copyright 1992-2020 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/m4/ax_compare_version.m4	#   permitted in any medium without royalty provided the copyright notice
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/install-sh	# Copyright (C) 1994 X Consortium
+line	5	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/missing	# Copyright (C) 1996-2020 Free Software Foundation, Inc.
+line	9	jq-1.8.2.tar.gz:jq-1.8.2/config/ylwrap	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	4	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/depcomp	# Copyright (C) 1999-2020 Free Software Foundation, Inc.
+line	8	jq-1.8.2.tar.gz:jq-1.8.2/config/depcomp	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	12	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/onig-config.in	# Copyright (C) 2006  K.Kosako
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/ar-lib	# Copyright (C) 2010-2021 Free Software Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/test-driver	# Copyright (C) 2011-2020 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	3	jq-1.8.2.tar.gz:jq-1.8.2/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/install-sh	# The above copyright notice and this permission notice shall be included in
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/install-sh	# following copyright and license.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/decNumber/decContext.c	/* Copyright (c) IBM Corporation, 2000, 2009.  All rights reserved.   */\r
+line	3	jq-1.8.2.tar.gz:jq-1.8.2/vendor/decNumber/decContext.h	/* Copyright (c) IBM Corporation, 2000, 2010.  All rights reserved.   */\r
+line	3	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/COPYING	1. Redistributions of source code must retain the above copyright
+line	3	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/COPYING	2. Redistributions in binary form must reproduce the above copyright
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/HISTORY	2004/04/20: [new]  add onig_copyright().
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	COPYRIGHT AND PERMISSION NOTICE
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/config/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	4	jq-1.8.2.tar.gz:jq-1.8.2/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Copyright (c) 1991, 1996 by Lucent Technologies.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Copyright (c) 1995-2005 International Business Machines Corporation and others
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Copyright (c) 1997, 1998, 2005, 2008 The NetBSD Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/COPYING	Copyright (c) 2002-2021  K.Kosako  <kkosako0@gmail.com>
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/config.guess	Copyright 1992-2020 Free Software Foundation, Inc.
+line	2	jq-1.8.2.tar.gz:jq-1.8.2/config/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Except as contained in this notice, the name of a copyright holder
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/onigposix.h	ONIG_EXTERN const char* onig_copyright P_((void));
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	Portions Copyright (c) 2016 Kungliga Tekniska Högskolan
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	The above copyright notice and this permission notice shall be
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/oniguruma.h	const char* onig_copyright P_((void));
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	copyright notice(s) and this permission notice appear in all copies of
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	jq is copyright (C) 2012 Stephen Dolan
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	of the copyright holder.
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/vendor/oniguruma/src/regversion.c	onig_copyright(void)
+line	1	jq-1.8.2.tar.gz:jq-1.8.2/COPYING	the Software and that both the above copyright notice(s) and this
+binary-head	jq-1.8.2.tar.gz:jq-1.8.2/docs/public/icon.png

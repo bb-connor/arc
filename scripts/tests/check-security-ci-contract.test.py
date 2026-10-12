@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -128,8 +129,9 @@ CONTRACT_DOCUMENT = Path("docs/security/committed-linux-evidence.md")
 ACTIONLINT_CONFIG = Path(".github/actionlint.yaml")
 SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
-    Path("deploy/docker/ca-certificates-20260611-r0.apk"),
     Path("deploy/docker/security-evidence-apk.lock"),
+    Path("deploy/docker/security-evidence-apk-archives.json"),
+    Path("deploy/docker/security-evidence-apks/SHA256SUMS"),
     Path("deploy/docker/security-evidence-seccomp.json"),
     Path("deploy/docker/security-evidence-seccomp-upstream.json"),
     Path("deploy/docker/security-evidence-seccomp-provenance.json"),
@@ -153,6 +155,17 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/tests/run-security-execution-container.test.py"),
     Path("scripts/tests/check-temporal-security.test.sh"),
 )
+APK_SOURCE_UNIT_FILES = (
+    Path("scripts/check-security-apk-sources.py"),
+    Path("scripts/tests/check-security-apk-sources.test.py"),
+    Path("deploy/docker/security-evidence-apk-sources/MANIFEST.json"),
+)
+
+
+SECURITY_APK_ARCHIVES = Path("deploy/docker/security-evidence-apks")
+SHARED_APK_ARCHIVES = tempfile.TemporaryDirectory(prefix="chio-security-apk-archives-")
+for archive in sorted((ROOT / SECURITY_APK_ARCHIVES).glob("*.apk")):
+    shutil.copy2(archive, Path(SHARED_APK_ARCHIVES.name) / archive.name)
 
 
 def set_bootstrap_sha(body: str, sha: str) -> str:
@@ -181,10 +194,17 @@ def populate_fixture(fixture: Path) -> None:
     shutil.copy2(ROOT / CONTRACT_DOCUMENT, document)
     for relative in (Path("Cargo.lock"), Path("rust-toolchain.toml")):
         shutil.copy2(ROOT / relative, fixture / relative)
-    for relative in SECURITY_EXECUTION_BOUNDARY_FILES:
+    for relative in (*SECURITY_EXECUTION_BOUNDARY_FILES, *APK_SOURCE_UNIT_FILES):
         destination = fixture / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / relative, destination)
+    # Fixtures only read the archives, so they share one private copy.
+    for archive in sorted(Path(SHARED_APK_ARCHIVES.name).iterdir()):
+        destination = fixture / SECURITY_APK_ARCHIVES / archive.name
+        try:
+            os.link(archive, destination)
+        except OSError:
+            shutil.copy2(archive, destination)
 
 
 def replace_once(old: str, new: str) -> Callable[[str], str]:
@@ -1157,13 +1177,35 @@ assert_boundary_file_rejected(
     ),
     "image has an unpinned build stage",
 )
+assert_rejected(
+    "enterprise trusted execution files omit the APK manifest",
+    "enterprise-hardening.yml",
+    replace_once("          644 deploy/docker/security-evidence-apks/SHA256SUMS\n", ""),
+    "authorized tooling inventory is incomplete",
+)
 assert_boundary_file_rejected(
-    "security image rejects reordered APK closure",
+    "security image resolves APKs from a network index",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "      bash=5.2.37-r0 \\\n      build-base=0.5-r3 \\\n",
-        "      build-base=0.5-r3 \\\n      bash=5.2.37-r0 \\\n",
+        "apk add --no-network --no-cache --repositories-file /dev/null \\\n",
+        "apk add --no-cache \\\n",
     ),
+    "image APK closure changed",
+)
+assert_boundary_file_rejected(
+    "security image accepts unsigned APKs",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        "apk add --no-network --no-cache --repositories-file /dev/null \\\n",
+        "apk add --no-network --no-cache --repositories-file /dev/null "
+        "--allow-untrusted \\\n",
+    ),
+    "image APK closure changed",
+)
+assert_boundary_file_rejected(
+    "security image skips the vendored APK digest check",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(" && sha256sum -c SHA256SUMS \\\n", ""),
     "image APK closure changed",
 )
 assert_boundary_file_rejected(
@@ -6175,5 +6217,177 @@ for label, replacement in (
     ("conditional", "          if false; then\n          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py\n          fi\n"),
 ):
     assert_rejected(f"CI revocation-regression entry {label}", "ci.yml", replace_in_named_step("Workspace structural gates", "          run_gate python3 ./scripts/tests/trusted-ci-revocation-regressions.test.py\n", replacement), "revocation regression gate is not exact and adjacent")
+assert_rejected(
+    'CI removes the APK corresponding source gate',
+    "ci.yml",
+    replace_once(
+        "      - name: APK corresponding source gate\n        run: |\n          git lfs pull --include='deploy/docker/security-evidence-apks/**,deploy/docker/security-evidence-apk-sources/**' --exclude=''\n          python3 scripts/check-security-apk-sources.py\n          python3 scripts/tests/check-security-apk-sources.test.py\n\n",
+        '',
+    ),
+    'expected exactly one workflow step named: APK corresponding source gate',
+)
+
+assert_rejected(
+    'CI conditionally skips the APK corresponding source gate',
+    "ci.yml",
+    replace_in_named_step(
+        'APK corresponding source gate',
+        '        run: |\n',
+        '        if: false\n        run: |\n',
+    ),
+    'conditionally skips mandatory step: APK corresponding source gate',
+)
+
+for apk_source_label, apk_source_old, apk_source_new in (
+    (
+        'soft-fails the source checker',
+        '          python3 scripts/check-security-apk-sources.py\n',
+        '          python3 scripts/check-security-apk-sources.py || true\n',
+    ),
+    (
+        'drops the source self-test',
+        '          python3 scripts/tests/check-security-apk-sources.test.py\n',
+        '',
+    ),
+):
+    assert_rejected(
+        'CI ' + apk_source_label,
+        "ci.yml",
+        replace_in_named_step('APK corresponding source gate', apk_source_old, apk_source_new),
+        'changes mandatory step body: APK corresponding source gate',
+    )
+
+
+def assert_apk_source_unit_rejected(
+    label: str, mutate: Callable[[Path], None], expected_error: str
+) -> None:
+    with tempfile.TemporaryDirectory(prefix="chio-apk-source-unit-") as raw:
+        fixture = Path(raw) / "root"
+        fixture.mkdir()
+        populate_fixture(fixture)
+        mutate(fixture)
+        try:
+            CHECKER.validate(fixture)
+        except CHECKER.ContractError as error:
+            if expected_error not in str(error):
+                raise AssertionError(f"{label}: unexpected rejection: {error}") from error
+        else:
+            raise AssertionError(f"security CI accepted APK source unit mutation: {label}")
+
+
+def rewrite_apk_source_pin(fixture: Path, digest: str) -> None:
+    checker = fixture / APK_SOURCE_UNIT_FILES[0]
+    body, count = re.subn(
+        r'(EXPECTED_SOURCES_MANIFEST_SHA256 = \(\n    ")[0-9a-f]{64}(")',
+        rf"\g<1>{digest}\g<2>",
+        checker.read_text(encoding="utf-8"),
+    )
+    if count != 1:
+        raise AssertionError("APK source checker pin fixture could not be rewritten")
+    checker.write_text(body, encoding="utf-8")
+
+
+def rebind_apk_source_manifest(fixture: Path, key: str) -> None:
+    manifest_path = fixture / APK_SOURCE_UNIT_FILES[2]
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest[key]["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    rewrite_apk_source_pin(fixture, hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+
+
+def symlink_apk_source_file(fixture: Path, relative: Path) -> None:
+    target = fixture / relative
+    backing = fixture / ("reviewed-" + relative.name)
+    shutil.copy2(target, backing)
+    target.unlink()
+    target.symlink_to(backing)
+
+
+def symlink_apk_source_directory(fixture: Path) -> None:
+    directory = fixture / APK_SOURCE_UNIT_FILES[2].parent
+    outside = fixture.parent / "outside-apk-sources"
+    directory.rename(outside)
+    directory.symlink_to(outside, target_is_directory=True)
+
+
+for apk_source_relative in APK_SOURCE_UNIT_FILES:
+    assert_apk_source_unit_rejected(
+        f"{apk_source_relative} removed",
+        lambda fixture, relative=apk_source_relative: (fixture / relative).unlink(),
+        f"APK corresponding source file is not regular: {apk_source_relative}",
+    )
+    assert_apk_source_unit_rejected(
+        f"{apk_source_relative} replaced by a symlink",
+        lambda fixture, relative=apk_source_relative: symlink_apk_source_file(fixture, relative),
+        f"APK corresponding source file is not regular: {apk_source_relative}",
+    )
+assert_apk_source_unit_rejected(
+    "source checker loses its executable mode",
+    lambda fixture: os.chmod(fixture / APK_SOURCE_UNIT_FILES[0], 0o644),
+    "APK corresponding source file is not regular: scripts/check-security-apk-sources.py",
+)
+assert_apk_source_unit_rejected(
+    "source directory is a symlink outside the root",
+    symlink_apk_source_directory,
+    "is not beneath real directories",
+)
+assert_apk_source_unit_rejected(
+    "source manifest edited without the checker pin",
+    lambda fixture: (fixture / APK_SOURCE_UNIT_FILES[2]).write_bytes(
+        (fixture / APK_SOURCE_UNIT_FILES[2]).read_bytes() + b"\n"
+    ),
+    "APK corresponding source checker does not pin the source manifest present",
+)
+for apk_source_key in ("binary_manifest", "binary_provenance"):
+    assert_apk_source_unit_rejected(
+        f"source manifest {apk_source_key} names another APK closure",
+        lambda fixture, key=apk_source_key: rebind_apk_source_manifest(fixture, key),
+        "APK corresponding source manifest does not bind this tree's APK closure",
+    )
+assert_apk_source_unit_rejected(
+    "source checker pin rebound after its literal",
+    lambda fixture: (fixture / APK_SOURCE_UNIT_FILES[0]).write_text(
+        (fixture / APK_SOURCE_UNIT_FILES[0]).read_text(encoding="utf-8")
+        + '\nEXPECTED_SOURCES_MANIFEST_SHA256 = "0" * 64\n',
+        encoding="utf-8",
+    ),
+    "does not bind EXPECTED_SOURCES_MANIFEST_SHA256 exactly once to a literal",
+)
+
+
+assert_apk_source_unit_rejected(
+    "hollow source checker keeps a valid manifest pin",
+    lambda fixture: (fixture / APK_SOURCE_UNIT_FILES[0]).write_text(
+        'EXPECTED_SOURCES_MANIFEST_SHA256 = "d719ae7431228377d71edc4e2bd68eadd3d4f979121205eac95177c48ea19719"\n',
+        encoding="utf-8",
+    ),
+    "APK corresponding source checker digest ratchet changed",
+)
+assert_apk_source_unit_rejected(
+    "hollow corresponding source self-test exits successfully",
+    lambda fixture: (fixture / APK_SOURCE_UNIT_FILES[1]).write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8",
+    ),
+    "APK corresponding source self-test digest ratchet changed",
+)
+assert_rejected(
+    "CI omits APK source LFS hydration",
+    "ci.yml",
+    replace_in_named_step("APK corresponding source gate", "          " + CHECKER.APK_SOURCES_HYDRATE + "\n", ""),
+    "changes mandatory step body: APK corresponding source gate",
+)
+assert_rejected(
+    "portable contract self-tests omit APK source LFS hydration",
+    "enterprise-hardening.yml",
+    replace_in_named_step("Gate contract self-tests", "          " + CHECKER.APK_SOURCES_HYDRATE + "\n", ""),
+    "enterprise portable contracts do not hydrate the APK source unit",
+)
+for hydration_workflow in ("enterprise-hardening.yml", "enterprise-linux-capture.yml"):
+    assert_rejected(
+        "trusted image build omits APK LFS hydration: " + hydration_workflow,
+        hydration_workflow,
+        replace_in_named_step("Build digest-addressed trusted security execution image", "          " + CHECKER.APK_IMAGE_HYDRATE + "\n", ""),
+        "does not hydrate the trusted APK archives",
+    )
 
 print("security CI contract rejects trust-boundary and evidence mutations")

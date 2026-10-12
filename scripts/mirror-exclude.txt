@@ -1,0 +1,82 @@
+# Paths withheld from the public backbay-labs/chio mirror.
+#
+# The public mirror carries no research, planning, roadmap, or internal
+# process-record documents. scripts/mirror-to-chio.sh removes every path
+# matching a pattern below from arc's main tree before it commits that tree
+# to chio. The script reads this file from the arc commit being mirrored, so
+# a change here takes effect on the next sync after it lands on main.
+#
+# Each line is a git glob pathspec (see `git help glob`): `*` stays inside one
+# path component, `**/` spans directories, and `/**` matches everything below
+# a directory. Blank lines and lines starting with `#` are ignored.
+
+# Research notes, evaluations, and paper drafts.
+docs/research/**
+docs/papers/**
+docs/reference/COMPETITIVE_LANDSCAPE.md
+docs/guards/02-WASM-RUNTIME-LANDSCAPE.md
+formal/experiments/**
+
+# Plans, specs for planned work, and strategy.
+docs/superpowers/**
+docs/strategy/**
+docs/coordination/**
+docs/architecture/AGENT_PROCESS_DIRECTION.md
+docs/architecture/PROGRAM-MAP.md
+docs/architecture/SWARM_EXECUTION_CONTRACT.md
+docs/operations/CONFORMANCE_HARNESS_PLAN.md
+docs/operations/HA_CONTROL_AUTH_PLAN.md
+docs/release/COMPLIANCE_EVIDENCE_EXPORT_PLAN.md
+docs/guards/03-IMPLEMENTATION-PLAN.md
+
+# Roadmaps and gap analyses.
+docs/operations/UNIFIED_ROADMAP.md
+docs/sdk/CPP_SDK_ROADMAP.md
+docs/protocols/COMPLIANCE-ROADMAP.md
+docs/formal/ROADMAP.md
+docs/formal/GAP_ANALYSIS.md
+docs/formal/HYGIENE_PASS.md
+docs/formal/plan/**
+
+# Proposed, unscheduled design programs.
+docs/architecture/chio-computer/**
+docs/architecture/reliability/**
+docs/architecture/transparency/**
+docs/protocols/ARCHITECTURAL-EXTENSIONS.md
+docs/protocols/STRUCTURAL-SECURITY-FIXES.md
+docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md
+docs/protocols/AIRFLOW-INTEGRATION.md
+docs/protocols/AWS-LAMBDA-INTEGRATION.md
+docs/protocols/CLOUD-SIDECAR-INTEGRATION.md
+docs/protocols/DAGSTER-INTEGRATION.md
+docs/protocols/DATA-LAYER-INTEGRATION.md
+docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md
+docs/protocols/EVENT-STREAMING-INTEGRATION.md
+docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md
+docs/protocols/IAC-INTEGRATION.md
+docs/protocols/K8S-JOBS-INTEGRATION.md
+docs/protocols/LANGGRAPH-INTEGRATION.md
+docs/protocols/PREFECT-INTEGRATION.md
+docs/protocols/RAY-INTEGRATION.md
+docs/protocols/SAAS-COMMUNICATION-INTEGRATION.md
+docs/protocols/TEMPORAL-INTEGRATION.md
+docs/guards/10-DATA-LAYER-GUARDS.md
+
+# Internal review, execution, and landing records.
+docs/reviews/**
+docs/security/launch-plan.md
+docs/security/launch-execution-plan.md
+docs/security/launch-status.md
+docs/security/landing-ledger.md
+docs/security/landing-ledger.json
+docs/security/pr-consolidation-*.json
+docs/security/legacy-integration-reconciliation-*.json
+docs/security/foundation-acceptance-scope.md
+docs/security/foundation-clock-and-relocation-diagnosis.md
+docs/security/foundation-containment-*.md
+docs/security/m4-*.md
+
+# Dated checkpoint records. The undated supply-chain audits beside them
+# (aws-lc-rs, cpp-demangle) are cargo-vet evidence and stay public.
+docs/security/audits/*-20[0-9][0-9][01][0-9][0-3][0-9]*
+docs/security/audits/*-20[0-9][0-9][01][0-9][0-3][0-9]*/**

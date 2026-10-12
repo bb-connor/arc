@@ -1,0 +1,10 @@
+tree 26b623cec8aad634903f7c09afeba9af63ae1a5b
+parent 862d752cd8c8c5c7f01d34ef72a9d0de2bffe2f6
+author Natanael Copa <ncopa@alpinelinux.org> 1744960379 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1744960379 +0200
+
+Revert "main/abuild: disable dt_relr for loongarch64"
+
+should be fixed with binutils 2.43
+
+This reverts commit 01b33360fca02c068ce526b07acdf9b01a326dcc.

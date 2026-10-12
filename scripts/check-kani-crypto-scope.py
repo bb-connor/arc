@@ -17,7 +17,7 @@ except ModuleNotFoundError:
 
 EXPECTED = {
     "chio-weights": (
-        "public_weights_hash_of_determinism_and_shape",
+        "public_weights_hash_hex_bytes_determinism_and_shape",
         "public_weights_hash_of_determinism_and_tampering",
     ),
     "chio-attest-verify": (

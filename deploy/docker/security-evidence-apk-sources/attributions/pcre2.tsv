@@ -1,0 +1,104 @@
+# chio.attribution-lines.v8 origin=pcre2 files=454 files_with_lines=146 binary_heads=4 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_chkdint.c	            Copyright (c) 2023 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2grep.c	           Copyright (c) 1997-2024 University of Cambridge
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2.h.in	           Copyright (c) 2016-2024 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_match.c	          New API code Copyright (c) 2015-2024 University of Cambridge
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_jit_neon_inc.h	          New API code Copyright (c) 2016-2019 University of Cambridge
+line	3	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_valid_utf.c	          New API code Copyright (c) 2016-2020 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_script_run.c	          New API code Copyright (c) 2016-2021 University of Cambridge
+line	3	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_ucd.c	          New API code Copyright (c) 2016-2022 University of Cambridge
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2posix.h	          New API code Copyright (c) 2016-2023 University of Cambridge
+line	26	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	          New API code Copyright (c) 2016-2024 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_string_utils.c	          New API code Copyright (c) 2018-2021 University of Cambridge
+line	4	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_ord2utf.c	         New API code Copyright (c) 2016 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	        /^Copyright /!{
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2016 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2018 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2019 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2021 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2022 University of Cambridge.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.txt	       Copyright (c) 1997-2023 University of Cambridge.
+line	11	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2test.txt	       Copyright (c) 1997-2024 University of Cambridge.
+line	43	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	     Original API code Copyright (c) 1997-2012 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2test.c	     Original code Copyright (c) 1997-2012 University of Cambridge
+line	48	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	    * Redistributions in binary form must reproduce the above copyright
+line	48	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	    * Redistributions of source code must retain the above copyright notice,
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	    Copyright (c) 1997-2007 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	    Copyright (c) 2007-2024 Philip Hazel
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	    Copyright (c) 2009-2024 Zoltan Herczeg
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	    Copyright (c) 2010-2024 Zoltan Herczeg
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2test.c	    Rewritten code Copyright (c) 2016-2024 University of Cambridge
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+line	33	pcre2-10.46.tar.bz2:pcre2-10.46/deps/sljit/sljit_src/sljitNativeRISCV_64.c	 *    Copyright Zoltan Herczeg (hzmester@freemail.hu). All rights reserved.
+line	33	pcre2-10.46.tar.bz2:pcre2-10.46/deps/sljit/sljit_src/sljitNativeRISCV_64.c	 *   1. Redistributions of source code must retain the above copyright notice, this list of
+line	33	pcre2-10.46.tar.bz2:pcre2-10.46/deps/sljit/sljit_src/sljitNativeRISCV_64.c	 *   2. Redistributions in binary form must reproduce the above copyright notice, this list
+line	33	pcre2-10.46.tar.bz2:pcre2-10.46/deps/sljit/sljit_src/sljitNativeRISCV_64.c	 * SHALL THE COPYRIGHT HOLDER(S) OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+line	33	pcre2-10.46.tar.bz2:pcre2-10.46/deps/sljit/sljit_src/sljitNativeRISCV_64.c	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER(S) AND CONTRIBUTORS ``AS IS'' AND ANY
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	#      /^# Copyright /
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ax_pthread.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ax_pthread.m4	#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ax_pthread.m4	#   Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/install-sh	# Copyright (C) 1994 X Consortium
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	5	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	pcre2-10.46.tar.bz2:pcre2-10.46/depcomp	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	6	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ar-lib	# Copyright (C) 2010-2021 Free Software Foundation, Inc.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/install-sh	# following copyright and license.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	* Redistributions in binary form must reproduce the above copyright
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	* Redistributions of source code must retain the above copyright notices,
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/cmake/COPYING-CMAKE-SCRIPTS	1. Redistributions of source code must retain the copyright
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/cmake/COPYING-CMAKE-SCRIPTS	2. Redistributions in binary form must reproduce the copyright
+line	49	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/AUTHORS.md	COPYRIGHT
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2sample.html	Copyright &copy; 1997-2016 University of Cambridge.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2convert.html	Copyright &copy; 1997-2018 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2partial.html	Copyright &copy; 1997-2019 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2.html	Copyright &copy; 1997-2021 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2perform.html	Copyright &copy; 1997-2022 University of Cambridge.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2grep.html	Copyright &copy; 1997-2023 University of Cambridge.
+line	11	pcre2-10.46.tar.bz2:pcre2-10.46/doc/html/pcre2test.html	Copyright &copy; 1997-2024 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2sample.3	Copyright (c) 1997-2016 University of Cambridge.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2serialize.3	Copyright (c) 1997-2018 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2partial.3	Copyright (c) 1997-2019 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2.3	Copyright (c) 1997-2021 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2perform.3	Copyright (c) 1997-2022 University of Cambridge.
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2grep.1	Copyright (c) 1997-2023 University of Cambridge.
+line	11	pcre2-10.46.tar.bz2:pcre2-10.46/doc/pcre2pattern.3	Copyright (c) 1997-2024 University of Cambridge.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2posix_test.c	Copyright (c) 2022
+line	2	pcre2-10.46.tar.bz2:pcre2-10.46/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	49	pcre2-10.46.tar.bz2:pcre2-10.46/src/pcre2_tables.c	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	assignment agreement, all contributions have copyright retained by each
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/AUTHORS.md	copyright details.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/m4/pcre2_visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2011 Free Software Foundation, Inc.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/aclocal.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	has never required a Contributor Licensing Agreement, or other copyright
+line	1	pcre2-10.46.tar.bz2:pcre2-10.46/LICENCE.md	testdata directory is not copyrighted and is in the public domain.
+binary-head	pcre2-10.46.tar.bz2:pcre2-10.46/testdata/grepbinary
+binary-head	pcre2-10.46.tar.bz2:pcre2-10.46/testdata/grepinputC.bz2
+binary-head	pcre2-10.46.tar.bz2:pcre2-10.46/testdata/grepinputC.gz
+binary-head	pcre2-10.46.tar.bz2:pcre2-10.46/testdata/testbtables

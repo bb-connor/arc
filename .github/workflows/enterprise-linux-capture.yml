@@ -725,6 +725,7 @@ jobs:
           done <<'TRUSTED_EXECUTION_FILES'
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
+          644 deploy/docker/security-evidence-apks/SHA256SUMS
           644 deploy/docker/security-evidence-seccomp.json
           644 deploy/docker/security-evidence-seccomp-upstream.json
           644 deploy/docker/security-evidence-seccomp-provenance.json
@@ -747,6 +748,7 @@ jobs:
         id: security-image
         run: |
           set -euo pipefail
+          /usr/bin/git -C authorized-security lfs pull --include='deploy/docker/security-evidence-apks/**' --exclude=''
           tag="chio-security-execution:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           /usr/bin/docker build \
             --platform linux/amd64 \
@@ -838,6 +840,7 @@ jobs:
           done <<'TRUSTED_EXECUTION_FILES'
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
+          644 deploy/docker/security-evidence-apks/SHA256SUMS
           644 deploy/docker/security-evidence-seccomp.json
           644 deploy/docker/security-evidence-seccomp-upstream.json
           644 deploy/docker/security-evidence-seccomp-provenance.json
@@ -860,6 +863,7 @@ jobs:
         id: security-image
         run: |
           set -euo pipefail
+          /usr/bin/git -C authorized-security lfs pull --include='deploy/docker/security-evidence-apks/**' --exclude=''
           tag="chio-security-execution:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           /usr/bin/docker build \
             --platform linux/amd64 \
@@ -1008,6 +1012,7 @@ jobs:
           done <<'TRUSTED_EXECUTION_FILES'
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
+          644 deploy/docker/security-evidence-apks/SHA256SUMS
           644 deploy/docker/security-evidence-seccomp.json
           644 deploy/docker/security-evidence-seccomp-upstream.json
           644 deploy/docker/security-evidence-seccomp-provenance.json
@@ -1030,6 +1035,7 @@ jobs:
         id: security-image
         run: |
           set -euo pipefail
+          /usr/bin/git -C authorized-security lfs pull --include='deploy/docker/security-evidence-apks/**' --exclude=''
           tag="chio-security-execution:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           /usr/bin/docker build \
             --platform linux/amd64 \

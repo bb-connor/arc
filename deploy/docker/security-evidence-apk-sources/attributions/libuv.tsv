@@ -1,0 +1,81 @@
+# chio.attribution-lines.v8 origin=libuv files=467 files_with_lines=337 binary_heads=12 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	                ii. a copyright notice;
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     all Copyright and Similar Rights that apply to Your use of the
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     any other exception or limitation to Copyright and Similar Rights
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     closely related to copyright including, without limitation,
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     copyright and certain other rights. Our licenses are
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     copyright--then that use is not regulated by the license. Our
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     fulfilling obligations under Article 11 of the WIPO Copyright
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     licenses grant only permissions under copyright and certain
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     limitation to copyright. More considerations for licensors:
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     permission under the Copyright and Similar Rights held by the
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     reasons, including because others have copyright or other
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	     specified in Section 2(b)(1)-(2) are not Copyright and Similar
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-extra	    copyright the Internet Systems Consortium, Inc., and licensed under the ISC
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/unix/qnx.c	  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/unix/qnx.c	  * The above copyright notice and this permission notice shall be included in
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-extra	  - tree.h (from FreeBSD), copyright Niels Provos. Two clause BSD license.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	  a. Adapted Material means material subject to Copyright and Similar
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	  a. This Public License applies for the term of the Copyright and
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	  b. Adapter's License means the license You apply to Your Copyright
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	  c. Copyright and Similar Rights means copyright and/or similar rights
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	  j. Sui Generis Database Rights means rights other than copyright
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv/tree.h	 * 1. Redistributions of source code must retain the above copyright
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv/tree.h	 * 2. Redistributions in binary form must reproduce the above copyright
+line	307	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv.h	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/inet.c	 * Copyright (c) 1996-1999 by Internet Software Consortium.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/inet.c	 * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv/tree.h	 * Copyright 2002 Niels Provos <provos@citi.umich.edu>
+line	307	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv.h	 * The above copyright notice and this permission notice shall be included in
+line	7	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/heap-inl.h	 * copyright notice and this permission notice appear in all copies.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/ax_pthread.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/ax_pthread.m4	#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/ax_pthread.m4	#   Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/sphinx-plugins/manpage.py	# Copyright (c) 2013 Dariusz Dwornikowski.  All rights reserved.
+line	3	libuv-v1.51.0.tar.gz:libuv-v1.51.0/Makefile.am	# Copyright (c) 2013, Ben Noordhuis <info@bnoordhuis.nl>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/conf.py	# If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
+line	3	libuv-v1.51.0.tar.gz:libuv-v1.51.0/Makefile.am	# copyright notice and this permission notice appear in all copies.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/conf.py	#html_show_copyright = True
+line	9	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/unix/getnameinfo.c	* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	9	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/unix/getnameinfo.c	* The above copyright notice and this permission notice shall be included in
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/ChangeLog	* build: fix utf-8 name of copyright holder (Jérémy Lal)
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/ChangeLog	* doc: update copyright years (Saúl Ibarra Corretgé)
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/ChangeLog	* test: add missing copyright header (cjihrig)
+line	2	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/heap-inl.h	/* Copyright (c) 2013, Ben Noordhuis <info@bnoordhuis.nl>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-loop-configure.c	/* Copyright (c) 2014, Ben Noordhuis <info@bnoordhuis.nl>
+line	5	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-pipe-connect-multiple.c	/* Copyright (c) 2015 Saúl Ibarra Corretgé <saghul@gmail.com>.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-pipe-set-non-blocking.c	/* Copyright (c) 2015, Ben Noordhuis <info@bnoordhuis.nl>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-poll-close-doesnt-corrupt-stack.c	/* Copyright Bert Belder, and other libuv contributors. All rights reserved.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-tcp-oob.c	/* Copyright Fedor Indutny. All rights reserved.
+line	214	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv.h	/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+line	5	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-idna.c	/* Copyright The libuv project and contributors. All rights reserved.
+line	19	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/idna.c	/* Copyright libuv contributors. All rights reserved.
+line	7	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-shutdown-simultaneous.c	/* Copyright libuv project and contributors. All rights reserved.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/test/test-udp-alloc-cb-fail.c	/* Copyright libuv project and other Node contributors. All rights reserved.
+line	62	libuv-v1.51.0.tar.gz:libuv-v1.51.0/include/uv/os390.h	/* Copyright libuv project contributors. All rights reserved.
+line	4	libuv-v1.51.0.tar.gz:libuv-v1.51.0/src/win/snprintf.c	/* Copyright the libuv project contributors. All rights reserved.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/tools/vswhere_usability_wrapper.cmd	:: Copyright 2017 - Refael Ackermann
+line	2	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE	Copyright (c) 2015-present libuv project contributors.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-extra	Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	Rights include other Copyright and Similar Rights.
+line	2	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE	The above copyright notice and this permission notice shall be included in
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/conf.py	copyright = u'2014-present, libuv contributors'
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/libuv-check-flags.m4	dnl As a special exception, the copyright owners of the
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/libuv-check-flags.m4	dnl Copyright (c) 2006-2008 Diego Pettenò <flameeyes gmail com>
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/libuv-check-flags.m4	dnl Copyright (c) 2006-2008 xine project
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/m4/libuv-check-flags.m4	dnl Copyright (c) 2021 libuv project
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/conf.py	epub_copyright = u'2014-present, libuv contributors'
+line	1	libuv-v1.51.0.tar.gz:libuv-v1.51.0/LICENSE-docs	original works of authorship and other material subject to copyright
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/architecture.png
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/Data/st0-311.jpg
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/Data/st1-475.jpg
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/Index.zip
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/Metadata/Properties.plist
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/preview-micro.jpg
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/preview-web.jpg
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/diagrams.key/preview.jpg
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/favicon.ico
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/logo.png
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/docs/src/static/loop_iteration.png
+binary-head	libuv-v1.51.0.tar.gz:libuv-v1.51.0/img/banner.png

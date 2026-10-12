@@ -1,0 +1,6 @@
+tree 38e95c7b43a3b9e9af792e62b1bdbef5214c669d
+parent 7db1e8881cc9cfd69311474276b22d95ed8365fb
+author Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1706415870 +0000
+committer J0WI <1715-J0WI@users.gitlab.alpinelinux.org> 1706477859 +0000
+
+main/libidn2: upgrade to 2.3.7

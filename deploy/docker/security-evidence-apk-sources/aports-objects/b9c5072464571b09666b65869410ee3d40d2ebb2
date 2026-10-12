@@ -1,0 +1,6 @@
+tree add7ed8fc33b4a7b5f2412c13fab611d1c11fa45
+parent a0a45ce74780c885391060813b5547818afe9285
+author Laurent Bercot <ska-devel@skarnet.org> 1746455101 +0200
+committer Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1746593427 +0000
+
+main/skalibs: fix APKBUILD style

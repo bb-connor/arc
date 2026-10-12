@@ -100,13 +100,14 @@ struct Fixture {
 }
 
 fn fixture(output_bytes: usize, dispatch_gate: Option<DispatchGate>) -> Fixture {
-    fixture_with_crash(output_bytes, dispatch_gate, None)
+    fixture_with_crash(output_bytes, dispatch_gate, None, None)
 }
 
 fn fixture_with_crash(
     output_bytes: usize,
     dispatch_gate: Option<DispatchGate>,
     notification_crash_gate: Option<DispatchGate>,
+    request_response_timeout_millis: Option<u64>,
 ) -> Fixture {
     let directory = tempfile::tempdir().unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
@@ -133,6 +134,11 @@ capabilities:
     )
     .unwrap();
     config.test_session_line_bytes = Some(SESSION_LINE_BYTES);
+    if let Some(millis) = request_response_timeout_millis {
+        let mut policy = config.lifecycle_policy();
+        policy.request_response_timeout_millis = millis;
+        config.test_lifecycle_policy = Some(policy);
+    }
     config.test_transport = Some(Arc::new(ReadTransport {
         calls: calls.clone(),
         output_bytes,
@@ -504,6 +510,16 @@ async fn controlled_session(
     session_id: &str,
     event_capacity: usize,
 ) -> (Arc<RemoteSession>, McpInboxReceiver) {
+    let lifecycle_policy = fixture.state.factory.config.lifecycle_policy();
+    controlled_session_with_policy(fixture, session_id, event_capacity, lifecycle_policy).await
+}
+
+async fn controlled_session_with_policy(
+    fixture: &Fixture,
+    session_id: &str,
+    event_capacity: usize,
+    lifecycle_policy: SessionLifecyclePolicy,
+) -> (Arc<RemoteSession>, McpInboxReceiver) {
     let clock = fixture.state.factory.config.clock.clone();
     let (input_tx, input_rx) = mcp_inbox();
     let (event_tx, _) = broadcast::channel(event_capacity);
@@ -524,7 +540,7 @@ async fn controlled_session(
             policy_fingerprint: "policy".into(),
             runtime_contract_fingerprint: "runtime".into(),
             hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
-            lifecycle_policy: fixture.state.factory.config.lifecycle_policy(),
+            lifecycle_policy,
             protocol_version: None,
             peer_capabilities: None,
             initialize_params: None,
@@ -596,9 +612,59 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
 }
 
 #[tokio::test]
+async fn unanswered_request_ends_at_its_deadline_and_releases_waiting_posts() {
+    let fixture = fixture(0, None);
+    let mut policy = fixture.state.factory.config.lifecycle_policy();
+    policy.request_response_timeout_millis = 200;
+    let (session, input_rx) =
+        controlled_session_with_policy(&fixture, "unanswered-session", 8, policy).await;
+    let first = post(
+        &fixture,
+        Some(&session.session_id),
+        &json!({"jsonrpc":"2.0","id":7,"method":"ping","params":{}}),
+    )
+    .await;
+    assert_eq!(first.status(), StatusCode::OK);
+    assert_eq!(input_rx.try_recv().unwrap().unwrap().value()["id"], 7);
+    let request = post_request(
+        Some(&session.session_id),
+        &json!({"jsonrpc":"2.0","id":8,"method":"ping","params":{}}),
+    );
+    let mut waiting = Box::pin(handle_post(State(fixture.state.clone()), request));
+    std::future::poll_fn(|cx| {
+        assert!(waiting.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    let bytes = tokio::time::timeout(WAIT, axum::body::to_bytes(first.into_body(), 64 * 1024))
+        .await
+        .expect("an unanswered request held its POST stream past its deadline")
+        .unwrap();
+    let outcome = sse_messages(&bytes)
+        .into_iter()
+        .find(|message| message["id"] == 7)
+        .expect("the timed-out request received no terminal message");
+    assert_eq!(outcome["error"]["code"], -32603);
+    assert!(outcome["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("effect is uncertain"));
+    assert!(outcome.get("result").is_none());
+    let waiting = tokio::time::timeout(WAIT, waiting)
+        .await
+        .expect("an unanswered request blocked a later POST past its deadline");
+    assert_eq!(waiting.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert!(input_rx.try_recv().unwrap().is_none());
+    assert!(matches!(
+        fixture.state.sessions.lookup(&session.session_id).await,
+        Some(RemoteSessionEntry::Terminal(_))
+    ));
+}
+
+#[tokio::test]
 async fn initialize_wait_closes_when_actual_worker_panics_before_reply() {
     let gate = Arc::new((StdMutex::new(false), Condvar::new()));
-    let fixture = fixture_with_crash(0, None, Some(gate.clone()));
+    let fixture = fixture_with_crash(0, None, Some(gate.clone()), None);
     let request = post_request(
         None,
         &json!({"jsonrpc":"2.0","id":1,
@@ -629,6 +695,26 @@ async fn initialize_wait_closes_when_actual_worker_panics_before_reply() {
     assert!(!std::str::from_utf8(&bytes).unwrap().contains("\"result\""));
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     assert!(fixture.state.sessions.snapshot().await.0.is_empty());
+}
+
+#[tokio::test]
+async fn initialize_without_reply_ends_at_its_deadline() {
+    let gate = Arc::new((StdMutex::new(false), Condvar::new()));
+    let fixture = fixture_with_crash(0, None, Some(gate.clone()), Some(200));
+    let request = post_request(
+        None,
+        &json!({"jsonrpc":"2.0","id":1,
+        "method":"initialize","params":{"protocolVersion":"2025-11-25",
+            "capabilities":{},"clientInfo":{"name":"silent-upstream","version":"1"}}}),
+    );
+    let response =
+        tokio::time::timeout(WAIT / 2, handle_post(State(fixture.state.clone()), request))
+            .await
+            .expect("an unanswered initialize outlived its response deadline");
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert!(fixture.state.sessions.snapshot().await.0.is_empty());
+    *gate.0.lock().unwrap() = true;
+    gate.1.notify_all();
 }
 
 /// Writes one worker output line through the production session writer, which

@@ -1,0 +1,12 @@
+tree a2293e76c5b8e79334d83563c6691825da79c577
+parent f354b5c6faf919882ddc0953664531e5677a66d4
+author Clayton Craft <clayton@craftyguy.net> 1744650857 -0700
+committer Natanael Copa <ncopa@alpinelinux.org> 1744817945 +0000
+
+main/coreutils: install link into /bin
+
+Busybox's symlink is in /bin/link, so link should be added to the list
+of symlinks to keep in /bin so that it properly overwrites busybox's
+symlink.
+
+This issue was found when testing usr merge downstream in pmOS.

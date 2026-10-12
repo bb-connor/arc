@@ -1,0 +1,24 @@
+tree 474586efdc64960bf5d7e36bb730b30950518f7e
+parent e95748873fa2f7e0e54cf27557fe0deff27b6c80
+author Natanael Copa <ncopa@alpinelinux.org> 1790748438 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1790753340 +0000
+
+main/openssl: security upgrade to 3.5.9
+
+https://github.com/openssl/openssl/releases/tag/openssl-3.5.9
+
+- CVE-2026-35189
+- CVE-2026-35191
+- CVE-2026-42772
+- CVE-2026-54872
+- CVE-2026-54873
+- CVE-2026-54875
+- CVE-2026-72897
+- CVE-2026-75804
+- CVE-2026-75805
+- CVE-2026-75806
+- CVE-2026-77696
+- CVE-2026-84782
+- CVE-2026-84784
+
+(cherry picked from commit 5ebc3527f96ca84caf382abd7f37d4009110e57d)

@@ -1,0 +1,14 @@
+tree 8de3e52b8fd13db986f9b5ecee4e6a1f43110262
+parent 33de1eff6af2ec993bda0c95a896425910556479
+author Daniel Néri <dne+alpine@mayonnaise.net> 1763454583 +0100
+committer Daniel Néri <dne+alpine@mayonnaise.net> 1763456099 +0100
+gpgsig -----BEGIN SSH SIGNATURE-----
+ U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgOMu493YNSMtf7QPDIUHZAI1P/a
+ r3aZ7jboW/n0thKz4AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5
+ AAAAQIQBzY9FaxDRVFnrytulDQ4ZCEJ56qK60P9rnKKlln/+mh48lmL01sCeDHeIFQ3rR4
+ enYK5D/2tznGEs8C/AfgI=
+ -----END SSH SIGNATURE-----
+
+main/libarchive: security upgrade to 3.8.3
+
+https://github.com/libarchive/libarchive/releases/tag/v3.8.3

@@ -11,6 +11,11 @@ use crate::kernel::settlement_observer::SettlementObserverStatus;
 const INVALID_HOOK_SKIP_DETAIL: &str =
     "settlement hook returned skipped for a positive economic observation";
 
+const INVALID_TRANSCRIPT_ID_DETAIL: &str =
+    "settlement hook returned an invalid transcript identifier";
+
+const MAX_TRANSCRIPT_ID_BYTES: usize = 512;
+
 const INLINE_SETTLEMENT_WORKER_ID: &str = "kernel-inline-observer";
 const INLINE_SETTLEMENT_LEASE_MS: u64 = 30_000;
 
@@ -148,6 +153,12 @@ fn normalize_failure(
     }
 }
 
+fn is_valid_transcript_id(transcript_id: &str) -> bool {
+    !transcript_id.trim().is_empty()
+        && transcript_id.len() <= MAX_TRANSCRIPT_ID_BYTES
+        && !transcript_id.chars().any(char::is_control)
+}
+
 fn normalize_status(status: &SettlementObserverStatus) -> Option<SettlementRoutingInput> {
     match status {
         SettlementObserverStatus::NotRegistered => None,
@@ -163,6 +174,16 @@ fn normalize_status(status: &SettlementObserverStatus) -> Option<SettlementRouti
             })
         }
         SettlementObserverStatus::Observed { outcome } => Some(match outcome {
+            SettlementOutcome::Accepted { transcript_id, .. }
+                if !is_valid_transcript_id(transcript_id) =>
+            {
+                SettlementRoutingInput::Permanent {
+                    reason: chio_settle::SettlementFailureReason::from_detail(
+                        chio_settle::SettlementFailureCode::InvalidObservation,
+                        INVALID_TRANSCRIPT_ID_DETAIL,
+                    ),
+                }
+            }
             SettlementOutcome::Accepted { .. } => SettlementRoutingInput::Accepted,
             SettlementOutcome::Skipped { .. } => SettlementRoutingInput::Permanent {
                 reason: chio_settle::SettlementFailureReason::from_detail(
@@ -658,6 +679,36 @@ mod tests {
             Some(SettlementRoutingInput::Permanent { reason })
                 if reason.code() == SettlementFailureCode::InvalidObservation
         ));
+    }
+
+    #[test]
+    fn normalizer_rejects_an_accepted_outcome_with_an_invalid_transcript_id() {
+        for transcript_id in [
+            String::new(),
+            " \n".to_string(),
+            "x".repeat(MAX_TRANSCRIPT_ID_BYTES + 1),
+            "transcript\u{7}".to_string(),
+        ] {
+            let status = SettlementObserverStatus::Observed {
+                outcome: SettlementOutcome::accepted(transcript_id.clone()),
+            };
+            assert!(
+                matches!(
+                    normalize_status(&status),
+                    Some(SettlementRoutingInput::Permanent { reason })
+                        if reason.code() == SettlementFailureCode::InvalidObservation
+                ),
+                "transcript id {transcript_id:?} must dead-letter"
+            );
+        }
+
+        let bounded = SettlementObserverStatus::Observed {
+            outcome: SettlementOutcome::accepted("x".repeat(MAX_TRANSCRIPT_ID_BYTES)),
+        };
+        assert_eq!(
+            normalize_status(&bounded),
+            Some(SettlementRoutingInput::Accepted)
+        );
     }
 
     #[test]

@@ -1,0 +1,9 @@
+tree 80748da6416fe336f99f0347f878bb914e9021ac
+parent e3356745807c5f5c6ea51d528dc8b2d5c1fa54bd
+author Natanael Copa <ncopa@alpinelinux.org> 1791317162 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1791319033 +0000
+
+main/zlib: backport fix for CVE-2026-85091
+
+ref: https://github.com/madler/zlib/commit/df84af25dc1942490e1d1c899a07619152a46148
+(cherry picked from commit ed7d11b8c5de5f1744b2cf762c160c2385f28212)

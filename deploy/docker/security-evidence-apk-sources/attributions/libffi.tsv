@@ -1,0 +1,300 @@
+# chio.attribution-lines.v8 origin=libffi files=451 files_with_lines=182 binary_heads=1 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/hpux32.S	\t                (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/darwin.S	\t      Copyright (c) 2004, 2010 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/linux.S	\t     (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/unix64.S	\t    - Copyright (c) 2002  Bo Thorsen <bo@suse.de>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/unix64.S	\t    - Copyright (c) 2008  Red Hat, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m68k/sysv.S	\t    Copyright (c) 1998, 2012 Andreas Schwab
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/sysv.S	\t    Copyright (c) 2005 Axis Communications AB
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m68k/sysv.S	\t    Copyright (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/sysv.S	\t    Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m68k/sysv.S	\t    Copyright (c) 2012, 2016 Thorsten Glaser
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/ffi.c	\t   (c) 2006 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/ffi.c	\t   Copyright (C) 2007 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/frv/ffi.c	\t   Copyright (C) 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	\t   Copyright (c) 1998 Geoffrey Keating
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffi.c	\t   Copyright (c) 1998, 2001, 2007, 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/ffi.c	\t   Copyright (c) 2000 Hewlett Packard Company
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/ffi.c	\t   Copyright (c) 2005 Axis Communications AB
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/ffi.c	\t   Copyright (c) 2011 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffi.c	\t   Copyright (c) 2011 Free Software Foundation
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sparc/v8.S	\t  Copyright (c) 1996, 1997, 2003, 2004, 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\t* LICENSE: Update copyright date.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\t* LICENSE: Update copyright notice.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\t* testsuite/lib/libffi-dg.exp: Change copyright header to refer to
+line	5	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\tAdjust copyright notice.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\tUpdate copyright.
+line	3	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\tUpdated copyright info.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\tcopyright years.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog.old	\tthe 64-bit return value.  Update copyright years.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/msvc_build/aarch64/aarch64_include/ffi.h	                    - Copyright (c) 1996-2003, 2007, 2008 Red Hat, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	                   Copyright (C) 2007, 2008 Free Software Foundation, Inc
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	                   Copyright (C) 2008 Red Hat, Inc
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	                   Copyright (C) 2011 Anthony Green
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	                   Copyright (C) 2011 Kyle Moffett
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	                   Copyright (c) 1998 Geoffrey Keating
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi_common.h	                  Copyright (C) 2007  Free Software Foundation, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi_common.h	                  Copyright (c) 1996  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffitarget.h	                 Copyright (C) 2007, 2008, 2010 Free Software Foundation, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffitarget.h	                 Copyright (C) 2008  Free Software Foundation, Inc.
+line	13	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffitarget.h	                 Copyright (c) 1996-2003  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffitarget.h	                 Copyright (c) 1996-2003, 2010  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/frv/ffitarget.h	                 Copyright (c) 1996-2004  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m32r/ffitarget.h	                 Copyright (c) 2004  Renesas Technology.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/avr32/ffitarget.h	                 Copyright (c) 2009  Bradley Smith <brad@brad-smith.co.uk>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffitarget.h	                 Copyright (c) 2010  CodeSourcery
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arc/ffitarget.h	                 Copyright (c) 2013  Synopsys, Inc. (www.synopsys.com)
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	                Copyright (C) 2007, 2008 Free Software Foundation, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/closures.c	                Copyright (C) 2007, 2009, 2010 Free Software Foundation, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	                Copyright (C) 2008 Red Hat, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	                Copyright (C) 2011 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	                Copyright (C) 2011 Kyle Moffett
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/prep_cif.c	                Copyright (c) 1996, 1998, 2007  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	                Copyright (c) 1998 Geoffrey Keating
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/closures.c	                Copyright (c) 2007, 2009, 2010 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/closures.c	                Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/prep_cif.c	                Copyright (c) 2022 Oracle and/or its affiliates.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffiw64.c	              Copyright (c) 2014 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi64.c	             Copyright (c) 2002, 2007  Bo Thorsen <bo@suse.de>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi64.c	             Copyright (c) 2008, 2010  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi64.c	             Copyright (c) 2013  The Written Word, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/tramp.c	             Copyright (c) 2022 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	            * LICENSE: Update copyright date.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	            * LICENSE: Update copyright notice.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/unix.S	            Copyright (c) 2000 Hewlett Packard Company
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/s390/sysv.S	            Copyright (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/ffi.c	           (c) 2003-2004 Randolph Chung <tausq@debian.org>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/ffi.c	           (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	           Copyright (C) 2007, 2008 Free Software Foundation, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	           Copyright (C) 2008 Red Hat, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	           Copyright (C) 2008, 2010  Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	           Copyright (C) 2011 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	           Copyright (C) 2011 Kyle Moffett
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	           Copyright (c) 1996, 1998, 1999, 2001, 2007, 2008  Red Hat, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sparc/ffi.c	           Copyright (c) 1996, 2003-2004, 2007-2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/mips/ffi.c	           Copyright (c) 1996, 2007, 2008, 2011  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffi.c	           Copyright (c) 1998, 2008, 2011  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	           Copyright (c) 2002  Bo Thorsen
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	           Copyright (c) 2002  Ranjit Mathew
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	           Copyright (c) 2002  Roger Sayle
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/ffi.c	           Copyright (c) 2004 Simon Posnjak
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/mips/ffi.c	           Copyright (c) 2008  David Daney
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m32r/ffi.c	           Copyright (c) 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh64/ffi.c	           Copyright (c) 2008 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/s390/ffi.c	           Copyright (c) 2008 Red Hat, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh/ffi.c	           Copyright (c) 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/avr32/ffi.c	           Copyright (c) 2009  Bradley Smith <brad@brad-smith.co.uk>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffi.c	           Copyright (c) 2011 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffi.c	           Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m32r/ffi.c	           Copyright (c) 2022  Anthony Green
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/sysv.S	          - Copyright (c) 1996,1998,2001-2003,2005,2008,2010  Red Hat, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/sysv.S	          - Copyright (c) 2013  The Written Word, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	        /^Copyright /!{
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/sysv_msvc_arm32.S	        Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/sysv_msvc_arm32.S	        Copyright (c) 2019 Microsoft Corporation.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi.h.in	     - Copyright (c) 1996-2003, 2007, 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi.h.in	     - Copyright (c) 2011, 2014, 2019, 2021, 2022, 2024 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    * Improvements to comments, add static asserts, and update copyright
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Add ChangeLog entry.  Fix copyright headers.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Add missing copyright/license header.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	    Copyright (C) <year>  <name of author>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	    Gnomovision version 69, Copyright (C) year name of author
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Update copyright date and clean up README notes.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Update copyright year
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Update copyright year.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    Update version, copyright and testsuite info.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	    announcement including an appropriate copyright notice and a
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    copyright updates patch
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ChangeLog	    update copyright year in libffi.texi
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_darwin.c	   Copyright (C) 1998 Geoffrey Keating
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_darwin.c	   Copyright (C) 2001 John Hornkvist
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_darwin.c	   Copyright (C) 2002, 2006, 2007, 2009, 2010 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/alignof.h	   Copyright (C) 2003-2004, 2006, 2009-2017 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/frv/ffi.c	   Copyright (C) 2007  Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/sysv.S	   Copyright (C) 2007 Free Software Foundation, Inc
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/libffi.info	   Copyright © 2008-2024 Anthony Green and Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/avr32/sysv.S	   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	92	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffitarget.h	   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	7	libffi-3.4.8.tar.gz:libffi-3.4.8/msvc_build/aarch64/aarch64_include/ffi.h	   The above copyright notice and this permission notice shall be
+line	112	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffitarget.h	   The above copyright notice and this permission notice shall be included
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/aix.S	   aix.S - Copyright (c) 2002, 2009 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/aix_closure.S	   aix_closure.S - Copyright (c) 2002, 2003, 2009 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arc/arcompact.S	   arcompact.S - Copyright (c) 2013 Synposys, Inc. (www.synopsys.com)
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/asm.h	   asm.h - Copyright (c) 1998 Geoffrey Keating
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/closures.c	   closures.c - Copyright (c) 2019, 2022 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/darwin.S	   darwin.S - Copyright (c) 2000 John Hornkvist
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/darwin_closure.S	   darwin_closure.S - Copyright (c) 2002, 2003, 2004, 2010,\x20
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/debug.c	   debug.c - Copyright (c) 1996 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/frv/eabi.S	   eabi.S - Copyright (c) 2004  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/moxie/eabi.S	   eabi.S - Copyright (c) 2012, 2013  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/ffi.c	   ffi.c - (c) 2011 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/frv/ffi.c	   ffi.c - Copyright (C) 2004  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/moxie/ffi.c	   ffi.c - Copyright (C) 2012, 2013, 2018, 2021, 2022  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi.c	   ffi.c - Copyright (C) 2013 IBM
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/ffi.c	   ffi.c - Copyright (c) 1998 Cygnus Solutions
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/ffi.c	   ffi.c - Copyright (c) 1998, 2007, 2008, 2012 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/s390/ffi.c	   ffi.c - Copyright (c) 2000, 2007 Software AG
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh/ffi.c	   ffi.c - Copyright (c) 2002-2008, 2012 Kaz Kojima
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh64/ffi.c	   ffi.c - Copyright (c) 2003, 2004, 2006, 2007, 2012 Kaz Kojima
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m32r/ffi.c	   ffi.c - Copyright (c) 2004  Renesas Technology
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/avr32/ffi.c	   ffi.c - Copyright (c) 2011  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/ffi.c	   ffi.c - Copyright (c) 2011 Timothy Wall
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sparc/ffi.c	   ffi.c - Copyright (c) 2011, 2013 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/bfin/ffi.c	   ffi.c - Copyright (c) 2012  Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com>,
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffi.c	   ffi.c - Copyright (c) 2012  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/tile/ffi.c	   ffi.c - Copyright (c) 2012 Tilera Corp.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/microblaze/ffi.c	   ffi.c - Copyright (c) 2012, 2013 Xilinx, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arc/ffi.c	   ffi.c - Copyright (c) 2013  Synopsys, Inc. (www.synopsys.com)
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/xtensa/ffi.c	   ffi.c - Copyright (c) 2013 Tensilica, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/or1k/ffi.c	   ffi.c - Copyright (c) 2014 Sebastian Macke <sebastian@macke.de>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/riscv/ffi.c	   ffi.c - Copyright (c) 2015 Michael Knyszek <mknyszek@berkeley.edu>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi.c	   ffi.c - Copyright (c) 2017, 2022  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/wasm32/ffi.c	   ffi.c - Copyright (c) 2018-2023  Hood Chatham, Brion Vibber, Kleis Auke Wolthuizen, and others.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/loongarch64/ffi.c	   ffi.c - Copyright (c) 2022 Xu Chenghua <xuchenghua@loongson.cn>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffi64.c	   ffi64.c - Copyright (c) 2011, 2018, 2022  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi_cfi.h	   ffi_cfi.h - Copyright (c) 2014  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/ffi_common.h	   ffi_common.h - Copyright (C) 2011, 2012, 2013  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_linux64.c	   ffi_linux64.c - Copyright (C) 2013 IBM
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_powerpc.h	   ffi_powerpc.h - Copyright (C) 2013 IBM
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/ffi_sysv.c	   ffi_sysv.c - Copyright (C) 2013 IBM
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/include/tramp.h	   ffi_tramp.h - Copyright (C) 2021  Microsoft, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/bfin/ffitarget.h	   ffitarget.h - Copyright (c) 2012  Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com>
+line	16	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/ffitarget.h	   ffitarget.h - Copyright (c) 2012  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh/ffitarget.h	   ffitarget.h - Copyright (c) 2012 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/tile/ffitarget.h	   ffitarget.h - Copyright (c) 2012 Tilera Corp.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/moxie/ffitarget.h	   ffitarget.h - Copyright (c) 2012, 2013  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/microblaze/ffitarget.h	   ffitarget.h - Copyright (c) 2012, 2013 Xilinx, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffitarget.h	   ffitarget.h - Copyright (c) 2012, 2014, 2018  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/metag/ffitarget.h	   ffitarget.h - Copyright (c) 2013 Imagination Technologies Ltd.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/xtensa/ffitarget.h	   ffitarget.h - Copyright (c) 2013 Tensilica, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/or1k/ffitarget.h	   ffitarget.h - Copyright (c) 2014 Sebastian Macke <sebastian@macke.de>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/wasm32/ffitarget.h	   ffitarget.h - Copyright (c) 2018-2023  Hood Chatham, Brion Vibber, Kleis Auke Wolthuizen, and others.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/kvx/ffitarget.h	   ffitarget.h - Copyright (c) 2020 Kalray
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/loongarch64/ffitarget.h	   ffitarget.h - Copyright (c) 2022 Xu Chenghua <xuchenghua@loongson.cn>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/ffiw64.c	   ffiw64.c - Copyright (c) 2018 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/hpux32.S	   hpux32.S - Copyright (c) 2006 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/hpux64.S	   hpux64.S - (c) 2005-2022 John David Anglin <dave.anglin@bell.net>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/ia64_flags.h	   ia64_flags.h - Copyright (c) 2000 Hewlett Packard Company
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/java_raw_api.c	   java_raw_api.c - Copyright (c) 1999, 2007, 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/msvc_build/aarch64/aarch64_include/ffi.h	   libffi 3.3-rc0 - Copyright (c) 2011, 2014 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/pa/linux.S	   linux.S - (c) 2003-2004 Randolph Chung <tausq@debian.org>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/mips/n32.S	   n32.S - Copyright (c) 1996, 1998, 2005, 2007, 2009, 2010  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/mips/o32.S	   o32.S - Copyright (c) 1996, 1998, 2005  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/alpha/osf.S	   osf.S - Copyright (c) 1998, 2001, 2007, 2008, 2011, 2014 Red Hat
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/prep_cif.c	   prep_cif.c - Copyright (c) 2011, 2012, 2021, 2025  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/raw_api.c	   raw_api.c - Copyright (c) 1999, 2008  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/sysv.S	   sysv.S - Copyright (c) 1998 Geoffrey Keating
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/arm/sysv.S	   sysv.S - Copyright (c) 1998, 2008, 2011 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/s390/sysv.S	   sysv.S - Copyright (c) 2000 Software AG
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh/sysv.S	   sysv.S - Copyright (c) 2002, 2003, 2004, 2006, 2008 Kaz Kojima
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sh64/sysv.S	   sysv.S - Copyright (c) 2003, 2004, 2006, 2008 Kaz Kojima
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m32r/sysv.S	   sysv.S - Copyright (c) 2004 Renesas Technology
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/cris/sysv.S	   sysv.S - Copyright (c) 2004 Simon Posnjak
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/avr32/sysv.S	   sysv.S - Copyright (c) 2009  Bradley Smith <brad@brad-smith.co.uk>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/bfin/sysv.S	   sysv.S - Copyright (c) 2012  Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com>,
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m68k/sysv.S	   sysv.S - Copyright (c) 2012 Alan Hourihane
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/microblaze/sysv.S	   sysv.S - Copyright (c) 2012, 2013 Xilinx, Inc
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/metag/sysv.S	   sysv.S - Copyright (c) 2013 Imagination Technologies Ltd.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/xtensa/sysv.S	   sysv.S - Copyright (c) 2013 Tensilica, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/or1k/sysv.S	   sysv.S - Copyright (c) 2014 Sebastian Macke <sebastian@macke.de>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/sysv.S	   sysv.S - Copyright (c) 2017  Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/sysv_intel.S	   sysv.S - Copyright (c) 2017, 2022  Anthony Green
+line	3	libffi-3.4.8.tar.gz:libffi-3.4.8/src/powerpc/linux64.S	   sysv.h - Copyright (c) 2003 Jakub Jelinek <jakub@redhat.com>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/tile/tile.S	   tile.S - Copyright (c) 2011 Tilera Corp.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/tramp.c	   tramp.c - Copyright (c) 2020 Madhavan T. Venkataraman
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/types.c	   types.c - Copyright (c) 1996, 1998, 2024  Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/ia64/unix.S	   unix.S - Copyright (c) 1998, 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/x86/unix64.S	   unix64.S - Copyright (c) 2013  The Written Word, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sparc/v8.S	   v8.S - Copyright (c) 2013  The Written Word, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/sparc/v9.S	   v9.S - Copyright (c) 2000, 2003, 2004, 2008 Red Hat, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/test-call.c	  Copyright 1993 Bill Triggs <Bill.Triggs@inrialpes.fr>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/test-call.c	  Copyright 1995-2017 Bruno Haible <bruno@clisp.org>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/metag/ffi.c	  The above copyright notice and this permission notice shall be included
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	  We protect your rights with two steps: (1) copyright the software, and
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright{}}%
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	  \\definedummyword\\copyright
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	  \\do\\copyright{copyright}%
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	  \\gdefchar^^a9{\\copyright{}}
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/metag/ffi.c	  ffi.c - Copyright (c) 2013 Imagination Technologies
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/src/loongarch64/sysv.S	  sysv.S  - Copyright (c) 2022 Xu Chenghua <xuchenghua@loongson.cn>
+line	6	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m88k/ffitarget.h	 * Copyright (c) 2013 Miodrag Vallat.  <miod@openbsd.org>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/test-callback.c	 * Copyright 1993 Bill Triggs <Bill.Triggs@inrialpes.fr>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/test-callback.c	 * Copyright 1995-2017 Bruno Haible <bruno@clisp.org>
+line	6	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m88k/ffitarget.h	 * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	6	libffi-3.4.8.tar.gz:libffi-3.4.8/src/m88k/ffitarget.h	 * The above copyright notice and this permission notice shall be included
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	#      /^# Copyright /
+line	6	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cc_maxopt.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	#   Copyright (C) 1999-2008, 2011-2019, 2021-2022 Free Software
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/lib/libffi.exp	#   Copyright (C) 2003, 2005, 2008, 2009, 2010, 2011, 2014, 2019, 2022 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/lib/wrapper.exp	#   Copyright (C) 2004, 2007 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cflags_warn_all.m4	#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cc_maxopt.m4	#   Copyright (c) 2008 Matteo Frigo
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cc_maxopt.m4	#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_enable_builddir.m4	#   Copyright (c) 2009 Alan Jenkins <alan-jenkins@tuffmail.co.uk>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_enable_builddir.m4	#   Copyright (c) 2009 Guido U. Draheim <guidod@gmx.de>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cflags_warn_all.m4	#   Copyright (c) 2010 Rhys Ulerich <rhys.ulerich@gmail.com>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_check_compile_flag.m4	#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_require_defined.m4	#   Copyright (c) 2014 Mike Frysinger <vapier@gentoo.org>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_gcc_archflag.m4	#   Copyright (c) 2014 Tsukasa Oi
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_gcc_x86_cpuid.m4	#   Copyright (c) 2015 Michael Petch <mpetch@capp-sysware.com>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_gcc_archflag.m4	#   Copyright (c) 2017-2018 Alexey Kopytov
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_cflags_warn_all.m4	#   Copyright (c) 2018 John Zaitseff <J.Zaitseff@zap.org.au>
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_compiler_vendor.m4	#   Copyright (c) 2018-19 John Zaitseff <J.Zaitseff@zap.org.au>
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/config.guess	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ax_check_compile_flag.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/install-sh	# Copyright (C) 1994 X Consortium
+line	5	libffi-3.4.8.tar.gz:libffi-3.4.8/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/mdate-sh	# Copyright (C) 1995-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	5	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	7	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	3	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.call/call.exp	# Copyright (C) 2003, 2006, 2009, 2010, 2014 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.bhaible/bhaible.exp	# Copyright (C) 2003, 2006, 2009, 2010, 2014, 2018 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.closures/closure.exp	# Copyright (C) 2003, 2006, 2009, 2010, 2014, 2019 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/lib/target-libpath.exp	# Copyright (C) 2004, 2005, 2007 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/libtool-ldflags	# Copyright (C) 2005 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/libtool.m4	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/testsuite/libffi.closures/closure.exp	# Copyright (C) 2019 Anthony Green
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/msvcc.sh	# Portions created by the Initial Developer are Copyright (C) 2009
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/install-sh	# following copyright and license.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/texinfo.tex	% Copyright 1985, 1986, 1988, 1990-2021 Free Software Foundation, Inc.
+line	4	libffi-3.4.8.tar.gz:libffi-3.4.8/src/aarch64/ffitarget.h	/* Copyright (c) 2009, 2010, 2011, 2012 ARM Ltd.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/src/kvx/ffi.c	/* Copyright (c) 2020 Kalray
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	2	libffi-3.4.8.tar.gz:libffi-3.4.8/config.guess	Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/libffi.texi	Copyright @copyright{} 2008--2024 Anthony Green and Red Hat, Inc.
+line	11	libffi-3.4.8.tar.gz:libffi-3.4.8/src/aarch64/ffitarget.h	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	9	libffi-3.4.8.tar.gz:libffi-3.4.8/src/aarch64/ffitarget.h	The above copyright notice and this permission notice shall be
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	a notice placed by the copyright holder saying it may be distributed
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	certain countries either by patents or by copyrighted interfaces, the
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	copyright notice and disclaimer of warranty; keep intact all the
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE	libffi - Copyright (c) 1996-2024  Anthony Green, Red Hat, Inc and others.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	means either the Program or any derivative work under copyright law:
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	original copyright holder who places the Program under this License
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	the "copyright" line and a pointer to where the full notice is found.
+line	1	libffi-3.4.8.tar.gz:libffi-3.4.8/LICENSE-BUILDTOOLS	to ask for permission.  For software which is copyrighted by the Free
+binary-head	libffi-3.4.8.tar.gz:libffi-3.4.8/doc/libffi.pdf

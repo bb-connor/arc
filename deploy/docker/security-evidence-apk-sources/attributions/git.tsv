@@ -1,0 +1,489 @@
+# chio.attribution-lines.v8 origin=git files=4640 files_with_lines=668 binary_heads=20 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/about.tcl	\t\t-text "[mc "git-gui - a graphical user interface for Git."]\\n$copyright"
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/perf/README	\t# Copyright (c) 2005 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/macosx/Info.plist	\t<string>Git Gui @@GITGUI_VERSION@@ © 2006-2007 Shawn Pearce, et. al.</string>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/about.tcl	\tglobal appvers copyright oguilib
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	          that You distribute, all copyright, patent, trademark, and
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-p4.py	       Copyright 1995-2011 Perforce Software.  All rights reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      "Licensor" shall mean the copyright owner or entity authorized by
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      You may add Your own copyright statement to Your modifications and
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      copyright license to reproduce, prepare Derivative Works of,
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      copyright notice that is included in or attached to the work
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      designated in writing by the copyright owner as "Not a Contribution."
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      same "printed page" as the copyright notice for easier
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      submitted to Licensor for inclusion in the Work by the copyright owner
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      the copyright owner that is granting the License.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	      the copyright owner. For the purposes of this definition, "submitted"
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/README	    # Copyright (C) 2007 Shawn Pearce
+line	3	git-2.49.1.tar.xz:git-2.49.1/COPYING	    Copyright (C) <year>  <name of author>
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	    Gnomovision version 69, Copyright (C) year name of author
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	    announcement including an appropriate copyright notice and a
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/malloc.c.h	   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/malloc.c.h	   * Copyright (c) 2006 KJK::Hyperion <hackbunny@reactos.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/malloc.c.h	   * The above copyright notice and this permission notice shall be included in
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	   2. Grant of Copyright License. Subject to the terms and conditions of
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regex.h	   Copyright (C) 1985,1989-93,1995-98,2000,2001,2002,2003,2005,2006,2008
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/obstack.c	   Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997, 1998,
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/obstack.h	   Copyright (C) 1988-1994,1996-1999,2003,2004,2005,2009
+line	1	git-2.49.1.tar.xz:git-2.49.1/kwset.h	   Copyright (C) 1989, 1998, 2005 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/sh-i18n--envsubst.c	   Copyright (C) 1998-2007 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regex.c	   Copyright (C) 2002, 2003, 2005 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regex_internal.h	   Copyright (C) 2002-2005, 2007, 2008, 2010 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regexec.c	   Copyright (C) 2002-2005, 2007, 2009, 2010 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regex_internal.c	   Copyright (C) 2002-2006, 2010 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/regex/regcomp.c	   Copyright (C) 2002-2007,2009,2010 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/sh-i18n--envsubst.c	   Copyright (C) 2003-2007 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/khash.h	   Copyright (c) 2008, 2009, 2011 by Attractive Chaos <attractor@live.co.uk>
+line	1	git-2.49.1.tar.xz:git-2.49.1/kwset.c	   Copyright 1989, 1998, 2000, 2005 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/poll/poll.h	   Copyright 2001, 2002, 2003, 2007, 2009, 2010 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/poll/poll.c	   Copyright 2001-2003, 2006-2011 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/LICENSE	   Copyright [yyyy] [name of copyright owner]
+line	1	git-2.49.1.tar.xz:git-2.49.1/khash.h	   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+line	1	git-2.49.1.tar.xz:git-2.49.1/khash.h	   The above copyright notice and this permission notice shall be
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4100/t-apply-7.patch	  * Copyright (C) Linus Torvalds, 2005
+line	2	git-2.49.1.tar.xz:git-2.49.1/reftable/reftable-reader.h	  Copyright 2020 Google LLC
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	  We protect your rights with a two-step method: (1) we copyright the
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	  We protect your rights with two steps: (1) copyright the software, and
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	  contact all copyright holders on record if/when the occasion arises.
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 *   copyright notice, this list of conditions and the following
+line	3	git-2.49.1.tar.xz:git-2.49.1/xdiff/xdiffi.c	 *  Copyright (C) 2003\tDavide Libenzi
+line	9	git-2.49.1.tar.xz:git-2.49.1/xdiff/xdiff.h	 *  Copyright (C) 2003  Davide Libenzi
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xmerge.c	 *  Copyright (C) 2003-2006 Davide Libenzi, Johannes E. Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xpatience.c	 *  Copyright (C) 2003-2016 Davide Libenzi, Johannes E. Schindelin
+line	2	git-2.49.1.tar.xz:git-2.49.1/patch-delta.c	 * (C) 2005 Nicolas Pitre <nico@fluxnic.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/helper/test-run-command.c	 * (C) 2009 Ilari Liusvaara <ilari.liusvaara@elisanet.fi>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/helper/test-revision-walking.c	 * (C) 2012 Heiko Voigt <hvoigt@hvoigt.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/log.c	 * (C) Copyright 2006 Linus Torvalds
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 * - Redistributions of source code must retain the above copyright
+line	1	git-2.49.1.tar.xz:git-2.49.1/sh-i18n--envsubst.c	 * 8dac033df0:gnulib-local/lib/closeout.c. The copyright notices for
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+line	1	git-2.49.1.tar.xz:git-2.49.1/diffcore-rotate.c	 * Based on diffcore-order.c, which is Copyright (C) 2005, Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/inet_pton.c	 * Copyright (C) 1996-2001  Internet Software Consortium.
+line	2	git-2.49.1.tar.xz:git-2.49.1/imap-send.c	 * Copyright (C) 2000-2002 Michael R. Elkins <me@mutt.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/list.h	 * Copyright (C) 2002 Free Software Foundation, Inc.
+line	2	git-2.49.1.tar.xz:git-2.49.1/imap-send.c	 * Copyright (C) 2002-2004 Oswald Buddenhagen <ossi@users.sf.net>
+line	2	git-2.49.1.tar.xz:git-2.49.1/imap-send.c	 * Copyright (C) 2004 Theodore Y. Ts'o <tytso@mit.edu>
+line	8	git-2.49.1.tar.xz:git-2.49.1/diff-lib.c	 * Copyright (C) 2005 Junio C Hamano
+line	3	git-2.49.1.tar.xz:git-2.49.1/builtin/checkout-index.c	 * Copyright (C) 2005 Linus Torvalds
+line	1	git-2.49.1.tar.xz:git-2.49.1/trace.c	 * Copyright (C) 2006 Christian Couder
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/mv.c	 * Copyright (C) 2006 Johannes Schindelin
+line	2	git-2.49.1.tar.xz:git-2.49.1/alloc.c	 * Copyright (C) 2006 Linus Torvalds
+line	2	git-2.49.1.tar.xz:git-2.49.1/imap-send.c	 * Copyright (C) 2006 Mike McCormack
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/annotate.c	 * Copyright (C) 2006 Ryan Anderson
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/fast-export.c	 * Copyright (C) 2007 Johannes E. Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/clean.c	 * Copyright (C) 2007 Shawn Bohrer
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/helper/test-genrandom.c	 * Copyright (C) 2007 by Nicolas Pitre, licensed under the GPL version 2.
+line	2	git-2.49.1.tar.xz:git-2.49.1/name-hash.c	 * Copyright (C) 2008 Linus Torvalds
+line	2	git-2.49.1.tar.xz:git-2.49.1/compat/win32/pthread.c	 * Copyright (C) 2009 Andrzej K. Haczewski <ahaczewski@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/list.h	 * Copyright (C) 2009 Pierre-Marc Fournier
+line	1	git-2.49.1.tar.xz:git-2.49.1/diffcore-pickaxe.c	 * Copyright (C) 2010 Google Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/list.h	 * Copyright (C) 2010 Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/sh-i18n--envsubst.c	 * Copyright (C) 2010 Ævar Arnfjörð Bjarmason
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 * Copyright (C) 2010, Google Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/credential/libsecret/git-credential-libsecret.c	 * Copyright (C) 2011 John Szakmeister <john@szakmeister.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/difftool.c	 * Copyright (C) 2016 Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/diffcore-rotate.c	 * Copyright (C) 2021, Google LLC.
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/var.c	 * Copyright (C) Eric Biederman, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/config.c	 * Copyright (C) Johannes Schindelin, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/hash-object.c	 * Copyright (C) Junio C Hamano, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/rm.c	 * Copyright (C) Linus Torvalds 2006
+line	17	git-2.49.1.tar.xz:git-2.49.1/apply.c	 * Copyright (C) Linus Torvalds, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/dir.c	 * Copyright (C) Linus Torvalds, 2005-2006
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/inet_ntop.c	 * Copyright (c) 1996-1999 by Internet Software Consortium.
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/revert.c	 * Copyright (c) 2005 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/revert.c	 * Copyright (c) 2005 Linus Torvalds
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/reset.c	 * Copyright (c) 2005, 2006 Linus Torvalds and Junio C Hamano
+line	2	git-2.49.1.tar.xz:git-2.49.1/archive-tar.c	 * Copyright (c) 2005, 2006 Rene Scharfe
+line	1	git-2.49.1.tar.xz:git-2.49.1/lockfile.c	 * Copyright (c) 2005, Junio C Hamano
+line	2	git-2.49.1.tar.xz:git-2.49.1/builtin/archive.c	 * Copyright (c) 2006 Franck Bui-Huu
+line	3	git-2.49.1.tar.xz:git-2.49.1/builtin/count-objects.c	 * Copyright (c) 2006 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/branch.c	 * Copyright (c) 2006 Kristian Høgsberg <krh@redhat.com>
+line	2	git-2.49.1.tar.xz:git-2.49.1/archive-zip.c	 * Copyright (c) 2006 Rene Scharfe
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/gc.c	 * Copyright (c) 2006 Shawn O. Pearce
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/blame.c	 * Copyright (c) 2006, 2014 by its authors
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/reset.c	 * Copyright (c) 2007 Carlos Rica
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/verify-tag.c	 * Copyright (c) 2007 Carlos Rica <jasampler@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/gc.c	 * Copyright (c) 2007 James Bowes
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/revert.c	 * Copyright (c) 2007 Johannes E. Schindelin
+line	2	git-2.49.1.tar.xz:git-2.49.1/merge-ll.c	 * Copyright (c) 2007 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/commit.c	 * Copyright (c) 2007 Kristian Høgsberg <krh@redhat.com>
+line	2	git-2.49.1.tar.xz:git-2.49.1/builtin/clone.c	 * Copyright (c) 2007 Kristian Høgsberg <krh@redhat.com>,
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/merge-ours.c	 * Copyright (c) 2007 Thomas Harning Jr
+line	1	git-2.49.1.tar.xz:git-2.49.1/diff-no-index.c	 * Copyright (c) 2007 by Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/progress.c	 * Copyright (c) 2007 by Nicolas Pitre <nico@fluxnic.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/replace.c	 * Copyright (c) 2008 Christian Couder <chriscool@tuxfamily.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/merge.c	 * Copyright (c) 2008 Miklos Vajna <vmiklos@frugalware.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/diff-no-index.c	 * Copyright (c) 2008 by Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/notes.c	 * Copyright (c) 2010 Johan Herland <johan@herland.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/gettext.c	 * Copyright (c) 2010 Ævar Arnfjörð Bjarmason
+line	1	git-2.49.1.tar.xz:git-2.49.1/gettext.h	 * Copyright (c) 2010-2011 Ævar Arnfjörð Bjarmason
+line	5	git-2.49.1.tar.xz:git-2.49.1/bulk-checkin.c	 * Copyright (c) 2011, Google Inc.
+line	2	git-2.49.1.tar.xz:git-2.49.1/builtin/interpret-trailers.c	 * Copyright (c) 2013, 2014 Christian Couder <chriscool@tuxfamily.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/verify-commit.c	 * Copyright (c) 2014 Michael J Gruber <git@drmicha.warpmail.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/rebase.c	 * Copyright (c) 2018 Pratik Karki
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/mktree.c	 * Copyright (c) Junio C Hamano, 2006, 2009
+line	5	git-2.49.1.tar.xz:git-2.49.1/t/unit-tests/clar/clar.c	 * Copyright (c) Vicent Marti. All rights reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/winansi.c	 * Copyright 2008 Peter Harris <git@peter.is-a-geek.org>
+line	6	git-2.49.1.tar.xz:git-2.49.1/ewah/bitmap.c	 * Copyright 2009-2013, Daniel Lemire, Cliff Moon,
+line	6	git-2.49.1.tar.xz:git-2.49.1/ewah/bitmap.c	 * Copyright 2013, GitHub, Inc
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/reftable-basics.h	 * Copyright 2020 Google LLC
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/merge-ours.c	 * Original Copyright (c) 2005 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/diff-delta.c	 * Rewritten for GIT by Nicolas Pitre <nico@fluxnic.net>, (C) 2005-2007
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/vcbuild/include/sys/utime.h	 * This file has no copyright assigned and is placed in the Public Domain.
+line	1	git-2.49.1.tar.xz:git-2.49.1/xdiff/xhistogram.c	 * and other copyright owners as documented in JGit's IP log.
+line	2	git-2.49.1.tar.xz:git-2.49.1/compat/inet_ntop.c	 * copyright notice and this permission notice appear in all copies.
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	 decision, you might note so in your copyright message, ie something
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/vi.po	"Bản quyền © 2005-2016 Paul Mackerras\\n"
+line	4	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/de.po	"Copyright \\\\u00a9 2005-2016 Paul Mackerras\\n"
+line	18	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/bg.po	"Copyright © 2005-2016 Paul Mackerras\\n"
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/pt_br.po	"Copyright ©9 2005-2016 Paul Mackerras\\n"
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	"copyright" line and a pointer to where the full notice is found.
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/bg.po	"Авторски права: © 2005-2016 Paul Mackerras\\n"
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/buildsystems/CMakeLists.txt	#\tCopyright (c) 2020 Sibi Siddharthan
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/completion/git-completion.bash	#             © 2009-2010, Bash Completion Maintainers
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/completion/git-completion.bash	#   Copyright © 2006-2008, Ian Macdonald <ian@caliban.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitweb/gitweb.perl	# (C) 2005, Christian Gierke
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitweb/gitweb.perl	# (C) 2005-2006, Kay Sievers <kay.sievers@vrfy.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9114-git-svn-dcommit-merge.sh	# (C) Copyright 2000 - 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/encoding.tcl	# Copyright (C) 2005 Paul Mackerras <paulus@samba.org>
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t1100-commit-tree-options.sh	# Copyright (C) 2005 Rene Scharfe
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/it.po	# Copyright (C) 2005-2008 Paul Mackerras
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/fr.po	# Copyright (C) 2005-2008 Paul Mackerras.  All rights reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/es.po	# Copyright (C) 2005-2008 Santiago Gala
+line	2	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/ja.po	# Copyright (C) 2005-2015 Paul Mackerras
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/ca.po	# Copyright (C) 2005-2016 Paul Mackerras
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5600-clone-fail-cleanup.sh	# Copyright (C) 2006 Carl D. Worth <cworth@cworth.org>
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t5604-clone-reference.sh	# Copyright (C) 2006 Martin Waitz <tali@admingilde.org>
+line	18	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/about.tcl	# Copyright (C) 2006, 2007 Shawn Pearce
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-svn.perl	# Copyright (C) 2006, Eric Wong <normalperson@yhbt.net>
+line	2	git-2.49.1.tar.xz:git-2.49.1/contrib/completion/git-completion.bash	# Copyright (C) 2006,2007 Shawn O. Pearce <spearce@spearce.org>
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/pt_br.po	# Copyright (C) 2007 Paul Mackerras, et al.
+line	2	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/de.po	# Copyright (C) 2007 Paul Mackerras.
+line	16	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/branch_checkout.tcl	# Copyright (C) 2007 Shawn Pearce
+line	6	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/de.po	# Copyright (C) 2007 Shawn Pearce, et al.
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/hu.po	# Copyright (C) 2007 THE git-gui-i'S COPYRIGHT HOLDER
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/nb.po	# Copyright (C) 2007-2008 Shawn Pearce, et al.
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/remote_add.tcl	# Copyright (C) 2008 Petr Baudis
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/spellcheck.tcl	# Copyright (C) 2008 Shawn Pearce
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/fr.po	# Copyright (C) 2008 Shawn Pearce, et al.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/subtree/git-subtree.sh	# Copyright (C) 2009 Avery Pennarun <apenwarr@gmail.com>
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/el.po	# Copyright (C) 2009 Jimmy Angelakos
+line	5	git-2.49.1.tar.xz:git-2.49.1/compat/vcbuild/scripts/clink.pl	# Copyright (C) 2009 Marius Storm-Olsen <mstormo@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/themed.tcl	# Copyright (C) 2009 Pat Thoyts <patthoyts@users.sourceforge.net>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/is.po	# Copyright (C) 2010 Ævar Arnfjörð Bjarmason <avarab@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/sv.po	# Copyright (C) 2010-2025 Peter Krefting <peter@softwolves.pp.se>
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/mw-to-git/git-remote-mediawiki.perl	# Copyright (C) 2011
+line	7	git-2.49.1.tar.xz:git-2.49.1/contrib/mw-to-git/t/Makefile	# Copyright (C) 2012
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/completion/git-completion.tcsh	# Copyright (C) 2012 Marc Khouzam <marc.khouzam@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/it.po	# Copyright (C) 2012 Marco Paolone <marcopaolone@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/pt_PT.po	# Copyright (C) 2012 Marco Sousa <marcomsousa AT gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/glossary/bg.po	# Copyright (C) 2012, 2013, 2014 Alexander Shopov <ash@kambanaria.org>.
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/bg.po	# Copyright (C) 2012, 2013, 2014, 2015, 2016, 2024 Alexander Shopov <ash@kambanaria.org>.
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/zh_CN.po	# Copyright (C) 2012,2013 Jiang Xin <worldhello.net AT gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/zh_TW.po	# Copyright (C) 2012-2021 Jiang Xin <worldhello.net AT gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/vi.po	# Copyright (C) 2012-2022, Translation Project, Vietnamese Team <http://translationproject.org/team/vi.html>
+line	2	git-2.49.1.tar.xz:git-2.49.1/contrib/mw-to-git/Makefile	# Copyright (C) 2013
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/bg.po	# Copyright (C) 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025 Alexander Shopov <ash@kambanaria.org>.
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/bg.po	# Copyright (C) 2014, 2015, 2019, 2020, 2024 Alexander Shopov <ash@kambanaria.org>.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4138-apply-ws-expansion.sh	# Copyright (C) 2015 Kyle J. McKay
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/ko.po	# Copyright (C) 2015-2018 git Korean translation contributors
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/pt_pt.po	# Copyright (C) 2016 Paul Mackerras
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/glossary/pt_pt.po	# Copyright (C) 2016 Shawn Pearce, et al.
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/pt_PT.po	# Copyright (C) 2016-2017 Vasco Almeida <vascomalmeida@sapo.pt>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/pl.po	# Copyright (C) 2017 m4sk1n, m4sk1n@vivaldi.net
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7418-submodule-sparse-gitmodules.sh	# Copyright (C) 2018  Antonio Ospite <ao2@ao2.it>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/es.po	# Copyright (C) 2018 Christopher Diaz Riveros <christopher.diaz.riv@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/el.po	# Copyright (C) 2019 Jimmy Angelakos <vyruss@hellug.gr>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/de.po	# Copyright (C) 2019 Matthias Rüster <matthias.ruester@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/zh_TW.po	# Copyright (C) 2019-2023 Yi-Jyun Pan <pan93412@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/pl.po	# Copyright (C) 2020 Arusekk <arek_koz@o2.pl>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7421-submodule-summary-add.sh	# Copyright (C) 2020 Shourya Shukla
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/pt_PT.po	# Copyright (C) 2020-2022 Daniel Santos <dacs.git@brilhante.top>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/tr.po	# Copyright (C) 2020-2024 Emir SARI <emir_sari@icloud.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/id.po	# Copyright (C) 2021 Bagas Sanjaya
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/fr.po	# Copyright (C) 2023 Jean-Noël Avila <jn.avila@free.fr>
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/vi.po	# Copyright (C) 2024-2025, Vũ Tiến Hưng <newcomerminecraft@gmail.com>
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/glossary/git-gui-glossary.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/po/git-gui.pot	# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/FromCPAN/Error.pm	# Copyright (c) 1997-8 Graham Barr <gbarr@ti.com>. All rights reserved.
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t0601-reffiles-pack-refs.sh	# Copyright (c) 2005 Amos Waterland
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t6400-merge-df.sh	# Copyright (c) 2005 Fredrik Kuivinen
+line	4	git-2.49.1.tar.xz:git-2.49.1/t/t1300-config.sh	# Copyright (c) 2005 Johannes Schindelin
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t6002-rev-list-bisect.sh	# Copyright (c) 2005 Jon Seymour
+line	47	git-2.49.1.tar.xz:git-2.49.1/contrib/subtree/t/Makefile	# Copyright (c) 2005 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-merge-resolve.sh	# Copyright (c) 2005 Linus Torvalds
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t3101-ls-tree-dirname.sh	# Copyright (c) 2005 Robert Fitzsimons
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4021-format-patch-numbered.sh	# Copyright (c) 2006 Brian C Gernhardt
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t3020-ls-files-error-unmatch.sh	# Copyright (c) 2006 Carl D. Worth
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4113-apply-ending.sh	# Copyright (c) 2006 Catalin Marinas
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0601-reffiles-pack-refs.sh	# Copyright (c) 2006 Christian Couder
+line	9	git-2.49.1.tar.xz:git-2.49.1/git-instaweb.sh	# Copyright (c) 2006 Eric Wong
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t4015-diff-whitespace.sh	# Copyright (c) 2006 Johannes E. Schindelin
+line	3	git-2.49.1.tar.xz:git-2.49.1/contrib/hooks/setgitperms.perl	# Copyright (c) 2006 Josh England
+line	13	git-2.49.1.tar.xz:git-2.49.1/t/t1003-read-tree-prefix.sh	# Copyright (c) 2006 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5401-update-hooks.sh	# Copyright (c) 2006 Shawn O. Pearce
+line	4	git-2.49.1.tar.xz:git-2.49.1/t/t1400-update-ref.sh	# Copyright (c) 2006 Shawn Pearce
+line	3	git-2.49.1.tar.xz:git-2.49.1/git-mergetool.sh	# Copyright (c) 2006 Theodore Y. Ts'o
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3500-cherry.sh	# Copyright (c) 2006 Yann Dirson, based on t3400 by Amos Waterland
+line	1	git-2.49.1.tar.xz:git-2.49.1/templates/hooks/pre-rebase.sample	# Copyright (c) 2006, 2008 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t6200-fmt-merge-msg.sh	# Copyright (c) 2006, Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5510-fetch.sh	# Copyright (c) 2006, Junio C Hamano.
+line	2	git-2.49.1.tar.xz:git-2.49.1/contrib/hooks/post-receive-email	# Copyright (c) 2007 Andy Parkins
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3060-ls-files-with-tree.sh	# Copyright (c) 2007 Carl D. Worth
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t0030-stripspace.sh	# Copyright (c) 2007 Carlos Rica
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-web--browse.sh	# Copyright (c) 2007 Christian Couder
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9119-git-svn-info.sh	# Copyright (c) 2007 David D. Kilzer
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t2008-checkout-subdir.sh	# Copyright (c) 2007 David Symonds
+line	12	git-2.49.1.tar.xz:git-2.49.1/t/t9103-git-svn-tracked-directory-removed.sh	# Copyright (c) 2007 Eric Wong
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9400-git-cvsserver-server.sh	# Copyright (c) 2007 Frank Lichtenheld
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/lib-gitweb.sh	# Copyright (c) 2007 Jakub Narebski
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3903-stash.sh	# Copyright (c) 2007 Johannes E Schindelin
+line	9	git-2.49.1.tar.xz:git-2.49.1/t/t1420-lost-found.sh	# Copyright (c) 2007 Johannes E. Schindelin
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t0040-parse-options.sh	# Copyright (c) 2007 Johannes Schindelin
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t2005-checkout-index-symlinks.sh	# Copyright (c) 2007 Johannes Sixt
+line	5	git-2.49.1.tar.xz:git-2.49.1/t/t1410-reflog.sh	# Copyright (c) 2007 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7501-commit-basic-functionality.sh	# Copyright (c) 2007 Kristian Høgsberg <krh@redhat.com>
+line	3	git-2.49.1.tar.xz:git-2.49.1/git-submodule.sh	# Copyright (c) 2007 Lars Hjemli
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7300-clean.sh	# Copyright (c) 2007 Michael Spang
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t1302-repo-version.sh	# Copyright (c) 2007 Nguyễn Thái Ngọc Duy
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5302-pack-index.sh	# Copyright (c) 2007 Nicolas Pitre
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9150-svk-mergetickets.sh	# Copyright (c) 2007 Sam Vilain
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5515-fetch-merge-logic.sh	# Copyright (c) 2007 Santi Béjar, based on t4013 by Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4120-apply-popt.sh	# Copyright (c) 2007 Shawn O. Pearce
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9300-fast-import.sh	# Copyright (c) 2007 Shawn Pearce
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7500-commit-template-squash-signoff.sh	# Copyright (c) 2007 Steven Grimm
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9151-svn-mergeinfo.sh	# Copyright (c) 2007, 2009 Sam Vilain
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9126-git-svn-follow-deleted-readded-directory.sh	# Copyright (c) 2008 Alec Berryman
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9124-git-svn-dcommit-auto-props.sh	# Copyright (c) 2008 Brad King
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7610-mergetool.sh	# Copyright (c) 2008 Charles Bailey
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t1503-rev-parse-verify.sh	# Copyright (c) 2008 Christian Couder
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/lib-httpd.sh	# Copyright (c) 2008 Clemens Buchacher <drizzd@aon.at>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7403-submodule-sync.sh	# Copyright (c) 2008 David Aguilar
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0060-path-utils.sh	# Copyright (c) 2008 David Reiss
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9127-git-svn-partial-rebuild.sh	# Copyright (c) 2008 Deskin Miller
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5518-fetch-exit-status.sh	# Copyright (c) 2008 Dmitry V. Levin
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9129-git-svn-i18n-commitencoding.sh	# Copyright (c) 2008 Eric Wong
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5306-pack-nobase.sh	# Copyright (c) 2008 Google Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9123-git-svn-rebuild-with-rewriteroot.sh	# Copyright (c) 2008 Jan Krüger
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5304-prune.sh	# Copyright (c) 2008 Johannes E. Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7402-submodule-rebase.sh	# Copyright (c) 2008 Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9120-git-svn-clone-with-percent-escapes.sh	# Copyright (c) 2008 Kevin Ballard
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9700-perl-git.sh	# Copyright (c) 2008 Lea Wiemann
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9125-git-svn-multi-glob-branch-names.sh	# Copyright (c) 2008 Marcus Griep
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9401-git-cvsserver-crlf.sh	# Copyright (c) 2008 Matthew Ogilvie
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t2104-update-index-skip-worktree.sh	# Copyright (c) 2008 Nguyễn Thái Ngọc Duy
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5303-pack-corruption-resilience.sh	# Copyright (c) 2008 Nicolas Pitre
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7401-submodule-summary.sh	# Copyright (c) 2008 Ping Yin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9121-git-svn-fetch-renamed-dir.sh	# Copyright (c) 2008 Santhosh Kumar Mani
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4026-color.sh	# Copyright (c) 2008 Timo Hirvonen
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/rerere-train.sh	# Copyright (c) 2008, Nanako Shiraishi
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9140-git-svn-reset.sh	# Copyright (c) 2009 Ben Jackson
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7110-reset-merge.sh	# Copyright (c) 2009 Christian Couder
+line	7	git-2.49.1.tar.xz:git-2.49.1/t/t9133-git-svn-nested-git-repo.sh	# Copyright (c) 2009 Eric Wong
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9138-git-svn-authors-prog.sh	# Copyright (c) 2009 Eric Wong, Mark Lodato
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7509-commit-authorship.sh	# Copyright (c) 2009 Erick Mattos
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4107-apply-ignore-whitespace.sh	# Copyright (c) 2009 Giuseppe Bilotta
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0061-run-command.sh	# Copyright (c) 2009 Ilari Liusvaara
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t6006-rev-list-format.sh	# Copyright (c) 2009 Jens Lehmann
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t4041-diff-submodule-option.sh	# Copyright (c) 2009 Jens Lehmann, based on t7401 by Ping Yin
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t7407-submodule-foreach.sh	# Copyright (c) 2009 Johan Herland
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4132-apply-removal.sh	# Copyright (c) 2009 Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9141-git-svn-multiple-branches.sh	# Copyright (c) 2009 Marc Branchaud
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9501-gitweb-standalone-http-status.sh	# Copyright (c) 2009 Mark Rada
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7406-submodule-update.sh	# Copyright (c) 2009 Red Hat, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9143-git-svn-gc.sh	# Copyright (c) 2009 Robert Allan Zeh
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9152-svn-empty-dirs-after-gc.sh	# Copyright (c) 2009 Robert Zeh
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4131-apply-fake-ancestor.sh	# Copyright (c) 2009 Stephen Boyd
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9134-git-svn-ignore-paths.sh	# Copyright (c) 2009 Vitaly Shukela
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-difftool--helper.sh	# Copyright (c) 2009, 2010 David Aguilar
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7800-difftool.sh	# Copyright (c) 2009, 2010, 2012, 2013 David Aguilar
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t6017-rev-list-stdin.sh	# Copyright (c) 2009, Junio C Hamano
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7408-submodule-reference.sh	# Copyright (c) 2009, Red Hat Inc, Author: Michael S. Tsirkin (mst@redhat.com)
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-mergetool.sh	# Copyright (c) 2009-2016 David Aguilar
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4133-apply-filenames.sh	# Copyright (c) 2010 Andreas Gruenbacher
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4206-log-follow-harder-copies.sh	# Copyright (c) 2010 Bo Yang
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t2105-update-index-gitfile.sh	# Copyright (c) 2010 Brad King
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7111-reset-table.sh	# Copyright (c) 2010 Christian Couder
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t2017-checkout-orphan.sh	# Copyright (c) 2010 Erick Mattos
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4043-diff-rename-binary.sh	# Copyright (c) 2010 Jakub Narebski, Christian Couder
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9153-git-svn-rewrite-uuid.sh	# Copyright (c) 2010 Jay Soffian
+line	4	git-2.49.1.tar.xz:git-2.49.1/t/t3308-notes-merge.sh	# Copyright (c) 2010 Johan Herland
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t1304-default-acl.sh	# Copyright (c) 2010 Matthieu Moy
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4207-log-decoration-colors.sh	# Copyright (c) 2010 Nazri Ramliy
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4134-apply-submodule.sh	# Copyright (c) 2010 Peter Collingbourne
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4253-am-keep-cr-dos.sh	# Copyright (c) 2010 Stefan-W. Hahn
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9157-git-svn-fetch-merge.sh	# Copyright (c) 2010 Steven Walter
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5801-remote-helpers.sh	# Copyright (c) 2010 Sverre Rabbelier
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5407-post-rewrite-hook.sh	# Copyright (c) 2010 Thomas Rast
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4300-merge-tree.sh	# Copyright (c) 2010 Will Palmer
+line	7	git-2.49.1.tar.xz:git-2.49.1/git-sh-i18n.sh	# Copyright (c) 2010 Ævar Arnfjörð Bjarmason
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5526-fetch-submodules.sh	# Copyright (c) 2010, Jens Lehmann
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4205-log-pretty-formats.sh	# Copyright (c) 2010, Will Palmer
+line	3	git-2.49.1.tar.xz:git-2.49.1/t/t4041-diff-submodule-option.sh	# Copyright (c) 2011 Alexey Shumkin (+ non-UTF-8 commit encoding tests)
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3905-stash-include-untracked.sh	# Copyright (c) 2011 David Caldwell
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9162-git-svn-dcommit-interactive.sh	# Copyright (c) 2011 Frédéric Heitzmann
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9160-git-svn-preserve-empty-dirs.sh	# Copyright (c) 2011 Ray Chen
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/perf/perf-lib.sh	# Copyright (c) 2011 Thomas Rast
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4205-log-pretty-formats.sh	# Copyright (c) 2011, Alexey Shumkin (+ non-UTF-8 commit encoding tests)
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t1050-large.sh	# Copyright (c) 2011, Google Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/subtree/t/t7900-subtree.sh	# Copyright (c) 2012 Avery Pennaraum
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7409-submodule-detached-work-tree.sh	# Copyright (c) 2012 Daniel Graña
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5801/git-remote-testgit	# Copyright (c) 2012 Felipe Contreras
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0062-revision-walking.sh	# Copyright (c) 2012 Heiko Voigt
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0063-string-list.sh	# Copyright (c) 2012 Michael Haggerty
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4055-diff-context.sh	# Copyright (c) 2012 Mozilla Foundation
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9163-git-svn-reset-clears-caches.sh	# Copyright (c) 2012 Peter Baumann
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9164-git-svn-dcommit-concurrent.sh	# Copyright (c) 2012 Robert Luberda
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9903-bash-prompt.sh	# Copyright (c) 2012 SZEDER Gábor
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t9165-git-svn-fetch-merge-branch-of-branch.sh	# Copyright (c) 2012 Steven Walter
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3910-mac-os-precompose.sh	# Copyright (c) 2012 Torsten Bögershausen
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t1306-xdg-files.sh	# Copyright (c) 2012 Valentin Duperray, Lucien Kong, Franck Jonas,
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4052-stat-output.sh	# Copyright (c) 2012 Zbigniew Jędrzejewski-Szmek
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9902-completion.sh	# Copyright (c) 2012-2020 Felipe Contreras
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/completion/git-completion.zsh	# Copyright (c) 2012-2020 Felipe Contreras <felipe.contreras@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9147-git-svn-include-paths.sh	# Copyright (c) 2013 Paul Walmsley - based on t9134 by Vitaly Shukela
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3420-rebase-autostash.sh	# Copyright (c) 2013 Ramkumar Ramachandra
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9167-git-svn-cmd-branch-subproject.sh	# Copyright (c) 2013 Tobias Schulte
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7513-interpret-trailers.sh	# Copyright (c) 2013, 2014 Christian Couder
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9148-git-svn-propset.sh	# Copyright (c) 2014 Alfred Perlstein
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7702-repack-cyclic-alternate.sh	# Copyright (c) 2014 Ephrim Khong
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7411-submodule-config.sh	# Copyright (c) 2014 Heiko Voigt
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/subtree/t/t7900-subtree.sh	# Copyright (c) 2015 Alexey Shumkin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3320-notes-merge-worktrees.sh	# Copyright (c) 2015 Twitter, Inc
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7517-per-repo-email.sh	# Copyright (c) 2016 Dan Aloni
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4060-diff-submodule-option-diff-format.sh	# Copyright (c) 2016 Jacob Keller (copy + convert to --submodule=diff)
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4059-diff-submodule-not-initialized.sh	# Copyright (c) 2016 Jacob Keller, based on t4041 by Jens Lehmann
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t7517-per-repo-email.sh	# Copyright (c) 2016 Jeff King
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4062-diff-pickaxe.sh	# Copyright (c) 2016 Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5323-pack-redundant.sh	# Copyright (c) 2018 Jiang Xin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3430-rebase-merges.sh	# Copyright (c) 2018 Johannes E. Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5321-pack-large-objects.sh	# Copyright (c) 2018 Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3437-rebase-fixup-options.sh	# Copyright (c) 2018 Phillip Wood
+line	4	git-2.49.1.tar.xz:git-2.49.1/t/t3431-rebase-fork-point.sh	# Copyright (c) 2019 Denton Liu
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3434-rebase-i18n.sh	# Copyright (c) 2019 Doan Tran Cong Danh
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3908-stash-in-worktree.sh	# Copyright (c) 2019 Johannes E Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3436-rebase-more-options.sh	# Copyright (c) 2019 Rohit Ashiwal
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t3435-rebase-gpg-sign.sh	# Copyright (c) 2020 Doan Tran Cong Danh
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t0610-reftable-basics.sh	# Copyright (c) 2020 Google LLC
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/t5411-proc-receive-hook.sh	# Copyright (c) 2020 Jiang Xin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5582-fetch-negative-refspec.sh	# Copyright (c) 2020, Jacob Keller.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t6020-bundle-misc.sh	# Copyright (c) 2021 Jiang Xin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/chainlint.pl	# Copyright (c) 2021-2022 Eric Sunshine <sunshine@sunshineco.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t5351-unpack-large-objects.sh	# Copyright (c) 2022 Han Xin
+line	2	git-2.49.1.tar.xz:git-2.49.1/t/test-lib-github-workflow-markup.sh	# Copyright (c) 2022 Johannes Schindelin
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/lib-perl.sh	# Copyright (c) 2022 Ævar Arnfjörð Bjarmason
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/uk.po	# Copyright (c) 2023 Arkadii Yakovets.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t1016-compatObjectFormat.sh	# Copyright (c) 2023 Eric Biederman
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4015-diff-whitespace.sh	# Copyright (c) 2023 Google LLC
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/uk.po	# Copyright (c) 2023 Kateryna Golovanova.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t3321-notes-stripspace.sh	# Copyright (c) 2023 Teng Long
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4029-diff-trailing-space.sh	# Copyright (c) Jim Meyering
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-merge-one-file.sh	# Copyright (c) Linus Torvalds, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-filter-branch.sh	# Copyright (c) Petr Baudis, 2006
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9200-git-cvsexportcommit.sh	# Copyright (c) Robin Rosenberg
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/unit-tests/clar/generate.py	# Copyright (c) Vicent Marti. All rights reserved.
+line	1	recipe:git-daemon.initd	# Copyright 1999-2014 Gentoo Foundation
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-send-email.perl	# Copyright 2002,2005 Greg Kroah-Hartman <greg@kroah.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-send-email.perl	# Copyright 2005 Ryan Anderson <ryan@michonline.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-request-pull.sh	# Copyright 2005, Ryan Anderson <ryan@michonline.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/thunderbird-patch-inline/appp.sh	# Copyright 2008 Lukas Sandström <luksan@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/fast-import/import-directories.perl	# Copyright 2008-2009 Peter Krefting <peter@softwolves.pp.se>
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/Makefile	# Copyright 2012 Google Inc. All Rights Reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/gitk	# Copyright © 2005-2016 Paul Mackerras.  All rights reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/po/it.po	# Copyright © 2018-2020 Alessandro Menti <alessandro.menti@alessandromenti.it>
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-p4.py	# Copyright: 2007 Simon Hausmann <simon@lst.de>
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/FromCPAN/Mail/Address.pm	# Copyrights 1995-2018 by [Mark Overmeer].
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/FromCPAN/Mail/Address.pm	# OODoc into POD and HTML manual-pages.  See README.md for Copyright.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9161-git-svn-mergeinfo-push.sh	# Portions copyright (c) 2007, 2009 Sam Vilain
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t9161-git-svn-mergeinfo-push.sh	# Portions copyright (c) 2011 Bryan Jacobs
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-archimport.perl	# This tool is copyright (c) 2005, Martin Langhoff.
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-cvsimport.perl	# This tool is copyright (c) 2005, Matthias Urlichs.
+line	2	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/line.tcl	# based on code from gitk, Copyright (C) Paul Mackerras
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/mergetool.tcl	# parts based on git-mergetool (c) 2006 Theodore Y. Ts'o
+line	3	git-2.49.1.tar.xz:git-2.49.1/git-cvsserver.perl	#### Copyright The Open University UK - 2006.
+line	1	git-2.49.1.tar.xz:git-2.49.1/Documentation/git-interpret-trailers.adoc	$ git interpret-trailers --trailer="ref:Add copyright notices." <msg.txt
+line	1	git-2.49.1.tar.xz:git-2.49.1/builtin/pack-redundant.c	* Copyright 2005, Lukas Sandstrom <lukass@etek.chalmers.se>
+line	1	git-2.49.1.tar.xz:git-2.49.1/sha1dc/sha1.c	* Copyright 2017 Marc Stevens <marc@marc-stevens.nl>, Dan Shumow (danshu@microsoft.com)
+line	3	git-2.49.1.tar.xz:git-2.49.1/sha1dc/sha1.h	* Copyright 2017 Marc Stevens <marc@marc-stevens.nl>, Dan Shumow <danshu@microsoft.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/LICENSE	* Redistributions in binary form must reproduce the above copyright
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/LICENSE	* Redistributions of source code must retain the above copyright notice,
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4100/t-apply-3.patch	+ * Copyright (C) Linus Torvalds, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/t4100/t-apply-3.patch	- * Copyright (C) Linus Torvalds, 2005
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/win32_shortcut.js	// Copyright (C) 2007 Shawn Pearce
+line	4	git-2.49.1.tar.xz:git-2.49.1/gitweb/static/js/blame_incremental.js	// Copyright (C) 2007, Fredrik Kuivinen <frekui@gmail.com>
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitweb/static/js/adjust-timezone.js	// Copyright (C) 2011, John 'Warthog9' Hawley <warthog9@eaglescrag.net>
+line	4	git-2.49.1.tar.xz:git-2.49.1/contrib/persistent-https/client.go	// Copyright 2012 Google Inc. All Rights Reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitweb/gitweb.perl	<!-- git web interface version $version, (C) 2005-2006, Kay Sievers <kay.sievers\\@vrfy.org>, Christian Gierke -->
+line	3	git-2.49.1.tar.xz:git-2.49.1/perl/FromCPAN/Error.pm	=head1 COPYRIGHT
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/LICENSE	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	git-2.49.1.tar.xz:git-2.49.1/sha1dc/LICENSE.txt	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	2	git-2.49.1.tar.xz:git-2.49.1/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/FromCPAN/Error.pm	Copyright (c) 1997-8  Graham Barr. All rights reserved.
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/git-gui.sh	Copyright (c) 2006-2010 Shawn Pearce, et. al.
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/unit-tests/clar/COPYING	Copyright (c) 2011-2015 Vicent Marti
+line	1	git-2.49.1.tar.xz:git-2.49.1/sha1dc/LICENSE.txt	Copyright (c) 2017:
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/LICENSE	Copyright (c) 2020, Google LLC
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/Git.pm	Copyright 2006 by Petr Baudis E<lt>pasky@suse.czE<gt>.
+line	1	git-2.49.1.tar.xz:git-2.49.1/contrib/fast-import/import-directories.perl	Copyright 2008-2009 Peter Krefting E<lt>peter@softwolves.pp.se>
+line	1	git-2.49.1.tar.xz:git-2.49.1/perl/Git/I18N.pm	Copyright 2010 E<AElig>var ArnfjE<ouml>rE<eth> Bjarmason <avarab@gmail.com>
+line	39	git-2.49.1.tar.xz:git-2.49.1/reftable/basics.c	Copyright 2020 Google LLC
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/gitk	Copyright \\u00a9 2005-2016 Paul Mackerras
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	git-2.49.1.tar.xz:git-2.49.1/Documentation/git-interpret-trailers.adoc	Reference-to: 8bc9a0c769 (Add copyright notices., 2005-04-07)
+line	3	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/License.txt	SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+line	1	git-2.49.1.tar.xz:git-2.49.1/reftable/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	git-2.49.1.tar.xz:git-2.49.1/sha1dc/LICENSE.txt	The above copyright notice and this permission notice shall be included in all
+line	3	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/License.txt	The copyright notices in the Software and this entire statement, including
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	a notice placed by the copyright holder saying it may be distributed
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	appropriate copyright notice and disclaimer of warranty; keep intact
+line	3	git-2.49.1.tar.xz:git-2.49.1/COPYING	certain countries either by patents or by copyrighted interfaces, the
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	copyright law: that is to say, a work containing the Library or a
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	copyright notice and disclaimer of warranty; keep intact all the
+line	1	git-2.49.1.tar.xz:git-2.49.1/t/unit-tests/clar/COPYING	copyright notice and this permission notice appear in all copies.
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	copyright notice for the Library among them, as well as a reference
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	copyrighted by the Free Software Foundation, write to the Free
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	during execution displays copyright notices, you must include the
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/Readme.txt	file which remains copyright to others.
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/nedmalloc.h	lock contention based on dlmalloc v2.8.3. (C) 2005 Niall Douglas
+line	1	git-2.49.1.tar.xz:git-2.49.1/compat/nedmalloc/nedmalloc.c	lock contention based on dlmalloc. (C) 2005-2006 Niall Douglas
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	means either the Program or any derivative work under copyright law:
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/ru.po	msgstr "\\nGitk — программа просмотра истории репозиториев git\\n\\n© 2005-2016 Paul Mackerras\\n\\nИспользование и распространение согласно условиям GNU General Public License"
+line	1	git-2.49.1.tar.xz:git-2.49.1/gitk-git/po/zh_cn.po	msgstr "\\nGitk — 一个git的提交查看器\\n\\n© 2005-2016 Paul Mackerras\\n\\n在GNU许可证下使用以及分发"
+line	1	git-2.49.1.tar.xz:git-2.49.1/Documentation/git-filter-branch.adoc	or copyright violation) from all commits:
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	original copyright holder who places the Library under this License may add
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	original copyright holder who places the Program under this License
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	program which contains a notice placed by the copyright holder or
+line	1	git-2.49.1.tar.xz:git-2.49.1/LGPL-2.1	school, if any, to sign a "copyright disclaimer" for the library, if
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	git-2.49.1.tar.xz:git-2.49.1/git-gui/git-gui.sh	set copyright [string map [list (c) \\u00a9] {
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	2	git-2.49.1.tar.xz:git-2.49.1/COPYING	to ask for permission.  For software which is copyrighted by the Free
+binary-head	git-2.49.1.tar.xz:git-2.49.1/git-gui/lib/git-gui.ico
+binary-head	git-2.49.1.tar.xz:git-2.49.1/git-gui/macosx/git-gui.icns
+binary-head	git-2.49.1.tar.xz:git-2.49.1/gitweb/static/git-favicon.png
+binary-head	git-2.49.1.tar.xz:git-2.49.1/gitweb/static/git-logo.png
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/lib-gpg/gpgsm_cert.p12
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t0013/shattered-1.pdf
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t3900/UTF-16.txt
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t4020/diff.NUL
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5000/huge-and-future.tar
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5000/huge-object
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5000/pax.tar
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5003/infozip-symlinks.zip
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5004/big-pack.zip
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5004/empty-with-pax-header.tar
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5004/empty.zip
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5100/nul-b64.expect
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5100/nul-plain
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/t5319/no-objects.midx
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/test-binary-1.png
+binary-head	git-2.49.1.tar.xz:git-2.49.1/t/test-binary-2.png

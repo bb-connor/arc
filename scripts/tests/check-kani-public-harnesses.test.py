@@ -73,7 +73,7 @@ def test_trust_bound_drift() -> None:
         row = next(
             row
             for row in document["harness"]
-            if row["harness"] == "public_weights_hash_of_determinism_and_shape"
+            if row["harness"] == "public_weights_hash_hex_bytes_determinism_and_shape"
         )
         row["default_unwind"] += 1
         write_toml(multi, document)
@@ -242,7 +242,7 @@ def main() -> int:
             (
                 "chio-weights",
                 (
-                    "public_weights_hash_of_determinism_and_shape",
+                    "public_weights_hash_hex_bytes_determinism_and_shape",
                     "public_model_card_require_live_fail_closed",
                     "public_weights_error_urn_is_stable",
                     "public_model_card_new_pins_schema_version",
@@ -324,7 +324,7 @@ def main() -> int:
 
         receipt = "public_sign_receipt_accepts_matching_kernel_key"
         for name in (
-            "public_weights_hash_of_determinism_and_shape",
+            "public_weights_hash_hex_bytes_determinism_and_shape",
             "public_model_card_require_live_fail_closed",
             "public_weights_error_urn_is_stable",
             "public_model_card_new_pins_schema_version",

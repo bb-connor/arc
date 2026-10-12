@@ -199,7 +199,10 @@ def static_contract_tests() -> None:
             "security image base is not pinned to the reviewed Rust 1.95.0 digest"
         )
     for marker in (
-        "bash=5.2.37-r0",
+        "--mount=type=bind,source=deploy/docker/security-evidence-apks,"
+        "target=/tmp/security-evidence-apks,readonly",
+        "c33666f5f02584d643496c747685dcba26b1b17165a011de380bf3aecfeecd12",
+        "apk add --no-network --no-cache --repositories-file /dev/null",
         "security-evidence-apk.lock",
         "b2f8548a3f724f94d664e215af35dcab952dabc1cdbd6ee334a872d222d1ff35",
         "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61",

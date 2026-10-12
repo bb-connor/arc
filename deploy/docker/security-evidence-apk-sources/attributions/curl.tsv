@@ -1,0 +1,197 @@
+# chio.attribution-lines.v8 origin=curl files=4033 files_with_lines=2157 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.am	\techo '/* !checksrc! disable COPYRIGHT all */' > $(CA_EMBED_CSOURCE)
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.am	\techo '/* !checksrc! disable COPYRIGHT all */' > $(HUGE);   \\
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	                      "Copyright year out of date, should be $commityear, " .
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	                      "is $copyright[0]{year}", 1);
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	                      $file, $copyright[0]{code},
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	                push @copyright, {
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/scripts/cd2cd	            $copyright=$1;
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	            checkwarn("COPYRIGHTYEAR", $copyright[0]{line}, $copyright[0]{col},
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/scripts/cd2cd	            if(!$copyright) {
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	           $copyright[0]{year} != $commityear) {
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        # The check for updated copyrightyear is overly complicated in order to
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        # check for a copyright statement and save the years
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        # condition below will enforce copyright year checks against the year
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        # not punish current hacking for past sins. The copyright years are
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        # right now a bit behind, so enforcing copyright year checking on all
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	        /^Copyright /!{
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        @copyright = sort {$$b{year} cmp $$a{year}} @copyright;
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        checkwarn("COPYRIGHT", 1, 0, $file, "", "Missing copyright statement", 1);
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/OS400/make-lib.sh	        echo '#pragma comment(copyright, "Copyright (C) Daniel Stenberg et al. OS/400 version by P. Monnerat")'
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        if($l =~ /\\* +copyright .* (\\d\\d\\d\\d|)/i) {
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	        if(defined($commityear) && scalar(@copyright) &&
+line	7	curl-8.14.1.tar.xz:curl-8.14.1/packages/OS400/curl.inc.in	      * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	7	curl-8.14.1.tar.xz:curl-8.14.1/packages/OS400/curl.inc.in	      * are also available at https://curl.se/docs/copyright.html.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/curl.rc	      VALUE "LegalCopyright",   "Copyright (C) " CURL_COPYRIGHT "\\0"
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/libcurl.rc	      VALUE "LegalCopyright",   "Copyright (C) " LIBCURL_COPYRIGHT "\\0"
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/libcurl.rc	      VALUE "License",          "https://curl.se/docs/copyright.html\\0"
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    # COPYRIGHTYEAR is an extended warning so we must first see if it has been
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    'COPYRIGHT'             => 'file missing a copyright statement',
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    'COPYRIGHTYEAR'    => 'copyright year incorrect',
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/mdlinkcheck	    'https://curl.se/docs/copyright.html' => 1,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/CMakeLists.txt	    COMMAND ${CMAKE_COMMAND} -E echo "/* !checksrc! disable COPYRIGHT all */" >> "tool_hugehelp.c"
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/MANPAGE.md	    c: (copyright line)
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CURLDOWN.md	    c: Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    if(!scalar(@copyright)) {
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    if(defined($warnings{"COPYRIGHTYEAR"})) {
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/scripts/cd2nroff	    my $copyright;
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc.pl	    my @copyright=();
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/FAQ	  All we ask is that you disclose "the copyright notice and this permission
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/MANPAGE.md	  Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/README	  Curl contains pieces of source code that is Copyright (c) 1998, 1999
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/FAQ	  notice in "all copies" and that you may not use the copyright holder's name
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/FAQ	  the COPYING file) which basically says you have to include the copyright
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/FAQ	  with the sources, on the condition that the copyright texts in the sources
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/krb5.c	 * 1. Redistributions of source code must retain the above copyright
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/krb5.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/inet_ntop.c	 * Copyright (C) 1996-2022  Internet Software Consortium.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/smb.c	 * Copyright (C) Bill Nagel <wnagel@tycoint.com>, Exacq Technologies
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/mqtt.c	 * Copyright (C) Björn Stenberg, <bjorn@haxx.se>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/rustls.c	 * Copyright (C) Daniel McCarney, <daniel@binaryparadox.net>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/krb5.c	 * Copyright (C) Daniel Stenberg
+line	884	curl-8.14.1.tar.xz:curl-8.14.1/CMake/CurlTests.c	 * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/lib/optiontable.pl	 * Copyright (C) Daniel Stenberg, <daniel\\@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/libtest/lib2405.c	 * Copyright (C) Dmitry Karpov <dkarpov1970@gmail.com>
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/lib/curl_sha512_256.c	 * Copyright (C) Evgeny Grin (Karlson2k), <k2k@narod.ru>.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/curl_sha256.h	 * Copyright (C) Florin Petriuc, <petriuc.florin@gmail.com>
+line	4	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/mbedtls.c	 * Copyright (C) Hoi-Ho Chan, <hoiho.chan@gmail.com>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/curl_rtmp.c	 * Copyright (C) Howard Chu, <hyc@highlandsun.com>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/openldap.c	 * Copyright (C) Howard Chu, <hyc@openldap.org>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/rustls.c	 * Copyright (C) Jacob Hoffman-Andrews,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/examples/maxconnects.c	 * Copyright (C) James Fuller, <jim@webcomposite.com>, et al.
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/cipher_suite.c	 * Copyright (C) Jan Venekamp, <jan@venekamp.net>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/examples/crawler.c	 * Copyright (C) Jeroen Ooms <jeroenooms@gmail.com>
+line	4	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/curl_crtl_init.c	 * Copyright (C) John Malmberg
+line	7	curl-8.14.1.tar.xz:curl-8.14.1/tests/libtest/lib1506.c	 * Copyright (C) Linus Nielsen Feltzing <linus@haxx.se>
+line	6	curl-8.14.1.tar.xz:curl-8.14.1/lib/conncache.c	 * Copyright (C) Linus Nielsen Feltzing, <linus@haxx.se>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/schannel.c	 * Copyright (C) Marc Hoersken, <info@marc-hoersken.de>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/schannel.h	 * Copyright (C) Marc Hoersken, <info@marc-hoersken.de>, et al.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/schannel.c	 * Copyright (C) Mark Salisbury, <mark.salisbury@hp.com>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/socks_gssapi.c	 * Copyright (C) Markus Moeller, <markus_moeller@compuserve.com>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/libtest/libprereq.c	 * Copyright (C) Max Dymond, <max.dymond@microsoft.com>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/bearssl.c	 * Copyright (C) Michael Forney, <mforney@mforney.org>
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/sectransp.c	 * Copyright (C) Nick Zitzmann, <nickzman@gmail.com>.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/libtest/lib3010.c	 * Copyright (C) Nicolas Sterchele, <nicolas@sterchelen.net>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/vssh/libssh.c	 * Copyright (C) Red Hat, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/vauth/gsasl.c	 * Copyright (C) Simon Josefsson, <simon@josefsson.org>, et al.
+line	12	curl-8.14.1.tar.xz:curl-8.14.1/lib/curl_des.c	 * Copyright (C) Steve Holme, <steve_holme@hotmail.com>.
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/tests/libtest/lib1525.c	 * Copyright (C) Vijay Panghal, <vpanghal@maginatics.com>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/vtls/rustls.c	 * Copyright (C) kpcyrd, <kpcyrd@archlinux.org>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/server/tftpd.c	 * Copyright (c) 1983, Regents of the University of California.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/krb5.c	 * Copyright (c) 1995, 1996, 1997, 1998, 1999 Kungliga Tekniska Högskolan
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/md5.c	 * Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/vssh/curl_path.c	 * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/md5.c	 * In case this attempt to disclaim copyright and place the software in the
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/lib/md4.c	 * This software was written by Alexander Peslyak in 2001. No copyright is
+line	925	curl-8.14.1.tar.xz:curl-8.14.1/CMake/CurlTests.c	 * are also available at https://curl.se/docs/copyright.html.
+line	7	curl-8.14.1.tar.xz:curl-8.14.1/lib/curlx/inet_pton.c	 * copyright notice and this permission notice appear in all copies.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/md4.c	 * domain is deemed null and void, then the software is Copyright (c) 2001
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/md4.c	 * this attempt to disclaim copyright and place the software in the public
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/curl_gnv_build_steps.txt	 Copyright (C) John Malmberg
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/curl_gnv_build_steps.txt	 copyright notice and this permission notice appear in all copies.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/RELEASE-NOTES	 o license: update some copyright links to curl.se [24]
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/curlmsg.msg	! Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/gnv_libcurl_symbols.opt	! Copyright (C) John Malmberg
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/curlmsg.msg	! are also available at https://curl.se/docs/copyright.html.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/gnv_libcurl_symbols.opt	! copyright notice and this permission notice appear in all copies.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	#      /^# Copyright /
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/docs/libcurl/mksymbolsmanpage.pl	# * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/docs/libcurl/mksymbolsmanpage.pl	# * are also available at https://curl.se/docs/copyright.html.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/wcurl.md	# COPYRIGHT
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/install-sh	# Copyright (C) 1994 X Consortium
+line	22	curl-8.14.1.tar.xz:curl-8.14.1/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	5	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	6	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2008-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/scripts/cmakelint.sh	# Copyright (C) Dan Fandrich, <dan@coneharvesters.com>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/devtest.pl	# Copyright (C) Daniel Fandrich, et al.
+line	8	curl-8.14.1.tar.xz:curl-8.14.1/configure	# Copyright (C) Daniel Stenberg, <daniel@haxx.se>
+line	277	curl-8.14.1.tar.xz:curl-8.14.1/CMake/CMakeConfigurableFile.in	# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/libcurl/libcurl.m4	# Copyright (C) David Shaw <dshaw@jabberwocky.com>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/certs/genserv.pl	# Copyright (C) EdelWeb for EdelKey and OpenEvidence
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/pathhelp.pm	# Copyright (C) Evgeny Grin (Karlson2k), <k2k@narod.ru>.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/gnv_curl_configure.sh	# Copyright (C) John Malmberg
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/tests/appveyor.pm	# Copyright (C) Marc Hoersken, <info@marc-hoersken.de>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/wcurl	# Copyright (C) Samuel Henrique <samueloph@debian.org>, Sergio Durigan
+line	6	curl-8.14.1.tar.xz:curl-8.14.1/scripts/checksrc-all.sh	# Copyright (C) Viktor Szakats
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/CMakeLists.txt	# Copyright (C) Viktor Szakats, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/wcurl	# Except as contained in this notice, the name of a copyright holder shall not be
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/wcurl	# NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	# Update copyright and license information
+line	286	curl-8.14.1.tar.xz:curl-8.14.1/CMake/CMakeConfigurableFile.in	# are also available at https://curl.se/docs/copyright.html.
+line	9	curl-8.14.1.tar.xz:curl-8.14.1/m4/xc-am-iface.m4	# copyright notice and this permission notice appear in all copies.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/install-sh	# following copyright and license.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/wcurl	# this Software without prior written authorization of the copyright holder.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/wcurl	# with or without fee is hereby granted, provided that the above copyright
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	## License and copyright
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/tool_version.h	#define CURL_COPYRIGHT LIBCURL_COPYRIGHT
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/include/curl/curlver.h	#define LIBCURL_COPYRIGHT "Daniel Stenberg, <daniel@haxx.se>."
+line	18	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/backup_gnv_curl_src.com	$! Copyright (C) John Malmberg
+line	18	curl-8.14.1.tar.xz:curl-8.14.1/packages/vms/backup_gnv_curl_src.com	$! copyright notice and this permission notice appear in all copies.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/internals/CHECKSRC.md	- `COPYRIGHTYEAR`: the current changeset has not updated the copyright year in
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/internals/CHECKSRC.md	- `COPYRIGHT`: the file is missing a copyright statement
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/data/test1185	./%LOGDIR/code1185.c:1:1: error: Missing copyright statement (COPYRIGHT)
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/data/test1705	.\\" * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/tests/data/test1705	.\\" * are also available at https://curl.se/docs/copyright.html.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/managen	.\\\\" * Copyright (C) Daniel Stenberg, <daniel\\@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/scripts/managen	.\\\\" * are also available at https://curl.se/docs/copyright.html.
+line	6	curl-8.14.1.tar.xz:curl-8.14.1/lib/curl_config.h.in	/* !checksrc! disable COPYRIGHT all */
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/OS400/curl.cmd	/* Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.                   */
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/lib/curlx/inet_pton.c	/* Copyright (c) Internet Software Consortium.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/include/curl/curlver.h	/* This is the global package copyright */
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/packages/OS400/curl.cmd	/* are also available at https://curl.se/docs/copyright.html.                */
+line	23	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/_AUTHORS.md	<!-- Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al. -->
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.in	@CURL_CA_EMBED_SET_FALSE@\techo '/* !checksrc! disable COPYRIGHT all */' > $(CA_EMBED_CSOURCE)
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.in	@HAVE_LIBZ_FALSE@@USE_MANUAL_TRUE@\techo '/* !checksrc! disable COPYRIGHT all */' > $(HUGE);   \\
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.in	@HAVE_LIBZ_TRUE@@USE_MANUAL_TRUE@\techo '/* !checksrc! disable COPYRIGHT all */' > $(HUGE);   \\
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/src/Makefile.in	@USE_MANUAL_FALSE@\techo '/* !checksrc! disable COPYRIGHT all */' > $(HUGE);   \\
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/configure.ac	AC_COPYRIGHT([Copyright (C) Daniel Stenberg, <daniel@haxx.se>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/configure.ac	AH_TOP([/* !checksrc! disable COPYRIGHT all */])
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	COPYRIGHT AND PERMISSION NOTICE
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/configure	Copyright (C) Daniel Stenberg, <daniel@haxx.se>
+line	77	curl-8.14.1.tar.xz:curl-8.14.1/CHANGES.md	Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/winbuild/README.md	Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.\r
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	Copyright (c) 1996 - 2025, Daniel Stenberg, <daniel@haxx.se>, and many
+line	2	curl-8.14.1.tar.xz:curl-8.14.1/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	Except as contained in this notice, the name of a copyright holder shall not
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/libcurl/symbols-in-versions	LIBCURL_COPYRIGHT               7.18.0
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/GOVERNANCE.md	The copyrights in the project are owned by the individuals and organizations
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	This means that all files need to have their license and copyright information
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	When changing existing source code, you do not alter the copyright of the
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	You can manually verify the copyright and compliance status by running the
+line	4	curl-8.14.1.tar.xz:curl-8.14.1/docs/libcurl/libcurl-symbols.md	c: Copyright (C) Daniel Stenberg, <daniel.se>, et al.
+line	781	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/abstract-unix-socket.md	c: Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/mptcp.md	c: Copyright (C) Dorian Craps, <dorian.craps@student.vinci.be>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/cmdline-opts/ipfs-gateway.md	c: Copyright (C) Mark Gaiser, <markg85@gmail.com>
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/wcurl.md	c: Copyright (C) Samuel Henrique <samueloph@debian.org>, Sergio Durigan Junior <sergiodj@debian.org> and many contributors, see the AUTHORS file.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/configure.ac	dnl configure script copyright
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	in this Software without prior written authorization of the copyright holder.
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	original file(s). The copyright is still owned by the original creator(s) or
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/winbuild/makedebug.bat	rem * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.\r
+line	3	curl-8.14.1.tar.xz:curl-8.14.1/projects/build-openssl.bat	rem * Copyright (C) Steve Holme, <steve_holme@hotmail.com>.\r
+line	4	curl-8.14.1.tar.xz:curl-8.14.1/projects/build-openssl.bat	rem * are also available at https://curl.se/docs/copyright.html.\r
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/docs/CONTRIBUTE.md	those who have been assigned copyright by the original author(s).
+line	1	curl-8.14.1.tar.xz:curl-8.14.1/COPYING	with or without fee is hereby granted, provided that the above copyright
