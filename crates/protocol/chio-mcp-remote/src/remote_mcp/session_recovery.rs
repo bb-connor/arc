@@ -143,6 +143,15 @@ pub(super) async fn restore_persisted_sessions(
                     }
                     continue;
                 }
+                // Authority may lapse while the restored generation persists.
+                if session.subscription_authority_expired() {
+                    warn!(session_id = %record.session_id,
+                        "terminating restored MCP session whose subscription authority lapsed");
+                    sessions
+                        .transition_to_terminal(&session, TerminalReason::SubscriptionNotRestored)
+                        .await?;
+                    continue;
+                }
                 sessions.insert_active(session).await;
             }
             Ok(None) => warn!(session_id = %record.session_id,

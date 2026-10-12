@@ -34,6 +34,13 @@ impl ResourceSubscriptionObserver for RecordingObserver {
     fn unsubscribed(&self, uri: &str) -> Result<(), AdapterError> {
         self.record(format!("unsubscribed {uri}"))
     }
+
+    fn authority_lost(&self, uri: &str) {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("authority_lost {uri}"));
+    }
 }
 
 fn observed_edge() -> (ChioMcpEdge, Arc<RecordingObserver>, String) {
@@ -146,5 +153,37 @@ fn a_refused_unsubscription_keeps_the_subscription() {
             .filter(|call| call.starts_with("unsubscribed"))
             .count(),
         2
+    );
+}
+
+fn resource_updates(edge: &mut ChioMcpEdge) -> usize {
+    edge.take_pending_notifications()
+        .iter()
+        .filter(|notification| notification["method"] == "notifications/resources/updated")
+        .count()
+}
+
+#[test]
+fn an_update_is_emitted_only_while_its_capability_still_authorizes_it() {
+    let (mut edge, observer, capability_id) = observed_edge();
+    assert_eq!(
+        request(&mut edge, 2, "resources/subscribe")["result"],
+        json!({})
+    );
+    edge.notify_resource_updated(URI);
+    assert_eq!(resource_updates(&mut edge), 1);
+
+    edge.kernel.revoke_capability(&capability_id).unwrap();
+    edge.notify_resource_updated(URI);
+    assert_eq!(resource_updates(&mut edge), 0);
+    edge.notify_resource_updated(URI);
+    assert_eq!(resource_updates(&mut edge), 0);
+    assert_eq!(
+        observer
+            .calls()
+            .iter()
+            .filter(|call| call.starts_with("authority_lost"))
+            .collect::<Vec<_>>(),
+        vec![&format!("authority_lost {URI}")]
     );
 }

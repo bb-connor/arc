@@ -554,7 +554,7 @@ impl ChioMcpEdge {
                         related_task_id.as_deref(),
                     )),
                 LateSessionEvent::ResourceUpdated { uri } => {
-                    if self.config.resources_subscribe {
+                    if self.config.resources_subscribe && self.resource_update_authorized(&uri) {
                         self.pending_notifications.push(json!({
                             "jsonrpc": "2.0",
                             "method": "notifications/resources/updated",
@@ -590,6 +590,42 @@ impl ChioMcpEdge {
                 }
             }
         }
+    }
+
+    /// Rechecks the subscription's bound capability before its update becomes
+    /// a frame. A failure stops every later resource update on this session.
+    fn resource_update_authorized(&mut self, uri: &str) -> bool {
+        if self.subscription_authority_lost {
+            return false;
+        }
+        let checked = match self.subscription_capabilities.get(uri).and_then(|id| {
+            self.capabilities
+                .iter()
+                .find(|capability| &capability.id == id)
+        }) {
+            Some(capability) => self
+                .kernel
+                .check_resource_subscription_authority(capability, &self.agent_id, uri)
+                .map_err(|error| error.to_string()),
+            None => Err("no capability is bound to the subscription".to_string()),
+        };
+        let Err(error) = checked else {
+            return true;
+        };
+        self.subscription_authority_lost = true;
+        self.emit_log(
+            LogLevel::Warning,
+            "chio.mcp.resources",
+            json!({
+                "event": "resource_subscription_authority_lost",
+                "uri": uri,
+                "error": error,
+            }),
+        );
+        if let Some(observer) = &self.resource_subscription_observer {
+            observer.authority_lost(uri);
+        }
+        false
     }
 
     pub fn notify_resource_updated(&mut self, uri: &str) {

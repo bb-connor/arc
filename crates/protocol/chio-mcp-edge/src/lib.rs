@@ -217,6 +217,10 @@ pub trait ResourceSubscriptionObserver: Send + Sync {
 
     /// The subscription to `uri` is about to be removed.
     fn unsubscribed(&self, uri: &str) -> Result<(), AdapterError>;
+
+    /// A subscription failed its authority check at emission. The edge has
+    /// already stopped emitting resource updates for this session.
+    fn authority_lost(&self, uri: &str);
 }
 
 /// Trait for communicating with an MCP server.
