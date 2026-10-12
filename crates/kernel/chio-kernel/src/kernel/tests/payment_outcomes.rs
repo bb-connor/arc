@@ -183,6 +183,18 @@ impl Fixture {
         capture: CaptureOutcome,
         release: ReleaseOutcome,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::with_grant(
+            capture,
+            release,
+            super::sim_payment::make_no_ceiling_mustprepay_grant(),
+        )
+    }
+
+    fn with_grant(
+        capture: CaptureOutcome,
+        release: ReleaseOutcome,
+        grant: ToolGrant,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut kernel = make_kernel(make_monetary_config());
         let counters = PaymentCounters::default();
         kernel.set_payment_adapter(Box::new(OutcomePaymentAdapter {
@@ -195,11 +207,7 @@ impl Fixture {
             invocations: Arc::clone(&counters.invocations),
         }));
         let agent = make_keypair();
-        let cap = kernel.issue_capability(
-            &agent.public_key(),
-            make_scope(vec![super::sim_payment::make_no_ceiling_mustprepay_grant()]),
-            300,
-        )?;
+        let cap = kernel.issue_capability(&agent.public_key(), make_scope(vec![grant]), 300)?;
         let mut intent = super::sim_payment::make_mustprepay_intent(
             "outcome-intent",
             "cost-srv",
@@ -358,6 +366,44 @@ async fn hosted_capture_error_retains_positive_authorization() -> TestResult {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn nested_capture_error_retains_positive_authorization() -> TestResult {
     assert_capture_error_retains_authorization(true).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn budgeted_capture_error_records_retention_without_changing_delivery() -> TestResult {
+    for nested in [false, true] {
+        for error in [
+            ErrorKind::Unavailable,
+            ErrorKind::RailError,
+            ErrorKind::Declined,
+            ErrorKind::InsufficientFunds,
+        ] {
+            let fixture = Fixture::with_grant(
+                CaptureOutcome::Error(error),
+                ReleaseOutcome::Status(RailSettlementStatus::Released),
+                make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
+            )?;
+            let response = fixture.evaluate(nested).await?;
+            fixture.assert_dispatch_and_terminal(&response)?;
+            assert_eq!(response.verdict, Verdict::Allow);
+            assert!(response.output.is_some());
+            assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
+            assert!(fixture
+                .counters
+                .authorization_retained
+                .load(Ordering::SeqCst));
+            let financial = financial(&response);
+            assert_eq!(financial["settlement_status"], "failed");
+            assert_eq!(financial["payment_reference"], AUTHORIZATION_ID);
+            assert_eq!(financial["authorization_id"], AUTHORIZATION_ID);
+            assert_eq!(financial["release_outcome"], "not_released");
+            assert_eq!(financial["payment_authorization_retained"], true);
+            assert_eq!(financial["payment_capture_ambiguous"], true);
+            assert_eq!(financial["payment_capture_error_code"], error.code());
+            assert!(!financial.to_string().contains(SENSITIVE_ERROR));
+            fixture.assert_audit_fault("post_execution_payment_capture_outcome_unknown");
+        }
+    }
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
