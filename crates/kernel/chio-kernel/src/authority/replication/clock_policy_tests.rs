@@ -1,4 +1,5 @@
 use super::*;
+use crate::authority::AuthorityTrustedKeySnapshot;
 
 fn envelope() -> Result<(SignedAuthoritySnapshot, AuthorityReplicationAnchor), AuthorityStoreError>
 {
