@@ -18,7 +18,7 @@ Tests live in `crates/security/chio-security-kernel/tests/dispatch_revalidation.
 
 ## Boundaries
 
-This repairs the last read-only dispatch check. It is not a same-writer closure fence and does not claim linearization across an independent remote store write. D5 delegated mint authority and the broader KSPEC-04 closure/drain phases remain separate work. Do not introduce an optional delegation wrapper or claim control over offline signature construction.
+This repairs the last read-only dispatch check. It is not a same-writer closure fence and does not claim linearization across an independent remote store write. The broader KSPEC-04 closure/drain phases remain separate work. Delegation presentation enforcement is included below. Do not introduce an optional delegation wrapper or claim control over offline signature construction.
 
 ## Qualification
 
@@ -37,4 +37,4 @@ The public non-tool validator admits issuer-signed delegated resource capabiliti
 - The tool invocation ban remains in force. No new capability minting interface is added.
 - Freeze-window replay after lift remains open because the authority has no retained interval history. Current presentation checks do not prove when an offline signature was created.
 
-Public Original `87238093c2` (unchanged delegation admission plus `fe2704734e` tests) passed three positive controls and failed four refusal controls: frozen subscription, frozen parent registration, missing authority and configured authority without signed binding. `6a01f759dd` implements the common admission check. `e65aeb0917` adds the exact public tool-ban control. Final combined candidate `8503a2e5f4` is under focused and strict qualification.
+Public Original `87238093c2` (unchanged delegation admission plus `fe2704734e` tests) passed three positive controls and failed four refusal controls: frozen subscription, frozen parent registration, missing authority and configured authority without signed binding. `6a01f759dd` implements the common admission check. `e65aeb0917` adds the public tool-ban control; `8fddc6c502` asserts the exact public error boundary. All eight public tests pass at `8fddc6c502`; combined strict qualification remains pending.
