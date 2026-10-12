@@ -661,7 +661,11 @@ mod settlement_routing_tests {
 
         let result = harness.kernel.record_chio_receipt(&receipt);
 
-        assert!(matches!(result, Err(KernelError::ReceiptPersistence(_))));
+        let Err(KernelError::ReceiptAppendOutcomeUnknown { receipt_id, source }) = result else {
+            panic!("a store error cannot certify non-commit at the kernel boundary");
+        };
+        assert_eq!(receipt_id, receipt.id);
+        assert!(matches!(*source, KernelError::ReceiptPersistence(_)));
         let state = harness.store.state();
         assert!(state.receipts.is_empty());
         assert!(state.attempts.is_empty());

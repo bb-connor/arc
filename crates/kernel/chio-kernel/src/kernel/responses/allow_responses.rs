@@ -138,7 +138,12 @@ impl ChioKernel {
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
             memory_action_kind.as_ref()
         {
-            self.append_memory_provenance_for_write(store, key, request, &receipt)?;
+            self.append_memory_provenance_for_write(store, key, request, &receipt)
+                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
+                    receipt_id: receipt.id.clone(),
+                    step: ReceiptDeliveryStep::Provenance,
+                    source: Box::new(source),
+                })?;
         }
 
         // Mint a short-lived, single-use execution nonce for allow responses
@@ -146,9 +151,13 @@ impl ChioKernel {
         // to execute must not chain-mint a replacement for the same call.
         let execution_nonce = match nonce {
             AllowResponseNonce::Preminted(nonce) => Some(nonce),
-            AllowResponseNonce::MintForAllow => {
-                self.mint_execution_nonce_for_allow(request, cap, &receipt)?
-            }
+            AllowResponseNonce::MintForAllow => self
+                .mint_execution_nonce_for_allow(request, cap, &receipt)
+                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
+                    receipt_id: receipt.id.clone(),
+                    step: ReceiptDeliveryStep::ExecutionNonce,
+                    source: Box::new(source),
+                })?,
             AllowResponseNonce::Suppressed => None,
         };
 
