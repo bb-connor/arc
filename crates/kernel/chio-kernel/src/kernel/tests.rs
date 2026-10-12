@@ -257,6 +257,8 @@ mod multi_tenant_receipt;
 mod nested_url_side_effects;
 #[path = "tests/payment_ambiguity.rs"]
 mod payment_ambiguity;
+#[path = "tests/payment_outcomes.rs"]
+mod payment_outcomes;
 #[path = "tests/post_payment_revalidation.rs"]
 mod post_payment_revalidation;
 #[path = "tests/prepared_dispatch_credentials.rs"]
