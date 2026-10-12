@@ -7,6 +7,58 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## SDK, wire and reviewed P3 landings (October 12 UTC)
+
+The next confirmed source snapshot is `d06f151ecf`, with live PR identities
+checked at 15:32Z. `landing_wave_continuation_20261012` records the exact SDK,
+recovery-clock, P3 and wire heads and merges. Twenty-one existing current
+requirement mappings advance; the SDK corpus and sibling clock fixtures receive
+two supplemental observations. All **2,029 original requirement objects** and
+their original current-map IDs remain unchanged.
+
+| Scope | Landed PR | Merge | Scoped evidence |
+|-------|-----------|-------|-----------------|
+| F086 and shared process SDK corpus | [#1217](https://github.com/bb-connor/arc/pull/1217) | `e545b1c021` | One governed-intent regression, one socket-corpus harness, Node 77/0, Python 54 plus 399 subtests, five qualifier controls, strict all-target lint and schema checks. |
+| Eight sibling recovery clock fixtures | [#1218](https://github.com/bb-connor/arc/pull/1218) | `143cd4c15b` | Claude reports 36/0 recovery tests, genuine 1,100 ms-delay Original/GREEN, strict lint, clock gate and format. |
+| Seventeen reviewed P3 repairs | [#1220](https://github.com/bb-connor/arc/pull/1220) | `d65d461c9b` | Reported aarch64 component suites and strict lint across nine crates; failed full core-types result retained separately. |
+| F070/F071 security wire contracts | [#1219](https://github.com/bb-connor/arc/pull/1219) | `d06f151ecf` | Canonical-key regression 1/0, Rust wire schemas 13/0, strict core-types/xtask lint, schema registry and trust inventory 497/88/181. |
+
+The [SDK producer audit](audits/process-sdk-corpus-20261012.json) preserves the
+earlier 615 core-types and 112 process invocations, source SDK results and
+installed-artifact checks. Installed wheel and rebuilt sdist-wheel runs each
+passed 49 behavioral tests with five optional schema-tool skips; installed Node
+passed 77 with no skips. Those results retain their older source and dependency
+bounds. They do not establish complete native installed starter/recovery
+acceptance on this main candidate.
+
+The [wire producer audit](audits/security-wire-contracts-20261012.json) retains
+the broader Rust and four-language generation/consumer evidence and disclosed
+Go, Unicode and identifier-bound limits. The composition logs renew only the
+named checks above. Between #1219's head and squash, the generated Rust file
+also acquired F108's one-line header-path comment correction from #1220.
+The current mapping records both hashes and that inspected difference; the
+generated behavior bytes are unchanged by the comment correction.
+
+#1220 maps F087, F088, F090, F098-F102, F105-F110 and F113-F115 to their
+retained reviewed producers and exact landed files. Claude reports keyring 174,
+secret-broker 295, data-guards 150, provider-adapter-core 54, spec-codegen 29,
+kernel nonce 106 and CLI provision 42 passing tests. The reference-swarm example
+build and Kubernetes controller Go tests are reported separately.
+
+The reported full core-types campaign had **537 passes and one failure caused
+by a missing Python module**. The later wire-vector checker passed 90 positive and 270
+negative cases. That scoped success does not replace the failed full-suite
+outcome. F091 was already on main: all 24 obsolete standalone lifecycle-lock
+imports are absent. It is recorded as existing source, with no fresh macOS
+qualification and no claim that it was newly landed in #1220.
+
+The source-landing policy and incomplete acceptance recorded below continue to
+apply. The older producer audits retain their historical private-source status;
+these current mappings record the subsequent publication and source merging.
+F112, F040, F020 and Root's F094-F097 composition remain outside this confirmed
+source snapshot. Full hosted, native, trusted and operational acceptance remains
+separate from these landings.
+
 ## October 12 follow-up landing wave
 
 The current source snapshot ends at [#1215](https://github.com/bb-connor/arc/pull/1215),
