@@ -511,7 +511,10 @@ pub enum StopControlError {
     BadRequest(String),
     /// The stop holds in this process, but no durable record committed.
     #[error("stop is not durable: {detail}")]
-    NotDurable { detail: String, status: StopStatus },
+    NotDurable {
+        detail: String,
+        status: Box<StopStatus>,
+    },
     #[error("stop head moved")]
     HeadMoved { head: Option<StopEpochId> },
     #[error("stop control is not ready: {0}")]
@@ -547,20 +550,18 @@ impl StopControlError {
     /// stop it holds.
     #[must_use]
     pub fn body(&self) -> serde_json::Value {
-        let mut body = serde_json::json!({
-            "error": self.code(),
-            "message": self.to_string(),
-        });
-        match self {
-            Self::NotDurable { status, .. } => {
-                body["status"] = serde_json::to_value(status).unwrap_or(serde_json::Value::Null);
-            }
-            Self::HeadMoved { head } => {
-                body["head"] = serde_json::to_value(head).unwrap_or(serde_json::Value::Null);
-            }
-            _ => {}
+        let mut body = serde_json::Map::new();
+        body.insert("error".into(), self.code().into());
+        body.insert("message".into(), self.to_string().into());
+        let detail = match self {
+            Self::NotDurable { status, .. } => Some(("status", serde_json::to_value(status))),
+            Self::HeadMoved { head } => Some(("head", serde_json::to_value(head))),
+            _ => None,
+        };
+        if let Some((field, value)) = detail {
+            body.insert(field.into(), value.unwrap_or(serde_json::Value::Null));
         }
-        body
+        serde_json::Value::Object(body)
     }
 }
 
@@ -678,7 +679,7 @@ impl StopControl {
                 tracing::error!(error = %error, "durable stop append failed; holding the stop in this process");
                 Err(StopControlError::NotDurable {
                     detail: error.to_string(),
-                    status: self.status(),
+                    status: Box::new(self.status()),
                 })
             }
         }

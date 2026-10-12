@@ -42,6 +42,14 @@ fn emergency_stop_forces_deny_on_next_evaluate() {
             .and_then(serde_json::Value::as_str),
         Some("reusable")
     );
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/retryable_after_resume")),
+        Some(&serde_json::Value::Bool(true))
+    );
 }
 
 #[test]
