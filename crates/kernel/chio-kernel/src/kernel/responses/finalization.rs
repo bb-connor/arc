@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(any(test, feature = "finding-market"))]
 pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) charge_result: Option<BudgetChargeResult>,
     pub(crate) reported_cost: Option<ToolInvocationCost>,
@@ -28,6 +29,7 @@ impl ChioKernel {
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
+    #[cfg(test)]
     pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,

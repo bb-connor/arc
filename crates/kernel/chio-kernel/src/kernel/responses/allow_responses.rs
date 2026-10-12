@@ -37,32 +37,6 @@ pub(crate) enum PreflightNonceSource {
 impl ChioKernel {
     #[allow(
         clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
-        &self,
-        request: &ToolCallRequest,
-        output: ToolCallOutput,
-        timestamp: u64,
-        matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-        nonce: AllowResponseNonce,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let prepared = self.prepare_allow_response_with_metadata_and_payee_binding(
-            request,
-            output,
-            timestamp,
-            matched_grant_index,
-            extra_metadata,
-            verified_payee_binding,
-            nonce,
-        )?;
-        self.publish_prepared_response(request, prepared)
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
         reason = "Preparation preserves the existing response input contract."
     )]
     pub(in crate::kernel) fn prepare_allow_response_with_metadata_and_payee_binding(

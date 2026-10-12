@@ -141,19 +141,6 @@ pub(crate) struct SecurityRequestLifecycleHandle {
 }
 
 impl SecurityRequestLifecycleHandle {
-    /// Final release gates response publication, including a signed denial
-    /// after tool execution. A failed response never asserts successful release.
-    pub(super) fn finish_response<T>(
-        response: Result<T, KernelError>,
-        permit: Option<Self>,
-    ) -> Result<T, KernelError> {
-        let response = response?;
-        if let Some(permit) = permit {
-            permit.ensure_final_release()?;
-        }
-        Ok(response)
-    }
-
     pub(super) fn new(
         permit: Box<dyn SecurityRequestLifecyclePermit>,
         context: &SecurityPreDispatchContext<'_>,
