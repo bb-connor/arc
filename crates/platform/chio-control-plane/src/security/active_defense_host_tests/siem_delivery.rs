@@ -2,6 +2,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
 use super::*;
+use crate::security::ProductionActiveDefenseHostError;
 
 const DELIVERY_TICKS: u64 = 20;
 const EXHAUSTING_MAX_ATTEMPTS: u32 = 2;
@@ -266,12 +267,29 @@ async fn production_host_delivers_a_paged_escalation_alert_to_the_siem_backend()
     .await;
     let delivered = backend.alerts();
     let remaining = outbox_rows(&alert_path);
+    let readiness = host.ensure_ready();
     host.shutdown()
         .await
         .unwrap_or_else(|error| panic!("shutdown host: {error}"));
 
     let health =
         observed.unwrap_or_else(|_| panic!("host worker did not complete {DELIVERY_TICKS} ticks"));
+    assert!(
+        readiness.is_ok(),
+        "a delivered alert must leave the host ready: {readiness:?}"
+    );
+    let delivery = health
+        .security_alert_delivery
+        .clone()
+        .unwrap_or_else(|| panic!("the host worker must report alert delivery: {health:?}"));
+    assert!(
+        delivery.delivered >= 1 && delivery.passes >= 1,
+        "delivery health must count the delivered alert: {delivery:?}"
+    );
+    assert_eq!(
+        (delivery.pending, delivery.parked, delivery.last_error),
+        (0, 0, None)
+    );
     assert_eq!(
         health.lifecycle,
         ResponseWorkerLifecycle::Ready,
@@ -354,12 +372,33 @@ async fn production_host_readiness_reports_an_alert_that_exhausted_siem_delivery
         "precondition: every attempt must have reached the SIEM backend"
     );
 
+    let reported = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        loop {
+            let health = host.worker_health();
+            if health
+                .security_alert_delivery
+                .as_ref()
+                .is_some_and(|delivery| delivery.parked == 1)
+            {
+                break health;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
     let readiness = host.ensure_ready();
     let health = host.worker_health();
     host.shutdown()
         .await
         .unwrap_or_else(|error| panic!("shutdown host: {error}"));
 
+    let reported = reported
+        .unwrap_or_else(|_| panic!("worker health never reported the parked alert: {health:?}"));
+    assert_eq!(
+        reported.lifecycle,
+        ResponseWorkerLifecycle::Ready,
+        "an exhausted alert must not degrade the response worker"
+    );
     let Err(error) = readiness else {
         panic!(
             "production host readiness stayed Ok after its paged security alert exhausted \
@@ -368,8 +407,132 @@ async fn production_host_readiness_reports_an_alert_that_exhausted_siem_delivery
             backend.attempts()
         );
     };
+    assert!(
+        matches!(
+            error,
+            ProductionActiveDefenseHostError::ExhaustedSecurityAlerts { exhausted: 1 }
+        ),
+        "{error}"
+    );
     assert_eq!(
         error.to_string(),
         "security alerts that exhausted SIEM delivery: 1"
     );
 }
+
+/// SIEM backend whose dispatch never completes.
+#[derive(Default)]
+struct HangingAlertBackend {
+    entered: AtomicBool,
+}
+
+impl AlertBackend for HangingAlertBackend {
+    fn name(&self) -> &str {
+        "active-defense-host-hanging"
+    }
+
+    fn dispatch<'a>(
+        &'a self,
+        _: &'a Alert,
+    ) -> Pin<Box<dyn Future<Output = Result<(), ExportError>> + Send + 'a>> {
+        Box::pin(async move {
+            self.entered.store(true, Ordering::SeqCst);
+            std::future::pending::<()>().await;
+            Ok(())
+        })
+    }
+}
+
+#[tokio::test]
+async fn containment_expiry_continues_while_siem_delivery_hangs() {
+    let mut fixture = HostFixture::new();
+    let alert_directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("alert tempdir: {error}"));
+    let alert_path = alert_directory.path().join("hanging-alerts.sqlite");
+    let backend = Arc::new(HangingAlertBackend::default());
+    install_alert_outbox(
+        &mut fixture,
+        &alert_path,
+        Arc::clone(&backend) as Arc<dyn AlertBackend>,
+        3,
+    );
+    let expires_at_unix_ms = fixture.install_ttl_containment_plan();
+    let paged_at_unix_ms = fixture
+        .clock
+        .read_now_unix_ms()
+        .unwrap_or_else(|error| panic!("read fixture clock: {error}"));
+    apply_escalation_plan(&fixture, paged_at_unix_ms);
+    let paged = outbox_rows(&alert_path);
+    assert!(
+        paged
+            .iter()
+            .any(|row| row.status == "pending" && row.attempts == 0),
+        "precondition: a due alert must be waiting for delivery: {paged:?}"
+    );
+
+    let mut host =
+        ProductionActiveDefenseHost::start(Arc::clone(&fixture.registry), fixture.config.clone())
+            .await
+            .unwrap_or_else(|error| panic!("start host: {error}"));
+    let hanging = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        while !backend.entered.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    let ticks_before_expiry = host.worker_health().ticks_completed;
+    fixture.clock.set(expires_at_unix_ms.saturating_add(1));
+    // A tick may lift the overlay before it completes, so also wait for a
+    // completed tick after the clock moved.
+    let lifted = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        while fixture.has_active_overlay_contributions()
+            || host.worker_health().ticks_completed <= ticks_before_expiry
+        {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await;
+    let health = host.worker_health();
+    let shutdown = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, host.shutdown()).await;
+
+    assert!(hanging.is_ok(), "delivery never reached the SIEM backend");
+    assert!(
+        lifted.is_ok(),
+        "a hanging SIEM delivery stranded the expired containment overlay: {health:?}"
+    );
+    assert!(
+        health.ticks_completed > ticks_before_expiry,
+        "response ticks stopped while SIEM delivery hung: {health:?}"
+    );
+    assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Ready);
+    assert_eq!(
+        health
+            .security_alert_delivery
+            .as_ref()
+            .map(|delivery| delivery.passes),
+        Some(0),
+        "the hanging pass must still be in flight: {health:?}"
+    );
+    match shutdown {
+        Ok(result) => result.unwrap_or_else(|error| panic!("shutdown host: {error}")),
+        Err(_) => panic!("host shutdown waited on the hanging SIEM delivery"),
+    }
+    let record = fixture
+        .security_store
+        .load_plan(&ResponsePlanKey {
+            tenant_id: TenantId::new("tenant-host-lifecycle")
+                .unwrap_or_else(|error| panic!("tenant: {error}")),
+            action_id: ActionId::new("host-lifecycle-ttl-action")
+                .unwrap_or_else(|error| panic!("action: {error}")),
+        })
+        .unwrap_or_else(|error| panic!("load lifted response: {error}"))
+        .unwrap_or_else(|| panic!("lifted response missing"));
+    assert_eq!(
+        decode_response_record(&record)
+            .unwrap_or_else(|error| panic!("decode lifted response: {error}"))
+            .state,
+        ResponseState::Lifted
+    );
+}
+
+mod outages;

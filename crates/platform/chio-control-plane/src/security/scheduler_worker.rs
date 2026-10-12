@@ -109,6 +109,8 @@ pub struct ResponseWorkerHealth {
     pub last_tick_completed_sequence: Option<u64>,
     pub tick_in_flight: bool,
     pub last_error: Option<String>,
+    /// Security alert delivery driven by this worker, when configured.
+    pub security_alert_delivery: Option<SecurityAlertDeliveryHealth>,
 }
 
 impl ResponseWorkerHealth {
@@ -125,9 +127,14 @@ impl ResponseWorkerHealth {
             last_tick_completed_sequence: None,
             tick_in_flight: false,
             last_error: None,
+            security_alert_delivery: None,
         }
     }
 }
+
+mod alert_delivery;
+pub(in crate::security) use alert_delivery::SecurityAlertDelivery;
+pub use alert_delivery::SecurityAlertDeliveryHealth;
 
 mod outbox;
 
@@ -160,6 +167,7 @@ mod tests;
 
 pub struct ProductionResponseWorker {
     port: Arc<dyn ResponseWorkerPort>,
+    alert_delivery: Option<Arc<SecurityAlertDelivery>>,
     next_tick_sequence: AtomicU64,
     shutdown_requested: AtomicBool,
     shutdown_completed: AtomicBool,

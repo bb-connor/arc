@@ -1,0 +1,96 @@
+{
+  "schema": "chio.security.local-repair-qualification.v1",
+  "requirement": "F041",
+  "base": "2f4479829e013b972fa914db81d78b27e0220b0d",
+  "preserved_producer": "b216cbfdbf50fc399d225763c900ae5b0072efd0",
+  "test_only_current_original": "c8700357b78b5af6b40a4de050b2efda2055510f",
+  "status": "locally_qualified_independently_reviewed_private",
+  "source_patch_sha256": "1e6bfa0a24d1d6e753bc1315f2b8b8f6e782cb08c13d626f1f8359c70ffeed02",
+  "rust_source_sha256": {
+    "crates/platform/chio-control-plane/src/security.rs": "ee9cea01e0ddf29b7d78fa8fb094a8ca8905b995d43249844c7ac2411ca99f17",
+    "crates/platform/chio-control-plane/src/security/active_defense_host_tests.rs": "556c50572be9f6d1a403d76e9ec09812908b5e04644138e4ea5fe0f614f3d72b",
+    "crates/platform/chio-control-plane/src/security/active_defense_host_tests/siem_delivery.rs": "73f627a6dd929bfa8f7370455ca0aefe40c8799f994c1da9b0dae36bb9fd7f0f",
+    "crates/platform/chio-control-plane/src/security/active_defense_host_tests/siem_delivery/outages.rs": "a7a71829860a9f3d2238616c9aa1929e7a3c6cf8984e8fd2fc351c067cde77df",
+    "crates/platform/chio-control-plane/src/security/adapters.rs": "a396b4ae8563812ac9b10729753078efd091b4f21f3c0a474a4563554942b4a7",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs": "55b0cc9cbbdb950dad561efcb856c11c9eb4aa6736ab5d5b1a3d53b0abf3194c",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery.rs": "532d5c8771e317cb31ae4cfc1c77ea535dc0eb656d02a32cd0f85f0887176a5c",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs": "c2503781a1d947bcfe620bd26eb66a57117cdd9174f290432593296b88627d32",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/tests.rs": "efd736bc4943e1d128b6d4e29473e0aa54d128e4c2e1451e2ae8a9f263af9377",
+    "crates/platform/chio-control-plane/src/security/orchestration.rs": "3ba9bdd8b2f1e06491015d0a5e0e4a685810ec7933a59cf0eb899b285e539ef2",
+    "crates/platform/chio-control-plane/src/security/orchestration/teardown.rs": "9de5d17e6e61296d201380aea2a359c62acf36b4ad8cf9eaaf215b6c89517c3c",
+    "crates/platform/chio-control-plane/src/security/scheduler_worker.rs": "d7e2c5c87a877baa3af8a2ff1e1a1a8976f5cfa2f38b3392711b605361df9a2b",
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/alert_delivery.rs": "6e9b26436617743cf64e085b02f110dbe1e13cc53b1b123f1804025d4eedf2b7",
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/tests/alert_delivery_passes_are_bounded_and_report_parked_alerts.rs": "4e367b7367ca0a50862aef363d57c07dc3711a55cdb35431b2abb5bf207ca320",
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/worker.rs": "ce7e245d0470af7b1d477cf8739348c352396b87e8020f3fb27b0d5989f768bc"
+  },
+  "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/security-alert-delivery-20261012",
+  "archive_manifest_sha256": "4a0778bed0a078d1d914114be7b126e7c43d63c372e598824c110e80488d5218",
+  "results": {
+    "original_host_failures": {
+      "passed": 0,
+      "failed": 2,
+      "genuine": true
+    },
+    "review_counterexamples": {
+      "passed": 3,
+      "failed": 2,
+      "genuine": true,
+      "patch_sha256": "47f7e039b3d6eb385194db6b3bc1cbb79724b353ff429b1fae986dd452bd938a"
+    },
+    "focused_repair_controls": {
+      "passed": 12,
+      "failed": 0
+    },
+    "host_worker_response_simulation": {
+      "passed": 127,
+      "failed": 0
+    },
+    "native_security_evidence": {
+      "passed": 24,
+      "failed": 0
+    },
+    "strict_clippy": "pass_all_targets",
+    "format": "pass",
+    "rust_hygiene": "pass",
+    "negative_assertions": "pass",
+    "security_ci_contract": "pass_after_local_checkout_mode_correction"
+  },
+  "retained_unsuccessful_attempts": [
+    "Composed test compile missing host-error enum import; not a genuine runtime Original.",
+    "First repair compile decoded a SQLite timestamp as unsupported u64; fixed test type to i64.",
+    "CI contract refused group-writable private-checkout boundary files; only its 18 pinned file modes were corrected after the frozen Rust campaign, with all bytes unchanged."
+  ],
+  "review": {
+    "reviewer": "Claude/C7",
+    "decision": "approve",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "closed_findings": [
+      "ROOT-F041-PANIC",
+      "ROOT-F041-STORAGE"
+    ],
+    "accepted_limits": [
+      "Synchronous public readiness can wait on storage.",
+      "Health mutex poisoning reports a readiness failure."
+    ]
+  },
+  "design": [
+    "One async delivery implementation; managed blocking storage operations retain owned delivery custody until completion.",
+    "Whole-pass panic isolation and transaction rollback preserve expiry, recovery, readiness closure and next-pass recovery.",
+    "Existing integrity checks, per-backend confirmation and at-least-once deduplication are preserved.",
+    "Parked alerts remain parked across retry-limit changes; no requeue or discard API."
+  ],
+  "remaining_acceptance": [
+    "Compose after the active two-PR queue advances and qualify on actual main.",
+    "Exact-head hosted required checks and current independent landing review.",
+    "Production library-host wiring and native SIEM acceptance are not established by this local suite."
+  ],
+  "separate_preserved_obligations": [
+    "F045 producer/scheduler tenant alignment: 37b1a7e519.",
+    "F007/T12 admission through terminal cleanup backlog: 6f4c0ade1e."
+  ],
+  "authority_changes": false,
+  "formal_campaigns": false,
+  "ratchet_waivers": false
+}
