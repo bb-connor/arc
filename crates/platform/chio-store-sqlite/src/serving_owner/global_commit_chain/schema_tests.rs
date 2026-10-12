@@ -41,8 +41,8 @@ fn history_bytes(connection: &Connection) -> Result<Vec<u8>, Box<dyn std::error:
 
 #[test]
 fn supported_previous_global_schemas_preserve_history_when_adding_replay_kinds() -> TestResult {
-    let without_checkpoint =
-        GLOBAL_COMMIT_SCHEMA.replace(", 'security_participant_checkpoint'", "");
+    let without_stop = GLOBAL_COMMIT_SCHEMA.replace(", 'stop_epoch'", "");
+    let without_checkpoint = without_stop.replace(", 'security_participant_checkpoint'", "");
     let without_preflight =
         without_checkpoint.replace(", 'security_participant_nonce_preflight'", "");
     let without_output = without_preflight.replace(", 'security_participant_output'", "");
@@ -56,6 +56,7 @@ fn supported_previous_global_schemas_preserve_history_when_adding_replay_kinds()
     let without_status = without_runtime.replace(", 'finding_status'", "");
     let without_challenge = without_status.replace(", 'finding_challenge'", "");
     for schema in [
+        without_stop,
         without_checkpoint,
         without_preflight,
         without_output,
