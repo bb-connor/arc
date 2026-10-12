@@ -34,7 +34,7 @@ pub struct RuntimeTrustedVerifierKeysDocument {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RuntimeVerifierTrustBundleV4 {
+pub struct RuntimeVerifierTrustBundle {
     pub schema: String,
     pub verifier_id: String,
     pub key_id: String,
@@ -49,7 +49,7 @@ pub struct RuntimeVerifierTrustBundleV4 {
     pub expires_at_unix_ms: u64,
 }
 
-pub type SignedRuntimeVerifierTrustBundle = SignedExportEnvelope<RuntimeVerifierTrustBundleV4>;
+pub type SignedRuntimeVerifierTrustBundle = SignedExportEnvelope<RuntimeVerifierTrustBundle>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

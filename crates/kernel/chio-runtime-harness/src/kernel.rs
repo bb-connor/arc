@@ -158,7 +158,7 @@ pub(crate) fn runtime_loopback_policy_inputs(
         valid_until_unix_ms: expires_at_unix_ms,
         status: "active".to_string(),
     }];
-    let trust_body = chio_runtime_core::RuntimeVerifierTrustBundleV4 {
+    let trust_body = chio_runtime_core::RuntimeVerifierTrustBundle {
         schema: chio_runtime_core::CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         verifier_id: verifier_id.clone(),
         key_id: key_id.clone(),

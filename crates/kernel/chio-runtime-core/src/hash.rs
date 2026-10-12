@@ -42,7 +42,7 @@ pub fn runtime_admission_bundle_sha256(
 }
 
 pub fn runtime_verifier_trust_bundle_sha256(
-    bundle: &RuntimeVerifierTrustBundleV4,
+    bundle: &RuntimeVerifierTrustBundle,
 ) -> Result<String, ChioRuntimeError> {
     let bytes = canonical_json_bytes(bundle)
         .map_err(|error| ChioRuntimeError::Canonical(error.to_string()))?;
