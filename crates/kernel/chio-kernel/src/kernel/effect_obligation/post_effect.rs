@@ -182,7 +182,7 @@ fn record_durable_return<'a>(
         Ok(returned) => returned,
         Err(error) => return obligation.fail(failure("durable_return", error), None),
     };
-    // The atomic return commit now makes the original saga authoritative. Its
+    // The atomic return commit makes the original saga authoritative. Its
     // finalizer owns settlement, security release and the terminal outbox.
     let Some(mut parts) = obligation.parts.take() else {
         return obligation.ownership_failure("durable_return_handoff");

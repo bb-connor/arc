@@ -126,25 +126,8 @@ impl ChioKernel {
                 .unwrap_or_else(|| authority.public_key()),
         )?;
 
-        // WYSIWYS: bind the signature to the exact content this receipt's
-        // `content_hash` was derived from. The handle recomputes
-        // `sha256_hex(canonical_content)` and the signing primitive refuses to
-        // sign if it disagrees with `body.content_hash`, closing the
-        // render-A / sign-B hole on the production path. The
-        // canonical_content is the same preimage `receipt_content_for_output`
-        // hashed to produce `content_hash`.
-        let handle = ReceiptSigningHandle::from_content_preimage(canonical_content);
-
-        // Delegate the pure signing step to chio-kernel-core so the portable
-        // TCB stays in one place. The full kernel still owns body construction
-        // (tenant scope resolution, policy_hash injection, evidence assembly)
-        // because those are std/tokio-aware concerns.
-        //
-        // Verified-core boundary note:
-        // `formal/proof-manifest.toml` includes this shell method only for the
-        // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
-        // body assembly, metadata shaping, and persistence remain
-        // operational-shell behavior outside the current bounded proof claim.
+        // The signing handle binds the canonical content to body.content_hash.
+        // Body assembly and persistence are outside the portable signing boundary.
         chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
             use chio_kernel_core::ReceiptSigningError;
             let message = match error {

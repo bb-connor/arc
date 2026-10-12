@@ -622,11 +622,8 @@ impl ChioKernel {
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    // The tool ran (a side effect may have committed) but the
-                    // stream ended incomplete, so any runtime-admission lease
-                    // consumed at admission is retained, not released. Mark it
-                    // so the burned lease is recoverable from the receipt,
-                    // matching the RequestIncomplete error arm.
+                    // An incomplete stream retains any consumed runtime lease
+                    // because tool effects may have committed.
                     self.mark_runtime_admission_reservations_retained_fail_closed(
                         merged_extra_metadata,
                     ),
