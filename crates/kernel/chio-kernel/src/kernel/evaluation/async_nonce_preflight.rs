@@ -3,7 +3,9 @@
 use super::evaluation_helpers::{ExecutionNonceReservingResponse, PreDispatchCleanupDeny};
 use super::*;
 use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 use crate::kernel::responses::PreflightNonceSource;
+use crate::kernel::validation::ReservedPrepaymentFailure;
 
 /// Evaluation state at the strict-nonce preflight: every admission check has
 /// passed, the pre-execution hold is reserved, and no execution nonce was
@@ -274,7 +276,73 @@ impl ChioKernel {
             verified_governed_payee_binding.as_ref(),
         ) {
             Ok(prepayment) => prepayment,
-            Err(error) => {
+            Err(ReservedPrepaymentFailure::CaptureOutcomeUnknown(failure)) => {
+                // The rail acknowledged authorization and may have captured it.
+                // Retain credentials before any diagnostic or receipt callback.
+                let mut reason = format!(
+                    "MustPrepay prepayment capture outcome is unknown before reserving an execution nonce: {}",
+                    failure.error_code()
+                );
+                let credential_disposition = match credential_reservation.commit() {
+                    Ok(disposition) => disposition,
+                    Err(error) => {
+                        reason.push_str("; dispatch credential retention could not be confirmed");
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %redacted!(&error),
+                            audit_fault = "pre_dispatch_payment_capture_credentials_unconfirmed",
+                            "credential retention is unconfirmed after prepayment capture"
+                        );
+                        PaymentCredentialDisposition::RetentionOutcomeUnknown
+                    }
+                };
+                let authorization = failure.authorization();
+                warn!(
+                    request_id = %request.request_id,
+                    authorization_id = %authorization.authorization_id,
+                    error_code = failure.error_code(),
+                    reason = %redacted!(failure.error()),
+                    audit_fault = "pre_dispatch_payment_capture_outcome_unknown",
+                    "prepayment capture outcome is unknown; retaining payment and budget custody"
+                );
+                let metadata = merge_metadata_objects(
+                    self.retained_admission_receipt_metadata(
+                        budget_mutation,
+                        extra_metadata.clone(),
+                    ),
+                    Some(serde_json::json!({
+                        "financial": {
+                            "authorization_id": authorization.authorization_id,
+                            "payment_reference": authorization.authorization_id,
+                            "settlement_status": SettlementStatus::Failed,
+                            "release_outcome": "not_released",
+                            "payment_authorization_retained": true,
+                            "payment_capture_ambiguous": true,
+                            "payment_capture_error_code": failure.error_code(),
+                            "payment_capture_attempt_reference": request.request_id
+                        }
+                    })),
+                );
+                let metadata = self.merge_dispatch_credential_disposition_metadata(
+                    metadata,
+                    credential_disposition,
+                );
+                let metadata = with_identity_disposition(metadata, IdentityDisposition::Retained);
+                return self.with_pre_invocation_guard_evidence(
+                    pre_invocation_guard_evidence,
+                    || {
+                        self.build_deny_response_with_metadata_and_payee_binding(
+                            request,
+                            &reason,
+                            revalidation_now_unix_ms / 1000,
+                            Some(matched_grant_index),
+                            metadata,
+                            verified_governed_payee_binding.as_ref(),
+                        )
+                    },
+                );
+            }
+            Err(ReservedPrepaymentFailure::Denied(error)) => {
                 let mut reason = error.to_string();
                 let credential_disposition = if governed_mustprepay {
                     match credential_reservation.commit() {

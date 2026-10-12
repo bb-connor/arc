@@ -518,11 +518,37 @@ pub struct BudgetCaptureHoldRequest {
     pub authority: Option<BudgetEventAuthority>,
 }
 
+/// Cleanup custody derived from the current authorization call.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetHoldCleanupCustody {
+    /// This call acquired authorization under the store's mutation boundary.
+    Fresh,
+    /// This call read back an authorization acquired by an earlier call.
+    Replayed,
+    /// The backend cannot prove whether this call acquired the authorization.
+    #[default]
+    Unknown,
+}
+
+impl BudgetHoldCleanupCustody {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Fresh => "fresh",
+            Self::Replayed => "replayed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 /// A decision record returned by the composition-installed budget store.
 /// Only the kernel-owned authorize-hold call admits this result; caller-built
 /// records are not an entry point to reserve, consume, or dispatch budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetHoldAuthorizationRecord {
+    /// Current-call custody, never copied from a persisted authorization event.
+    pub cleanup_custody: BudgetHoldCleanupCustody,
     pub hold_id: Option<String>,
     pub admission_binding: Option<BudgetAdmissionBinding>,
     pub authorized_exposure_units: u64,
@@ -989,6 +1015,7 @@ pub trait BudgetStore: Send + Sync {
         if allowed {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
                 BudgetHoldAuthorizationRecord {
+                    cleanup_custody: BudgetHoldCleanupCustody::Unknown,
                     hold_id: request.hold_id,
                     admission_binding: request.admission_binding,
                     authorized_exposure_units: request.requested_exposure_units,

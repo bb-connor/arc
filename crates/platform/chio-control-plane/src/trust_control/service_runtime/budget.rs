@@ -853,6 +853,7 @@ impl BudgetStore for RemoteBudgetStore {
         let decision = match response.decision {
             BudgetAuthorizeExposureDecision::Authorized => {
                 BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
+                    cleanup_custody: response.cleanup_custody,
                     hold_id: request.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: request.requested_exposure_units,

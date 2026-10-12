@@ -1146,14 +1146,23 @@ fn exhausted_member_denies_without_reserving_other_quotas_or_exposure() {
 
 #[test]
 fn exact_authorization_replay_is_stable_and_identifier_reuse_fails_closed() {
+    use chio_kernel::budget_store::BudgetHoldCleanupCustody;
+
     let store = InMemoryBudgetStore::new();
     let request = authorize_request("replay", three_quotas(2), 10);
-    let first = store
-        .authorize_budget_hold(request.clone())
-        .expect("first authorization");
-    let replay = store
-        .authorize_budget_hold(request.clone())
-        .expect("exact replay");
+    let mut first = expect_authorized(
+        store
+            .authorize_budget_hold(request.clone())
+            .expect("first authorization"),
+    );
+    let replay = expect_authorized(
+        store
+            .authorize_budget_hold(request.clone())
+            .expect("exact replay"),
+    );
+    assert_eq!(first.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
+    assert_eq!(replay.cleanup_custody, BudgetHoldCleanupCustody::Replayed);
+    first.cleanup_custody = BudgetHoldCleanupCustody::Replayed;
     assert_eq!(replay, first);
 
     let mut changed_event_payload = request.clone();

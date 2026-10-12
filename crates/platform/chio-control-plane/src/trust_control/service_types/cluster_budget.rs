@@ -449,6 +449,7 @@ pub(crate) struct TryChargeCostRequest {
 
 #[derive(Debug)]
 pub(crate) struct TryChargeCostResponse {
+    pub(crate) cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     pub(crate) capability_id: String,
     pub(crate) grant_index: usize,
     pub(crate) allowed: bool,
@@ -647,6 +648,7 @@ impl<'de> Deserialize<'de> for TryChargeCostRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TryChargeCostResponseWire<'a> {
+    cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     capability_id: &'a str,
     grant_index: usize,
     allowed: bool,
@@ -680,6 +682,8 @@ struct TryChargeCostResponseWire<'a> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TryChargeCostResponseWireInput {
+    #[serde(default)]
+    cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     capability_id: String,
     grant_index: usize,
     allowed: bool,
@@ -717,6 +721,7 @@ impl Serialize for TryChargeCostResponse {
         S: Serializer,
     {
         TryChargeCostResponseWire {
+            cleanup_custody: self.cleanup_custody,
             capability_id: &self.capability_id,
             grant_index: self.grant_index,
             allowed: self.allowed,
@@ -745,6 +750,7 @@ impl<'de> Deserialize<'de> for TryChargeCostResponse {
     {
         let wire = TryChargeCostResponseWireInput::deserialize(deserializer)?;
         Ok(Self {
+            cleanup_custody: wire.cleanup_custody,
             capability_id: wire.capability_id,
             grant_index: wire.grant_index,
             allowed: wire.allowed,

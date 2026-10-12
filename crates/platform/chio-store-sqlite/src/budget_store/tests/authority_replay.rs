@@ -281,13 +281,17 @@ fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
     let mismatch = |case: &str| {
         format!("budget event_id `{case}:authorize` authority metadata does not match the original mutation")
     };
+    let mut renewed_authorization = None;
     for case in ["renewed", "conflict", "foreign", "future", "same-epoch"] {
         let admitted = match case {
             "foreign" => authority("budget-standby", "budget-standby#term-2", 2),
             "future" => authority("budget-primary", "budget-primary#term-4", 4),
             _ => original.clone(),
         };
-        store.authorize_budget_hold(authorize_request(case, Some(admitted)))?;
+        let decision = store.authorize_budget_hold(authorize_request(case, Some(admitted)))?;
+        if case == "renewed" {
+            renewed_authorization = Some(decision);
+        }
     }
 
     // The ordinary path keeps the exact-authority contract under the renewed lease.
@@ -303,6 +307,10 @@ fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
     // The replay-only path returns the original decision and metadata unchanged.
     let decision =
         store.replay_budget_authorization(&authorize_request("renewed", None), &renewed)?;
+    super::cleanup_custody::assert_replayed_authorization(
+        renewed_authorization.expect("fresh renewed authorization"),
+        decision.clone(),
+    );
     let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
         return Err("renewed-lease replay did not return the original authorization".into());
     };

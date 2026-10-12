@@ -354,6 +354,7 @@ impl ChioKernel {
             recorded_at_unix_seconds: Some(now_unix),
         };
         let charge = BudgetChargeResult {
+            cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody::Replayed,
             grant_index: hold.grant_index,
             cost_charged: exposed,
             currency: receipt_currency.clone(),
