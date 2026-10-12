@@ -1,99 +1,83 @@
 # chio-wall
 
-`chio-wall` is the Chio-Wall companion-product CLI, a public entry point
-binary (`public_entrypoint = true`) built on Chio. It produces and checks the
-bounded Chio-Wall control-path evidence package for one fixed
-research-to-execution tool-access denial scenario, and runs a production SIEM
-export serve loop over a Chio receipt database. The typed package contracts it
-builds and validates live in `chio-wall-core`; this crate owns command
-orchestration, guard evaluation, receipt signing, file output, and serve-mode
-wiring.
-
-## Responsibilities
-
-- Build the fixed Chio-Wall control-path scenario (one workflow, one policy,
-  one denied cross-domain tool call) and write it as a validated
-  `chio-wall-core` package: control profile, policy snapshot, authorization
-  context, guard outcome, denied-access record, buyer-review package, and
-  control package.
-- Evaluate the scenario's tool call through `chio_guards::McpToolGuard` and
-  sign a Chio capability token and receipt recording the fail-closed denial.
-- Persist the receipt to a temporary SQLite store and export a Chio evidence
-  bundle (`chio_control_plane::evidence_export`) alongside the control-path
-  package.
-- Re-read every artifact from disk after writing it and reconcile file
-  contents, cross-file references, and the package's file listing before
-  reporting success.
-- Run `siem-export`: an at-least-once `chio_siem::ExporterManager` serve loop
-  with operator-configured SOC export sinks, alert backends, a receipt-log
-  health watchdog, and a Prometheus scrape endpoint.
-
-## Public API
-
-`chio-wall` is a bin-only crate (no `[lib]` target). Its surface is the CLI:
-
-| Command | Flags | Effect |
-|---------|-------|--------|
-| `chio-wall control-path export` | `--output <dir>` | Writes the control-path package and `chio-evidence/` bundle into an empty `<dir>`. |
-| `chio-wall control-path validate` | `--output <dir>` | Exports the package into `<dir>/control-path/`, then writes `validation-report.json` and `expansion-decision.json`. |
-| `chio-wall siem-export` | `--receipt-db <path> --cursor-db <path>` | Runs the SIEM export serve loop until interrupted. |
-| global | `--json` | Boolean flag; emits JSON instead of the human-readable summary for `control-path` commands (`siem-export` ignores it). |
+`chio-wall` exports a fixed Chio-Wall control-path package and runs SIEM export
+against a receipt database. The package describes one research agent denied
+access to `execution_oms.submit_order`. Typed artifacts live in `chio-wall-core`;
+this binary owns guard evaluation, signing, file reconciliation, and serve wiring.
 
 ## Usage
 
-```bash
-cargo run -p chio-wall -- control-path export --output target/chio-wall-control-path-export
-cargo run -p chio-wall -- control-path validate --output target/chio-wall-control-path-validation
-cargo run -p chio-wall -- siem-export --receipt-db kernel-receipts.sqlite3 --cursor-db chio-wall-siem-cursor.sqlite3
-```
-
-## Environment (`siem-export`)
-
-| Variable | Effect |
-|----------|--------|
-| `CHIO_SIEM_WEBHOOK_URL`, `CHIO_SIEM_WEBHOOK_BEARER_TOKEN` | Configures the generic webhook SOC export sink. |
-| `CHIO_SIEM_ALERT_PAGERDUTY_ROUTING_KEY`, `CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT` | Configures the PagerDuty alert backend. |
-| `CHIO_SIEM_ALERT_OPSGENIE_API_KEY`, `CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT` | Configures the OpsGenie alert backend. |
-| `CHIO_SIEM_TRUSTED_KERNEL_KEYS` | JSON array of independent kernel public-key pins; required when paging is configured. |
-| `CHIO_SIEM_METRICS_ADDR` | Overrides the Prometheus scrape bind address (default `127.0.0.1:9090`). |
-
-At least one real SOC export sink must be configured or `siem-export` fails
-closed at startup; a configured alert backend alone does not satisfy this (see
-`ARCHITECTURE.md`).
-
-Paging also requires `CHIO_SIEM_TRUSTED_KERNEL_KEYS`, a JSON array containing
-1 through 64 unique algorithm-aware public-key strings. Set it from independently
-managed kernel signer configuration, never from an event or receipt database:
+From the workspace root, export the built-in scenario into a temporary directory:
 
 ```sh
-export CHIO_SIEM_TRUSTED_KERNEL_KEYS='["<independently-configured-kernel-public-key>"]'
+wall_output=$(mktemp -d "${TMPDIR:-/tmp}/chio-wall-docs.XXXXXX")
+trap 'rm -rf "$wall_output"' EXIT
+cargo run -p chio-wall -- --json control-path export --output "$wall_output"
 ```
 
-Replace the placeholder with an actual key accepted by `PublicKey::from_hex`
-(bare Ed25519 hex, or the existing `p256:`, `p384:`, or hybrid wire format).
-Algorithm support still depends on the verifier's compiled features. The value
-must be at most 1 MiB; malformed, empty, duplicate or weak Ed25519 keys reject
-startup. Non-Unicode values reject too. Supplied malformed configuration also
-rejects SOC-only startup; an absent value is allowed when no paging backend is
-configured. The existing decoder checks key encoding, while receipt verification
-checks cryptographic validity.
+This command needs a writable temporary filesystem and local SQLite support.
+It opens no listener, contacts no upstream, and dispatches no tool. The output
+contains eight JSON files and `chio-evidence/`, with a receipt and checkpoint
+built using generated keys. `McpToolGuard::is_allowed` evaluates the fixed
+allowlist; evidence signing is performed directly by the CLI. These generated
+artifacts describe the scenario, with no live kernel invocation.
 
-Existing paging deployments must add these independent pins before upgrading.
-For signer rotation, explicitly include both accepted identities. The library's
-`AlertingExporterBuilder::with_trusted_kernel_keys` takes typed public keys;
-its default empty set sends no pages. Each dispatch rechecks the original receipt
-ID, strict signature and action hash against its own pins. Mutable SIEM event
-annotations cannot enable paging.
+| Command | Required flags | Behavior |
+| --- | --- | --- |
+| `control-path export` | `--output <empty-dir>` | Writes and reconciles the scenario package. |
+| `control-path validate` | `--output <empty-dir>` | Exports under `control-path/` and writes validation and decision JSON. |
+| `siem-export` | `--receipt-db <path> --cursor-db <path>` | Polls receipts and delivers them to configured consumers until interrupted. |
 
-## Testing
+Global `--json` controls the two package commands' stdout. `control-path validate`
+generates its own package; it takes no existing package as input.
 
-`cargo test -p chio-wall` runs the unit tests embedded in `commands.rs`,
-`metrics_server.rs`, and `registry_metrics_sink.rs`, plus the `tests/cli.rs`
-black-box tests that run the built binary.
+## Guarantees
 
-## See also
+`ensure_empty_directory` refuses occupied or symlink output directories.
+`verify_control_path_export` re-reads artifacts, runs core validation, compares
+workflow/request/domain/tool/policy joins and references, and rejects unexpected
+top-level entries. Its evidence-directory check establishes presence and
+nonemptiness; independent receipt/checkpoint verification remains a consumer duty.
 
-- `chio-wall-core` - the typed control-path contracts this CLI builds and validates.
-- `chio-siem` - the exporter manager, alert backends, and metrics-sink trait `siem-export` drives.
-- `chio-control-plane` - `CliError` and the shared `evidence_export` used for the Chio evidence bundle.
-- `docs/chio-wall/` - product scope, supported claims, and operating posture.
+`siem-export` opens the source receipt DB read-only and persists per-exporter
+cursors in the separate writable cursor DB. Startup requires a SOC sink;
+alerting alone cannot satisfy `ensure_serve_has_consumer`. The current CLI wires
+a generic HTTPS webhook, with optional PagerDuty and OpsGenie notification
+backends. Delivery follows the manager's at-least-once retry semantics.
+
+## Serve configuration
+
+| Environment variable | Effect |
+| --- | --- |
+| `CHIO_SIEM_WEBHOOK_URL` | HTTPS endpoint for the required SOC webhook consumer. |
+| `CHIO_SIEM_WEBHOOK_BEARER_TOKEN` | Optional webhook authentication secret. |
+| `CHIO_SIEM_ALERT_PAGERDUTY_ROUTING_KEY`, `CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT` | Enable PagerDuty and optionally override its endpoint. |
+| `CHIO_SIEM_ALERT_OPSGENIE_API_KEY`, `CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT` | Enable OpsGenie and optionally override its endpoint. |
+| `CHIO_SIEM_TRUSTED_KERNEL_KEYS` | JSON array of independent signer pins, required when paging is enabled. |
+| `CHIO_SIEM_METRICS_ADDR` | Plain HTTP scrape address, default `127.0.0.1:9090`. |
+
+Signer configuration accepts 1 through 64 unique algorithm-aware public keys
+within 1 MiB. Invalid explicit configuration rejects SOC-only startup too;
+unset pins are allowed for SOC-only export. Pins must come from operator custody.
+Algorithm support follows the compiled verifier. The metrics listener has no
+TLS or authentication; deployment networking must control access when rebinding.
+A scrape bind failure logs and leaves the export loop running.
+
+## Status
+
+Package generation, local validation, webhook export, paging configuration, and
+metrics wiring are implemented. Tests exercise artifact reconciliation, the CLI,
+local scrape sockets, exporter wiring, and signer rejection. The offline scenario
+uses generated identities and fixed receipt timestamps. Production operation
+requires a real receipt source, durable cursor custody, receiver configuration,
+independent paging pins, and deployment monitoring.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Core artifact contracts](../chio-wall-core/README.md)
+- [SIEM exporters](../../observability/chio-siem/README.md)
+- [Protocol receipts](../../../spec/PROTOCOL.md#http-and-openapi-surfaces)
+- [Wall operations](../../../docs/chio-wall/OPERATIONS.md)
+
+License: [root license](../../../LICENSE).

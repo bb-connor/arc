@@ -1,46 +1,13 @@
 # chio-wall-core
 
-`chio-wall-core` defines the typed JSON contracts for Chio-Wall's control-path
-artifacts: the schemas, enums, and fail-closed validation for the bounded
-evidence bundle that the `chio-wall` CLI produces for buyer review. It is a
-pure data crate with no I/O and no dependency on any other `chio-*` crate.
-
-Use this crate for the Chio-Wall artifact types and their `validate()` methods.
-The CLI that builds these artifacts from real capability tokens, guard
-evaluation, and signed receipts, then writes and exports them, is `chio-wall`.
-
-## Responsibilities
-
-- Define the seven Chio-Wall artifact schemas, each tagged with its own
-  `CHIO_WALL_*_SCHEMA` constant: control profile, policy snapshot,
-  authorization context, guard outcome, denied-access record, buyer review
-  package, and control package.
-- Constrain Chio-Wall to one buyer motion and one control surface at the type
-  level: `ChioWallBuyerMotion` and `ChioWallControlSurface` are single-variant
-  enums (`ControlRoomBarrierReview`, `ToolAccessDomainBoundary`).
-- Validate each artifact independently: schema-tag match, non-empty /
-  non-padded / control-character-free strings, unique list entries, and
-  `fail_closed` fields that must stay `true`.
-- Own `ChioWallControlPackage::validate`, which requires the complete bounded
-  artifact set (all seven `ChioWallArtifactKind` variants, no duplicates).
-- Define the `ChioWallContractError` taxonomy every validator returns.
-
-## Public API
-
-- `ChioWallControlProfile`, `ChioWallPolicySnapshot`, `ChioWallAuthorizationContext`,
-  `ChioWallGuardOutcome`, `ChioWallDeniedAccessRecord`, `ChioWallBuyerReviewPackage`,
-  `ChioWallControlPackage`, `ChioWallArtifact` - the artifact structs, each with a
-  `validate(&self) -> Result<(), ChioWallContractError>` method.
-- `ChioWallBuyerMotion`, `ChioWallControlSurface`, `ChioWallInformationDomain`,
-  `ChioWallGuardDecision`, `ChioWallArtifactKind` - the closed enums the
-  artifacts are built from.
-- `ChioWallContractError` - schema, field, and JSON error variants.
-- Schema constants: `CHIO_WALL_CONTROL_PROFILE_SCHEMA`, `CHIO_WALL_POLICY_SNAPSHOT_SCHEMA`,
-  `CHIO_WALL_AUTHORIZATION_CONTEXT_SCHEMA`, `CHIO_WALL_GUARD_OUTCOME_SCHEMA`,
-  `CHIO_WALL_DENIED_ACCESS_RECORD_SCHEMA`, `CHIO_WALL_BUYER_REVIEW_PACKAGE_SCHEMA`,
-  `CHIO_WALL_CONTROL_PACKAGE_SCHEMA`.
+`chio-wall-core` defines the typed JSON artifacts used by Chio-Wall to describe
+a research-to-execution tool-access boundary. It owns schemas and explicit
+validation; `chio-wall` builds packages, evaluates a guard, and writes evidence.
+This library has no I/O or dependency on another Chio crate.
 
 ## Usage
+
+Validate a control profile and reject a profile whose domains are identical:
 
 ```rust
 use chio_wall_core::{
@@ -49,24 +16,57 @@ use chio_wall_core::{
 };
 
 let profile = ChioWallControlProfile {
-    schema: CHIO_WALL_CONTROL_PROFILE_SCHEMA.to_string(),
-    profile_id: "wall-profile".to_string(),
-    workflow_id: "wf-1".to_string(),
+    schema: CHIO_WALL_CONTROL_PROFILE_SCHEMA.into(),
+    profile_id: "research-barrier".into(),
+    workflow_id: "research-to-execution".into(),
     buyer_motion: ChioWallBuyerMotion::ControlRoomBarrierReview,
     control_surface: ChioWallControlSurface::ToolAccessDomainBoundary,
     source_domain: ChioWallInformationDomain::Research,
     protected_domain: ChioWallInformationDomain::Execution,
-    retained_artifact_policy: "retain-minimum".to_string(),
-    intended_use: "boundary review".to_string(),
+    retained_artifact_policy: "retain-denied-access-record".into(),
+    intended_use: "control-room review".into(),
     fail_closed: true,
 };
-assert!(profile.validate().is_ok());
+profile.validate()?;
+let invalid = ChioWallControlProfile {
+    protected_domain: ChioWallInformationDomain::Research,
+    ..profile
+};
+assert!(invalid.validate().is_err());
+# Ok::<(), chio_wall_core::ChioWallContractError>(())
 ```
 
-## Testing
+Deserializing JSON does not run `validate()`. Call it after decoding or changing
+public fields and before accepting the artifact into a package.
 
-`cargo test -p chio-wall-core`
+## Guarantees
 
-## See also
+- Each schema-bearing artifact's `validate` method checks its exact
+  `CHIO_WALL_*_SCHEMA` constant and required strings. Helpers reject empty,
+  padded, and control-character-bearing string values.
+- `ChioWallControlProfile`, `ChioWallAuthorizationContext`, and
+  `ChioWallDeniedAccessRecord` require different source and target domains.
+  Fields named `fail_closed` must be true wherever present.
+- `ChioWallPolicySnapshot` and `ChioWallGuardOutcome` require nonempty,
+  unique tool lists. A denial cannot name a tool in its allowlist; an allow
+  outcome has no corresponding membership requirement.
+- `ChioWallControlPackage::validate` requires all seven artifact kinds exactly
+  once. `ChioWallArtifact::validate` checks the path string; filesystem
+  containment, existence, cross-file identity, and receipt verification belong
+  to package consumers.
 
-- `chio-wall` - the CLI that builds, writes, and exports these artifacts.
+## Status
+
+The contract types and validators are implemented with unit tests and a profile
+integration smoke test. Buyer motion and control surface each have one enum
+variant. Validation establishes local artifact consistency. Enforcement, signer
+trust, persistence, and operational control ownership must be supplied by the
+application consuming these artifacts.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Wall CLI](../chio-wall/README.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+
+License: [root license](../../../LICENSE).

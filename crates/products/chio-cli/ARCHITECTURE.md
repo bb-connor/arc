@@ -1,295 +1,193 @@
 # chio-cli architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-cli` builds the `chio` binary, the public entry point for the Chio
-protocol (`[package.metadata.chio] public_entrypoint = true`). It sits outside
-the kernel's trust boundary: the crate parses arguments, chooses a local
-(file/SQLite) or remote (`--control-url`) backend, and renders output. Policy
-evaluation, capability issuance, artifact signing, and verification are
-performed by the crates it calls into (`chio-kernel`, `chio-control-plane`, and
-52 other internal `chio-*` crates), not by this crate. Every command
-follows the same shape: a clap type defines the surface, a dispatch function
-routes it, and either a same-crate module or an external crate implements it.
+The public surface is the `chio` command tree. `Cli`, `Commands`, `CheckMode`,
+and the dispatch functions are crate-private implementation details. This
+binary owns argument parsing, command-specific input handling, local process
+or service orchestration, output rendering, and operator-selected persistence.
+`chio-kernel` owns admission and evaluation; `chio-control-plane` loads policy
+and constructs/configures kernels. Specialized crates own domain verification.
+Some verification adapters, archive checks, and process-host orchestration are
+implemented directly in this binary.
 
-## Diagram
+The package has `autobins = false` and one declared binary. It is a public
+entrypoint with publishing disabled. Commands can operate entirely offline,
+start long-running services, or contact configured remote endpoints. The
+command and its flags determine those effects.
 
-The local process host in `src/cli/process_host/` composes existing policy
-loading, policy-gated capability issuance, the durable authority runtime and
-MCP adapters and native mailbox tools with `chio-process`. An exclusive state lock serializes serving
-and offline administration before startup reconciliation. Policy hashes and
-tool definitions and mailbox quotas are pinned at initialization; the process journal keeps
-capabilities, logical operation identities and cancellation across restart.
-Connection descriptors are private worker credentials and contain no signing
-keys or capability tokens. `tests/process_host.rs` qualifies the CLI boundary
-with real MCP and Python subprocesses, host death and original receipt replay.
-It also tests a native mailbox-only host without an MCP subprocess. Each
-mailbox endpoint uses the same worker invocation and kernel capability path.
+## Structure
 
-The Linux `runner/` module launches declared OS workers above the kernel.
-Its private journal freezes the run plan and authority, reserves bounded
-attempts before spawning, and retains completion across host death. Commands
-receive per-attempt credentials over stdin. The host's existing exclusive
-lock owns reconciliation and lifecycle; no second tool dispatcher is added.
-Direct-child termination, bounded output capture and restart attempts are
-host responsibilities. Kernel admission still owns uncertain effects, while
-the application owns planning checkpoints and output correctness. Runner
-qualification includes process/host death, concurrency, cancellation and
-uncertain effect recovery through the real CLI.
-
-The opt-in `lifecycle.rs` connection provides kernel-mediated spawn templates
-and direct-child joins. Its `ProcessRegistry` retains no kernel `Arc`; the
-kernel owns the connection and the runner activates it only after binding the
-executable plan. Caller identity comes from the exact admitted capability,
-and private subject keys sign only attenuated children. Child process, key and
-work identity commit together in `process.db`. The runner discovers committed
-work, adds bounded attempts to `runner.db`, and resumes checkpointed parents
-after their joined children complete. Declared dependencies and dynamic waits
-must remain acyclic. Tests run Python parents and Node children at concurrency
-one, inject parent/child and host deaths, and verify original receipts against
-the initialization key. This remains a local trusted-host deployment profile.
-
-`diagnostics.rs` reads a bounded, atomically published runner snapshot and
-retained attempt logs. It never constructs a second kernel, reconciles
-admissions or uses diagnostic state to authorize execution. Its host-lock
-sample is advisory and its worker states are the last published observation;
-a crash can leave a recorded running attempt. Snapshot publication follows
-journal transitions, while the journal remains the recovery authority. Local
-readers require existing private files and reject symlinks, hard links,
-nonregular files and oversized content. The real runner tests exercise live
-inspection, stale crash snapshots, retry generations and private log access.
-
-```mermaid
-flowchart TD
-    entry["chio.rs to main.rs entry"]
-    dispatch["Cli parse, redacted tracing, Commands match"]
-
-    entry --> dispatch
-
-    subgraph edgegrp["Session and edge"]
-        sess["run / check / start"]
-        edge["mcp serve / api protect"]
-    end
-
-    subgraph trustgrp["Trust, receipts, settlement"]
-        trust["trust / receipt / evidence / reputation / settle"]
-    end
-
-    subgraph proofgrp["Proof and identity"]
-        proof["proof / commerce / passport / did / cert"]
-    end
-
-    subgraph chiogrp["chio namespaced trees"]
-        chions["federation / attest / runtime / pheromone"]
-    end
-
-    subgraph lifegrp["Guard and tooling"]
-        tools["guard / bind / conformance / arena / lineage / replay / doctor / init"]
-    end
-
-    dispatch --> sess
-    dispatch --> edge
-    dispatch --> trust
-    dispatch --> proof
-    dispatch --> chions
-    dispatch --> tools
-
-    subgraph plumbing["Shared runtime plumbing"]
-        backend["backend select: local SQLite or control-url"]
-        policy["load_policy"]
-        kernel["build_kernel"]
-        stores["configure receipt and revocation stores"]
-    end
-
-    sess --> policy
-    edge --> policy
-    trust --> backend
-    proof --> backend
-    chions --> backend
-    tools --> backend
-    policy --> kernel
-    kernel --> stores
-
-    crates["chio-kernel / chio-control-plane / chio-store-sqlite"]
-    stores --> crates
-    backend --> crates
-```
-
-## Module map
-
-| Path | Responsibility |
+| Source | Role |
 |---|---|
-| `src/bin/chio.rs`, `src/main.rs` | Binary entry point. `bin/chio.rs` is a two-line `include!` of `main.rs`. `main.rs` mounts every `cli/*` file as a crate-root sibling module via `#[path]` (not `mod cli;`), re-exports `chio-control-plane`'s policy/kernel helpers and `CliError` at the crate root, and defines `fn main()`. |
-| `src/cli/types.rs` + `cli/types/{runtime,trust,receipt,passport,proof,workflow,replay}.rs` | The full `Cli`/`Commands` clap surface: ~29 top-level commands and their nested subcommand trees. Despite its name, `types/runtime.rs` defines Federation/Attest/Arena/Settle/Lineage/Conformance/Guard/Mcp/Api, not `chio runtime` (see next row). |
-| `src/cli/chio/types.rs` + `chio/types/{authority,runtime,treaty}.rs` + `chio/types/pheromone/*.rs` | Clap definitions for the `chio`-namespaced trees: `ChioRuntimeCommands` (`chio runtime`), `ChioPheromoneCommands` (`chio pheromone`, the deepest tree in the crate at 7 levels), `ChioAuthorityCommands`/`ChioTrustBundleCommands`/`ChioTreatyCommands` (nested under `chio federation`). |
-| `src/cli/dispatch/mod.rs` | `run()`: parses `Cli`, installs the redacting tracing subscriber, matches every `Commands` variant to a dispatch function, writes the terminal error and exit code. |
-| `src/cli/dispatch/{trust,api_mcp,market,lineage,settle_arena,reputation_guard,certify_cert,did_passport,receipt_evidence,output}.rs` | Pure routers: destructure one `Commands` variant's clap fields and call an implementation function elsewhere in the crate. |
-| `src/cli/dispatch/proof.rs` + `dispatch/proof/*.rs` | Router for `Commands::Proof`/`Commands::Commerce` plus the Transaction Passport verifier engine itself (claim families, required-claim tables, error-to-exit mapping); the fixture catalog (`fixture.rs`, 6275 lines) is generated in part from a workspace-level fixture directory via `build.rs`. |
-| `src/cli/dispatch/{federation,attest,runtime,pheromone}.rs` | Routers for the `chio`-namespaced trees. Mostly pure dispatch into `cli/chio/dispatch/*`; `attest.rs` additionally implements `supply-chain verify` and `runtime-quote verify` directly, with no `chio/dispatch/` counterpart. |
-| `src/cli/chio/dispatch.rs` + `chio/dispatch/{authority,buyer,io,treaty}.rs` + `chio/dispatch/pheromone/*.rs` + `chio/dispatch/runtime/*.rs` | Implementation layer the previous row's routers call into, reached through a chain of `use super::*` glob re-exports rooted at `main.rs`'s `use chio_dispatch::*;`. Includes the optional iroh P2P transport lane for the pheromone relay (`pheromone/iroh_mount.rs`). |
-| `src/cli/runtime.rs` | `cmd_run`, `cmd_check`, `cmd_start`, `cmd_api_protect`, `cmd_mcp_serve[_http]`, `cmd_trust_{serve,status,revoke}`: the session and edge-hosting implementations. |
-| `src/cli/session/*.rs` | The `chio run` message loop: agent-message normalization, capability selection, tool-response mapping, session stats, a signed deny receipt on kernel-internal failure. |
-| `src/cli/trust_commands.rs` + `cli/trust/*.rs` + `cli/runtime/trust_reports.rs` | `chio trust` implementation: credit, liability, underwriting, runtime-attestation appraisal, capital/exposure/behavioral-feed reports. `cli/trust/receipt/*.rs` physically nests here but implements the separate top-level `chio receipt` command. |
-| `src/cli/replay.rs` + `cli/replay/*.rs` | The `chio replay` pipeline: reader, schema/redaction gates, signature and Merkle verification, verdict rederivation, traffic replay/diff/bless. |
-| `src/cli/mcp.rs` + `cli/mcp/*.rs` | `chio mcp wrap`: manifest-gated stdio MCP wrapper (default-deny), IDE config emission, tool-scope classification. |
-| `src/cli/doctor.rs` + `doctor/*.rs` | `chio doctor`: six ordered environment probes (toolchain, OCI, cosign, OTEL, kernel `/metrics`, `chio.yaml`). |
-| `src/cli/conformance.rs`, `cli/arena.rs` | `chio conformance run/fetch-peers`, `chio arena run/replay/evolve`: validated front ends onto `chio-conformance`/`chio-arena`/`chio-replay-corpus`. Arena bounds and validates inputs but does not execute scenarios in-process. |
-| `src/admin.rs` | `chio trust provider`/`federation-policy`/`federated-issue`/`federated-delegation-policy-create` and `chio certify registry` CRUD, local-file or remote backend. |
-| `src/passport.rs` + `passport/verifier.rs` | `chio passport` and its `policy`/`challenge`/`status`/`issuance`/`oid4vp` subtrees. Unrelated to `chio proof`'s Transaction Passport concept beyond the shared word. |
-| `src/market.rs` | `chio guard market`: tenant-scoped pricing, reputation-gated discovery, credit-ceiling-gated install. |
-| `src/settle.rs` | `chio settle status`: read-only pending/settled/dead-lettered classification over the receipt-store schema. |
-| `src/cert.rs`, `src/did.rs`, `src/lineage.rs` | `chio cert` (on `chio-acp-proxy`), `chio did resolve` (on `chio-did`), `chio lineage` (on `chio-lineage`). |
-| `src/archive.rs` | Hardened tar.gz/tar.zst codec (path-traversal, zip-bomb, and symlink guards on both read and write) shared by proof export, pheromone archive packaging, conformance corpus extraction, and guard pack/install. |
-| `src/guard.rs` + `guard/*.rs` + `src/commands/{bind,guard_blocklist}.rs` | `chio guard` WASM lifecycle (scaffold, build, inspect, test, bench, pack, publish/pull over OCI, sign/verify, install) and `chio bind` (model-card weights binding). |
-| `src/scaffold.rs` + `templates/init/*.tmpl` | `chio init`: renders an embedded example project whose generated `demo.rs` drives a real `chio mcp serve` round trip and prints the resulting signed receipt. |
-| `src/policies/mod.rs` | Bundled `chio mcp serve --preset code-agent` policy YAML, materialized to a temp file per invocation so it reuses the normal `load_policy(&Path)` path. |
-| `dashboard/` | Standalone React/TypeScript operator dashboard (Vite), built separately to `dashboard/dist/`. `chio proof serve` serves it as a static SPA (falls back to `/opt/chio/dashboard/dist` when not found alongside the crate). |
-| `src/main_tests_*.rs`, `tests/*.rs` | `#[cfg(test)]` CLI-parsing/entrypoint-surface suites compiled into the test binary only, and black-box integration tests (roughly one file per command family) that spawn the built `chio` binary. |
+| `src/bin/chio.rs`, `src/main.rs` | Include-based entrypoint, shared imports/re-exports, explicit module mounts, and `main`. |
+| `src/cli/types.rs`, `src/cli/types/*.rs` | Clap arguments, global state paths, command enum, and nested command families. |
+| `src/cli/chio/types.rs`, `src/cli/chio/types/` | Federation, runtime, authority, treaty, and pheromone argument trees. |
+| `src/cli/dispatch/mod.rs`, `src/cli/dispatch/*.rs` | Central dispatch, tracing initialization, family routing, error rendering. |
+| `src/cli/runtime.rs`, `src/cli/runtime/` | Agent sessions, fixture checks, MCP/HTTP edge setup, stores, and authority wiring. |
+| `src/cli/session/` | Agent-message normalization, capability selection, response mapping, and statistics. |
+| `src/cli/mcp/` | Manifest-gated wrapper, nonce mediation, IDE configuration, signed launch inputs, and provisioning. |
+| `src/cli/trust/`, `src/admin.rs`, `src/passport.rs` | Trust issuance/query adapters and local or remote administrative operations. |
+| `src/cli/trust/receipt/`, `src/cli/receipt_verify.rs` | Store queries/maintenance and separate offline receipt verification. |
+| `src/cli/dispatch/proof/`, `src/cli/dispatch/finding/` | Proof collection/verification/serving and finding ingress, challenge, and status handling. |
+| `src/cli/chio/dispatch/` | Runtime, federation, buyer, and pheromone implementation trees. |
+| `src/cli/process_host/` | Private host state, process admission, native brokerage, worker journals, and diagnostics. |
+| `src/cli/input.rs`, `src/archive.rs` | Bounded original-document decoding and constrained archive codecs. |
+| `src/guard/`, `src/commands/`, `src/guards/` | Guard lifecycle, model-card binding, blocklists, and signing helpers. |
+| `src/cert/`, `src/cert.rs` | Session receipt coverage, compliance profiles, certificate generation/verification. |
+| `src/doctor/`, `src/scaffold.rs`, `templates/init/` | Environment probes and embedded project templates. |
 
-## Command dispatch flow
+`build.rs` includes `../proof_fixture_build.rs` to prepare proof
+fixture support. Command-specific tests are compiled into the binary through
+`main_tests_*.rs`; black-box tests invoke the `chio` executable from `tests/`.
 
-1. `main()` calls `dispatch_cli::run()`.
-2. `Cli::parse()` parses argv (clap derive on `Cli`/`Commands`); global flags
-   (`--receipt-db`, `--control-url`, ...) are cloned out before the command is
-   matched.
-3. `init_redacted_tracing()` installs an `EnvFilter` plus a
-   `chio_log_redact::RedactionLayer` subscriber so every log field is redacted
-   and control-character-escaped before it reaches stderr, then seeds known
-   metric label sets.
-4. The parsed `Commands` variant is matched to one dispatch function in
-   `dispatch/mod.rs::run`'s single `match`.
-5. The dispatch function either implements the command inline (rare, for
-   example `attest.rs`'s supply-chain and runtime-quote arms), forwards to a
-   same-crate module (`admin`, `passport`, `market`, `settle`, `archive`,
-   `guard`, `doctor`, `cli/replay`, `cli/trust_commands`,
-   `cli/dispatch/proof`), or calls an external `chio-*` crate.
-6. `Result<(), CliError>` propagates back to `run()`. `Err` writes a JSON or
-   human error envelope (`write_cli_error`) to stderr and exits 1. `chio doctor`
-   bypasses this path: it calls `std::process::exit` directly with its own
-   worst-severity code. `chio replay` and `chio check` use their own documented
-   exit-code registries (see Invariants).
+## Data and control flow
 
-Two dispatch layers exist side by side: flat routers at
-`cli/dispatch/{federation,attest,runtime,pheromone}.rs` match each `Commands`
-variant, then delegate into the nested `cli/chio/dispatch/*` implementation
-tree for the `chio`-namespaced command families (federation, runtime,
-pheromone).
+`main` calls `dispatch_cli::run`. On Windows it first creates an 8 MiB-stack
+worker for the large generated clap parser. Dispatch parses `Cli`, extracts
+store/control settings and output mode, then initializes redacted tracing.
+A match over `Commands` routes the command to its implementation.
 
-## Invariants and failure modes
+The common terminal error path renders `CliError::report()` through
+`write_cli_error`, writes stderr, and exits 1. Human error fields pass through
+`terminal_safe`; JSON errors use structured serialization. Individual commands
+have additional exit meanings. `check` uses 2 for deny and 3 for pending
+approval; policy analysis uses 1 for findings at the selected threshold and
+2 for analysis failure. Automation must use the selected command's contract.
 
-- Local-versus-remote backend selection is a uniform branch repeated across
-  trust, receipt, evidence, passport, and admin dispatch: `--control-url`
-  (with `--control-token`, checked by `require_control_token`) selects the
-  remote trust-control client; its absence requires the matching local file or
-  SQLite path, else the command fails closed rather than defaulting.
-- Local receipt reads (`chio receipt list`/`explain`, `chio trust
-  evidence-share`/`authorization-context`) require exactly one of `--tenant
-  <id>` or `--admin-all`; clap's `conflicts_with` blocks both, and the local
-  read-context constructor independently rejects neither being set. Receipt
-  operator commands (`health`, `flush`, `checkpoint`, `audit --repair`,
-  `retention repair`) are local-only and reject any `--control-url` outright;
-  their repair paths are explicitly offline and say so in their own output.
-- `chio replay <log>` exit codes: `0` clean, `10` verdict drift, `20`
-  signature or Merkle mismatch, `30` parse error, `40` schema mismatch, `50`
-  redaction mismatch (`cli/replay/report.rs::exit_code_for`, unit-tested
-  against every `EXIT_*` constant). `chio doctor` exit codes: `0`
-  ok/info/warning, `1` error, `2` fatal (`doctor::DoctorRun::exit_code`); its
-  `--fix` repairs only the `chio.yaml` probe, idempotently.
-- `chio check --mode preflight` refuses a policy that has any post-invocation
-  guard rather than silently skipping it; `--mode full` requires an explicit
-  `--output-fixture`.
-- Receipt durability fails closed: booting without a durable
-  `--receipt-db`/`--receipt-store` path requires an explicit
-  `--allow-ephemeral-receipts` opt-in, and SQLite `:memory:`/`mode=memory`
-  sentinels count as no path, not as durable. One-shot local sessions (`run`,
-  `check`) auto-opt into ephemeral revocation; the long-running MCP edge never
-  does, and denies dispatch without durable revocation, a control URL, or an
-  explicit policy opt-in.
-- `chio mcp wrap` is default-deny: a tool absent from a promoted manifest, or
-  any run with no `--manifest` at all, is denied. `--strict-execution-nonce`
-  swaps the pass-through path for an in-process kernel with a two-phase
-  mint/present nonce dispatch.
-- `chio mcp serve-http` resolves `--auth-token`/`--admin-token` in three
-  layers: the flag, then the clap-level `CHIO_AUTH_TOKEN`/`CHIO_ADMIN_TOKEN`
-  env vars, then an additional `CHIO_MCP_AUTH_TOKEN`/`CHIO_MCP_ADMIN_TOKEN`
-  fallback applied in `cmd_mcp_serve_http`. `chio start`/`chio api protect`
-  read a sidecar control token from `CHIO_SIDECAR_CONTROL_TOKEN`, then
-  `CHIO_API_PROTECT_CONTROL_TOKEN` (no flag). All sidecar control requests,
-  including loopback, require that configured token as a bearer credential.
-  An absent or blank token disables control access. Remote MCP auth builds a
-  default-deny SSRF egress contract over the operator's own configured auth
-  URLs, capped at 3 redirects and 1 MiB.
-- `chio proof`/`chio commerce` claim verification pulls trusted signer keys
-  exclusively from `CHIO_*_TRUSTED_*_KEYS` env vars; a missing var is a hard
-  error, never an empty trust-nothing default.
-- The archive codec (`src/archive.rs`) rejects absolute paths, `.`/`..`
-  segments, backslashes, non-UTF8, and duplicate or case-fold-colliding
-  members, and caps compressed size, decompressed size, and member count.
-  Extraction never follows symlinks and stages into a sibling directory before
-  an atomic rename into place.
-- `chio guard publish` requires the manifest's `wasm_sha256` to match the
-  built artifact's actual hash and the WIT world to match the pinned
-  `GUARD_WIT_WORLD` before it pushes to the OCI registry. `chio guard pull`
-  checks a local digest blocklist before caching.
-- `chio runtime` orchestration and admission gates are conjunctions, not
-  single checks: `orchestrate run` only accepts a run if profile hash, time
-  window, evidence freshness, evidence-to-contract binding, and the verifier
-  report's own acceptance all hold, each with a distinct failure code. Paired
-  flags (`--runtime-trust-input`/`--trusted-verifiers`,
-  `--static-package`/`--static-report`) must be supplied both or neither.
-- The pheromone relay's optional iroh transport lane (`--iroh-enable`) fails
-  closed at load time if a caller requests the revocation or bilateral
-  co-sign lanes, rather than wiring no-op stand-ins that would silently fail
-  open.
-- `chio arena run/replay/evolve` validate and bound their inputs
-  (scenario-id charset, `--generations <= 200`, `--wall-seconds <= 1800`) and
-  hand off to `chio-arena`/`chio-replay-corpus`; they do not execute scenarios
-  in-process.
-- The `chio run` session loop signs and returns a `Deny` receipt on a
-  kernel-internal evaluation error rather than dropping the request; only a
-  subsequent signing failure is logged and dropped.
-- `chio cert generate` self-certifies against the caller's own
-  `--authority-seed-file`; `chio cert verify` requires a separately supplied
-  `--trusted-kernel-pubkey` and always exits 1 on a failed verification.
+For `check`, `cmd_check` loads policy and calls `validate_check_mode` before
+opening admission state. It builds/configures a kernel, registers a
+`CheckToolServer`, parses arguments, generates an agent key, and issues the
+policy's default capabilities. If no capability matches, it issues an empty
+scope that leaves rejection to kernel evaluation. Where required, it signs a
+DPoP proof bound to the capability, server, tool, canonical argument hash,
+nonce, time, and generated agent key.
+
+The command opens and activates a session, constructs a `ToolCallOperation`,
+and calls `evaluate_session_operation`. It drains and closes the session
+before rendering the verdict, reason, receipt ID, policy hashes, and check
+mode. Preflight uses a synthetic probe result; full mode supplies the decoded
+output fixture through the same tool-server connection. Neither mode launches
+an external tool implementation.
+
+`run` instead starts the selected agent with stdio pipes and mediates its
+messages through the session handler. MCP service commands construct adapted
+servers and governed edges. `mcp wrap` uses a name allowlist for ordinary
+forwarding; its strict mode constructs a local kernel with execution nonces
+and the default runtime guard profile. Wrapper receipt state remains ephemeral.
+
+## Trust, validation, and persistence
+
+`input::read_regular` reads at most the configured bound plus one byte and
+requires a regular file. On Unix it adds `O_NOFOLLOW` and `O_NONBLOCK`.
+The general document bound is 16 MiB. `input::decode` uses
+`UntrustedJsonText::decode_signed` for duplicate-aware original JSON decoding;
+`input::canonical_ijson` additionally checks canonical and typed preservation.
+These helpers provide decoding boundaries; each command supplies its own
+signature, identity, and business validation.
+
+`cmd_receipt_verify` limits each NDJSON line to 8 MiB, total input to 64 MiB,
+and receipts to 10,000. It refuses empty input. `verify_original_receipt`
+canonicalizes the original document, checks the typed supported schema,
+and invokes replay verification with the external kernel pin. Acceptance
+requires the signature, signer identity, and recomputed action hash. This
+operation does not reconstruct policy execution or prove log completeness.
+
+`open_cli_durable_admission_runtime` validates participant paths and, when
+applicable, distinct database paths before opening local or remote admission
+state. A remote runtime requires a control token. The default admission mode
+is `SideEffecting`; enabled modes require a session/admission database path. `run` and
+`check` call `opt_in_ephemeral_revocation_for_local_session` only when they
+have no durable admission runtime; it opts in when no durable revocation
+backend or remote control service is selected.
+
+`require_durable_or_ephemeral_optin` is the sidecar startup boundary used by
+`start` and `api protect`. Missing receipt storage or an SQLite in-memory
+sentinel requires explicit ephemeral opt-in. A filesystem receipt store
+requires an existing private authority seed; the helper validates custody
+before startup. These rules belong to these launchers and do not describe
+every command's persistence behavior.
+
+Trust issuance has an explicit owner initialization step:
+`provision_local_issuance_authority` accepts a seed file or private SQLite
+authority, validates existing custody, or initializes missing custody.
+`StagedLocalIssuanceSeed::publish` uses non-overwriting publication and reads
+back the retained owner. Later business refusal can leave initialized custody.
+Receipt preflight can also leave an initialized store. Read/report paths use
+existing custody loaders for signed exports/reports; operators must preserve
+keys alongside stored state.
+
+Local receipt list/explain reads require a tenant or explicit administrative
+scope through `local_receipt_read_context`. Remote reads reject these local
+scope flags and rely on the authenticated service. Local operator maintenance
+commands reject a remote control URL. A global option's syntactic availability
+does not imply every command consumes it: process-host dispatch rejects global
+store/control overrides, and MCP wrap rejects receipt storage before startup.
+
+`init_redacted_tracing` installs the redaction layer and preregisters known
+metric labels. A redaction construction error terminates startup.
+`format_redacted_event_line` control-encodes field names and values, preventing
+fields from introducing extra physical stderr log lines. The default filter
+is `warn,chio.guard=info`; `RUST_LOG` can select another filter.
+
+## Process and feature boundaries
+
+The experimental process host binds its databases and retained identity to
+`--state`. Unix modules own private custody, provision/serve operations, and
+inspection. Linux enables the worker runner and call/outcome/run attestation.
+`runner::run` loads and validates a plan, acquires `Host`, opens a journal,
+starts a worker socket, and reconciles retained container ownership. Unresolved
+container custody blocks replacement. Completion incorporates journal state,
+cleanup, credential revocation, and publication checks.
+
+Diagnostics read the retained snapshot and logs without opening a kernel or
+reconciling admissions. Snapshot worker states are the last observation; a
+crash can leave a recorded running attempt. The journal supplies recovery state.
+The [host guide](PROCESS_HOST.md) and [container guide](PROCESS_CONTAINERS.md)
+describe operator requirements for those execution profiles.
+
+No CLI features are enabled by default. `real-linux-enforcement` forwards to
+`chio-cage` and enables feature-required native integration tests.
+`tee-quotes` enables the runtime-quote verification backend; its disabled
+implementation returns an explicit feature error. `iroh` links the optional
+transport and enables the pheromone relay lane; requesting that lane without
+the feature is rejected. Dependency-level Wasmtime, marketplace, worker,
+BBS, and native MCP support are enabled independently in the manifest.
 
 ## Dependencies
 
-52 internal `chio-*` crates (see `Cargo.toml`), grouped by the command
-families they back:
+`chio-core` and `chio-core-types` supply signed artifacts, sessions, canonical
+JSON, and keys; `chio-kernel` evaluates operations; `chio-control-plane` supplies
+policy loading, kernel configuration, trust services, and domain adapters.
+`chio-mcp-adapter`/`chio-mcp-remote` implement MCP transport edges, and
+`chio-api-protect` supplies the HTTP sidecar. `chio-store-sqlite` and `rusqlite`
+supply durable stores and operator queries; `chio-process` supplies persistent
+process admission and worker services.
 
-- **Kernel and protocol**: `chio-kernel` (session and tool-call evaluation,
-  transport) and `chio-core`/`chio-core-types` (capabilities, receipts,
-  sessions, messages) back `run`, `check`, `mcp serve[-http]`, and the message
-  loop in `cli/session/*`.
-- **Control plane**: `chio-control-plane` supplies policy loading, kernel
-  construction and configuration, `certify`, `evidence_export`,
-  `federation_policy`, `issuance`, `passport_verifier`, `reputation`,
-  `scim_lifecycle`, and the `trust_control` HTTP service. Re-exported at the
-  crate root, it is the largest single source of business logic behind
-  `admin.rs`, `passport.rs`, and the trust/receipt dispatch.
-- **MCP edge**: `chio-mcp-adapter` and `chio-mcp-remote` (imported in-code as
-  `remote_mcp`) host the stdio and HTTP MCP edges behind `mcp serve[-http]`.
-- **Federation and runtime**: `chio-federation`, `chio-federation-authority`,
-  `chio-federation-transport-iroh` back `federation`; `chio-runtime-core`,
-  `chio-runtime-harness`, `chio-runtime` back `runtime`; `chio-pheromone`,
-  `chio-pheromone-relay`, `chio-pheromone-runtime` back `pheromone`.
-- **Attestation and identity**: `chio-attest-buyer[-core]`,
-  `chio-attest-verify`, `chio-attest-loopback` back `attest`;
-  `chio-credentials`, `chio-did` back `passport`/`did`.
-- **Guards**: `chio-guard-registry` (OCI publish/pull) and `chio-wasm-guards`
-  (wasmtime build/inspect/test/bench) back `guard`.
-- **Proof and verification**: `chio-proof-room` (bundle format, dashboard
-  serving), `chio-commerce-order`, `chio-swarm-authority`,
-  `chio-selective-disclosure`, and `chio-runtime-core` supply the claim-family
-  verifiers behind `proof`/`commerce`; `chio-egress-contract` pins the
-  public-settlement chain-head fetch to a single host with no redirects.
-- **Storage and scenarios**: `chio-store-sqlite` backs local receipt,
-  revocation, and settlement persistence; `chio-lineage`, `chio-arena`,
-  `chio-replay-corpus`, `chio-conformance` back their namesake commands.
-- **Edge hosting**: `chio-api-protect` backs the `api protect`/`start` HTTP
-  sidecar.
+`chio-proof-room`, `chio-commerce-order`, `chio-finding-verifier`, and
+`chio-acp-proxy` provide proof, commerce, finding, and compliance verification.
+`chio-guard-registry` and `chio-wasm-guards` back registry and WASM operations.
+Federation/runtime/pheromone crates supply their respective state machines.
+Clap parses arguments; Tokio/Axum drive asynchronous services;
+Reqwest/Ureq provide HTTP clients; `chio-log-redact` handles tracing redaction.
+The economy dependencies support specific artifacts and configured adapters;
+a CLI command or dependency alone establishes no deployed settlement service.
 
-No dependency in `Cargo.toml` is package-aliased; every `chio-*` name resolves
-to the identically-named crate in the workspace root. `axum`, `tokio`,
-`reqwest`/`ureq`, `rusqlite`, `tower-http`, and `p256`/`p384`/`ed25519-dalek`
-are the externally significant HTTP, storage, and cryptography dependencies.
+## Verification
+
+`cargo test --locked -p chio-cli` exercises parsing and command integration.
+`tests/code_agent_preset.rs` covers preflight refusal and fixture-backed output
+guards; `tests/receipt_verify.rs` checks signer pins, tampered actions, schema
+changes, empty input, and line limits. `tests/receipt_list_tenant_scope.rs`
+checks local query scope; `tests/mcp_startup_security.rs` checks early rejection
+and store acquisition ordering. `tests/session_certificate.rs` covers complete
+session receipt verification and incomplete input refusal.
+
+`tests/process_state.rs` checks administrative reads without authority or
+launch side effects. Feature-required `enforced_discovery` and
+`process_host_native` need `real-linux-enforcement`; native execution also
+requires its platform prerequisites. The README sample evaluates a synthetic
+call using a conformance policy and temporary private admission database.
+These checks establish the
+exercised command behavior; credentials, retained custody, server operation,
+and deployment acceptance require operator validation.

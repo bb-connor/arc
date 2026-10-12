@@ -1,111 +1,79 @@
 # chio-http-core architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-http-core` is the protocol-agnostic HTTP security model that every HTTP
-substrate adapter (`chio-tower`, `chio-api-protect`, hosted sidecars,
-framework middleware) builds on. It ships no HTTP server: adapters extract a
-`ChioHttpRequest` from their own framework and hand it to this crate's types
-and handlers.
+The crate exposes `ChioHttpRequest`, `CallerIdentity`, `AuthMethod`,
+`SessionContext`, `Verdict`, `HttpReceipt`, and `HttpAuthority`. It also
+exports framework-neutral approval, emergency, compliance, plan, and
+regulatory handlers plus route registrations. HTTP hosting, credential
+verification, body measurement, and actual forwarding are consumer
+responsibilities.
 
-`HttpAuthority` does not reimplement guard or capability logic. It embeds a
-`ChioKernel` whose only registered tool server exposes a synthetic
-`authorize_http_request` tool and projects each HTTP request into a
-`ToolCallRequest` against it, so the same guard/capability/receipt pipeline
-that mediates native tool calls also mediates HTTP requests. Most of the
-crate is trust-neutral DTOs and wire logic; `authority.rs` and
-`authority_projection.rs` are the actual trust boundary.
+`HttpAuthorityInput` binds route/method, caller, query, optional body
+digest, capabilities, projected tool identity/arguments, model metadata,
+authorization extensions, and an execution nonce. `SessionContext` carries
+counters and optional expiry; hosts must maintain it across requests.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Module declarations and the public re-export surface, including selected `chio-kernel` and `chio-core-types` types. |
-| `src/request.rs` | `ChioHttpRequest`: the shared evaluation input and its content-hash binding. |
-| `src/identity.rs`, `src/method.rs`, `src/session.rs` | `CallerIdentity`/`AuthMethod`, `HttpMethod`, `SessionContext`: caller, method, and per-session primitives the request and authority types build on. |
-| `src/verdict.rs` | `Verdict`/`DenyDetails`: the allow/deny/cancel/incomplete outcome type and structured deny context. |
-| `src/receipt.rs` | `HttpReceipt`/`HttpReceiptBody`: signed receipt type, authority-semantics validation, decision/final status metadata helpers. |
-| `src/authority.rs` (+ `authority/tests.rs`) | `HttpAuthority`: kernel-backed evaluation, capability token validation, decision/final receipt signing. |
-| `src/authority_projection.rs` | Reserved `/chio/tools/{server}/{tool}` path binding and the `HttpKernelAuthorizationRequest` projection sent to the embedded kernel. |
-| `src/evaluation.rs` | `EvaluateResponse`, `HealthResponse`, `SidecarStatus`, `VerifyReceiptResponse`: sidecar-facing response shapes. |
-| `src/egress.rs` | Re-exports `chio-egress-contract` types (and, under `reqwest-egress`, its reqwest helpers) so adapters depend on one crate for outbound egress policy. |
-| `src/metrics.rs` | Guard-evaluation counters and decision-latency histogram for the HTTP authority, rendered as Prometheus text. |
-| `src/routes.rs` | Route path and header constants plus route-registration descriptors shared by every substrate adapter. |
-| `src/approvals.rs`, `src/emergency.rs`, `src/plan.rs`, `src/compliance.rs`, `src/regulatory_api.rs` | Substrate-agnostic handlers for HITL approvals, the kill switch, plan pre-flight evaluation, compliance scoring, and signed regulatory export (see README for the per-path table). |
+`authority.rs` builds an embedded kernel and coordinates preparation,
+decision signing, and receipt finalization. `authority_projection.rs` binds
+HTTP paths and projected tools to the kernel request. `request.rs`,
+`identity.rs`, `method.rs`, `session.rs`, `verdict.rs`, and `receipt.rs`
+define shared models.
 
-## Request lifecycle
+`approvals.rs`, `emergency.rs`, `compliance.rs`, `plan.rs`, and
+`regulatory_api.rs` implement administrative/read interfaces. `routes.rs`
+provides registration data; `input.rs` decodes bounded original JSON.
+`metrics.rs` reports latency and verdict counts. `egress.rs` re-exports the
+separate egress contract.
 
-1. An adapter decodes its request into `HttpAuthorityInput` (method, route
-   pattern, path, `CallerIdentity`, body hash/length, optional presented
-   capability, optional execution nonce, `HttpAuthorityPolicy`) and calls
-   `HttpAuthority::evaluate` (or `prepare`, to sign the receipt separately).
-2. `authority_projection::capability_binding` derives the tool-server/
-   tool-name binding. A reserved `/chio/tools/{server}/{tool}` path always
-   wins, decoding server and tool identity from the path and forcing
-   `DenyByDefault`; a malformed path denies immediately. Otherwise the
-   binding follows the caller-supplied policy and tool fields.
-3. A presented capability token is verified for issuer trust, signature,
-   time bounds, tool/scope match, and non-revocation across the delegation
-   chain; any failure forces a deny.
-4. `prepare` content-hashes a `ChioHttpRequest` and dispatches it as a
-   `ToolCallRequest` through the embedded kernel.
-5. The kernel's verdict is cross-checked against the HTTP-projected verdict
-   (disagreement is an `HttpAuthorityError`). `PendingApproval` surfaces as
-   `HttpAuthorityError::PendingApproval` for the adapter to map to `409` and
-   `/approvals/*`; a fail-closed durability denial also surfaces as an error
-   rather than a routine deny receipt.
-6. `evaluate` signs a decision receipt and records guard-evaluation/latency
-   metrics. Once the adapter has an upstream response, `finalize_receipt`
-   signs a second receipt carrying the real `response_status`.
+## Data and control flow
 
-## Invariants and failure modes
+The builder accepts a clock, durable receipt/revocation/admission stores,
+approval store, and trusted capability issuers. `prepare` uses the kernel
+authority clock, computes identity/content bindings, checks capability hints
+and scopes, and runs mediated authorization. `evaluate` adds a signed
+decision receipt and updates outcome metrics.
 
-- Reserved `/chio/tools/{server}/{tool}` paths bind capability identity from
-  the decoded path segments, not adapter-supplied fields; a missing tool
-  segment, nested segments, an empty segment, or incomplete/non-UTF-8
-  percent-encoding denies (`DenyByDefault`) before any session-allow or
-  wildcard policy can authorize the request.
-- Every `HttpAuthority` constructor (and `HttpAuthorityBuilder`, by default)
-  is fail-closed: no receipt or revocation store is attached and both
-  ephemeral opt-ins default `false`, so the first mediated call denies with
-  a durability error (kernel guard `kernel.receipt_persistence`) until a
-  durable store is wired through `HttpAuthority::builder`. Only the
-  `_ephemeral` constructors, or `allow_ephemeral_*(true)` on the builder,
-  opt into in-memory state.
-- A presented capability's revocation check fails closed: an unavailable
-  revocation store rejects the capability instead of treating it as valid.
-- `HttpReceipt::sign` and `verify_signature` both enforce fixed authority
-  semantics (`receipt_kind = MediatedDecision`, `boundary_class = Prevent`,
-  `observation_outcome = None`, `trust_level = Mediated`); a receipt that
-  drifts from this shape refuses to sign or fails verification.
-- `EmergencyAdmin` treats a blank or control-character-bearing configured
-  admin token as permanently unusable, so an empty or missing caller header
-  can never match it.
-- The embedded HTTP-mediation kernel disables sampling, sampling-tool-use,
-  elicitation, and Web3-evidence requirements; only the receipt-store,
-  revocation-store, and ephemeral flags vary per `HttpAuthority` instance.
-- `#![forbid(unsafe_code)]` at the crate root.
+`finalize_receipt` and `finalize_decision_receipt` record final transport
+outcome and receipt links after execution. Decision-scope and final-scope
+status metadata distinguish these stages. Optional strict execution nonces
+bind preflight to completion. Framework hosts perform transport work between
+evaluation and finalization.
+
+## Trust and invariants
+
+Presented capabilities are decoded through the original JSON boundary,
+verified against selected issuer keys, and checked for expiry, revocation,
+and requested grant bindings. Unsupported governed
+intent/approval/supplemental fields are retained for explicit rejection.
+`CallerIdentity` serialization carries a verified flag; decoding it does not
+authenticate credentials.
+
+Request hashes bind the method, route pattern, actual path, query, and
+supplied body hash. Receipt verification checks semantic validity and
+canonical receipt identity against the embedded key. Trusted-kernel identity
+still requires external pins. Ordinary constructors fail mediation without
+durable state; `new_ephemeral` deliberately permits in-memory operation.
+Session model expiry uses wall time; authoritative capability evaluation
+uses the configured kernel clock.
 
 ## Dependencies
 
-`chio-kernel` supplies the embedded `ChioKernel` (capability issuance, guard
-evaluation, receipt/revocation durability gates) `HttpAuthority` wraps.
-`chio-core-types` supplies canonical JSON, capability/crypto/receipt
-primitives, and the plan-evaluation types re-exported for the plan endpoint.
-`chio-egress-contract` supplies the typed egress contract re-exported under
-`egress`; it stays a leaf crate so callers such as `chio-link` (itself a
-`chio-kernel` dependency) can consume it without forming a cycle.
-`chio-cross-protocol` supplies the route-planning types `authority.rs` uses
-for route-selection metadata. `chio-metrics-spec` supplies the metric-name
-constants `metrics.rs` renders, including `chio_dispatch_failure_total`.
-`chrono`, `sha2`/`hex`, `uuid` (`v7`), and `thiserror` support timestamps,
-hashing, ids, and typed handler errors.
+`chio-kernel` supplies mediation, stores, clocks, and nonce handling.
+`chio-core-types` supplies signatures and canonical receipt/request
+primitives. `chio-cross-protocol` supplies authoritative route selection.
+`chio-security-types`, `chio-egress-contract`, and `chio-metrics-spec`
+supply clocks/security interfaces, egress restrictions, and metric names.
+`reqwest-egress` exposes optional request-sending helpers.
 
-## Extension points
+## Verification
 
-- `ComplianceSource` (`compliance.rs`) - backing store for
-  `/compliance/score`; adapters supply an implementation (typically
-  `chio-store-sqlite`-backed) to `handle_compliance_score`.
-- `RegulatoryReceiptSource` (`regulatory_api.rs`) - backing store for
-  `/regulatory/receipts`; adapters supply an implementation to
-  `handle_regulatory_receipts_signed`.
+Tests cover capability-input provenance, authority/security binding,
+execution nonces, final receipt links, egress contracts, administrative
+endpoints, plan evaluation, and signed regulatory exports. Authority unit
+tests cover durability errors and invalid capabilities on safe routes. Run
+`cargo test -p chio-http-core`; use `--features reqwest-egress` to include
+the optional helpers. The README default-feature example selects ephemeral
+state and never sends a network request.

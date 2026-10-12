@@ -1,68 +1,59 @@
 # chio-trust-market-context
 
-Verifies the trust-market section of a Chio transaction proof bundle:
-provider discovery, provider selection, trust scorecards, portable
-reputation imports, SLA commitments and performance, collateral,
-guarantees, and adjudication jurisdiction, plus the risk-comptroller report
-that binds them to reserves. The crate's one function,
-`verify_trust_market_context`, turns a bundle of signed JSON artifacts and
-an evidence graph into a `TrustMarketVerifierReport` or a fail-closed
-`TransactionPassportError`.
+Verifies transaction evidence for provider discovery/selection, local
+scorecards, reputation imports, SLA performance, risk, collateral,
+guarantees, and jurisdiction. It produces a trust-market family report
+consumed by higher-level Chio proof composition.
 
-It is one claim-family verifier among several that `chio-proof-room`
-composes over a proof bundle; `chio-control-plane` re-exports it as
-`trust_market`. It verifies a bundle after the fact and does not select
-providers, update reputation, enforce SLAs live, or authorize settlement.
+## Usage
 
-## Responsibilities
+Exercise missing-root-pin rejection offline. Complete verification needs
+committed graph/policy/artifact bytes, root pins, and market-authority keys
+selected outside the bundle. The passport fixture is embedded at compile
+time.
 
-- Delegate passport-signature and minimal-artifact checks to
-  `chio-transaction-passport` before trusting anything else in the bundle.
-- Parse the trust-market evidence graph and verifier policy, then resolve
-  all ten evidence artifacts by content digest and a `sig-ed25519:`
-  signature check against market authority keys the verifier policy pins
-  (not just supplied by the caller).
-- Cross-bind the artifacts to each other (ids, order ids, freshness
-  windows, ranks and scores) in dependency order: discovery, reputation
-  import, scorecard, selection, risk report, SLA, jurisdiction, then
-  collateral and guarantee.
-- Delegate risk-comptroller report validation to `chio-risk-comptroller`
-  and bind its result to the selected provider and order.
-- Enforce that the verifier policy discloses a fixed set of market
-  capabilities Chio does not implement (permissionless marketplace,
-  published global trust score, liquidity pool, risk syndication,
-  underwriter market, autonomous guarantee sales, slashing court), and
-  reject any policy that requires one of them.
+```rust
+use std::collections::BTreeMap;
+use chio_trust_market_context::{verify_trust_market_context, TrustMarketBundle};
+use chio_transaction_passport::{decode_evidence_json, TransactionPassport,
+    TransactionPassportError};
 
-## Public API
-
-- `TrustMarketBundle` - input: a `TransactionPassport`, the trust-market-
-  scoped evidence graph bytes, an optional `root_evidence_graph_bytes` for
-  when that graph is a scoped subset of the one the passport signs, the
-  verifier policy bytes, artifact bytes keyed by bundle-relative path, and
-  the trusted passport-signer and market-authority key sets.
-- `TrustMarketVerifierReport` / `TrustMarketVerifierSections` - output:
-  verdict, verified and unsupported claim ids, and the artifact id bound to
-  each trust-market section. Both derive `Serialize`/`Deserialize`.
-- `verify_trust_market_context(bundle: &TrustMarketBundle) -> Result<TrustMarketVerifierReport, TransactionPassportError>` -
-  the sole entry point.
-
-## Testing
-
-`tests/trust_market_context.rs` builds one signed fixture bundle and
-exercises each failure mode by mutating a single field at a time; the lib
-target itself carries no unit tests (`test = false` in `Cargo.toml`).
-
-```bash
-cargo test -p chio-trust-market-context
+let passport: TransactionPassport = decode_evidence_json(include_bytes!(
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fixtures/proof-room/",
+        "enterprise-export/valid-autonomous-commerce/transaction-passport.json")))?;
+let bundle = TrustMarketBundle {
+    passport, evidence_graph_bytes: vec![], root_evidence_graph_bytes: None,
+    verifier_policy_bytes: vec![], artifacts: BTreeMap::new(),
+    trusted_passport_signer_keys: vec![], trusted_market_authority_keys: vec![],
+};
+assert!(matches!(verify_trust_market_context(&bundle),
+    Err(TransactionPassportError::MissingTrustedTransactionRootKeys)));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## See also
+## Guarantees
 
-- `chio-transaction-passport` - passport and evidence-graph signature
-  verification, and the schema id constants this crate validates against.
-- `chio-risk-comptroller` - validates the `RiskComptrollerReport` this
-  crate binds to the selected provider.
-- `chio-proof-room` - composes this verifier with other claim-family
-  verifiers over one proof bundle.
-- `chio-control-plane` - re-exports this crate as `trust_market`.
+`verify_trust_market_context` authenticates the passport and then intersects
+caller-trusted market keys with policy-pinned market keys.
+`parse_signed_artifact` binds each artifact to its graph digest/schema and
+verifies its signature against that intersection.
+
+Family checks bind provider selection, score recomputation, reputation
+weight, SLA metrics, risk references, collateral, guarantee terms, and
+jurisdiction. Policy-required unsupported market claims are rejected; the
+report lists declared unsupported claims.
+
+## Status
+
+Implemented offline trust-market evidence verifier. `[lib] test = false`;
+integration tests exercise signed bundles. Freshness and SLA windows are
+evaluated over supplied timestamps. The crate does not discover providers,
+update reputation, enforce SLA remedies, operate a market, or execute
+sanctions.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol](../../../spec/PROTOCOL.md#643-transaction-passport-proof-root)
+- [chio-commerce-order](../chio-commerce-order/README.md)
+- [License](../../../LICENSE)

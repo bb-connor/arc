@@ -1,106 +1,108 @@
 # chio-proof-room architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-proof-room` is a standalone product binary and library, marked
-`public_entrypoint = true` in its manifest metadata: a supported public entry
-point distinct from the full `chio` CLI, built for the Docker quickstart. It
-sits at an untrusted edge: it reads a bundle or fixture directory supplied by
-the caller and never trusts a claimed verdict, recomputing every verifier
-report from source artifacts through the domain-verifier crates listed under
-Dependencies. Its verification and fixture machinery (around 8,800 lines) is
-`pub(crate)`; the public surface is a handful of verification entry points
-and the axum router/server constructors.
+Proof Room owns bundle verification, fixture report recomputation, and an HTTP
+inspection surface. It consumes existing signed artifacts and verification
+policies. It does not mint runtime authorization or mediate the tool executions
+those artifacts describe.
 
-## Module map
+`verify_proof_room_bundle` returns `VerifiedProofRoomBundle`, an opaque result
+that retains the exact authenticated manifest hash and bundle ID. Its fields
+are private, and it has no Serde constructor. This result identifies the
+verified manifest; it does not freeze later changes to files served from disk.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Schema/claim/env-var constants, `ProofRoomError`, manifest and fixture-catalog wire types, the embedded-fixture include, and per-domain `*_trust_from_env` / `*_keys_from_env` trust configuration (including the public-settlement independent-chain-head RPC fetch). |
-| `src/main.rs` | CLI argument parsing; dispatches to `serve_proof_room` or `verify_proof_room_quickstart`. |
-| `src/server.rs` | The axum `Router`: bundle/artifact/fixture routes, hand-rolled multipart upload verification, static UI serving, and `serve_proof_room` (bind, verify-before-serve, graceful shutdown). |
-| `src/bundle_a.rs` | Core manifest verification: schema/hash checks, DSSE bundle-signature verification, negative-case replay, claim-to-artifact binding, first-run authority-evidence checks, and bundle-relative path safety. |
-| `src/bundle_b.rs` | UI verifier-report cross-check, JSON Schema validation plumbing, bundle path resolution/percent-decoding, and negative-case mutation appliers (JSON-path edits, evidence-graph node rehash, manifest/DSSE refresh). |
-| `src/receipt_coverage.rs` | Verifies the manifest's receipt-coverage matrix: required categories, terminal-status-to-category matching, kernel-signature verification per covered receipt. |
-| `src/source_verifier.rs` | Recomputes the verifier report for a bare transaction passport on the manifest-bundle path: routes evidence-graph subsets to domain verifier crates by policy `required_claims`, merges family reports, attaches a runtime-proof-parity report. |
-| `src/fixture_a.rs` | The fixture-catalog HTTP path: resolves `/proof-room-fixtures/{id}/{asset}`, defines `ProofRoomFixtureReportRoute` and the embedded/installed asset source, and routes each fixture's `verifier-report.json` to one domain verifier. |
-| `src/fixture_b.rs` | Decodes typed domain-verifier bundles (commerce, disclosure lineage, swarm authority, public settlement, runtime) from an evidence graph and artifact map; shared by `source_verifier.rs` and `fixture_a.rs`. Also builds the `/proof-room-fixture-catalog.json` response. |
-| `src/crypto_context.rs` | Recomputes a BBS selective-disclosure crypto-context report and cross-checks it against a claimed signed report. |
-| `build.rs` (+ `../proof_fixture_build.rs`) | Embeds `fixtures/proof-room/first-run/single-call-authority` into the binary via `include_bytes!` at compile time; other catalog fixtures need `--fixture-root`. |
+## Structure
 
-`fixture_a.rs` and `source_verifier.rs` are independent recomputation paths
-that both route through `ProofRoomFixtureReportRoute` and share
-`fixture_b.rs`'s artifact decoders: the fixture-catalog path resolves one
-route per fixture, while the manifest-bundle path can merge several family
-reports into one.
+| Module | Role |
+| --- | --- |
+| `lib.rs` | Public entrypoints, schema definitions, domain routing constants, and environment-based trust. |
+| `verified` | Verified manifest identity with read-only accessors. |
+| `bundle_a` | Manifest/artifact checks, authority bindings, DSSE verification, negatives, and doctor reports. |
+| `bundle_b` | Schema/report checks, path resolution, bounded tree copying, and negative mutations. |
+| `receipt_coverage` | Covered/excluded categories, status bindings, and receipt signatures. |
+| `source_verifier` | Passport reconstruction and routing required claims to domain verifiers. |
+| `fixture_a`, `fixture_b` | Fixture catalogs, embedded files, and generated fixture reports. |
+| `crypto_context` | BBS crypto-context report recomputation. |
+| `input`, `error`, `environment` | Bounded signed JSON, typed errors, and scoped environment overrides. |
+| `server` | Axum routes, asset allow-lists, uploads, and graceful shutdown. |
+| `main.rs` | Argument parsing and verification/serving exit codes. |
 
-## Bundle verification
+`build.rs` includes the shared `proof_fixture_build.rs` generator. The focused
+binary embeds the single-call-authority fixture subtree. A configured fixture
+root can supply additional catalog entries from disk.
 
-1. Read `manifest.json`, reject any non-regular file in the bundle tree, and
-   validate the manifest against `bundle.schema.json`
-   (`chio.proof-room.bundle.v1`, `hash_algorithm: sha256`).
-2. Verify the detached DSSE bundle signature against trust roots declared in
-   the bundle's own `artifacts/authority/trust-roots.json`, intersected with
-   `CHIO_PROOF_ROOM_TRUSTED_BUNDLE_SIGNER_KEYS`.
-3. Verify the `transaction_passport_ref` and `evidence_graph_ref` artifacts,
-   and, for first-run bundles, the capability-proof / guard-report /
-   trust-roots artifacts and their evidence-graph node bindings.
-4. Recompute the source verifier report from the transaction passport
-   (`source_verifier::verify_source_verifier_report`) and compare it to the
-   manifest's claimed `verifier_report_ref` - the manifest's own report is
-   never trusted directly.
-5. Verify every claim is bundle-scoped or covered by the recomputed report,
-   verify the receipt-coverage matrix, and (unless disabled) replay every
-   negative case against a temp copy of the bundle, checking its expected
-   failure code.
-6. Verify the remaining manifest artifacts hash correctly and, if present,
-   cross-check the UI-facing report against the recomputed verdict.
+## Data and control flow
 
-`serve_proof_room` runs this pipeline before binding a listener: an
-unverified or tampered bundle is never served.
+The verifier first checks the bundle tree, reads bounded manifest bytes, and
+validates the schema and hash algorithm. It verifies detached DSSE signatures,
+loads referenced passport and graph bytes by hash, and recomputes the source
+verifier report. Authority evidence, claim bindings, receipt coverage, negative
+cases, listed artifacts, and the dashboard report are checked before success.
 
-## Invariants and failure modes
+The source verifier derives required claim families from the verifier policy.
+It checks passport artifact digests, scopes graph subsets for domain verifiers,
+merges verified reports, and requires each demanded claim to be satisfied.
+Unknown required claim routes reject. Runtime report handling also checks
+proof-parity and regeneration artifacts against graph and workflow bindings.
 
-- Fail closed: any schema, hash, signature, or claim mismatch rejects with a
-  `proof-room.*` error code; the server refuses to serve until verification
-  succeeds.
-- Bundle-relative paths are validated and percent-decoded before resolution;
-  canonicalized paths must stay under the bundle root, ruling out `..`,
-  absolute paths, and symlink escapes.
-- A DSSE bundle signature must be signed by a key both declared in the
-  bundle's own trust-roots artifact and present in the env-pinned trusted
-  signer set - a bundle cannot self-declare a new trusted signer.
-- Negative cases must reproduce their exact `expected_failure_code`; an
-  unexpectedly-passing negative case fails the whole verification.
-- HTTP asset serving only exposes paths enumerated from a verified manifest
-  (`proof_room_served_bundle_paths`) or the UI directory; everything else
-  404s.
-- The public-settlement independent-chain-head RPC path is the crate's only
-  outbound network call; it runs through `chio-egress-contract`'s pinned-DNS
-  resolver with redirects denied and a response-byte ceiling.
-- Trust configuration (signer keys, chain policy) is read from `CHIO_*`
-  environment variables at verification time; missing required configuration
-  is a hard error, not a silent skip.
+`verify_proof_room_quickstart` optionally writes a doctor report from the
+verified result. The report includes declared receipt exclusions and replayed
+negative-case results. Its output parent must already exist.
 
-## Dependencies
+`serve_proof_room` checks the UI index and full bundle before binding, builds
+routes, applies server hygiene and connection limits, and drains on shutdown.
+`proof_room_router*` constructors build route state and manifest-derived path
+allow-lists without the full verifier. Library hosts must verify independently.
 
-Domain verifiers this crate orchestrates and recomputes reports from (each
-owns its own fail-closed rules): `chio-transaction-passport` (root
-passport/evidence-graph/claim-set and runtime-security verification),
-`chio-swarm-authority`, `chio-runtime-proof-parity` (both validators -
-`validate_runtime_proof_parity_report` and
-`validate_runtime_proof_regeneration_artifacts`), `chio-web3`
-(`settlement_proof`), `chio-commerce-order`, `chio-disclosure-lineage`,
-`chio-selective-disclosure` (`bbs` feature), `chio-enterprise-export`,
-`chio-risk-comptroller`, `chio-trust-market-context`,
-`chio-agent-web-interop`, `chio-workflow-preflight` (fixture-catalog path
-only).
+Uploads pass multipart parsing and path validation before a temporary tree is
+written. The upload handler calls the full verifier and returns a stable public
+verdict; its temporary directory is removed on drop. There is no persistent
+upload catalog or receipt database owned by the server.
 
-Also: `chio-core-types` (`PublicKey`, `Signature`, canonical JSON,
-`sha256_hex`); `chio-http-serve` (connection caps and graceful drain wrapped
-around the axum router); `chio-egress-contract` (`reqwest-egress` feature,
-pinned-DNS egress for the settlement RPC call). External: `axum` +
-`tower-http` (router, static files), `tokio` (async runtime), `jsonschema`
-(bundle/artifact schema validation), `reqwest` (RPC client), `serde` /
-`serde_json`, `sha2` / `hex`, `thiserror`. No dependency aliasing:
-`chio-core-types` imports as `chio_core_types`, matching its package name.
+## Trust and invariants
+
+DSSE pre-authentication encoding signs the exact manifest bytes. Every detached
+signer must belong to both declared trust roots and the independently configured
+operator key set. Hash references bind original artifact bytes; canonicalization
+is applied by domain contracts where their signed formats require it.
+Receipt coverage checks use a separate trusted kernel-key set and distinguish
+covered categories from explicit exclusions.
+
+`validate_bundle_relative_path` rejects absolute paths, dot segments,
+backslashes, colons, whitespace, controls, and decoded traversal/separators.
+Path resolution canonicalizes the root and target and requires containment.
+Tree validation rejects symlinks and special files. `input::read` checks regular
+files and reads at most 16 MiB plus one byte; Unix opens reject a final symlink.
+Signed JSON decoding rejects duplicate object keys before typed projection.
+
+Collectors charge a maximum of 4,096 entries, depth 64, and 128 MiB cumulatively.
+The upload route caps the HTTP body at 32 MiB. These limits cover different
+stages; verification errors retain typed local causes while HTTP responses
+project public error information.
+
+Trust configuration is process environment data. The source quickstart helper
+exports fixture keys and replay timing for local inspection. Domain-specific
+verifiers require their own authority keys. Public-settlement verification may
+use an independent-chain-head JSON value or a configured RPC URL; RPC requests
+pass through `HttpEgressContract`. The README's single-call example uses local
+fixtures and opens no network listener.
+
+## Dependencies and verification
+
+Transaction-passport and domain crates implement evidence verification for
+runtime, swarm, commerce, enterprise, risk, trust-market, web3, disclosure, and
+agent-web claims. Selective-disclosure enables BBS support. Core types provide
+cryptography and strict JSON; Jsonschema checks artifact shapes. Axum, Tokio,
+Tower HTTP, and `chio-http-serve` provide routing, static files, connection
+limits, and shutdown. SHA-256 hashes raw manifest and artifact bytes.
+There are no package-defined Cargo features.
+
+`src/tests/core.rs` checks the authority fixture, receipt coverage, negatives,
+and runtime regeneration bindings. `source.rs` checks report drift, required
+claims, signer rejection, and BBS material. `catalog.rs` exercises fixture and
+asset routes. Input tests check allocation bounds and JSON-RPC response IDs.
+`tests/cli.rs` checks help, verify-only reports, and missing UI rejection before
+binding. Run `cargo test -p chio-proof-room` for these local verifier and HTTP tests.
+
+[README](README.md) contains the source-checkout verification command.

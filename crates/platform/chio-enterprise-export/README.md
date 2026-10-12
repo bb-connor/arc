@@ -1,60 +1,60 @@
 # chio-enterprise-export
 
-Verifies enterprise evidence-export bundles: a transaction passport plus a
-risk comptroller report, data-governance report, evidence-export bundle,
-telemetry projection, approval case, and control-evidence map, all
-digest-bound to each other and signed by independently trusted keys. It is a
-pure offline verifier with no I/O; callers assemble the bundle and get back a
-report of which enterprise claims verified.
+Verifies enterprise export evidence within a transaction proof bundle:
+governance classifications, export digests, telemetry receipts, approval
+quorum, control mapping, and risk-comptroller reports.
 
-## Responsibilities
+## Usage
 
-- Verify the passport signature and baseline evidence-graph/verifier-policy
-  shape by delegating to `chio-transaction-passport`, accepting either the
-  full signed evidence graph or a scoped subset that must be a literal
-  node/edge subset of a caller-supplied signed root graph.
-- Parse the enterprise evidence graph and digest-bind every artifact it
-  references before trusting its contents.
-- Validate the five enterprise artifact types: data-governance report
-  (region allow-list, legal hold, retention floor, PII redaction),
-  evidence-export bundle (recomputed digest, required artifact roles,
-  cross-links to the passport and risk report), telemetry projection
-  (required event kinds, receipt-bound SIEM events), approval case (quorum,
-  Ed25519 signature, expiry window), and control-evidence map (each control's
-  claim tied to a graph node that actually proves it).
-- Validate one or more risk comptroller reports and their evidence
-  references by delegating to `chio-risk-comptroller`.
-- Accumulate verified enterprise claims and fail if the bundle's own
-  verifier policy requires one that was not proven.
+Show that a supplied passport cannot make a bundle trusted without selected
+root keys. Complete bundles additionally need committed
+graph/policy/artifact bytes and separate receipt, approval, and
+risk-authority pins. The fixture is embedded at compile time.
 
-## Public API
+```rust
+use std::collections::BTreeMap;
+use chio_enterprise_export::{verify_enterprise_export, EnterpriseExportBundle};
+use chio_transaction_passport::{decode_evidence_json, TransactionPassport,
+    TransactionPassportError};
 
-- `verify_enterprise_export(bundle: &EnterpriseExportBundle) ->
-  Result<EnterpriseVerifierReport, TransactionPassportError>` - the single
-  entry point.
-- `EnterpriseExportBundle` - the passport, evidence-graph bytes (plus an
-  optional signed root graph for scoped disclosure), verifier-policy bytes, a
-  `BTreeMap<String, Vec<u8>>` of artifact path to bytes, and four trusted-key
-  sets (passport signer, telemetry-receipt kernel, approval signer, risk
-  comptroller signer).
-- `EnterpriseVerifierReport` / `EnterpriseVerifierSections` - the verdict,
-  verified claim list, and an artifact id reference for each enterprise
-  section.
+let passport: TransactionPassport = decode_evidence_json(include_bytes!(
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fixtures/proof-room/",
+        "enterprise-export/valid-autonomous-commerce/transaction-passport.json")))?;
+let bundle = EnterpriseExportBundle {
+    passport, evidence_graph_bytes: vec![], root_evidence_graph_bytes: None,
+    verifier_policy_bytes: vec![], artifacts: BTreeMap::new(),
+    trusted_passport_signer_keys: vec![], trusted_receipt_kernel_keys: vec![],
+    trusted_approval_signer_keys: vec![],
+    trusted_risk_comptroller_signer_keys: vec![],
+};
+assert!(matches!(verify_enterprise_export(&bundle),
+    Err(TransactionPassportError::MissingTrustedTransactionRootKeys)));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-enterprise-export`. The library target carries no unit
-tests (`[lib] test = false`); coverage lives in `tests/enterprise_export.rs`,
-which builds full bundles, including risk-comptroller lifecycle cases
-(reserves, settlement, appeals, capital adequacy), through
-`verify_enterprise_export`.
+`verify_enterprise_export` bounds evidence inputs and verifies the pinned
+passport signature before family checks. Artifact lookup recomputes graph
+digests; risk and approval signatures use caller-selected keys, and
+telemetry receipt checks require trusted kernel keys.
 
-## See also
+`validate_evidence_export_bundle` recomputes the export index digest and
+checks required artifact roles. Approval checks bind that digest, distinct
+approvers/quorum, and issuance/expiry relative to export time. Control
+mapping checks that each claim uses a suitable graph gate.
 
-- `chio-transaction-passport` - passport, evidence-graph, and verifier-policy
-  types plus the baseline signature and shape verification this crate builds
-  on.
-- `chio-risk-comptroller` - `RiskComptrollerReport` and its structural,
-  portfolio, and evidence-reference validation.
-- `chio-core-types` - canonical JSON, SHA-256 hashing, and signature
-  primitives used for every digest and signature check.
+## Status
+
+Implemented offline enterprise evidence verifier. `[lib] test = false`;
+integration tests compose signed artifacts and exercise rejection cases.
+Governance fields, export policy, and telemetry are checked as supplied
+evidence. The crate does not perform exports, apply retention, enforce legal
+holds, or query enterprise systems.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol](../../../spec/PROTOCOL.md#643-transaction-passport-proof-root)
+- [chio-risk-comptroller](../chio-risk-comptroller/README.md)
+- [License](../../../LICENSE)

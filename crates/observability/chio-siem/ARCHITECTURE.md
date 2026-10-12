@@ -1,207 +1,127 @@
 # chio-siem architecture
 
-## Overview
+## Responsibility and boundary
 
-chio-siem sits outside the kernel trust boundary. It reads kernel receipts
-through an explicit, admin-scoped `ReceiptReadContext`, but never signs
-receipts, mutates revocation state, issues capabilities, enforces runtime
-policy, or owns the receipt database schema; its own writes are confined to a
-separate, SIEM-owned SQLite cursor store. The dependency on `chio-kernel` is
-one-directional (chio-kernel does not depend on chio-siem), which keeps the
-SIEM HTTP-client surface out of the kernel TCB.
+`ExporterManager` owns a read-only SQLite connection to `chio_tool_receipts`,
+registered `Exporter` objects, polling state, rate limiting, and an in-memory
+failure queue. An optional `SiemCursorStore` owns a separate writable database.
+The manager validates an admin receipt-read context but performs its own SQL
+reads; it does not call the kernel's receipt-query API. It neither mediates tool
+execution nor signs exported projections.
 
-The manager's central design commitment is durable, at-least-once export:
-when a cursor store is configured, the read cursor can advance only to the
-slowest exporter's acknowledged high-water mark, so a failing exporter forces
-redelivery instead of silently losing receipts.
+`SiemEvent` retains the complete original receipt for evidence consumers.
+`SiemSinkProjection` is the ordinary export boundary: constructors and fields are
+restricted, and serialization produces an unsigned reference to the original.
+Custom `Exporter` implementations receive full events and must choose an
+appropriate disclosure contract themselves.
 
-## Diagram
+## Structure
 
-```mermaid
-flowchart LR
-    subgraph src["Source (read only)"]
-        RDB["Kernel receipt DB"]
-    end
-    subgraph ingest["Ingest and normalize"]
-        POLL["Cursor pull poll loop"]
-        SE["Original SiemEvent and owned signer pins"]
-        PROJ["Closed unsigned sink projection"]
-        DL["Dead letters (siem_dead_letters)"]
-    end
-    subgraph dispatch["Manager dispatch"]
-        FANOUT["Fan out retry and backoff"]
-        CUR["Cursor store (acked_seq)"]
-        DLQ["In memory dead letter queue"]
-    end
-    subgraph sinks["SOC export sinks"]
-        SPLUNK["Splunk HEC NDJSON"]
-        ELASTIC["Elasticsearch bulk NDJSON"]
-        DATADOG["Datadog Log Intake v2"]
-        SUMO["Sumo Logic HTTP Source"]
-        WEBHOOK["Webhook JSON POST"]
-        OCSFX["OCSF exporter (class 3002)"]
-        CEFX["CEF v0 text"]
-    end
-    subgraph alerting["Alerting overlay"]
-        ALERT["Alerting exporter severity gate"]
-        PAGE["PagerDuty and OpsGenie"]
-    end
-    RDB -->|"raw_json rows"| POLL
-    POLL -->|"parse ok"| SE
-    POLL -->|"malformed"| DL
-    SE -->|"reverify original"| PROJ
-    PROJ -->|"ordinary payload"| FANOUT
-    FANOUT --> SPLUNK
-    FANOUT --> ELASTIC
-    FANOUT --> DATADOG
-    FANOUT --> SUMO
-    FANOUT --> WEBHOOK
-    FANOUT --> OCSFX
-    FANOUT --> CEFX
-    FANOUT -->|"severity gate"| ALERT
-    ALERT --> PAGE
-    FANOUT -->|"acked seq"| CUR
-    FANOUT -->|"export err"| DLQ
-    CUR -->|"min ack resume"| POLL
-```
+| Module | Responsibility |
+| --- | --- |
+| `manager` | Polling, retries, cursor advancement, exporter fan-out, metric calls |
+| `event` | Original receipt, descriptive caches, privately owned signer pin |
+| `sink_projection` | Closed payload schema and fresh source verification |
+| `cursor_store` | Monotonic progress rows and malformed-row capture |
+| `dlq` | Drop-oldest queue of failed projection JSON and diagnostic errors |
+| `ratelimit` | Token buckets keyed by exporter name, one token per attempt |
+| `exporter` | Dyn-compatible `Exporter` and `ExportError` contracts |
+| `exporters` | Splunk, Elastic, Datadog, Sumo, webhook, OCSF, and CEF adapters |
+| `ocsf` | OCSF 1.3.0 Authorization-class mapping from the closed view |
+| `alerting` | Severity/filter rules, private notification projection, paging |
+| `metrics_sink` | Host-installed instrumentation seam with a no-op default |
+| `redaction` | Operator error formatting through `chio-log-redact` |
 
-## Module map
+## Data and control flow
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public module declarations and the crate's re-export surface. |
-| `src/manager.rs` | `ExporterManager`: cursor-pull poll loop, per-exporter retry/backoff, cursor persistence, DLQ routing, metric emission. |
-| `src/event.rs` | `SiemEvent`: wraps `ChioReceipt`, recomputes id/signature/parameter-hash validity and signer trust, extracts `financial` metadata. |
-| `src/sink_projection.rs` | Closed, Serialize-only ordinary sink payload with fixed tags, bounded commitments, hashed identifiers, typed source semantics, original verification and numeric-only financial diagnostics. |
-| `src/exporter.rs` | `Exporter` trait, `ExportError`, `ExportFuture`. |
-| `src/cursor_store.rs` | `SiemCursorStore`: RW SQLite store for per-exporter `acked_seq` and durably captured malformed rows (`siem_dead_letters`). |
-| `src/dlq.rs` | `DeadLetterQueue`: bounded, drop-oldest in-memory queue for events that exhaust retry. |
-| `src/ratelimit.rs` | `ExportRateLimiter`: per-exporter token-bucket batch rate limiting. |
-| `src/metrics_sink.rs` | `SiemMetricsSink` trait and `NoopMetricsSink`; decouples the manager and alerting exporter from a metric registry. |
-| `src/redaction.rs` | `redact_for_operator_log`, wrapping `chio-log-redact`, applied to every error surfaced to tracing. |
-| `src/ocsf.rs` | `receipt_to_ocsf` / `siem_event_to_ocsf`: stateless mapping to OCSF 1.3.0 Authorization events (class_uid 3002). |
-| `src/alerting.rs` | `AlertSeverity`, `derive_severity`, `AlertBackend`, `PagerDutyBackend`, `OpsGenieBackend`, `AlertingExporter`: severity-gated paging overlay. |
-| `src/alerting/projection.rs` | Automatic paging projection: receipt ID, timestamp and hashes for correlation; raw arguments, denial reasons, evidence and metadata stay out of notifications. This is an unsigned reference, not a signed receipt. |
-| `src/exporters/mod.rs` | Shared HTTPS-scheme enforcement (`require_https_endpoint`) used by every network exporter. |
-| `src/exporters/splunk.rs` | `SplunkHecExporter`: newline-delimited JSON to Splunk HEC; classifies HEC's 200-with-embedded-error responses. |
-| `src/exporters/elastic.rs` | `ElasticsearchExporter`: NDJSON `_bulk` API; detects per-item partial failure inside a 200 response. |
-| `src/exporters/datadog.rs` | `DatadogExporter`: Datadog Log Intake v2 API. |
-| `src/exporters/sumo_logic.rs` | `SumoLogicExporter`: Sumo Logic HTTP Source, with Json/Text/KeyValue wire formats. |
-| `src/exporters/ocsf_exporter.rs` | `OcsfExporter`: OCSF events over HTTPS as a JSON array or NDJSON; usable as a pure formatter when `endpoint` is empty. |
-| `src/exporters/cef.rs` | `CefExporter`: CEF v0 text formatting only, no transport. |
-| `src/exporters/webhook.rs` | `WebhookExporter`: generic HTTPS JSON POST/PUT; `from_endpoint` is the production SOC-sink constructor. |
+Construction rejects zero batch size, zero polling interval, tenant-scoped read
+contexts, and invalid optional rate limits before opening the source read-only.
+`run` waits on a Tokio interval and a watch cancellation channel. Each poll reads
+`seq > cursor` in ascending order with a row-count limit, then releases the
+connection mutex before awaiting any exporter. The row limit does not bound the
+byte length of each stored JSON receipt.
 
-## Poll and export cycle
+Parsed receipts become events with operator-configured trusted signer keys.
+Malformed rows go to `siem_dead_letters` when a cursor database is configured;
+persistence must succeed before that row is skipped. The in-memory malformed
+entry contains its sequence marker, while the durable table keeps raw JSON.
+Capture is idempotent by source sequence.
 
-1. `ExporterManager::new` opens a read-only, no-mutex SQLite connection to the
-   kernel receipt database (`SQLITE_OPEN_READ_ONLY | SQLITE_OPEN_NO_MUTEX`,
-   wrapped in a `Mutex` so the manager stays `Send + Sync`), and rejects a
-   non-`AdminAll` `ReceiptReadContext`, a zero `batch_size`, or a zero
-   `poll_interval` before the database is touched.
-2. `add_exporter` registers a backend; with a cursor store configured, an
-   unseen exporter's `cursor_identity()` is seeded at baseline 0, and the
-   resume cursor is recomputed as the minimum acknowledged seq across all
-   registered exporters.
-3. Each tick (`run`'s `tokio::time::interval` driving the internal
-   `poll_once`) reads up to `batch_size` rows with `seq > cursor` and parses
-   each `raw_json` into a `ChioReceipt`.
-4. A row that fails to parse is durably persisted to `siem_dead_letters`
-   (when a cursor store is configured) before the cursor is allowed past it;
-   a persist failure leaves the cursor behind the row so the next poll
-   retries it.
-5. Every parsed row becomes a `SiemEvent` via
-   `SiemEvent::from_receipt_with_trusted_kernel_keys`, recomputing
-   source verification independently of the embedded `decision`, retaining a
-   private owned signer pin that cannot be supplied by deserialization.
-6. The batch fans out to each registered exporter through
-   `export_with_retry` (exponential backoff capped at
-   `MAX_RETRY_BACKOFF_MS` = 60s), gated by the optional `ExportRateLimiter`.
-7. A returned `Ok(n)` acks only the delivered prefix (`n` may be less than
-   the batch size); a returned `Err` leaves that exporter's high-water mark
-   untouched and pushes an unsigned sink projection for every event in the
-   batch onto the `DeadLetterQueue`.
-   An exporter with `is_soc_export_sink() == false` (the alerting overlay)
-   still advances its own cursor but is excluded from SOC export/lag/DLQ
-   metrics, so a failed page cannot burn the SOC export SLO.
-8. The read cursor advances to the minimum acknowledged seq across
-   registered exporters (or unconditionally, in the legacy no-cursor-store
-   mode, where a restart replays from seq 0 and downstream ingest must dedup
-   idempotently).
+The manager awaits exporters sequentially. It retries failed batches up to
+`max_retries` after the initial attempt, with doubling delays capped at 60 seconds.
+Rate limiting applies to each attempt and shares a bucket among equal exporter
+names. A successful count is interpreted as an accepted prefix; a short count
+leaves its tail unacknowledged in persistent cursor mode. `PartialFailure` errors
+retain the entire batch for retry, so previously accepted events can repeat.
 
-## Invariants and failure modes
+With `cursor_db_path`, acknowledged progress is stored under
+`Exporter::cursor_identity()`, and the read cursor follows the slowest registered
+identity. New identities start at zero. The trait default uses the bare exporter
+name; only the built-in webhook overrides it with a sanitized endpoint. Callers
+must distinguish multiple destinations that otherwise share the same identity.
+With no cursor database, polling advances past failures and restart begins at
+zero. Downstream duplicate handling remains specific to the collector.
 
-- `ExporterManager::new` fails closed on a non-admin `ReceiptReadContext`,
-  `batch_size == 0`, or `poll_interval == 0`, all before opening the receipt
-  database.
-- The receipt database connection is opened read-only; the cursor database
-  is the only SQLite file this crate writes.
-- `SiemEvent::is_authorized()` and ordinary sink projection authorization require receipt id, signature, and action
-  parameter hash to verify AND the signer to be in the caller-supplied
-  privately owned trusted-kernel-key set and a mediated prevent/allow boundary.
-  Public cached annotations are not authority. Mutating the source receipt or
-  deserializing cached flags cannot promote an untrusted allow.
-- All built-in ordinary exporters serialize/render `SiemSinkProjection`; none
-  forwards the source receipt or arbitrary financial metadata. The projection
-  is explicitly unsigned and requires authorized original retrieval for
-  independent authentication. The original signed receipt remains unchanged.
-  Source payload retention and durable malformed-row capture remain separate
-  retention/erasure acceptance, including the stored `raw_json` dead letters.
-- Alerting dispatch owns its own typed kernel signer pins, supplied through
-  `AlertingExporterBuilder::with_trusted_kernel_keys`. An empty pin set never
-  pages. Before invoking backends it checks the original receipt's canonical ID,
-  strict signature and action parameter hash, then applies Deny severity/guard
-  filters. Public SiemEvent annotations are descriptive, not dispatch authority.
-  Wall's operator pin configuration feeds both manager annotations and the
-  exporter policy; configured paging without independent pins rejects startup.
-  Existing callers must supply pins explicitly when upgrading.
-- Every exporter that accepts a caller-supplied endpoint URL (Splunk HEC,
-  Elasticsearch, Sumo Logic, webhook, the OCSF exporter with a non-empty
-  endpoint, PagerDuty, OpsGenie) rejects a non-`https://` scheme at
-  construction and requires an `HttpEgressContract`. The Datadog exporter
-  takes only a `site` suffix and always builds an
-  `https://http-intake.logs.<site>` URL, so it needs no scheme check but
-  still requires the contract. `*_for_tests` / `*_plaintext_for_tests`
-  constructors are the only bypass, intended for local `wiremock` targets.
-- A malformed receipt row is durably captured before the cursor advances
-  past it. With no cursor store configured the crate falls back to
-  advancing unconditionally past malformed rows.
-- The durable per-exporter cursor is keyed by `Exporter::cursor_identity()`,
-  not registration order, so reordering exporters in config cannot make one
-  inherit another's high-water mark. `WebhookExporter` folds its
-  (userinfo/query-stripped) URL into its identity because every instance
-  otherwise shares the bare name `"webhook"`.
-- Error text passed to `tracing` is routed through `redact_for_operator_log`
-  before it is logged.
+`CefExporter::export_batch` counts formatted lines without transmitting them.
+`OcsfExporter` similarly counts formatting when its endpoint is empty. These
+counts can advance manager progress, so registering a formatter is not a
+transport acknowledgment. HTTP exporters check their own response status/body;
+Elasticsearch uses receipt references as document IDs, while Splunk checks HEC
+response codes and invalid-event markers.
+
+## Trust and invariants
+
+`SourceVerification::new` recomputes the content-addressed receipt ID, verifies
+its signature and action parameter hash, and compares the signer with the
+independently accepted pin. `is_authorized` and `sink_projection` repeat these
+checks against the current receipt. Pins are skipped during event serialization,
+so deserialized annotations cannot introduce signer trust. An authorization label
+also requires coherent mediated allow semantics at a prevent boundary.
+
+The projection carries SHA-256 references for freeform identities, well-formed
+commitments where available, closed enums, numeric financial fields, and flags.
+It omits signatures, payload parameters, evidence details, freeform outcome
+reasons, actor chains, and arbitrary metadata. The `authoritative` flag describes
+source ID/signature/parameter verification; signer trust is a separate flag.
+Numeric financial amounts omit currency and cannot support currency-aware totals.
+Original receipt retrieval, content-preimage verification, checkpoint inclusion,
+and independent signer trust remain responsibilities of evidence consumers.
+
+Production network constructors require HTTPS destinations and typed
+`HttpEgressContract` dispatch through `send_with_contract`. Explicit test
+constructors enable local mock transport. Operator errors use pattern-based log
+redaction. Full source receipts and durable malformed rows retain their original
+content; sink minimization does not erase those stores.
+
+`AlertingExporter::should_alert` independently verifies pinned source receipts,
+requires a deny decision, and applies guard/severity filters. The default
+threshold is High; no pins or backends means no paging. Alert dispatch has its
+own metric calls and is excluded from SOC metric/DLQ accounting, but remains a
+registered exporter in cursor coordination. Both manager and alerting metrics
+are inactive until the host installs `SiemMetricsSink` implementations.
 
 ## Dependencies
 
-- `chio-core` (Cargo alias for `chio-core-types`, not the `chio-core` facade
-  crate) - `ChioReceipt`, `Decision`, `FinancialReceiptMetadata`,
-  `GuardEvidence`, and the crypto/signing types this crate reads and never
-  writes.
-- `chio-kernel` - `ReceiptReadBoundary`, `ReceiptReadContext`; the dependency
-  is one-directional, so the SIEM HTTP-client surface stays out of the
-  kernel TCB.
-- `chio-egress-contract` (`reqwest-egress` feature) - `HttpEgressContract`,
-  `client_builder_with_contract`, `send_with_contract`; every network
-  exporter builds its `reqwest::Client` and sends every request through this
-  contract.
-- `chio-log-redact` - `redacted!`, wrapped by
-  `redaction::redact_for_operator_log`.
-- `rusqlite` - direct, synchronous access to the read-only kernel receipt
-  database and the read-write SIEM cursor store.
-- `reqwest` (`rustls`), `tokio`, `url`, `zeroize` - HTTP transport, the async
-  poll loop, endpoint parsing/validation, and zeroizing of routing
-  keys/tokens/passwords held by exporters and alert backends.
+`chio-core` is a Cargo alias for `chio-core-types`, supplying receipt semantics,
+crypto verification, and financial metadata. `chio-kernel` supplies read-context
+types. `rusqlite` handles source reads and cursor writes; `tokio` supplies timers,
+watch cancellation, and async transport execution. `reqwest`, `url`, and
+`chio-egress-contract` implement bounded destination dispatch. `serde_json`
+provides backend payloads, `chio-log-redact` formats diagnostic text, and
+`zeroize` protects selected owned credentials. The manifest declares no features.
 
-## Extension points
+## Verification
 
-Implement `Exporter` (`export_batch`, `name`; optionally `cursor_identity`
-and `is_soc_export_sink`) and register the instance with
-`ExporterManager::add_exporter` to add a backend. Implement `AlertBackend`
-(`name`, `dispatch`) and attach it to an `AlertingExporter` via
-`AlertingExporterBuilder::with_backend` to add a paging destination.
-Implement `SiemMetricsSink` and attach it with
-`ExporterManager::with_metrics_sink` or
-`AlertingExporterBuilder::with_metrics_sink` to wire metrics into a
-registry.
+Run `cargo test -p chio-siem`. `manager_integration.rs` exercises polling,
+retry, failure isolation, and rate limiting against fixture databases.
+`manager.rs` unit tests cover missing cursors, identity separation, short
+acknowledgments, and malformed-row metric attribution. `at_least_once.rs` tests
+cursor-store reopening and models cursor progress under generated outages.
+
+`sink_payload_privacy.rs` checks real manager-to-sink payloads and adversarial
+cached flags, deserialization, and receipt replacement. `cef_emitter.rs` checks
+its golden text. Backend test files use local `wiremock` servers for request
+shape, response errors, authentication, timeout, and retry behavior.
+`alerting_dispatch/authentication.rs` checks dispatch signer enforcement.
+These network tests require local TCP binding; collector retention and host
+configuration require separate operational verification.

@@ -1,100 +1,71 @@
 # chio-commerce-order architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-commerce-order` is a pure verification library: no I/O, no network
-calls, no runtime state. It sits downstream of a commerce order's artifacts
-(order context, event log, payment lifecycle, mandate allowance ledger,
-provider trust evidence, settlement packet, kernel authority receipts) and
-answers one question: are these artifacts internally consistent with each
-other and with the order context. It does not move funds,
-price markets, select providers, or issue risk decisions; those concerns
-belong to `chio-market`, `chio-credit`, and `chio-settle`. This crate only
-replays and cross-checks evidence those systems already produced.
+`verify_commerce_order` accepts `CommerceOrderVerificationBundle` and
+returns `CommerceOrderPassportReport`. `CommerceOrderContext` binds
+buyer/agent/merchant identities, order/quote references, state, paths, and
+artifact digests. The bundle supplies event authority receipts,
+payment/mandate/provider/settlement bytes, protocol payloads, optional
+coverage, and signer pins.
 
-## Module map
+The verifier replays supplied facts and builds a selective public summary.
+It has no PSP client or transfer execution API. External payment
+observations and authoritative receipt production occur outside this crate.
+Trusted keys and previously verified trust-market context are caller-owned
+inputs.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | `verify_commerce_order`: shape validation, quote and artifact digest binding, optional coverage/trust-market checks, deserialization, dispatch into the other modules, and passport assembly. |
-| `src/types.rs` | Wire types: `CommerceOrderContext`, `CommerceOrderVerificationBundle`, the coverage and trust-market requirement/evidence pairs, `CommerceOrderPassportReport` and its digest/disclosure sub-types, and the crate-private artifact structs (payment lifecycle, settlement packet, provider passport, reputation snapshot, federation trust bundle). |
-| `src/ids.rs` | Schema id constants, one per artifact kind. |
-| `src/error.rs` | `CommerceOrderError`, one variant per validation domain. |
-| `src/validation.rs` | Shared low-level checks: non-empty, sha256-hex, bundle-relative path, money, RFC 3339 parsing. |
-| `src/replay.rs` | Event log deserialization and FSM replay; per-event authority-receipt verification. |
-| `src/provider.rs` | Provider passport, reputation snapshot, and federation trust bundle cross-checks and signature verification. |
-| `src/mandate.rs` | Mandate allowance ledger cross-checks and AP2 / x402 / ACP-Commerce / Chio protocol-projection binding. |
-| `src/payment.rs` | Payment lifecycle cross-checks, PSP object-ref conventions, and signature verification. |
-| `src/settlement.rs` | Settlement packet cross-checks and dispatch-receipt verification. |
+## Structure
 
-## Verification pipeline
+`types.rs` defines strict serialized context, bundle, report, coverage
+requirements, and trust-market projections. `ids.rs` defines schema
+identifiers. `input.rs` bounds and strictly decodes original JSON.
+`replay.rs` validates transitions and authority receipt bindings.
+`mandate.rs`, `payment.rs`, `provider.rs`, and `settlement.rs` check their
+artifact families. `validation.rs` checks money, timestamps, digests, and
+safe paths; `error.rs` defines domain failures.
 
-`verify_commerce_order` runs a fixed sequence; any failure returns
-`Err(CommerceOrderError)` and no report is produced.
+## Data and control flow
 
-1. Shape-validate the order context: schema id, required fields, money
-   invariants, digest formats, and artifact paths.
-2. Recompute and check the canonical quote digest and the seven per-artifact
-   digests against the context's declared `*_sha256` fields, before any
-   artifact is parsed.
-3. If declared required, verify the risk-comptroller coverage report
-   (digest and `chio-risk-comptroller` signature) and cross-check the
-   caller-asserted trust-market context's refs against the requirement.
-4. Deserialize the seven artifacts (`#[serde(deny_unknown_fields)]`).
-5. Replay the event log against the transition table in `replay.rs`,
-   verifying per-event evidence refs and authority receipts. The final
-   replayed state must equal `context.current_state`.
-6. Cross-check provider trust evidence, the mandate ledger, the payment
-   lifecycle, and the settlement packet (which also binds to the replayed
-   dispatch event) against the context and against each other.
-7. Assemble `verified_claims` and return the `CommerceOrderPassportReport`.
+Verification checks byte/count budgets, context shape, canonical quote
+digest, and each required artifact digest. Optional required coverage and
+trust-market gates run before parsing the main artifacts. It decodes the
+artifacts and replays the event log, then validates provider trust, mandate
+payload bindings, payment lifecycle, and settlement dispatch.
 
-## Invariants and failure modes
+The resulting report includes the replayed state, verified claim list,
+canonical context digest, input artifact digests, and a selective-disclosure
+policy listing disclosed/redacted fields. This policy is summary metadata;
+actual private artifact distribution remains with the caller.
 
-- No artifact is trusted before its digest matches the context's declared
-  value; digests are recomputed locally (sha256 over raw bytes, or sha256
-  over RFC 8785 canonical JSON for the quote binding and event bodies).
-- Every authority receipt, per-event and settlement-dispatch, must carry
-  `ReceiptKind::MediatedDecision`, `BoundaryClass::Prevent`,
-  `TrustLevel::Mediated`, and `Decision::Allow`, and its kernel key must be
-  in the caller-supplied trusted set. No other receipt shape authorizes an
-  event.
-- The settlement dispatch receipt must match the specific dispatch event
-  observed during replay, by ref and content hash; a matching
-  `dispatch_receipt_ref` string alone is insufficient. Settlement binds to replayed
-  history, not to an independently supplied receipt.
-- The trust-market context is a caller assertion: this crate checks its
-  refs are consistent with the order context's declared requirement but
-  does not verify how it was produced.
-- A `current_state` of `"failed_closed"` relaxes several checks: payment
-  `payment_status` may be `"succeeded"` or `"failed"` (otherwise only
-  `"succeeded"` is accepted), payment recovery posture (dispute, refund,
-  chargeback, transfer-reversal status) is not checked at all, and replay
-  does not require having observed `mandate_bound` or `payment_verified`
-  events.
-- Bundle-relative paths reject absolute paths, drive letters, backslashes,
-  and `..` components. The crate validates path shape only; it never reads
-  from or resolves against a filesystem itself.
-- The selective-disclosure policy on the passport report is declarative: it
-  names underlying-artifact fields (buyer/agent subjects, payment intent
-  id, mandate protocol hashes) the caller must keep redacted. The crate
-  does not enforce redaction itself.
-- Mandate protocol projections and payloads are matched by
-  `(protocol, purpose)` pairs and must be duplicate-free; each of the five
-  expected pairs (`ap2/checkout_mandate`, `ap2/payment_mandate`,
-  `acp-commerce/delegated_payment_token`, `x402/payment_requirements`,
-  `chio/authority_projection`) must be present with a payload whose sha256
-  matches the projection's declared digest.
+## Trust and invariants
+
+Original JSON rejects duplicate/ambiguous input before typed projection.
+Budgets allow at most 16 MiB per document, 64 MiB total, and 4096 supplied
+documents. Event replay verifies supplied signed authority receipts using
+caller-selected kernel keys. Provider and payment signatures likewise
+require selected keys.
+
+Provider freshness is relative to `order_context.issued_at`, including a
+one-day maximum age. A required coverage report is authenticated through
+`validate_risk_report_signature` and a commerce coverage projection; full
+risk-ledger validation is a separate risk-comptroller operation. Required
+trust-market context checks references and the selected provider; the public
+typed structure does not itself prove prior verification.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies canonical JSON, the `PublicKey` /
-`Signature` crypto types and `verify_canonical`, and the `ChioReceipt` type
-this crate verifies signatures and content hashes against (no dependency
-aliasing; it is imported under its own name). `chio-risk-comptroller`
-supplies `validate_risk_report_signature` for the optional coverage report.
+`chio-core-types` supplies receipts, canonical JSON, signatures, and hashes.
+`chio-risk-comptroller` authenticates coverage report signatures. `chrono`
+parses evidence timestamps. `sha2`/`hex` compute artifact digests;
+`serde`/`serde_json` represent strict artifact types, and `thiserror`
+preserves typed errors. No optional features are declared.
 
-External: `chrono` (RFC 3339 parsing and ordering), `sha2` / `hex` (digest
-computation), `serde` / `serde_json` (artifact deserialization with
-`deny_unknown_fields`), `thiserror` (`CommerceOrderError`). Dev-only:
-`chio-test-support`.
+## Verification
+
+`tests/commerce_order.rs` builds bundles from proof-room fixtures, adds
+selected signer/receipt material, and mutates amounts, currencies,
+transitions, provider trust, authority receipts, protocol payloads, and
+coverage/context bindings. Run `cargo test -p chio-commerce-order`. The
+README embeds the valid context, omits the event body, and asserts its
+digest rejection. It performs no transaction or network access.

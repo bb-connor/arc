@@ -1,64 +1,70 @@
 # chio-log-redact
 
-Tracing log-redaction primitives for Chio's operator-facing telemetry. Wraps
-`chio-data-guards-redactors-default`'s regex-driven byte redactor in a text,
-`Display`, and `tracing_subscriber::Layer` surface so payload-like log content
-is redacted before it reaches a sink.
-
-## Responsibilities
-
-- Redact UTF-8 text and `Display` values under a selected `RedactClass` policy.
-- Provide `redacted!(value)`, a macro that wraps exactly one payload expression
-  for use at a log call site; formatting-style invocations are a compile error.
-- Provide `RedactionLayer`, a `tracing_subscriber::Layer` that redacts an
-  event's target and every field before handing a `RedactedEvent` to a sink,
-  independently of whether the call site used `redacted!`.
-- Fail closed: construction validates the default redactor patterns compile,
-  and `RedactedValue` substitutes `[REDACTION-FAILED]` rather than ever
-  rendering the pre-redaction value.
-
-## Public API
-
-- `redacted!(value)` - wrap one payload expression; returns a `RedactedValue`.
-- `LogRedactor` - validated policy handle (`new`, `with_classes`, `classes`,
-  `redact_text`, `redact_display`, `redact_display_or_placeholder`).
-- `RedactedValue` - `Display` wrapper holding only the redacted string (`new`,
-  `with_classes`, `with_redactor`, `as_str`).
-- `redact_text`, `redact_text_with_classes` - free functions for one-off
-  string redaction.
-- `RedactionLayer<Sink>` - the tracing layer (`new`, `with_classes`,
-  `with_redactor`, `redactor`).
-- `RedactedEventSink` - trait a sink implements, or a `Fn(RedactedEvent)`
-  closure via the blanket impl.
-- `MemoryRedactionSink` - in-memory sink for tests and embedding probes.
-- `RedactedEvent`, `RedactedField` - the event shape delivered to a sink.
-- `LogRedactError` - `DefaultRedactorInvalid`, `RedactionFailed`.
-
-Selecting non-default `RedactClass` values requires depending on
-`chio-data-guards-redactors-default` directly; this crate does not re-export it.
+`chio-log-redact` redacts operator log text through Chio's default pattern
+redactor. It provides a `Display` wrapper for sensitive log expressions and a
+tracing layer that sends redacted event targets and field values to a sink.
+Sinks own formatting, escaping, storage, and delivery.
 
 ## Usage
 
+Capture a redacted event without changing the process-wide subscriber:
+
 ```rust
-use chio_log_redact::{redacted, RedactionLayer};
+use chio_log_redact::{MemoryRedactionSink, RedactionLayer};
 use tracing_subscriber::prelude::*;
 
-let redaction = RedactionLayer::new(|event: chio_log_redact::RedactedEvent| {
-    eprintln!("{} {} {:?}", event.level, event.target, event.fields);
-})?;
-tracing_subscriber::registry().with(redaction).init();
-
-tracing::warn!(payload = %redacted!(user_message), "dispatch failed");
+let sink = MemoryRedactionSink::default();
+let subscriber = tracing_subscriber::registry()
+    .with(RedactionLayer::new(sink.clone())?);
+tracing::subscriber::with_default(subscriber, || {
+    tracing::warn!(payload = "contact jane@example.com", "dispatch failed");
+});
+let events = sink.events();
+assert_eq!(events.len(), 1);
+assert!(events[0].fields.iter().any(|field|
+    field.name == "payload" && field.value.contains("[REDACTED-EMAIL]")));
+# Ok::<(), chio_log_redact::LogRedactError>(())
 ```
 
-## Testing
+The example uses the crate's existing tracing dependencies and an in-memory
+sink. At a log call site, `redacted!(value)` produces a `RedactedValue` using
+the value's `Display` representation. `LogRedactor::redact_text` returns a
+`Result<String, LogRedactError>` for explicit error handling.
 
-`cargo test -p chio-log-redact`
+## Guarantees
 
-## See also
+- `LogRedactor::new` and `with_classes` validate built-in pattern compilation;
+  `RedactionLayer::new` and `with_classes` use this validated policy handle.
+- `RedactedValue` and layer redaction replace redaction errors with
+  `[REDACTION-FAILED]`. Their error fallback never exposes the original text.
+  Free text functions return errors and do not perform startup validation.
+- `RedactionLayer::on_event` redacts event targets and visited field values,
+  including UTF-8-lossy rendering of byte fields. Field names pass through
+  unchanged. Span fields are outside this layer's event-only output.
+- Default classes enable secret patterns, basic PII, and bearer tokens.
+  Coverage includes email, US phone and SSN patterns, Luhn-checked cards,
+  selected API keys, JWTs, and long alphanumeric secret candidates.
+  Pattern matching cannot establish that all sensitive content was removed.
+- `redacted!` accepts one expression. Formatting-style invocations fail to
+  compile; callers construct their structured log fields separately.
 
-- `chio-data-guards-redactors-default` - the byte redactor this crate wraps.
-- `chio-kernel` - uses `redacted!` at kernel log sites.
-- `chio-siem` - wraps `redacted!` in its own operator-log redaction helper.
-- `chio-cli` - installs `RedactionLayer` as the process tracing subscriber's
-  event-formatting layer.
+## Status
+
+Implemented with tests for default and selected class policies, event fields,
+byte values, and targets. `MemoryRedactionSink` is an unbounded test and probe
+sink. The crate declares no Cargo features and is marked `publish = false`.
+Selecting classes requires the dependency's `RedactClass` type; the default
+backend accepts `pii_extended` and `custom` flags as no-ops.
+
+A parallel tracing formatting layer can still observe the original event.
+Route operator output through the redacted sink, and escape surviving control
+characters when the sink writes one event per line.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol receipt redaction field](../../../spec/PROTOCOL.md#6-receipt-contract)
+- [Default redactor](../../guards/chio-data-guards/redactors/default/README.md)
+- [SIEM export](../chio-siem/README.md)
+
+License: [Apache-2.0](../../../LICENSE).

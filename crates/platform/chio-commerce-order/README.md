@@ -1,92 +1,63 @@
 # chio-commerce-order
 
-Offline verifier for a Chio commerce order proof bundle. Given an order
-context and the raw bytes of every artifact it references (event log,
-payment lifecycle, mandate allowance ledger, provider trust evidence,
-settlement packet, kernel authority receipts, and optional risk-coverage and
-trust-market evidence), it replays the order's state transitions, checks
-every digest, signature, and cross-reference, and emits a passport report
-summarizing what verified.
+Verifies supplied commerce-order evidence: state transitions, mandate
+allowances, provider trust, payment status, settlement, and optional
+coverage/trust-market context. It produces a digest-bound order summary for
+Chio transaction proof consumers.
 
-The crate is pure verification: no I/O, no network calls, no runtime state,
-and no market, payment, or risk decisions of its own.
-`chio-cli`, `chio-proof-room`, and `chio-control-plane` assemble the bundle
-from stored artifacts and call into this crate to judge it.
+## Usage
 
-## Responsibilities
+Demonstrate rejection of a bundle missing its committed event log. The
+context fixture is embedded at compile time. Complete verification requires
+the committed artifact bytes and independently selected authority keys.
 
-- Validate the shape of a `CommerceOrderContext`: schema id, required
-  fields, money invariants, sha256-hex digest format, and bundle-relative
-  artifact paths (rejects absolute paths and `..` traversal).
-- Bind every referenced artifact to its declared digest
-  (`sha256(bytes) == context.*_sha256`) before parsing it.
-- Replay the order's event log against a fixed transition table, requiring
-  monotonic timestamps, unique event and idempotency ids, evidence refs per
-  transition, and a kernel-issued authority receipt (verified signature,
-  action hash, and decision) behind every event.
-- Cross-check the payment lifecycle, the mandate allowance ledger (AP2,
-  x402, ACP-Commerce, and Chio protocol projections), provider trust
-  evidence (passport, reputation snapshot, federation trust bundle), and
-  the settlement packet against the order context and against each other.
-- Verify an optional risk-comptroller coverage decision report
-  (`chio-risk-comptroller`) by digest and signature, and cross-check its
-  coverage id, order, verdict, and currency against the order context, when
-  required.
-- Cross-check an optional trust-market context, asserted by the caller and
-  not independently verified here, against the order context's declared
-  requirement refs.
-- Emit a `CommerceOrderPassportReport` carrying a fixed selective-disclosure
-  policy naming which passport fields may be shared and which underlying
-  artifact fields must stay redacted.
+```rust
+use chio_commerce_order::{verify_commerce_order, CommerceOrderContext,
+    CommerceOrderError, CommerceOrderVerificationBundle};
 
-## Public API
+let context: CommerceOrderContext = serde_json::from_slice(include_bytes!(
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fixtures/proof-room/",
+        "commerce-payments/offline-psp-valid/order-context.json")))?;
+let bundle = CommerceOrderVerificationBundle {
+    order_context: context, event_log_bytes: vec![],
+    event_authority_receipts: vec![], payment_lifecycle_bytes: vec![],
+    mandate_ledger_bytes: vec![], provider_passport_bytes: vec![],
+    reputation_snapshot_bytes: vec![], federation_trust_bundle_bytes: vec![],
+    settlement_packet_bytes: vec![], mandate_protocol_payloads: vec![],
+    risk_comptroller_report_bytes: None, verified_trust_market_context: None,
+    trusted_event_authority_receipt_kernel_keys: vec![],
+    trusted_payment_signer_keys: vec![], trusted_provider_trust_signer_keys: vec![],
+    trusted_risk_comptroller_signer_keys: vec![],
+};
+assert!(matches!(verify_commerce_order(&bundle),
+    Err(CommerceOrderError::DigestMismatch { field, .. }) if field == "event log"));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-- `verify_commerce_order(&CommerceOrderVerificationBundle) ->
-  Result<CommerceOrderPassportReport, CommerceOrderError>` - the sole entry
-  point.
-- `CommerceOrderVerificationBundle` - the order context, every referenced
-  artifact's raw bytes, trusted signer key sets, and optional
-  coverage/trust-market evidence.
-- `CommerceOrderContext`, `CommerceCoverageRequirement`,
-  `CommerceTrustMarketRequirement`, `CommerceVerifiedTrustMarketContext` -
-  the order-context wire type and its two optional requirement/evidence
-  pairs.
-- `CommerceMandateProtocolPayload`, `CommerceEventAuthorityReceiptArtifact`
-  - side artifacts referenced by ref from the context rather than embedded
-  in it.
-- `CommerceOrderPassportReport` - the verifier's output: verdict, replayed
-  `current_state`, artifact digests, disclosure policy, and
-  `verified_claims`.
-- `CommerceOrderError` - `thiserror` enum, one variant per validation
-  domain (schema, artifact shape, digest, replay, payment, mandate,
-  provider trust, settlement, coverage).
-- Schema id constants: `COMMERCE_ORDER_CONTEXT_SCHEMA_ID`,
-  `COMMERCE_EVENT_LOG_SCHEMA_ID`, `COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID`,
-  `COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID`,
-  `COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID`,
-  `COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID`,
-  `COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID`,
-  `COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID`,
-  `COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID`,
-  `COMMERCE_ORDER_PASSPORT_SCHEMA_ID`.
+## Guarantees
 
-## Testing
+`verify_commerce_order` bounds supplied document bytes/count, calls
+`CommerceOrderContext::validate_shape`, and recomputes quote/artifact
+digests before replay. Replay verifies authority receipts and transition
+consistency; payment/provider validation uses supplied signer pins.
 
-`cargo test -p chio-commerce-order`
+Required coverage verifies a signed risk report’s coverage projection.
+Required trust-market context checks a supplied
+`CommerceVerifiedTrustMarketContext` for matching references and provider
+subject. Callers obtain that context from an independently completed
+trust-market verification.
 
-Integration tests in `tests/commerce_order.rs` read fixtures from
-`fixtures/proof-room/commerce-payments/` and
-`fixtures/proof-room/enterprise-export/` at the workspace root.
+## Status
 
-## See also
+Implemented offline order-evidence verifier and selective summary
+generation. It consumes supplied PSP/protocol evidence and executes no
+payment or settlement. Provider evidence freshness is evaluated relative to
+order-context time. A typed verified trust-market context is supplied
+evidence whose provenance the caller must enforce.
 
-- `chio-risk-comptroller` - produces the coverage decision report this
-  crate optionally verifies.
-- `chio-core-types` - canonical JSON, hashing, receipt, and signing types
-  this crate verifies against.
-- `chio-cli`, `chio-proof-room` - assemble a
-  `CommerceOrderVerificationBundle` from stored artifacts and call
-  `verify_commerce_order`.
-- `chio-control-plane` - re-exports this crate as `commerce_order`.
-- `chio-market`, `chio-credit`, `chio-settle` - own the live marketplace,
-  credit, and settlement execution this crate only verifies evidence of.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol](../../../spec/PROTOCOL.md#644-commerce-order-and-settlement-family)
+- [chio-trust-market-context](../chio-trust-market-context/README.md)
+- [License](../../../LICENSE)
