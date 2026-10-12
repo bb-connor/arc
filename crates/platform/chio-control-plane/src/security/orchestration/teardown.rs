@@ -924,9 +924,12 @@ impl ProductionActiveDefenseHost {
     ///
     /// Port probes alone are insufficient for production admission: a created,
     /// degraded, failed, or stopped worker cannot enforce expiry and rollback.
+    /// Paged security alerts must also be reaching an operator: a parked
+    /// alert or a failed delivery pass closes host readiness.
     pub fn ensure_ready(&self) -> Result<(), ProductionActiveDefenseHostError> {
         self.ensure_bootstrap_ready()?;
         self.orchestrator.ensure_ready()?;
+        self.orchestrator.ensure_security_alerts_delivered()?;
         Ok(())
     }
 

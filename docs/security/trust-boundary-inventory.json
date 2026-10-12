@@ -1302,9 +1302,9 @@
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs::decode_session_throttle_limits::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_due::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_persisted_alert_command::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::validate_request::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs::classify_output::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::correlate::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::ensure_supported_policy::from_wire",
@@ -16648,9 +16648,9 @@
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs::decode_session_throttle_limits::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_due::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_persisted_alert_command::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::validate_request::from_wire#1::decode_signed",
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs::classify_output::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::correlate::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::ensure_supported_policy::from_wire#1::decode_signed",
@@ -18054,10 +18054,15 @@
       "resolve_pre_with_evidence::shared-reader::crates/security/chio-flow/src/declassification.rs::verify_declassification"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs": [
-      "load_due::original-json-reader::UntrustedJsonText",
       "load_persisted_alert_command::original-json-reader::UntrustedJsonText",
       "receipt_body::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record",
       "validate_request::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery.rs": [
+      "deliver_due::shared-reader::crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due"
+    ],
+    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs": [
+      "load_due::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs": [
       "classify_output::original-json-reader::UntrustedJsonText"
