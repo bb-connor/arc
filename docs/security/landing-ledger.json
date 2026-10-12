@@ -60,7 +60,8 @@
     "train1-residuals": 1227,
     "recovery-history-index": 1228,
     "landed-trust-inventory": 1225,
-    "payment-external-call-lock": 1229
+    "payment-external-call-lock": 1229,
+    "control-plane-secret-hygiene": 1230
   },
   "sources": [
     {
@@ -10109,8 +10110,8 @@
   },
   "current_requirement_states_semantics": {
     "schema": "chio.security-landing-ledger.current-requirement-states.v1",
-    "observed_utc": "2026-10-12T16:26:26.313704Z",
-    "source_head": "fa10d4b856b2cc915a7f35978c95f10bef2eb5c5",
+    "observed_utc": "2026-10-12T16:33:37.039922Z",
+    "source_head": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
     "authority": "AUTHORITATIVE CURRENT requirement state. Base requirements and prior dated observations are HISTORICAL and preserved byte-exact.",
     "keys_are_exact_existing_requirement_IDs": true,
     "entries": 2029,
@@ -10135,7 +10136,7 @@
     "installation_guard": "Writer current relevant Cargo capture must CLOSE; fresh current before/document/source/artifact guards and validations before install.",
     "current_mapping_not_all_acceptance_complete": true,
     "current_review_rule": "For the October12 source wave, Connor authorized Claude review plus relevant local focused checks and strict Clippy without full hosted waits. Greptile quota is unavailable and not source-review evidence; full acceptance remains separate.",
-    "current_source_overlay": "Confirmed accounting source freezes at #1229. Root owns the next CP/formal metadata merge-identity reconciliation.",
+    "current_source_overlay": "Root source waves through #1230 and reviewed formal metadata #1231 are merged. Native, trusted, proof and operational acceptance remain separate.",
     "preparation_basis": "All 2029 original requirement objects and exact original current-map IDs are preserved; selected current mappings advance with bounded evidence.",
     "previous_census": {
       "observed_utc": "2026-10-07T05:09:29.467373+00:00",
@@ -10151,7 +10152,7 @@
       "source_head": "679e97daf8f238cb0a00b20d8592c21375cd8ab7",
       "checkpoint": "landing_wave_metadata_recovery_20261012"
     },
-    "latest_landing_wave_checkpoint": "landing_wave_review_handoff_20261012"
+    "latest_landing_wave_checkpoint": "landing_wave_final_source_20261012"
   },
   "current_requirement_states": {
     "launch-execution-plan:M0": {
@@ -129112,24 +129113,59 @@
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
       "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
-      "source_repair": null,
-      "source_integrated": null,
-      "focused_green": null,
+      "landing_pr": 1230,
+      "landing_unit": "control-plane-secret-hygiene",
+      "current_state": "source-landed-scoped-local-evidence-preserved-acceptance-open",
+      "source_repair": {
+        "checkpoint": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "files": [
+          "crates/platform/chio-control-plane/src/security/active_response_authority.rs",
+          "crates/platform/chio-control-plane/src/security/active_response_validation.rs",
+          "crates/platform/chio-control-plane/src/security/active_response_authority/tests.rs"
+        ],
+        "file_sha256": {
+          "crates/platform/chio-control-plane/src/security/active_response_authority.rs": "601045b322dd60e2c9ea9128d8092beabcb6b6199d8302087a11763110ac53f5",
+          "crates/platform/chio-control-plane/src/security/active_response_validation.rs": "09d5d04f32fa326a61f63b66297f996c749da9f0c2f8781e300e6d85ab135ac1",
+          "crates/platform/chio-control-plane/src/security/active_response_authority/tests.rs": "55258d0a2868e82dd4c28ed5d36a8d9e7979e2416096575a696ace9840d6faa5"
+        },
+        "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+        "control_plane_source_unchanged_after_rebase": true
+      },
+      "source_integrated": true,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "/tmp/cp-seed-original.log",
+          "sha256": "4d9ff9ee222439e55397adbacfb728f770b891ff0b7c168d7899f2a51033f79a",
+          "tested_source": "bd78b235721d5d4a2de953cb5cbb76ef604abf22",
+          "result": "Genuine seed-Debug Original: 0 passed, 1 intended assertion failed.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-focused.log",
+          "sha256": "305c121b99fa832d895b8f0c1cb00ea1011a97b59cd780d4b522fcf7238c885f",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "91 focused control-plane tests passed, 0 failed, 0 ignored.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-clippy.log",
+          "sha256": "39b9eef696d39c6ad8c273207e35fd12b7de8726cf3e2020628fa8ddfb8f273b",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "Pinned1.95 strict all-target control-plane Clippy completed successfully.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Source repair, focused tests, strict owning lint and source landing are complete.",
+        "Retain future exact-source hosted results separately; this local wave does not establish full-workspace or protected qualification.",
+        "Trusted evidence, broader native and operational acceptance remain separate where applicable."
       ],
       "historical_source_claim": {
         "source": {
@@ -129162,6 +129198,36 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "source_reviewed": true,
+      "source_merged": true,
+      "published": true,
+      "observed_utc": "2026-10-12T16:33:37.039922Z",
+      "observed_source_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+      "previous_current_observation": {
+        "current_state": "unestablished-current-source-not-qualified",
+        "landing_pr": null,
+        "remaining_acceptance": [
+          "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
+          "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+          "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+          "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        ]
+      },
+      "source_landing": {
+        "landing_pr": 1230,
+        "main_commit": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "pr_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "merged_at": "2026-10-12T16:22:16Z",
+        "source_merged": true,
+        "main_ancestry_verified": true,
+        "four_required_green_established": false,
+        "protected_landing_established": false
+      },
+      "independent_internal_review": {
+        "reviewer": "Claude",
+        "mailbox_source_approval_utc": "2026-10-12T15:49:21Z",
+        "basis": "Reviewed control-plane source unchanged through main composition; generated coverage regenerated after metadata merge."
       }
     },
     "incoming-pr1160-review-20261006:F095": {
@@ -129177,24 +129243,59 @@
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
       "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
-      "source_repair": null,
-      "source_integrated": null,
-      "focused_green": null,
+      "landing_pr": 1230,
+      "landing_unit": "control-plane-secret-hygiene",
+      "current_state": "source-landed-scoped-local-evidence-preserved-acceptance-open",
+      "source_repair": {
+        "checkpoint": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "files": [
+          "crates/platform/chio-control-plane/src/security/os_random.rs",
+          "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs",
+          "crates/platform/chio-control-plane/src/security/scheduler_worker/scheduler.rs"
+        ],
+        "file_sha256": {
+          "crates/platform/chio-control-plane/src/security/os_random.rs": "6f41155bc7936dcf5f8dfcb22de5fc3d8f540ddc869af7fb9a2f088e355e339e",
+          "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs": "4ee5f031ee8a27a4eaf7d4b6dff929650dd9e8e32c472fd1701f0095a127c585",
+          "crates/platform/chio-control-plane/src/security/scheduler_worker/scheduler.rs": "f1b99d59a3f0e0e65bd48c370cd2db743d223ef65ac2c63b2db68346beb4dcd1"
+        },
+        "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+        "control_plane_source_unchanged_after_rebase": true
+      },
+      "source_integrated": true,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "/tmp/cp-seed-original.log",
+          "sha256": "4d9ff9ee222439e55397adbacfb728f770b891ff0b7c168d7899f2a51033f79a",
+          "tested_source": "bd78b235721d5d4a2de953cb5cbb76ef604abf22",
+          "result": "Genuine seed-Debug Original: 0 passed, 1 intended assertion failed.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-focused.log",
+          "sha256": "305c121b99fa832d895b8f0c1cb00ea1011a97b59cd780d4b522fcf7238c885f",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "91 focused control-plane tests passed, 0 failed, 0 ignored.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-clippy.log",
+          "sha256": "39b9eef696d39c6ad8c273207e35fd12b7de8726cf3e2020628fa8ddfb8f273b",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "Pinned1.95 strict all-target control-plane Clippy completed successfully.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Source repair, focused tests, strict owning lint and source landing are complete.",
+        "Retain future exact-source hosted results separately; this local wave does not establish full-workspace or protected qualification.",
+        "Trusted evidence, broader native and operational acceptance remain separate where applicable."
       ],
       "historical_source_claim": {
         "source": {
@@ -129227,6 +129328,36 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "source_reviewed": true,
+      "source_merged": true,
+      "published": true,
+      "observed_utc": "2026-10-12T16:33:37.039922Z",
+      "observed_source_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+      "previous_current_observation": {
+        "current_state": "unestablished-current-source-not-qualified",
+        "landing_pr": null,
+        "remaining_acceptance": [
+          "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
+          "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+          "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+          "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        ]
+      },
+      "source_landing": {
+        "landing_pr": 1230,
+        "main_commit": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "pr_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "merged_at": "2026-10-12T16:22:16Z",
+        "source_merged": true,
+        "main_ancestry_verified": true,
+        "four_required_green_established": false,
+        "protected_landing_established": false
+      },
+      "independent_internal_review": {
+        "reviewer": "Claude",
+        "mailbox_source_approval_utc": "2026-10-12T15:49:21Z",
+        "basis": "Reviewed control-plane source unchanged through main composition; generated coverage regenerated after metadata merge."
       }
     },
     "incoming-pr1160-review-20261006:F096": {
@@ -129242,24 +129373,57 @@
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
       "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
-      "source_repair": null,
-      "source_integrated": null,
-      "focused_green": null,
+      "landing_pr": 1230,
+      "landing_unit": "control-plane-secret-hygiene",
+      "current_state": "source-landed-scoped-local-evidence-preserved-acceptance-open",
+      "source_repair": {
+        "checkpoint": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "files": [
+          "crates/platform/chio-control-plane/src/security/active_response_validation.rs",
+          "crates/platform/chio-control-plane/src/security/active_response_authority.rs"
+        ],
+        "file_sha256": {
+          "crates/platform/chio-control-plane/src/security/active_response_validation.rs": "09d5d04f32fa326a61f63b66297f996c749da9f0c2f8781e300e6d85ab135ac1",
+          "crates/platform/chio-control-plane/src/security/active_response_authority.rs": "601045b322dd60e2c9ea9128d8092beabcb6b6199d8302087a11763110ac53f5"
+        },
+        "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+        "control_plane_source_unchanged_after_rebase": true
+      },
+      "source_integrated": true,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "/tmp/cp-seed-original.log",
+          "sha256": "4d9ff9ee222439e55397adbacfb728f770b891ff0b7c168d7899f2a51033f79a",
+          "tested_source": "bd78b235721d5d4a2de953cb5cbb76ef604abf22",
+          "result": "Genuine seed-Debug Original: 0 passed, 1 intended assertion failed.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-focused.log",
+          "sha256": "305c121b99fa832d895b8f0c1cb00ea1011a97b59cd780d4b522fcf7238c885f",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "91 focused control-plane tests passed, 0 failed, 0 ignored.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-clippy.log",
+          "sha256": "39b9eef696d39c6ad8c273207e35fd12b7de8726cf3e2020628fa8ddfb8f273b",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "Pinned1.95 strict all-target control-plane Clippy completed successfully.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Source repair, focused tests, strict owning lint and source landing are complete.",
+        "Retain future exact-source hosted results separately; this local wave does not establish full-workspace or protected qualification.",
+        "Trusted evidence, broader native and operational acceptance remain separate where applicable."
       ],
       "historical_source_claim": {
         "source": {
@@ -129292,6 +129456,36 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "source_reviewed": true,
+      "source_merged": true,
+      "published": true,
+      "observed_utc": "2026-10-12T16:33:37.039922Z",
+      "observed_source_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+      "previous_current_observation": {
+        "current_state": "unestablished-current-source-not-qualified",
+        "landing_pr": null,
+        "remaining_acceptance": [
+          "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
+          "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+          "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+          "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        ]
+      },
+      "source_landing": {
+        "landing_pr": 1230,
+        "main_commit": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "pr_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "merged_at": "2026-10-12T16:22:16Z",
+        "source_merged": true,
+        "main_ancestry_verified": true,
+        "four_required_green_established": false,
+        "protected_landing_established": false
+      },
+      "independent_internal_review": {
+        "reviewer": "Claude",
+        "mailbox_source_approval_utc": "2026-10-12T15:49:21Z",
+        "basis": "Reviewed control-plane source unchanged through main composition; generated coverage regenerated after metadata merge."
       }
     },
     "incoming-pr1160-review-20261006:F097": {
@@ -129307,24 +129501,57 @@
         "reviewed_source": "d0496c14d824a327f00b98576132834306ff6694"
       },
       "scope": "later",
-      "landing_pr": null,
-      "landing_unit": "security-follow-ups",
-      "current_state": "unestablished-current-source-not-qualified",
-      "source_repair": null,
-      "source_integrated": null,
-      "focused_green": null,
+      "landing_pr": 1230,
+      "landing_unit": "control-plane-secret-hygiene",
+      "current_state": "source-landed-scoped-local-evidence-preserved-acceptance-open",
+      "source_repair": {
+        "checkpoint": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "files": [
+          "crates/platform/chio-control-plane/src/keyring_runtime.rs",
+          "docs/security/trust-boundary-inventory.json"
+        ],
+        "file_sha256": {
+          "crates/platform/chio-control-plane/src/keyring_runtime.rs": "5d55b3dadd809be6917f2d58b688eaf78200401df0ed7561bb5685c1df64faa7",
+          "docs/security/trust-boundary-inventory.json": "12156fa48aa806b49ac7755d92c18074028bc794e7afa79dd98023f22865addb"
+        },
+        "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+        "control_plane_source_unchanged_after_rebase": true
+      },
+      "source_integrated": true,
+      "focused_green": true,
       "owning_pending": true,
       "native_pending": true,
       "trusted_pending": true,
       "hosted_pending": true,
       "merged": false,
       "full_qualified": false,
-      "verification_evidence": [],
+      "verification_evidence": [
+        {
+          "path": "/tmp/cp-seed-original.log",
+          "sha256": "4d9ff9ee222439e55397adbacfb728f770b891ff0b7c168d7899f2a51033f79a",
+          "tested_source": "bd78b235721d5d4a2de953cb5cbb76ef604abf22",
+          "result": "Genuine seed-Debug Original: 0 passed, 1 intended assertion failed.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-focused.log",
+          "sha256": "305c121b99fa832d895b8f0c1cb00ea1011a97b59cd780d4b522fcf7238c885f",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "91 focused control-plane tests passed, 0 failed, 0 ignored.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        },
+        {
+          "path": "/tmp/cp-hygiene-clippy.log",
+          "sha256": "39b9eef696d39c6ad8c273207e35fd12b7de8726cf3e2020628fa8ddfb8f273b",
+          "tested_source": "a101b10ca4dbe54da7d3506a7f23e2bc138e201c",
+          "result": "Pinned1.95 strict all-target control-plane Clippy completed successfully.",
+          "scope": "Retained local terminal output; no rerun or full hosted/native acceptance inferred."
+        }
+      ],
       "remaining_acceptance": [
-        "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
-        "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
-        "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
-        "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        "Source repair, focused tests, strict owning lint and source landing are complete.",
+        "Retain future exact-source hosted results separately; this local wave does not establish full-workspace or protected qualification.",
+        "Trusted evidence, broader native and operational acceptance remain separate where applicable."
       ],
       "historical_source_claim": {
         "source": {
@@ -129357,6 +129584,36 @@
         "Codex_required": false,
         "Codex_quota_blocker": false,
         "review_acceptance_established": false
+      },
+      "source_reviewed": true,
+      "source_merged": true,
+      "published": true,
+      "observed_utc": "2026-10-12T16:33:37.039922Z",
+      "observed_source_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+      "previous_current_observation": {
+        "current_state": "unestablished-current-source-not-qualified",
+        "landing_pr": null,
+        "remaining_acceptance": [
+          "Establish the exact current requirement-to-source repair and hash-bound behavioral/source evidence; no absence of repair or loss of historical established work is inferred.",
+          "Current combined-source owning/strict tests, lint/format/codegen/schema/dependency checks with their exact package/feature/environment bounds.",
+          "Current immutable native/physical/cold, trusted and hosted acceptance; scoped component/source evidence is not full qualification.",
+          "Obtain exact-candidate Greptile review plus independent internal source review under the explicit user override. Codex quota is historical unavailable service, not a mandatory blocker. Terminal exact-source CI/checks and App/ruleset protected landing remain required."
+        ]
+      },
+      "source_landing": {
+        "landing_pr": 1230,
+        "main_commit": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "pr_head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "merged_at": "2026-10-12T16:22:16Z",
+        "source_merged": true,
+        "main_ancestry_verified": true,
+        "four_required_green_established": false,
+        "protected_landing_established": false
+      },
+      "independent_internal_review": {
+        "reviewer": "Claude",
+        "mailbox_source_approval_utc": "2026-10-12T15:49:21Z",
+        "basis": "Reviewed control-plane source unchanged through main composition; generated coverage regenerated after metadata merge."
       }
     },
     "incoming-pr1160-review-20261006:F098": {
@@ -139358,6 +139615,59 @@
       "The cflite production-path cfg(test) case remains an explicitly accepted failing residual.",
       "The six reviewed implementation-anchor renewals and generated coverage establish source metadata consistency, not new formal proof execution."
     ],
+    "full_qualified": false
+  }
+,
+  "landing_wave_final_source_20261012": {
+    "schema": "chio.security.landing-wave-observation.v1",
+    "observed_utc": "2026-10-12T16:33:37.039922Z",
+    "source_boundary": {
+      "main_commit": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+      "included_prs": [
+        1230,
+        1231
+      ]
+    },
+    "pull_requests": {
+      "1230": {
+        "pr": 1230,
+        "head": "5c4abe736f621274b5a44b8618e7b8a087b04478",
+        "merge": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "merged_at": "2026-10-12T16:22:16Z",
+        "url": "https://github.com/bb-connor/arc/pull/1230",
+        "source_merged": true,
+        "four_required_green_established": false
+      },
+      "1231": {
+        "pr": 1231,
+        "head": "0149699a76d497958339a4b6d7c74987b4596345",
+        "merge": "76f4ad12693a661454bd830feb56cbc8cccf25ec",
+        "merged_at": "2026-10-12T16:16:40Z",
+        "url": "https://github.com/bb-connor/arc/pull/1231",
+        "source_merged": true,
+        "four_required_green_established": false
+      }
+    },
+    "updated_current_requirement_ids": [
+      "incoming-pr1160-review-20261006:F094",
+      "incoming-pr1160-review-20261006:F095",
+      "incoming-pr1160-review-20261006:F096",
+      "incoming-pr1160-review-20261006:F097"
+    ],
+    "formal_metadata": {
+      "source_review": "Six inherited abstraction anchors reviewed with unchanged model contracts in #1231.",
+      "checks": "All256 formal mirrors and proof coverage65 rows/179 artifacts match at #1230 head.",
+      "new_proof_execution": false
+    },
+    "remaining_acceptance": [
+      "MINISW-NATIVE-DENY: genuine current native trajectory under unchanged10000ms fence.",
+      "FEDERATION-RAW-SIGNER: expected-safe Original and consumer-semantics triage, repair if confirmed.",
+      "KANI-REVOCATION-SCOPE and KANI-PROOF-QUAL remain open; no new proof result.",
+      "Trusted authorization/definition activation, committed Linux evidence, cold-state and broader operational readiness remain open.",
+      "F089/F093 remain Claude-owned pending source landing at this checkpoint."
+    ],
+    "original_requirement_count": 2029,
+    "original_requirements_raw_sha256": "5b81da14b6ac25918f9ee93765ce943c69de7ce1f974c52597d404b65d2de9ca",
     "full_qualified": false
   }
 }

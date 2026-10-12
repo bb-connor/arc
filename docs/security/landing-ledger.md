@@ -7,6 +7,29 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Final source wave through #1230 (October 12 UTC)
+
+The preserved control-plane wave is merged in [#1230](https://github.com/bb-connor/arc/pull/1230)
+as `66f976ab27`. F094-F097 now map to their landed source and exact local evidence:
+91 focused tests and strict all-target control-plane Clippy passed at `a101b10ca4`;
+the seed-Debug control failed on Original `bd78b23572`. The control-plane source
+is unchanged after rebasing. Secret handoffs use zeroizing storage and redact
+Debug output; authority IDs use the OS RNG; canonical digest validation and
+signed-byte golden controls retain their contracts.
+
+[#1231](https://github.com/bb-connor/arc/pull/1231), `76f4ad1269`, refreshed six
+inherited model anchors after source/model review. All 256 bindings and the
+65-row/179-artifact coverage inventory match at #1230's head. This is static
+metadata evidence, with no new proof execution or proof-completion claim.
+
+The original queued source waves and superseded docs-run disposition are now
+accounted for. F089/F093 remain Claude-owned at this checkpoint. The next
+readiness work is the actual native 10-second acceptance run and federation
+receipt-trust reproduction. Revocation proof acceptance, trusted definition and
+evidence activation, cold-state and broader operational acceptance remain open.
+No four-required-check or release-readiness claim is made. All 2,029 original
+requirement objects remain byte-exact; only four current mappings advance here.
+
 ## Current accounting through #1229 (October 12 UTC)
 
 This bounded checkpoint ends at F020's source landing in
