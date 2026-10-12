@@ -234,6 +234,34 @@ fn preparing_a_terminal_response_does_not_append_it() {
     assert!(response.receipt.is_allowed());
 }
 
+#[test]
+fn a_nonce_delivery_error_keeps_its_stage_and_original_receipt() {
+    let (mut kernel, request, invocations) = fixture();
+    let config = ExecutionNonceConfig {
+        nonce_ttl_secs: 0,
+        nonce_store_capacity: 16,
+        require_nonce: false,
+    };
+    kernel.set_execution_nonce_store(
+        config.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&config)),
+    );
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("invalid nonce expiry must withhold post-commit delivery");
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let receipts = kernel.receipt_log();
+    assert_eq!(receipts.len(), 1, "delivery cannot add a second terminal");
+    let original = receipts.get(0).unwrap();
+    assert!(original.is_allowed());
+    assert!(
+        matches!(error, KernelError::DeliveryFailedAfterReceipt {
+            receipt_id, step: ReceiptDeliveryStep::ExecutionNonce, ..
+        } if receipt_id == original.id),
+        "nonce failure must retain the acknowledged receipt and exact stage"
+    );
+}
+
 struct PanicAfterCommitStore {
     receipts: Arc<Mutex<Vec<ChioReceipt>>>,
     panic_first: AtomicBool,
