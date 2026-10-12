@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::admission_operation::AuthenticatedRequestNamespace;
+use crate::admission_operation::RequestNamespaceDigest;
 use crate::receipt_support::merge_metadata_objects;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,15 +60,22 @@ impl RefusalReceiptMetadata {
 
     pub(in crate::kernel) fn into_signed_metadata(
         self,
-        namespace: &AuthenticatedRequestNamespace,
+        namespace: &RequestNamespaceDigest,
     ) -> Option<Value> {
+        let mut context = self
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("receipt_context"))
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        context.insert(
+            "request_namespace_digest".into(),
+            Value::String(namespace.as_str().into()),
+        );
         merge_metadata_objects(
             with_identity_disposition(self.metadata, self.disposition),
-            Some(serde_json::json!({
-                "receipt_context": {
-                    "request_namespace_digest": namespace.digest().as_str(),
-                }
-            })),
+            Some(serde_json::json!({ "receipt_context": context })),
         )
     }
 }

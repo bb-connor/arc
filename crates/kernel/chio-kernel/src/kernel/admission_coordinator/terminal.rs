@@ -766,6 +766,12 @@ impl ChioKernel {
                     signing_nonce
             })),
         );
+        let expected_metadata = if matches!(expected_decision, Decision::Allow) {
+            expected_metadata
+        } else {
+            RefusalReceiptMetadata::new(expected_metadata, IdentityDisposition::Terminal)
+                .into_signed_metadata(operation.binding().request_namespace_digest())
+        };
         let dispatch_fence = operation
             .dispatch_commit()
             .map(|commit| &commit.store_fence);
@@ -1539,6 +1545,12 @@ impl ChioKernel {
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
             })?;
+        let metadata = if matches!(terminal_decision, Decision::Allow) {
+            metadata
+        } else {
+            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal)
+                .into_signed_metadata(admission.operation.binding().request_namespace_digest())
+        };
         let persisted_binding = admission.operation.binding().to_persisted();
         let authenticated_tenant_id = persisted_binding.authenticated_tenant_id.as_str();
         let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
