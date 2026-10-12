@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 #[path = "delegated_share/boundaries.rs"]
 mod boundaries;
+#[path = "delegated_share/indexed.rs"]
+mod indexed;
 #[path = "delegated_share/outcome_unknown.rs"]
 mod outcome_unknown;
 #[path = "delegated_share/pending.rs"]
@@ -311,3 +313,6 @@ fn an_expired_caller_share_stays_owned_until_recovery_compensates_it() -> TestRe
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
+
+#[path = "delegated_share/projection_tamper.rs"]
+mod projection_tamper;

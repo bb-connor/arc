@@ -14,6 +14,15 @@ pub(super) fn budget_request(
     fixture: &Fixture,
     operation: &AdmissionOperationV1,
 ) -> BudgetAuthorizeHoldRequest {
+    budget_request_with_ids(fixture, operation, "nonce-hold", "nonce-authorize")
+}
+
+pub(super) fn budget_request_with_ids(
+    fixture: &Fixture,
+    operation: &AdmissionOperationV1,
+    hold_id: &str,
+    event_id: &str,
+) -> BudgetAuthorizeHoldRequest {
     BudgetAuthorizeHoldRequest {
         capability_id: operation.binding().capability_id().as_str().into(),
         grant_index: 0,
@@ -43,8 +52,8 @@ pub(super) fn budget_request(
         requested_exposure_units: 0,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some("nonce-hold".into()),
-        event_id: Some("nonce-authorize".into()),
+        hold_id: Some(hold_id.into()),
+        event_id: Some(event_id.into()),
         authority: Some(authority(fixture)),
     }
 }

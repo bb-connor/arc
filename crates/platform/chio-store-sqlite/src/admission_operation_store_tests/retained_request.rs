@@ -63,6 +63,24 @@ pub(super) fn original_with_intent_and_signer(
         },
         key,
     )?;
+    original_with_capability(
+        fence,
+        request_id,
+        requirements,
+        governed_intent,
+        key,
+        capability,
+    )
+}
+
+pub(super) fn original_with_capability(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    requirements: AdmissionParticipantRequirements,
+    governed_intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
+    key: &Keypair,
+    capability: CapabilityToken,
+) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
     let request: chio_kernel::ToolCallRequest = serde_json::from_value(serde_json::json!({
         "request_id": request_id, "capability": capability,
         "tool_name": "tool", "server_id": "server", "agent_id": key.public_key().to_hex(),

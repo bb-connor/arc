@@ -1,0 +1,87 @@
+{
+  "schema": "chio.security.local-repair-qualification.v1",
+  "requirements": [
+    "F038",
+    "ROOT-PRIVATE-BOUNDARY-INVENTORY"
+  ],
+  "base": "9544a33d2906b5005dbca9632fdc7fd2f323f32e",
+  "preserved_producer": "be0d2b7ac088a8f4759e0460431f1083e0d983f9",
+  "test_producer": "337a7d06ffff3e31000648ab25f9bdab79be6935",
+  "current_original": "e92d52591095b6179f6c510706c04733379aba46",
+  "status": "locally_qualified_independently_reviewed_private",
+  "source_patch_sha256": "0bcfb9d7f46d78e228457d6b038f808ba91505594365474957daa07f7656d405",
+  "source_sha256": {
+    "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": "067d679a36eb48553e0f3bd5debbbb23fa572691ae6d88c56e283e638db3cef7",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget.rs": "9a87becc2421885776e46bf53afa58dfda759d639f6fa7927ef0d650db49fe78",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/caller_budget/schema.sql": "410af2fdb7f368b99cd6f5b7518d41146560e11542e463ac1b7a45aeea175159",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/commit_chain.rs": "233c9c8b76163c0112e55d761bd1e6ce01f8f03abaf9959bb5a28b6a7702555b",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": "0b1bbc8beff3cd323315ae48cfdaa2d23157d0fde97d4cf4f7caeb7a1423d729",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v37.rs": "e41b0d8efd364d3c879552e4ddc44ebff2ace7fb22fe1f6aaa508b379596dcdd",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs": "f36db8d9392e06188f37e7a370282aa822004a7e91ed43a7b225d99a58e2791c",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce.rs": "4434949614867244f37ae8ae59216d617d3b121b809f16423732eb3b40da504a",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/caller_share_index.rs": "f566b8445878c7b19970998659e4ff63d36143cae0af86b6d52a8a12622d0a4f",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/caller_share_isolation.rs": "b97cee529be8afdb4df41bb0739f11ec0665b91997f0eef8815fa96827b09ca0",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/caller_share_work.rs": "9783a22464f54beda783423b6f88f96cded9a8e1c49b996010fc5241c4cc44a4",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/execution_nonce/lifecycle.rs": "3f8e5b633cf6f0e2a96dee367bf4d99a980aef9e87a6983a834a790e52c0869d",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/retained_request.rs": "3591acf236f76c9ff828626986bffb20b0695d710f276a9f29b1338ecc596a0e",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs": "f945ae987fb92730c4e57bd3895f65b6eb94e260ee5be5cea865b5292a3d7d58",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema/caller_wait.rs": "b408351bf18c92c02782be006147f72e27da22b6a18efa3855cb698446a1e9c2",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/checkpoint_migration.rs": "561ddf2bb5fde9e1c07e9cc911f0c21796c3354f8be0a8337139e6053c1f3f4d",
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs": "412a8513cd3a68e05968adb5a3d11fd04f970ae78727fa8d9652993487ad20ee",
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share/indexed.rs": "33f847726ff455cb8bbdc01eea3390cb3ac8126cec2aa7c8a11c2c7d09ca6c3c",
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share/projection_tamper.rs": "a4a75f40aab7561185a3591d898e758a28acc8a5490e28f620d7dd1fdb189a9a",
+    "docs/security/trust-boundary-inventory.json": "8882f1c7dc2e60943556d2fa69e3351b3dbf9fb899d17c9255d7760ec7de147a"
+  },
+  "inventory_amendment_patch_sha256": "9535ac4b3d9d6dc3d37f98c8f6caf3d0756a7c304d344684921af2151ced4286",
+  "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/caller-share-index-20261012",
+  "archive_manifest_sha256": "c63426a69a7e31ee51da7799b77349b09e5339709e82ef9f7f7ca693895ce4ab",
+  "results": {
+    "genuine_originals": {
+      "passed": 0,
+      "failed": 2,
+      "oracles": [
+        "8 then 16 unrelated decoded operations",
+        "funded B share read rejects after owner-connection corruption of A"
+      ]
+    },
+    "focused_index_controls": 7,
+    "delegated_share_controls": 17,
+    "owning": {
+      "admission-store-owning": 607,
+      "caller-execution-owning": 38
+    },
+    "strict_clippy": "all-targets pass with admission-test-support",
+    "trust_boundary_gate": "final unchanged CLI pass after reviewed metadata amendment",
+    "other_static": "format, rust hygiene, negative assertions, security clocks and security CI contract pass"
+  },
+  "review": {
+    "reviewer": "Claude",
+    "decision": "approve",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "source_review": "2026-10-12T06:18:38Z",
+    "inventory_ack": "2026-10-12T06:22:21Z"
+  },
+  "retained_unsuccessful_attempts": [
+    "Two genuine Original runtime failures are retained.",
+    "Trust-boundary inventory gate originally failed on inherited F041 reader relocation and F071 generated constrained newtypes; only exact reviewed inventory entries changed. The raw debt cohort, full contracts, signed-input files and checker bytes remain unchanged."
+  ],
+  "design": [
+    "Immutable parent index enrolled in the same funding transaction; v37 migration backfills atomically and verifies restart completeness and ownership.",
+    "Requested-parent live/outcome-unknown candidates and every unresolved funded row retain full operation/history verification; mismatched attribution denies.",
+    "Existing external data_version custody fence remains authoritative. Four controls begin with live exact shares, mutate through a separate connection, require the exact custody refusal on the share read and verify no sibling invocation."
+  ],
+  "accepted_limits": [
+    "The former external-writer omission allegation is withdrawn; owner-connection corruption is an explicitly artificial isolation test.",
+    "No per-query whole-index authentication claim. Same-parent histories, unresolved funded operations and cold-state operational costs remain.",
+    "The sibling invocation controls accept either denial or error, while the preceding share-read assertion requires the exact custody error."
+  ],
+  "remaining_acceptance": [
+    "Actual-main composition after the active two-PR queue advances; no private schema activation or new public PR.",
+    "Fresh exact-head required checks and review before landing."
+  ],
+  "authority_changes": false,
+  "formal_campaigns": false,
+  "ratchet_waivers": false
+}
