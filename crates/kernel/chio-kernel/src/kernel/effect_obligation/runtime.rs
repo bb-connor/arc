@@ -40,10 +40,6 @@ impl ChioKernel {
         &self,
         bytes: NonZeroUsize,
     ) -> Result<EvidenceSlot, KernelError> {
-        let mut state = self
-            .post_effect_evidence
-            .lock()
-            .map_err(|_| KernelError::Internal("post-effect evidence owner poisoned".into()))?;
         let resources = EvidenceRecoveryResources {
             clock: self.authority_clock(),
             signer: Arc::clone(&self.signing_authority.backend),
@@ -59,6 +55,10 @@ impl ChioKernel {
             append_budget: self.config.deadlines.receipt_append_budget(),
             settlement_observation: self.settlement_observer.is_some(),
         };
+        let mut state = self
+            .post_effect_evidence
+            .lock()
+            .map_err(|_| KernelError::Internal("post-effect evidence owner poisoned".into()))?;
         if let Some(worker) = state.as_ref() {
             if !worker.matches_resources(&resources) {
                 if !worker.is_idle() {

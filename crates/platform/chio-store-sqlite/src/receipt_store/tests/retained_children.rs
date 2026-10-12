@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 
-use chio_kernel::{ChildRequestReceipt, ReceiptStore, ReceiptStoreError};
+use chio_core::ChildRequestReceipt;
+use chio_kernel::{ReceiptStore, ReceiptStoreError};
 
 use super::support::{
     receipt_test_keypair, sample_child_receipt_with_keypair_and_timestamp, signer,

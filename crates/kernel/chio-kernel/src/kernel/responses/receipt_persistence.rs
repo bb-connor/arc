@@ -1,5 +1,6 @@
 use super::*;
 use crate::kernel::effect_obligation::publication::{ReceiptAppendFailure, ReceiptCommit};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn require_receipt_body_fields_coupled(
     body: &ChioReceiptBody,
@@ -438,10 +439,12 @@ impl ChioKernel {
         let mut projected = true;
         if let Some(store) = self.receipt_store.as_ref() {
             if suppress_exact_durable_replay && settlement_visible_at_ms.is_none() {
-                match store
-                    .load_retained_chio_receipt(&receipt.id)
-                    .map_err(KernelError::from)?
-                {
+                let existing = catch_unwind(AssertUnwindSafe(|| {
+                    store.load_retained_chio_receipt(&receipt.id)
+                }))
+                .map_err(|_| KernelError::Internal("receipt readback panicked".into()))?
+                .map_err(KernelError::from)?;
+                match existing {
                     Some(existing) if receipts_match(&existing, receipt)? => projected = false,
                     Some(_) => {
                         return Err(KernelError::DurableAdmission(format!(
@@ -454,7 +457,9 @@ impl ChioKernel {
                 }
             }
             if projected {
-                let appended = match settlement_visible_at_ms {
+                // Catch inside both publication locks. Once the append is
+                // entered, a panic cannot establish that nothing committed.
+                let appended = catch_unwind(AssertUnwindSafe(|| match settlement_visible_at_ms {
                     Some(next_visible_at_ms) => store
                         .append_chio_receipt_with_pending_observation_and_timeout(
                             receipt,
@@ -465,14 +470,16 @@ impl ChioKernel {
                         receipt,
                         self.config.deadlines.receipt_append_budget(),
                     ),
-                };
+                }))
+                .map_err(|_| KernelError::Internal("receipt append panicked".into()))
+                .and_then(|result| result.map_err(KernelError::from));
                 appended.map_err(|source| {
                     if settlement_visible_at_ms.is_some() {
                         crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
                     }
                     // Once entered, a store error does not prove non-commit.
                     // In particular a timed-out writer may still own the append.
-                    ReceiptAppendFailure::unknown(&receipt.id, source.into())
+                    ReceiptAppendFailure::unknown(&receipt.id, source)
                 })?;
             }
         }
