@@ -35,7 +35,7 @@ use crate::lanes::revocation::VerifiedSignerDirectory;
 
 /// Schema pin for the adapter's issuer-signed transport-directory bundle.
 pub const TRANSPORT_DIRECTORY_BUNDLE_SCHEMA: &str =
-    "chio.federation.transport.iroh.peer-directory-bundle.v2";
+    "chio.federation.transport.iroh.peer-directory-bundle.v1";
 
 /// Domain-separation context for the passport-over-transport endorsement. The
 /// passport signs [`transport_endorsement_preimage`] (this tag, the entry
