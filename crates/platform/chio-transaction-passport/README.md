@@ -1,103 +1,65 @@
 # chio-transaction-passport
 
-Verifies signed Chio transaction passports and the evidence bundles they anchor: the
-passport itself, its evidence graph, verifier policy, and claim set, plus (for
-runtime-security callers) the execution-lease and swarm artifacts a governed tool call
-produces. Every check is a pure function of caller-supplied bytes and caller-pinned
-trust keys; the only ambient input is the wall clock, consulted to check passport
-expiry.
+Authenticates transaction passport roots and checks their committed evidence
+graph, claim set, verifier policy, and selected proof families. It supplies
+the common verifier primitives used by commerce, enterprise, and Agent Web
+proof consumers.
 
-It is the shared platform-level verifier for transaction proof bundles:
-`chio-control-plane`, `chio-proof-room`, `chio-risk-comptroller`,
-`chio-trust-market-context`, `chio-enterprise-export`, and `chio-agent-web-interop`
-verify passports through it instead of re-implementing the digest and signature
-bindings.
+## Usage
 
-## Responsibilities
+Sign and authenticate a local root with an explicit signer pin. The example
+checks the root signature; committed artifact bytes are checked by the
+artifact entrypoints. Consumers select trusted keys independently of
+received passports.
 
-- Validate a `TransactionPassport`'s shape, validity window, and self-certifying
-  signature against caller-pinned trust keys.
-- Validate evidence-graph structure: node/edge shape, content-addressed node ids
-  (`id == sha256`), acyclicity, and the rule that advisory evidence cannot satisfy an
-  authority edge.
-- Bind the passport to its evidence graph, verifier policy, and claim set by digest and
-  path, and enforce verifier-policy gates (accepted issuers, required evidence roles,
-  accepted transparency states, omission-policy match).
-- In standalone mode, independently re-verify the capability -> guard-decision ->
-  receipt -> trust-root signature chain and every cross-artifact digest binding,
-  without trusting the claim set's self-reported status.
-- Verify runtime-security evidence: execution leases, sandbox attestations,
-  tool-server acknowledgements, revocation-freshness and trusted-time proofs, terminal
-  receipts, policy-activation receipts, and the swarm task graphs, route-plan receipts,
-  budget pools, and join receipts a lease references.
-- Sign a transaction passport (`sign_transaction_passport`) on behalf of an issuer
-  whose keypair matches the passport's self-certifying identity.
+```rust
+use chio_core_types::Keypair;
+use chio_transaction_passport::{sign_transaction_passport,
+    verify_transaction_passport_signature, TransactionPassport,
+    TRANSACTION_PASSPORT_SCHEMA_ID};
 
-## Public API
+let key = Keypair::from_seed(&[7; 32]);
+let mut passport = TransactionPassport {
+    schema: TRANSACTION_PASSPORT_SCHEMA_ID.into(), id: "passport-demo".into(),
+    issued_at: "2026-06-10T00:00:00Z".into(),
+    not_before: None, expires_at: None,
+    issuer: format!("did:chio:{}", key.public_key().to_hex()),
+    evidence_graph_sha256: "a".repeat(64),
+    evidence_graph_path: "evidence-graph.json".into(),
+    claim_set_sha256: "b".repeat(64), claim_set_path: "claim-set.json".into(),
+    verifier_policy_sha256: "c".repeat(64),
+    verifier_policy_path: "verifier-policy.json".into(),
+    omission_policy: vec![], signature: String::new(),
+};
+passport.signature = sign_transaction_passport(&passport, &key)?;
+verify_transaction_passport_signature(&passport, &[key.public_key()])?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-Passport shape and signature:
+## Guarantees
 
-- `TransactionPassport`, `TransactionOmissionPolicyEntry` - the passport document and
-  its per-claim omission entries.
-- `verify_minimal_passport_schema`, `verify_minimal_passport_schema_at` - schema,
-  validity-window, digest-shape and path-safety checks on a passport alone.
-- `sign_transaction_passport` - sign a passport with a `Keypair` whose public key
-  matches its self-certifying issuer.
-- `verify_transaction_passport_signature` - verify a passport's signature against
-  caller-pinned trust keys.
-- `verify_transaction_passport_signature_with_evidence_graph` - verify against a
-  signed evidence graph digest and accept a redacted "scoped" graph that is a subset
-  of it.
+`verify_transaction_passport_signature` checks schema/validity, requires
+caller-pinned root keys, and verifies the canonical body against the
+self-certifying issuer. `verify_minimal_passport_schema_at` accepts a
+supplied time for deterministic validity checks.
 
-Root-graph verification (claim set is trusted, except `claim.risk.*`):
+`decode_evidence_json` validates bounded original JSON before projection.
+`verify_passport_root_and_claim_set_artifacts` combines root authentication
+with artifact and claim checks. Transparency anchoring requires separate
+checkpoint pins through `TransactionTrustAnchors`.
 
-- `verify_passport_root_and_claim_set_artifacts`,
-  `verify_passport_root_and_claim_set_artifacts_with_external_claims`,
-  `verify_passport_root_and_claim_set_artifacts_unchecked_signature_with_external_claims`
-  - bind passport, evidence graph, verifier policy and claim set, and enforce policy
-  gates.
-- `verify_minimal_passport_artifacts` - the schema, digest and policy-gate subset of
-  the above, without passport signature or claim-set checks.
-- `TransactionVerifierReport` - the resulting report, built with
-  `verified`/`failed`/`with_transparency_state`/`with_claim_results`.
+## Status
 
-Standalone verification (the crate re-derives every binding itself):
+Implemented root/artifact, runtime-security, and cognition-market
+verification APIs. `verify_minimal_passport_artifacts` checks shape and
+commitments without authenticating the root signature. Explicit
+unchecked-signature variants require an already authenticated caller
+context. Evidence verification uses supplied artifacts and trust; it does
+not operate tools or settle purchases.
 
-- `verify_standalone_minimal_passport_artifacts`,
-  `verify_standalone_minimal_passport_artifacts_unchecked_signature` - full
-  self-contained verification of the capability -> guard-decision -> receipt ->
-  trust-root chain, restricted to the six `claim.transaction.*` structural claims.
-- `validate_transaction_evidence_graph` - structural validation of evidence-graph
-  bytes alone.
-- `transaction_evidence_graph_transparency_state` - derive
-  `transparency_preview` / `not_present` from evidence-graph bytes. The
-  `trust_anchored` tier requires cryptographic verification of an inclusion
-  proof against a checkpoint signed by a pinned key, so it is only reachable
-  through the artifact-carrying verification surfaces.
-- `validate_verifier_policy_artifact` - standalone verifier-policy shape validation.
+## Related
 
-Runtime security:
-
-- `verify_runtime_security_claims`, `verify_runtime_security_claims_with_trust` -
-  verify a `RuntimeSecurityBundle` and produce a `RuntimeSecurityReport`.
-- `RuntimeSecurityBundle`, `RuntimeSecurityTrust` - the input bundle (passport,
-  graphs, artifacts) and the pinned trust keys.
-
-Schema ids (`TRANSACTION_PASSPORT_SCHEMA_ID`, `TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID`,
-`TRANSACTION_VERIFIER_POLICY_SCHEMA_ID`, `TRANSACTION_VERIFIER_REPORT_SCHEMA_ID`,
-`TRANSACTION_RUNTIME_SECURITY_REPORT_SCHEMA_ID`, `RUNTIME_EXECUTION_LEASE_SCHEMA_ID`,
-`RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID`, `RUNTIME_REVOCATION_FRESHNESS_PROOF_SCHEMA_ID`,
-`RUNTIME_SANDBOX_ATTESTATION_SCHEMA_ID`) and the crate-wide `TransactionPassportError`.
-
-## Testing
-
-`cargo test -p chio-transaction-passport`. The test suite cross-checks fixtures
-against the JSON Schemas in `spec/schemas/chio-transaction/v1/` via `jsonschema`.
-
-## See also
-
-- `chio-core-types` - supplies Ed25519 signing/verification and the signed-artifact
-  schema registry evidence-graph nodes are checked against.
-- `chio-control-plane`, `chio-proof-room`, `chio-risk-comptroller`,
-  `chio-trust-market-context`, `chio-enterprise-export`, `chio-agent-web-interop` -
-  platform and product crates that verify transaction passports through this crate.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol](../../../spec/PROTOCOL.md#643-transaction-passport-proof-root)
+- [chio-enterprise-export](../chio-enterprise-export/README.md)
+- [License](../../../LICENSE)

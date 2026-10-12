@@ -1,218 +1,175 @@
 # chio-store-sqlite architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-store-sqlite` is the durable backend behind the kernel's trust
-decisions: it does not decide policy, but a degraded or corrupted store can
-still let an unrecorded tool call through or lose the evidence a dispute
-depends on. The receipt-commit writer is marked trust-critical explicitly
-(`SupervisorConfig { tcb_critical: true, .. }`, with the comment "Durable
-receipt persistence is on the money path: a degraded writer must fail
-evaluations closed rather than execute tools without a receipt"). The crate's
-design idea is a single-writer, multi-reader split per store: one dedicated
-writer connection (a group-commit actor for the receipt store, a mutex-guarded
-connection for the smaller stores) serializes every mutation, while an
-8-connection reader pool serves concurrent queries against the same file.
+This crate owns SQLite implementations of Chio store contracts and local
+operator queries. `SqliteReceiptStore` implements `ReceiptStore` and
+`IndexedSecurityEvidenceStore`; `SqliteBudgetStore`, `SqliteApprovalStore`,
+`SqliteRevocationStore`, and `SqliteExecutionNonceStore` implement the
+corresponding kernel traits. `SqliteCapabilityAuthority` implements
+`CapabilityAuthority`. `SqliteMemoryProvenanceStore` implements
+`MemoryProvenanceStore`, and `SqliteIouEnvelopeStore` implements
+`chio_credit::IouEnvelopeStore`.
 
-## Diagram
+`SqliteSecurityStateStore` implements security ports including `FlowStateStore`
+and `DeclassificationEvidenceCommitStore`. The joint
+`SqliteAdmissionOperationStore` implements the kernel's admission-operation
+contract and receipt projections. Obtain it from a serving
+`SqliteAuthorityStore`; its connection and owner are shared with that store.
+The feature-gated standalone security admission store has a separate type and
+implementation. Applications select the backend and supply authenticated
+identities, clocks, read contexts, and signed artifacts.
 
-```mermaid
-flowchart TD
-    Kernel["Chio kernel"]
+## Structure
 
-    subgraph traits["Storage traits (chio-kernel / chio-credit / chio-settle)"]
-        TReceipt["ReceiptStore (trait)"]
-        TBudget["BudgetStore (trait)"]
-        TState["ApprovalStore RevocationStore ExecutionNonceStore CapabilityAuthority MemoryProvenanceStore (traits)"]
-        TExt["IouEnvelopeStore DeadLetterStore (external traits)"]
-    end
+`receipt_store.rs` owns the receipt writer actor and health state.
+`receipt_store/bootstrap/open.rs` initializes schema and connection pools;
+`receipt_store/support` validates receipt readback, checkpoints, and claim-log
+projections. `receipt_query`, `receipt_query_snapshot`, and `evidence_export`
+handle paginated reads, retained snapshots, and proof-bearing export.
+`receipt_store/reports` contains operator report families.
 
-    subgraph impls["SQLite implementations"]
-        IReceipt["SqliteReceiptStore"]
-        IBudget["SqliteBudgetStore"]
-        IState["Sqlite state stores"]
-        IExt["SqliteIouEnvelopeStore SqliteDeadLetterStore"]
-    end
+`budget_store/store` opens the standalone connection and performs invocation
+increments. Other budget modules handle composite holds, replication,
+snapshots, and reconciliation. `approval_store`, `revocation_store`, and
+`execution_nonce_store` own their respective tables and mutation paths.
+`schema_version` implements shared application-ID and keyed revision checks.
 
-    subgraph storage["Connection layer"]
-        Writer["Group-commit writer actor (single thread)"]
-        Mutex["Mutex-guarded writer connection"]
-        Readers["r2d2 reader pool (8 connections)"]
-        Schema["check_schema_version and migrations"]
-        Db[("SQLite file")]
-    end
+`serving_owner` provisions the joint authority database, owns process fencing,
+and verifies the global commit chain and rollback anchor.
+`admission_operation_store` retains operations, participant history, recovery
+leases, and terminal projections. `authority/custody` handles signing-seed file
+custody. `security_state` contains flow, declassification, response, scheduler,
+and source-retirement logic. Encrypted blobs, provenance, settlement, finding
+markets, FROST state, and fiscal state have dedicated modules.
 
-    Kernel -->|read and write| TReceipt
-    Kernel --> TBudget
-    Kernel --> TState
-    Kernel --> TExt
+## Construction and migrations
 
-    TReceipt -.impl.-> IReceipt
-    TBudget -.impl.-> IBudget
-    TState -.impl.-> IState
-    TExt -.impl.-> IExt
+`check_schema_version` inspects `PRAGMA application_id` and store-specific
+anchor tables. An empty or recognized legacy database with application ID zero
+is stamped as Chio and reported as revision zero. A stamped populated file
+must still carry an accepted anchor. Revisions live in
+`chio_store_schema_versions`, keyed by store, so co-located stores have
+independent revisions. The helper validates provenance and returns a revision;
+the constructor owns migration and the later `stamp_schema_version` call.
 
-    IReceipt -->|append| Writer
-    IReceipt -->|query| Readers
-    IBudget -->|charge txn| Mutex
-    IState -->|write| Mutex
-    IState -->|read| Readers
-    IExt -->|persist| Mutex
+Receipt creation performs schema work in an immediate transaction and stamps
+the revision before commit. Its `open_existing` path requires the current
+schema and uses read/write flags without creation. It still configures
+connection pragmas and transparency guards. Approval co-location explicitly
+accepts the receipt anchor; ordinary approval opens use their own anchor set.
+These checks apply to the constructors that invoke them. Security-state
+migrations and joint serving-owner initialization have their own gates.
 
-    Writer -->|group commit txn| Db
-    Mutex -->|immediate txn| Db
-    Readers -->|SELECT| Db
-    Schema -->|verified open| Db
-```
+`SqliteSecurityStateStore::open` accepts a plain filesystem path. On Unix it
+opens and binds an unaliased main file before migration, initializes encrypted
+blob tables, and retains the identity for later connection checks. Its default
+isolation-epoch verifier denies new evidence; callers can supply an explicit
+verifier through `open_with_isolation_epoch_verifier`.
 
-## Module map
+## Data and control flow
 
-| Path | Responsibility |
-|------|-----------------|
-| `src/lib.rs` | Crate root: pool-size defaults, `SqlitePoolConfig`/`SqliteStoreOptions`, in-memory-path detection, top-level re-exports. |
-| `src/receipt_store.rs` + `src/receipt_store/**` | `SqliteReceiptStore`: group-commit writer actor, checkpoints, retention, lineage, liability/underwriting persistence, reports. See the submodule map below. |
-| `src/receipt_query.rs` | `SqliteReceiptStore::query_receipts`, filtered and cursor-paginated. |
-| `src/budget_store.rs` + `src/budget_store/**` | `SqliteBudgetStore`: per-grant spend limits, authorization holds, replication sequencing. |
-| `src/approval_store.rs` | `SqliteApprovalStore`: human-approval requests, resolutions, consumed-token replay guard. |
-| `src/revocation_store.rs` | `SqliteRevocationStore`: durable, monotonic capability revocation list. |
-| `src/execution_nonce_store.rs` | `SqliteExecutionNonceStore`: one-time execution-nonce reservation with retention-extended expiry. |
-| `src/authority.rs` | `SqliteCapabilityAuthority`: kernel signing-key custody, rotation, trusted-key history, cluster-leader fencing. |
-| `src/capability_lineage.rs` | `impl SqliteReceiptStore` extension: capability delegation lineage (parent/child, depth, recursive ancestor query). Not a standalone store. |
-| `src/evidence_export.rs` | `impl SqliteReceiptStore` extension: builds `EvidenceExportBundle`s (receipts, lineage, checkpoints, Merkle inclusion proofs). |
-| `src/encrypted_blob.rs` | `SqliteEncryptedBlobStore`: tenant-scoped ChaCha20-Poly1305 blob storage. |
-| `src/memory_provenance_store.rs` | `SqliteMemoryProvenanceStore`: hash-chained audit trail of agent-memory writes. |
-| `src/finding_status_store.rs` + `src/finding_status_store.sql` | `SqliteFindingStatusStore`: exact signed status epochs, monotonic feed floors, sticky pending/retracted findings, retraction intents, sparse leaves, and portable proof bytes. |
-| `src/iou_store.rs` | `SqliteIouEnvelopeStore`: persists `chio_credit::IouEnvelope`s; can share a receipt store's pool. |
-| `src/dead_letters.rs` | `SqliteDeadLetterStore`: permanently failed settlement receipts (`chio_settle::DeadLetterRecord`); always opened alongside another store's pool. |
-| `src/lineage_cte.rs` (`lineage` feature) | Recursive-CTE forward/reverse walks over `receipt_lineage_statements`. |
-| `src/schema_version.rs` | Shared open-path schema/anchor-table gate used by every store above. |
+A standalone budget increment takes the connection mutex, starts an immediate
+transaction, validates the grant index and retained history, reads the counter,
+and records the decision and replication sequence. An allowed increment writes
+the updated usage before commit. Rejected increments retain a denial event.
+Supplying an event ID enables the path's exact replay checks.
 
-### receipt_store submodule map
+Receipt opens create a reader pool of eight connections and a writer pool of
+one by default. The actor seeds a verified durable head before processing
+queued commands. `wait_for_writer_ready` provides a bounded readiness barrier.
+Receipt appends and critical settlement projections use the writer handle;
+reader queries borrow pooled connections. Every pooled receipt connection
+configures and verifies WAL, FULL synchronization, foreign keys, and busy timeout.
 
-| Path | Responsibility |
-|------|-----------------|
-| `receipt_store/bootstrap/open.rs` | `SqliteReceiptStore::open*`: pragmas, schema creation and migration, pool construction, actor spawn. |
-| `receipt_store/bootstrap/federated.rs` | Import and query federated evidence shares from partner Chio instances. |
-| `receipt_store/bootstrap/listing.rs` | Paginated tool/child receipt listing and counts. |
-| `receipt_store/evidence_retention.rs` | Checkpoint-aligned archival watermark; archive-then-delete rotation. |
-| `receipt_store/support/store_impl.rs` | `impl ReceiptStore for SqliteReceiptStore` - the trait's method surface. |
-| `receipt_store/support/receipt_verify.rs` | Signature and action-hash verification before a receipt is trusted. |
-| `receipt_store/support/retention_watermark.rs` | The archival watermark that gates skipping full checkpoint-chain re-verification. |
-| `receipt_store/support/lineage.rs` | Session anchors, request lineage, receipt-lineage statements. |
-| `receipt_store/support/claim_log/**` | The unified `claim_receipt_log_entries` projection: schema, validation, authorization/metadata extraction, query matching, enum codecs. |
-| `receipt_store/support/checkpoint_projection.rs` | Re-derives checkpoint transparency-projection tables for verification; backfill and repair. |
-| `receipt_store/writer_accounting.rs` | Checked command-owned queue, inflight and terminal accounting. |
-| `receipt_store/support/checkpoint_schema.rs` | Typed checkpoint predecessor columns, projection triggers and transactional schema upgrades. |
-| `receipt_store/support/checkpoint_validate.rs` | Checkpoint signature, predecessor-chain, and Merkle-root validation. |
-| `receipt_store/reports/*` | Ten operator report families (analytics, authorization, behavioral, billing, compliance, cost attribution, economic, reconciliation, settlement, shared evidence). |
-| `receipt_store/liability_claims.rs` | Claim to response to dispute to adjudication to payout to settlement persistence. |
-| `receipt_store/liability_market.rs` | Provider, quote, placement, pricing-authority, and auto-bind persistence. |
-| `receipt_store/underwriting_credit.rs` | Underwriting decisions, appeals, credit facilities, credit bonds, credit-loss lifecycle. |
+`query_receipts` uses a retained snapshot and authenticates archive history;
+`query_live_receipts` is the live-store diagnostic path. Query contracts require
+an explicit `ReceiptReadContext`; remote adapters must authenticate credentials
+before choosing it. Low-level local list/count helpers also exist, so adapters
+must select the API that enforces their intended read boundary.
 
-Every file under `receipt_store/` other than `receipt_store.rs` itself is
-wired in with `#[path = "..."] mod x;` and opens with `use super::*;`, so
-these are organizational splits of one Rust module, not a nested module tree:
-each file's `impl SqliteReceiptStore` block shares `receipt_store.rs`'s
-imports and adds methods to the same struct.
+## Transactions and concurrency
 
-## Group-commit write path
+Standalone budget state uses one `StoreConnection` behind a mutex. SQLite's
+immediate transaction acquires the writer lock before reading the counter.
+Independent connections and processes still contend through SQLite locking;
+the mutex and receipt actor serialize work only within their owning instances.
+Pool sizes and busy timeouts are operational choices, with contention errors
+returned to callers.
 
-1. A caller invokes an append method on `SqliteReceiptStore` (directly, or
-   through `impl ReceiptStore for SqliteReceiptStore` in `support/store_impl.rs`).
-2. The call increments `ReceiptCommitWriterHealth::inflight` (`AtomicU64`)
-   and `try_send`s a `ReceiptCommitCommand` on a bounded
-   `mpsc::sync_channel` (capacity `RECEIPT_GROUP_COMMIT_MAX_BATCH * 16` = 1024)
-   to the single writer thread. A full queue fails closed with
-   `ReceiptStoreError::Pool`; a disconnected channel returns
-   `ReceiptStoreError::WriterDead`.
-3. The writer thread (`ReceiptCommitActor`, run under `SupervisedThread`)
-   drains up to `RECEIPT_GROUP_COMMIT_MAX_BATCH` (64) queued commands, or
-   waits up to `RECEIPT_GROUP_COMMIT_FLUSH_DELAY` (500 microseconds), then
-   commits them as one SQLite transaction with a `SAVEPOINT` per record so
-   one bad receipt fails only its own slot. `inflight` is decremented
-   unconditionally on dequeue.
-4. `receipt_verify.rs` checks each receipt's signature
-   (`ReceiptCryptoFloor::AllowHybrid`) and action hash before it is trusted;
-   failures fail closed as `ReceiptStoreError::Conflict`.
-5. With `incremental_verification` enabled (the default), the actor's cached
-   `VerifiedHead` advances with an O(1) predecessor check plus an O(b) delta
-   cross-check against the newly committed claim-log rows. Disabled, the
-   actor instead re-runs full O(N) claim-log and checkpoint-chain
-   verification on every batch, for A/B verification of a suspect database.
-6. After a durable append, `build_due_checkpoints_and_record` builds any
-   checkpoints now owed (count-triggered against
-   `BackgroundCheckpointSigner::max_batch`), wrapped in `catch_unwind` so a
-   checkpoint failure only records `health.last_error` and never fails or
-   blocks the caller's write.
-7. A panic in batch commit or checkpoint build is caught and poisons
-   `ReceiptCommitWriterHealth::head_poisoned` (`true` by default until the
-   open path seeds a verified head), which `writer_serving_closed` surfaces
-   to the kernel's pre-dispatch gate. A poisoned store still runs
-   `RetentionRepair` (its own command variant) but refuses ordinary appends
-   until `reseed_verified_head` (the `chio receipt audit --repair` path)
-   re-verifies from scratch.
+Internal `SecurityStateWriteTransaction` consumes and returns ownership when
+composing selected flow and declassification mutations. It requires a write
+transaction, sets rollback-on-drop, and checks legacy source writability.
+`ScopedMutation` borrows an owner and exposes a closed query catalog with exact
+numbered parameter arity. Native queries prepend the security authority.
+Domain methods cannot commit or obtain the underlying connection through this
+wrapper. Legacy public methods create and commit their own transactions.
 
-## Invariants and failure modes
+Native scoped mutation constructors require an admission-owned flow or egress
+owner; an authority-scoped reader cannot construct those owners. Trusted security time
+is sampled after the transaction has acquired its snapshot/lock and checked
+source retirement. Exact retained replay follows its separate historical path.
+These composition rules cover those security mutations, with each unrelated
+store method retaining its own commit boundary.
 
-- The write queue is bounded and non-blocking (`try_send` only, capacity
-  1024); a saturated queue rejects new work rather than growing unbounded or
-  blocking the caller. `tests/loom_receipt_writer.rs` model-checks the
-  inflight-counter accounting under concurrent producers.
-- `ReceiptCommitWriterHealth` starts `head_poisoned: true`, so a freshly
-  opened store cannot serve ordinary appends until its head is seeded.
-- Retention never deletes a live row that is not byte-identical in the
-  archive first (`verify_co_archival_complete`), never prunes past the last
-  checkpoint the actor has itself verified (`verified_checkpoint_ceiling`),
-  and refuses tenant-scoped retention outright
-  (`ReceiptStoreError::RetentionTenantScopeUnsupported`).
-- The archival watermark that lets checkpoint-chain verification skip
-  rebuilding the Merkle tree is itself guarded at the SQL layer
-  (`receipt_retention_watermark_reject_update` / `_reject_delete` /
-  `_reject_regression` triggers); a `None` watermark disables the skip
-  exemption entirely rather than assuming zero.
-- Every store gates its on-disk file through
-  `schema_version::check_schema_version` before any write: a foreign file, a
-  file missing this store's anchor tables, or a schema newer than the binary
-  supports is refused, never adopted or upgraded silently.
-- `SqliteEncryptedBlobStore` binds tenant id, blob id, and creation timestamp
-  into the ChaCha20-Poly1305 associated data, so ciphertext copied onto
-  another row's handle fails authentication instead of decrypting under the
-  wrong scope.
-- `SqliteExecutionNonceStore` and `SqliteRevocationStore` are monotonic: a
-  reserved nonce or a revoked capability has no store-level "undo" path.
-- `SqliteFindingStatusStore` keeps one stable operator identity and the fixed
-  finding-status nonce per feed. Signed epoch bytes advance a monotonic
-  `(map_epoch, epoch_id, root_hash)` floor; lower epochs and same-epoch
-  equivocation reject. Pending and retracted finding rows are sticky, and a
-  non-inclusion proof cannot clear either state.
-- `SqliteBudgetStore` evaluates and writes each limit check
-  (`try_charge_cost_with_ids_and_authority`) inside one `Immediate`
-  transaction, so no interleaved write can land between check and commit;
-  denied attempts are still durably logged to `budget_mutation_events`.
-- Double-adjudication in the liability-claim workflow is blocked at the
-  schema layer: `liability_claim_adjudications.dispute_id` and `.claim_id`
-  are `UNIQUE`, so a second adjudication against the same dispute or claim
-  fails the constraint independent of the Rust-level checks.
+## Trust, custody, and restart
+
+Linux `AuthorityCustody::prepare` validates directories and database sidecars
+before signing-seed writes. The immediate parent must belong to the effective
+user with mode 0700; database and sidecars must be owned, regular, single-link
+files with mode 0600. Retained directory handles and main-file identity checks
+detect path replacement. Non-Linux signing-authority custody returns refusal.
+The seed is stored in plaintext under this filesystem boundary.
+
+`SqliteAuthorityStore::provision` and `open_serving` require Unix support,
+validate database/lock identities, and retain an exclusive serving lock.
+Joint admission writes verify the active owner, mutation fence, and authority
+anchor inside an immediate transaction. Commit precedes external anchor sync;
+an uncertain commit or anchor mismatch requires owner recovery. Reopening
+validates retained state and reconciles the anchor according to that path.
+
+`StoreConnection` distinguishes transaction-only and anchored connections.
+After a poisoned mutex, it explicitly rolls back an open transaction, checks
+autocommit, and invokes the configured consistency check. Any failure
+permanently fences that handle until reopen. This recovery helper is used by
+selected mutex-backed stores; receipt actor health uses its own lifecycle.
+
+Finding-pool receipt opens add descriptor custody and an independent rollback
+anchor on another device. Ordinary receipt opens omit that qualification.
+Successful file-backed commits rely on SQLite synchronization and the backing
+storage; memory stores disappear with their process. A receipt page-count cap
+limits main-file growth while WAL space still needs checkpoint progress.
+
+Security participant migration retains `Expected` and `ImportedInactive`
+history. Source preview/import I/O runs outside destination locks; bounded
+history and global commits are checked under the serving fence. Imported rows
+require the typed hydration and operation-owned serving paths before mutation.
 
 ## Dependencies
 
-Internal: `chio-kernel` defines the store traits this crate implements
-(`ReceiptStore`, `BudgetStore`, `ApprovalStore`,
-`RevocationStore`, `ExecutionNonceStore`, `CapabilityAuthority`,
-`MemoryProvenanceStore`) and the protocol-adjacent types persisted here
-(checkpoints, retention config, report and query types). `chio-credit`
-supplies `IouEnvelope` and the `IouEnvelopeStore` trait. `chio-settle`
-supplies `DeadLetterRecord`. `chio-supervisor` runs the receipt-commit actor
-as a supervised, restart-bounded thread (`max_restarts: 5`,
-`trip_after: 1`). The dependency named `chio-core` in `Cargo.toml` is
-aliased to `package = "chio-core-types"`: every `chio_core::` path in this
-crate's source resolves to `chio-core-types`, not the `chio-core` facade
-crate.
+`rusqlite` uses the workspace's bundled SQLite; `r2d2` and `r2d2_sqlite` provide
+receipt and other read pools. `chio-sqlite-file-identity` inspects SQLite's main
+descriptor for custody callers. `rustix`, `nix`, and standard file locks support
+filesystem validation and serving exclusion. Core types supply canonical JSON,
+receipt verification, keys, and hashes; kernel and security types supply traits
+and fences. `chacha20poly1305` and `zeroize` support encrypted blob handling.
+Credit, settlement, finding, and fiscal dependencies supply their typed records.
 
-External: `r2d2` / `r2d2_sqlite` / `rusqlite` for pooled SQLite access;
-`chacha20poly1305` and `zeroize` for encrypted-blob key handling; `uuid`
-(`v7` feature) for time-ordered identifiers; `thiserror` for error types;
-`tracing` for instrumentation. Dev-only: `loom` models the commit actor's
-channel accounting, `proptest` and `criterion` exercise the receipt-store and
-budget-store paths, `tempfile` backs on-disk test databases, and
-`chio-test-support` supplies shared test fixtures.
+## Verification
+
+`receipt_store/tests/bootstrap.rs` covers reopen persistence and main-file page
+bounds; `receipt_store/tests/insert.rs` checks sequence persistence and
+authorization-consumption replay. `tests/integration_smoke.rs` exercises budget
+limits, revocation ordering, and budget hold/idempotency reopen behavior.
+`tests/authority_custody.rs` exercises permissions, aliases, replacement, URI
+refusal, and seed-write boundaries. Security open-path tests check alias and
+permission handling; `security_state/deadline_tests.rs` advances the clock
+after real database lock waits. `store_connection.rs` tests panic rollback,
+anchor checks, and fenced recovery. Serving-owner tests exercise its provisioning
+and relocation paths. Receipt-throughput and authorization benchmarks measure
+populated local database workloads.
+
+Run `cargo test -p chio-store-sqlite` for the local crate suites and
+`cargo test -p chio-store-sqlite --features lineage` for lineage-enabled tests.
+Use `cargo bench -p chio-store-sqlite --bench store_receipt_write_throughput`
+to measure the receipt append workload on the target storage.
