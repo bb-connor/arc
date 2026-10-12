@@ -27,6 +27,7 @@ mod admission_coordinator;
 mod admission_terminal_receipt;
 mod approval_cleanup;
 mod credential_reservation;
+mod effect_obligation;
 mod error;
 mod guard_invocation_attempt;
 pub(crate) use guard_invocation_attempt::GuardInvocationAttempt;
@@ -85,7 +86,7 @@ pub use active_response_policy::{
 
 pub use construction::KernelBuildError;
 pub use error::{
-    HotPathStage, KernelError, OverloadResource, ReplayClockDirection,
+    HotPathStage, KernelError, OverloadResource, ReceiptDeliveryStep, ReplayClockDirection,
     SettlementRuntimeConfigError, StructuredErrorReport,
 };
 pub use evaluation::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};

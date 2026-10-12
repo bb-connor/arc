@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::effect_obligation::publication::{ReceiptAppendFailure, ReceiptCommit};
 
 fn require_receipt_body_fields_coupled(
     body: &ChioReceiptBody,
@@ -249,15 +250,24 @@ impl ChioKernel {
         if receipt.is_allowed() {
             self.check_revocation(&request.capability)?;
         }
-        let (trace_event, settlement_visible_at_ms) = self
-            .record_chio_receipt_during_trace_transition(receipt, &trace_transition, true, false)?;
+        let committed = self.record_chio_receipt_during_trace_transition(
+            receipt,
+            &trace_transition,
+            true,
+            false,
+        )?;
         drop(trace_transition);
-        self.finish_record_chio_receipt(receipt, trace_event, settlement_visible_at_ms)?;
+        self.finish_record_chio_receipt(receipt, committed)?;
         self.apply_federation_cosign_for_admitted_request_with_snapshot(
             request,
             receipt,
             request_admission.as_ref().or(thread_admission),
-        )?;
+        )
+        .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
+            receipt_id: receipt.id.clone(),
+            step: ReceiptDeliveryStep::Federation,
+            source: Box::new(source),
+        })?;
         Ok(())
     }
 
@@ -319,10 +329,14 @@ impl ChioKernel {
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
         let trace_transition = self.lock_runtime_trace_transition()?;
-        let (trace_event, settlement_visible_at_ms) = self
-            .record_chio_receipt_during_trace_transition(receipt, &trace_transition, true, false)?;
+        let committed = self.record_chio_receipt_during_trace_transition(
+            receipt,
+            &trace_transition,
+            true,
+            false,
+        )?;
         drop(trace_transition);
-        self.finish_record_chio_receipt(receipt, trace_event, settlement_visible_at_ms)
+        self.finish_record_chio_receipt(receipt, committed)
     }
 
     /// Persist an internal audit receipt without presenting it to the
@@ -333,15 +347,14 @@ impl ChioKernel {
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         let trace_transition = self.lock_runtime_trace_transition()?;
-        let (trace_event, settlement_visible_at_ms) = self
-            .record_chio_receipt_during_trace_transition(
-                receipt,
-                &trace_transition,
-                false,
-                false,
-            )?;
+        let committed = self.record_chio_receipt_during_trace_transition(
+            receipt,
+            &trace_transition,
+            false,
+            false,
+        )?;
         drop(trace_transition);
-        self.finish_record_chio_receipt(receipt, trace_event, settlement_visible_at_ms)
+        self.finish_record_chio_receipt(receipt, committed)
     }
 
     /// Project an internal audit receipt once, using retained durable history
@@ -354,10 +367,14 @@ impl ChioKernel {
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         let trace_transition = self.lock_runtime_trace_transition()?;
-        let (trace_event, settlement_visible_at_ms) = self
-            .record_chio_receipt_during_trace_transition(receipt, &trace_transition, false, true)?;
+        let committed = self.record_chio_receipt_during_trace_transition(
+            receipt,
+            &trace_transition,
+            false,
+            true,
+        )?;
         drop(trace_transition);
-        self.finish_record_chio_receipt(receipt, trace_event, settlement_visible_at_ms)
+        self.finish_record_chio_receipt(receipt, committed)
     }
 
     fn record_chio_receipt_during_trace_transition(
@@ -366,7 +383,7 @@ impl ChioKernel {
         _trace_transition: &std::sync::MutexGuard<'_, ()>,
         settlement_eligible: bool,
         suppress_exact_durable_replay: bool,
-    ) -> Result<(Option<RuntimeTraceEvent>, Option<u64>), KernelError> {
+    ) -> Result<ReceiptCommit, ReceiptAppendFailure> {
         let settlement_visible_at_ms = if settlement_eligible {
             self.settlement_observer
                 .as_ref()
@@ -375,89 +392,108 @@ impl ChioKernel {
         } else {
             None
         };
-        let projected = {
-            let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
-                KernelError::Internal("receipt store write lock poisoned".to_string())
-            })?;
-            if let Some(next_visible_at_ms) = settlement_visible_at_ms {
-                self.with_receipt_store(|store| {
-                    Ok(
-                        store.append_chio_receipt_with_pending_observation_and_timeout(
+        let _receipt_store_write = self
+            .receipt_store_write_lock
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        let mut projected = true;
+        if let Some(store) = self.receipt_store.as_ref() {
+            if suppress_exact_durable_replay && settlement_visible_at_ms.is_none() {
+                match store
+                    .load_retained_chio_receipt(&receipt.id)
+                    .map_err(KernelError::from)?
+                {
+                    Some(existing) if receipts_match(&existing, receipt)? => projected = false,
+                    Some(_) => {
+                        return Err(KernelError::DurableAdmission(format!(
+                            "receipt projection {} conflicts with retained durable history",
+                            receipt.id
+                        ))
+                        .into())
+                    }
+                    None => {}
+                }
+            }
+            if projected {
+                let appended = match settlement_visible_at_ms {
+                    Some(next_visible_at_ms) => store
+                        .append_chio_receipt_with_pending_observation_and_timeout(
                             receipt,
                             &PendingSettlementObservation { next_visible_at_ms },
                             self.config.deadlines.receipt_append_budget(),
-                        )?,
-                    )
-                })
-                .inspect_err(|_| {
-                    // The critical write is inflight-preserving on expiry, so the
-                    // attempt row may still commit after this caller gives up.
-                    // Surface it as due work instead of losing it on the timeout.
-                    crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
-                })?;
-                self.append_chio_receipt_to_local_log(receipt.clone());
-                true
-            } else if suppress_exact_durable_replay {
-                let inserted = self
-                    .with_receipt_store(|store| {
-                        match store.load_retained_chio_receipt(&receipt.id)? {
-                            Some(existing) if receipts_match(&existing, receipt)? => Ok(false),
-                            Some(_) => Err(KernelError::DurableAdmission(format!(
-                                "receipt projection {} conflicts with retained durable history",
-                                receipt.id
-                            ))),
-                            None => {
-                                store.append_chio_receipt_with_timeout(
-                                    receipt,
-                                    self.config.deadlines.receipt_append_budget(),
-                                )?;
-                                Ok(true)
-                            }
-                        }
-                    })?
-                    .unwrap_or(true);
-                if inserted {
-                    self.append_chio_receipt_to_local_log(receipt.clone());
-                }
-                inserted
-            } else {
-                // Bound the commit round trip so a wedged writer cannot pin
-                // the kernel-wide receipt write lock indefinitely. On timeout
-                // this fails closed before an allow response is signed.
-                self.with_receipt_store(|store| {
-                    Ok(store.append_chio_receipt_with_timeout(
+                        ),
+                    None => store.append_chio_receipt_with_timeout(
                         receipt,
                         self.config.deadlines.receipt_append_budget(),
-                    )?)
+                    ),
+                };
+                appended.map_err(|source| {
+                    if settlement_visible_at_ms.is_some() {
+                        crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
+                    }
+                    // Once entered, a store error does not prove non-commit.
+                    // In particular a timed-out writer may still own the append.
+                    ReceiptAppendFailure::unknown(&receipt.id, source.into())
                 })?;
-                self.append_chio_receipt_to_local_log(receipt.clone());
-                true
             }
-        };
-        if !projected {
-            return Ok((None, None));
         }
-        let trace_event = if self.runtime_trace_observer.is_some() {
-            Some(RuntimeTraceEvent::ReceiptAppended {
-                source_sequence: self.allocate_runtime_trace_source_sequence()?,
-                receipt: Box::new(receipt.clone()),
-            })
+        if projected {
+            self.append_chio_receipt_to_local_log(receipt.clone());
+        }
+        // Allocate under the transition lock to preserve receipt/revocation
+        // ordering. Failure here is carried by an acknowledged commit.
+        let trace_source_sequence = if projected && self.runtime_trace_observer.is_some() {
+            self.allocate_runtime_trace_source_sequence().map(Some)
         } else {
-            None
+            Ok(None)
         };
-        Ok((trace_event, settlement_visible_at_ms))
+        Ok(ReceiptCommit {
+            receipt_id: receipt.id.clone(),
+            projected,
+            trace_source_sequence,
+            settlement_visible_at_ms,
+        })
     }
 
     fn finish_record_chio_receipt(
         &self,
         receipt: &ChioReceipt,
-        trace_event: Option<RuntimeTraceEvent>,
+        committed: ReceiptCommit,
+    ) -> Result<(), KernelError> {
+        let ReceiptCommit {
+            receipt_id,
+            projected,
+            trace_source_sequence,
+            settlement_visible_at_ms,
+        } = committed;
+        if !projected {
+            return Ok(());
+        }
+        if let Some(source_sequence) =
+            trace_source_sequence.map_err(|source| KernelError::DeliveryFailedAfterReceipt {
+                receipt_id: receipt_id.clone(),
+                step: ReceiptDeliveryStep::Trace,
+                source: Box::new(source),
+            })?
+        {
+            self.observe_runtime_trace(RuntimeTraceEvent::ReceiptAppended {
+                source_sequence,
+                receipt: Box::new(receipt.clone()),
+            });
+        }
+        self.finish_receipt_settlement(receipt, settlement_visible_at_ms)
+            .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
+                receipt_id,
+                step: ReceiptDeliveryStep::Settlement,
+                source: Box::new(source),
+            })
+    }
+
+    fn finish_receipt_settlement(
+        &self,
+        receipt: &ChioReceipt,
         settlement_visible_at_ms: Option<u64>,
     ) -> Result<(), KernelError> {
-        if let Some(event) = trace_event {
-            self.observe_runtime_trace(event);
-        }
-
         let Some(runtime) = self.settlement_observer.as_ref() else {
             return Ok(());
         };
