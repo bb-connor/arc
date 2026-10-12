@@ -85,6 +85,19 @@ impl From<KernelError> for ReservedPrepaymentFailure {
     }
 }
 
+pub(super) fn ensure_fresh_budget_cleanup_custody(
+    charge: &BudgetChargeResult,
+) -> Result<(), KernelError> {
+    if charge.cleanup_custody == crate::budget_store::BudgetHoldCleanupCustody::Fresh {
+        return Ok(());
+    }
+    Err(crate::budget_store::BudgetStoreError::Invariant(format!(
+        "budget hold cleanup requires fresh custody; current call custody is {}",
+        charge.cleanup_custody.as_str()
+    ))
+    .into())
+}
+
 impl ChioKernel {
     pub(crate) fn resolve_security_invocation_context(
         &self,
@@ -832,6 +845,10 @@ impl ChioKernel {
     ) -> serde_json::Value {
         let mut budget_authority = serde_json::Map::new();
         budget_authority.insert(
+            "cleanup_custody".to_string(),
+            serde_json::json!(charge.cleanup_custody),
+        );
+        budget_authority.insert(
             "guarantee_level".to_string(),
             serde_json::json!(charge.authorize_metadata.guarantee_level.as_str()),
         );
@@ -1348,6 +1365,7 @@ impl ChioKernel {
                 match decision {
                     BudgetAuthorizeHoldDecision::Authorized(authorized) => {
                         let charge = BudgetChargeResult {
+                            cleanup_custody: authorized.cleanup_custody,
                             grant_index: matching.index,
                             cost_charged: cost_units,
                             currency,
@@ -1398,6 +1416,7 @@ impl ChioKernel {
                             trusted_now_unix_ms,
                         )?;
                         let charge = BudgetChargeResult {
+                            cleanup_custody: authorized.cleanup_custody,
                             grant_index: matching.index,
                             cost_charged: cost_units,
                             currency,
@@ -1427,6 +1446,8 @@ impl ChioKernel {
                             return Err(KernelError::CapturedBudgetReplay(cap.id.clone()));
                         }
                         let charge = BudgetChargeResult {
+                            cleanup_custody:
+                                crate::budget_store::BudgetHoldCleanupCustody::Replayed,
                             grant_index: matching.index,
                             cost_charged: cost_units,
                             currency,
@@ -1493,6 +1514,7 @@ impl ChioKernel {
         capability_id: &str,
         charge: &BudgetChargeResult,
     ) -> Result<BudgetReverseHoldDecision, KernelError> {
+        ensure_fresh_budget_cleanup_custody(charge)?;
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
             Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
@@ -1543,6 +1565,7 @@ impl ChioKernel {
         capability_id: &str,
         charge: &BudgetChargeResult,
     ) -> Result<BudgetHoldMutationDecision, KernelError> {
+        ensure_fresh_budget_cleanup_custody(charge)?;
         let authority = charge.authorize_metadata.authority.clone();
         let decision = self.with_budget_store(|store| {
             Ok(store.cancel_captured_before_dispatch(

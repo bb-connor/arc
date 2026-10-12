@@ -121,6 +121,7 @@ fn structured_authorize_body(
             .clone()
             .ok_or_else(|| std::io::Error::other("missing test event"))?,
         BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
+            cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh,
             hold_id: request.hold_id.clone(),
             admission_binding: request.admission_binding.clone(),
             authorized_exposure_units: request.requested_exposure_units,

@@ -1694,6 +1694,7 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
 // per-invocation ceiling would produce alongside a MustPrepay quote.
 fn make_provisional_charge(cost_charged: u64, currency: &str) -> BudgetChargeResult {
     BudgetChargeResult {
+        cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody::Fresh,
         grant_index: 0,
         cost_charged,
         currency: currency.to_string(),

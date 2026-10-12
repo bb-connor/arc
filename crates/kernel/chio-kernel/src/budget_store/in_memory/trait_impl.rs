@@ -425,7 +425,13 @@ impl BudgetStore for InMemoryBudgetStore {
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let mut inner = self.lock_inner()?;
+        let sequence_before = inner.next_seq;
         let event = inner.authorize_composite_budget_hold(&request)?;
+        let cleanup_custody = if event.event_seq > sequence_before {
+            crate::budget_store::BudgetHoldCleanupCustody::Fresh
+        } else {
+            crate::budget_store::BudgetHoldCleanupCustody::Replayed
+        };
         if request.hold_id.as_deref().is_some_and(|hold_id| {
             inner
                 .holds
@@ -547,6 +553,7 @@ impl BudgetStore for InMemoryBudgetStore {
 
         Ok(BudgetAuthorizeHoldDecision::Authorized(
             BudgetHoldAuthorizationRecord {
+                cleanup_custody,
                 hold_id: event.hold_id,
                 admission_binding: event.admission_binding,
                 authorized_exposure_units: event.exposure_units,

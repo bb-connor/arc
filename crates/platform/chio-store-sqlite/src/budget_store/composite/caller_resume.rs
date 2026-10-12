@@ -154,6 +154,7 @@ impl SqliteBudgetStore {
         }
         Ok(Some(BudgetAuthorizeHoldDecision::Authorized(
             BudgetHoldAuthorizationRecord {
+                cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed,
                 hold_id: approved.hold_id,
                 admission_binding: approved.admission_binding,
                 authorized_exposure_units: hold.authorized_exposure,
