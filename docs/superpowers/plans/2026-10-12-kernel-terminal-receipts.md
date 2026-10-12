@@ -174,7 +174,7 @@ The response builders require a typed disposition supplied by the producing row.
 | Explicit unconfirmed dispatch commit | Retained |
 | Effect already executed, including cancellation or output refusal | Terminal |
 | Successful cleanup without a durable operation or remaining custody | Reusable |
-| Cleanup that leaves custody bound to the request | Terminal |
+| Unconfirmed cleanup while a durable operation still owns the request | No new terminal receipt; preserve the original owner. Drop may persist a signed observation without an execution decision |
 
 Durable admission returns a typed failure with an optional receipt disposition selected at its storage boundary. Before admission it may sign Reusable. A typed storage OutcomeUnknown permits Retained. A confirmed live operation permits no new receipt; confirmed compensation permits Terminal. The original typed error remains available to the caller.
 
@@ -210,3 +210,32 @@ No caller gains retry authority from a Terminal or Retained response. The remain
 - `39883cf4a6` composes current main, including the independently landed subscription-authority extraction. The broad owning gates run on this composed candidate. The earlier gate driver was stopped after the resource control, before its broad run.
 - The metric-isolation fix already landed in #1273 (`5f28da106f`, head `2e6ec654e2`). Duplicate #1275 was closed after verifying identical source and no unresolved review threads; its branch is preserved. No hosted qualification is inferred from that closure.
 - Cancellation #1277 is published at `a45d6b8e70`, with three focused tests and strict all-target kernel Clippy passing. Claude owns review and merge; the additional matching-saga Replayed control remains in its isolated lane.
+
+
+## Remaining receipt identity repairs
+
+The bounded source review found three P2 defects in the producer implementation.
+Complete them in the existing candidate before publication:
+
+- [ ] Require an authenticated replay-key lookup before signing Reusable. A live
+  or terminal row refuses that new receipt; a failed lookup cannot attest absence.
+  Use the admission mutation sequencer for the lookup. The observation does not
+  grant permission for any later request.
+- [ ] Sign Retained only for the typed unknown result of a submitted durable
+  commit. Known pre-write errors propagate without minting a competing receipt.
+  Apply this to caller nonce reservation, nonce issuance and capture preparation.
+- [ ] Preserve the original owner when runtime or payment cleanup is unconfirmed.
+  Drop fault evidence is a signed TraceObservation with its fault and hold IDs,
+  without an execution decision or identity disposition. Confirmed compensation
+  still permits its ordinary terminal response.
+- [ ] Run the Original controls, focused repaired controls, the full kernel
+  library suite and strict owning Clippy. Refresh reviewed source anchors and
+  generated coverage only after the repair source is complete.
+
+Test-only candidate `7dcbbdcfbd` composes the replay-identity, capture-boundary,
+Drop-fault and unconfirmed-payment controls. Its focused runtime gates are pending.
+The preceding source candidate passed 10 CLI failure-receipt controls and strict
+kernel/store/CLI Clippy. The kernel replay reconciliation passed 1,780 tests and
+failed one added assertion that queried a removed session claim; its corrected
+oracle checks the unchanged durable operation. These are local results, not hosted
+qualification of the final repair candidate.
