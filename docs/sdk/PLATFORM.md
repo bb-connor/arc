@@ -156,10 +156,7 @@ Prefer explicit forms:
 - `prompt:<prompt_name>:<operation>`
 
 Supported operations are `invoke`, `read`, `read_result`, `subscribe`, `get`,
-and `delegate`, plus operator-friendly aliases such as `call`, `exec`,
-`execute`, and `watch`. The controller also accepts a legacy shorthand
-`<tool_name>:<verb>` for tool-oriented policy, mapping `read`/`write` style
-verbs onto tool invocation.
+and `delegate`. Any other operation, and any two-part scope, is rejected.
 
 ### Trust Anchor Configuration
 
