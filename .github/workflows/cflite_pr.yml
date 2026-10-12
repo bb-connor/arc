@@ -125,7 +125,7 @@ jobs:
           head_sha="${{ github.event.pull_request.head.sha }}"
           merge_base="$(git merge-base "${base_sha}" "${head_sha}")"
           echo "merge-base: ${merge_base}"
-          git diff --name-only "${merge_base}" "${head_sha}" > changed.txt
+          git diff --no-renames --name-only "${merge_base}" "${head_sha}" > changed.txt
           mapfile -t targets < <(yq -p=toml -r '.targets | keys | .[]' \
             fuzz/target-map.toml)
           fired=()
@@ -166,7 +166,7 @@ jobs:
       - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
         run: |
-          if ! grep -E '\.rs$' changed.txt \
+          if [[ -s changed.txt ]] && ! grep -E '\.rs$|^"' changed.txt \
             | grep -vqE '(^|/)(tests|benches|examples)/|_tests(\.rs$|/)|(^|/)tests\.rs$'; then
             echo "no production Rust source changed; nothing to fuzz"
             exit 0

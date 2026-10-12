@@ -23,6 +23,7 @@ sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 LIVE = CHECKER.load_workflow(ROOT / ".github/workflows/ci.yml")
 CHILDREN = ("build-lint", "workspace-tests", "cognition-market")
+PRODUCERS = (*CHILDREN, "msrv-workspace")
 MARKET_STEP = "cognition-market promoted-default build, clippy, and tests"
 
 
@@ -34,23 +35,46 @@ class WorkspaceCiExtractionTests(unittest.TestCase):
     def test_live_workflow_preserves_required_aggregate(self) -> None:
         CHECKER.validate_build_lint_test(LIVE)
 
-    def test_aggregate_requires_every_successful_result(self) -> None:
-        body = LIVE["jobs"]["check"]["steps"][0]["run"]
-        states = ("success", "failure", "cancelled", "skipped", "", "timed_out")
-        for results in itertools.product(states, repeat=len(CHILDREN)):
-            with self.subTest(results=results):
-                command = body
-                for child, result in zip(CHILDREN, results):
-                    command = command.replace(f"${{{{ needs.{child}.result }}}}", result)
-                self.assertNotIn("${{", command)
-                result = subprocess.run(
-                    ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", command],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    check=False,
-                )
-                self.assertEqual(result.returncode == 0, set(results) == {"success"})
+    def aggregate_passes(self, job: str, docs_only: str, results: dict[str, str]) -> bool:
+        command = LIVE["jobs"][job]["steps"][0]["run"].replace(
+            "${{ needs.classify.outputs.docs_only }}", docs_only
+        )
+        for dependency, result in results.items():
+            command = command.replace(f"${{{{ needs.{dependency}.result }}}}", result)
+        self.assertNotIn("${{", command)
+        return subprocess.run(
+            ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        ).returncode == 0
+
+    def test_aggregates_accept_only_full_runs_or_classified_documentation(self) -> None:
+        states = ("success", "failure", "skipped", "")
+        for job, children, gates in (
+            ("check", CHILDREN, ("docs-gates",)),
+            ("msrv", ("msrv-workspace",), ()),
+        ):
+            for docs_only, classify, results in itertools.product(
+                ("true", "false", ""),
+                ("success", "failure"),
+                itertools.product(states, repeat=len(children) + len(gates)),
+            ):
+                gate_results, child_results = results[:len(gates)], results[len(gates):]
+                if docs_only == "true":
+                    expected = set(gate_results) <= {"success"} and set(child_results) == {"skipped"}
+                else:
+                    expected = set(gate_results) <= {"skipped"} and set(child_results) == {"success"}
+                with self.subTest(job=job, docs_only=docs_only, classify=classify, results=results):
+                    self.assertEqual(
+                        self.aggregate_passes(
+                            job,
+                            docs_only,
+                            {"classify": classify, **dict(zip((*gates, *children), results))},
+                        ),
+                        expected and classify == "success",
+                    )
 
     def test_aggregate_refuses_missing_dependencies_or_final_evaluation(self) -> None:
         for key in ("needs", "if", "steps"):
@@ -84,25 +108,44 @@ class WorkspaceCiExtractionTests(unittest.TestCase):
             with self.subTest(child=child):
                 self.rejected(changed, "exact unique aggregate")
 
-    def test_children_cannot_be_conditional_or_tolerate_failure(self) -> None:
+    def test_children_skip_only_for_classified_documentation(self) -> None:
         for child, field in itertools.product(
-            CHILDREN,
+            PRODUCERS,
             ("if", "continue-on-error", "strategy", "needs", "env", "container"),
         ):
             changed = copy.deepcopy(LIVE)
             changed["jobs"][child][field] = "false"
             with self.subTest(child=child, field=field):
-                self.rejected(changed, "unconditional execution contract")
+                self.rejected(changed, "changes its execution contract")
 
     def test_children_keep_host_and_original_budget(self) -> None:
         for child, (field, value) in itertools.product(
-            CHILDREN,
+            PRODUCERS,
             (("runs-on", "windows-latest"), ("timeout-minutes", "361")),
         ):
             changed = copy.deepcopy(LIVE)
             changed["jobs"][child][field] = value
             with self.subTest(child=child, field=field):
-                self.rejected(changed, "unconditional execution contract")
+                self.rejected(changed, "changes its execution contract")
+
+    def test_classifier_and_documentation_gates_are_exact(self) -> None:
+        for job, path, value, message in (
+            ("msrv", ("if",), "${{ success() }}", "MSRV build and test changes"),
+            ("msrv", ("needs",), ["classify"], "MSRV build and test changes"),
+            ("classify", ("steps", 1, "run"), "echo docs_only=true", "classifier job changed"),
+            ("classify", ("steps", 0, "with", "fetch-depth"), "1", "classifier job changed"),
+            ("classify", ("continue-on-error",), "true", "classifier job changed"),
+            ("docs-gates", ("if",), "${{ always() }}", "documentation gates job"),
+            ("docs-gates", ("steps", -1, "run"), "true", "documentation-only content gates"),
+            ("docs-gates", ("steps", -1, "if"), "false", "documentation-only content gates"),
+        ):
+            changed = copy.deepcopy(LIVE)
+            target = changed["jobs"][job]
+            for key in path[:-1]:
+                target = target[key]
+            target[path[-1]] = value
+            with self.subTest(job=job, path=path):
+                self.rejected(changed, message)
 
     def test_workspace_command_cannot_filter_targets_tests_or_features(self) -> None:
         for suffix in (" --lib", " --tests", " --features iroh", " -- --skip security", " -- --ignored"):
@@ -202,7 +245,7 @@ class WorkspaceCiExtractionTests(unittest.TestCase):
 
     def test_market_suite_cannot_reappear_in_another_job(self) -> None:
         market = LIVE["jobs"]["cognition-market"]["steps"][-1]
-        for child in ("build-lint", "msrv"):
+        for child in ("build-lint", "msrv-workspace"):
             changed = copy.deepcopy(LIVE)
             changed["jobs"][child]["steps"].append(copy.deepcopy(market))
             with self.subTest(child=child):

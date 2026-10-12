@@ -662,10 +662,10 @@ SERIAL_FIXTURE_STEPS = (
         "cognition-market promoted-default build, clippy, and tests",
         "required CI cognition market evidence",
     ),
-    ("msrv", "MSRV workspace lane", "MSRV evidence"),
+    ("msrv-workspace", "MSRV workspace lane", "MSRV evidence"),
 )
 live_ci = CHECKER.load_workflow(ROOT / ".github/workflows/ci.yml")
-if CHECKER.job(live_ci, "msrv").get("timeout-minutes") != "360":
+if CHECKER.job(live_ci, "msrv-workspace").get("timeout-minutes") != "360":
     raise AssertionError("MSRV serial workspace budget must be exactly 360 minutes")
 for label, replacement in (
     ("removed", ""),
@@ -676,7 +676,7 @@ for label, replacement in (
     assert_rejected(
         f"MSRV serial workspace budget {label}",
         "ci.yml",
-        replace_in_named_job("msrv", "    timeout-minutes: 360\n", replacement),
+        replace_in_named_job("msrv-workspace", "    timeout-minutes: 360\n", replacement),
         "MSRV serial workspace budget must be exactly 360 minutes",
     )
 for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
@@ -702,9 +702,9 @@ for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
         replace_in_named_step(
             step_name, "cargo test ", "RUST_TEST_THREADS=2 cargo test "
         ),
-        error_context if job_id == "msrv" else "required CI",
+        error_context if job_id == "msrv-workspace" else "required CI",
     )
-for python_job in ("build-lint", "workspace-tests", "msrv"):
+for python_job in ("build-lint", "workspace-tests", "msrv-workspace"):
     for dependency in ("jsonschema==4.26.0", "referencing==0.37.0"):
         assert_rejected(
             f"{python_job} omits {dependency}",
