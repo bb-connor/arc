@@ -1,0 +1,6 @@
+tree 4aa5f30e0b26d6a7306b22a61659be11dcda47fb
+parent 836c8c3b9385e9266a98e85d23042356b413bc78
+author Stefan Krah <libmpdec4@gmail.com> 1747319284 +0000
+committer Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1747406985 +0000
+
+main/mpdecimal: upgrade to 4.0.1

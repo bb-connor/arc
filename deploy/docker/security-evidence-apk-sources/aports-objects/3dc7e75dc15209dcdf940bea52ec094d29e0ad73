@@ -1,0 +1,8 @@
+tree 2ee5b04e14dbf65ea225b6c54c5e3225ce3c4acb
+parent 23f27af757717cb3fd4a598014c84df57074f546
+author omni <omni+alpine@hack.org> 1774886104 +0000
+committer omni <omni+alpine@hack.org> 1775168438 +0000
+
+main/perl: upgrade to 5.40.4
+
+we avoid bundling vendored zlib, nack CVE

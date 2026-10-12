@@ -1,0 +1,855 @@
+# chio.attribution-lines.v8 origin=perl files=6891 files_with_lines=1087 binary_heads=24 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perl.c	\t\t      "\\n\\nCopyright 1987-2026, Larry Wall\\n");
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/run/switches.t	\t      qr/This is perl 5, version \\Q$ver\\E, subversion \\Q$rel\\E \\(v\\Q$v\\E(?:[-*\\w]+| \\([^)]+\\))?\\) built for \\Q$Config{archname}\\E.+Copyright.+Larry Wall.+Artistic License.+GNU General Public License/s,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-SHA/shasum	\t## Copyright (C) 2003-2023 Mark Shelor, All Rights Reserved
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/ChangeLog	\t- Changed copyright/distribution policy back to be the same as perl
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/Changes	\t- Moved Copyright section to perldoc
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/Changes	\t- add copyright 2005 to HiRes.pm
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/Changes	\t- add copyright and license to HiRes.xs
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/Changes	\t- add copyrights 2003, 2004, 2005 to README
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/Changes	\t- add jhi's copyright alongside Douglas'
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/ChangeLog	\t- change copyright notice
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/Changes	\t- update Copyright years
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	\tCopyright (C) Year, Year, ... by Someone
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	\tCopyright (C) Year, Year, ... by Someone and others
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamesList.txt	\tx (copyright sign - 00A9)
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamesList.txt	\tx (sound recording copyright - 2117)
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.clr	\x1b[1mCOPYRIGHT AND LICENSE\x1b[0m
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.cap	\x1b[1mCOPYRIGHT AND LICENSE\x1b[m
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/regcharclass.pl	                                 copyright => [2007, 2011],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perl.c	                      "Version 5 port Copyright (c) 1994-2002, Andreas Kaiser, Ilya Zakharevich\\n");
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perl.c	                      "\\n\\nOS/2 port Copyright (c) 1990, 1991, Raymond Chen, Kai Uwe Rommel\\n"
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/embed.pl	                      copyright => [1993 .. 2022],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/reentr.pl	                      copyright => [2002, 2003, 2005 .. 2024],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/locale.pl	                      copyright => [2023..2024],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/keywords.pl	                   copyright => [1994 .. 1997, 1999 .. 2002, 2005 .. 2007]});
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/overload.pl	                   file => 'lib/overload/numbers.pm', copyright => [2008] });
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/README	               Copyright (c) 1995-2000, Raphael Manfredi
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/README	               Copyright (c) 2001-2004, Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/README	               Copyright (c) 2016,2017 cPanel Inc
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/overload.pl	               copyright => [1997, 1998, 2000, 2001, 2005 .. 2007, 2011] });
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/AutoLoader/lib/AutoLoader.pm	             Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/PPPort_pm.PL	             Copyright (C) 2018-2020, The perl5 porters
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/lib/Pod/Simple/PullParser.pm	             | COPYRIGHT | LICENSE | NOTES? | FUNCTIONS? | METHODS?
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Attribute-Handlers/lib/Attribute/Handlers.pm	         Copyright (c) 2001-2014, Damian Conway. All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	        "Copyright Holder" is whoever is named in the copyright or
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlebcdic.pod	        $char =~ /[\xc2\xa0¡¢£¤¥¦§¨©ª«¬\xc2\xad®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ]
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	        '.github/README.md and perl -v copyright dates match');
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	        '.github/README.md copyright includes current year');
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	        Copyright Holder, and derivatives of that collection of files
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	        Copyright Holder, but only to the computing community at large
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/constant/Changes	        [DOC] The copyright section is also the license.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/opcode.pl	        copyright   => [2014 .. 2014],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/opcode.pl	        copyright => [1993 .. 2007],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/opcode.pl	        copyright => [1999 .. 2008],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/scope_types.pl	        copyright => [2022],
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	        copyrights for the package.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	        of the Copyright Holder as specified below.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/corpus/CL018_yaml.meta	      "Olivier MenguÃ© <dolmen@cpan.org>",
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/scope_types.h	      Copyright (C) 2022 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	      or die "Copyright statement not found in perl -v output '$output'";
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	      or die "Year not found in $file copyright message '$copyright_msg'";
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/inline.h	     * comprehensive documentation of the original version.  A copyright notice
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	     Copyright (C) 19yy  <name of author>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/version.c	     Copyright (c) 1995-2002 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/DB_File.xs	     Copyright (c) 1995-2023 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	     Gnomovision version 69, Copyright (C) 19xx name of author
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	     display an announcement including an appropriate copyright notice
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	     such as ftp.uu.net, or by allowing the Copyright Holder to include your
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/op/split_unicode.t	    # Copyright (c) 1991-2006 Unicode, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/hints/linux.sh	    # followed by a copyright on the second line
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	    Copyright (C) 19yy  <name of author>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Filter-Simple/lib/Filter/Simple.pm	    Copyright (c) 2000-2014, Damian Conway. All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest/lib/Digest.pm	    Copyright 1995,1996 Neil Winton.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest/lib/Digest.pm	    Copyright 1998-2006 Gisle Aas.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.cap	    Copyright 2001, 2004, 2016, 2018 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlpodstyle.pod	    Copyright YEAR(s) YOUR NAME(s)
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	    Gnomovision version 69, Copyright (C) 19xx name of author
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	    announcement including an appropriate copyright notice and a notice
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	    d) make other distribution arrangements with the Copyright Holder.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/regen_lib.pl	    if ($args{copyright}) {
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/op/sprintf2.t	    my $string = "\\xB4"x$i;        # latin1 ACUTE or ebcdic COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	    not be required to justify it to the Copyright Holder, but only to the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	    or has been modified in accordance with the wishes of the Copyright
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.clr	    permitted in any medium without royalty provided the copyright notice
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.cap	    permitted in any medium without royalty provided the copyright notice and
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	    site such as uunet.uu.net, or by allowing the Copyright Holder to include
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/deflate.c	   " deflate 1.3.2 Copyright 1995-2026 Jean-loup Gailly and Mark Adler ";
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/inftrees.c	   " inflate 1.3.2 Copyright 1995-2026 Mark Adler ";
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perly.h	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
+line	9	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Bzip2/bzip2-src/blocksort.c	   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/XS-Typemap/Typemap.xs	   Copyright (C) 2001 Tim Jenness.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	   We protect your rights with two steps: (1) copyright the software,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	   Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  # The copyright message is the first paragraph:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zconf.h	  #pragma map(inflate_copyright,"INCOPY")
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	  - "Copyright Holder" is whoever is named in the copyright or copyrights for
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	  - "Package" refers to the collection of files distributed by the Copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/INSTALL	  /usr/share/doc/perl/copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	  Copyright (C) 1989 Free Software Foundation, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zlib.h	  Copyright (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/Zlib.xs	  Copyright (C) 2003 Mark Adler, all rights reserved
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/Base64.xs	  Copyright (c) 1991 Bell Communications Research, Inc. (Bellcore)
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	  We protect your rights with two steps: (1) copyright the software, and
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/deflate.c	  copyright string in the executable of your product.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	  d) make other distribution arrangements with the Copyright Holder.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  is $readme_year, $current_year, 'README copyright includes current year';
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  is $readme_year, $v_year, 'README and perl -v copyright dates match';
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  is $v_year, $current_year, 'perl -v copyright includes current year';
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  my $copyright_msg = <$readme>;
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  my ($year) = $copyright_msg =~ /.*\\b(\\d{4,})/s
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	  my ($year) = $output =~ /copyright 1987.*\\b(\\d{4,})/i
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/ppphbin	  my($copy) = $self =~ /^=head\\d\\s+COPYRIGHT\\s*^(.*?)^=\\w+/ms;
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/Base64.xs	  that the above copyright notice and this permission notice
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/release_managers_guide.pod	 $ pushd t; ../perl -I../lib porting/copyright.t --now
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/regcomp.c	 *\tCopyright (c) 1986 by University of Toronto.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/B/B.xs	 *\tCopyright (c) 1996 Malcolm Beattie
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/regcomp.h	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+line	20	perl-5.40.4.tar.xz:perl-5.40.4/av.c	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mg.h	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/handy.h	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cv.h	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/deb.c	 *    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/EXTERN.h	 *    Copyright (C) 1991, 1992, 1993, 1995, 1996, 1997, 1998, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/av.h	 *    Copyright (C) 1991, 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/INTERN.h	 *    Copyright (C) 1991, 1992, 1993, 1995, 1996, 1998, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/hv.h	 *    Copyright (C) 1991, 1992, 1993, 1996, 1997, 1998, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/util.h	 *    Copyright (C) 1991, 1992, 1993, 1999, 2001, 2002, 2003, 2004, 2005,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/form.h	 *    Copyright (C) 1991, 1992, 1993, 2000, 2004, 2011 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/peep.c	 *    Copyright (C) 1991-2022 by Larry Wall and others
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/perl.c	 *    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
+line	10	perl-5.40.4.tar.xz:perl-5.40.4/embed.h	 *    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/unixish.h	 *    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dosish.h	 *    Copyright (C) 1993, 1994, 1996, 1997, 1998, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/scope.h	 *    Copyright (C) 1993, 1994, 1996, 1997, 1998, 1999, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regexp.h	 *    Copyright (C) 1993, 1994, 1996, 1997, 1999, 2000, 2001, 2003,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/patchlevel.h	 *    Copyright (C) 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/vms.c	 *    Copyright (C) 1993-2015 by Charles Bailey and others.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/XSUB.h	 *    Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm	 *    Copyright (C) 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2003,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/keywords.h	 *    Copyright (C) 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2005,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pp_sys.c	 *    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/globals.c	 *    Copyright (C) 1995, 1999, 2000, 2001, 2008 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perlsdio.h	 *    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/universal.c	 *    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perlio.h	 *    Copyright (C) 1996, 1997, 1999, 2000, 2001, 2002, 2003,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/nostdio.h	 *    Copyright (C) 1996, 2000, 2001, 2005, by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/intrpvar.h	 *    Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/overload.h	 *    Copyright (C) 1997, 1998, 2000, 2001, 2005, 2006, 2007, 2011
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/thread.h	 *    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/opnames.h	 *    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/attributes/attributes.xs	 *    Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utf8.c	 *    Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utf8.h	 *    Copyright (C) 2000, 2001, 2002, 2005, 2006, 2007, 2009,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/fakesdio.h	 *    Copyright (C) 2000, by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utfebcdic.h	 *    Copyright (C) 2001, 2002, 2003, 2005, 2006, 2007, 2009,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pad.c	 *    Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pad.h	 *    Copyright (C) 2002, 2003, 2005, 2006, 2007, 2008,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/reentr.c	 *    Copyright (C) 2002, 2003, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mathoms.c	 *    Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/Win32CORE/Win32CORE.c	 *    Copyright (C) 2007 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regcharclass.h	 *    Copyright (C) 2007, 2011 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mydtrace.h	 *    Copyright (C) 2008, 2010, 2011 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/op_reg_common.h	 *    Copyright (C) 2010, 2011 by Larry Wall and others
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/inline.h	 *    Copyright (C) 2012 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/caretx.c	 *    Copyright (C) 2013
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perlstatic.h	 *    Copyright (C) 2020 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/builtin.c	 *    Copyright (C) 2021 by Paul Evans and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/sv_inline.h	 *    Copyright (C) 2022 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/class.c	 *    Copyright (C) 2022 by Paul Evans and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/locale_table.h	 *    Copyright (C) 2023, 2024 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perly.y	 *    Copyright (c) 1991-2002, 2003, 2004, 2005, 2006 Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/DynaLoader/dl_freemint.xs	 *    Copyright (c) 1994, Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.xs	 *    Copyright (c) 1995-2011 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/threads-shared/shared.xs	 *    Copyright (c) 2001-2002, 2006 Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perly.c	 *    Copyright (c) 2004, 2005, 2006, 2007, 2008,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/parser.h	 *    Copyright (c) 2006, 2007, 2009, 2010, 2011 Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mro_core.c	 *    Copyright (c) 2007 Brandon L Black
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mro_core.c	 *    Copyright (c) 2007, 2008, 2009, 2010, 2011 Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perly.y	 *    Copyright (c) 2007, 2008, 2009, 2010, 2011 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.xs	 *    Copyright (c) 2011-2014, 2018 Reini Urban. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perly.c	 *    Here is an important copyright statement from the original, generated
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/inline.h	 *    copyright notice:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/Zlib.xs	 *   Copyright (c) 1995-2013 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Bzip2/Bzip2.xs	 *   Copyright (c) 2005-2010 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/vms.c	 *  Copyright (C) 1989-1994, 2007 by                                         *
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.xs	 *  Copyright (c) 1995-2000, Raphael Manfredi
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.xs	 *  Copyright (c) 2016, 2017 cPanel Inc
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.xs	 *  Copyright (c) 2017 Reini Urban
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.xs	 *  Copyright 1991-1992 RSA Data Security, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.xs	 *  Copyright 1995-1996 Neil Winton.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/vms.c	 *  Copyright 1996 by Charles Bailey <bailey@newman.upenn.edu>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.xs	 *  Copyright 1998-2000 Gisle Aas.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/vms.c	 *  on condition that this copyright notice is included in source            *
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/win32/win32.c	 * (c) 1995 Microsoft Corporation. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/win32/win32sck.c	 * (c) 1995 Microsoft Corporation. All rights reserved.\x20
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/win32/perlhost.h	 * (c) 1999 Microsoft Corporation. All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/win32/vdir.h	 * (c) 1999 Microsoft Corporation. All rights reserved.\x20
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Sys-Syslog/fallback/syslog.h	 * 1. Redistributions of source code must retain the above copyright
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Sys-Syslog/fallback/syslog.h	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.xs	 * Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/Zlib.xs	 * Copyright (C) 1995 Jean-loup Gailly.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/inffast.h	 * Copyright (C) 1995-2003, 2010 Mark Adler
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/adler32.c	 * Copyright (C) 1995-2011, 2016 Mark Adler
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/inflate.h	 * Copyright (C) 1995-2019 Mark Adler
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/deflate.h	 * Copyright (C) 1995-2026 Jean-loup Gailly
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/deflate.c	 * Copyright (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/compress.c	 * Copyright (C) 1995-2026 Jean-loup Gailly, Mark Adler
+line	6	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/crc32.c	 * Copyright (C) 1995-2026 Mark Adler
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-SHA/src/sha.c	 * Copyright (C) 2003-2023 Mark Shelor, All Rights Reserved
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/HiRes.xs	 * Copyright (C) 2011, 2012, 2013 Andrew Main (Zefram) <zefram@fysh.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Sys-Syslog/fallback/syslog.h	 * Copyright (c) 1982, 1986, 1988, 1993
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/ext/File-Glob/bsd_glob.c	 * Copyright (c) 1989, 1993
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Time-Piece/Piece.xs	 * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/HiRes.xs	 * Copyright (c) 1996-2002 Douglas E. Wegscheid.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perlio.c	 * Copyright (c) 1996-2006, Nick Ing-Simmons
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/IO.xs	 * Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/HiRes.xs	 * Copyright (c) 2002-2010 Jarkko Hietaniemi.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/Cwd.xs	 * Copyright (c) 2003 Constantin S. Svintsoff <kostik@iclub.nsu.ru>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perlio.c	 * Copyright (c) 2006, 2007, 2008, 2009, 2010, 2011 Larry Wall and others
+line	18	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/adler32.c	 * For conditions of distribution and use, see copyright notice in zlib.h
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/malloc.c	 * Modifications Copyright Ilya Zakharevich 1996-99.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/win32/win32.c	 * Portions (c) 1993 Intergraph Corporation. All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/win32/perlhost.h	 * Portions (c) 1999 ActiveState Tool Corp, http://www.ActiveState.com/
+line	7	perl-5.40.4.tar.xz:perl-5.40.4/ebcdic_tables.h	 * See copyright notice at the beginning of this file.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/DynaLoader/dl_aix.xs	 * This is an unpublished work copyright (c) 1992 Helios Software GmbH
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/inline.h	 * documentation of the original version.  A copyright notice for the original
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/perl.h	 * https://bjoern.hoehrmann.de/utf-8/decoder/dfa/, which requires this copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/Zlib.xs	 * the standard zlib source distribution. Below are the copyright statements
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/ebcdic_tables.h	 * which requires this copyright notice:
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/regcomp.c	 ****    Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/Changes	 - Added a COPYRIGHT section to the documentation.  [Spotted by Ville
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/Changes	 - Added licensing/copyright statements to the POD in each .pm
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/Changes	 - Updated copyright and maintainer list
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlebcdic.pod	 <COPYRIGHT SIGN>            169  180  180  180  194.169  128.74
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlebcdic.pod	 <COPYRIGHT SIGN>            A9   B4   B4   B4   C2.A9    80.4A
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	 Copyright (C) 1989 Free Software Foundation, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodlib.PL	 Copyright (c) 1995 Your Name. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/NEXT/lib/NEXT.pm	 Copyright (c) 2000-2001, Damian Conway. All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	 Copyright 1991-1992 RSA Data Security, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	 Copyright 1995-1996 Neil Winton.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	 Copyright 1998-2003 Gisle Aas.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 author to ask for permission.  For software which is copyrighted by the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 contains a notice placed by the copyright holder saying it may be
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 copyright notice and disclaimer of warranty; keep intact all the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/lib/CPAN/Meta/Spec.pm	 restricted      Requires special permission from copyright holder
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlgpl.pod	 the "copyright" line and a pointer to where the full notice is found.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	"copyright" line and a pointer to where the full notice is found.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/PPPort_pm.PL	#               Copyright (C) 2018, The perl5 porters
+line	10	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-1.ucm	#       Copyright (c) 1991-1999 Unicode, Inc.  All Rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/koi8-u.ucm	#       Copyright (c) 1991-2008 Unicode, Inc.  All Rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-13.ucm	#       Copyright (c) 1998 - 1999 Unicode, Inc.  All Rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-10.ucm	#       Copyright (c) 1999 Unicode, Inc.  All Rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-16.ucm	#       Copyright (c) 1999-2001 Unicode, Inc.  All Rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-11.ucm	#       Copyright (c) 2002 Unicode, Inc.  All Rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/B/B.pm	#      Copyright (c) 1996, 1997, 1998 Malcolm Beattie
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/mro/mro.pm	#      Copyright (c) 2007 Brandon L Black
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/mro/mro.pm	#      Copyright (c) 2008,2009 Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/DB_File.pm	#     Copyright (c) 1995-2023 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/dbinfo	#     Copyright (c) 1998-2023 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/overload/numbers.pm	#    Copyright (C) 2008 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/B/Op_private.pm	#    Copyright (C) 2014 by Larry Wall and others
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/Makefile.PL	#   Copyright (C) 2014-2015, 2020 Steve Hay.  All rights reserved.
+line	7	perl-5.40.4.tar.xz:perl-5.40.4/cpan/PerlIO-via-QuotedPrint/t/changes.t	#   Copyright (C) 2015 Steve Hay.  All rights reserved.
+line	2	perl-cross-1.6.2.tar.gz.noauto:perl-cross-1.6.2/cnf/config.guess	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/adobeStdenc.ucm	#  Copyright (c) 1991-2011 Unicode, Inc. All Rights reserved.
+line	17	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Makefile.PL	#  Copyright (c) 1995-2000, Raphael Manfredi
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.pm	#  Copyright (c) 1995-2001, Raphael Manfredi
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/code.t	#  Copyright (c) 2002 Slaven Rezic
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.pm	#  Copyright (c) 2002-2014 by the Perl 5 Porters
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.pm	#  Copyright (c) 2015-2016 cPanel Inc
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Storable.pm	#  Copyright (c) 2017 Reini Urban
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/Makefile.PL	#  Copyright (c) 2017, Reini Urban
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/retrieve.t	#  Copyright (c) 2017, cPanel Inc
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/downgrade.t	#  Copyright 2002, Larry Wall.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/weak.t	#  Copyright 2004, Larry Wall.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/attach_errors.t	#  Copyright 2005, Adam Kennedy.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/lib/IPC/Msg.pm	#  Version 1.x, Copyright (C) 1997, Graham Barr <gbarr@pobox.com>.
+line	8	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/Makefile.PL	#  Version 1.x, Copyright (C) 1999, Graham Barr <gbarr@pobox.com>.
+line	18	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/apicheck_c.PL	#  Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
+line	18	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/apicheck_c.PL	#  Version 2.x, Copyright (C) 2001, Paul Marquess.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/io/shm.t	#  Version 2.x, Copyright (C) 2007-2010, Marcus Holland-Moritz <mhx@cpan.org>.
+line	11	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/lib/IPC/Msg.pm	#  Version 2.x, Copyright (C) 2007-2013, Marcus Holland-Moritz <mhx@cpan.org>.
+line	18	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/apicheck_c.PL	#  Version 3.x, Copyright (C) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zconf.h	#  define deflate_copyright     Perl_crz_deflate_copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zconf.h	#  define inflate_copyright     Perl_crz_inflate_copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Storable/t/forgive.t	# (C) Copyright 1997, Universitat Dortmund, all rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/File/Copy.pm	# Additions copyright 1996 by Charles Bailey.  Permission is granted
+line	9	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta-YAML/t/10_read.t	# COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	# Check that both copyright dates are up-to-date, but only if requested, so
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/configpm	# Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Checker/lib/Pod/Checker.pm	# Copyright (C) 1994-2000 by Bradford Appleton. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/NNTP.pm	# Copyright (C) 1995-1997 Graham Barr.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Domain.pm	# Copyright (C) 1995-1998 Graham Barr.  All rights reserved.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/FTP.pm	# Copyright (C) 1995-2004 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Cmd.pm	# Copyright (C) 1995-2006 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Usage/t/inc/Pod/InputObjects.pm	# Copyright (C) 1996-2000 by Bradford Appleton. All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Usage/t/inc/Pod/Parser.pm	# Copyright (C) 1996-2000 by Bradford Appleton. All rights reserved.\r
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	# Copyright (C) 1997-2001 Damian Conway.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Config.pm	# Copyright (C) 2000 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/B/B/Concise.pm	# Copyright (C) 2000-2003 Stephen McCamant. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/PerlIO-via-QuotedPrint/lib/PerlIO/via/QuotedPrint.pm	# Copyright (C) 2002-2004, 2012 Elizabeth Mattijsen.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/config_h.pl	# Copyright (C) 2005-2020 by H.Merijn Brand (m)'20 [23-08-2020]
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	# Copyright (C) 2009 Adam Kennedy.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Config.pm	# Copyright (C) 2013-2014, 2016, 2020 Steve Hay.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Domain.pm	# Copyright (C) 2013-2014, 2020 Steve Hay.  All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/NNTP.pm	# Copyright (C) 2013-2016, 2020 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Cmd.pm	# Copyright (C) 2013-2016, 2020, 2022 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/FTP.pm	# Copyright (C) 2013-2017, 2020, 2022 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Time.pm	# Copyright (C) 2014, 2020 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/PerlIO-via-QuotedPrint/lib/PerlIO/via/QuotedPrint.pm	# Copyright (C) 2015 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	# Copyright (C) 2015, 2022 Steve Hay and other contributors.  All rights
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Locale-Maketext-Simple/t/po_without_i_default/en.po	# Copyright (C) All Perl Hackers everywhere
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/FindBin/lib/FindBin.pm	# Copyright (c) 1995 Graham Barr & Nick Ing-Simmons. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	# Copyright (c) 1995-2011 Paul Marquess. All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Usage/lib/Pod/Usage.pm	# Copyright (c) 1996-2000 by Bradford Appleton. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Pipe.pm	# Copyright (c) 1996-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/Scalar/Util.pm	# Copyright (c) 1997-2007 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/List/Util.pm	# Copyright (c) 1997-2009 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	6	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Dir.pm	# Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Checker/scripts/podchecker.PL	# Copyright (c) 1998-2000 by Bradford Appleton. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/B/Deparse.pm	# Copyright (c) 1998-2000, 2002, 2003, 2004, 2005, 2006 Stephen McCamant.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Zlib/Zlib.pm	# Copyright (c) 1998-2004 Tom Hughes <tom@compton.nu>.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Usage/lib/Pod/Usage.pm	# Copyright (c) 2001-2016 by Marek Rouchal.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen_perly.pl	# Copyright (c) 2004, 2005, 2006, 2009, 2010, 2011 Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	# Copyright (c) 2011-2014, 2018-2022 Reini Urban. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/Sub/Util.pm	# Copyright (c) 2014 Paul Evans <leonerd@leonerd.org.uk>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	# Copyright (c) 2014-2017 cPanel Inc. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/basic.t	# Copyright 1997-1998, 2000-2002, 2005-2006, 2009-2010, 2012, 2014, 2020
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Memoize/Memoize.pm	# Copyright 1998, 1999, 2000, 2001, 2012 M. J. Dominus.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Usage/t/inc/Pod/PlainText.pm	# Copyright 1999-2000 by Russ Allbery <rra@stanford.edu>\r
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/Makefile.PL	# Copyright 1999-2001, 2008, 2010, 2012, 2014-2016, 2018-2019, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/docs/docknot.yaml	# Copyright 1999-2010, 2012-2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/parselink/basic.t	# Copyright 2001, 2009, 2018, 2020, 2022 by Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/general/basic.t	# Copyright 2001-2002, 2004, 2006, 2009, 2012, 2014-2015, 2018-2019, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/heading.t	# Copyright 2002, 2004, 2006, 2008-2009, 2012, 2015, 2018-2019, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/snippets.t	# Copyright 2002, 2004, 2006, 2008-2009, 2012-2013, 2015-2016, 2018-2020, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/utf8-io.t	# Copyright 2002, 2004, 2006, 2008-2010, 2012, 2014-2015, 2018-2020, 2022
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/text/color.t	# Copyright 2002, 2004, 2006, 2009, 2012-2013, 2018-2019
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/text/termcap.t	# Copyright 2002, 2004, 2006, 2009, 2012-2014, 2018-2019, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/text/snippets.t	# Copyright 2002, 2004, 2006-2009, 2012, 2018-2020, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/text/utf8-io.t	# Copyright 2002, 2004, 2006-2010, 2012, 2014, 2018, 2020, 2022
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/general/pod-parser.t	# Copyright 2006, 2008-2009, 2012, 2015, 2018-2019 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/general/filehandle.t	# Copyright 2006, 2009, 2012, 2014-2016, 2018-2019 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/devise-date.t	# Copyright 2009, 2014-2015, 2018-2019, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/stringify.t	# Copyright 2011 Revilo Reegiles
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/stringify.t	# Copyright 2011, 2014, 2020 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perlcriticrc	# Copyright 2011-2013
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/basic256.t	# Copyright 2012 Kurt Starsinic <kstarsinic@gmail.com>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/aliases-func.t	# Copyright 2012, 2020 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perltidyrc	# Copyright 2012-2013
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/basic256.t	# Copyright 2012-2013, 2016, 2020 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/docs/pod.t	# Copyright 2012-2014
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/eval.t	# Copyright 2012-2014, 2020 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/empty.t	# Copyright 2013, 2016, 2018-2019, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/text/invalid.t	# Copyright 2013, 2018, 2020, 2022 Russ Allbery <rra@cpan.org>
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/docs/pod-spelling.t	# Copyright 2013-2014
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/devise-title.t	# Copyright 2015-2016, 2018-2019 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/no-encode.t	# Copyright 2016 Niko Tyni <ntyni@iki.fi>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/no-encode.t	# Copyright 2016, 2018-2019, 2022 Russ Allbery <rra@cpan.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/style/obsolete-strings.t	# Copyright 2016, 2018-2021 Russ Allbery <eagle@eyrie.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/man/iso-8859-1.t	# Copyright 2016, 2019, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/docs/spdx-license.t	# Copyright 2018-2021 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perlcriticrc	# Copyright 2018-2022 Russ Allbery <eagle@eyrie.org>
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/docs/pod-spelling.t	# Copyright 2019, 2021 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/style/critic.t	# Copyright 2019-2022 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/module/true-color.t	# Copyright 2020 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate/allkeys.txt	# Copyright 2020 Unicode, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/docs/changes.t	# Copyright 2021 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perltidyrc	# Copyright 2021-2022 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/style/kwalitee.t	# Copyright 2022 Russ Allbery <eagle@eyrie.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/regenerate-data	# Copyright 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	# Otherwise simply check that the two copyright dates match each other:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/gen_shrfls.pl	# Symbol shortening Copyright (c) 2012 Craig A. Berry
+line	11	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perlcriticrc	# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	11	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perlcriticrc	# The above copyright notice and this permission notice shall be included in
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/lib/CPAN/Meta/Validator.pm	# _uri_split taken from URI::Split by Gisle Aas, Copyright 2003
+line	16	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Man.pm	# copyright-at-end-flag: t
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/perltidyrc	# permitted in any medium without royalty provided the copyright notice and
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	# returns the latest copyright year from the top-level README file
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	# returns the latest copyright year shown in perl -v
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Configure	# script belongs to the public domain and cannot be copyrighted.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamedSequences.txt	# © 2021 Unicode®, Inc.
+line	51	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/ArabicShaping.txt	# © 2022 Unicode®, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/mess	##  Copyright (C) 2017, Pali <pali@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/01_test	##  Copyright (C) 2019, Pali <pali@cpan.org>
+line	38	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/call	##  Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
+line	38	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/call	##  Version 2.x, Copyright (C) 2001, Paul Marquess.
+line	38	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/call	##  Version 3.x, Copyright (C) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/win32/bin/search.pl	## Copyright 19.... ah hell, just take it.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/snippets/README.md	## Copyright and license
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utils/h2xs.PL	#=head1 COPYRIGHT AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/at-tw.t	'\xb7P\xc1©Ҧ\xb3\xa8ϥ\xce Perl \x9d\xef\xaaB\xa4͡A\xb5\xb9\xa7ڒ]\x9d\xef\xa4\xe4\xab\xf9\xa1B\xb7N\xa8\xa3\xa9M\xb9\xaa\xc0y',
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	(You will not be required to justify it to the Copyright Holder, but
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/SysV.xs	*  Version 1.x, Copyright (C) 1999, Graham Barr <gbarr@pobox.com>.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/module2.c	*  Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/module2.c	*  Version 2.x, Copyright (C) 2001, Paul Marquess.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/SysV.xs	*  Version 2.x, Copyright (C) 2007-2013, Marcus Holland-Moritz <mhx@cpan.org>.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/module2.c	*  Version 3.x, Copyright (C) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/util.c	* Copyright (c) 1993 Martin Birgmeier
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/util.c	* code provided that the above copyright notice and this and the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/vms/vms.c	** Copyright 1996 by Charles Bailey  <bailey@newman.upenn.edu>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.man	.IX Header "COPYRIGHT AND LICENSE"
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.man	.SH "COPYRIGHT AND LICENSE"
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/l1_char_class_tab.h	/* 0xB4 U+A9 I8=DD COPYRIGHT */ (1U<<CC_GRAPH_)|(1U<<CC_PRINT_)|(1U<<CC_QUOTEMETA_),
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/l1_char_class_tab.h	/* 0xB4 U+A9 I8=DE COPYRIGHT */ (1U<<CC_GRAPH_)|(1U<<CC_PRINT_)|(1U<<CC_QUOTEMETA_),
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/win32/fcrypt.c	/* Copyright (C) 1993 Eric Young - see README for more details */
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/ListUtil.xs	/* Copyright (c) 1997-2000 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/l1_char_class_tab.h	/* U+A9 COPYRIGHT */ (1U<<CC_GRAPH_)|(1U<<CC_PRINT_)|(1U<<CC_QUOTEMETA_),
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Time-Piece/Piece.xs	/* strptime copied from freebsd with the following copyright: */
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamesList.txt	00A9\tCOPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/VerticalOrientation.txt	00A9           ; U  # So         COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DCombiningClass.txt	00A9          ; 0 # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DLineBreak.txt	00A9          ; AL # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Scripts.txt	00A9          ; Common # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/emoji/emoji.txt	00A9          ; Emoji                # E0.6   [1] (©️)       copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/emoji/emoji.txt	00A9          ; Extended_Pictographic# E0.6   [1] (©️)       copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/DCoreProperties.txt	00A9          ; Grapheme_Base # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DEastAsianWidth.txt	00A9          ; N # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/IdType.txt	00A9          ; Not_XID                        # 1.1        COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DBidiClass.txt	00A9          ; ON # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/PropList.txt	00A9          ; Pattern_Syntax # So       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DGeneralCategory.txt	00A9          ; So #       COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate/keys.txt	00A9  ; [*029F.0020.0002.00A9] # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate/allkeys.txt	00A9  ; [*05D2.0020.0002] # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/LineBreak.txt	00A9;AL           # So         COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/UnicodeData.txt	00A9;COPYRIGHT SIGN;So;0;ON;;;;;N;;;;;
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/EastAsianWidth.txt	00A9;N           # So         COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/jisx0212.utf	0x2260:            ºª©®™¤№\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/gb2312.enc	0x2940: \xa9\xc0\xa9\xc1\xa9©éĩũƩǩȩɩʩ˩̩ͩΩϩЩѩҩөԩթ֩שة٩ک۩ܩݩީ\xdf
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/jisx0212.enc	0x4220:  \x8f¡\x8f¢\x8f£\x8f¤\x8f¥\x8f¦\x8f§\x8f¨\x8f©\x8fª\x8f«\x8f¬\x8f\xc2\xad\x8f®\x8f¯\x8f°\x8f±\x8f²\x8f³\x8f´\x8fµ\x8f¶\x8f·\x8f¸\x8f¹\x8fº\x8f»\x8f¼\x8f½\x8f¾\x8f¿
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/gb2312.enc	0x4220:  ¡¢£¤¥¦§¨©ª«¬\xc2\xad®¯°±²³´µ¶·¸¹º»¼½¾¿
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/big5-eten.enc	0xa9c0: \xa9\xc0\xa9\xc1\xa9©éĩũƩǩȩɩʩ˩̩ͩΩϩЩѩҩөԩթ֩שة٩ک۩ܩݩީ\xdf
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/t/big5-eten.enc	0xc2a0:  ¡¢£¤¥¦§¨©ª«¬\xc2\xad®¯°±²³´µ¶·¸¹º»¼½¾¿
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Bzip2/bzip2-src/LICENSE	1. Redistributions of source code must retain the above copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/VerticalOrientation.txt	2116..2117     ; U  # So     [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DCombiningClass.txt	2116..2117    ; 0 # So   [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Scripts.txt	2116..2117    ; Common # So   [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/DCoreProperties.txt	2116..2117    ; Grapheme_Base # So   [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DBidiClass.txt	2116..2117    ; ON # So   [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DGeneralCategory.txt	2116..2117    ; So #   [2] NUMERO SIGN..SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamesList.txt	2117\tSOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DLineBreak.txt	2117          ; AL # So       SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/extracted/DEastAsianWidth.txt	2117          ; N # So       SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/IdType.txt	2117          ; Not_XID                        # 1.1        SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate/allkeys.txt	2117  ; [*05D9.0020.0002] # SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/LineBreak.txt	2117;AL           # So         SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/EastAsianWidth.txt	2117;N           # So         SOUND RECORDING COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/UnicodeData.txt	2117;SOUND RECORDING COPYRIGHT;So;0;ON;;;;;N;;;;;
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	8. The name of the Copyright Holder may not be used to endorse or promote
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	9. The name of the Copyright Holder may not be used to endorse or promote
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/devel/mkppport_fnc.pl	:  Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/devel/mkppport_fnc.pl	:  Version 2.x, Copyright (C) 2001, Paul Marquess.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/devel/mkppport_fnc.pl	:  Version 3.x, Copyright (C) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate.pm	<SADAHIRO@cpan.org>. This module is Copyright(C) 2001-2021,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/jis0212.ucm	<U00A9> \\x22\\x6D |0 # COPYRIGHT SIGN
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp932.ucm	<U00A9> \\x63 |1 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macKorean.ucm	<U00A9> \\x83 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/euc-jp.ucm	<U00A9> \\x8F\\xA2\\xED |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/koi8-f.ucm	<U00A9> \\x98 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp949.ucm	<U00A9> \\xA8\\xCF |1 # COPYRIGHT SIGN
+line	26	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/8859-1.ucm	<U00A9> \\xA9 |0 # COPYRIGHT SIGN
+line	6	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp037.ucm	<U00A9> \\xB4 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp856.ucm	<U00A9> \\xB8 |0 # COPYRIGHT SIGN
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/koi8-r.ucm	<U00A9> \\xBF |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/symbol.ucm	<U00A9> \\xD3 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macSymbol.ucm	<U00A9> \\xD3 |0 # COPYRIGHT SIGN # serif
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macCroatian.ucm	<U00A9> \\xD9 |0 # COPYRIGHT SIGN
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp875.ucm	<U00A9> \\xFB |0 # COPYRIGHT SIGN
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macChinsimp.ucm	<U00A9> \\xFD |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macJapanese.ucm	<U00A9> \\xFD |0 # COPYRIGHT SIGN # Apple addition
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/macSymbol.ucm	<U00A9><UF87F> \\xE3 |3 # COPYRIGHT SIGN, alternate: sans serif
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp869.ucm	<U00a9> \\x97 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/nextstep.ucm	<U00a9> \\xa0 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp775.ucm	<U00a9> \\xa8 |0 # COPYRIGHT SIGN
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/cp850.ucm	<U00a9> \\xb8 |0 # COPYRIGHT SIGN
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/adobeSymbol.ucm	<UF6D9> \\xD3 |0 # COPYRIGHT SIGN SERIF # copyrightserif (CUS)
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/ucm/adobeSymbol.ucm	<UF8E9> \\xE3 |0 # COPYRIGHT SIGN SANS SERIF # copyrightsans (CUS)
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/bench.pl	==32350== Copyright (C) 2002-2013, and GNU GPL'd, by Nicholas Nethercote et al.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/bench.pl	==32350== Using Valgrind-3.9.0 and LibVEX; rerun with -h for copyright info
+line	15	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/libnetFAQ.pod	=head1 AUTHOR AND COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlopentut.pod	=head1 AUTHOR and COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate.pm	=head1 AUTHOR, COPYRIGHT AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perluniintro.pod	=head1 AUTHOR, COPYRIGHT, AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/libnetFAQ.pod	=head1 Author and Copyright Information
+line	275	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/bin/ptargrep	=head1 COPYRIGHT
+line	9	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Module-Metadata/lib/Module/Metadata.pm	=head1 COPYRIGHT & LICENSE
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Getopt-Long/lib/Getopt/Long/Parser.pm	=head1 COPYRIGHT AND DISCLAIMER
+line	36	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Escapes/lib/Pod/Escapes.pm	=head1 COPYRIGHT AND DISCLAIMERS
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Tie-RefHash/lib/Tie/RefHash.pm	=head1 COPYRIGHT AND LICENCE
+line	81	perl-5.40.4.tar.xz:perl-5.40.4/cpan/AutoLoader/lib/AutoLoader.pm	=head1 COPYRIGHT AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/IO/Scalar.pm	=head1 COPYRIGHT and LICENSE
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlfilter.pod	=head1 Copyrights
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Harness/lib/Test/Harness.pm	=head1 LICENCE AND COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/bin/encguess	=head1 LICENSE AND COPYRIGHT
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	=head2 Copyright Issues
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldocstyle.pod	=head3 Author and copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/release_managers_guide.pod	=head3 Check copyright years
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	=item "Copyright Holder"
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlpodstyle.pod	=item COPYRIGHT AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/reentr.pl	?RCS: Copyright (c) 2002,2003 Jarkko Hietaniemi
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/NamesList.txt	@+\t\t© 2022 Unicode®, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodlib.PL	A copyright notice - see below.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/perlfaqo.txt	AUTHOR AND COPYRIGHT
+line	11	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA/Config.pm	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodlib.PL	Adding a Copyright Notice.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Module-Metadata/lib/Module/Metadata.pm	Additional code Copyright (c) 2010-2011 Matt Trout and David Golden.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlootut.pod	Best Practices> (copyright 2004, Published by O'Reilly Media, Inc.),
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Tie-File/lib/Tie/File.pm	C<Tie::File> version 0.96 is copyright (C) 2003 Mark Jason Dominus.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Carp/README	COPYRIGHT
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/Encode/README.e2x	COPYRIGHT AND LICENCE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.txt	COPYRIGHT AND LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Index.txt	COPYRIGHT SIGN\t00A9
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodstyle.pod	COPYRIGHT and LICENSE
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Index.txt	COPYRIGHT, SOUND RECORDING\t2117
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/release_managers_guide.pod	Check that the copyright years are up to date by running:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utils/h2xs.PL	Copyright (C) ${\\(1900 + (localtime) [5])} by $author
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/XSLoader/XSLoader_pm.PL	Copyright (C) 1990-2011 by Larry Wall and others.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Sys-Syslog/Syslog.pm	Copyright (C) 1990-2012 by Larry Wall and others.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/SelfLoader/lib/SelfLoader.pm	Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Carp/lib/Carp.pm	Copyright (C) 1994-2013 Larry Wall
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlembed.pod	Copyright (C) 1995, 1996, 1997, 1998 Doug MacEachern and Jon Orwant.  All
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/NNTP.pm	Copyright (C) 1995-1997 Graham Barr.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Domain.pm	Copyright (C) 1995-1998 Graham Barr.  All rights reserved.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/FTP.pm	Copyright (C) 1995-2004 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Cmd.pm	Copyright (C) 1995-2006 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Tabs/lib/Text/Tabs.pm	Copyright (C) 1996-2002,2005,2006 David Muir Sharnoff.\x20\x20
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Tabs/lib/Text/Wrap.pm	Copyright (C) 1996-2009 David Muir Sharnoff.\x20\x20
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/constant/lib/constant.pm	Copyright (C) 1997, 1999 Tom Phoenix
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/libnetFAQ.pod	Copyright (C) 1997-1998 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	Copyright (C) 1997-2001 Damian Conway.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/FTP/dataconn.pm	Copyright (C) 1997-2010 Graham Barr.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodinstall.pod	Copyright (C) 1998, 2002, 2003 Jon Orwant.  All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Config.pm	Copyright (C) 2000 Graham Barr.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/ext/XS-Typemap/README	Copyright (C) 2001 Tim Jenness All Rights Reserved.  This program is
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/Encode/README.e2x	Copyright (C) 2002 Your Name <your@address.domain>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/XS-APItest/APItest.pm	Copyright (C) 2002,2004 Tim Jenness, Christian Soeller, Hugo van der Sanden.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/PerlIO-via-QuotedPrint/lib/PerlIO/via/QuotedPrint.pm	Copyright (C) 2002-2004, 2012 Elizabeth Mattijsen.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Module-CoreList/lib/Module/CoreList.pod	Copyright (C) 2002-2009 Richard Clamp.  All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-SHA/lib/Digest/SHA.pm	Copyright (C) 2003-2022 Mark Shelor
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-SHA/shasum	Copyright (C) 2003-2023 Mark Shelor <mshelor@cpan.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/Scalar/Util.pm	Copyright (C) 2004, 2008  Matthijs van Duin.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Tabs/lib/Text/Tabs.pm	Copyright (C) 2005 Aristotle Pagaltzis\x20
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/Hash-Util-FieldHash/lib/Hash/Util/FieldHash.pm	Copyright (C) 2006-2007 by (Anno Siegel)
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	Copyright (C) 2009 Adam Kennedy.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/XS-APItest/APItest.pm	Copyright (C) 2009 Andrew Main (Zefram) <zefram@fysh.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/deprecate.pm	Copyright (C) 2009, 2011
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Config-Perl-V/V.pm	Copyright (C) 2009-2023 H.Merijn Brand
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/Carp/lib/Carp.pm	Copyright (C) 2011, 2012, 2013 Andrew Main (Zefram) <zefram@fysh.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Tabs/lib/Text/Tabs.pm	Copyright (C) 2012-2013 Google, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Module-CoreList/lib/Module/CoreList/Utils.pm	Copyright (C) 2013 Chris Williams.  All Rights Reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/ext/Amiga-ARexx/ARexx.pm	Copyright (C) 2013 by Andy Broad.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Config.pm	Copyright (C) 2013-2014, 2016, 2020 Steve Hay.  All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Domain.pm	Copyright (C) 2013-2014, 2020 Steve Hay.  All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/NNTP.pm	Copyright (C) 2013-2016, 2020 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Cmd.pm	Copyright (C) 2013-2016, 2020, 2022 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/FTP.pm	Copyright (C) 2013-2017, 2020, 2022 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/Scalar/Util.pm	Copyright (C) 2014 cPanel Inc.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/libnet/lib/Net/Time.pm	Copyright (C) 2014, 2020 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/PerlIO-via-QuotedPrint/lib/PerlIO/via/QuotedPrint.pm	Copyright (C) 2015, 2020 Steve Hay.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Text-Balanced/lib/Text/Balanced.pm	Copyright (C) 2015, 2020, 2022 Steve Hay and other contributors.  All rights
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/regen/regen_lib.pl	Copyright (C) @{$args{copyright}} by\\0Larry\\0Wall\\0and\\0others
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/exception/system.pm	Copyright (C)2008 Paul Fenwick
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/File-Glob/Glob.pm	Copyright (c) 1989, 1993 The Regents of the University of California.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/FindBin/lib/FindBin.pm	Copyright (c) 1995 Graham Barr & Nick Ing-Simmons. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	Copyright (c) 1995-2011 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/DB_File.pm	Copyright (c) 1995-2023 Paul Marquess. All rights reserved. This program
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/lib/Compress/Zlib.pm	Copyright (c) 1995-2024 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/Devel-Peek/Peek.pm	Copyright (c) 1995-98 Ilya Zakharevich. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/IO/Scalar.pm	Copyright (c) 1996 by Eryq.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/HiRes.pm	Copyright (c) 1996-2002 Douglas E. Wegscheid.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Data-Dumper/Dumper.pm	Copyright (c) 1996-2019 Gurusamy Sarathy. All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Pipe.pm	Copyright (c) 1996-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/perlfaq.pod	Copyright (c) 1997-1999 Tom Christiansen and Nathan Torkington.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/perlfaqo.txt	Copyright (c) 1997-1999 Tom Christiansen and Nathan Torkington. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Dir.pm	Copyright (c) 1997-2003 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/List/Util.pm	Copyright (c) 1997-2007 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	8	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlfaq1.pod	Copyright (c) 1997-2010 Tom Christiansen, Nathan Torkington, and
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlfaq7.pod	Copyright (c) 1997-2013 Tom Christiansen, Nathan Torkington, and
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Poll.pm	Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/Errno/Errno_pm.PL	Copyright (c) 1997-8 Graham Barr. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/I18N-LangTags/lib/I18N/LangTags.pm	Copyright (c) 1998+ Sean M. Burke. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Test/lib/Test.pm	Copyright (c) 1998-2000 Joshua Nathaniel Pritikin.\x20
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/I18N-LangTags/lib/I18N/LangTags/Detect.pm	Copyright (c) 1998-2004 Sean M. Burke. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Zlib/Zlib.pm	Copyright (c) 1998-2004 Tom Hughes E<lt>F<tom@compton.nu>E<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/Scalar/Util.pm	Copyright (c) 1999 Tuomas J. Lukka <lukka@iki.fi>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/IO/Scalar.pm	Copyright (c) 1999,2001 by ZeeGee Software Inc.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Locale-Maketext/lib/Locale/Maketext.pod	Copyright (c) 1999-2004 Sean M. Burke.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlrequick.pod	Copyright (c) 2000 Mark Kvale
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlretut.pod	Copyright (c) 2000 Mark Kvale.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlglossary.pod	Copyright (c) 2000, 1996, 1991, 2012 O'Reilly Media, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/I18N-LangTags/lib/I18N/LangTags/List.pm	Copyright (c) 2001+ Sean M. Burke. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/lib/Net/Ping.pm	Copyright (c) 2001, Colin McMillen.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Test/lib/Test.pm	Copyright (c) 2001-2002 Michael G. Schwern.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Escapes/lib/Pod/Escapes.pm	Copyright (c) 2001-2004 Sean M. Burke.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN/scripts/cpan	Copyright (c) 2001-2015, brian d foy, All Rights Reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN/lib/App/Cpan.pm	Copyright (c) 2001-2021, brian d foy, All Rights Reserved.
+line	19	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/lib/Pod/Simple/Checker.pm	Copyright (c) 2002 Sean M. Burke.
+line	6	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/ToChecker.pm	Copyright (c) 2002 Sean M. Burke.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Time-HiRes/HiRes.pm	Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007, 2008 Jarkko Hietaniemi.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/ToMan.pm	Copyright (c) 2002,3,4 Sean M. Burke.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/lib/Net/Ping.pm	Copyright (c) 2002-2003, Rob Brown.  All rights reserved.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/lib/Pod/Simple/HTML.pm	Copyright (c) 2002-2004 Sean M. Burke.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/BaseTo.pm	Copyright (c) 2002-2007 Sean M. Burke.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Module-CoreList/corelist	Copyright (c) 2002-2007 by D.H. aka PodMaster
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/lib/Pod/Simple/XHTML.pm	Copyright (c) 2003-2005 Allison Randal.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/lib/ExtUtils/CBuilder.pm	Copyright (c) 2003-2005 Ken Williams.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/lib/Pod/Simple/LinkSection.pm	Copyright (c) 2004 Sean M. Burke.
+line	7	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/Cwd.pm	Copyright (c) 2004 by the Perl 5 Porters.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/lib/File/Spec/Cygwin.pm	Copyright (c) 2004,2007 by the Perl 5 Porters.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/lib/File/Spec/VMS.pm	Copyright (c) 2004-14 by the Perl 5 Porters.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/lib/File/Spec.pm	Copyright (c) 2004-2013 by the Perl 5 Porters.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/devel/buildperl.pl	Copyright (c) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/lib/File/GlobMapper.pm	Copyright (c) 2005 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/Util/Guard.pm	Copyright (c) 2005-2015, chocolateboy.
+line	16	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Bzip2/lib/Compress/Raw/Bzip2.pm	Copyright (c) 2005-2024 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/lib/Compress/Raw/Zlib.pm	Copyright (c) 2005-2026 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/devel/regenerate	Copyright (c) 2006-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/time64.c	Copyright (c) 2007-2008  Michael G Schwern
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Harness/lib/Test/Harness.pm	Copyright (c) 2007-2011, Andy Armstrong C<< <andy@hexten.net> >>. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/parent/lib/parent.pm	Copyright (c) 2007-2017 Max Maischein C<< <corion@cpan.org> >>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Scalar-List-Utils/lib/List/Util/XS.pm	Copyright (c) 2008 Graham Barr <gbarr@pobox.com>. All rights reserved.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/ebcdic_tables.h	Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/ToANSI.pm	Copyright (c) 2011 Mark Allen.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/ToMan.pm	Copyright (c) 2011 brian d foy. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	Copyright (c) 2011-2014, 2018-2022 Reini Urban. All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/bin/zipdetails	Copyright (c) 2011-2024 Paul Marquess. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/lib/Net/Ping.pm	Copyright (c) 2012, Steve Peters.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Filter-Util-Call/Call.pm	Copyright (c) 2014-2017 cPanel Inc. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/lib/Net/Ping.pm	Copyright (c) 2016, cPanel Inc.  All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Perldoc/lib/Pod/Perldoc/ToTerm.pm	Copyright (c) 2017 Mark Allen.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Net-Ping/lib/Net/Ping.pm	Copyright (c) 2017-2020, Reini Urban.  All rights reserved.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/bin/streamzip	Copyright (c) 2019-2024 Paul Marquess. All rights reserved.
+line	2	perl-cross-1.6.2.tar.gz.noauto:perl-cross-1.6.2/cnf/config.guess	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/lib/MIME/QuotedPrint.pm	Copyright 1995-1997,2002-2004 Gisle Aas.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/lib/MIME/Base64.pm	Copyright 1995-1999, 2001-2004, 2010 Gisle Aas.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-Cap/Cap.pm	Copyright 1995-2015 (c) perl5 porters.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/lib/Term/ANSIColor.pm	Copyright 1996 Zenin
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/lib/Term/ANSIColor.pm	Copyright 1996-1998, 2000-2002, 2005-2006, 2008-2018, 2020 Russ Allbery
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/Base64.xs	Copyright 1997-2004 Gisle Aas
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlreftut.pod	Copyright 1998 The Perl Journal.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/I18N-LangTags/README	Copyright 1998+, Sean M. Burke <sburke@cpan.org>, all rights
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlpodstyle.pod	Copyright 1999, 2000, 2001, 2004, 2006, 2008, 2010, 2015, 2018 Russ
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Text/Color.pm	Copyright 1999, 2001, 2004, 2006, 2008, 2009, 2018-2019, 2022 Russ Allbery
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Text/Termcap.pm	Copyright 1999, 2001-2002, 2004, 2006, 2008-2009, 2014-2015, 2018-2019, 2022
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/scripts/pod2man.PL	Copyright 1999-2001, 2004, 2006, 2008, 2010, 2012-2019, 2022 Russ Allbery
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Text.pm	Copyright 1999-2002, 2004, 2006, 2008-2009, 2012-2016, 2018-2019, 2022 Russ
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Locale-Maketext/README	Copyright 1999-2004, Sean M. Burke <sburke@cpan.org>, all rights
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Man.pm	Copyright 1999-2010, 2012-2020, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Text/Overstrike.pm	Copyright 2000 by Joe Smith <Joe.Smith@inwap.com>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/I18N-Langinfo/Langinfo.pm	Copyright 2001 by Jarkko Hietaniemi
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Tutorial.pod	Copyright 2001 by Michael G Schwern E<lt>schwern@pobox.comE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/Text/Overstrike.pm	Copyright 2001, 2004, 2008, 2014, 2018-2019, 2022 by Russ Allbery <rra@cpan.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.man	Copyright 2001, 2004, 2016, 2018 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/lib/Pod/ParseLink.pm	Copyright 2001, 2008, 2009, 2014, 2018-2019, 2022 Russ Allbery <rra@cpan.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Time-Piece/Piece.pm	Copyright 2001, Larry Wall.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/More.pm	Copyright 2001-2008 by Michael G Schwern E<lt>schwern@pobox.comE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perluniintro.pod	Copyright 2001-2011 Jarkko Hietaniemi E<lt>jhi@iki.fiE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder.pm	Copyright 2002-2008 by chromatic E<lt>chromatic@wgz.orgE<gt> and
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/Encode.pm	Copyright 2002-2014 Dan Kogai I<< <dankogai@cpan.org> >>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/lib/ExtUtils/ParseXS.pod	Copyright 2002-2014 by Ken Williams, David Golden and other contributors.  All
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Tester/CaptureRunner.pm	Copyright 2003 by Fergal Daly <fergal@esatclear.ie>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/valgrindpp.pl	Copyright 2003 by Marcus Holland-Moritz <mhx@cpan.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Locale-Maketext-Simple/lib/Locale/Maketext/Simple.pm	Copyright 2003, 2004, 2005, 2006 by Audrey Tang E<lt>cpan@audreyt.orgE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/encoding-warnings/lib/encoding/warnings.pm	Copyright 2004, 2005, 2006, 2007 by Audrey Tang E<lt>cpan@audreyt.orgE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlreapi.pod	Copyright 2006 Yves Orton and 2007 E<AElig>var ArnfjE<ouml>rE<eth> Bjarmason.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/mkppport	Copyright 2006 by Marcus Holland-Moritz <mhx@cpan.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Harness/lib/TAP/Parser.pm	Copyright 2006-2008 Curtis "Ovid" Poe, all rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/checkansi.pl	Copyright 2007 by Marcus Holland-Moritz <mhx@cpan.org>.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Harness/lib/TAP/Parser/YAMLish/Reader.pm	Copyright 2007-2011 Andy Armstrong.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/JSON-PP/lib/JSON/PP.pm	Copyright 2007-2016 by Makamaka Hannyaharamitu
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/Scope/Guard.pm	Copyright 2008-2009, Paul Fenwick E<lt>pjf@perltraining.com.auE<gt>
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/lib/ExtUtils/Typemaps/InputMap.pm	Copyright 2009, 2010, 2011, 2012 Steffen Mueller
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/lib/ExtUtils/Typemaps.pm	Copyright 2009, 2010, 2011, 2012, 2013 Steffen Mueller
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/hints.pm	Copyright 2009, Paul Fenwick E<lt>pjf@perltraining.com.auE<gt>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MakeMaker/Locale.pm	Copyright 2010 Gisle Aas <gisle@aas.no>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/bin/ptargrep	Copyright 2010 Grant McLean E<lt>grantm@cpan.orgE<gt>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/JSON-PP/bin/json_pp	Copyright 2010 by Makamaka Hannyaharamitu
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlexperiment.pod	Copyright 2010, brian d foy C<< <brian.d.foy@gmail.com> >>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/lib/Term/ANSIColor.pm	Copyright 2012 Kurt Starsinic <kstarsinic@gmail.com>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-ParseXS/lib/ExtUtils/Typemaps/Cmd.pm	Copyright 2012 Steffen Mueller
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlopentut.pod	Copyright 2013 Tom Christiansen; now maintained by Perl5 Porters
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/Scope/GuardStack.pm	Copyright 2013, Niels Thykier E<lt>niels@thykier.netE<gt>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/skip.pm	Copyright 2013, Paul Fenwick <pjf@cpan.org>
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA/Config.pm	Copyright 2013-2014 The Board of Trustees of the Leland Stanford Junior
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/autodie/lib/autodie/Util.pm	Copyright 2013-2014, Niels Thykier E<lt>niels@thykier.netE<gt>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/style/module-version.t	Copyright 2014-2016, 2019-2021 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/bin/encguess	Copyright 2015 Michael LaGrasta and Dan Kogai.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/snippets/README.md	Copyright 2015, 2018, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/Podlators.pm	Copyright 2015-2016, 2018-2020, 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/lib/Test/RRA/Config.pm	Copyright 2015-2016, 2019 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA/Config.pm	Copyright 2015-2016, 2019, 2021 Russ Allbery <eagle@eyrie.org>
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-Table/lib/Term/Table/Cell.pm	Copyright 2016 Chad Granum E<lt>exodist@cpan.orgE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-ANSIColor/t/lib/Test/RRA.pm	Copyright 2016, 2018-2019 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA.pm	Copyright 2016, 2018-2019, 2021 Russ Allbery <eagle@eyrie.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA/ModuleVersion.pm	Copyright 2016, 2018-2020, 2022 Russ Allbery <eagle@eyrie.org>
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Term-Table/lib/Term/Table/HashBase.pm	Copyright 2017 Chad Granum E<lt>exodist@cpan.orgE<gt>.
+line	13	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/AsyncSubtest/Event/Attach.pm	Copyright 2018 Chad Granum E<lt>exodist7@gmail.comE<gt>.
+line	105	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/Bundle/Extended.pm	Copyright 2018 Chad Granum E<lt>exodist@cpan.orgE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/Compare/Bag.pm	Copyright 2018 Gianni Ceccarelli E<lt>dakkar@thenautilus.netE<gt>
+line	57	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/Formatter.pm	Copyright 2020 Chad Granum E<lt>exodist@cpan.orgE<gt>.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/man/encoding.groff	Copyright 2022 Russ Allbery <rra@cpan.org>
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/Util/Importer.pm	Copyright 2023 Chad Granum E<lt>exodist7@gmail.comE<gt>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	Copyright Holder as specified below.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	Copyright Holder, and derivatives of that collection of files created
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/Tester.pm	Copyright Mark Fowler E<lt>mark@twoshortplanks.comE<gt> 2002, 2004.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/Tester/Color.pm	Copyright Mark Fowler E<lt>mark@twoshortplanks.comE<gt> 2002.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Builder/Tester.pm	Copyright Micheal G Schwern 2001.  Used and distributed with
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlunicook.pod	Copyright © 2012 Tom Christiansen.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Unicode-Normalize/Normalize.pm	Copyright(C) 2001-2012, SADAHIRO Tomoyuki. Japan. All rights reserved.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlpodstyle.pod	For copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate.pm	For this file, Copyright (c) 2020 Unicode, Inc.; distributed
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodstyle.pod	In I<Perl Best Practices> (copyright 2004, Published by O'Reilly Media, Inc.),
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlthrtut.pod	Journal #10, and is copyright 1998 The Perl Journal. It appears courtesy
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlfilter.pod	Journal #11, and is copyright 1998 The Perl Journal. It appears
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test2-Suite/lib/Test2/Util/Guard.pm	Modified copy is Copyright 2023 Chad Granum E<lt>exodist7@gmail.comE<gt>.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	One cannot give away one's copyright trivially.  One can give one's
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Module-Metadata/lib/Module/Metadata.pm	Original code Copyright (c) 2001-2011 Ken Williams.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	Package may be copied, such that the Copyright Holder maintains some
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/README	Perl is Copyright (C) 1993 - 2026 by Larry Wall and others.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/DB_File.pm	Please read L<"COPYRIGHT"> before using version 2.x or greater of Berkeley
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Harness/lib/TAP/Parser/YAMLish/Reader.pm	Portions copyright 2006-2008 Adam Kennedy.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/PathTools/Cwd.pm	Portions of the C code in this library are copyright (c) 1994 by the
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/utils/h2xs.PL	Put the correct copyright and licence information here.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Index.txt	RECORDING COPYRIGHT, SOUND\t2117
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/File-Glob/Glob.pm	Redistributions in binary form must reproduce the above copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/File-Glob/Glob.pm	Redistributions of source code must retain the above copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodlib.PL	Remember to include the other words in addition to the Copyright.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldebtut.pod	Richard Foley <richard.foley@rfi.net> Copyright (c) 2000
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlperf.pod	Richard Foley <richard.foley@rfi.net> Copyright (c) 2008
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/Index.txt	SOUND RECORDING COPYRIGHT\t2117
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlglossary.pod	Something X<public domain>not owned by anybody. Perl is copyrighted and is
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Locale-Maketext-Simple/lib/Locale/Maketext/Simple.pm	THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	Tacking on copyright statements is unnecessary to begin with because
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	Tests that the latest copyright years in the top-level README file and the
+line	82	perl-5.40.4.tar.xz:perl-5.40.4/pod/perl5005delta.pod	The F<Artistic> and F<Copying> files for copyright information.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perl5004delta.pod	The F<Copying> file for copyright information.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/MIME-Base64/lib/MIME/Base64.pm	The XS implementation uses code from metamail.  Copyright 1991 Bell
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Locale-Maketext-Simple/lib/Locale/Maketext/Simple.pm	The above copyright notice and this permission notice shall be included in
+line	10	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/lib/Test/RRA/Config.pm	The above copyright notice and this permission notice shall be included in all
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/IO/lib/IO/Socket.pm	The atmark() implementation: Copyright 2001, Lincoln Stein <lstein@cshl.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlmodlib.PL	The general mechanism is to assert your Copyright and then make
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	The name of the Copyright Holder may not be used to endorse or promote
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	The right form of a copyright statement is
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	The rule of thumb: in split files, copy the copyright years of
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	This copyright does not prohibit distribution of any version of Perl
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Unicode-Collate/Collate/Locale.pm	This module is Copyright(C) 2004-2020, SADAHIRO Tomoyuki. Japan.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/File-Path/lib/File/Path.pm	This module is copyright (C) Charles Bailey, Tim Bunce, David Landgren,
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/lib/Archive/Tar.pm	This module is copyright (c) 2002 - 2009 Jos Boumans
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/Test/Tester.pm	This module is copyright 2005 Fergal Daly <fergal@esatclear.ie>, some parts
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/lib/lib_pm.PL	This package has the same copyright and license as the perl core.
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/cpan/AutoLoader/lib/AutoLoader.pm	This package has the same copyright and license as the perl core:
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Getopt-Long/lib/Getopt/Long/Parser.pm	This program is Copyright 1990,2015,2023 by Johan Vromans.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	This software is Copyright (c) 2020 by Ken Williams.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/ExtUtils-Manifest/lib/ExtUtils/Manifest.pm	This software is copyright (c) 1996- by Andreas Koenig.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Time-Local/lib/Time/Local.pm	This software is copyright (c) 1997 - 2023 by Graham Barr & Dave Rolsky.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/if/if.pm	This software is copyright (c) 2002 by Ilya Zakharevich.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Tie-RefHash/lib/Tie/RefHash.pm	This software is copyright (c) 2006 by יובל קוג'מן (Yuval Kogman) <nothingmuch@woobling.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/JustPod01.t	This software is copyright (c) 2009 by Michael Schwern <mschwern@cpan.org>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta-YAML/lib/CPAN/Meta/YAML.pm	This software is copyright (c) 2010 by Adam Kennedy.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta-Requirements/lib/CPAN/Meta/Requirements/Range.pm	This software is copyright (c) 2010 by David Golden and Ricardo Signes.
+line	9	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/lib/CPAN/Meta/Converter.pm	This software is copyright (c) 2010 by David Golden, Ricardo Signes, Adam Kennedy and Contributors.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/git-deltatool	This software is copyright (c) 2010 by David Golden.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Memoize/Memoize.pm	This software is copyright (c) 2012 by Mark Jason Dominus.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/experimental/lib/experimental.pm	This software is copyright (c) 2013 by Leon Timmermans.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/ExtUtils-PL2Bat/lib/ExtUtils/PL2Bat.pm	This software is copyright (c) 2015 by Leon Timmermans.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Perl-OSType/lib/Perl/OSType.pm	This software is copyright (c) 2016 by David Golden.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	This software is copyright (c) 2020 by Ken Williams.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/File-Temp/lib/File/Temp.pm	This software is copyright (c) 2020 by Tim Jenness and the UK Particle Physics and Astronomy Research Council.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/HTTP-Tiny/lib/HTTP/Tiny.pm	This software is copyright (c) 2023 by Christian Hansen.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Test-Simple/lib/ok.pm	To the extent possible under law, 唐鳳 has waived all copyright and related
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/HACKERS	Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/lib/IPC/Msg.pm	Version 1.x, Copyright (c) 1997, Graham Barr.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/HACKERS	Version 2.x, Copyright (C) 2001, Paul Marquess.
+line	4	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-SysV/lib/IPC/Msg.pm	Version 2.x, Copyright (C) 2007-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/PPPort_pm.PL	Version 3.x, Copyright (C) 2004-2013, Marcus Holland-Moritz.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/HACKERS	Version 3.x, Copyright (C) 2004-2020, Marcus Holland-Moritz
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/dist/Devel-PPPort/parts/inc/ppphdoc	Version 3.x, Copyright (c) 2004-2013, Marcus Holland-Moritz.
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Encode/Encode.pm	While Dan Kogai retains the copyright as a maintainer, credit
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/SDBM_File/readme.ms	a copyright (which is now dropped) to protect its
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	an union of the copyright years of all the old files; in generated
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/Locale-Maketext/lib/Locale/Maketext/TPJ13.pod	and is copyright 1999 The Perl Journal. It appears
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	appropriately publish on each copy an appropriate copyright notice and
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/lib/CPAN/Meta/History/Meta_1_0.pod	author and/or copyright holder.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	away a copyright you may not even have.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/deflate.c	const char deflate_copyright[] =
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/inftrees.c	const char inflate_copyright[] =
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	contains a notice placed by the copyright holder saying it may be
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/DB_File/DB_File.pm	copyright and its own license.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	copyright away by using public domain, but even that requires a little
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldocstyle.pod	copyright statements, as found in C<perlpodstyle>.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/t/porting/copyright.t	copyright.t
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/SDBM_File/readme.ms	copyrighted software.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	copyrights alone.  Doing more than that requires quite a bit of tracking.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	copyrights for the package.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	copyrights, by various people.  (There are many copyrights embedded in
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/docs/docknot.yaml	copyrights:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/SDBM_File/README	derived  from  any  licensed,  proprietary  or   copyrighted
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	derived from the Public Domain or from the Copyright Holder.  A Package
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	do is to simply update Larry's copyrights at the beginning of the
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/inline.h	documentation of the original version.  A copyright notice for the original
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Bzip2/bzip2-src/LICENSE	documentation, are copyright (C) 1996-2019 Julian R Seward.  All
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	domain, one cannot "transfer" one's copyright to another person or
+line	3	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	duplicate all of the original copyright notices and associated disclaimers.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zutil.h	extern const char deflate_copyright[];
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zutil.h	extern const char inflate9_copyright[];
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Compress-Raw-Zlib/zlib-src/zutil.h	extern const char inflate_copyright[];
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	files propagate the copyright years of the generating file(s).
+line	5	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta/lib/CPAN/Meta/History/Meta_1_0.pod	files, copyright by Ken Williams and licensed under the same terms as Perl
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/File-Glob/Glob.pm	following copyright:
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	from the Public Domain or from the Copyright Holder. A Package modified in such
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	from the programs of this Package do not automatically fall under the copyright
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	give away their copyright or "transfer" it to the "owner" of the software.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/Hash-Util/lib/Hash/Util.pm	hv_store() is from Array::RefElem, Copyright 2000 Gisle Aas.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldocstyle.pod	include additional "LICENSE" or "COPYRIGHT" sections of your own.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlfaq.pod	individual perlfaq documents for additional copyright information.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	is whoever is named in the copyright or
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	make other distribution arrangements with the Copyright Holder.
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/dist/ExtUtils-CBuilder/LICENSE	may be copied, such that the Copyright Holder maintains some semblance of
+line	8	perl-5.40.4.tar.xz:perl-5.40.4/cpan/podlators/t/data/basic.man	permitted in any medium without royalty provided the copyright notice and
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlhacktips.pod	read the source code.  You should see the copyright message, followed
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldocstyle.pod	same copyright and license terms as Perl itself. You do not need to
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/ext/SDBM_File/README	software  contained  a  copyright  (which is now dropped) to
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlartistic.pod	such as uunet.uu.net, or by allowing the Copyright Holder to include
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/MANIFEST	t/porting/copyright.t\t\t\tCheck that copyright years match
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perlunicook.pod	that is, from the 4ᵗʰ Edition of I<Programming Perl>, Copyright © 2012 Tom
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/release_managers_guide.pod	the "Copyright"). If updating perl.c, check if the file's own copyright date in
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/perlfaq/lib/perlglossary.pod	the copyright on it may still belong to someone else (like Larry).
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Digest-MD5/MD5.pm	the following copyright statement:
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Copying	to ask for permission.  For software which is copyrighted by the Free
+line	2	perl-5.40.4.tar.xz:perl-5.40.4/Artistic	under the copyright of this Package, but belong to whoever generated
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/pod/perldocstyle.pod	within C<.pod> files--do not need to include any copyright or license
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/Porting/pumpkin.pod	your work may be copyrighted to your employer, even when you are
+line	1	perl-5.40.4.tar.xz:perl-5.40.4/lib/unicore/auxiliary/LBTest.txt	× 00A9 ÷ 1F3FF ÷\t#  × [0.3] COPYRIGHT SIGN (AL) ÷ [999.0] EMOJI MODIFIER FITZPATRICK TYPE-6 (EM) ÷ [0.3]
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/header/signed.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/linktest/linktest_missing_dir.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/linktest/linktest_with_dir.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/long/bar.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/long/foo.tbz
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/long/foo.tgz
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/long/prefix-directory-concat.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/short/bar.tar
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/short/foo.tbz
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Archive-Tar/t/src/short/foo.tgz
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/CPAN-Meta-YAML/t/data/utf_16_le_bom.yml
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/bad-efs.zip
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/encrypt-aes.zip
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/encrypt-standard.zip
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/jar.zip
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/test.ods
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IO-Compress/t/files/testfile1.odt
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/IPC-Cmd/t/src/x.tgz
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Module-Metadata/corpus/BOMTest/UTF16BE.pm
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Module-Metadata/corpus/BOMTest/UTF16LE.pm
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/corpus2/polish_utf16be_bom.txt
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/cpan/Pod-Simple/t/corpus2/polish_utf16le_bom.txt
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/t/re/bigfuzzy_not_utf8.t
+binary-head	perl-5.40.4.tar.xz:perl-5.40.4/win32/perlexe.ico

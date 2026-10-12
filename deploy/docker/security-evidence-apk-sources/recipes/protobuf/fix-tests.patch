@@ -1,0 +1,59 @@
+diff --git a/src/google/protobuf/compiler/command_line_interface_unittest.cc b/src/google/protobuf/compiler/command_line_interface_unittest.cc
+index 787d56fbf..5bd5959d5 100644
+--- a/src/google/protobuf/compiler/command_line_interface_unittest.cc
++++ b/src/google/protobuf/compiler/command_line_interface_unittest.cc
+@@ -4177,8 +4177,18 @@ class EncodeDecodeTest : public testing::TestWithParam<EncodeDecodeTestMode> {
+ 
+  private:
+   void WriteUnittestProtoDescriptorSet() {
++    std::string temp_dir = TestTempDir();
+     unittest_proto_descriptor_set_filename_ =
+-        absl::StrCat(TestTempDir(), "/unittest_proto_descriptor_set.bin");
++        absl::StrCat(temp_dir, "/unittest_proto_descriptor_set.bin");
++    
++    struct stat st;
++    if (stat(temp_dir.c_str(), &st) != 0) {
++      if (mkdir(temp_dir.c_str(), 0777) != 0) {
++        ABSL_LOG(ERROR) << "Failed to create directory " << temp_dir 
++                       << ": " << strerror(errno);
++      }
++    }
++    
+     FileDescriptorSet file_descriptor_set;
+     protobuf_unittest::TestAllTypes test_all_types;
+     test_all_types.descriptor()->file()->CopyTo(file_descriptor_set.add_file());
+diff --git a/src/google/protobuf/generated_enum_util_test.cc b/src/google/protobuf/generated_enum_util_test.cc
+index b6034e1cf..d61d0c53a 100644
+--- a/src/google/protobuf/generated_enum_util_test.cc
++++ b/src/google/protobuf/generated_enum_util_test.cc
+@@ -39,7 +39,7 @@ namespace internal {
+ namespace {
+ 
+ TEST(GenerateEnumDataTest, DebugChecks) {
+-#if GTEST_HAS_DEATH_TEST
++#if GTEST_HAS_DEATH_TEST && !defined(GOOGLE_PROTOBUF_ARCH_32_BIT)
+   // Not unique
+   EXPECT_DEBUG_DEATH(GenerateEnumData({1, 1}), "sorted_and_unique");
+   // Not sorted
+diff --git a/src/google/protobuf/testing/googletest.cc b/src/google/protobuf/testing/googletest.cc
+index 3d57981f3..51fbd2db8 100644
+--- a/src/google/protobuf/testing/googletest.cc
++++ b/src/google/protobuf/testing/googletest.cc
+@@ -119,8 +119,15 @@ class TempDirDeleter {
+   std::string GetTempDir() {
+     if (name_.empty()) {
+       name_ = GetTemporaryDirectoryName();
+-      ABSL_CHECK(mkdir(name_.c_str(), 0777) == 0) << strerror(errno);
+-
++      struct stat st;
++      if (stat(name_.c_str(), &st) != 0) {
++        if (mkdir(name_.c_str(), 0777) != 0) {
++          ABSL_LOG(ERROR) << "Failed to create directory " << name_ 
++                         << ": " << strerror(errno);
++          ABSL_CHECK(false) << "Could not create temporary directory";
++        }
++      }
++  
+       // Stick a file in the directory that tells people what this is, in case
+       // we abort and don't get a chance to delete it.
+       File::WriteStringToFileOrDie(

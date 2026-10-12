@@ -1,0 +1,32 @@
+{
+  "schema": "chio.split-archive.v1",
+  "name": "linux-6.14.tar.xz",
+  "length": 149408504,
+  "sha256": "a294b683e7b161bb0517bb32ec7ed1d2ea7603dfbabad135170ed12d00c47670",
+  "sha512": "71dcaa3772d8d9797c3ae30cae9c582b11a7047a3bbcb8dfd479a4dffb40ff0da74cf3d45175f50cc9992e338bcadd46c9c570f54054ca3bde6661768d3d22eb",
+  "chunk_bytes": 50331648,
+  "chunks": [
+    {
+      "path": "linux-6.14.tar.xz.part-001",
+      "offset": 0,
+      "length": 50331648,
+      "sha256": "fe2486fda1ac1769439b5195a6fb4615abd25a14ff454b62192327353b8c271e",
+      "sha512": "027b5dc46fa93fb1982e01abb832283a8b202c3b73ea5c910ae9993071dd594c3e76c646608fcf92f9bbbedcfe98c3b1c769c83c3970ef1ef9dd0faa458ea3b7"
+    },
+    {
+      "path": "linux-6.14.tar.xz.part-002",
+      "offset": 50331648,
+      "length": 50331648,
+      "sha256": "6b89742a2cd4016d75004d46d5a5e88635185a5aa743800445d868acc01f152d",
+      "sha512": "3087cbfeec9fc0411f01ef31d59491948634f6530eabd3f435011d6c9f883e06561cbc79ef5db6e2b4f92f8b2b7254fe8ed285c7b5f2abc49ee470c16b50f6d8"
+    },
+    {
+      "path": "linux-6.14.tar.xz.part-003",
+      "offset": 100663296,
+      "length": 48745208,
+      "sha256": "ada795dfee68b524706af45a2ffe0a54aef50656048a19e1c909b36b02e91de4",
+      "sha512": "3f3f4f98301e93c6aac0a85ced68e6f0f23de3edae83cd88b6fb4ac6bc659e9495d5d8c93837b90bda5bce2d8263f71bb7b463153c553fcc71fd2a3e38b158eb"
+    }
+  ],
+  "rebuild": "cat linux-6.14.tar.xz.part-001 linux-6.14.tar.xz.part-002 linux-6.14.tar.xz.part-003 > linux-6.14.tar.xz"
+}

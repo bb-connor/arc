@@ -1,0 +1,6 @@
+tree 010c29cf4e34863c02ac481c9dff52d306008607
+parent d969d0147853ede5a89f4beb76507067987718b7
+author Ferass El Hafidi <funderscore@postmarketos.org> 1781883380 +0000
+committer Ferass El Hafidi <funderscore@postmarketos.org> 1781883515 +0000
+
+main/ca-certificates: upgrade to 20260611

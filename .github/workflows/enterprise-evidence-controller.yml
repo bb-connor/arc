@@ -97,6 +97,7 @@ jobs:
           done <<'TRUSTED_EXECUTION_FILES'
           100644:deploy/docker/Dockerfile.security-evidence-runner
           100644:deploy/docker/security-evidence-apk.lock
+          100644:deploy/docker/security-evidence-apks/SHA256SUMS
           100644:deploy/docker/security-evidence-seccomp.json
           100755:crates/security/chio-cage/scripts/check-linux-enforcement.sh
           100644:scripts/check-cage-all-target-inventory.py

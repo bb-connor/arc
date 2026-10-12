@@ -1,0 +1,6 @@
+tree 3246e224825dc6aa2652671cc271334f922f93ac
+parent edb89a5feaab59f73eb287587ba7fc005d46ee48
+author J0WI <J0WI@users.noreply.github.com> 1778944656 +0200
+committer Kevin Daudt <kdaudt@alpinelinux.org> 1784005653 +0200
+
+main/curl: patch CVE-2026-5545

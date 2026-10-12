@@ -1,0 +1,6 @@
+tree ef85ee43cf18a5101fb4dc5ea10220eb2ad13cc7
+parent eca5824ffb9bd4158a839862d2e760724bf38b37
+author Krassy Boykinov <kboykinov@teamcentrixx.com> 1715078875 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1715080109 +0000
+
+main/libeconf: upgrade to 0.6.3

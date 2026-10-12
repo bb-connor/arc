@@ -1,0 +1,1076 @@
+# chio.attribution-lines.v8 origin=util-linux files=3690 files_with_lines=948 binary_heads=229 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	\t\t\t\t\t\t  strlen(copyright));
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	\t\t\t\t\twrite_all(STDOUT_FILENO, copyright,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/udf.c	\t\t\tuint32_t\tvol_copyright[2];
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/iso9660.c	\t\t\tunsigned char copyright_file_id[32];
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/iso9660.c	\t\t\tunsigned char copyright_file_id[37];
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	\t\t  _("%s %s Copyright (c) 2000-2001 Gunnar Ritter. All rights reserved.\\n"),
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cfdisk.c	\t\t"Copyright (C) 2014-2023 Karel Zak <kzak@redhat.com>"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/howto-contribute.txt	\t\tCopyright (C) 1997 The Open Group
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makefile.in.in	\t      --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	\txasprintf(&copyright,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	                      EUPL © the European Union 2007, 2016
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	        /^Copyright /!{
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.41.1-ReleaseNotes	    - remove "Copyright (C) ...." notes from files that claim no copyright (by Benno Schulenberg)
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/docs/libblkid-docs.xml	    </copyright>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/docs/libblkid-docs.xml	    <copyright>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	    <program>  Copyright (C) <year>  <name of author>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	    Copyright (C) <year>  <name of author>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	    Gnomovision version 69, Copyright (C) year name of author
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	    announcement including an appropriate copyright notice and a
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.30-ReleaseNotes	   - add Copyright  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.40-ReleaseNotes	   - add SPDX and Copyright notices  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.30-ReleaseNotes	   - add copyright to help  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.25-ReleaseNotes	   - add copyrights, etc.  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.25-ReleaseNotes	   - add missing copyright notifications  [Ondrej Oprala]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.23-ReleaseNotes	   - cleanup copyright headers  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.23-ReleaseNotes	   - fix copyright noticed to be consistent (so all are LGPL)  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.40-ReleaseNotes	   - move Copyright in boilerplate.c  [Karel Zak]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.36-ReleaseNotes	   - order AUTHORS / COPYRIGHT / SEE ALSO / AVAILABILITY consistently  [Michael Kerrisk (man-pages)]
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.32-ReleaseNotes	   - udf  Update copyright  [Pali Rohár]
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/releases/v2.21-ReleaseNotes	   - update copyright years  [Karel Zak]
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/src/filter-parser.c	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/cctype.h	   Copyright (C) 2000-2003, 2006, 2008-2023 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_dlopen.c	   Copyright (C) Nalin Dahyabhai <nalin@redhat.com> 2003
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	  "The Program" refers to any copyrightable work licensed under this
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_pam_lastlog2_output.c	  1. Redistributions of source code must retain the above copyright notice,
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_pam_lastlog2_output.c	  2. Redistributions in binary form must reproduce the above copyright
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	  A "contributor" is a copyright holder who authorizes use under this
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_pam_lastlog2_output.c	  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+line	10	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_pam_lastlog2_output.c	  Copyright (c) 2023, Thorsten Kukuk <kukuk@suse.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/lastlog2P.h	  Copyright (c) 2024, Thorsten Kukuk <kukuk@suse.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	  Moreover, your license from a particular copyright holder is
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/src/tests/tst_pam_lastlog2_output.c	  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	  We protect your rights with a two-step method: (1) we copyright the
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	  We protect your rights with two steps: (1) copyright the software, and
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	  determined by copyright law applicable in the country mentioned in Article 15.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	 *\tCopyright (c) 2000-2001 Gunnar Ritter. All rights reserved.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/xxhash.h	 *      copyright notice, this list of conditions and the following disclaimer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cfdisk.c	 *     Copyright (C) 1994 Kevin E. Martin (martin@cs.unc.edu)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cfdisk.c	 *     Copyright (C) 2014-2023 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/xxhash.h	 *    * Redistributions of source code must retain the above copyright
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/logindefs.h	 *    copyright notices, this list of conditions, and the following
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/chfn.c	 *   (c) 1994 by salvatore valente <svalente@athena.mit.edu>
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/chfn.c	 *   (c) 2012 by Cody Maloney <cmaloney@theoreticalchaos.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.c	 *   Copyright 2003-2005 H. Peter Anvin - All Rights Reserved
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.c	 *   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.c	 *   The above copyright notice and this permission notice shall
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/setpwnam.h	 *  (c) 1994 Martin Schulze <joey@infodrom.north.de>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/setpwnam.c	 *  (c) 1994 Salvatore Valente <svalente@mit.edu>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/crc32.c	 *  COPYRIGHT (C) 1986 Gary S. Brown.  You may use this program, or
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcmk.c	 *  Copyright (C) 2008 Hayden A. James (hayden.james@gmail.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcmk.c	 *  Copyright (C) 2008 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/getopt.c	 *  Copyright (c) 1997-2014 Frodo Looijaard <frodo@frodo.looijaard.name>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.c	 * (C) 1991 Linus Torvalds. This file may be redistributed as per
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.minix.c	 * (C) 1991, 1992 Linus Torvalds. This file may be redistributed
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/logindefs.h	 * 1. Redistributions of source code must retain any existing copyright
+line	41	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-4-Clause-UC	 * 1. Redistributions of source code must retain the above copyright
+line	41	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-4-Clause-UC	 * 2. Redistributions in binary form must reproduce the above copyright
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/xxhash.h	 * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/crc64.c	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/uuidparse.c	 * All alterations (C) 2017 Sami Kerola
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/script.c	 * Copyright (C) 1980      Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/more.c	 * Copyright (C) 1980 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/setterm.c	 * Copyright (C) 1990 Gordon Irlam (gordoni@cs.ua.oz.au).  Conditions of use,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkswap.c	 * Copyright (C) 1991 Linus Torvalds
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/utmpdump.c	 * Copyright (C) 1991-2000 Miquel van Smoorenburg <miquels@cistron.nl>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/last.c	 * Copyright (C) 1991-2004 Miquel van Smoorenburg.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdisk.c	 * Copyright (C) 1992  A. V. Le Blanc (LeBlanc@mcc.ac.uk)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/hwclock.c	 * Copyright (C) 1992 Charles Hedrick, hedrick@cs.rutgers.edu
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ctrlaltdel.c	 * Copyright (C) 1992 Peter Orbaek <poe@daimi.aau.dk>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdformat.c	 * Copyright (C) 1992 Werner Almesberger
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ctrlaltdel.c	 * Copyright (C) 1992-1993 Rickard E. Faith <faith@cs.unc.edu>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/tunelp.c	 * Copyright (C) 1992-1997 Michael K. Johnson, johnsonm@redhat.com
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/su-common.c	 * Copyright (C) 1992-2006 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/dmesg.c	 * Copyright (C) 1993 Theodore Ts'o <tytso@athena.mit.edu>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcrm.c	 * Copyright (C) 1993 rishna balasubramanian
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.c	 * Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/readprofile.c	 * Copyright (C) 1994,1996 Alessandro Rubini (rubini@ipvvis.unipv.it)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/eject.c	 * Copyright (C) 1994-2005 Jeff Tranter (tranter@pobox.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/sfdisk.c	 * Copyright (C) 1995  Andries E. Brouwer (aeb@cwi.nl)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcs.c	 * Copyright (C) 1995 ike Jagdis <jaggy@purplet.demon.co.uk>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/getsize.c	 * Copyright (C) 1995, 1995 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/ismounted.c	 * Copyright (C) 1995,1996,1997,1998,1999,2000,2008 Theodore Ts'o.
+line	9	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/uuidP.h	 * Copyright (C) 1996, 1997 Theodore Ts'o.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/uuid.h	 * Copyright (C) 1996, 1997, 1998 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/gen_uuid.c	 * Copyright (C) 1996, 1997, 1998, 1999 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/utmpdump.c	 * Copyright (C) 1998 Danek Duvall <duvall@alumni.princeton.edu>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/uuid_time.c	 * Copyright (C) 1998, 1999 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin.c	 * Copyright (C) 1998-2003 Miquel van Smoorenburg.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.bfs.c	 * Copyright (C) 1999 Andries E. Brouwe
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkswap.c	 * Copyright (C) 1999 Jakub Jelinek <jj@ultra.linux.cz>
+line	10	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/cramfs.c	 * Copyright (C) 1999 by Andries Brouwer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/devname.c	 * Copyright (C) 1999, 2000, 2001, 2002, 2003 Theodore Ts'o
+line	14	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/cramfs.c	 * Copyright (C) 1999, 2000, 2003 by Theodore Ts'o
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/ext.c	 * Copyright (C) 1999, 2001 by Andries Brouwer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/uuidgen.c	 * Copyright (C) 1999, Andreas Dilger and Theodore Ts'o
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/hwclock-parse-date.c	 * Copyright (C) 1999-2000, 2002-2017 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.cramfs.c	 * Copyright (C) 1999-2002 Transmeta Corporation
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/list.h	 * Copyright (C) 1999-2008 by Theodore Ts'o
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/isosize.c	 * Copyright (C) 2000 Andries Brouwer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/pivot_root.c	 * Copyright (C) 2000 Werner Almesberger
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/helpers/test_byteswap.c	 * Copyright (C) 2000 by Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/devno.c	 * Copyright (C) 2000, 2001, 2003 Theodore Ts'o
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.cramfs.c	 * Copyright (C) 2000-2002 Transmeta Corporation
+line	10	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/blkid.h.in	 * Copyright (C) 2001 Andreas Dilger
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/cramfs.c	 * Copyright (C) 2001 by Andreas Dilger
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/resolve.c	 * Copyright (C) 2001, 2003 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/read.c	 * Copyright (C) 2001, 2003 Theodore Y. Ts'o
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/blkid.h.in	 * Copyright (C) 2003 Theodore Ts'o
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/logindefs.h	 * Copyright (C) 2003, 2004, 2005 Thorsten Kukuk
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/setarch.c	 * Copyright (C) 2003-2007 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/cramfs.c	 * Copyright (C) 2004 Kay Sievers <kay.sievers@vrfy.org>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/chrt.c	 * Copyright (C) 2004 Robert Love
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/version.c	 * Copyright (C) 2004 Theodore Ts'o.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/hfs.c	 * Copyright (C) 2004-2008 Kay Sievers <kay.sievers@vrfy.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/ionice.c	 * Copyright (C) 2005 Jens Axboe <jens@axboe.dk>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/nvidia_raid.c	 * Copyright (C) 2005 Kay Sievers <kay.sievers@vrfy.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/test_uuidd.c	 * Copyright (C) 2006 Hewlett-Packard Development Company, L.P.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcs.c	 * Copyright (C) 2006-2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/uuidd.c	 * Copyright (C) 2007  Theodore Ts'o
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rtcwake.c	 * Copyright (C) 2007 Bernhard Walle <bwalle@suse.de>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libfdisk/src/gpt.c	 * Copyright (C) 2007 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/uuidd.h	 * Copyright (C) 2007 Theodore Ts'o.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdisk.c	 * Copyright (C) 2007-2013 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkswap.c	 * Copyright (C) 2007-2014 Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/blockdev.c	 * Copyright (C) 2007-2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/hardlink.c	 * Copyright (C) 2008 - 2014 Julian Andres Klode <jak@jak-linux.org>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu.c	 * Copyright (C) 2008 Cai Qian <qcai@redhat.com>
+line	40	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/list.h	 * Copyright (C) 2008 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/encode.c	 * Copyright (C) 2008 Kay Sievers <kay.sievers@vrfy.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.c	 * Copyright (C) 2008, James Youngman <jay@gnu.org>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/partitions/partitions.c	 * Copyright (C) 2008-2009 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/fallocate.c	 * Copyright (C) 2008-2009 Red Hat, Inc. All rights reserved.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/minix.c	 * Copyright (C) 2008-2013 Karel Zak <kzak@redhat.com>
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/libmount.h.in	 * Copyright (C) 2008-2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.c	 * Copyright (C) 2008-2019, Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu.c	 * Copyright (C) 2008-2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/ubifs.c	 * Copyright (C) 2009 Corentin Chary <corentincj@iksaif.net>
+line	27	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/encode.c	 * Copyright (C) 2009 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/vmfs.c	 * Copyright (C) 2009 Mike Hommey <mh@glandium.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/unshare.c	 * Copyright (C) 2009 Mikhail Gusarov <dottedmag@dottedmag.net>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/bfs.c	 * Copyright (C) 2009 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/wipefs.c	 * Copyright (C) 2009 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/drbd.c	 * Copyright (C) 2009 by Bastian Friedrich <bastian.friedrich@collax.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/mbsalign.h	 * Copyright (C) 2009-2010 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/zfs.c	 * Copyright (C) 2009-2010 by Andreas Dilger <adilger@sun.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/canonicalize.c	 * Copyright (C) 2009-2013 Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.c	 * Copyright (C) 2009-2014 Karel Zak <kzak@redhat.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/cache.c	 * Copyright (C) 2009-2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/exfat.c	 * Copyright (C) 2010 Andrew Nayenko <resver@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/partx.c	 * Copyright (C) 2010 Davidlohr Bueso <dave@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/fsfreeze.c	 * Copyright (C) 2010 Hajime Taira <htaira@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/swaplabel.c	 * Copyright (C) 2010 Jason Borden <jborden@bluehost.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/befs.c	 * Copyright (C) 2010 Jeroen Oortwijn <oortwijn@gmail.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/swaplabel.c	 * Copyright (C) 2010 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/strv.c	 * Copyright (C) 2010 Lennart Poettering
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/fstrim.c	 * Copyright (C) 2010 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/nilfs.c	 * Copyright (C) 2010 by Jiro SEKIBA <jir@unicus.jp>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/mbsalign.h	 * Copyright (C) 2010-2013 Karel Zak <kzak@redhat.com>
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/samples/colors.c	 * Copyright (C) 2010-2014 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/findmnt.c	 * Copyright (C) 2010-2015 Red Hat, Inc. All rights reserved.
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/optmap.c	 * Copyright (C) 2010-2018 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/lsblk.c	 * Copyright (C) 2010-2018 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/prlimit.c	 * Copyright (C) 2011 Davidlohr Bueso <dave@gnu.org>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/match.h	 * Copyright (C) 2011 Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/mount.c	 * Copyright (C) 2011 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/minix_programs.h	 * Copyright (C) 2011 Sami Kerola <kerolasa@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/drbdproxy_datalog.c	 * Copyright (C) 2011 by Philipp Marek <philipp.marek@linbit.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/libuuid.sym	 * Copyright (C) 2011-2017 Kareil Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/tab_diff.c	 * Copyright (C) 2011-2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/hook_loopdev.c	 * Copyright (C) 2011-2022 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/dmesg.c	 * Copyright (C) 2011-2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdisk.c	 * Copyright (C) 2012  Davidlohr Bueso <dave@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/setpriv.c	 * Copyright (C) 2012 Andy Lutomirski <luto@amacapital.net>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libfdisk/src/sgi.c	 * Copyright (C) 2012 Davidlohr Bueso <dave@gnu.org>
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/resizepart.c	 * Copyright (C) 2012 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/wdctl.c	 * Copyright (C) 2012 Lennart Poettering
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/lvm.c	 * Copyright (C) 2012 Milan Broz <gmazyland@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/blkdiscard.c	 * Copyright (C) 2012 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/su-common.c	 * Copyright (C) 2012 SUSE Linux Products GmbH, Nuernberg
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/fileutils.c	 * Copyright (C) 2012 Sami Kerola <kerolasa@iki.fi>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin.c	 * Copyright (C) 2012 Werner Fink <werner@suse.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libfdisk/src/libfdisk.h.in	 * Copyright (C) 2012-2014 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/xxhash.h	 * Copyright (C) 2012-2020 Yann Collet
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/nsenter.c	 * Copyright (C) 2012-2023 Eric Biederman <ebiederm@xmission.com>
+line	9	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/addpart.c	 * Copyright (C) 2012-2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/fileutils.c	 * Copyright (C) 2012-2024 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/last.c	 * Copyright (C) 2013      Ondrej Oprala <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/f2fs.c	 * Copyright (C) 2013 Alejandro Martinez Ruiz <alex@nowcomputing.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/exfs.c	 * Copyright (C) 2013 Eric Sandeen <sandeen@redhat.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/refs.c	 * Copyright (C) 2013 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu.h	 * Copyright (C) 2013 Ondrej Oprala <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/bcache.c	 * Copyright (C) 2013 Rolf Fokkens <rolf@fokkens.nl>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/python/pylibmount.c	 * Copyright (C) 2013, Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/script.c	 * Copyright (C) 2013-2019 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu.h	 * Copyright (C) 2013-2023 Karel Zak <kzak@redhat.com>
+line	15	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdisk-menu.c	 * Copyright (C) 2014 Karel Zak <kzak@redhat.com>
+line	9	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/src/libsmartcols.h.in	 * Copyright (C) 2014 Ondrej Oprala <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/kill.c	 * Copyright (C) 2014 Sami Kerola <kerolasa@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libfdisk/src/libfdisk.sym	 * Copyright (C) 2014-2015 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/src/libsmartcols.sym	 * Copyright (C) 2014-2016 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/udf.c	 * Copyright (C) 2014-2017 Pali Rohár <pali.rohar@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/monitor.c	 * Copyright (C) 2014-2018 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fdisk.h	 * Copyright (C) 2014-2023 Karel Zak <kzak@redhat.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/strv.c	 * Copyright (C) 2015 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lsipc.c	 * Copyright (C) 2015 Karel Zak <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lsipc.c	 * Copyright (C) 2015 Ondrej Oprala <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/drbdmanage.c	 * Copyright (C) 2015 by Philipp Marek <philipp.marek@linbit.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/blkzone.c	 * Copyright (C) 2015,2016 Seagate Technology PLC
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/strv.c	 * Copyright (C) 2015-2022 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/btrfs.c	 * Copyright (C) 2016 David Sterba <dsterba@suse.cz>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/src/symbols.c	 * Copyright (C) 2016 Igor Gnatenko <i.gnatenko.brain@gmail.com>
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/samples/continuous.c	 * Copyright (C) 2016 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/mpool.c	 * Copyright (C) 2016 Micron Technology, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/colcrt.c	 * Copyright (C) 2016 Sami Kerola <kerolasa@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/btrfs.c	 * Copyright (C) 2016 Stanislav Brabec <sbrabec@suse.cz>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/su-common.c	 * Copyright (C) 2016-2017 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/exfs.c	 * Copyright (C) 2017 Hewlett Packard Enterprise Development LP
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/mbsedit.c	 * Copyright (C) 2017 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/src/predefined.c	 * Copyright (C) 2017 Philip Prindeville
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/helpers/test_sha1.c	 * Copyright (C) 2017 Philip Prindeville <philipp@redfish-solutions.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/ubi.c	 * Copyright (C) 2017 Rafał Miłecki <rafal@milecki.pl>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/vdo.c	 * Copyright (C) 2017 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/fincore.c	 * Copyright (C) 2017 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/apfs.c	 * Copyright (C) 2018 Harry Mallon <hjmallon@gmail.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/bitlocker.c	 * Copyright (C) 2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu-arm.c	 * Copyright (C) 2018 Riku Voipio <riku.voipio@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/stratis.c	 * Copyright (C) 2018 Tony Asleson <tasleson@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/partitions/atari.c	 * Copyright (C) 2018 Vaclav Dolezal <vdolezal@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/bluestore.c	 * Copyright (C) 2018 by Kenneth Van Alstyne <kvanals@kvanals.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/luks.c	 * Copyright (C) 2018-2024 Milan Broz <gmazyland@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/hook_veritydev.c	 * Copyright (C) 2019 Microsoft Corporation
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/helpers/test_strerror.c	 * Copyright (C) 2019 Patrick Steinhardt <ps@pks.im
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/irqtop.c	 * Copyright (C) 2019 zhenwei pi <pizhenwei@bytedance.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptlive.c	 * Copyright (C) 2019, Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lscpu-dmi.c	 * Copyright (C) 2020 FUJITSU LIMITED.  All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/erofs.c	 * Copyright (C) 2020 Gao Xiang
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/irqtop.c	 * Copyright (C) 2020 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/encode.c	 * Copyright (C) 2020 Pali Rohár <pali.rohar@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/zonefs.c	 * Copyright (C) 2020 Western Digital Corporation or its affiliates.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/sched_attr.h	 * Copyright (C) 2020-2021 Arm Ltd
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/sched_attr.h	 * Copyright (C) 2020-2021 Qais Yousef
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/c_strtod.c	 * Copyright (C) 2021 Karel Zak <kzak@redhat.com>
+line	8	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lsfd-cmd/lsfd.c	 * Copyright (C) 2021 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/blkpr.c	 * Copyright (C) 2021-2022 zhenwei pi <pizhenwei@bytedance.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/hook_idmap.c	 * Copyright (C) 2022 Christian Brauner (Microsoft) <brauner@kernel.org>
+line	9	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/src/optlist.c	 * Copyright (C) 2022 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/superblocks/cs_fvault2.c	 * Copyright (C) 2022 Milan Broz <gmazyland@gmail.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lsfd-cmd/decode-file-flags.c	 * Copyright (C) 2022 Red Hat, Inc. All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/waitpid.c	 * Copyright (C) 2022 Thomas Weißschuh <thomas@t-8ch.de>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/isosize.c	 * Copyright (C) 2023 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/column-list-table.h	 * Copyright (C) 2023 Red Hat, Inc. All rights reserved.
+line	8	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/audit-arch.h	 * Copyright (C) 2023 Thomas Weißschuh <thomas@t-8ch.de>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/samples/listmount.c	 * Copyright (C) 2024 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/irqtop.c	 * Copyright (C) 2024 Robin Jarry <robin@jarry.cc>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/coresched.c	 * Copyright (C) 2024 Thijs Raymakers, Phil Auld
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/seccomp.h	 * Copyright (C) 2024 Thomas Weißschuh <thomas@t-8ch.de>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lsfd-cmd/pidfd.h	 * Copyright (C) 2024 Xi Ruoyao <xry111@xry111.site>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.c	 * Copyright (C) 2024, Jonathan Ketchker <jonathan@ketchker.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/devname.c	 * Copyright (C) Andries Brouwer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.c	 * Copyright (C) David Engel, <david@ods.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.c	 * Copyright (C) Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/eject.c	 * Copyright (C) Michal Luscon <mluscon@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.c	 * Copyright (C) Ron Sommeling, <sommel@sci.kun.nl>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/colrm.c	 * Copyright (c) 1980 Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/whereis.c	 * Copyright (c) 1980 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/login.c	 * Copyright (c) 1980, 1987, 1988 The Regents of the University of California.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/colcrt.c	 * Copyright (c) 1980, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/renice.c	 * Copyright (c) 1983, 1989, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/logger.c	 * Copyright (c) 1983, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/vipw.c	 * Copyright (c) 1987 Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/rev.c	 * Copyright (c) 1987, 1992 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/mesg.c	 * Copyright (c) 1987, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/wall.c	 * Copyright (c) 1988, 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/kill.c	 * Copyright (c) 1988, 1993, 1994
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-4-Clause-UC	 * Copyright (c) 1989 The Regents of the University of California.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/ttymsg.c	 * Copyright (c) 1989, 1993
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/cal.c	 * Copyright (c) 1989, 1993, 1994
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/col.c	 * Copyright (c) 1990 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/look.c	 * Copyright (c) 1991, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/fallocate.c	 * Copyright (c) 2003-2005 Silicon Graphics, Inc.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cramfs.h	 * Copyright (c) 2004-2006 by Juliane Holzt, kju -at- fqdn.org
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cramfs.h	 * Copyright (c) 2008 Roy Peled, the.roy.peled  -at-  gmail
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cramfs_common.c	 * Copyright (c) 2008 Roy Peled, the.roy.peled  -at-  gmail.com
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin-consoles.c	 * Copyright (c) 2011 SuSE LINUX Products GmbH, All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin-consoles.h	 * Copyright (c) 2012 Werner Fink <werner@suse.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/zramctl.c	 * Copyright (c) 2014 Timofey Titovets <Nefelim4ag@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/crc64.c	 * Copyright (c) 2016 Lammert Bies
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/plymouth-ctrl.h	 * Copyright (c) 2016 SUSE Linux GmbH, All rights reserved.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/plymouth-ctrl.h	 * Copyright (c) 2016 Werner Fink <werner@suse.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/pipesz.c	 * Copyright (c) 2022 Nathan Sharp
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/bits.c	 * Copyright (c) 2024 Robin Jarry
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/boilerplate.c	 * Copyright (c) 20nn  Example Commercial, Inc
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/switch_root.c	 * Copyright 2002-2009 Red Hat, Inc.  All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rfkill.c	 * Copyright 2009 Johannes Berg <johannes@sipsolutions.net>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rfkill.c	 * Copyright 2009 Marcel Holtmann <marcel@holtmann.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/src/topology/topology.c	 * Copyright 2009 Red Hat, Inc.  All rights reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rfkill.c	 * Copyright 2009 Tim Gardner <tim.gardner@canonical.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/timeutils.h	 * Copyright 2010 Lennart Poettering
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rfkill.c	 * Copyright 2017 Sami Kerola <kerolasa@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/chcpu.c	 * Copyright IBM Corp. 2011
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/chmem.c	 * Copyright IBM Corp. 2016
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/raw.c	 * Copyright Red Hat Software, 1999, 2000
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/tunelp.c	 * Fixed copyright and license.
+line	82	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/all-io.h	 * No copyright is claimed.  This code is in the public domain; do with
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/crc32.h	 * No copyright is claimed. This code is in the public domain; do with
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/md5.h	 * No copyright is claimed. This code is in the public domain; do with it what
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/swapoff.c	 * Original implementation from Linux 0.99, without License and copyright in
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/include/xxhash.h	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/hardlink.c	 * The above copyright notice and this permission notice shall be included in
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/crc64.c	 * The above copyright notice and this permission notice shall be included in all
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/rfkill.c	 * copyright notice and this permission notice appear in all copies.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/login.c	 * copyright notice below.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/setterm.c	 * modification, and redistribution are contained in the file COPYRIGHT that
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.minix.c	 * partition.  Code adapted from e2fsck, Copyright (C) 1993, 1994 Theodore
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/login.c	 * provided that the above copyright notice and this paragraph are
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.c	 * the Linux copyright.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/md5.c	 * written by Colin Plumb in 1993, no copyright is claimed.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	 Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	"Copyright {copyright} 2003-2006 H. Peter Anvin. C'est un logiciel libre\xc2\xa0; "
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	"Copyright {copyright} 2003-2006 H. Peter Anvin. This is free software; see "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	"Copyright {copyright} 2004 Robert M. Love. C'est un logiciel libre\xc2\xa0; "
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	"Copyright {copyright} 2004 Robert M. Love. This is free software; see the "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ko.po	"Copyright {copyright} 2004 Robert M. Love. 이 프로그램은 자유 소프트웨어입니"
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	"Copyright {copyright} 2024 Thijs Raymakers and Phil Auld. This is free "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	"aggregate" if the compilation and its resulting copyright are not
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	"copyright" line and a pointer to where the full notice is found.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	#      /^# Copyright /
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2024 Free Software
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2024 Free Software Foundation,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2024 Free
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2024 Free
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ax_compare_version.m4	#   Copyright (c) 2008 Tim Toolan <toolan@ele.uri.edu>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ax_check_vscript.m4	#   Copyright (c) 2014 Kevin Cernekee <cernekee@gmail.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/config.guess	#   Copyright 1992-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/config.rpath	#   Copyright 1996-2013 Free Software Foundation, Inc.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ax_check_vscript.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/year2038.m4	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/install-sh	# Copyright (C) 1994 X Consortium
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/docs/Makefile.in	# Copyright (C) 1994-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makefile.in.in	# Copyright (C) 1995-1997, 2000-2007, 2009-2010 by Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	# Copyright (C) 1996-2019, 2021-2024 Free Software Foundation, Inc.
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/missing	# Copyright (C) 1996-2025 Free Software Foundation, Inc.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 1997-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ja.po	# Copyright (C) 1999 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright (C) 1999, 2000, 2001 Elrond <Elrond@Wunder-Nett.org>.
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/compile	# Copyright (C) 1999-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/es.po	# Copyright (C) 2000 Beth Powell <bpowell@turbolinux.com>.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/it.po	# Copyright (C) 2000, 2005, 2006, 2008 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/py-compile	# Copyright (C) 2000-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/es.po	# Copyright (C) 2001, 2002, 2003 Santiago Vila Doncel <sanvila@unex.es>.
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2001-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/et.po	# Copyright (C) 2002 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/et.po	# Copyright (C) 2002 Meelis Roos <mroos@linux.ee>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sl.po	# Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/hu.po	# Copyright (C) 2002, 2007, 2008, 2010 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2002-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ru.po	# Copyright (C) 2003 Free Software Foundation Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2003-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/uk.po	# Copyright (C) 2004 Free Software Foundation, Inc
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2024 Free Software
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	# Copyright (C) 2004-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2004-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/id.po	# Copyright (C) 2005 Adrian Bunk <bunk@stusta.de>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pl.po	# Copyright (C) 2005 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/autogen.sh	# Copyright (C) 2006-2010 - Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2006-2025 Free Software Foundation, Inc.
+line	39	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/functions.sh	# Copyright (C) 2007 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/checkconfig.sh	# Copyright (C) 2007 Matthias Koenig <mkoenig@suse.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/git-version-gen	# Copyright (C) 2007-2011 Free Software Foundation, Inc.
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/cal/column	# Copyright (C) 2007-2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/git-tp-sync	# Copyright (C) 2007-2025 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/lscpu	# Copyright (C) 2008 Cai Qian <qcai@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/login/islocal	# Copyright (C) 2008 James Youngman <jay@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/checkconfig.sh	# Copyright (C) 2008 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/mk-input.sh	# Copyright (C) 2008-2009 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_CN.po	# Copyright (C) 2008-2016, util-linux's authors.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libmount/mount.pc.in	# Copyright (C) 2008-2018 Karel Zak <kzak@redhat.com>
+line	10	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/update-potfiles	# Copyright (C) 2009 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2009-2025 Free Software Foundation, Inc.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/partx/partx	# Copyright (C) 2010 Davidlohr Bueso <dave@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/eu.po	# Copyright (C) 2010 Free Software Foundation, Inc.
+line	16	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/libmount/context	# Copyright (C) 2010 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	# Copyright (C) 2010-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ar-lib	# Copyright (C) 2010-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	# Copyright (C) 2011 Free Software Foundation, Inc.
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/build-sys/config	# Copyright (C) 2011 Karel Zak <kzak@redhat.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/colrm/rm2-2	# Copyright (C) 2011 Sami Kerola <kerolasa@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/git-version-gen	# Copyright (C) 2011-2021 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2011-2025 Free Software Foundation, Inc.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mount/umount-recursive	# Copyright (C) 2012 Karel Zak <kzak@redhat.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fdisk/bsd	# Copyright (C) 2013 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkdiscard/offsets	# Copyright (C) 2014 Federico Simoncelli <fsimonce@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mount/fslists	# Copyright (C) 2014 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/libmount/debug	# Copyright (C) 2014 Ondrej Oprala <ooprala@redhat.com
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/rename/basic	# Copyright (C) 2014 Sami Kerola <kerolasa@iki.fi>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/logger/errors	# Copyright (C) 2015 Sami Kerola <kerolasa@iki.fi>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/dm-err	# Copyright (C) 2016 Karel Zak <kzak@redhat.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/libmount/loop	# Copyright (C) 2016 Stanislav Brabec <sbrabec@suse.cz>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsns/netnsid	# Copyright (C) 2017 Masatake YAMATO <yamato@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/rename/overwrite	# Copyright (C) 2017 Sami Kerola <kerolasa@iki.fi>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsblk/lsblk	# Copyright (C) 2018 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/hardlink/options	# Copyright (C) 2018 Ruediger Meier <ruediger.meier@ga-group.nl>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/misc/mbsencode	# Copyright (C) 2018 Vaclav Dolezal <vdolezal@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/da.po	# Copyright (C) 2019 Free Software Foundation, Inc. og nedenstående oversættere.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt.po	# Copyright (C) 2019 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/chfn/gecos	# Copyright (C) 2019 Radka Skvarilova <rskvaril@redhat.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/col/io	# Copyright (C) 2020 Sami Kerola <kerolasa@iki.fi>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ko.po	# Copyright (C) 2021 Karel Zak <kzak@redhat.com>
+line	12	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsns/ioctl_ns	# Copyright (C) 2021 Masatake YAMATO <yamato@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mount/dm-verity	# Copyright (C) 2021 Vojtech Eichler <veichler@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ka.po	# Copyright (C) 2022 Karel Zak <kzak@redhat.com>
+line	13	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsfd/column-ainodeclass	# Copyright (C) 2022 Masatake YAMATO <yamato@redhat.com>
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lib/procfs	# Copyright (C) 2022 Thomas Weißschuh <thomas@t-8ch.de>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsfd/mkfds-udp-lite	# Copyright (C) 2022,2026 Masatake YAMATO <yamato@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/aclocal.m4	# Copyright (C) 2022-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/cal/column	# Copyright (C) 2023      Thomas Weißschuh <thomas@t-8ch.de>
+line	25	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/exch/exch	# Copyright (C) 2023 Masatake YAMATO <yamato@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lib/timeutils	# Copyright (C) 2023 Thomas Weißschuh <thomas@t-8ch.de>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsfd/mkfds-udp6	# Copyright (C) 2023,2026 Masatake YAMATO <yamato@redhat.com>
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/libtool.m4	# Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/column/ansiescape	# Copyright (C) 2024 Juarez Rudsatz <juarezr@gmail.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt_BR.po	# Copyright (C) 2024 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsns/filedesc	# Copyright (C) 2024 Masatake YAMATO <yamato@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/schedutils/coresched	# Copyright (C) 2024 Thijs Raymakers
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/output	# Copyright (C) 2024 Thomas Weißschuh <thomas.weissschuh@linutronix.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/misc/colors	# Copyright (C) 2025 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsfd/option-inet-udplite	# Copyright (C) 2026 Masatake YAMATO <yamato@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/util-linux.pot	# Copyright (C) YEAR Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/gl.po	# Copyright (c) 2010 Rosetta Contributors and Canonical Ltd 2010
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/misc/bits	# Copyright (c) 2024 Robin Jarry
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tools/checkincludes.pl	# Copyright abandoned, 2000, Niels Kristian Bech Jensen <nkbj@image.dk>.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/hr.po	# Copyright © 1996-2006, 2008-2018 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fr.po	# Copyright © 1996-2006, 2008-2025 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 1999, 2000, 2001, 2014 Elrond <Elrond@Wunder-Nett.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 2001, 2002 Karl Eichwalder.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sv.po	# Copyright © 2001, 2002, 2003, 2004, 2007, 2016, 2017, 2018, 2019, 2020, 20201Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ca.po	# Copyright © 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.po	# Copyright © 2002-2018 Lauri Nurmi <lanurmi@iki.fi>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/tr.po	# Copyright © 2004 Nilgün Belma Bugüner.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 2011,2015,2016 Philipp Thomas <pth@suse.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 2012 Arun Persaud <arun@nubati.net>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 2014 Benjamin Weis <benjamin.weis@gmx.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.po	# Copyright © 2015 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sr.po	# Copyright © 2020 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	# Copyright © 2021 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © 2023 Hermann Beckers <hjb-news@onlinehome.de>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ro.po	# Copyright © 2023, 2024, 2025 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	# Copyright © Michael Piefel <piefel@informatik.hu-berlin.de>, 2002, 2004, 2005, 2007, 2008.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/cs.po	# Copyright © of this file:
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/install-sh	# following copyright and license.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	# their copyright.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright (c) 2017 Sami Kerola
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright 1993, 1994, 1995 by Theodore Ts'o.  All Rights Reserved.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright 2000 Andreas Dilger (adilger@turbolinux.com)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright 2001 Gunnar Ritter
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright 2009 by Karel Zak.  All Rights Reserved.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  Copyright 2014 Ondrej Oprala (ondrej.oprala@gmail.com)
+line	44	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#.  No copyright is claimed.  This code is in the public domain; do with
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. (c) 1980, 1989, 1991 The Regents of the University of California
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. (c) 1994 by salvatore valente <svalente@athena.mit.edu>
+line	308	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. 1. Redistributions of source code must retain the above copyright
+line	308	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. 2. Redistributions in binary form must reproduce the above copyright
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 1994-2005 Jeff Tranter (tranter@pobox.com)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 1998-2004 Miquel van Smoorenburg.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 1998-2006 Miquel van Smoorenburg.
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2004 Robert Love
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2006-2012 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2008 - 2012 Julian Andres Klode. See hardlink.c for license.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2010 Michael Krapp
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2012 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2012 Karel Zak <kzak@redhat.com>.
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2013 Karel Zak <kzak@redhat.com>
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2014 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2015 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2020-2021 Arm Ltd
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2020-2021 Qais Yousef <qyousef@layalina.io>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2021 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (C) 2023 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1980, 1989, 1991 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1980, 1990 Regents of the University of California.
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1980, 1990 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1980, 1990, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1980, 1991, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1983, 1990, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1983, 1991 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1983, 1991, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1985, 1992 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1987, 1990, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1988 Mark Nudleman
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1988, 1990 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1989, 1990 The Regents of the University of California.
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1989, 1990, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1989, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1990 The Regents of the University of California.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1990, 1993
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1992 Rik Faith (faith@cs.unc.edu)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1996 Andries Brouwer
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 1996-2004 Andries Brouwer
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright (c) 2024 Robin Jarry
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1990 Gordon Irlam (gordoni@cs.ua.oz.au)
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1992 Rickard E. Faith (faith@cs.unc.edu)
+line	44	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1992, 1993 Rickard E. Faith (faith@cs.unc.edu)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1992, 1993, 1994 Rickard E. Faith (faith@cs.unc.edu)
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1993 Rickard E. Faith (faith@cs.unc.edu)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1993, 1994, 1995 by Theodore Ts'o.  All Rights Reserved.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1994 Kevin E. Martin (martin@cs.unc.edu)
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1994 Salvatore Valente (svalente@mit.edu)
+line	44	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1998 Andries E. Brouwer (aeb@cwi.nl)
+line	110	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1999 Andreas Dilger (adilger@enel.ucalgary.ca)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 1999 Andries E. Brouwer (aeb@cwi.nl)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2000 Colin Watson (cjw44@cam.ac.uk)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2001 Andreas Dilger (adilger@turbolinux.com)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2002 Andre C. Mazzone (linuxdev@karagee.com)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2003-2006 H. Peter Anvin - All Rights Reserved
+line	44	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2007 Karel Zak <kzak@redhat.com>
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2007 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2007 by Theodore Ts'o.  All Rights Reserved.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2008 Hayden A. James (hayden.james@gmail.com)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2008 Tilman Schmidt (tilman@imap.cc)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2010 Davidlohr Bueso <dave@gnu.org>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2010 Jason Borden <jborden@bluehost.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2011 Davidlohr Bueso <dave@gnu.org>
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2012 Davidlohr Bueso <dave@gnu.org>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2012 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2012 Vivek Goyal <vgoyal@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2014 Ondrej Oprala <ooprala@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2014 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2015 Karel Zak <kzak@redhat.com>
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2017 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2021 Red Hat, Inc.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. Copyright 2023 Thorsten Kukuk (kukuk@suse.de)
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	66	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. TRANSLATORS: Keep {copyright} untranslated.
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. The above copyright notice and this permission notice shall
+line	22	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	#. manual provided the copyright notice and this permission notice are
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/es.po	#| msgid "Copyright {copyright} 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ko.po	#| msgid "Copyright {copyright} 2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ "Copyright \\\\(co 2004 Robert M. Love. C'est un logiciel libre\xc2\xa0; consultez "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ "Copyright © 2004 Robert M. Love. This is free software; see the source "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	#~ msgid "%s %s Copyright (c) 2000-2001 Gunnar Ritter. All rights reserved.\\n"
+line	15	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgid "Copyright (C) 1994-1999 Kevin E. Martin & aeb"
+line	16	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgid "Copyright (C) 1994-2002 Kevin E. Martin & aeb\\n"
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgid "Copyright (C) 2014 Karel Zak <kzak@redhat.com> "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgid "Copyright \\\\(co 2003-2006 H. Peter Anvin."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgid "Copyright © 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgid "Copyright © 2008-2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	#~ msgstr "%s %s Ауторска права © 2000-2001 Гунар Ритер. Сва права су задржана.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.po	#~ msgstr "Bản quyền (C) 2014 Karel Zak <kzak@redhat.com> "
+line	8	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/et.po	#~ msgstr "Copyright (C) 1994-1999 Kevin E. Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/et.po	#~ msgstr "Copyright (C) 1994-2000 Kevin E. Martin & aeb\\n"
+line	8	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/eu.po	#~ msgstr "Copyright (C) 1994-2002 Kevin E. Martin & aeb\\n"
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ja.po	#~ msgstr "Copyright (C) 2014 Karel Zak <kzak@redhat.com> "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt_BR.po	#~ msgstr "Copyright (C) 2014 Karel Zak <kzak@redhat.com>"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgstr "Copyright \\\\(co 2003-2006 H. Peter Anvin."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgstr "Copyright \\\\(co 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~ msgstr "Copyright \\\\(co 2008-2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.po	#~ msgstr "Copyright © 1994-1999 Kevin E. Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sv.po	#~ msgstr "Copyright © 1994-1999 Kevin E. Martin och aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.po	#~ msgstr "Copyright © 1994-2002 Kevin E. Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sv.po	#~ msgstr "Copyright © 1994-2002 Kevin E. Martin och aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgstr "Copyright © 1994–1999 Kevin E.\xe2\x80\xafMartin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgstr "Copyright © 1994–2002 Kevin E.\xc2\xa0Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.po	#~ msgstr "Copyright © 2014 Karel Zak <kzak@redhat.com> "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	#~ msgstr "Copyright © 2014 Karel Žák <kzak@redhat.com> "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/nl.po	#~ msgstr "Copyright © Karel Zak <kzak@redhat.com> 2014 "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/id.po	#~ msgstr "Hak Cipta (C) 1994-1999 Kevin E. Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/id.po	#~ msgstr "Hak Cipta (C) 1994-2002 Kevin E. Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.po	#~ msgstr "Tác quyền © năm 1994-1999 của Kevin E. Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.po	#~ msgstr "Tác quyền © năm 1994-2002 của Kevin E. Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_CN.po	#~ msgstr "版权所有 (C) 1994-1999 Kevin E. Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_CN.po	#~ msgstr "版权所有 (C) 1994-2002 Kevin E. Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_TW.po	#~ msgstr "版權©1994-2002 Kevin E. Martin & aeb\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_TW.po	#~ msgstr "著作權©1994-1999 Kevin E.Martin & aeb"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~| "Copyright \\\\(co 2004 Robert M. Love.  This is free software; see the "
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~| msgid "Copyright \\\\(co 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	#~| msgid "Copyright \\\\(co 2008-2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	(1) assert copyright on the software, and (2) offer you this License
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/mount.8.adoc	(c) 1980, 1989, 1991 The Regents of the University of California
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/chfn.1.adoc	(c) 1994 by salvatore valente <svalente@athena.mit.edu>
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1	.SH "COPYRIGHT"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/uuidparse.1.adoc	// Copyright (c) 2017 Sami Kerola
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/findfs.8.adoc	// Copyright 1993, 1994, 1995 by Theodore Ts'o.  All Rights Reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/blkid.8.adoc	// Copyright 2000 Andreas Dilger (adilger@turbolinux.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.1.adoc	// Copyright 2001 Gunnar Ritter
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/wipefs.8.adoc	// Copyright 2009 by Karel Zak.  All Rights Reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/lslogins.1.adoc	// Copyright 2014 Ondrej Oprala (ondrej.oprala@gmail.com)
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/newgrp.1.adoc	// No copyright is claimed.  This code is in the public domain; do with
+line	6	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1.adoc	//TRANSLATORS: Keep {copyright} untranslated.
+line	29	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-3-Clause	1. Redistributions of source code must retain the above copyright
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-2-Clause	1. Redistributions of source code must retain the above copyright notice, this
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	29	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-3-Clause	2. Redistributions in binary form must reproduce the above copyright
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-2-Clause	2. Redistributions in binary form must reproduce the above copyright notice,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	4. Limitations on copyright
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1.adoc	:copyright: ©
+line	7	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1.adoc	== COPYRIGHT
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.MIT	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	Attribution right: The Licensee shall keep intact all copyright, patent or
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/Makevars	COPYRIGHT_HOLDER = Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/ltmain.sh	Copyright (C) $year Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/eject.1.adoc	Copyright (C) 1994-2005 Jeff Tranter (tranter@pobox.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/deprecated.txt	Copyright (C) 1997 The Open Group
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/last.1.adoc	Copyright (C) 1998-2004 Miquel van Smoorenburg.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin.8.adoc	Copyright (C) 1998-2006 Miquel van Smoorenburg.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/chrt.1.adoc	Copyright (C) 2004 Robert Love
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/mount.8.adoc	Copyright (C) 2006-2012 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/hardlink.1.adoc	Copyright (C) 2008 - 2012 Julian Andres Klode. See hardlink.c for license.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/utmpdump.1.adoc	Copyright (C) 2010 Michael Krapp
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/sulogin.8.adoc	Copyright (C) 2012 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/eject.1.adoc	Copyright (C) 2012 Karel Zak <kzak@redhat.com>.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.8.adoc	Copyright (C) 2013 Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/sfdisk.8.adoc	Copyright (C) 2014 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/chrt.1.adoc	Copyright (C) 2015 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/uclampset.1.adoc	Copyright (C) 2020-2021 Arm Ltd
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/uclampset.1.adoc	Copyright (C) 2020-2021 Qais Yousef <qyousef@layalina.io>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/hardlink.1.adoc	Copyright (C) 2021 Karel Zak <kzak@redhat.com>
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libsmartcols/scols-filter.5.adoc	Copyright (C) 2023 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/libtool.m4	Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/fstab.5.adoc	Copyright (c) 1980, 1989, 1991 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/script.1.adoc	Copyright (c) 1980, 1990 Regents of the University of California.
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/whereis.1.adoc	Copyright (c) 1980, 1990 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/colcrt.1.adoc	Copyright (c) 1980, 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/ul.1.adoc	Copyright (c) 1980, 1991, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/logger.1.adoc	Copyright (c) 1983, 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/vipw.8.adoc	Copyright (c) 1983, 1991 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/renice.1.adoc	Copyright (c) 1983, 1991, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/rev.1.adoc	Copyright (c) 1985, 1992 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/mesg.1.adoc	Copyright (c) 1987, 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/more.1.adoc	Copyright (c) 1988 Mark Nudleman
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/more.1.adoc	Copyright (c) 1988, 1990 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/wall.1.adoc	Copyright (c) 1989, 1990 The Regents of the University of California.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/cal.1.adoc	Copyright (c) 1989, 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/write.1.adoc	Copyright (c) 1989, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/col.1.adoc	Copyright (c) 1990 The Regents of the University of California.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/look.1.adoc	Copyright (c) 1990, 1993
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/more.1.adoc	Copyright (c) 1992 Rik Faith (faith@cs.unc.edu)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/umount.8.adoc	Copyright (c) 1996 Andries Brouwer
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/mount.8.adoc	Copyright (c) 1996-2004 Andries Brouwer
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/liblastlog2/COPYING	Copyright (c) 2023, Thorsten Kukuk
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/bits.1.adoc	Copyright (c) 2024 Robin Jarry
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/setterm.1.adoc	Copyright 1990 Gordon Irlam (gordoni@cs.ua.oz.au)
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/lslocks.8.adoc	Copyright 1992 Rickard E. Faith (faith@cs.unc.edu)
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.8.adoc	Copyright 1992, 1993 Rickard E. Faith (faith@cs.unc.edu)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.minix.8.adoc	Copyright 1992, 1993, 1994 Rickard E. Faith (faith@cs.unc.edu)
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/config/config.guess	Copyright 1992-2025 Free Software Foundation, Inc.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/login-utils/login.1.adoc	Copyright 1993 Rickard E. Faith (faith@cs.unc.edu)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/fsck.8.adoc	Copyright 1993, 1994, 1995 by Theodore Ts'o.  All Rights Reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/cfdisk.8.adoc	Copyright 1994 Kevin E. Martin (martin@cs.unc.edu)
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/lslocks.8.adoc	Copyright 1994 Salvatore Valente (svalente@mit.edu)
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.8.adoc	Copyright 1998 Andries E. Brouwer (aeb@cwi.nl)
+line	10	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libuuid/man/uuid.3.adoc	Copyright 1999 Andreas Dilger (adilger@enel.ucalgary.ca)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.bfs.8.adoc	Copyright 1999 Andries E. Brouwer (aeb@cwi.nl)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/setterm.1.adoc	Copyright 2000 Colin Watson (cjw44@cam.ac.uk)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/libblkid/libblkid.3.adoc	Copyright 2001 Andreas Dilger (adilger@turbolinux.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcrm.1.adoc	Copyright 2002 Andre C. Mazzone (linuxdev@karagee.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.1.adoc	Copyright 2003-2006 H. Peter Anvin - All Rights Reserved
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/blockdev.8.adoc	Copyright 2007 Karel Zak <kzak@redhat.com>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/addpart.8.adoc	Copyright 2007 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/uuidd.8.adoc	Copyright 2007 by Theodore Ts'o.  All Rights Reserved.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ipcmk.1.adoc	Copyright 2008 Hayden A. James (hayden.james@gmail.com)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/ldattach.8.adoc	Copyright 2008 Tilman Schmidt (tilman@imap.cc)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/partx.8.adoc	Copyright 2010 Davidlohr Bueso <dave@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/swaplabel.8.adoc	Copyright 2010 Jason Borden <jborden@bluehost.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/prlimit.1.adoc	Copyright 2011 Davidlohr Bueso <dave@gnu.org>
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/mkfs.minix.8.adoc	Copyright 2012 Davidlohr Bueso <dave@gnu.org>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/resizepart.8.adoc	Copyright 2012 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/resizepart.8.adoc	Copyright 2012 Vivek Goyal <vgoyal@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/terminal-colors.d.5.adoc	Copyright 2014 Ondrej Oprala <ooprala@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lib/terminal-colors.d.5.adoc	Copyright 2014 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/lsns.8.adoc	Copyright 2015 Karel Zak <kzak@redhat.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/fincore.1.adoc	Copyright 2017 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/lsfd-cmd/lsfd.1.adoc	Copyright 2021 Red Hat, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/misc-utils/lastlog2.8.adoc	Copyright 2023 Thorsten Kukuk (kukuk@suse.de)
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/chcpu.8.adoc	Copyright IBM Corp. 2011
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.1.adoc	Copyright {copyright} 2003-2006 H. Peter Anvin. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1.adoc	Copyright {copyright} 2004 Robert M. Love. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1.adoc	Copyright {copyright} 2008 James Youngman
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1.adoc	Copyright {copyright} 2008-2019 Karel Zak
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptlive.1.adoc	Copyright {copyright} 2019 Karel Zak
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1.adoc	Copyright {copyright} 2024 Jonathan Ketchker
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/coresched.1.adoc	Copyright {copyright} 2024 Thijs Raymakers and Phil Auld. This is free software licensed under the EUPL.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.1	Copyright © 2003\\-2006 H. Peter Anvin. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/taskset.1	Copyright © 2004 Robert M. Love. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1	Copyright © 2008 James Youngman
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1	Copyright © 2008\\-2019 Karel Zak
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptlive.1	Copyright © 2019 Karel Zak
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/term-utils/scriptreplay.1	Copyright © 2024 Jonathan Ketchker
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/schedutils/coresched.1	Copyright © 2024 Thijs Raymakers and Phil Auld. This is free software licensed under the EUPL.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-2-Clause	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	Each Contributor warrants that the copyright in the modifications he/she brings
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/getopt.txt	Files in the gnu directory are from glibc-2.0.4: copyright (C) 1987, 88,
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.1.adoc	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.BSD-2-Clause	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.MIT	The above copyright notice and this permission notice (including the next
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/sys-utils/flock.1.adoc	The above copyright notice and this permission notice shall
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	The original Licensor warrants that the copyright in the Original Work granted
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	a notice following the copyright notice attached to the Work, a repository where
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	a notice placed by the copyright holder saying it may be distributed
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	add to a covered work, you may (if authorized by the copyright holders of
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	appropriate copyright notice and disclaimer of warranty; keep intact
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	appropriately publish on each copy an appropriate copyright notice;
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	author or copyright holder as a result of your choosing to follow a
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	certain countries either by patents or by copyrighted interfaces, the
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/getopt.txt	copy it, it is copyright (c) 1997-2005 by Frodo Looijaard
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	copyright as stated in Article 6 of this Licence.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	copyright holder, and you cure the violation prior to 30 days after
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	copyright law: that is to say, a work containing the Library or a
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	copyright notice and disclaimer of warranty; keep intact all the
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.ISC	copyright notice and this permission notice appear in all copies.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	copyright notice for the Library among them, as well as a reference
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	copyright notice for the Work:
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	copyright on the Program, and are irrevocable provided the stated
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	copyrighted by the Free Software Foundation, write to the Free
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2013 Free Software Foundation,
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/gettext.m4	dnl Copyright (C) 1995-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/lib-link.m4	dnl Copyright (C) 2001-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/intlmacosx.m4	dnl Copyright (C) 2004-2013 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/compiler.m4	dnl Copyright (C) 2008-2011 Free Software Foundation, Inc.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/pkg.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/m4/pkg.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	during execution displays copyright notices, you must include the
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	finally terminates your license, and (b) permanently, if the copyright
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	for which you have or can give appropriate copyright permission.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	in a fashion requiring copyright permission, other than the making of an
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	infringement under applicable copyright law, except executing it on a
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	license from a particular copyright holder is reinstated (a)
+line	2	util-linux-2.41.6.tar.xz:util-linux-2.41.6/disk-utils/sfdisk.8.adoc	manual provided the copyright notice and this permission notice are
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	means either the Program or any derivative work under copyright law:
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	modify any covered work.  These actions infringe copyright if you do
+line	33	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ca.po	msgid "%s %s Copyright (c) 2000-2001 Gunnar Ritter. All rights reserved.\\n"
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "COPYRIGHT"
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "Copyright IBM Corp. 2011"
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgid "Copyright {copyright} 2003-2006 H. Peter Anvin. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgid "Copyright {copyright} 2004 Robert M. Love. This is free software; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "Copyright {copyright} 2008 James Youngman"
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "Copyright {copyright} 2008-2019 Karel Zak"
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "Copyright {copyright} 2019 Karel Zak"
+line	11	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/util-linux-man.pot	msgid "Copyright {copyright} 2024 Jonathan Ketchker"
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgid "Copyright {copyright} 2024 Thijs Raymakers and Phil Auld. This is free software licensed under the EUPL."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/nl.po	msgstr "%s %s Copyright (C) 2000-2001 Gunnar Ritter.  Alle rechten voorbehouden.\\n"
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ja.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. All rights reserved.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Alle Rechte vorbehalten.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/hr.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Sva prava pridržana.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/es.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Todos los derechos reservados.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Todos os direitos reservados.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt_BR.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Todos os diritos reservados.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ca.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Tots els drets reservats."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fr.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Tous droits réservés.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pl.po	msgstr "%s %s Copyright (c) 2000-2001 Gunnar Ritter. Wszelkie prawa zastrzeżone.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sv.po	msgstr "%s %s Copyright © 2000-2001 Gunnar Ritter. Med ensamrätt.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.po	msgstr "%s %s Copyright © 2000–2001 Gunnar Ritter. Všechna práva vyhrazena.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ro.po	msgstr "%s %s Drepturi de autor © 2000-2001 Gunnar Ritter. Toate drepturile rezervate.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.po	msgstr "%s %s Tekijänoikeudet (c) 2000-2001 Gunnar Ritter. Kaikki oikeudet pidätetään.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/tr.po	msgstr "%s %s Telif Hakkı (c) 2000-2001 Gunnar Ritter. Tüm hakkları saklıdır.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.po	msgstr "%s %s Tác quyền (c) 2000-2001 Gunnar Ritter. Giữ toàn bộ bản quyền.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/uk.po	msgstr "%s %s © Gunnar Ritter, 2000–2001. Всі права застережено.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sr.po	msgstr "%s %s Ауторска права © 2000-2001 Гунар Ритер. Сва права су задржана.\\n"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_TW.po	msgstr "%s %s 著作權©2000-2001 Gunnar Ritter。版權所有。\\n"
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "COPYRIGHT"
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright IBM Corp. 2011"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/fr.po	msgstr "Copyright IBM Corp.\xc2\xa02011"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2003-2006 H. Peter Anvin. Dies ist freie Software, in den Quellen finden Sie die Bedingungen zur Vervielfältigung und Weitergabe. Es gibt KEINE Garantie, auch nicht für die MARKTREIFE oder die TAUGLICHKEIT FÜR EINEN BESTIMMTEN ZWECK."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2004 Robert M. Love. Dies ist freie Software, in den Quellen finden Sie die Bedingungen zur Vervielfältigung und Weitergabe. Es gibt KEINE Garantie, auch nicht für die MARKTREIFE oder die TAUGLICHKEIT FÜR EINEN BESTIMMTEN ZWECK."
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2008 James Youngman"
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2008-2019 Karel Zak"
+line	5	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2024 Jonathan Ketchker"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/de.po	msgstr "Copyright {copyright} 2024 Thijs Raymakers und Phil Auld. Dies ist freie Software, lizenziert unter der EUPL."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2003-2006 H. Peter Anvin. Acesta este un software liber; consultați sursa pentru condițiile de copiere. Nu există nicio garanție; nici măcar pentru COMERCIALIZARE sau ADECVARE LA UN SCOP PARTICULAR."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2004 Robert M. Love. Acesta este un software liber; consultați sursa pentru condițiile de copiere. Nu există nicio garanție; nici măcar pentru COMERCIALIZARE sau ADECVARE LA UN SCOP PARTICULAR."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2008-2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2024 Jonathan Ketchker"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/ro.po	msgstr "Drepturi de autor {copyright} 2024 Thijs Raymakers și Phil Auld. Acesta este un software liber sub licența EUPL."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/pl.po	msgstr "Prawa autorskie zastrzeżone {copyright} 2003-2006 H. Peter Anvin. Jest to wolne oprogramowanie; warunki rozpowszechniania znajdują się w źródle programu. NIE ma gwarancji, nawet PRZYDATNOŚCI HANDLOWEJ czy PRZYDATNOŚCI DO OKREŚLONEGO CELU."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} 2008 James Youngman, 2008"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} H. Peter Anvin, 2003. Це програмне забезпечення є вільним, умови копіювання викладено у його початкових кодах Умовами ліцензування програми НЕ передбачено жодних гарантій, зокрема гарантій працездатності або придатності для певної мети."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} Jonathan Ketchker, 2024"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} Karel Zak, 2008-2019"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} Karel Zak, 2019"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/uk.po	msgstr "{copyright} Robert M. Love, 2004. Це програмне забезпечення є вільним, умови копіювання викладено у його початкових кодах. Умовами ліцензування програми НЕ передбачено жодних гарантій, зокрема гарантій працездатності або придатності для певної мети."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2003-2006. H. Peter Anvin. Ово је слободан софтвер; погледајте извор за услове умножавања. Нема НИКАКВЕ гаранције; чак ни о ТРЖИШНОЈ ВРЕДНОСТИ или ПРИЛАГОЂЕНОСТИ ПОСЕБНОЈ НАМЕНИ."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2004 Robert M. Love. Ово је слободан софтвер; погледајте извор за услове умножавања. Нема НИКАКВЕ гаранције; чак ни о ТРЖИШНОЈ ВРЕДНОСТИ или ПРИЛАГОЂЕНОСТИ ПОСЕБНОЈ НАМЕНИ."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2008 James Youngman"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2008-2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2019 Karel Zak"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2024 Jonathan Ketchker"
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po-man/sr.po	msgstr "Ауторска права {copyright} 2024 Thijs Raymakers и Phil Auld. Ово је слободан софтвер лиценциран под EUPL."
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	not control copyright.  Those thus making or running the covered works
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	original copyright holder who places the Library under this License may add
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	original copyright holder who places the Program under this License
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	program which contains a notice placed by the copyright holder or
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	provisionally, unless and until the copyright holder explicitly and
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	reinstated permanently if the copyright holder notifies you of the
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	reproducing the content of the copyright notice.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	rights of fair use or other equivalent, as provided by copyright law.
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.LGPL-2.1-or-later	school, if any, to sign a "copyright disclaimer" for the library, if
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/text-utils/pg.c	static char *copyright;
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	sublicensable licence to do the following, for the duration of copyright vested
+line	4	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	the "copyright" line and a pointer to where the full notice is found.
+line	3	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-2.0-only	to ask for permission.  For software which is copyrighted by the Free
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.EUPL-1.2	use is covered by a right of the copyright holder of the Work).
+line	1	util-linux-2.41.6.tar.xz:util-linux-2.41.6/Documentation/licenses/COPYING.GPL-3.0-or-later	your copyrighted material outside their relationship with you.
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ca.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/cs.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/da.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/de.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/es.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/et.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/eu.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fi.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/fr.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/gl.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/hr.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/hu.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/id.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/it.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ja.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ka.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ko.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/nl.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pl.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/pt_BR.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ro.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/ru.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sk.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sl.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sr.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/sv.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/tr.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/uk.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/vi.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_CN.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/po/zh_TW.gmo
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/blkid-output.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/adaptec-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/apfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bcache-B.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bcache-C.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bcache-journal.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bcachefs-2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bcachefs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/befs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bitlocker-win7.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/bluestore.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/btrfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/cramfs-big.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/cramfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/cs_fvault2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ddf-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/drbd-v08.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/drbd-v09.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/drbdmanage-control-volume.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/erofs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/exfat.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ext2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ext3.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ext4.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/f2fs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat16_noheads.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_cp850_O_tilde.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_label_64MB.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_dosfslabel_NO_NAME.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_dosfslabel_empty.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_dosfslabel_label2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_mlabel_NO_NAME.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_mlabel_erase.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_xp_erase.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_label1_xp_label2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none_dosfslabel_NO_NAME.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none_dosfslabel_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none_dosfslabel_label1_xp_label2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none_xp_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_mkdosfs_none_xp_label1_dosfslabel_label2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_xp_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_xp_none.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_xp_none_dosfslabel_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/fat32_xp_none_mlabel_label1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/gfs2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/hfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/hfsplus.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/hpfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/hpt37x-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/hpt45x-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso-different-iso-joliet-label.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso-joliet.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso-multi-0-174-348-genisoimage.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso-rr-joliet.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso-unicode-long-label.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/iso.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/isw-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/jbd.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/jfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/jmicron-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/lsi-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/luks1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/luks2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/lvm2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/mdraid-1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/mdraid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/minix-BE.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/minix-LE.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/mpool.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/netware.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/nilfs2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ntfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/nvidia-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ocfs2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/promise-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/reiser3.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/reiser4.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/romfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/silicon-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/small-fat32.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/squashfs3.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/squashfs4.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/swap-luks.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/swap0.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/swap1-big.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/swap1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/tuxonice.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ubi.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ubifs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-bdr-2.60-nero.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-cd-mkudfiso-20100208.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-cd-nero-6.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-macosx-2.60-4096.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.0.0-1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.0.0-2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-1.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-3.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-4.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-5.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-6.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-7.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-1.3-8.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-mkudffs-2.2.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-udfclient-0.7.5.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-udfclient-0.7.7.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-hdd-win7.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-multi-0-320-640-mkudffs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf-multi-0-417-834-genisoimage.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/udf.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/ufs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/vdo.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/via-raid.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/vmfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/vmfs_volume.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/vxfs-be.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/vxfs-le.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/xfs-log.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/xfs-v5.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/xfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/zfs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-fs/zonefs.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/atari-primary.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/atari-xgm.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/bsd.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/dos+bsd.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/gpt.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/sgi.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/blkid/images-pt/sun.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/colcrt/crash1
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/colcrt/crash2
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/colcrt/nasty-input
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/cramfs/cramfs-big.img
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/cramfs/cramfs-little.img
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/dmesg/cid-kmsg-input
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/dmesg/cid-kmsg-newlines
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/dmesg/kmsg-input
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-371061095
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-53142
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-53149
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-53160
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-55282
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-55291
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-55318
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_blkid_fuzz_files/oss-fuzz-62691
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_fdisk_script_fuzz_files/github-1015-1
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_last_fuzz_files/github-1097
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/fuzzers/test_mount_fuzz_files/oss-fuzz-23722
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/hardlink/testdir1.tar.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/hexdump/files/ascii.in
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/isosize/sample.iso.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lib/procfs-data/proc/1/cmdline
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lib/procfs-data/proc/2/cmdline
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lib/procfs-data/proc/3/cmdline
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsblk/dumps/simple-lvm.tar.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsblk/dumps/simple-nvme.tar.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/arm-A510-A710-A715-X3.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/armv7.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/loongarch-kvm_on_loongson_3c6000.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/loongarch-loongson_3a5000_hv.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/ppc-qemu.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/ppc64-POWER7-64cpu.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/ppc64-POWER7.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/rv64-linux.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/rv64-milkvpioneer.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/rv64-visionfive2.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/s390-kvm.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/s390-lpar-drawer.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/s390-lpar.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/s390-nested-virt.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/s390-zvm.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/sparc64.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/vbox-win.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/vmware_fpe.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/x86_64-64cpu-linux6.2.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/x86_64-64cpu.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/x86_64-dell_e4310.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lscpu/dumps/x86_64-epyc_7451.tar.gz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsmem/dumps/s390-zvm-6g.tar.bz2
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/lsmem/dumps/x86_64-16g.tar.bz2
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/minix/broken-root
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/minix/debian.bug.773892
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mkswap/BE-4096.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mkswap/BE-8192.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mkswap/LE-4096.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/mkswap/LE-8192.img.xz
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-a.BE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-a.LE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-b.BE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-b.LE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-ipv6.BE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/utmp/wtmp-ipv6.LE
+binary-head	util-linux-2.41.6.tar.xz:util-linux-2.41.6/tests/ts/wipefs/images/bcachefs.img.xz

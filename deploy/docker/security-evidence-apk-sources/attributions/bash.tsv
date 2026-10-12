@@ -1,0 +1,635 @@
+# chio.attribution-lines.v8 origin=bash files=1481 files_with_lines=624 binary_heads=49 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	\t\t\t\t\tsubject= copyright= srcform= \\
+line	1	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	\t\t\t\t-check-session -copyright -d -D -dir-mode \\
+line	1	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	\t\t\t--copyright --license-i --info -a --all -q \\
+line	1	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	\t\t-@(o|abstract|biblio|check-session|copyright|log-file|root-info|prep-boot|*-list))
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2html	\t       'copyright', '(C)',
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makefile.in.in	\t  --copyright-holder='$(COPYRIGHT_HOLDER)'
+line	1	bash-5.2.tar.gz:bash-5.2/po/Rules-builtins	\t  --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	          adjacent to the other copyright notices.
+line	1	bash-5.2.tar.gz:bash-5.2/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.0	       Bash is Copyright (C) 1989-2022 by the Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	       Copyright (C)  YEAR  YOUR NAME.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	       D. Preserve all the copyright notices of the Document.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	       E. Add an appropriate copyright notice for your modifications
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	       F. Include, immediately after the copyright notices, a license
+line	1	bash-5.2.tar.gz:bash-5.2/version.c	      printf ("%s\\n", _(bash_copyright));
+line	1	bash-5.2.tar.gz:bash-5.2/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	bash-5.2.tar.gz:bash-5.2/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     Copyright (C) 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     Moreover, your license from a particular copyright holder is
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     World Wide Web server that publishes copyrightable works and also
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     copyright holder fails to notify you of the violation by some
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     copyright notices, and the license notice saying this License
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     copyright resulting from the compilation is not used to limit the
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     license from a particular copyright holder is reinstated (a)
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     permission from their copyright holders, but you may include
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     provisionally, unless and until the copyright holder explicitly and
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     reinstated permanently if the copyright holder notifies you of the
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     requiring permission under copyright law.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     site means any set of copyrightable works thus published on the MMC
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     that contains a notice placed by the copyright holder saying it can
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	     that copyright holder, and you cure the violation prior to 30 days
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2html	    $things_map{'copyright'} = "&copy;";
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	    <program>  Copyright (C) <year>  <name of author>
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	    Copyright (C) <year>  <name of author>
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	    Copyright (c)  YEAR  YOUR NAME.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/plural.c	   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/y.tab.c	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/parse-colors.h	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012 Free Software Foundation,
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/colors.h	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012, 2015
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/parse-colors.c	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012, 2017
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/colors.c	   Copyright (C) 1985, 1988, 1990-1991, 1995-2021
+line	2	bash-5.2.tar.gz:bash-5.2/lib/glob/glob.h	   Copyright (C) 1985-2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/getpagesize.h	   Copyright (C) 1991-2003 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/gettext.h	   Copyright (C) 1995-1998, 2000-2002, 2008,2009 Free Software Foundation, Inc.
+line	18	bash-5.2.tar.gz:bash-5.2/examples/loadables/pathchk.c	   Copyright (C) 1999-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/realpath.c	   Copyright (C) 1999-2009,2021,2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/cat.c	   Copyright (C) 1999-2009,2022 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/examples/loadables/basename.c	   Copyright (C) 1999-2020 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/examples/loadables/sleep.c	   Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/shmbchar.h	   Copyright (C) 2001, 2005-2007, 2009-2010, 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/os2compat.h	   Copyright (C) 2001-2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/snprintf.c	   Copyright (C) 2001-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/stat-time.h	   Copyright (C) 2005, 2007, 2009-2012 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/glob/gmisc.c	   Copyright (C) 2010-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strchrnul.c	   Copyright (C) 2012 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/rm.c	   Copyright (C) 2016 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/stat.c	   Copyright (C) 2016,2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/fdflags.c	   Copyright (C) 2017-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/seq.c	   Copyright (C) 2018-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/mktemp.c	   Copyright (C) 2019 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/examples/loadables/csv.c	   Copyright (C) 2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/getconf.h	   Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/dsv.c	   Copyright (C) 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	   adjacent to the other copyright notices.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/mkbuiltins.c	  "/* Copyright (C) 1987-2022 Free Software Foundation, Inc.",
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	  "The Program" refers to any copyrightable work licensed under this
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	  A "contributor" is a copyright holder who authorizes use under this
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	  Copyright (C)  @var{year}  @var{your name}.
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	  Moreover, your license from a particular copyright holder is
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright}
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	  \\def\\copyright{copyright}%
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	  \\definedummyword\\copyright
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	  \\gdef^^a9{\\copyright}
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/help.def	  printf ("%s\\n", _(bash_copyright));
+line	2	bash-5.2.tar.gz:bash-5.2/lib/readline/vi_keymap.c	  { ISFUNC, rl_insert },\t/* Copyright sign */
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * ++Copyright++ 1983, 1990, 1993
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * --Copyright--
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * 1. Redistributions of source code must retain the above copyright
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * Copyright (c) 1983, 1990, 1993
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * Portions Copyright (c) 1993 by Digital Equipment Corporation.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/inet_aton.c	 * copyright notice and this permission notice appear in all copies, and that
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	 Copyright (C) 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/COPYING	 Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	bash-5.2.tar.gz:bash-5.2/examples/shellmath/LICENSE	 Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2html	 verbose => 'if set, ISO8879 characters are used for special symbols (like copyright, etc)',
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	"aggregate" if the compilation and its resulting copyright are not
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2html	#    Copyright (C) 1999, 2000  Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/examples/Inputrc	#   Copyright (C) 1989-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/locale.alias	#   Copyright (C) 1996,1997,1998,1999,2000,2001,2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/Makefile	#   Copyright (C) 1996-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/shobj-conf	#   Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/perl/Makefile.in	#   Copyright (C) 1998 Free Software Foundation, Inc.\x20\x20\x20\x20\x20
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	#   Copyright (C) 1998 Richard Braakman
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/ref-add.sin	#   Copyright (C) 2000 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/config.charset	#   Copyright (C) 2000-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	#   Copyright (C) 2002 Josip Rodin
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	#   Copyright (C) 2003 Julian Gilbey
+line	1	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	#   Copyright (C) Ian Macdonald <ian@caliban.org>
+line	1	bash-5.2.tar.gz:bash-5.2/support/config.sub	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/config.rpath	#   Copyright 1996-2018 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/functions/func	#  Copyright 1991 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/examples/functions/notify.bash	#  Copyright 1992 Chester Ramey
+line	2	bash-5.2.tar.gz:bash-5.2/examples/functions/whence	#  Copyright 1994 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/examples/functions/seq	#  Copyright 1995 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/examples/scripts/zprintf	#  Copyright 1996 Chester Ramey
+line	2	bash-5.2.tar.gz:bash-5.2/examples/scripts/xterm_title	#  Copyright 1997 Chester Ramey
+line	2	bash-5.2.tar.gz:bash-5.2/examples/functions/seq2	#  Copyright 1998 Chester Ramey
+line	4	bash-5.2.tar.gz:bash-5.2/examples/scripts/center	#  Copyright 1999 Chester Ramey
+line	2	bash-5.2.tar.gz:bash-5.2/examples/functions/sort-pos-params	#  Copyright 2001 Chester Ramey
+line	6	bash-5.2.tar.gz:bash-5.2/examples/complete/complete-examples	#  Copyright 2002 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/tests/complete.tests	#  Copyright 2002-2020 Chester Ramey
+line	2	bash-5.2.tar.gz:bash-5.2/examples/complete/cdfunc	#  Copyright 2011 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	bash-5.2.tar.gz:bash-5.2/configure.ac	# Copyright (C) 1987-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/xenix-link.sh	# Copyright (C) 1989-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/examples/Makefile	# Copyright (C) 1994 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/Makefile.in	# Copyright (C) 1994-2012 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makefile.in.in	# Copyright (C) 1995-1997, 2000-2003 by Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/Makefile.in	# Copyright (C) 1995-1998, 2000-2003, 2008,2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/missing	# Copyright (C) 1996, 1997 Free Software Foundation, Inc.
+line	7	bash-5.2.tar.gz:bash-5.2/support/printenv.sh	# Copyright (C) 1996-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/termcap/Makefile.in	# Copyright (C) 1996-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/glob/Makefile.in	# Copyright (C) 1996-2009 Free Software Foundation, Inc.\x20\x20\x20\x20\x20
+line	1	bash-5.2.tar.gz:bash-5.2/support/mkversion.sh	# Copyright (C) 1996-2020 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/Makefile.in	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/tilde/Makefile.in	# Copyright (C) 1996-2021 Free Software Foundation, Inc.\x20\x20\x20\x20\x20
+line	2	bash-5.2.tar.gz:bash-5.2/builtins/Makefile.in	# Copyright (C) 1996-2022 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/configure	# Copyright (C) 1998-1999, 2001, 2003, 2005-2007, 2009-2012 Free Software
+line	1	bash-5.2.tar.gz:bash-5.2/support/Makefile.in	# Copyright (C) 1998-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/Makefile.in	# Copyright (C) 1998-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/ja.po	# Copyright (C) 1999, 2010, 2011, 2013 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/configure	# Copyright (C) 2000-2001, 2003-2007, 2009-2011, 2012 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/et.po	# Copyright (C) 2001 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/ru.po	# Copyright (C) 2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/ro.po	# Copyright (C) 2003 - 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/Makefile.in	# Copyright (C) 2003-2015 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/po/POTFILES.in	# Copyright (C) 2004 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/examples/complete/bash_completion	# Copyright (C) 2004 Servilio Afre Puentes <servilio@gmail.com>
+line	2	bash-5.2.tar.gz:bash-5.2/po/tr.po	# Copyright (C) 2006 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/pl.po	# Copyright (C) 2007, 2010, 2011, 2013, 2014, 2015, 2016, 2018, 2019, 2020, 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/bg.po	# Copyright (C) 2007, 2010, 2012, 2013, 2014, 2015, 2016, 2018, 2020, 2022 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/po/cs.po	# Copyright (C) 2008 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/po/fi.po	# Copyright (C) 2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_CN.po	# Copyright (C) 2010, 2011, 2013 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/hu.po	# Copyright (C) 2010, 2016, 2017, 2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/po/gl.po	# Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/sl.po	# Copyright (C) 2012 - 2013 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/el.po	# Copyright (C) 2013 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/Makefile.inc.in	# Copyright (C) 2015-2022 Free Software Foundation, Inc.\x20\x20\x20\x20\x20
+line	1	bash-5.2.tar.gz:bash-5.2/po/ga.po	# Copyright (C) 2017 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/es.po	# Copyright (C) 2018, 2019, 2020 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/po/nb.po	# Copyright (C) 2019 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/po/zh_TW.po	# Copyright (C) 2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/pt_BR.po	# Copyright (C) 2021 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/po/ca.po	# Copyright (C) 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/bash.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/tests/posix2.tests	# Copyright (c) 1995  Stephen Gildea
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/xleaktrace	# Copyright (c) 2001 Chester Ramey
+line	1	bash-5.2.tar.gz:bash-5.2/examples/shellmath/shellmath.sh	# Copyright (c) 2020 by Michael Wood. All rights reserved.
+line	1	bash-5.2.tar.gz:bash-5.2/support/install.sh	# Copyright 1991 by the Massachusetts Institute of Technology
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2dvi	# Copyright 1992-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/sr.po	# Copyright © 2007 Marko Uskokovic
+line	1	bash-5.2.tar.gz:bash-5.2/po/sv.po	# Copyright © 2008, 2009, 2010, 2011, 2013, 2014, 2015, 2016, 2018, 2019, 2020, 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/vi.po	# Copyright © 2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/hr.po	# Copyright © 2018 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/sr.po	# Copyright © 2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	bash-5.2.tar.gz:bash-5.2/support/install.sh	# copyright notice and this permission notice appear in supporting
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2html	# if set, ISO8879 characters are used for special symbols (like copyright, etc)
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	bash-5.2.tar.gz:bash-5.2/support/install.sh	# the above copyright notice appear in all copies and that both that
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	# their copyright.
+line	6	bash-5.2.tar.gz:bash-5.2/po/uk.po	#~ msgid "Copyright (C) 2009 Free Software Foundation, Inc.\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/id.po	#~ msgid "Copyright (C) 2013 Free Software Foundation, Inc."
+line	9	bash-5.2.tar.gz:bash-5.2/po/nb.po	#~ msgid "Copyright (C) 2014 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/pt_BR.po	#~ msgid "Copyright (C) 2015 Free Software Foundation, Inc."
+line	2	bash-5.2.tar.gz:bash-5.2/po/ca.po	#~ msgid "Copyright (C) 2016 Free Software Foundation, Inc."
+line	8	bash-5.2.tar.gz:bash-5.2/po/nb.po	#~ msgid "Copyright (C) 2018 Free Software Foundation, Inc."
+line	6	bash-5.2.tar.gz:bash-5.2/po/vi.po	#~ msgid "Copyright (C) 2019 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/sl.po	#~ msgstr "Avtorske pravice (C) 2011 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/fr.po	#~ msgstr "Copyright (C) 2009 Free Software Foundation, Inc.\\n"
+line	2	bash-5.2.tar.gz:bash-5.2/po/gl.po	#~ msgstr "Copyright (C) 2011 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ca.po	#~ msgstr "Copyright (C) 2013 Free Software Foundation, Inc."
+line	2	bash-5.2.tar.gz:bash-5.2/po/pt_BR.po	#~ msgstr "Copyright (C) 2014 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/pt_BR.po	#~ msgstr "Copyright (C) 2015 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ca.po	#~ msgstr "Copyright (C) 2016 Free Software Foundation, Inc."
+line	2	bash-5.2.tar.gz:bash-5.2/po/hr.po	#~ msgstr "Copyright (C) 2018 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/it.po	#~ msgstr "Copyright © 2011 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/cs.po	#~ msgstr "Copyright ©\xc2\xa02009 Free Software Foundation, Inc.\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/cs.po	#~ msgstr "Copyright ©\xc2\xa02014 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/cs.po	#~ msgstr "Copyright ©\xc2\xa02018 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ga.po	#~ msgstr "Cóipcheart © 2018 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/id.po	#~ msgstr "Hak Cipta (C) 2009 Free Software Foundation, Inc.\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/id.po	#~ msgstr "Hak Cipta (C) 2013 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/da.po	#~ msgstr "Ophavsret (C) 2009 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/nb.po	#~ msgstr "Opphavsrett (C) 2014 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/nb.po	#~ msgstr "Opphavsrett (C) 2018 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ru.po	#~ msgstr "© Free Software Foundation, Inc, 2016."
+line	1	bash-5.2.tar.gz:bash-5.2/po/uk.po	#~ msgstr "© Free Software Foundation, Inc., 2009\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/uk.po	#~ msgstr "© Free Software Foundation, Inc., 2014"
+line	1	bash-5.2.tar.gz:bash-5.2/po/uk.po	#~ msgstr "© Free Software Foundation, Inc., 2018"
+line	1	bash-5.2.tar.gz:bash-5.2/po/sr.po	#~ msgstr "Ауторска права (C) 2014 Задужбина слободног софтвера, Доо."
+line	1	bash-5.2.tar.gz:bash-5.2/po/sr.po	#~ msgstr "Ауторска права © 2018 Задужбина слободног софтвера, Доо."
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_CN.po	#~ msgstr "版权所有 (C) 2009 自由软件基金会\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_CN.po	#~ msgstr "版权所有 (C) 2014 自由软件基金会."
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_CN.po	#~ msgstr "版权所有 (C) 2018 自由软件基金会"
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	% Copyright (c) 2001 Vladimir Volovich <vvv@vsu.ru>.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/texinfo.tex	% Copyright 1985, 1986, 1988, 1990, 1991, 1992, 1993, 1994, 1995,
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%%Creator: dvips(k) 2021.1 Copyright 2021 Radical Eye Software
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMBX12.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMCSC10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI12.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI9.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMR10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMR9.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSL10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSLTT10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSY10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTI10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTT10.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTT12.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTT9.
+line	14	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	%Copyright: Copyright (c) 1997, 2009 American Mathematical Society
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	(1) assert copyright on the software, and (2) offer you this License
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	(:)g(:)g(:)g(:)h(:)34 b Fb(122)2021 3297 y Fs(C)2025
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.ps	(COPYRIGHT)72 141.6 Q F0(Bash is Cop)108 153.6 Q
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.1	.SH COPYRIGHT
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.1	.if n Bash is Copyright (C) 1989-2022 by the Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.1	.if t Bash is Copyright \\(co 1989-2022 by the Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/malloc.c	/*  Copyright (C) 1985-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/dngettext.c	/*  Copyright (C) 1995-1997, 2000, 2001, 2002, 2005, 2006, 2008,2009 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/malloc/stats.c	/*  Copyright (C) 2001-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/mstats.h	/*  Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/termcap/tparam.c	/* Copyright (C) 1985, 1986, 1993,1994, 1995, 1998, 2001,2003,2005,2006,2008,2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/termcap/version.c	/* Copyright (C) 1985-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/parens.c	/* Copyright (C) 1987, 1989, 1992-2015, 2017, 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/keymaps.h	/* Copyright (C) 1987, 1989, 1992-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/psize.c	/* Copyright (C) 1987, 1991 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/vprint.c	/* Copyright (C) 1987,1989 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/hashlib.c	/* Copyright (C) 1987,1989,1991,1995,1998,2001,2003,2005,2006,2008,2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/include/posixdir.h	/* Copyright (C) 1987,1991,2012,2019,2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/include/posixjmp.h	/* Copyright (C) 1987,1991-2015 Free Software Foundation, Inc.
+line	8	bash-5.2.tar.gz:bash-5.2/pathnames.h.in	/* Copyright (C) 1987-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/config.h.in	/* Copyright (C) 1987-2009,2011-2012,2013-2019 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/readline/vi_keymap.c	/* Copyright (C) 1987-2017 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/include/posixstat.h	/* Copyright (C) 1987-2019 Free Software Foundation, Inc.
+line	8	bash-5.2.tar.gz:bash-5.2/pathexp.h	/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
+line	18	bash-5.2.tar.gz:bash-5.2/unwind_prot.c	/* Copyright (C) 1987-2021 Free Software Foundation, Inc.
+line	13	bash-5.2.tar.gz:bash-5.2/execute_cmd.c	/* Copyright (C) 1987-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/keymaps.c	/* Copyright (C) 1988,1989-2009,2017 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/tilde/tilde.c	/* Copyright (C) 1988-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/histsearch.c	/* Copyright (C) 1989, 1992-2009,2017,2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/CWRU/misc/open-files.c	/* Copyright (C) 1989-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/histlib.h	/* Copyright (C) 1989-2009,2021-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/histfile.c	/* Copyright (C) 1989-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/getopt.h	/* Copyright (C) 1989-2020 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/siglist.c	/* Copyright (C) 1989-2021 Free Software Foundation, Inc.
+line	6	bash-5.2.tar.gz:bash-5.2/print_cmd.c	/* Copyright (C) 1989-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/CWRU/misc/sigs.c	/* Copyright (C) 1990-2010 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/expr.c	/* Copyright (C) 1990-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/getcwd.c	/* Copyright (C) 1991 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strtod.c	/* Copyright (C) 1991, 1992 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/termcap/termcap.h	/* Copyright (C) 1991, 1992, 1995, 2001, 2005, 2006, 2008,2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strpbrk.c	/* Copyright (C) 1991, 1994 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strtol.c	/* Copyright (C) 1991,92,94,95,96,97,98,99,2000,2001 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/memset.c	/* Copyright (C) 1991-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/xmalloc.c	/* Copyright (C) 1991-2003 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/CWRU/misc/sigstat.c	/* Copyright (C) 1991-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/xfree.c	/* Copyright (C) 1991-2010,2017 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/xmalloc.c	/* Copyright (C) 1991-2016 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/glob/gm_loop.c	/* Copyright (C) 1991-2017 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/include/systimes.h	/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/examples/loadables/getconf.c	/* Copyright (C) 1991-2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/tilde/tilde.h	/* Copyright (C) 1992-2009,2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/rlconf.h	/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/mksignames.c	/* Copyright (C) 1992-2020 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/input.c	/* Copyright (C) 1992-2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/readline/rltty.c	/* Copyright (C) 1992-2022 Free Software Foundation, Inc.
+line	5	bash-5.2.tar.gz:bash-5.2/include/filecntl.h	/* Copyright (C) 1993 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/siglist.h	/* Copyright (C) 1993, 2001, 2005, 2008-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/stub.c	/* Copyright (C) 1993-2003 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/bashtypes.h	/* Copyright (C) 1993-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/make_cmd.h	/* Copyright (C) 1993-2009,2020  Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/execute_cmd.h	/* Copyright (C) 1993-2017 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/bashline.h	/* Copyright (C) 1993-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/bashhist.h	/* Copyright (C) 1993-2020 Free Software Foundation,  Inc.
+line	9	bash-5.2.tar.gz:bash-5.2/hashlib.h	/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
+line	12	bash-5.2.tar.gz:bash-5.2/bashansi.h	/* Copyright (C) 1993-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/jobs.h	/* Copyright (C) 1993-2022  Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/common.h	/* Copyright (C) 1993-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strstr.c	/* Copyright (C) 1994, 1999 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/macro.c	/* Copyright (C) 1994-2009,2017 Free Software Foundation, Inc.
+line	5	bash-5.2.tar.gz:bash-5.2/sig.c	/* Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/strerror.c	/* Copyright (C) 1995 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/hash-string.h	/* Copyright (C) 1995, 1997, 1998, 2000, 2001, 2005-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/gettext.c	/* Copyright (C) 1995, 1997, 2000, 2001, 2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/gmo.h	/* Copyright (C) 1995, 1997, 2000-2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/intl-compat.c	/* Copyright (C) 1995, 2000-2003, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/oslib.c	/* Copyright (C) 1995,2010 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/dgettext.c	/* Copyright (C) 1995-1997, 2000, 2001, 2002, 2006-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/libgnuintl.h.in	/* Copyright (C) 1995-1997, 2000-2003, 2004-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/textdomain.c	/* Copyright (C) 1995-1998, 2000, 2001, 2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/explodename.c	/* Copyright (C) 1995-1998, 2000, 2001, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/l10nflist.c	/* Copyright (C) 1995-1999, 2000, 2001, 2002, 2005-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/dcgettext.c	/* Copyright (C) 1995-1999, 2000, 2001, 2002, 2006-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/finddomain.c	/* Copyright (C) 1995-1999, 2000, 2001, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/localealias.c	/* Copyright (C) 1995-1999, 2000-2001, 2003, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/localename.c	/* Copyright (C) 1995-1999, 2000-2002, 2005-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/gettextP.h	/* Copyright (C) 1995-1999, 2000-2003, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/dcigettext.c	/* Copyright (C) 1995-1999, 2000-2003, 2006-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/rltty.h	/* Copyright (C) 1995-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/mbscmp.c	/* Copyright (C) 1995-2018 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/pathexp.c	/* Copyright (C) 1995-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/parser.h	/* Copyright (C) 1995-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/unionwait.h	/* Copyright (C) 1996 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/loadinfo.h	/* Copyright (C) 1996-1999, 2000-2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/zecho.c	/* Copyright (C) 1996-2002 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/bashintl.h	/* Copyright (C) 1996-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/locale.c	/* Copyright (C) 1996-2009,2012,2016-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/tcap.h	/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/evalfile.c	/* Copyright (C) 1996-2017 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/eval.c	/* Copyright (C) 1996-2022 Free Software Foundation, Inc.
+line	5	bash-5.2.tar.gz:bash-5.2/include/posixwait.h	/* Copyright (C) 1997 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/redir.h	/* Copyright (C) 1997, 2001, 2005, 2008, 2009-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/setlinebuf.c	/* Copyright (C) 1997,2022 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/support/printenv.c	/* Copyright (C) 1997-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/rlwinsize.h	/* Copyright (C) 1997-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/shell.c	/* Copyright (C) 1997-2009,2017,2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/findcmd.h	/* Copyright (C) 1997-2015,2020 Free Software Foundation, Inc.
+line	6	bash-5.2.tar.gz:bash-5.2/array.c	/* Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/findcmd.c	/* Copyright (C) 1997-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/savestring.c	/* Copyright (C) 1998,2003,2017 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/itos.c	/* Copyright (C) 1998-2002 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/CWRU/misc/errlist.c	/* Copyright (C) 1998-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/fmtulong.c	/* Copyright (C) 1998-2011 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/tilde/shell.c	/* Copyright (C) 1998-2017 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/lib/sh/rename.c	/* Copyright (C) 1999 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/zwrite.c	/* Copyright (C) 1999-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/termcap/ltcap.h	/* Copyright (C) 1999-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/xmalloc.h	/* Copyright (C) 1999-2009,2010-2021 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/pcomplete.h	/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/shtty.h	/* Copyright (C) 1999-2020 Free Software Foundation, Inc. */
+line	5	bash-5.2.tar.gz:bash-5.2/pcomplete.c	/* Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/rlprivate.h	/* Copyright (C) 1999-2022 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/strcasestr.c	/* Copyright (C) 2000 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/plural-exp.h	/* Copyright (C) 2000, 2001, 2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/syntax.h	/* Copyright (C) 2000, 2001, 2005, 2008, 2009-2020 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/intl/plural.c	/* Copyright (C) 2000, 2001, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/stringvec.c	/* Copyright (C) 2000-2002 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/intl/eval-plural.h	/* Copyright (C) 2000-2002, 2006-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/localcharset.h	/* Copyright (C) 2000-2003, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/mksyntax.c	/* Copyright (C) 2000-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strtrans.c	/* Copyright (C) 2000-2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/stringlist.c	/* Copyright (C) 2000-2019 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/sh/spell.c	/* Copyright (C) 2000-2020 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/readline/rltypedefs.h	/* Copyright (C) 2000-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/mailstat.c	/* Copyright (C) 2001 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/conftypes.h	/* Copyright (C) 2001, 2005, 2008,2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/shmbchar.c	/* Copyright (C) 2001, 2006, 2009, 2010, 2012, 2015-2018 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/fmtullong.c	/* Copyright (C) 2001-2002 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/intl/osdep.c	/* Copyright (C) 2001-2002, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/malloc/watch.c	/* Copyright (C) 2001-2003 Free Software Foundation, Inc.
+line	5	bash-5.2.tar.gz:bash-5.2/xmalloc.h	/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
+line	8	bash-5.2.tar.gz:bash-5.2/arrayfunc.c	/* Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/include/ocache.h	/* Copyright (C) 2002 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/support/recho.c	/* Copyright (C) 2002-2005 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/include/shmbutil.h	/* Copyright (C) 2002-2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/zcatfd.c	/* Copyright (C) 2002-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/config-top.h	/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/intl/relocatable.h	/* Copyright (C) 2003, 2005-2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/shmatch.c	/* Copyright (C) 2003-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strnlen.c	/* Copyright (C) 2004 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/winsize.c	/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/wcsdup.c	/* Copyright (C) 2006 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/zmapfd.c	/* Copyright (C) 2006-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/signames.c	/* Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/fpurge.c	/* Copyright (C) 2007-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/xcase.c	/* Copyright (C) 2008,2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/assoc.c	/* Copyright (C) 2008,2009,2011-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/uconvert.c	/* Copyright (C) 2008,2009,2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/input_avail.c	/* Copyright (C) 2008,2009-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/ufuncs.c	/* Copyright (C) 2008,2009-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/assoc.h	/* Copyright (C) 2008,2009-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/dprintf.c	/* Copyright (C) 2008-2010 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/zgetline.c	/* Copyright (C) 2008-2020 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/include/posixselect.h	/* Copyright (C) 2009 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/mbscasecmp.c	/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/fnxform.c	/* Copyright (C) 2009-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/wcswidth.c	/* Copyright (C) 2010 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/unicode.c	/* Copyright (C) 2010-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/wcsnwidth.c	/* Copyright (C) 2012 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/gen-helpfiles.c	/* Copyright (C) 2012-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strdup.c	/* Copyright (C) 2013 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/loadables/loadables.h	/* Copyright (C) 2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/utf8.c	/* Copyright (C) 2018 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/gettimeofday.c	/* Copyright (C) 2020 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/include/timer.h	/* Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/sh/strvis.c	/* Copyright (C) 2022 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/lib/sh/strtoimax.c	/* Copyright 1999-2020 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMBX12.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMCSC10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI12.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI9.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMR10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMR9.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSL10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSLTT10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSY10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTI10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTT10.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTT12.) readonly def
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTT9.) readonly def
+line	5	bash-5.2.tar.gz:bash-5.2/doc/article.ps	/brokenbar/section/dieresis/copyright/ordfeminine/guilsinglleft
+line	1	bash-5.2.tar.gz:bash-5.2/doc/rose94.ps	/section/dieresis/copyright/ordfeminine/guilsinglleft/logicalnot/minus
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	680 y Fe(Copyright)42 b(\\(C\\))79 b Fd(year)g(your)40
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	</li><li> Add an appropriate copyright notice for your modifications
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	</li><li> Include, immediately after the copyright notices, a license notice
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	</li><li> Preserve all the copyright notices of the Document.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.html	<DT><A HREF="#lbAD">COPYRIGHT</A><DD>
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.html	<H3>COPYRIGHT</H3>
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	<p>Moreover, your license from a particular copyright holder is
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	<pre class="display">Copyright &copy; 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	<pre class="example">  Copyright (C)  <var>year</var>  <var>your name</var>.
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	Add an appropriate copyright notice for your modifications
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bash.html	Bash is Copyright &#169; 1989-2022 by the Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/po/Makevars	COPYRIGHT_HOLDER = Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/builtins/times.def	Copyright (C) 1987-2009 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/builtins/return.def	Copyright (C) 1987-2015 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/eval.def	Copyright (C) 1987-2016 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/builtin.def	Copyright (C) 1987-2017 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/echo.def	Copyright (C) 1987-2018 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/builtins/getopts.def	Copyright (C) 1987-2019 Free Software Foundation, Inc.
+line	11	bash-5.2.tar.gz:bash-5.2/builtins/shift.def	Copyright (C) 1987-2020 Free Software Foundation, Inc.
+line	14	bash-5.2.tar.gz:bash-5.2/builtins/trap.def	Copyright (C) 1987-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/enable.def	Copyright (C) 1987-2021 Free Software Foundation, Inc.\x20
+line	2	bash-5.2.tar.gz:bash-5.2/builtins/suspend.def	Copyright (C) 1987-2022 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/rluser.texi	Copyright (C) 1988--2022 Free Software Foundation, Inc.
+line	3	bash-5.2.tar.gz:bash-5.2/doc/version.texi	Copyright (C) 1988-2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/version.texi	Copyright (C) 1988-2022 Free Software Foundation, Inc.\x20
+line	1	bash-5.2.tar.gz:bash-5.2/support/bash.xbm	Copyright (C) 1992 Simon Marshall
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/shopt.def	Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/printf.def	Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/examples/excallback.c	Copyright (C) 1999 Jeff Solomon
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/complete.def	Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/caller.def	Copyright (C) 2002-2008 Rocky Bernstein for Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/mapfile.def	Copyright (C) 2005-2006 Rocky Bernstein for Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/caller.def	Copyright (C) 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/mapfile.def	Copyright (C) 2008-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/texi2dvi	Copyright (C) 2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/config.sub	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/support/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	4	bash-5.2.tar.gz:bash-5.2/doc/bashref.texi	Copyright @copyright{} 1988--2022 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	Copyright @copyright{} 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	D. Preserve all the copyright notices of the Document.
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	E. Add an appropriate copyright notice for your modifications
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	F. Include, immediately after the copyright notices, a license notice
+line	3	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/rluser.texi	GNU Copyright statement is available to the distributee, and provided that
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	Include, immediately after the copyright notices, a license notice
+line	3	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	Moreover, your license from a particular copyright holder is
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	Preserve all the copyright notices of the Document.
+line	1	bash-5.2.tar.gz:bash-5.2/tests/README	Read COPYRIGHT for copyright information.
+line	1	bash-5.2.tar.gz:bash-5.2/examples/shellmath/LICENSE	Shellfloat is copyright (c) 2020 by Michael Wood.
+line	1	bash-5.2.tar.gz:bash-5.2/tests/COPYRIGHT	The file ifs-posix.tests is Copyright (C) 2005 Glen Fowler.
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	This code is copyright 2003 by Julian Gilbey <jdg\\@debian.org>,
+line	1	bash-5.2.tar.gz:bash-5.2/doc/FAQ	This document is Copyright 1995-2014 by Chester Ramey.
+line	1	bash-5.2.tar.gz:bash-5.2/tests/COPYRIGHT	Unless otherwise stated, all files in this directory are Copyright (C)
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	World Wide Web server that publishes copyrightable works and also
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	add to a covered work, you may (if authorized by the copyright holders of
+line	3	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	adjacent to the other copyright notices.
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	and copyright 2002 by Josip Rodin.
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	appropriately publish on each copy an appropriate copyright notice;
+line	3	bash-5.2.tar.gz:bash-5.2/COMPAT	are permitted in any medium without royalty provided the copyright
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	author or copyright holder as a result of your choosing to follow a
+line	1	bash-5.2.tar.gz:bash-5.2/support/checkbashisms	based on original code which is copyright 1998 by Richard Braakman
+line	1	bash-5.2.tar.gz:bash-5.2/version.c	const char * const bash_copyright = N_("Copyright (C) 2022 Free Software Foundation, Inc.");
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	contains a notice placed by the copyright holder saying it can be
+line	7	bash-5.2.tar.gz:bash-5.2/COPYING	copyright holder, and you cure the violation prior to 30 days after
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	copyright notices, and the license notice saying this License applies
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	copyright on the Program, and are irrevocable provided the stated
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	distribution medium, is called an "aggregate" if the copyright
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.html	distribution medium, is called an &ldquo;aggregate&rdquo; if the copyright
+line	2	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	distribution medium, is called an ``aggregate'' if the copyright
+line	1	bash-5.2.tar.gz:bash-5.2/aclocal.m4	dnl Copyright (C) 1987-2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/lcmessage.m4	dnl Copyright (C) 1995-2002, 2004-2005, 2008-2014, 2016, 2019 Free Software
+line	1	bash-5.2.tar.gz:bash-5.2/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2014, 2016, 2019 Free Software
+line	1	bash-5.2.tar.gz:bash-5.2/m4/po.m4	dnl Copyright (C) 1995-2014, 2016, 2018-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/gettext.m4	dnl Copyright (C) 1995-2014, 2016, 2018-2019, 2021 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/intl.m4	dnl Copyright (C) 1995-2014, 2016-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/inttypes-pri.m4	dnl Copyright (C) 1997-2002, 2006, 2008-2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/m4/stdint_h.m4	dnl Copyright (C) 1997-2004, 2006, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/uintmax_t.m4	dnl Copyright (C) 1997-2004, 2007-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/ulonglong.m4	dnl Copyright (C) 1999-2007, 2009-2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/m4/glibc2.m4	dnl Copyright (C) 2000-2002, 2004, 2008, 2010-2019 Free Software Foundation,
+line	1	bash-5.2.tar.gz:bash-5.2/m4/codeset.m4	dnl Copyright (C) 2000-2002, 2006, 2008-2014, 2016, 2019 Free Software
+line	1	bash-5.2.tar.gz:bash-5.2/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014, 2016-2019 Free Software Foundation,
+line	1	bash-5.2.tar.gz:bash-5.2/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/lib-link.m4	dnl Copyright (C) 2001-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/intdiv0.m4	dnl Copyright (C) 2002, 2007-2008, 2010-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/wchar_t.m4	dnl Copyright (C) 2002-2003, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/intmax.m4	dnl Copyright (C) 2002-2005, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/host-cpu-c-abi.m4	dnl Copyright (C) 2002-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/size_max.m4	dnl Copyright (C) 2003, 2005-2006, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/printf-posix.m4	dnl Copyright (C) 2003, 2007, 2009-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/wint_t.m4	dnl Copyright (C) 2003, 2007-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/xsize.m4	dnl Copyright (C) 2003-2004, 2008-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/intlmacosx.m4	dnl Copyright (C) 2004-2014, 2016, 2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2019 Free Software Foundation, Inc.
+line	2	bash-5.2.tar.gz:bash-5.2/m4/lock.m4	dnl Copyright (C) 2005-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/fcntl-o.m4	dnl Copyright (C) 2006, 2009-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/inttypes.m4	dnl Copyright (C) 2006-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/intl-thread-locale.m4	dnl Copyright (C) 2015-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/pthread_rwlock_rdlock.m4	dnl Copyright (C) 2017-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/strtoimax.m4	dnl Copyright (C) 2022 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/m4/extern-inline.m4	dnl Copyright 2012-2019 Free Software Foundation, Inc.
+line	1	bash-5.2.tar.gz:bash-5.2/builtins/help.def	extern const char * const bash_copyright;
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	feature that (1) displays an appropriate copyright notice, and (2)
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	finally terminates your license, and (b) permanently, if the copyright
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	for which you have or can give appropriate copyright permission.
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	from a particular copyright holder is reinstated (a) provisionally,
+line	1	bash-5.2.tar.gz:bash-5.2/doc/bashref.ps	g(:)g(:)31 b Fb(136)2021 4769 y Fs(C)2025 4893 y Fe
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	in a fashion requiring copyright permission, other than the making of an
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	infringement under applicable copyright law, except executing it on a
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	license from a particular copyright holder is reinstated (a)
+line	1	bash-5.2.tar.gz:bash-5.2/doc/fdl.txt	means any set of copyrightable works thus published on the MMC site.
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	modify any covered work.  These actions infringe copyright if you do
+line	1	bash-5.2.tar.gz:bash-5.2/po/tr.po	msgid "Copyright (C) 2020 Free Software Foundation, Inc."
+line	39	bash-5.2.tar.gz:bash-5.2/po/nb.po	msgid "Copyright (C) 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/lt.po	msgstr "Autorinės teisės (C) 2009 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/sl.po	msgstr "Avtorske pravice (C) 2009 Free Software Foundation, Inc.\\n"
+line	2	bash-5.2.tar.gz:bash-5.2/po/gl.po	msgstr "Copyright (C) 2009 Free Software Foundation, Inc.\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/hu.po	msgstr "Copyright (C) 2018 Free Software Foundation, Inc."
+line	6	bash-5.2.tar.gz:bash-5.2/po/en@quot.po	msgstr "Copyright (C) 2020 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/eo.po	msgstr "Copyright (C) 2020 ĉe «Free Software Foundation, Inc.»"
+line	8	bash-5.2.tar.gz:bash-5.2/po/ca.po	msgstr "Copyright (C) 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_CN.po	msgstr "Copyright (C) 2022 自由软件基金会"
+line	1	bash-5.2.tar.gz:bash-5.2/po/fi.po	msgstr "Copyright © 2009 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/it.po	msgstr "Copyright © 2009 Free Software Foundation, Inc.\\n"
+line	1	bash-5.2.tar.gz:bash-5.2/po/sv.po	msgstr "Copyright © 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/cs.po	msgstr "Copyright ©\xc2\xa02022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ga.po	msgstr "Cóipcheart © 2012 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ro.po	msgstr "Drepturi de autor © 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/id.po	msgstr "Hak Cipta (C) 2020 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/da.po	msgstr "Ophavsret (C) 2009 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/nb.po	msgstr "Opphavsrett (C) 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/tr.po	msgstr "Telif hakkı (C) 2020 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/ru.po	msgstr "© Free Software Foundation, Inc, 2020."
+line	1	bash-5.2.tar.gz:bash-5.2/po/uk.po	msgstr "© Free Software Foundation, Inc., 2022"
+line	1	bash-5.2.tar.gz:bash-5.2/po/bg.po	msgstr "Авторски права © 2022 Free Software Foundation, Inc."
+line	1	bash-5.2.tar.gz:bash-5.2/po/sr.po	msgstr "Ауторска права © 2022. Фондација слободног софтвера, Доо."
+line	1	bash-5.2.tar.gz:bash-5.2/po/zh_TW.po	msgstr "著作權所有 (C) 2022 自由軟體基金會"
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	not control copyright.  Those thus making or running the covered works
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	permission from their copyright holders, but you may include
+line	3	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/rluser.texi	provided the copyright notice and this permission notice are preserved on
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	provisionally, unless and until the copyright holder explicitly and
+line	7	bash-5.2.tar.gz:bash-5.2/COPYING	reinstated permanently if the copyright holder notifies you of the
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	rights of fair use or other equivalent, as provided by copyright law.
+line	3	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	site means any set of copyrightable works thus published on the MMC
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	terminates your license, and (b) permanently, if the copyright holder
+line	1	bash-5.2.tar.gz:bash-5.2/MANIFEST	tests/COPYRIGHT\t\tf
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	the License in the document and put the following copyright and
+line	2	bash-5.2.tar.gz:bash-5.2/doc/bashref.info	the License in the document and put the following copyright and license
+line	1	bash-5.2.tar.gz:bash-5.2/doc/FAQ	this document for any purpose, provided that the above copyright
+line	1	bash-5.2.tar.gz:bash-5.2/lib/readline/doc/rltech.texi	this manual provided the copyright notice and this permission notice
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	under copyright law.
+line	4	bash-5.2.tar.gz:bash-5.2/doc/fdl.texi	unless and until the copyright holder explicitly and finally
+line	3	bash-5.2.tar.gz:bash-5.2/COPYING	your copyrighted material outside their relationship with you.
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/aosa-bash-full.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/aosa-bash.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/article.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/bash.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/bashref.dvi
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/bashref.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/doc/rose94.pdf
+binary-head	bash-5.2.tar.gz:bash-5.2/examples/bash-completion/bash-completion-2.5.tar.xz
+binary-head	bash-5.2.tar.gz:bash-5.2/examples/complete/bashcc-1.0.1.tar.gz
+binary-head	bash-5.2.tar.gz:bash-5.2/examples/shellmath/image.png
+binary-head	bash-5.2.tar.gz:bash-5.2/po/af.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/bg.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ca.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/cs.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/da.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/de.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/el.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/en@boldquot.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/en@quot.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/eo.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/es.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/et.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/fi.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/fr.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ga.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/gl.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/hr.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/hu.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/id.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/it.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ja.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ko.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/lt.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/nb.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/nl.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/pl.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/pt.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/pt_BR.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ro.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/ru.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/sk.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/sl.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/sr.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/sv.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/tr.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/uk.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/vi.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/zh_CN.gmo
+binary-head	bash-5.2.tar.gz:bash-5.2/po/zh_TW.gmo

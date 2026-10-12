@@ -1,0 +1,6 @@
+tree 2fb174a701c68e0112ba0a3d686e3f387eceb400
+parent 1776bed7e384ad2c9e24645cad353417005d681e
+author strophy <badfunkstripe@gmail.com> 1745578449 +0200
+committer Patrycja Rosa <alpine@ptrcnull.me> 1747129935 +0000
+
+main/protobuf: upgrade to 29.4

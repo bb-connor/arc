@@ -1,0 +1,6 @@
+tree bad5a9d94de0163660dcac23bceadb7e29e91ff1
+parent 4f054b752dcdf24780062407af652f4b82e8f69e
+author Bart Ribbers <bribbers@disroot.org> 1739470715 +0100
+committer Bart Ribbers <bribbers@disroot.org> 1739470715 +0100
+
+main/abseil-cpp: bump pkgver due to gtest update and soname change

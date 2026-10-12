@@ -1,0 +1,33 @@
+# chio.attribution-lines.v8 origin=rhash files=190 files_with_lines=74 binary_heads=2 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/mono/doc/index.xml	          <AttributeName>System.Reflection.AssemblyCopyright("(c) 2011, Sergey Basalaev")</AttributeName>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/mono/doc/index.xml	  <Copyright>(c) 2011, Sergey Basalaev</Copyright>
+line	2	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/crc32.c	 * Copyright (c) 2006, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	5	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/md4.c	 * Copyright (c) 2007, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	6	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/aich.c	 * Copyright (c) 2008, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	6	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/gost94.c	 * Copyright (c) 2009, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	4	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/sha256.c	 * Copyright (c) 2010, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	3	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/algorithms.c	 * Copyright (c) 2011, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	13	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/java/native/bindings.c	 * Copyright (c) 2011, Sergey Basalaev <sbasalaev@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/ruby/rhash.c	 * Copyright (c) 2011, Sergey Basalaev <sbasalaev@gmail.com> and
+line	3	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/php/php_compatibility.h	 * Copyright (c) 2012, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	2	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/blake2b.c	 * Copyright (c) 2012, Samuel Neves <sneves@dei.uc.pt>
+line	2	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/rhash_torrent.c	 * Copyright (c) 2013, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/gost12.c	 * Copyright (c) 2019, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/util.c	 * Copyright (c) 2020, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	2	rhash-1.4.5-src.tar.gz:RHash-1.4.5/librhash/blake2b.c	 * Copyright (c) 2021, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/po/pt_BR.po	# Copyright (C) 2023 THE RHash'S COPYRIGHT HOLDER
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/po/rhash.pot	# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/po/ru.po	# Copyright (c) 2011 RHash Software Corp.
+line	8	rhash-1.4.5-src.tar.gz:RHash-1.4.5/po/ca.po	# Copyright (c) 2011 Rosetta Contributors and Canonical Ltd 2011
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/python/tests/rhash_test.py	# Copyright (c) 2011, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	4	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/java/Makefile	# Copyright (c) 2011, Sergey Basalaev <sbasalaev@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/python/rhash/rhash.py	# Copyright (c) 2011, Sergey Basalaev <sbasalaev@gmail.com>,
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/po/uk.po	# Copyright (c) 2019 Rosetta Contributors and Canonical Ltd 2019
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/python/rhash/__init__.py	# Copyright (c) 2021, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/COPYING	Copyright (c) 2005, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	2	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/perl/README	Copyright (c) 2011, Aleksey Kravchenko
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/COPYING	Copyright (c) 2011, Aleksey Kravchenko and Sergey Basalaev
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/python/LICENSE	Copyright (c) 2011, Sergey Basalaev <sbasalaev@gmail.com>,
+line	1	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/mono/AssemblyInfo.cs	[assembly: AssemblyCopyright("(c) 2011, Sergey Basalaev")]
+binary-head	rhash-1.4.5-src.tar.gz:RHash-1.4.5/bindings/mono/RHash.snk
+binary-head	rhash-1.4.5-src.tar.gz:RHash-1.4.5/tests/test1K.data

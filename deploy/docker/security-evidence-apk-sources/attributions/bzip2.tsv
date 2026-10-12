@@ -1,0 +1,33 @@
+# chio.attribution-lines.v8 origin=bzip2 files=62 files_with_lines=26 binary_heads=6 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/bzip2.c	    "   Copyright (C) 1996-2019 by Julian Seward.\\n"
+line	14	bzip2-1.0.8.tar.gz:bzip2-1.0.8/blocksort.c	   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	2	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.html	   above copyright notice, this list of conditions and the
+line	5	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	  /currency/copyright/quotedblleft/guillemotleft/guilsinglleft/guilsinglright/fi/fl
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.xml	  </copyright>
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.xml	  <copyright>
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/README.XML.STUFF	  Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.xml	  all documentation, are copyright &copy; &bz-lifespan; Julian Seward.
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.html	  all documentation, are copyright © 1996-2019 Julian Seward.
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/CHANGES	 Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/xmlproc.sh	#  Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	3	bzip2-1.0.8.tar.gz:bzip2-1.0.8/Makefile	# Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	5	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	% (URW)++,Copyright 1999 by (URW)++ Design & Development
+line	5	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	% Copyright (URW)++,Copyright 1999 by (URW)++ Design & Development
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	%%Copyright: Copyright 1996-2011 Glyph & Cog, LLC
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI10.
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSY10.
+line	2	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	%Copyright: Copyright (c) 1997, 2009 American Mathematical Society
+line	5	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	/Copyright (Copyright (URW)++,Copyright 1999 by (URW)++ Design & Development) readonly def
+line	5	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	/Notice ((URW)++,Copyright 1999 by (URW)++ Design & Development. See the file COPYING (GNU General Public License) for license conditions. As a special exception, permission is granted to include this font program in a Postscript or PDF file that consists of a document that contains text to be displayed or printed using this font, regardless of the conditions or license applying to the document itself.) readonly def
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI10.) readonly def
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSY10.) readonly def
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/LICENSE	1. Redistributions of source code must retain the above copyright
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.html	<div><p class="copyright">Copyright © 1996-2019 Julian Seward</p></div>
+line	2	bzip2-1.0.8.tar.gz:bzip2-1.0.8/README	Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	1	bzip2-1.0.8.tar.gz:bzip2-1.0.8/LICENSE	documentation, are copyright (C) 1996-2019 Julian R Seward.  All
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/manual.pdf
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/sample1.bz2
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/sample1.ref
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/sample2.bz2
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/sample2.ref
+binary-head	bzip2-1.0.8.tar.gz:bzip2-1.0.8/sample3.bz2

@@ -1,0 +1,9 @@
+tree e0728158df8a7dfee89adf315676a7f81de07de9
+parent c21d2a6afd3a93c4632e925ce36971d20c31f187
+author Sertonix <sertonix@posteo.net> 1756336189 +0200
+committer Jakub Jirutka <jakub@jirutka.cz> 1760871188 +0200
+
+main/pcre2: security upgrade to 10.46
+
+https://github.com/PCRE2Project/pcre2/releases/tag/pcre2-10.46
+(cherry picked from commit 13de10ec8b692a8650eff220e538f8dab9696c36)

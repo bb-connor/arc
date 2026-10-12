@@ -1,0 +1,14 @@
+tree 21a830193c4e5f1ba909699ba49106a068fa0656
+parent 86dfe8140ff5b9be1ad90cb066b708c6cd449dad
+author Kaarle Ritvanen <kunkku@alpinelinux.org> 1759851568 +0300
+committer Natanael Copa <ncopa@alpinelinux.org> 1760003999 +0000
+
+main/abuild: fix rootbld backward compatibility
+
+abuild commit 751870231aff5e935ef9561f10bedf9a98f4632e broke backward
+compatibility by renaming an environment variable passed into the build
+root. This patch (commit b0d3dbe3f0b89700fb1df44a7f65dadf164ff558)
+solves the original problem in a way this is more generic and retains
+compatibility with stable branches.
+
+(cherry picked from commit 1b9cda0483b8c59c3bdabe2de79fee698f0a2c0f)

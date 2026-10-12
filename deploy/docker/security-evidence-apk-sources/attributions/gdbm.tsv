@@ -1,0 +1,219 @@
+# chio.attribution-lines.v8 origin=gdbm files=253 files_with_lines=215 binary_heads=16 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/po/Makefile.in.in	\t      --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/ChangeLog	\t* (all files): Update copyright headers.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/ChangeLog	\t* Added 1991 to copyright lines on all files.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/ChangeLog	\t* Changed copyright on all files to include 1993.  Also deleted
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	          adjacent to the other copyright notices.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/ChangeLog	        Update NEWS. Update copyright years.
+line	7	gdbm-1.24.tar.gz:gdbm-1.24/ChangeLog	        Update copyright years
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	       Copyright (C)  YEAR  YOUR NAME.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	       D. Preserve all the copyright notices of the Document.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	       E. Add an appropriate copyright notice for your modifications
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	       F. Include, immediately after the copyright notices, a license
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     Copyright (C) 2000-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     Moreover, your license from a particular copyright holder is
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     World Wide Web server that publishes copyrightable works and also
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     copyright holder fails to notify you of the violation by some
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     copyright notices, and the license notice saying this License
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     copyright resulting from the compilation is not used to limit the
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     license from a particular copyright holder is reinstated (a)
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     permission from their copyright holders, but you may include
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     provisionally, unless and until the copyright holder explicitly and
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     reinstated permanently if the copyright holder notifies you of the
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     requiring permission under copyright law.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     site means any set of copyrightable works thus published on the MMC
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	     symbol suitable for this locale, and second %s are the copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     that contains a notice placed by the copyright holder saying it can
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	     that copyright holder, and you cure the violation prior to 30 days
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	    <program>  Copyright (C) <year>  <name of author>
+line	3	gdbm-1.24.tar.gz:gdbm-1.24/compat/dbm.h	    Copyright (C) 1990-2024 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/tests/gtcacheopt.c	    Copyright (C) 2021-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	    Copyright (C) <year>  <name of author>
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/tools/gram.h	   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+line	42	gdbm-1.24.tar.gz:gdbm-1.24/tools/lex.l	   Copyright (C) 1990-2024 Free Software Foundation, Inc.
+line	6	gdbm-1.24.tar.gz:gdbm-1.24/compat/dbmrdonly.c	   Copyright (C) 1993-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/src/gettext.h	   Copyright (C) 1995-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/src/gdbmfdesc.c	   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+line	3	gdbm-1.24.tar.gz:gdbm-1.24/src/gdbmimp.c	   Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/src/lock.c	   Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	29	gdbm-1.24.tar.gz:gdbm-1.24/tools/wordwrap.c	   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	4	gdbm-1.24.tar.gz:gdbm-1.24/tools/input-std.c	   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	4	gdbm-1.24.tar.gz:gdbm-1.24/tools/input-file.c	   Copyright (C) 2018-2024 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/tests/t_wordwrap.c	   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tests/t_dumpload.c	   Copyright (C) 2022-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/src/debug.c	   Copyright 2016-2024 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/README	   copyright notice and this permission notice are preserved,
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	  "Copyright %s %s Free Software Foundation, Inc";
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	  "The Program" refers to any copyrightable work licensed under this
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	  /* Do *not* mark this string for translation.  First %s is a copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	  /* TRANSLATORS: Translate "(C)" to the copyright symbol
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	  A "contributor" is a copyright holder who authorizes use under this
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	  Copyright (C)  @var{year}  @var{your name}.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	  Moreover, your license from a particular copyright holder is
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright{}}%
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	  \\definedummyword\\copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	  \\do\\copyright{copyright}%
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	  \\gdefchar^^a9{\\copyright{}}
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	  printf (version_etc_copyright, _("(C)"), "2011-2024");
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	 Copyright (C) 2007, 2011 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	"aggregate" if the compilation and its resulting copyright are not
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2015 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2015 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2015 Free Software
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2015 Free Software
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/config.sub	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/config.rpath	#   Copyright 1996-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/install-sh	# Copyright (C) 1994 X Consortium
+line	7	gdbm-1.24.tar.gz:gdbm-1.24/doc/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makefile.in.in	# Copyright (C) 1995-2000 Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/mdate-sh	# Copyright (C) 1995-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/ltmain.sh	# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+line	4	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makefile.in.in	# Copyright (C) 2000-2020 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/insert-header.sin	# Copyright (C) 2001 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Rules-quot	# Copyright (C) 2001-2017 Free Software Foundation, Inc.
+line	6	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/remove-potcdate.sin	# Copyright (C) 2002 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2015 Free Software
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/ltmain.sh	# Copyright (C) 2004-2015 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	11	gdbm-1.24.tar.gz:gdbm-1.24/Makefile.am	# Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tests/testsuite	# Copyright (C) 2009-2017, 2020-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/ltmain.sh	# Copyright (C) 2010-2015 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/uk.po	# Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/ja.po	# Copyright (C) 2011, 2012 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/pl.po	# Copyright (C) 2011, 2013, 2016, 2018, 2020, 2021, 2022, 2024 Free Software Foundation, Inc.
+line	29	gdbm-1.24.tar.gz:gdbm-1.24/po/POTFILES.in	# Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/de.po	# Copyright (C) 2012 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/eo.po	# Copyright (C) 2013, 2017, 2018, 2021 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/m4/libtool.m4	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	4	gdbm-1.24.tar.gz:gdbm-1.24/tests/blocksize00.at	# Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/da.po	# Copyright (C) 2017 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/es.po	# Copyright (C) 2018, 2022, 2023, 2024 Free Software Foundation, Inc.
+line	5	gdbm-1.24.tar.gz:gdbm-1.24/tests/gdbmtool03.at	# Copyright (C) 2018-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/ru.po	# Copyright (C) 2019 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gendocs.pl	# Copyright (C) 2020-2021 Sergey Poznyakoff
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/po/pt_BR.po	# Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tests/wordwrap.at	# Copyright (C) 2021-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/ka.po	# Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/fr.po	# Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/gdbm.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/fi.po	# Copyright © 2011, 2013 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/vi.po	# Copyright © 2016 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/sv.po	# Copyright © 2017, 2019, 2020, 2021, 2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/sr.po	# Copyright © 2020 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/ro.po	# Copyright © 2022, 2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/po/remove-potcdate.sin	# are permitted in any medium without royalty provided the copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/install-sh	# following copyright and license.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	# their copyright.
+line	17	gdbm-1.24.tar.gz:gdbm-1.24/po/es.po	#. TRANSLATORS: Translate "(C)" to the copyright symbol
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/texinfo.tex	% Copyright 1985, 1986, 1988, 1990-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	(1) assert copyright on the software, and (2) offer you this License
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.texi	(@command{GDBM}) is not in the public domain; it is copyrighted and there
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/README	* Copyright information:
+line	4	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbmtool.1	.SH COPYRIGHT
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.3	.\\" Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbmtool.1	.\\" Copyright (C) 2013-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	Add an appropriate copyright notice for your modifications
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/po/Makevars	COPYRIGHT_HOLDER = Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/NEWS	Copyright (C) 1990-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/NEWS	Copyright (C) 1990-2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/README	Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	3	gdbm-1.24.tar.gz:gdbm-1.24/tests/testsuite	Copyright (C) 2021 Free Software Foundation, Inc.
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/build-aux/config.sub	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.texi	Copyright @copyright{} 1989--2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	Copyright @copyright{} 2000--2024 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.3	Copyright \\(co 1990 - 2021 Free Software Foundation, Inc.
+line	3	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbmtool.1	Copyright \\(co 2013-2021 Free Software Foundation, Inc
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/NEWS	Copyright information:
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	Include, immediately after the copyright notices, a license notice
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	Moreover, your license from a particular copyright holder is
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	Preserve all the copyright notices of the Document.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	World Wide Web server that publishes copyrightable works and also
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	add to a covered work, you may (if authorized by the copyright holders of
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	adjacent to the other copyright notices.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	appropriately publish on each copy an appropriate copyright notice;
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	author or copyright holder as a result of your choosing to follow a
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/tools/parseopt.c	const char version_etc_copyright[] =
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	contains a notice placed by the copyright holder saying it can be
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	copyright holder, and you cure the violation prior to 30 days after
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	copyright notices, and the license notice saying this License applies
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	copyright on the Program, and are irrevocable provided the stated
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	distribution medium, is called an ``aggregate'' if the copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2014, 2016, 2019-2022 Free
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/gettext.m4	dnl Copyright (C) 1995-2014, 2016, 2018-2020 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/po.m4	dnl Copyright (C) 1995-2014, 2016, 2018-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/longlong.m4	dnl Copyright (C) 1999-2007, 2009-2016 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014, 2016-2022 Free Software Foundation,
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/lib-link.m4	dnl Copyright (C) 2001-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/host-cpu-c-abi.m4	dnl Copyright (C) 2002-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/m4/intlmacosx.m4	dnl Copyright (C) 2004-2014, 2016, 2019-2022 Free Software Foundation, Inc.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	finally terminates your license, and (b) permanently, if the copyright
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	for which you have or can give appropriate copyright permission.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	from a particular copyright holder is reinstated (a) provisionally,
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	in a fashion requiring copyright permission, other than the making of an
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	infringement under applicable copyright law, except executing it on a
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	license from a particular copyright holder is reinstated (a)
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	modify any covered work.  These actions infringe copyright if you do
+line	12	gdbm-1.24.tar.gz:gdbm-1.24/po/es.po	msgstr "©"
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	not control copyright.  Those thus making or running the covered works
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	permission from their copyright holders, but you may include
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	provisionally, unless and until the copyright holder explicitly and
+line	2	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	reinstated permanently if the copyright holder notifies you of the
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	rights of fair use or other equivalent, as provided by copyright law.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	site means any set of copyrightable works thus published on the MMC
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	terminates your license, and (b) permanently, if the copyright holder
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	the License in the document and put the following copyright and
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	the License in the document and put the following copyright and license
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/gdbm.info	the public domain; it is copyrighted and there are restrictions on its
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	under copyright law.
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/doc/fdl.texi	unless and until the copyright holder explicitly and finally
+line	1	gdbm-1.24.tar.gz:gdbm-1.24/COPYING	your copyrighted material outside their relationship with you.
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/da.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/de.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/eo.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/es.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/fi.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/fr.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/ja.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/ka.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/pl.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/pt_BR.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/ro.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/ru.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/sr.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/sv.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/uk.gmo
+binary-head	gdbm-1.24.tar.gz:gdbm-1.24/po/vi.gmo

@@ -1,0 +1,763 @@
+# chio.attribution-lines.v8 origin=python3 files=4583 files_with_lines=654 binary_heads=160 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Makefile.pre.in	\t\tPython/getcopyright.o \\
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/Info.plist.in	\t<key>NSHumanReadableCopyright</key>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/framework/Info.plist.in	\t<string>%VERSION%, (c) 2001-2023 Python Software Foundation.</string>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/Info.plist.in	\t<string>%VERSION%, © 2001-2023 Python Software Foundation</string>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/app/Info.plist.in	\t<string>%version%, (c) 2001-2023 Python Software Foundation.</string>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/IDLE/IDLE.app/Contents/Info.plist	\t<string>%version%, © 2001-2023 Python Software Foundation</string>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/app/Info.plist.in	\t<string>(c) 2001-2023 Python Software Foundation.</string>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/Info.plist.in	\t<string>Copyright © 2001-2023 Python Software Foundation</string>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/ChangeLog	\tcopyright text output at startup 1.30 Delay setting sys.args until
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	                                   command=self.show_py_copyright)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_re.py	                                "bad character in group name '©'", 3)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/idle_test/test_help_about.py	                          (dialog.py_copyright, copyright, 'copyright'),
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/code.py	                       help="don't print version and copyright messages")
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/frozenmain.c	                Py_GetVersion(), Py_GetCopyright());
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/asyncio/__main__.py	                f'Type "help", "copyright", "credits" or "license" '
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/sqlite3.rc	            VALUE "LegalCopyright", "Unspecified\\0"
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/PC/pylauncher.rc	            VALUE "LegalCopyright", PYTHON_COPYRIGHT "\\0"
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_imaplib.py	            msg_string = 'Subject: üñí©öðé'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	          that You distribute, all copyright, patent, trademark, and
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	        "Handle Copyright button event."
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_site.py	        # 'copyright', 'credits', and 'license' should be in builtins
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_http_cookies.py	        c['foo'] = '\\N{COPYRIGHT SIGN}'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_http_cookies.py	        c['foo']['comment'] = 'comment \\N{COPYRIGHT SIGN}'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/code.py	        cprt = 'Type "help", "copyright", "credits" or "license" for more information.'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/main.c	        fprintf(stderr, "%s\\n", COPYRIGHT);
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_imaplib.py	        msg_string = 'Subject: üñí©öðé'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_capi/test_unicode.py	        self.assertEqual(isidentifier("©"), 0)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_unicode.py	        self.assertFalse("©".isidentifier())
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_sys.py	        self.assertIsInstance(sys.copyright, str)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_site.py	        self.assertTrue(hasattr(builtins, "copyright"))
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_re.py	        self.checkPatternError('(?(©)y)', "bad character in group name '©'", 3)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_re.py	        self.checkPatternError('(?P<©>x)', "bad character in group name '©'", 4)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_re.py	        self.checkPatternError('(?P=©)', "bad character in group name '©'", 4)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_re.py	        self.checkTemplateError('(?P<a>x)', r'\\g<©>', 'xx',
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	        self.display_printer_text('About - Copyright', copyright)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	        self.py_copyright = Button(py_buttons, text='Copyright', width=8,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	        self.py_copyright.pack(side=LEFT, padx=10, pady=10)
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	       copyright notice, this list of conditions and the following
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      "Licensor" shall mean the copyright owner or entity authorized by
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/tools/templates/indexcontent.html	      <p class="biglink"><a class="biglink" href="{{ pathto("copyright") }}">{% trans %}Copyright{% endtrans %}</a></p>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/xml.etree.elementtree.rst	      Copyright (c) 2003.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/xml.etree.elementtree.rst	      Copyright (c) <xi:include href="year.txt" parse="text" />.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init_config.rst	      Quiet mode. If greater than ``0``, don't display the copyright and version at
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/sys.rst	      Type "help", "copyright", "credits" or "license" for more information.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      You may add Your own copyright statement to Your modifications and
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      copyright license to reproduce, prepare Derivative Works of,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      copyright notice that is included in or attached to the work
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      copyright, i.e., "Copyright © 2001-2023 Python Software Foundation; All Rights
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      designated in writing by the copyright owner as "Not a Contribution."
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      i.e., "Copyright © 1995-2001 Corporation for National Research Initiatives; All
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      law of the United States, including without limitation the federal copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      provided, however, that CNRI's License Agreement and CNRI's notice of copyright,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      submitted to Licensor for inclusion in the Work by the copyright owner
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      the copyright owner that is granting the License.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	      the copyright owner. For the purposes of this definition, "submitted"
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	     * Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_randommodule.c	     1. Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_randommodule.c	     2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sre/sre.c	    " SRE 2.2.2 Copyright (c) 1997-2002 by Secret Labs AB ";
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/site.py	    """Set 'copyright' and 'credits' in builtins"""
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_stable_abi_ctypes.py	    "Py_GetCopyright",
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/main.c	    "Type \\"help\\", \\"copyright\\", \\"credits\\" or \\"license\\" " \\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	    # License, copyright, and credits are of type _sitebuiltins._Printer
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/kz1048.py	    '\\xa9'      #  0xA9 -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp273.py	    '\\xa9'      #  0xB4 -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp869.py	    '\\xa9'     #  0x0097 -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp775.py	    '\\xa9'     #  0x00a8 -> COPYRIGHT SIGN
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp850.py	    '\\xa9'     #  0x00b8 -> COPYRIGHT SIGN
+line	26	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp1250.py	    '\\xa9'     #  0xA9 -> COPYRIGHT SIGN
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp037.py	    '\\xa9'     #  0xB4 -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp856.py	    '\\xa9'     #  0xB8 -> COPYRIGHT SIGN
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/koi8_r.py	    '\\xa9'     #  0xBF -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/mac_croatian.py	    '\\xa9'     #  0xD9 -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp875.py	    '\\xa9'     #  0xFB -> COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/tutorial/modules.rst	    'callstats', 'copyright', 'displayhook', 'dont_write_bytecode', 'exc_info',
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/tutorial/modules.rst	    'chr', 'classmethod', 'compile', 'complex', 'copyright', 'credits',
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/html/entities.py	    'copy':     0x00a9, # copyright sign, U+00A9 ISOnum
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_unicodedata.py	    (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	    * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp869.py	    0x0097: 0x00a9,     #  COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp775.py	    0x00a8: 0x00a9,     #  COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp869.py	    0x00a9: 0x0097,     #  COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp775.py	    0x00a9: 0x00a8,     #  COPYRIGHT SIGN
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp850.py	    0x00a9: 0x00b8,     #  COPYRIGHT SIGN
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/cp850.py	    0x00b8: 0x00a9,     #  COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	    1. Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	    2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/tools/extensions/pyspecific.py	    :copyright: 2008-2014 by Georg Brandl.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/ast.py	    :copyright: Copyright 2008 by Armin Ronacher.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/PCbuild/_freeze_module.vcxproj	    <ClCompile Include="..\\Python\\getcopyright.c" />\r
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/PCbuild/_freeze_module.vcxproj.filters	    <ClCompile Include="..\\Python\\getcopyright.c">\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/data/python3.12.abi	    <elf-symbol name='Py_GetCopyright' type='func-type' binding='global-binding' visibility='default-visibility' is-defined='yes'/>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/data/python3.12.abi	    <function-decl name='Py_GetCopyright' mangled-name='Py_GetCopyright' filepath='Python/getcopyright.c' line='20' column='1' visibility='default' binding='global' size-in-bits='64' elf-symbol-id='Py_GetCopyright'>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/whatsnew/3.8.rst	    >>> copyright_year_pattern = re.compile(r'\\N{copyright sign}\\s*(\\d{4})')
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/whatsnew/3.8.rst	    >>> int(copyright_year_pattern.search(notice).group(1))
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/whatsnew/3.8.rst	    >>> notice = 'Copyright © 2019'
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/urllib/robotparser.py	    Copyright (C) 2000  Bastian Kleineidam
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/platform.py	    Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/platform.py	    Copyright (c) 2000-2010, eGenix.com Software GmbH; mailto:info@egenix.com
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.vcxproj	    Copyright (c) 2004, Outercurve Foundation.\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/sysmodule.c	    SET_SYS_FROM_STRING("copyright", Py_GetCopyright());
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.vcxproj	    The license and further copyright text can be found in the file\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/whatsnew/3.8.rst	    Type "help", "copyright", "credits" or "license" for more information.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/platform.py	    both that copyright notice and this permission notice appear in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/site.py	    builtins.copyright = _sitebuiltins._Printer("copyright", sys.copyright)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/_sitebuiltins.py	    contributors and the copyright notice."""
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help_about.py	    def show_py_copyright(self):
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_site.py	    def test_setting_copyright(self):
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sre/sre.c	    if (PyModule_AddStringConstant(m, "copyright", copyright) < 0) {
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/platform.py	    provided that the above copyright notice appear in all copies and that
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/site.py	    setcopyright()
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   * Redistributions in binary form must reproduce the original copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   * Redistributions of works must retain the original copyright notice,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	   .. index:: single: copyright (in module sys)
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   1. Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   2. Grant of Copyright License. Subject to the terms and conditions of
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   2. Redistributions in binary form must reproduce the above copyright
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/sys.rst	   A string containing the copyright pertaining to the Python interpreter.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/md5module.c	   Copyright (C) 2005-2007   Gregory P. Smith (greg@krypto.org)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 1996-2008  Red Hat, Inc and others.
+line	14	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/asciitab.h	   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   Copyright (c) 1999-2000 Thai Open Source Software Center Ltd
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 1999-2002 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 1999-2002 by Secret Labs AB
+line	16	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/nametab.h	   Copyright (c) 2000 Clark Cooper <coopercc@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat_external.h	   Copyright (c) 2000-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2000-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2001-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	9	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/winconfig.h	   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlrole.h	   Copyright (c) 2002      Karl Waclawek <karl@waclawek.net>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2002-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.h	   Copyright (c) 2002-2005 Karl Waclawek <karl@waclawek.net>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat_external.h	   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2003      Greg Stein <gstein@users.sourceforge.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_functoolsmodule.c	   Copyright (c) 2004, 2005, 2006 Python Software Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/winconfig.h	   Copyright (c) 2005      Karl Waclawek <karl@waclawek.net>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 2005 Don Owens
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   Copyright (c) 2007      Karl Waclawek <karl@waclawek.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 2008-2020 Stefan Krah. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright (c) 2013 W3C(R) (MIT, ERCIM, Keio, Beihang),
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2016      Cristian Rodríguez <crrodriguez@opensuse.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2016      Don Lewis <truckman@apache.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2016      Ed Schouten <ed@nuxi.nl>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2016      Eric Rahm <erahm@mozilla.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2016      Gaurav <g.gupta@samsung.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2016      Gustavo Grieco <gustavo.grieco@imag.fr>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2016      Pascal Cuoq <cuoq@trust-in-soft.com>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2016      Thomas Beutlich <tc@tbeu.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat_external.h	   Copyright (c) 2016-2025 Sebastian Pipping <sebastian@pipping.org>
+line	7	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2016-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2017      Alexander Bluhm <alexander.bluhm@gmx.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2017      Benbuck Nason <bnason@netflix.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017      Chanho Park <chanho61.park@samsung.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017      Hans Wennborg <hans@chromium.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2017      José Gutiérrez de la Concha <jose@zeroc.com>
+line	6	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   Copyright (c) 2017      Sebastian Pipping <sebastian@pipping.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017      Viktor Szakats <commit@vsz.me>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017      Václav Slavík <vaclav@slavik.io>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/nametab.h	   Copyright (c) 2017 Sebastian Pipping <sebastian@pipping.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok_impl.h	   Copyright (c) 2017-2019 Sebastian Pipping <sebastian@pipping.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/winconfig.h	   Copyright (c) 2017-2023 Sebastian Pipping <sebastian@pipping.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlrole.h	   Copyright (c) 2017-2026 Sebastian Pipping <sebastian@pipping.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2018      Anton Maklakov <antmak.pub@gmail.com>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2018      Mariusz Zaborski <oshogbo@vexillium.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat_external.h	   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2019      Vadim Zeitlin <vadim@zeitlins.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2019-2020 Ben Wagner <bungeman@chromium.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok_impl.c	   Copyright (c) 2020      Boris Kolpackov <boris@codesynthesis.com>
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2022      Jann Horn <jannh@google.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2022      Jeffrey Walton <noloader@gmail.com>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2022      Martin Ettl <ettl.martin78@googlemail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2022      Samanta Navarro <ferivoz@riseup.net>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2022      Sean McBride <sean@rogue-research.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2022      Thijs Schreijer <thijs@thijsschreijer.nl>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xcsinc.c	   Copyright (c) 2022-2026 Sebastian Pipping <sebastian@pipping.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2023      Hanno Böck <hanno@gentoo.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/winconfig.h	   Copyright (c) 2023      Orgad Shaneh <orgad.shaneh@audiocodes.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2023      Owain Davies <owaind@bath.edu>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2023      Sony Corporation / Snild Dolkow <snild@sony.com>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2023-2024 Sony Corporation / Snild Dolkow <snild@sony.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2024      Hanno Böck <hanno@gentoo.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2024      Taichi Haradaguchi <20001722@ymail.ne.jp>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2024-2025 Berkay Eren Ürün <berkay.ueruen@siemens.com>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2025      Alfonso Gregory <gfunni234@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2025      Atrem Borovik <polzovatellllk@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2025      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2025-2026 Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmltok.c	   Copyright (c) 2026      Afonso Januário <afonso-januario@hotmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Alberto Maschietto <albertomaschietto9@gmail.com>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat.h	   Copyright (c) 2026      Braian Plaku <braianplaku@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Christian Ng <christianrng@berkeley.edu>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Darren Carreras <carrerasdarren@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Evgeny Kotkov <kotkov@apache.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2026      Florian Schmaus <florian.schmaus@codasip.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Francesco Bertolaccini
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Haris Hussain <hextheshadow0x@gmail.com>
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Kartik Kenchi <netliomax25@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/expat_external.h	   Copyright (c) 2026      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/internal.h	   Copyright (c) 2026      Matthew Wozniczka <mattheww@simba.com>
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Nick Begg <nick@stunttruck.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Rosen Penev <rosenp@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Stan Ulbrych <stan@python.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/xmlparse.c	   Copyright (c) 2026      Zeyou Liu <zeyouliu@tencent.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/memory_sanitizer.h	   Copyright (c) 2026 Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/fallthrough.h	   Copyright (c) 2026 Nick Begg <nick@stunttruck.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/hash_table.h	   Copyright (c) 2026 Sebastian Pipping <sebastian@pipping.org>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/unicodedata.c	   Copyright (c) Corporation for National Research Initiatives.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 1991-1995, Stichting Mathematisch Centrum, all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 1994 by Lance Ellinghouse
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 1995-1997, Automatrix, Inc., all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 1996 by Sam Rushing
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 1999, Bioreason, Inc., all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 2000 by Timothy O'Malley <timo@alum.mit.edu>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright 2000, Mojam Media, Inc., all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/hashtable.c	   Copyright of cfuhash:
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   Copyright © 1991 - 1995, Stichting Mathematisch Centrum Amsterdam, The
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/idle.rst	   Display version, copyright, license, credits, and more.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	   Don't display the copyright and version messages even in interactive mode.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   INFRINGEMENT OF COPYRIGHTS, TRADE SECRETS OR ANY PATENTS BY THIS SOFTWARE
+line	22	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/constants.rst	   Objects that when printed or called, print the text of copyright or
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	   Return the official copyright string for the current Python version, for example
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	22	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/ascii.h	   The above copyright  notice and this permission notice  shall be included
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   The above copyright notice and this permission notice shall be included
+line	15	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/hashlib.rst	   To the extent possible under law, the author(s) have dedicated all copyright
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/windows.rst	   Type "help", "copyright", "credits" or "license" for more information.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	   ``'Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam'``
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   all copies, and that both that copyright notice and this permission
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   and that both that copyright notice and this permission notice appear in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   both that copyright notice and this permission notice appear in
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   copies and that both that copyright notice and this permission
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/store_info.txt	   copyright, i.e., "Copyright © 2001-2018 Python Software Foundation; All Rights
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/contents.rst	   copyright.rst
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   granted, provided that the above copyright notice appear in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   granted, provided that the above copyright notice appears in all copies,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   hereby granted, provided that the above copyright notice appears in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   portions copyright 2001, Autonomous Zones Industries, Inc., all rights...
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   provided that the above copyright notice appear in all copies and that
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	   the above copyright notice appear in all copies and that both that copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	   value.  The value is available to Python code as ``sys.copyright``.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	  * :c:func:`Py_GetCopyright`
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	  * Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	  * Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  1. Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.vcxproj	  </copyright>\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/data/python3.12.abi	  <abi-instr address-size='64' path='Python/getcopyright.c' comp-dir-path='/home/encukou/dev/cpython' language='LANG_C11'>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.vcxproj	  <copyright file="wixstdba.vcxproj" company="Outercurve Foundation">\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (C) 1995-2011 Jean-loup Gailly and Mark Adler
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/socketserver.py	  Copyright (C) 2000  Luke Kenneth Casson Leighton <lkcl@samba.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (c) 1998, 1999, 2000 Thai Open Source Software Center Ltd
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Objects/unicodeobject.c	  Copyright (c) 1999 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Objects/unicodeobject.c	  Copyright (c) 1999 by Secret Labs AB
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (c) 2000 Doug White, 2006 James Knight, 2007 Christian Heimes
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (c) 2001-2006 Twisted Matrix Laboratories.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (c) 2013  Marek Majkowski <marek@popcount.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  Copyright (c) 2015-2021 MagicStack Inc.  http://magic.io
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/include/krml/FStar_UInt128_Verified.h	  Copyright (c) INRIA and Microsoft Corporation. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  The above copyright notice and this permission notice shall be
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  The above copyright notice and this permission notice shall be included
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	  The above copyright notice and this permission notice shall be included in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/whatsnew/3.2.rst	  the copyright and version information from being displayed in the interactive
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/diff/jisx0213-2004-std.txt.diff	 ## \tCopyright (C) 2001 I'O, All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/diff/jisx0213-2004-std.txt.diff	 ## \tCopyright (C) 2001 earthian@tama.or.jp, All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/LICENSE.txt	 (A) Copyright Grant- Subject to the terms of this license, including the license conditions and limitations in section 3, each contributor grants you a non-exclusive, worldwide, royalty-free copyright license to reproduce its contribution, prepare derivative works of its contribution, and distribute its contribution or any derivative works that you create.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/LICENSE.txt	 (D) If you distribute any portion of the software, you must retain all copyright, patent, trademark, and attribution notices that are present in the software.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Include/dynamic_annotations.h	 *     * Redistributions of source code must retain the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_cursesmodule.c	 *   Copyright 1996,1997 by Oliver Andrich, Koblenz, Germany.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_cursesmodule.c	 *   The above copyright notice and this permission notice shall be included
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_cursesmodule.c	 *   Version 1.2 of this module: Copyright 1994 by Lance Ellinghouse,
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/doscript.h	 *  Copyright (c) 2002 __MyCompanyName__. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/ossaudiodev.c	 * (c) 2000 Peter Bosch.  All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/ossaudiodev.c	 * (c) 2002 Gregory P. Ward.  All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/ossaudiodev.c	 * (c) 2002 Python Software Foundation.  All Rights Reserved.
+line	46	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/_decimal.c	 * 1. Redistributions of source code must retain the above copyright
+line	46	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/_decimal.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sre/sre.c	 * 2001-04-15 fl   export copyright as Python attribute, not global
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Include/dynamic_annotations.h	 * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	13	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/Hacl_Hash_MD5.c	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/addrinfo.h	 * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/getaddrinfo.c	 * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sqlite/microprotocols.c	 * Copyright (C) 2003-2004 Federico Di Gregorio <fog@debian.org>
+line	6	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sqlite/connection.c	 * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/_msi.c	 * Copyright (C) 2005 Martin v. Löwis
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hashopenssl.c	 * Copyright (C) 2005-2010   Gregory P. Smith (greg@krypto.org)
+line	8	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sqlite/prepare_protocol.c	 * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/launcher.c	 * Copyright (C) 2011-2013 Vinay Sajip.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/sha3module.c	 * Copyright (C) 2012-2022  Christian Heimes (christian@python.org)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/dtoa.c	 * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+line	6	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sre/sre.c	 * Copyright (c) 1997-2001 by Secret Labs AB.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/winsound.c	 * Copyright (c) 1999 Toby Dickenson
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * Copyright (c) 1999 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * Copyright (c) 1999 by Fredrik Lundh.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * Copyright (c) 1999 by Secret Labs AB
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * Copyright (c) 1999 by Secret Labs AB.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_elementtree.c	 * Copyright (c) 1999-2009 by Fredrik Lundh.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_elementtree.c	 * Copyright (c) 1999-2009 by Secret Labs AB.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/selectmodule.c	 * Copyright (c) 2000 Doug White, 2006 James Knight, 2007 Christian Heimes
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/docstrings.h	 * Copyright (c) 2001-2012 Python Software Foundation. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_winapi.c	 * Copyright (c) 2004 by Fredrik Lundh <fredrik@pythonware.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_winapi.c	 * Copyright (c) 2004 by Peter Astrand <astrand@lysator.liu.se>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_winapi.c	 * Copyright (c) 2004 by Secret Labs AB, http://www.pythonware.com
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_multiprocessing/multiprocessing.c	 * Copyright (c) 2006-2008, R Oudkerk
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/_decimal.c	 * Copyright (c) 2008-2012 Stefan Krah. All rights reserved.
+line	41	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/basearith.c	 * Copyright (c) 2008-2020 Stefan Krah. All rights reserved.
+line	13	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/Hacl_Hash_MD5.c	 * Copyright (c) 2016-2022 INRIA, CMU and Microsoft Corporation
+line	13	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/Hacl_Hash_MD5.c	 * Copyright (c) 2022-2023 HACL* Contributors
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getopt.c	 * Copyright 1992-1994, David Gottner
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/audioop.c	 * INFRINGEMENT OF COPYRIGHTS, TRADE SECRETS OR ANY PATENTS BY THIS SOFTWARE
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Include/dynamic_annotations.h	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	13	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/Hacl_Hash_MD5.c	 * The above copyright notice and this permission notice shall be included in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_winapi.c	 * all copies, and that both that copyright notice and this permission
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * copies, and that both that copyright notice and this permission notice
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_blake2/blake2b_impl.c	 * copyright and related and neighboring rights to this software to
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/winsound.c	 * fee, provided that the copyright notice above appears in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/unicodeobject.h	 * granted, provided that the above copyright notice appears in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_winapi.c	 * hereby granted, provided that the above copyright notice appears in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getopt.c	 * provided that the above copyright notice, this permission notice and
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/atexitmodule.c	 +   Copyright 2007 Python Software Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/pyhash.c	 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/binascii.c	 Copyright (C) 1986 Gary S. Brown.  You may use this program, or
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/pyhash.c	 Copyright (c) 2013  Marek Majkowski <marek@popcount.org>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/audioop.c	 Copyright of g771.c:
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/pyhash.c	 The above copyright notice and this permission notice shall be included in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/LICENSE.txt	 The terms "reproduce," "reproduction," "derivative works," and "distribution" have the same meaning here as under U.S. copyright law.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/GB2312.TXT	#\tCopyright (c) 1991-1999 Unicode, Inc.  All Rights reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/CP1140.TXT	#\tCopyright (c) 2002 Unicode, Inc.  All Rights reserved.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/CP1140.TXT	#       (c) Copyright Marc-Andre Lemburg, 2005.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/functools.py	#   Copyright (C) 2006-2013 Python Software Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   Copyright (c) 2008, 2023 Daniel Amelang <dan@amelang.net>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   Copyright (c) 2009,2010 Dustin J. Mitchell <dustin@zmanda.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   Copyright (c) 2009,2010 Zmanda Inc. <http://www.zmanda.com/>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/config.guess	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_hashlib.py	#  Copyright (C) 2005-2010   Gregory P. Smith (greg@krypto.org)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/wsgiref/validate.py	# (c) 2005 Ian Bicking and contributors; written for Paste (http://pythonpaste.org)
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/fnt.py	# 1. Redistributions of source code must retain the above copyright
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/fnt.py	# 2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/install-sh	# Copyright (C) 1994 X Consortium
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/textwrap.py	# Copyright (C) 1999-2001 Gregory P. Ward.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_gettext.py	# Copyright (C) 2001 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_csv.py	# Copyright (C) 2001,2002 Python Software Foundation
+line	9	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/encoders.py	# Copyright (C) 2001-2006 Python Software Foundation
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/__init__.py	# Copyright (C) 2001-2007 Python Software Foundation
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/generator.py	# Copyright (C) 2001-2010 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/tests/bench.py	# Copyright (C) 2001-2012 Python Software Foundation. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/tarfile.py	# Copyright (C) 2002 Lars Gustaebel <lars@gustaebel.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/textwrap.py	# Copyright (C) 2002, 2003 Python Software Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/torture_test.py	# Copyright (C) 2002-2004 Python Software Foundation
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/mime/multipart.py	# Copyright (C) 2002-2006 Python Software Foundation
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/_parseaddr.py	# Copyright (C) 2002-2007 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_shutil.py	# Copyright (C) 2003 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_plistlib.py	# Copyright (C) 2003-2013 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/sqlite3/dbapi2.py	# Copyright (C) 2004-2005 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/email/feedparser.py	# Copyright (C) 2004-2006 Python Software Foundation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_sqlite3/test_dbapi.py	# Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/sqlite3/__init__.py	# Copyright (C) 2005 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/msilib/__init__.py	# Copyright (C) 2005 Martin v. Löwis
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_sqlite3/test_factory.py	# Copyright (C) 2005-2007 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/turtle.py	# Copyright (C) 2006 - 2010  Gregor Lingl
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_sqlite3/test_hooks.py	# Copyright (C) 2006-2007 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_sqlite3/test_regression.py	# Copyright (C) 2006-2010 Gerhard Häring <gh@ghaering.de>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_unittest/testmock/testcallable.py	# Copyright (C) 2007-2012 Michael Foord & the mock team
+line	6	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_tools/i18n_data/ascii-escapes.pot	# Copyright (C) YEAR ORGANIZATION
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/tkinter/simpledialog.py	# Copyright (c) 1997 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/re/_compiler.py	# Copyright (c) 1997-2001 by Secret Labs AB.  All rights reserved.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/re/__init__.py	# Copyright (c) 1998-2001 by Secret Labs AB.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/makeunicodedata.py	# Copyright (c) 1999-2000 by Secret Labs AB
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xmlrpc/client.py	# Copyright (c) 1999-2002 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xmlrpc/client.py	# Copyright (c) 1999-2002 by Fredrik Lundh.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xmlrpc/client.py	# Copyright (c) 1999-2002 by Secret Labs AB
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xmlrpc/client.py	# Copyright (c) 1999-2002 by Secret Labs AB.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementInclude.py	# Copyright (c) 1999-2008 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementTree.py	# Copyright (c) 1999-2008 by Fredrik Lundh.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementPath.py	# Copyright (c) 1999-2009 by Fredrik Lundh
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/pgen2/tokenize.py	# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_epoll.py	# Copyright (c) 2001-2006 Twisted Matrix Laboratories.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementInclude.py	# Copyright (c) 2003-2004 by Fredrik Lundh.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/subprocess.py	# Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementPath.py	# Copyright (c) 2003-2009 by Fredrik Lundh.  All rights reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/_pydecimal.py	# Copyright (c) 2004 Python Software Foundation.
+line	14	Python-3.12.15.tar.xz:Python-3.12.15/Lib/multiprocessing/__init__.py	# Copyright (c) 2006-2008, R Oudkerk
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/tests/deccheck.py	# Copyright (c) 2008-2012 Stefan Krah. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/fnt.py	# Copyright (c) 2008-2020 Stefan Krah. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/tests/randfloat.py	# Copyright (c) 2010 Python Software Foundation. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# Copyright 1991-1995, Stichting Mathematisch Centrum, all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/uu.py	# Copyright 1994 by Lance Ellinghouse
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# Copyright 1995-1997, Automatrix, Inc., all rights reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/support/asynchat.py	# Copyright 1996 by Sam Rushing
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# Copyright 1999, Bioreason, Inc., all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/http/cookies.py	# Copyright 2000 by Timothy O'Malley <timo@alum.mit.edu>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# Copyright 2000, Mojam Media, Inc., all rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/handlers.py	# Copyright 2001-2021 by Vinay Sajip. All Rights Reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/__init__.py	# Copyright 2001-2022 by Vinay Sajip. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/config.py	# Copyright 2001-2023 by Vinay Sajip. All Rights Reserved.
+line	7	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/pgen2/__init__.py	# Copyright 2004-2005 Elemental Security, Inc. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/fixes/fix_intern.py	# Copyright 2006 Georg Brandl.
+line	17	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/PatternGrammar.txt	# Copyright 2006 Google, Inc. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/fixes/fix_numliterals.py	# Copyright 2007 Georg Brandl.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/ipaddress.py	# Copyright 2007 Google Inc.
+line	12	Python-3.12.15.tar.xz:Python-3.12.15/Lib/_collections_abc.py	# Copyright 2007 Google, Inc. All Rights Reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/lib2to3/fixes/fix_isinstance.py	# Copyright 2008 Armin Ronacher.
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Lib/concurrent/futures/__init__.py	# Copyright 2009 Brian Quinlan. All Rights Reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_clinic.py	# Copyright 2012-2013 by Larry Hastings.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/profile.py	# Copyright Disney Enterprises, Inc.  All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/tarfile.py	# NONINFRINGEMENT.  IN  NO  EVENT SHALL  THE  AUTHORS  OR COPYRIGHT
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_epoll.py	# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	9	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_tomllib/__init__.py	# SPDX-FileCopyrightText: 2021 Taneli Hukkinen
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Lib/asyncio/constants.py	# SPDX-FileCopyrightText: Copyright (c) 2015-2021 MagicStack Inc.  http://magic.io
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/functools.py	# See C source code for _functools credits/copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/tarfile.py	# The above copyright  notice and this  permission notice shall  be
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_epoll.py	# The above copyright notice and this permission notice shall be
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/tkinter/simpledialog.py	# This copyright applies to Dialog, askinteger, askfloat and asktring
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementInclude.py	# all copies, and that both that copyright notice and this permission
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# and that both that copyright notice and this permission notice appear in
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/__init__.py	# both that copyright notice and this permission notice appear in
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/http/cookies.py	# copies and that both that copyright notice and this permission
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/install-sh	# following copyright and license.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/http/cookies.py	# granted, provided that the above copyright notice appear in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# granted, provided that the above copyright notice appears in all copies,
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/xml/etree/ElementInclude.py	# hereby granted, provided that the above copyright notice appears in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/trace.py	# portions copyright 2001, Autonomous Zones Industries, Inc., all rights...
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/__init__.py	# provided that the above copyright notice appear in all copies and that
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/jisx0213-2004-std.txt	## \tCopyright (C) 2001 I'O, All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/jisx0213-2004-std.txt	## \tCopyright (C) 2001 earthian@tama.or.jp, All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/store_info.txt	## Copyright Trademark Information
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/Makefile	#(c) Copyright Marc-Andre Lemburg, 2005.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/hashlib.py	#.  Copyright (C) 2005-2010   Gregory P. Smith (greg@krypto.org)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/main.c	#define COPYRIGHT \\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/python_ver_rc.h	#define PYTHON_COPYRIGHT "Copyright \\xA9 2001-2023 Python Software Foundation. Copyright \\xA9 2000 BeOpen.com. Copyright \\xA9 1995-2001 CNRI. Copyright \\xA9 1991-1995 SMC."
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/matrix-transform.txt	(* Copyright (c) 2011-2020 Stefan Krah. All rights reserved. *)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/ssl/multissltests.py	(c) 2013-2017 Christian Heimes <christian@python.org>
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Lib/encodings/mac_latin2.py	(c) Copyright 2000 Guido van Rossum.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/comparecodecs.py	(c) Copyright 2005, Marc-Andre Lemburg (mal@lemburg.com).
+line	18	Python-3.12.15.tar.xz:Python-3.12.15/Lib/codecs.py	(c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/gencodec.py	(c) Copyright Guido van Rossum, 2000.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/gencodec.py	(c) Copyright Marc-Andre Lemburg, 2005.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/HISTORY.txt	(http://www.python.org/doc/Copyright.html).
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	* Redistributions in binary form must reproduce the original copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	* Redistributions of works must retain the original copyright notice,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- Copyright was assigned to the Python Software Foundation (PSF) and a
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- Issue #1772833: Add the -q command-line option to suppress copyright and
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- Slight changes to the CNRI license.  A copyright notice has been
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- The CNRI copyright notice was updated to include 2001.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/crtlicense.txt	- alter any copyright, trademark or patent notice in Microsoft's
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- cPickle.c: new version from Jim Fulton, with Open Source copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/HISTORY	- cStringIO.c: new version from Jim Fulton, with Open Source copyright
+line	25	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/abs.decTest	-- Copyright (c) IBM Corporation, 1981, 2008.  All rights reserved.   --
+line	95	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/and.decTest	-- Copyright (c) IBM Corporation, 1981, 2008.  All rights reserved.   --\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/clamp.decTest	-- Copyright (c) IBM Corporation, 2000, 2008.  All rights reserved.   --
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/ddEncode.decTest	-- Copyright (c) IBM Corporation, 2000, 2008.  All rights reserved.   --\r
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/samequantum.decTest	-- Copyright (c) IBM Corporation, 2001, 2008.  All rights reserved.   --
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/ddSameQuantum.decTest	-- Copyright (c) IBM Corporation, 2001, 2008.  All rights reserved.   --\r
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/reduce.decTest	-- Copyright (c) IBM Corporation, 2003, 2008.  All rights reserved.   --
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/ddReduce.decTest	-- Copyright (c) IBM Corporation, 2003, 2008.  All rights reserved.   --\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/powersqrt.decTest	-- Copyright (c) IBM Corporation, 2004, 2008.  All rights reserved.   --\r
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/ddLogB.decTest	-- Copyright (c) IBM Corporation, 2005, 2008.  All rights reserved.   --\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/decimaltestdata/logb.decTest	-- Copyright (c) IBM Corporation, 2005, 2009.  All rights reserved.   --\r
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/initconfig.c	-q     : don't print version and copyright messages on interactive startup\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/c-api/init.rst	.. c:function:: const char* Py_GetCopyright()
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/constants.rst	.. data:: copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/pyexpatns.h	/* Copyright (c) 2005-2006 ActiveState Software Inc.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Include/dynamic_annotations.h	/* Copyright (c) 2008-2009, Google Inc.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_hacl/include/krml/fstar_uint128_struct_endianness.h	/* Copyright (c) INRIA and Microsoft Corporation. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	/* Return the copyright string.  This is updated manually. */
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/PythonBootstrapperApplication.cpp	//   Copyright (c) 2004, Outercurve Foundation.
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/PythonBootstrapperApplication.cpp	//   The license and further copyright text can be found in the file
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/FileSettings.h	//  Copyright (c) 2002 __MyCompanyName__. All rights reserved.
+line	4	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/PythonBootstrapperApplication.cpp	// </copyright>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/PythonBootstrapperApplication.cpp	// <copyright file="WixStandardBootstrapperApplication.cpp" company="Outercurve Foundation">
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pch.h	// <copyright file="precomp.h" company="Outercurve Foundation">
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/resource.h	// <copyright file="resource.h" company="Outercurve Foundation">
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.cpp	// <copyright file="wixstdba.cpp" company="Outercurve Foundation">
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/_wmimodule.cpp	// Copyright (c) Microsoft Corporation
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/turtle-star.ps	/dieresis/copyright/ordfeminine/guillemotleft/logicalnot/hyphen/registered/macron
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/CP1140.TXT	0xB4\t0x00A9\t#COPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/KOI8-U.TXT	0xBF\t0x00A9\t#\tCOPYRIGHT SIGN
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/License.rtf	2. Subject to the terms and conditions of this License Agreement, CNRI hereby grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce, analyze, test, perform and/or display publicly, prepare derivative works, distribute, and otherwise use Python 1.6.1 alone or in any derivative version, provided, however, that CNRI's License Agreement and CNRI's notice of copyright, i.e., "Copyright (c) 1995-2001 Corporation for National Research Initiatives; All Rights Reserved" are retained in Python 1.6.1 alone or in any derivative version prepared by Licensee. Alternately, in lieu of CNRI's License Agreement, Licensee may substitute the following text (omitting the quotes): "Python 1.6.1 is made available subject to the terms and conditions in CNRI's License Agreement. This Agreement together with Python 1.6.1 may be located on the internet using the following unique, persistent identifier (known as a handle): 1895.22/1013. This Agreement may also be obtained from a proxy server on the internet using the following URL: http://hdl.handle.net/1895.22/1013".\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/License.rtf	2. Subject to the terms and conditions of this License Agreement, PSF hereby grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce, analyze, test, perform and/or display publicly, prepare derivative works, distribute, and otherwise use Python alone or in any derivative version, provided, however, that PSF's License Agreement and PSF's notice of copyright, i.e., "Copyright \\'a9 2001-2020 Python Software Foundation; All Rights Reserved" are retained in Python alone or in any derivative version prepared by Licensee.\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unicode/python-mappings/jisx0213-2004-std.txt	3-2926\tU+00A9\t# COPYRIGHT SIGN\t[2000]
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/License.rtf	7. This License Agreement shall be governed by the federal intellectual property law of the United States, including without limitation the federal copyright law, and, to the extent such U.S. federal law does not apply, by the law of the Commonwealth of Virginia, excluding Virginia's conflict of law provisions. Notwithstanding the foregoing, with regard to derivative works based on Python 1.6.1 that incorporate non-separable material that was previously distributed under the GNU General Public License (GPL), the law of the Commonwealth of Virginia shall govern this License Agreement only as to issues arising under or with respect to Paragraphs 4, 5, and 7 of this License Agreement. Nothing in this License Agreement shall be deemed to create any relationship of agency, partnership, or joint venture between CNRI and Licensee. This License Agreement does not grant permission to use CNRI trademarks or trade name in a trademark sense to endorse or promote products or services of Licensee, or any third party.\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.def	;   Copyright (c) 2004, Outercurve Foundation.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.def	;   The license and further copyright text can be found in the file
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/umodarith.lisp	; 1. Redistributions of source code must retain the above copyright
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/umodarith.lisp	; 2. Redistributions in binary form must reproduce the above copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.def	; </copyright>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/bootstrap/pythonba.def	; <copyright file="wixstdba.def" company="Outercurve Foundation">
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_decimal/libmpdec/literature/umodarith.lisp	; Copyright (c) 2008-2020 Stefan Krah. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/out_inC14N6_c14nDefault.xml	<doc>©</doc>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/help.html	<dt>About IDLE</dt><dd><p>Display version, copyright, license, credits, and more.</p>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/general.rst	Are there copyright restrictions on the use of Python?
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/HISTORY.txt	COPYRIGHT
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/copyright.rst	Copyright
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_tkinter.c	Copyright (C) 1994 Steen Lumholt.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_localemodule.c	Copyright (C) 1997, 2002, 2003, 2007, 2008 Martin von Loewis
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/handlers.py	Copyright (C) 2001-2021 Vinay Sajip. All Rights Reserved.
+line	3	Python-3.12.15.tar.xz:Python-3.12.15/Lib/logging/__init__.py	Copyright (C) 2001-2022 Vinay Sajip. All Rights Reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_venv.py	Copyright (C) 2011-2012 Vinay Sajip.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/venv/__init__.py	Copyright (C) 2011-2014 Vinay Sajip.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/config.c.in	Copyright (c) 1990-1995, Stichting Mathematisch Centrum.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	Copyright (c) 1991 - 1995, Stichting Mathematisch Centrum Amsterdam,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/License.rtf	Copyright (c) 1991 - 1995, Stichting Mathematisch Centrum Amsterdam, The Netherlands. All rights reserved.\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	Copyright (c) 1991-1995 Stichting Mathematisch Centrum, Amsterdam.\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/config.c.in	Copyright (c) 1995-2000, Corporation for National Research Initiatives.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	Copyright (c) 1995-2001 Corporation for National Research Initiatives.\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/COPYING	Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Tools/unittestgui/unittestgui.py	Copyright (c) 1999, 2000, 2001 Steve Purcell
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/unittest/__init__.py	Copyright (c) 1999-2003 Steve Purcell
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	Copyright (c) 2000 BeOpen.com.\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/config.c.in	Copyright (c) 2000, BeOpen.com.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	Copyright (c) 2001-2006 Gregory P. Ward.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	Copyright (c) 2001-2023 Python Software Foundation.\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/COPYING	Copyright (c) 2001-2025 Expat maintainers
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	Copyright (c) 2002-2006 Python Software Foundation.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/unittest/__init__.py	Copyright (c) 2003-2010 Python Software Foundation
+line	5	Python-3.12.15.tar.xz:Python-3.12.15/Include/codecs.h	Copyright (c) Corporation for National Research Initiatives.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/config.guess	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/syslogmodule.c	Copyright 1994 by Lance Ellinghouse,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	Copyright and License Information
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	Copyright © 1991-1995 Stichting Mathematisch Centrum.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/copyright.rst	Copyright © 1991-1995 Stichting Mathematisch Centrum. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/copyright.rst	Copyright © 1995-2000 Corporation for National Research Initiatives. All rights
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	Copyright © 1995-2001 Corporation for National Research Initiatives.  All
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	Copyright © 2000 BeOpen.com.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/copyright.rst	Copyright © 2000 BeOpen.com. All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/copyright.rst	Copyright © 2001-2023 Python Software Foundation. All rights reserved.
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	Copyright © 2001-2024 Python Software Foundation.  All rights reserved.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	Copyright © 2013 W3C® (MIT, ERCIM, Keio, Beihang),
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/python.man	Do not print the version and copyright messages. These messages are
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/python3dll.c	EXPORT_FUNC(Py_GetCopyright)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Objects/sliceobject.c	Guido, feel free to do whatever you want in the way of copyrights
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/HISTORY.txt	IDLE is covered by the standard Python copyright notice
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/COPYING	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	License Agreement and CNRI's notice of copyright, i.e., "Copyright (c)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/License.rtf	Permission to use, copy, modify, and distribute this software and its documentation for any purpose and without fee is hereby granted, provided that the above copyright notice appear in all copies and that both that copyright notice and this permission notice appear in supporting documentation, and that the name of Stichting Mathematisch Centrum or CWI not be used in advertising or publicity pertaining to distribution of the software without specific, written prior permission.\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Include/pylifecycle.h	PyAPI_FUNC(const char *) Py_GetCopyright(void);
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/getcopyright.c	Py_GetCopyright(void)
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/data/refcounts.dat	Py_GetCopyright:const char*:::
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/README.rst	See the end of this file for further copyright and license information.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/config.c.in	See the file "Misc/COPYRIGHT" for information on usage and
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/expat/COPYING	The above copyright notice and this permission notice shall be included
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Misc/stable_abi.toml	[function.Py_GetCopyright]
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/optparse.py	__copyright__ = """
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	both that copyright notice and this permission notice appear in
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Objects/unicodeobject.c	copies, and that both that copyright notice and this permission notice
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Python/sysmodule.c	copyright -- copyright notice pertaining to this interpreter\\n\\
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/conf.py	copyright = "2001-%Y, Python Software Foundation"
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/license.rst	copyright and licensing notice::
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/PC/crtlicense.txt	copyrighted by Microsoft Corporation. The Microsoft Distributable Code
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/general.rst	copyrights in and display those copyrights in any documentation about Python
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/site.py	def setcopyright():
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/aclocal.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/data/stable_abi.dat	func,Py_GetCopyright,3.2,,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Objects/unicodeobject.c	granted, provided that the above copyright notice appears in all
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/general.rst	holds the copyright on Python versions 2.1 and newer.  The PSF's mission is to
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/xmltestdata/c14n-20/README	https://www.w3.org/Consortium/Legal/2008/04-testsuite-copyright.html
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/Lib/unittest/__init__.py	it under the same terms as Python itself, so long as this copyright message
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/conf.py	latex_appendices = ['glossary', 'about', 'license', 'copyright']
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	limitation the federal copyright law, and, to the extent such
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/tutorial/interpreter.rst	prints a welcome message stating its version number and a copyright notice
+line	2	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	provided that the above copyright notice appear in all copies and that
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_localemodule.c	provided that the above copyright notice appear in all copies.
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/LICENSE	provided, however, that PSF's License Agreement and PSF's notice of copyright,
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Lib/wsgiref/headers.py	so portions are Copyright (C) 2001,2002 Python Software Foundation, and were
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_sre/sre.c	static const char copyright[] =
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/general.rst	that you produce.  If you honor the copyright rules, it's OK to use Python for
+line	1	Python-3.12.15.tar.xz:Python-3.12.15/Doc/extending/extending.rst	the module and a copyright notice if you like).
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/_static/og-image.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/faq/python-video-icon.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/howto/logging_flow.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/hashlib-blake2-tree.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/kde_example.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/pathlib-inheritance.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/tk_msg.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/tulip_coro.dia
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/tulip_coro.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/turtle-star.pdf
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/library/turtle-star.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Doc/using/win_installer.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/ensurepip/_bundled/pip-25.0.1-py3-none-any.whl
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/folder.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_16.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_16.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_256.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_32.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_32.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_48.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/idle_48.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/minusnode.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/openfolder.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/plusnode.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/python.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/idlelib/Icons/tk.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/Sine-1000Hz-300ms.aif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-alaw.aifc
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm16.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm16.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm16.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm24-ext.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm24.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm24.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm24.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm32.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm32.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm32.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm8.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm8.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-pcm8.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-ulaw.aifc
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiodata/pluck-ulaw.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/audiotest.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python-raw.jpg
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.bmp
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.exr
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.jpg
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.pgm
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.ppm
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.ras
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.sgi
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.tiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/imghdrdata/python.webp
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/pstats.pck
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/recursion.tar
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.8svx
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.aifc
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.hcom
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.sndt
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.voc
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/sndhdrdata/sndhdr.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.bmp
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.exr
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.gif
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.jpg
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.pgm
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.ppm
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.ras
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.sgi
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.tiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/python.webp
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/sndhdr.aifc
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/sndhdr.aiff
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/sndhdr.au
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_email/data/sndhdr.wav
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/data/example-21.12-py3-none-any.whl
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/data/example-21.12-py3.6.egg
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/data/example2-1.0.0-py3-none-any.whl
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/namespace_pkgs/missing_directory.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/namespace_pkgs/nested_portion1.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/namespace_pkgs/top_level_portion1.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/data01/binary.file
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/data01/subdirectory/binary.file
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/data01/utf-16.file
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/namespacedata01/binary.file
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/namespacedata01/utf-16.file
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/zipdata01/ziptestdata.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_importlib/resources/zipdata02/ziptestdata.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_tools/msgfmt_data/fuzzy.mo
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/test_tools/msgfmt_data/general.mo
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/testtar.tar
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/testtar.tar.xz
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/wheeldata/setuptools-79.0.1-py3-none-any.whl
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/wheeldata/wheel-0.40.0-py3-none-any.whl
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/zip_cp437_header.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/zipdir.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/zipdir_backslash.zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/ziptestdata/exe_with_z64
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Lib/test/ziptestdata/exe_with_zip
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/BuildScript/resources/background.jpg
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/IDLE/IDLE.app/Contents/Resources/IDLE.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/IDLE/IDLE.app/Contents/Resources/PythonCompiled.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/IDLE/IDLE.app/Contents/Resources/PythonSource.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/Disk Image.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/IDLE.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/Python Folder.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/PythonCompiled.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/PythonLauncher.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Icons/PythonSource.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/English.lproj/MainMenu.nib/objects.nib
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/English.lproj/MyDocument.nib/objects.nib
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/PythonLauncher/English.lproj/PreferenceWindow.nib/objects.nib
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/app/Resources/PythonApplet.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/app/Resources/PythonInterpreter.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/IDE.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PackageManager.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PythonApplet.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PythonCompiled.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PythonIcon.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PythonSource.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Mac/Resources/iconsrc/PythonWSource.psd
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_xxtestfuzz/fuzz_csv_reader_corpus/test.csv
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_xxtestfuzz/fuzz_struct_unpack_corpus/hello_string
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_xxtestfuzz/fuzz_struct_unpack_corpus/long_zero
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Modules/_xxtestfuzz/fuzz_struct_unpack_corpus/varied_format_string
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Objects/object_layout_312.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Objects/object_layout_full_312.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/classicAppCompat.cat
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/idlex150.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/idlex44.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/launcher.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/launcher.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/logox128.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/py.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/py.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/py.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pyc.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pyc.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pyd.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pyd.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/python.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/python.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonw.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonw.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonwx150.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonwx44.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonx150.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonx44.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/pythonx50.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/setup.icns
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/PC/icons/setup.ico
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Tools/msi/bundle/SideBar.png
+binary-head	Python-3.12.15.tar.xz:Python-3.12.15/Tools/peg_generator/data/xxl.zip

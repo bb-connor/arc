@@ -15,3 +15,24 @@ spec/ietf/tools/fonts/*-OFL.txt -whitespace
 
 # Mobile xcframework static archives are generated release artifacts.
 sdks/swift/Frameworks/ChioKernel.xcframework/**/*.a filter=lfs diff=lfs merge=lfs -text
+
+# Vendored corresponding source keeps its exact bytes on every checkout.
+deploy/docker/security-evidence-apk-sources/** -text
+# Upstream and Alpine files there are copied byte for byte, so repository
+# whitespace rules do not apply to them; derived files there keep them.
+deploy/docker/security-evidence-apk-sources/aports-objects/** -whitespace
+deploy/docker/security-evidence-apk-sources/build-tools/** -whitespace
+deploy/docker/security-evidence-apk-sources/licenses/** -whitespace
+deploy/docker/security-evidence-apk-sources/recipes/** -whitespace
+deploy/docker/security-evidence-apk-sources/sources/** -whitespace
+
+# The binary closure and compressed corresponding sources travel through Git LFS.
+deploy/docker/security-evidence-apks/*.apk filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.tar.gz.noauto filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.tar.xz filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.tar.bz2 filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.tgz filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.patch.xz filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/sources/**/*.part-* filter=lfs diff=lfs merge=lfs -text
+deploy/docker/security-evidence-apk-sources/build-tools/abuild/sources/*.tar.gz filter=lfs diff=lfs merge=lfs -text

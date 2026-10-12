@@ -1,0 +1,6 @@
+tree 6f2cbeca3af3b4d47d37af011a8fe860621b9292
+parent 8f2c70ff7db8641076f733b7e741c91a3d26a584
+author Hannes Braun <hannes@hannesbraun.net> 1741364368 +0100
+committer Patrycja Rosa <alpine@ptrcnull.me> 1746799641 +0000
+
+main/gcc: backport patch for arm intrinsics

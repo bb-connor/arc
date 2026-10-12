@@ -1,0 +1,480 @@
+# chio.attribution-lines.v8 origin=libunistring files=2372 files_with_lines=2189 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	                       |Copyright-paperwork-exempt:[ ]
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	               'copyright'    => '&copy;',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	               'copyright'    => '00A9',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	               'copyright' => '(C)',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	               'copyright', 'C',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/libunistring.rc	            VALUE "LegalCopyright", "Copyright (C) 2001-2019\\0"
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	          adjacent to the other copyright notices.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	          execution, include the copyright notice for the Library among
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniname/gen-uninames.lisp	        (format ostream "/* Copyright (C) 2000-2024 Free Software Foundation, Inc.~%")
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	        /^Copyright /!{
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	       Copyright (C)  YEAR  YOUR NAME.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	       D. Preserve all the copyright notices of the Document.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	       E. Add an appropriate copyright notice for your modifications
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	       F. Include, immediately after the copyright notices, a license
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	       c. For a Combined Work that displays copyright notices during
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	      # Format 'Copyright-paperwork-exempt: Yes' as a standard ChangeLog
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	      my $tiny = (grep (/^(?:Copyright-paperwork-exempt|Tiny-change):\\s+[Yy]es$/, @line)
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     A “contributor” is a copyright holder who authorizes use under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM “AS IS”
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     Copyright (C) YEAR NAME OF AUTHOR
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     Copyright © 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     Copyright © 2007 Free Software Foundation, Inc. <https://fsf.org/>
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     Moreover, your license from a particular copyright holder is
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     PROGRAM Copyright (C) YEAR NAME OF AUTHOR
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     World Wide Web server that publishes copyrightable works and also
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     appropriately publish on each copy an appropriate copyright notice;
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     article 11 of the WIPO copyright treaty adopted on 20 December
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     author or copyright holder as a result of your choosing to follow a
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright are not used to limit the access or legal rights of the
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright holder fails to notify you of the violation by some
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright law.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright notices, and the license notice saying this License
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright on the Program, and are irrevocable provided the stated
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     copyright resulting from the compilation is not used to limit the
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     feature that (1) displays an appropriate copyright notice, and (2)
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     for which you have or can give appropriate copyright permission.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     infringe copyright if you do not accept this License.  Therefore,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     infringement under applicable copyright law, except executing it on
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     license from a particular copyright holder is reinstated (a)
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     material for which you do not control copyright.  Those thus making
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     permission from their copyright holders, but you may include
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     provisionally, unless and until the copyright holder explicitly and
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     reinstated permanently if the copyright holder notifies you of the
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     requiring permission under copyright law.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     site means any set of copyrightable works thus published on the MMC
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     that contains a notice placed by the copyright holder saying it can
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     that copyright holder, and you cure the violation prior to 30 days
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     them from making any copies of your copyrighted material outside
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     work in a fashion requiring copyright permission, other than the
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     you add to a covered work, you may (if authorized by the copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     “Copyright” also means copyright-like laws that apply to other
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	     “The Program” refers to any copyrightable work licensed under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	    <program>  Copyright (C) <year>  <name of author>
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	    ChangeLog header to mark a change that does not require a copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	    Copyright (C) <year>  <name of author>
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/random.c	   1. Redistributions of source code must retain the above copyright
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/random.c	   2. Redistributions in binary form must reproduce the above copyright
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/random.c	   Copyright (C) 1983 Regents of the University of California.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/basename-lgpl.c	   Copyright (C) 1990, 1998-2001, 2003-2006, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/xmalloc.c	   Copyright (C) 1990-2000, 2002-2006, 2008-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/xalloc-oversized.h	   Copyright (C) 1990-2000, 2003-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/error.c	   Copyright (C) 1990-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/memrchr.c	   Copyright (C) 1991, 1993, 1996-1997, 1999-2000, 2003-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/cloexec.c	   Copyright (C) 1991, 2004-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/stpcpy.c	   Copyright (C) 1992, 1995, 1997-1998, 2006, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/pathmax.h	   Copyright (C) 1992, 1999, 2001, 2003, 2005, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/ftruncate.c	   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/save-cwd.h	   Copyright (C) 1995, 1997-1998, 2003, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/save-cwd.c	   Copyright (C) 1995, 1997-1998, 2003-2006, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/minmax.h	   Copyright (C) 1995, 1998, 2001, 2003, 2005, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/alloca.in.h	   Copyright (C) 1995, 1999, 2001-2004, 2006-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/xgetcwd.h	   Copyright (C) 1995, 2001, 2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/stdlib.in.h	   Copyright (C) 1995, 2001-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/c-strcase.h	   Copyright (C) 1995-1996, 2001, 2003, 2005, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/string.in.h	   Copyright (C) 1995-1996, 2001-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/error.in.h	   Copyright (C) 1995-1997, 2003, 2006, 2008-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/gettext.h	   Copyright (C) 1995-1998, 2000-2002, 2004-2006, 2009-2024 Free Software
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/localename.c	   Copyright (C) 1995-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/filenamecat.h	   Copyright (C) 1996-1997, 2003, 2005, 2007, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/filenamecat-lgpl.c	   Copyright (C) 1996-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/realloc.c	   Copyright (C) 1997, 2003-2004, 2006-2007, 2009-2024 Free Software
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/malloc.c	   Copyright (C) 1997-1998, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/hard-locale.c	   Copyright (C) 1997-1999, 2002-2004, 2006-2007, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/xalloc-die.c	   Copyright (C) 1997-2000, 2002-2004, 2006, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/lstat.c	   Copyright (C) 1997-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/basename-lgpl.h	   Copyright (C) 1998, 2001, 2003-2006, 2009-2024 Free Software Foundation,
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/c-strcasecmp.c	   Copyright (C) 1998-1999, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistdio/u-printf-parse.h	   Copyright (C) 1999, 2002, 2005, 2007, 2009-2024 Free Software Foundation,
+line	32	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistdio/u8-sprintf.c	   Copyright (C) 1999, 2002, 2005-2007, 2009-2024 Free Software Foundation,
+line	65	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr/u-strlen.h	   Copyright (C) 1999, 2002, 2006, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/strncat.c	   Copyright (C) 1999, 2002, 2006, 2010-2024 Free Software Foundation, Inc.
+line	39	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr/u8-strchr.c	   Copyright (C) 1999, 2002, 2006-2007, 2009-2024 Free Software Foundation,
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistdio/u-vsnprintf.h	   Copyright (C) 1999, 2002, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/printf-parse.h	   Copyright (C) 1999, 2002-2003, 2005, 2007, 2010-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/printf-args.c	   Copyright (C) 1999, 2002-2003, 2005-2007, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/printf-args.h	   Copyright (C) 1999, 2002-2003, 2006-2007, 2011-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/vasnprintf.c	   Copyright (C) 1999, 2002-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/hard-locale.h	   Copyright (C) 1999, 2003-2004, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/dup2.c	   Copyright (C) 1999, 2004-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/wcsstr-impl.h	   Copyright (C) 1999, 2011-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/nanosleep.c	   Copyright (C) 1999-2000, 2002, 2004-2024 Free Software Foundation, Inc.
+line	10	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr/u8-strmblen.c	   Copyright (C) 1999-2000, 2002, 2006-2007, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/printf-parse.c	   Copyright (C) 1999-2000, 2002-2003, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/iconv.c	   Copyright (C) 1999-2001, 2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/mbrtowc-impl-utf8.h	   Copyright (C) 1999-2002, 2005-2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr/u8-mbtouc.c	   Copyright (C) 1999-2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniname.in.h	   Copyright (C) 2000-2002, 2005, 2007, 2009-2024 Free Software Foundation,
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/identsyntaxmap.h	   Copyright (C) 2000-2002, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniname/test-uninames.c	   Copyright (C) 2000-2003, 2005, 2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/c-ctype.h	   Copyright (C) 2000-2003, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/localcharset.h	   Copyright (C) 2000-2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/localcharset.c	   Copyright (C) 2000-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/binary-io.h	   Copyright (C) 2001, 2003, 2005, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/unistd-safer.h	   Copyright (C) 2001, 2003, 2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/xgetcwd.c	   Copyright (C) 2001, 2003-2004, 2006-2007, 2009-2024 Free Software
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/dup-safer-flag.c	   Copyright (C) 2001, 2004-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/mbiterf.h	   Copyright (C) 2001, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/mbchar.h	   Copyright (C) 2001, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/dirfd.c	   Copyright (C) 2001, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwidth.in.h	   Copyright (C) 2001-2002, 2005, 2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwidth/cjk.h	   Copyright (C) 2001-2002, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr.in.h	   Copyright (C) 2001-2002, 2005-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwidth/u16-strwidth.c	   Copyright (C) 2001-2002, 2006, 2009-2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwidth/u8-width.c	   Copyright (C) 2001-2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwidth/width.c	   Copyright (C) 2001-2002, 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/streq.h	   Copyright (C) 2001-2002, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uninorm.in.h	   Copyright (C) 2001-2002, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/gettimeofday.c	   Copyright (C) 2001-2003, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/unilbrk.in.h	   Copyright (C) 2001-2003, 2005-2024 Free Software Foundation, Inc.
+line	15	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwbrk/ulc-wordbreaks.c	   Copyright (C) 2001-2003, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uninorm/decomposition-table.h	   Copyright (C) 2001-2003, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/concat-filename.c	   Copyright (C) 2001-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/concat-filename.h	   Copyright (C) 2001-2004, 2007-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/iconveh.h	   Copyright (C) 2001-2007, 2009-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/lib/striconveh.c	   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/striconveha.c	   Copyright (C) 2002, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/striconveha.h	   Copyright (C) 2002, 2005, 2007-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistr/u32-uctomb.c	   Copyright (C) 2002, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/pr_test.c	   Copyright (C) 2002, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype.in.h	   Copyright (C) 2002, 2005-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uninorm/composition.c	   Copyright (C) 2002, 2006, 2009, 2011-2024 Free Software Foundation, Inc.
+line	33	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/combiningclass.c	   Copyright (C) 2002, 2006, 2009-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/bidi_longname.c	   Copyright (C) 2002, 2006, 2011-2024 Free Software Foundation, Inc.
+line	191	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/pr_private_use.c	   Copyright (C) 2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/combiningclass_longname.c	   Copyright (C) 2002, 2006-2007, 2011-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniconv/u-conv-to-enc.h	   Copyright (C) 2002, 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/unicase.in.h	   Copyright (C) 2002, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/raise.c	   Copyright (C) 2002-2003, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/exitfail.c	   Copyright (C) 2002-2003, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/math.in.h	   Copyright (C) 2002-2003, 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-stdbool.c	   Copyright (C) 2002-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/relocatable.h	   Copyright (C) 2003, 2005, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/free.c	   Copyright (C) 2003, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/malloca.c	   Copyright (C) 2003, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/mempcpy.c	   Copyright (C) 2003, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/xsize.h	   Copyright (C) 2003, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/relocatable.c	   Copyright (C) 2003-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/malloca.h	   Copyright (C) 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/c-ctype.c	   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistdio/ulc-vfprintf.c	   Copyright (C) 2004, 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/stdio.in.h	   Copyright (C) 2004, 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/cloexec.h	   Copyright (C) 2004, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/chdir-long.h	   Copyright (C) 2004-2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/openat.h	   Copyright (C) 2004-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/calloc.c	   Copyright (C) 2004-2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/tests/chdir-long.c	   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/tests/stat-time.h	   Copyright (C) 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-c-ctype.c	   Copyright (C) 2005, 2007-2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/atomic-int-posix.h	   Copyright (C) 2005, 2008-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-verify.c	   Copyright (C) 2005, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/openat-die.c	   Copyright (C) 2005-2006, 2008-2024 Free Software Foundation, Inc.
+line	7	libunistring-1.3.tar.xz:libunistring-1.3/lib/size_max.h	   Copyright (C) 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	29	libunistring-1.3.tar.xz:libunistring-1.3/lib/windows-recmutex.h	   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/inet_pton.c	   Copyright (C) 2006, 2008-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/tests/fstatat.c	   Copyright (C) 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/woe32dll/export.h	   Copyright (C) 2006, 2011-2023 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-inttypes.c	   Copyright (C) 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/wcwidth.c	   Copyright (C) 2006-2007, 2010-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistring/inline.h	   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+line	11	libunistring-1.3.tar.xz:libunistring-1.3/woe32dll/unistring-exports.c	   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/iconv_open-solaris.gperf	   Copyright (C) 2007, 2009, 2020-2024 Free Software Foundation, Inc.
+line	51	libunistring-1.3.tar.xz:libunistring-1.3/lib/isnanf.c	   Copyright (C) 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/pr_byname.c	   Copyright (C) 2007, 2011-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/lib/iconv_open-osf.gperf	   Copyright (C) 2007, 2020-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/stdio-impl.h	   Copyright (C) 2007-2008, 2010-2024 Free Software Foundation, Inc.
+line	286	libunistring-1.3.tar.xz:libunistring-1.3/lib/frexp.c	   Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/wctob.c	   Copyright (C) 2008, 2010-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unistring/cdefs.h	   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+line	64	libunistring-1.3.tar.xz:libunistring-1.3/lib/sched.in.h	   Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/version.c	   Copyright (C) 2009 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/setlocale.c	   Copyright (C) 2009, 2011-2024 Free Software Foundation, Inc.
+line	269	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniwbrk/u32-wordbreaks.c	   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	167	libunistring-1.3.tar.xz:libunistring-1.3/lib/unigbrk/u8-grapheme-prev.c	   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+line	92	libunistring-1.3.tar.xz:libunistring-1.3/lib/itold.c	   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	9	libunistring-1.3.tar.xz:libunistring-1.3/lib/math.c	   Copyright (C) 2012-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/assure.h	   Copyright (C) 2014-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/tests/unistr/test-u32-strtok.c	   Copyright (C) 2015-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/tests/getprogname.h	   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/tests/stat-w32.c	   Copyright (C) 2017-2024 Free Software Foundation, Inc.
+line	8	libunistring-1.3.tar.xz:libunistring-1.3/lib/localename-table.c	   Copyright (C) 2018-2024 Free Software Foundation, Inc.
+line	21	libunistring-1.3.tar.xz:libunistring-1.3/lib/setlocale_null.c	   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+line	44	libunistring-1.3.tar.xz:libunistring-1.3/lib/c32iscntrl.c	   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/pr_regional_indicator.c	   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+line	12	libunistring-1.3.tar.xz:libunistring-1.3/lib/mbiterf.c	   Copyright (C) 2023-2024 Free Software Foundation, Inc.
+line	9	libunistring-1.3.tar.xz:libunistring-1.3/lib/unimetadata.in.h	   Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/select.c	   Copyright 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-alignasof.c	   Copyright 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/pselect.c	   Copyright 2011-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/limits.in.h	   Copyright 2016-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/libc-config.h	   Copyright 2017-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/attribute.h	   Copyright 2020-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/tests/ialloc.c	   Copyright 2021-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/lib/stdckdint.in.h	   Copyright 2022-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/cdefs.h	   Copyright The GNU Toolchain Authors.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING.LIB	   c) For a Combined Work that displays copyright notices during
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING.LIB	   execution, include the copyright notice for the Library among
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	  "The Program" refers to any copyrightable work licensed under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	  A "contributor" is a copyright holder who authorizes use under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	  Copyright (C)  @var{year}  @var{your name}.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	  Copyright-paperwork-exempt: Yes
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	  Moreover, your license from a particular copyright holder is
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright{}}%
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	  \\defglyph\\copyright{copyright}%
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	  \\definedummyword\\copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	  \\gdefchar^^a9{\\copyright{}}
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/config.rpath	  echo "Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	  print "Copyright (C) $copyright_year Free Software Foundation, Inc.\\n";
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-strstr.c	 * Copyright (C) 2004, 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-gettimeofday.c	 * Copyright (C) 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/tests/test-sockets.c	 * Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/inet_pton.c	 * Copyright (c) 1996,1999 by Internet Software Consortium.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/inet_pton.c	 * copyright notice and this permission notice appear in all copies.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/COPYING.LIB	 Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	 verbose => 'if set, ISO8859 characters are used for special symbols (like copyright, etc)',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	"aggregate" if the compilation and its resulting copyright are not
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	#               #'copyright' => '(C)',
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	#      /^# Copyright /
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	#    Copyright (C) 1999-2005  Patrice Dumas <dumas@centre-cired.fr>,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2024 Free
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2024 Free
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/config.guess	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/config.rpath	#   Copyright 1996-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	# (like copyright, etc).
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# COPYRIGHT AND PERMISSION NOTICE
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/install-sh	# Copyright (C) 1994 X Consortium
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/doc/Makefile.in	# Copyright (C) 1994-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/mdate-sh	# Copyright (C) 1995-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	# Copyright (C) 1996-2019, 2021-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/missing	# Copyright (C) 1996-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/aclocal.m4	# Copyright (C) 1997-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/depcomp	# Copyright (C) 1999-2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/aclocal.m4	# Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	7	libunistring-1.3.tar.xz:libunistring-1.3/lib/Makefile.gnulib	# Copyright (C) 2002-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/autogen.sh	# Copyright (C) 2003-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	# Copyright (C) 2004-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/aclocal.m4	# Copyright (C) 2004-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/exported.sh.in	# Copyright (C) 2006, 2009, 2019 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/declared.sh	# Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	# Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/run-test	# Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	# Copyright (C) 2010-2019, 2021, 2023-2024 Bootstrap Authors
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/test-driver	# Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/relocatable.valgrind	# Copyright (C) 2017-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/join-v-1	# Copyright (C) 2021 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/aclocal.m4	# Copyright (C) 2022-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/configure	# Copyright (C) 2024 Free Software Foundation, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# Copyright © 1991-2024 Unicode, Inc.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# Except as contained in this notice, the name of a copyright holder shall
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# Files or Software, or (b) this copyright and permission notice appear in
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/install-sh	# The above copyright notice and this permission notice shall be included in
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# authorization of the copyright holder.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texi2html	# do copyright notice inserted in comment at the beginning of the files
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/install-sh	# following copyright and license.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	6	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# this copyright and permission notice appear with all copies of the Data
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniwbrk/WordBreakTest.txt	# © 2024 Unicode®, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-local/Makefile.am	## Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/Makefile.am	## Copyright (C) 2009, 2011, 2014, 2017-2023 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/Makefile.am	## Copyright (C) 2009, 2016, 2018, 2021-2022 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/Makefile.am	## Copyright (C) 2009, 2019 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/Makefile.am	## Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/texinfo.tex	% Copyright 1985, 1986, 1988, 1990, 1991, 1992, 1993, 1994, 1995,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	&ldquo;aggregate&rdquo; if the compilation and its resulting copyright are not
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	(1) assert copyright on the software, and (2) offer you this License
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/gitlog-to-changelog	(my $copyright_year = $VERSION) =~ s/^(\\d*)-.*$/$1/;
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/memchr.c	/* Copyright (C) 1991, 1993, 1996-1997, 1999-2000, 2003-2004, 2006, 2008-2024
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/putenv.c	/* Copyright (C) 1991, 1994, 1997-1998, 2000, 2003-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/strdup.c	/* Copyright (C) 1991, 1996-1998, 2002-2004, 2006-2007, 2009-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/strstr.c	/* Copyright (C) 1991-1994, 1996-1998, 2000, 2004, 2007-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/getcwd.c	/* Copyright (C) 1991-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/unsetenv.c	/* Copyright (C) 1992, 1995-2002, 2005-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/setenv.c	/* Copyright (C) 1992, 1995-2003, 2005-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/cdefs.h	/* Copyright (C) 1992-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/random.c	/* Copyright (C) 1995-2024 Free Software Foundation, Inc.
+line	183	libunistring-1.3.tar.xz:libunistring-1.3/lib/unictype/digit.h	/* Copyright (C) 2000-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/mbchar.c	/* Copyright (C) 2001, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/stdint.mini.h	/* Copyright (C) 2001-2002, 2004-2010 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/stdint.in.h	/* Copyright (C) 2001-2002, 2004-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unilbrk/lbrktables.c	/* Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/inttypes.in.h	/* Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/lib/uninorm/composition-table-bounds.h	/* Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/getcwd-lgpl.c	/* Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/unimetadata/u-version.c	/* Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniname/UnicodeData.txt	00A9;COPYRIGHT SIGN;So;0;ON;;;;;N;;;;;
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/uniname/UnicodeData.txt	2117;SOUND RECORDING COPYRIGHT;So;0;ON;;;;;N;;;;;
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/lib/uniname/gen-uninames.lisp	;;; Copyright (C) 2000-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<p>&ldquo;Copyright&rdquo; also means copyright-like laws that apply to other kinds
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<p>&ldquo;The Program&rdquo; refers to any copyrightable work licensed under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<p>A &ldquo;contributor&rdquo; is a copyright holder who authorizes use under this
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<p>Moreover, your license from a particular copyright holder is
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<table><tr><td>&nbsp;</td><td><pre class="display">Copyright &copy; 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<table><tr><td>&nbsp;</td><td><pre class="display">Copyright &copy; 2007 Free Software Foundation, Inc. <a href="https://fsf.org/">https://fsf.org/</a>
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<table><tr><td>&nbsp;</td><td><pre class="smallexample">  Copyright (C)  <var>year</var>  <var>your name</var>.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	<table><tr><td>&nbsp;</td><td><pre class="smallexample"><var>program</var> Copyright (C) <var>year</var> <var>name of author</var>
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	@var{program} Copyright (C) @var{year} @var{name of author}
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	A ``contributor'' is a copyright holder who authorizes use under this
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	APPLICABLE LAW@.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	Add an appropriate copyright notice for your modifications
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/README	Copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/INSTALL	Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005,
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.texi	Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/run-test	Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	Copyright (C) <var>year</var> <var>name of author</var>
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	Copyright (C) @var{year} @var{name of author}
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/build-aux/config.guess	Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	Copyright @copyright{} 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/lgpl.texi	Copyright @copyright{} 2007 Free Software Foundation, Inc. @url{https://fsf.org/}
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/lgpl.texi	For a Combined Work that displays copyright notices during
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	Include, immediately after the copyright notices, a license notice
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	Moreover, your license from a particular copyright holder is
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	Preserve all the copyright notices of the Document.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	World Wide Web server that publishes copyrightable works and also
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	``Copyright'' also means copyright-like laws that apply to other kinds
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	``The Program'' refers to any copyrightable work licensed under this
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	``aggregate'' if the compilation and its resulting copyright are not
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	add to a covered work, you may (if authorized by the copyright holders
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	add to a covered work, you may (if authorized by the copyright holders of
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	adjacent to the other copyright notices.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	appropriately publish on each copy an appropriate copyright notice;
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	author or copyright holder as a result of your choosing to follow a
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	contains a notice placed by the copyright holder saying it can be
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	control copyright.  Those thus making or running the covered works for
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	copyright holder, and you cure the violation prior to 30 days after
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	copyright notices, and the license notice saying this License applies
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	copyright on the Program, and are irrevocable provided the stated
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	copyrighted material outside their relationship with you.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	distribution medium, is called an &ldquo;aggregate&rdquo; if the copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	distribution medium, is called an ``aggregate'' if the copyright
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/m4/init-package-version.m4	dnl Copyright (C) 1992-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/lcmessage.m4	dnl Copyright (C) 1995-2002, 2004-2005, 2008-2014, 2016, 2019-2024 Free
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/error.m4	dnl Copyright (C) 1996-1998, 2001-2004, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/error_h.m4	dnl Copyright (C) 1996-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/d-ino.m4	dnl Copyright (C) 1997, 1999-2001, 2003-2004, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/lstat.m4	dnl Copyright (C) 1997-2001, 2003-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/inttypes_h.m4	dnl Copyright (C) 1997-2004, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/intmax_t.m4	dnl Copyright (C) 1997-2004, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/stat-time.m4	dnl Copyright (C) 1998-1999, 2001, 2003, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/nanosleep.m4	dnl Copyright (C) 1999-2001, 2003-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/time_h.m4	dnl Copyright (C) 2000-2001, 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/codeset.m4	dnl Copyright (C) 2000-2002, 2006, 2008-2014, 2016, 2019-2024 Free Software
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014, 2016-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbstate_t.m4	dnl Copyright (C) 2000-2002, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/getcwd.m4	dnl Copyright (C) 2001, 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbrtowc.m4	dnl Copyright (C) 2001-2002, 2004-2005, 2008-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/signalblocking.m4	dnl Copyright (C) 2001-2002, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/gettimeofday.m4	dnl Copyright (C) 2001-2003, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/ssize_t.m4	dnl Copyright (C) 2001-2003, 2006, 2010-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/environ.m4	dnl Copyright (C) 2001-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/dirfd.m4	dnl Copyright (C) 2001-2006, 2008-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/lib-link.m4	dnl Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/localcharset.m4	dnl Copyright (C) 2002, 2004, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/dup2.m4	dnl Copyright (C) 2002, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/unistd-safer.m4	dnl Copyright (C) 2002, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/stpcpy.m4	dnl Copyright (C) 2002, 2007, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/strerror_r.m4	dnl Copyright (C) 2002, 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/pathmax.m4	dnl Copyright (C) 2002-2003, 2005-2006, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/memrchr.m4	dnl Copyright (C) 2002-2003, 2005-2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/alloca.m4	dnl Copyright (C) 2002-2004, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/vasnprintf.m4	dnl Copyright (C) 2002-2004, 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/strncat.m4	dnl Copyright (C) 2002-2004, 2009-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/xgetcwd.m4	dnl Copyright (C) 2002-2006, 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/putenv.m4	dnl Copyright (C) 2002-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/size_max.m4	dnl Copyright (C) 2003, 2005-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/relocatable-lib.m4	dnl Copyright (C) 2003, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/locale-zh.m4	dnl Copyright (C) 2003, 2005-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/extensions.m4	dnl Copyright (C) 2003, 2006-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/printf.m4	dnl Copyright (C) 2003, 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/eealloc.m4	dnl Copyright (C) 2003, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mempcpy.m4	dnl Copyright (C) 2003-2004, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/xsize.m4	dnl Copyright (C) 2003-2004, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/free.m4	dnl Copyright (C) 2003-2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/getcwd-path-max.m4	dnl Copyright (C) 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/locale-en.m4	dnl Copyright (C) 2003-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/errno_h.m4	dnl Copyright (C) 2004, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/sockpfaf.m4	dnl Copyright (C) 2004, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/chdir-long.m4	dnl Copyright (C) 2004-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/intlmacosx.m4	dnl Copyright (C) 2004-2014, 2016, 2019-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/openat.m4	dnl Copyright (C) 2004-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mmap-anon.m4	dnl Copyright (C) 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbiter.m4	dnl Copyright (C) 2005, 2008-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/nocrash.m4	dnl Copyright (C) 2005, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbchar.m4	dnl Copyright (C) 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/sys_socket_h.m4	dnl Copyright (C) 2005-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/double-slash-root.m4	dnl Copyright (C) 2006, 2008-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/inline.m4	dnl Copyright (C) 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/fcntl_h.m4	dnl Copyright (C) 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	11	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/sys_select_h.m4	dnl Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	9	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/malloc.m4	dnl Copyright (C) 2007, 2009-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/exponentd.m4	dnl Copyright (C) 2007-2008, 2010-2024 Free Software Foundation, Inc.
+line	20	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/isnand.m4	dnl Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbsinit.m4	dnl Copyright (C) 2008, 2010-2024 Free Software Foundation, Inc.
+line	16	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/random_r.m4	dnl Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/configure.ac	dnl Copyright (C) 2009-2023 Free Software Foundation, Inc.
+line	13	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/symlink.m4	dnl Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/pipe.m4	dnl Copyright (C) 2010-2024 Free Software Foundation, Inc.
+line	19	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/iswblank.m4	dnl Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/off_t.m4	dnl Copyright (C) 2012-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/mbrtoc32.m4	dnl Copyright (C) 2014-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/intl-thread-locale.m4	dnl Copyright (C) 2015-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/getprogname.m4	dnl Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/reallocarray.m4	dnl Copyright (C) 2017-2024 Free Software Foundation, Inc.
+line	12	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/pthread-rwlock.m4	dnl Copyright (C) 2019-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/c32rtomb.m4	dnl Copyright (C) 2020-2024 Free Software Foundation, Inc.
+line	8	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/build-to-host.m4	dnl Copyright (C) 2023-2024 Free Software Foundation, Inc.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/extensions-aix.m4	dnl Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/largefile.m4	dnl Copyright 1992-1996, 1998-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/stdalign.m4	dnl Copyright 2011-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/extern-inline.m4	dnl Copyright 2012-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/limits-h.m4	dnl Copyright 2016-2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/open-cloexec.m4	dnl Copyright 2017-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/c-bool.m4	dnl Copyright 2022-2024 Free Software Foundation, Inc.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/gnulib-m4/sys_cdefs_h.m4	dnl Copyright 2024 Free Software Foundation, Inc.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/lgpl.texi	execution, include the copyright notice for the Library among
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	finally terminates your license, and (b) permanently, if the copyright
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	for which you have or can give appropriate copyright permission.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	from a particular copyright holder is reinstated (a) provisionally,
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	if any, to sign a &ldquo;copyright disclaimer&rdquo; for the program, if necessary.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	if any, to sign a ``copyright disclaimer'' for the program, if necessary.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	in a fashion requiring copyright permission, other than the making of
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	in a fashion requiring copyright permission, other than the making of an
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	infringement under applicable copyright law, except executing it on a
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	license from a particular copyright holder is reinstated (a)
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	modify any covered work.  These actions infringe copyright if you do
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	not control copyright.  Those thus making or running the covered works
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	permission from their copyright holders, but you may include
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	provisionally, unless and until the copyright holder explicitly and
+line	5	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	reinstated permanently if the copyright holder notifies you of the
+line	3	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	rights of fair use or other equivalent, as provided by copyright law.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	school, if any, to sign a “copyright disclaimer” for the program, if
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	site means any set of copyrightable works thus published on the MMC
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	terminates your license, and (b) permanently, if the copyright holder
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring_20.html	the &ldquo;copyright&rdquo; line and a pointer to where the full notice is found.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	the License in the document and put the following copyright and
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	the License in the document and put the following copyright and license
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/gpl.texi	the ``copyright'' line and a pointer to where the full notice is found.
+line	2	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	under copyright law.
+line	4	libunistring-1.3.tar.xz:libunistring-1.3/doc/fdl.texi	unless and until the copyright holder explicitly and finally
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/COPYING	your copyrighted material outside their relationship with you.
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/tests/unilbrk/LineBreakTest.txt	× 00A9 ÷ 1F3FF ÷\t#  × [0.3] COPYRIGHT SIGN (AL_NotEastAsian_AL) ÷ [999.0] EMOJI MODIFIER FITZPATRICK TYPE-6 (EM) ÷ [0.3]
+line	1	libunistring-1.3.tar.xz:libunistring-1.3/doc/libunistring.info	“copyright” line and a pointer to where the full notice is found.

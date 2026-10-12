@@ -1,0 +1,8 @@
+tree 83da2a60dfeccdf8362c0041f5b27ae2d6a58611
+parent 7ef212d8776ae0d78238426175a92f4961a0714d
+author Daniel Néri <dne+alpine@mayonnaise.net> 1783455278 +0200
+committer mio <miyopan@e.email> 1783541984 +0000
+
+main/c-ares: security upgrade to 1.34.8
+
+https://github.com/c-ares/c-ares/blob/v1.34.8/RELEASE-NOTES.md

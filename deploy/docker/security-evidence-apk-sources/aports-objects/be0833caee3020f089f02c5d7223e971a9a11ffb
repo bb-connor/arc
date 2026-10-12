@@ -1,0 +1,6 @@
+tree e4453605f9a13aca57fe9c664884498d43782d11
+parent dc4ecc886ee1bffb59b11390eab1f6ca7068a098
+author Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1747291357 +0000
+committer Natanael Copa <ncopa@alpinelinux.org> 1747304947 +0000
+
+main/<various>: take over maintainership from ncopa

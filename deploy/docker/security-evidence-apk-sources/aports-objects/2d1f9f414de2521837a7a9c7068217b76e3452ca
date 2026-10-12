@@ -1,0 +1,6 @@
+tree e5f2bd5c011887fc2dc6bced51adde399463d907
+parent 34ea024556c8d2d7c164fd8b0ed3905716d6eaf7
+author Sertonix <sertonix@posteo.net> 1720100050 +0200
+committer Kevin Daudt <kdaudt@alpinelinux.org> 1720102284 +0000
+
+main/*: remove empty build/prepare

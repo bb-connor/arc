@@ -1,0 +1,97 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Celeste <cielesti@protonmail.com>
+maintainer="Celeste <cielesti@protonmail.com>"
+pkgname=cmake
+pkgver=3.31.7
+pkgrel=1
+pkgdesc="Cross-platform, open-source make system"
+url="https://www.cmake.org/"
+arch="all"
+license="BSD-3-Clause"
+makedepends="
+	bzip2-dev
+	expat-dev
+	libarchive-dev
+	libuv-dev
+	linux-headers
+	ncurses-dev
+	py3-sphinx
+	rhash-dev
+	samurai
+	xz-dev
+	zlib-dev
+	"
+checkdepends="file"
+subpackages="
+	ccmake
+	$pkgname-doc
+	$pkgname-bash-completion
+	$pkgname-emacs::noarch
+	$pkgname-vim::noarch
+	"
+case $pkgver in
+*.*.*.*) _v=v${pkgver%.*.*};;
+*.*.*) _v=v${pkgver%.*};;
+esac
+source="https://www.cmake.org/files/$_v/cmake-$pkgver.tar.gz"
+options="!check"
+
+build() {
+	# jsoncpp/cppdap/curl/nghttp2 needs cmake to build so to avoid recursive build
+	# dependency, we use the bundled version.
+	# Do NOT remove --no-system-*
+
+	./bootstrap \
+		--prefix=/usr \
+		--mandir=/share/man \
+		--datadir=/share/$pkgname \
+		--docdir=/share/doc/$pkgname \
+		--sphinx-man \
+		--no-system-cppdap \
+		--no-system-curl \
+		--no-system-jsoncpp \
+		--no-system-nghttp2 \
+		--system-bzip2 \
+		--system-expat \
+		--system-libarchive \
+		--system-liblzma \
+		--system-librhash \
+		--system-libuv \
+		--system-zlib \
+		--generator=Ninja \
+		--parallel="${JOBS:-2}"
+	ninja
+}
+
+check() {
+	bin/ctest
+}
+
+package() {
+	DESTDIR="$pkgdir" ninja install
+}
+
+ccmake() {
+	pkgdesc="$pkgdesc (ccmake configurator)"
+	depends="$pkgname=$pkgver-r$pkgrel"
+
+	amove usr/bin/ccmake
+}
+
+emacs() {
+	pkgdesc="$pkgdesc (emacs mode)"
+	install_if="$pkgname=$pkgver-r$pkgrel emacs"
+
+	amove usr/share/emacs
+}
+
+vim() {
+	pkgdesc="$pkgdesc (vim files)"
+	install_if="$pkgname=$pkgver-r$pkgrel vim"
+
+	amove usr/share/vim
+}
+
+sha512sums="
+896f29e8e7c897e6e346141496d3f338aeaced8300fb2fd1fedcd0236742bfe4842de1c94253adf54f4847b17c5d9699c92d199cbb4a74c99ee14972c939b09e  cmake-3.31.7.tar.gz
+"

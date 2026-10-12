@@ -7,6 +7,7 @@ import argparse
 import ast
 import hashlib
 import json
+import os
 import re
 import stat
 import sys
@@ -62,13 +63,45 @@ EXPECTED_SECURITY_IMAGE_FROM = (
 EXPECTED_APK_LOCK_SHA256 = (
     "b2f8548a3f724f94d664e215af35dcab952dabc1cdbd6ee334a872d222d1ff35"
 )
-SECURITY_CA_PACKAGE = Path("deploy/docker/ca-certificates-20260611-r0.apk")
+SECURITY_APK_ARCHIVES = Path("deploy/docker/security-evidence-apks")
+SECURITY_APK_MANIFEST = SECURITY_APK_ARCHIVES / "SHA256SUMS"
+EXPECTED_APK_MANIFEST_SHA256 = (
+    "c33666f5f02584d643496c747685dcba26b1b17165a011de380bf3aecfeecd12"
+)
+EXPECTED_APK_ARCHIVE_COUNT = 203
+MAX_APK_ARCHIVE_BYTES = 64 * 1024 * 1024
+SECURITY_APK_PROVENANCE = Path("deploy/docker/security-evidence-apk-archives.json")
+EXPECTED_APK_PROVENANCE_SHA256 = (
+    "19c88e47ba275c0a88cdd1beae05818418ea47a7b52a969bd3ed59836c1d4fce"
+)
+APK_SOURCES_MANIFEST = Path("deploy/docker/security-evidence-apk-sources/MANIFEST.json")
+APK_SOURCES_SCHEMA = "chio.security-evidence-apk-sources.v1"
+APK_SOURCES_CHECKER = Path("scripts/check-security-apk-sources.py")
+APK_SOURCES_SELF_TEST = Path("scripts/tests/check-security-apk-sources.test.py")
+EXPECTED_APK_SOURCES_CHECKER_SHA256 = (
+    "0cad7d39b55511a81e35d8773d4e5fbce9828bc087fa81c98a7801bb1173ce21"
+)
+EXPECTED_APK_SOURCES_SELF_TEST_SHA256 = (
+    "30f84fdf22f1fdc568a048b45c9c2b49f10bf8287d0b776beb9a43b369ac77b7"
+)
+APK_SOURCES_PIN = "EXPECTED_SOURCES_MANIFEST_SHA256"
+APK_SOURCES_HYDRATE = (
+    "git lfs pull --include='deploy/docker/security-evidence-apks/**,"
+    "deploy/docker/security-evidence-apk-sources/**' --exclude=''"
+)
+APK_IMAGE_HYDRATE = (
+    "/usr/bin/git -C authorized-security lfs pull "
+    "--include='deploy/docker/security-evidence-apks/**' --exclude=''"
+)
+EXPECTED_APK_REPOSITORY = "https://dl-cdn.alpinelinux.org/alpine/v3.22/main"
+EXPECTED_APK_SIGNING_KEY = "alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub"
+SECURITY_CA_PACKAGE = SECURITY_APK_ARCHIVES / "ca-certificates-20260611-r0.apk"
 EXPECTED_CA_PACKAGE_BYTES = 129495
 EXPECTED_CA_PACKAGE_SHA256 = (
     "a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "2d2965cb879a003de3d76dcd73668bd91c0a1a0a2f4337950d127afca44b4429"
+    "83c6cb7f2a00a2c4471dc85a943df8bdf735d106445db1804e2beae271040bc4"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
@@ -131,16 +164,16 @@ printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /us
 /bin/bash -p "${{temporal_runner}}"
 """.strip()
 EXPECTED_DIRECT_APK_PACKAGES = (
-    "/tmp/ca-certificates-20260611-r0.apk",
     "bash=5.2.37-r0",
     "build-base=0.5-r3",
+    "ca-certificates=20260611-r0",
     "cmake=3.31.7-r1",
     "coreutils=9.7-r1",
     "curl=8.14.1-r3",
     "git=2.49.1-r0",
     "jq=1.8.2-r0",
-    "linux-headers=6.14.2-r0",
     "libexpat=2.8.5-r0",
+    "linux-headers=6.14.2-r0",
     "openssl-dev=3.5.9-r0",
     "perl=5.40.4-r0",
     "pkgconf=2.4.3-r0",
@@ -923,7 +956,7 @@ EXPECTED_ENTERPRISE_BOUNDARY_STEP_INVENTORIES = {
     ),
 }
 EXPECTED_TRUST_JOB_DIGESTS = {
-    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "bac3f1f1f1d8c285488775a73acd1e7f152f13c68b575c52a7e86d8276e7babc",
+    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "5a5f5800225a858342e9f27d7d1777e544b96ccdf1f8683f1c914ff865c3f4f8",
     (
         "enterprise-hardening",
         "bind-source",
@@ -931,7 +964,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence controller",
         "dispatch-isolated-capture",
-    ): "48c8d65cc18f94395b593dcdc801df256be4e48e9534ba2e94e95633c5868d0e",
+    ): "12cfbd260d17a827c3b72393b61a67ef48a36acca1815a4618c5ae1fca67e755",
     (
         "enterprise Linux capture",
         "authorize-capture",
@@ -939,11 +972,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
-    ): "4e8aa0c1a096aa4ccd3b7d2c3071c93814c3f5843bc106dbf9a35a16183a52f1",
+    ): "4d64cf8f2ea44f1068092be0d029043554d99972502ff7b2e4232b33f5504516",
     (
         "enterprise Linux capture",
         "capture-linux-enforcement",
-    ): "3cfd02c24c052bfa32ce8056f07232ef59982b882549f1866aa2691f9e8bda58",
+    ): "ca9f8b3f60fd6f8b0bf92fce7d42e8c99b92137374932880b5687952aaee00e8",
     (
         "enterprise Linux capture",
         "dispatch-trusted-finalizer",
@@ -1167,6 +1200,12 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "Trusted security definition regressions",
         "python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.3'\n"
         "python3 scripts/tests/check-security-definitions.test.py",
+    ),
+    (
+        "APK corresponding source gate",
+        APK_SOURCES_HYDRATE + "\n"
+        "python3 scripts/check-security-apk-sources.py\n"
+        "python3 scripts/tests/check-security-apk-sources.test.py",
     ),
     ("Formal traceability gate", "bash scripts/check-mapping.sh"),
     ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
@@ -2526,6 +2565,250 @@ def validate_security_ca_package(root: Path) -> None:
         raise ContractError("security CA package digest ratchet changed")
 
 
+APK_MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  ([a-z0-9][a-z0-9._+-]*\.apk)")
+APK_INVENTORY_ENTRY = re.compile(r"(.+)-([^-]+-r[0-9]+)")
+APK_PROVENANCE_RECORD_KEYS = frozenset(
+    {
+        "file",
+        "name",
+        "version",
+        "length",
+        "sha256",
+        "origin_url",
+        "retrieved",
+        "signing_key",
+        "source_package",
+        "source_commit",
+        "license",
+    }
+)
+
+
+def read_bounded_regular_file(path: Path, limit: int, description: str) -> bytes:
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as error:
+        raise ContractError(f"{description} is unavailable") from error
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > limit:
+            raise ContractError(f"{description} is not a bounded regular file")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            content = stream.read(limit + 1)
+    finally:
+        os.close(descriptor)
+    if len(content) > limit:
+        raise ContractError(f"{description} is not a bounded regular file")
+    return content
+
+
+def require_real_directories(root: Path, relative: Path, description: str) -> None:
+    current = root
+    for part in relative.parts[:-1]:
+        current = current / part
+        try:
+            metadata = current.lstat()
+        except OSError as error:
+            raise ContractError(f"{description} is unavailable") from error
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise ContractError(f"{description} is not beneath real directories")
+
+
+def module_string_constant(source: bytes, name: str, description: str) -> str:
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError) as error:
+        raise ContractError(f"{description} is not Python") from error
+    stores = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Store)
+    ]
+    assignments = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == name
+    ]
+    if (
+        len(stores) != 1
+        or len(assignments) != 1
+        or not isinstance(assignments[0].value, ast.Constant)
+        or not isinstance(assignments[0].value.value, str)
+    ):
+        raise ContractError(f"{description} does not bind {name} exactly once to a literal")
+    return assignments[0].value.value
+
+
+def validate_apk_source_unit(root: Path) -> None:
+    """Bind the vendored APK closure to its in-repository corresponding source.
+
+    The APK corresponding source gate step runs the source checker and its
+    self-test. Here the checker, the self-test and the source manifest must be
+    regular files below real directories with the reviewed code digests. The checker must pin exactly the
+    manifest present, and that manifest must name the archive manifest and
+    provenance that this tree's security image installs from.
+    """
+    for relative, mode in (
+        (APK_SOURCES_CHECKER, 0o755),
+        (APK_SOURCES_SELF_TEST, 0o755),
+        (APK_SOURCES_MANIFEST, 0o644),
+    ):
+        require_real_directories(root, relative, f"APK corresponding source file {relative}")
+        path = root / relative
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or stat.S_IMODE(path.lstat().st_mode) != mode
+        ):
+            raise ContractError(f"APK corresponding source file is not regular: {relative}")
+    checker = read_bounded_regular_file(
+        root / APK_SOURCES_CHECKER, 1024 * 1024, "APK corresponding source checker"
+    )
+    pin = module_string_constant(checker, APK_SOURCES_PIN, "APK corresponding source checker")
+    manifest_bytes = read_bounded_regular_file(
+        root / APK_SOURCES_MANIFEST, 8 * 1024 * 1024, "APK corresponding source manifest"
+    )
+    if hashlib.sha256(manifest_bytes).hexdigest() != pin:
+        raise ContractError(
+            "APK corresponding source checker does not pin the source manifest present"
+        )
+    try:
+        manifest = json.loads(manifest_bytes)
+    except ValueError as error:
+        raise ContractError("APK corresponding source manifest is not JSON") from error
+    closure = {
+        "binary_manifest": (SECURITY_APK_MANIFEST, 1024 * 1024, "security APK archive manifest"),
+        "binary_provenance": (SECURITY_APK_PROVENANCE, 4 * 1024 * 1024, "security APK provenance"),
+    }
+    if not isinstance(manifest, dict) or manifest.get("schema") != APK_SOURCES_SCHEMA or any(
+        manifest.get(key)
+        != {
+            "path": relative.as_posix(),
+            "sha256": hashlib.sha256(
+                read_bounded_regular_file(root / relative, limit, description)
+            ).hexdigest(),
+        }
+        for key, (relative, limit, description) in closure.items()
+    ):
+        raise ContractError(
+            "APK corresponding source manifest does not bind this tree's APK closure"
+        )
+    for relative, expected, description in (
+        (APK_SOURCES_CHECKER, EXPECTED_APK_SOURCES_CHECKER_SHA256,
+         "APK corresponding source checker"),
+        (APK_SOURCES_SELF_TEST, EXPECTED_APK_SOURCES_SELF_TEST_SHA256,
+         "APK corresponding source self-test"),
+    ):
+        require_exact_file_digest(root / relative, expected, description)
+
+
+def validate_security_apk_archives(root: Path, apk_lines: list[str]) -> str:
+    directory = root / SECURITY_APK_ARCHIVES
+    try:
+        directory_metadata = directory.lstat()
+    except OSError as error:
+        raise ContractError("security APK archive directory is unavailable") from error
+    if not stat.S_ISDIR(directory_metadata.st_mode):
+        raise ContractError("security APK archive directory is not a directory")
+    manifest = read_bounded_regular_file(
+        root / SECURITY_APK_MANIFEST, 1024 * 1024, "security APK archive manifest"
+    )
+    manifest_digest = hashlib.sha256(manifest).hexdigest()
+    if manifest_digest != EXPECTED_APK_MANIFEST_SHA256:
+        raise ContractError("security APK archive manifest digest ratchet changed")
+    entries = []
+    for line in manifest.decode("ascii").splitlines():
+        match = APK_MANIFEST_LINE.fullmatch(line)
+        if match is None:
+            raise ContractError("security APK archive manifest is not canonical")
+        entries.append((match.group(2), match.group(1)))
+    names = [name for name, _digest in entries]
+    if (
+        len(entries) != EXPECTED_APK_ARCHIVE_COUNT
+        or names != sorted(names)
+        or len(set(names)) != len(names)
+        or not manifest.endswith(b"\n")
+    ):
+        raise ContractError("security APK archive manifest is not canonical")
+    if sorted(os.listdir(directory)) != sorted([*names, SECURITY_APK_MANIFEST.name]):
+        raise ContractError("security APK archive directory does not match its manifest")
+
+    provenance_bytes = read_bounded_regular_file(
+        root / SECURITY_APK_PROVENANCE, 4 * 1024 * 1024, "security APK provenance"
+    )
+    if hashlib.sha256(provenance_bytes).hexdigest() != EXPECTED_APK_PROVENANCE_SHA256:
+        raise ContractError("security APK provenance digest ratchet changed")
+    provenance = json.loads(provenance_bytes)
+    base_image = EXPECTED_SECURITY_IMAGE_FROM.removeprefix("--platform=linux/amd64 ")
+    records = provenance.get("archives")
+    if (
+        provenance.get("schema") != "chio.security-execution-apk-archives.v2"
+        or provenance.get("base_image") != base_image
+        or provenance.get("platform") != "linux/amd64"
+        or provenance.get("repository") != EXPECTED_APK_REPOSITORY
+        or (provenance.get("trusted_signing_key") or {}).get("name") != EXPECTED_APK_SIGNING_KEY
+        or provenance.get("installed_inventory_sha256") != EXPECTED_APK_LOCK_SHA256
+        or provenance.get("installed_package_count") != len(apk_lines)
+        or provenance.get("direct_packages") != list(EXPECTED_DIRECT_APK_PACKAGES)
+        or provenance.get("archive_directory") != SECURITY_APK_ARCHIVES.as_posix()
+        or provenance.get("archive_manifest_sha256") != manifest_digest
+        or provenance.get("archive_count") != len(entries)
+        or not isinstance(records, list)
+        or len(records) != len(entries)
+    ):
+        raise ContractError("security APK provenance does not bind the archive manifest")
+    archive_ids = []
+    for (name, digest), record in zip(entries, records):
+        if (
+            not isinstance(record, dict)
+            or set(record) != APK_PROVENANCE_RECORD_KEYS
+            or record["file"] != name
+            or record["sha256"] != digest
+            or name != f"{record['name']}-{record['version']}.apk"
+            or record["origin_url"] != f"{EXPECTED_APK_REPOSITORY}/x86_64/{name}"
+            or record["signing_key"] != EXPECTED_APK_SIGNING_KEY
+            or not re.fullmatch(r"[0-9a-f]{40}", str(record["source_commit"]))
+            or not isinstance(record["source_package"], str)
+            or not record["source_package"]
+            or not isinstance(record["license"], str)
+            or not record["license"]
+            or not isinstance(record["length"], int)
+            or isinstance(record["length"], bool)
+            or not 0 < record["length"] <= MAX_APK_ARCHIVE_BYTES
+        ):
+            raise ContractError(f"security APK provenance record is not exact: {name}")
+        content = read_bounded_regular_file(
+            directory / name, record["length"], f"security APK archive {name}"
+        )
+        if len(content) != record["length"] or hashlib.sha256(content).hexdigest() != digest:
+            raise ContractError(f"security APK archive digest ratchet changed: {name}")
+        archive_ids.append(name.removesuffix(".apk"))
+
+    archive_packages = {record["name"] for record in records}
+    base_inventory = provenance.get("base_inventory")
+    if not isinstance(base_inventory, list) or not all(
+        isinstance(entry, str) and APK_INVENTORY_ENTRY.fullmatch(entry)
+        for entry in base_inventory
+    ):
+        raise ContractError("security APK provenance base inventory is not exact")
+    retained_base = [
+        entry
+        for entry in base_inventory
+        if APK_INVENTORY_ENTRY.fullmatch(entry).group(1) not in archive_packages
+    ]
+    if sorted([*retained_base, *archive_ids]) != apk_lines:
+        raise ContractError("security APK archives do not reproduce the inventory lock")
+    if any(
+        package.replace("=", "-", 1) not in archive_ids
+        for package in EXPECTED_DIRECT_APK_PACKAGES
+    ):
+        raise ContractError("security APK direct package is not vendored")
+    return manifest_digest
+
+
 def validate_security_dockerfile(root: Path, document: str) -> None:
     validate_security_ca_package(root)
     apk_lock = root / "deploy/docker/security-evidence-apk.lock"
@@ -2548,6 +2831,7 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         or any(not line or line != line.strip() for line in apk_lines)
     ):
         raise ContractError("security APK inventory is not canonical and exact")
+    apk_manifest_digest = validate_security_apk_archives(root, apk_lines)
 
     instructions = parse_dockerfile(document)
     if tuple(keyword for keyword, _value in instructions) != (
@@ -2572,11 +2856,15 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
-        f"--mount=type=bind,source={SECURITY_CA_PACKAGE},"
-        "target=/tmp/ca-certificates-20260611-r0.apk,readonly "
-        f"echo '{EXPECTED_CA_PACKAGE_SHA256} "
-        "/tmp/ca-certificates-20260611-r0.apk' | sha256sum -c -",
-        "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
+        f"--mount=type=bind,source={SECURITY_APK_ARCHIVES},"
+        "target=/tmp/security-evidence-apks,readonly "
+        f"echo '{apk_manifest_digest} "
+        "/tmp/security-evidence-apks/SHA256SUMS' | sha256sum -c -",
+        "cd /tmp/security-evidence-apks",
+        f'test "$(ls -A | wc -l)" = {EXPECTED_APK_ARCHIVE_COUNT + 1}',
+        "sha256sum -c SHA256SUMS",
+        "apk add --no-network --no-cache --repositories-file /dev/null "
+        "$(awk '{print \"/tmp/security-evidence-apks/\" $2}' SHA256SUMS)",
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
         f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
@@ -4898,6 +5186,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
     inventory = {
         "deploy/docker/Dockerfile.security-evidence-runner": 0o644,
         "deploy/docker/security-evidence-apk.lock": 0o644,
+        "deploy/docker/security-evidence-apks/SHA256SUMS": 0o644,
         "deploy/docker/security-evidence-seccomp.json": 0o644,
         "deploy/docker/security-evidence-seccomp-upstream.json": 0o644,
         "deploy/docker/security-evidence-seccomp-provenance.json": 0o644,
@@ -5240,6 +5529,7 @@ def validate_isolated_execution_job(
     trusted_inventory = (
         "644 deploy/docker/Dockerfile.security-evidence-runner",
         "644 deploy/docker/security-evidence-apk.lock",
+        "644 deploy/docker/security-evidence-apks/SHA256SUMS",
         "644 deploy/docker/security-evidence-seccomp.json",
         "644 deploy/docker/security-evidence-seccomp-upstream.json",
         "644 deploy/docker/security-evidence-seccomp-provenance.json",
@@ -5282,6 +5572,10 @@ def validate_isolated_execution_job(
     if build.get("id") != "security-image":
         raise ContractError(f"{contract} image identity is not exported")
     build_run = build.get("run")
+    if not isinstance(build_run, str) or not build_run.startswith(
+        "set -euo pipefail\n" + APK_IMAGE_HYDRATE + "\n"
+    ):
+        raise ContractError(f"{contract} does not hydrate the trusted APK archives")
     build_markers = (
         "--platform linux/amd64",
         "--file authorized-security/deploy/docker/Dockerfile.security-evidence-runner",
@@ -5557,6 +5851,7 @@ def validate(root: Path) -> None:
     validate_global_workflow_boundaries(root)
     validate_environment_provisioning_document(root)
     validate_security_execution_boundary_files(root)
+    validate_apk_source_unit(root)
     validate_temporal_security_contract_files(root)
     validate_supply_chain_contract_file(root)
     ci = load_workflow(root / ".github/workflows/ci.yml")
@@ -5928,6 +6223,11 @@ def validate(root: Path) -> None:
         raise ContractError("enterprise-hardening contains continue-on-error")
 
     portable = job(enterprise, "portable-contracts")
+    portable_self_tests = named_step(portable, "Gate contract self-tests")
+    if "if" in portable_self_tests or not portable_self_tests.get("run", "").startswith(
+        APK_SOURCES_HYDRATE + "\n"
+    ):
+        raise ContractError("enterprise portable contracts do not hydrate the APK source unit")
     for identifier in (
         "portable-contracts",
         "active-defense-security",
@@ -6223,6 +6523,7 @@ def validate(root: Path) -> None:
             'test "${CONTROLLER_SHA}" = "${EVENT_BASE_SHA}"',
             "100644:deploy/docker/Dockerfile.security-evidence-runner",
             "100644:deploy/docker/security-evidence-apk.lock",
+            "100644:deploy/docker/security-evidence-apks/SHA256SUMS",
             "100644:deploy/docker/security-evidence-seccomp.json",
             "100755:crates/security/chio-cage/scripts/check-linux-enforcement.sh",
             "100644:scripts/check-cage-all-target-inventory.py",

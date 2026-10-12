@@ -1,0 +1,8 @@
+tree b653896d4042786602af291d5487bbbab73e979f
+parent ebacf2ddbc397de412b5d090f561e054e9e076d8
+author Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1727144961 +0000
+committer Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1727144961 +0000
+
+main/bash: upgrade to 5.2.37
+
+https://git.savannah.gnu.org/cgit/bash.git/log/

@@ -1,0 +1,6 @@
+tree d09944d10d99bb24855502ad228399b98cfe414c
+parent 232da3c2e38d57584786dc5ce68c5f4cccca9860
+author Celeste <20312-Celeste@users.gitlab.alpinelinux.org> 1719978942 +0000
+committer Natanael Copa <ncopa@alpinelinux.org> 1719989947 +0000
+
+main/gdbm: upgrade to 1.24

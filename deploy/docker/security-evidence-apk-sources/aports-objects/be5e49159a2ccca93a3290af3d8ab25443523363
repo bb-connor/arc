@@ -1,0 +1,8 @@
+tree 64df77b491c2fa8c7cbaa6e4fb77713f7c9214a3
+parent f2b661f0e5256ff669303a315452bf6e46250aa9
+author fossdd <fossdd@pwned.life> 1744397271 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1744538638 +0000
+
+main/libffi: upgrade to 3.4.8
+
+https://github.com/libffi/libffi/releases/tag/v3.4.8

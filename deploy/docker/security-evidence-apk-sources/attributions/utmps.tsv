@@ -1,0 +1,6 @@
+# chio.attribution-lines.v8 origin=utmps files=103 files_with_lines=7 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	3	recipe:btmpd.initd	# Copyright 2020-2021 Laurent Bercot for Alpine Linux
+line	2	recipe:utmp-init.initd	# Copyright 2020-2022 Laurent Bercot for Alpine Linux
+line	1	utmps-0.1.3.1.tar.gz:utmps-0.1.3.1/DCO	Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+line	1	utmps-0.1.3.1.tar.gz:utmps-0.1.3.1/COPYING	Copyright (c) 2018-2025 Laurent Bercot <ska-skaware@skarnet.org>
+line	1	utmps-0.1.3.1.tar.gz:utmps-0.1.3.1/COPYING	copyright notice and this permission notice appear in all copies.

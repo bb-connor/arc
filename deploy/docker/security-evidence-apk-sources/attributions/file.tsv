@@ -1,0 +1,156 @@
+# chio.attribution-lines.v8 origin=file files=626 files_with_lines=88 binary_heads=44 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	file-5.46.tar.gz:file-5.46/ChangeLog	\t* Remove 3rd and 4th copyright clause; approved by Ian Darwin.
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	        /^Copyright /!{
+line	1	file-5.46.tar.gz:file-5.46/src/vasprintf.c	  #               Copyright (c) 2002-2005 David TAILLANDIER                   #
+line	38	file-5.46.tar.gz:file-5.46/tests/test.c	 * 1. Redistributions of source code must retain the above copyright
+line	38	file-5.46.tar.gz:file-5.46/tests/test.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	file-5.46.tar.gz:file-5.46/src/strcasestr.c	 * Copyright (c) 1990, 1993
+line	2	file-5.46.tar.gz:file-5.46/src/strlcat.c	 * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
+line	3	file-5.46.tar.gz:file-5.46/src/fmtcheck.c	 * Copyright (c) 2000 The NetBSD Foundation, Inc.
+line	3	file-5.46.tar.gz:file-5.46/src/cdf.c	 * Copyright (c) 2008 Christos Zoulas
+line	1	file-5.46.tar.gz:file-5.46/src/readcdf.c	 * Copyright (c) 2008, 2016 Christos Zoulas
+line	1	file-5.46.tar.gz:file-5.46/src/getline.c	 * Copyright (c) 2011 The NetBSD Foundation, Inc.
+line	2	file-5.46.tar.gz:file-5.46/src/der.c	 * Copyright (c) 2016 Christos Zoulas
+line	1	file-5.46.tar.gz:file-5.46/src/is_json.c	 * Copyright (c) 2018 Christos Zoulas
+line	1	file-5.46.tar.gz:file-5.46/src/is_csv.c	 * Copyright (c) 2019 Christos Zoulas
+line	1	file-5.46.tar.gz:file-5.46/src/is_simh.c	 * Copyright (c) 2023 Christos Zoulas
+line	6	file-5.46.tar.gz:file-5.46/tests/test.c	 * Copyright (c) Christos Zoulas 2003.
+line	1	file-5.46.tar.gz:file-5.46/src/elfclass.h	 * Copyright (c) Christos Zoulas 2008.
+line	1	file-5.46.tar.gz:file-5.46/src/buffer.c	 * Copyright (c) Christos Zoulas 2017.
+line	1	file-5.46.tar.gz:file-5.46/src/memtest.c	 * Copyright (c) Christos Zoulas 2021.
+line	14	file-5.46.tar.gz:file-5.46/src/asprintf.c	 * Copyright (c) Ian F. Darwin 1986-1995.
+line	2	file-5.46.tar.gz:file-5.46/src/strlcat.c	 * copyright notice and this permission notice appear in all copies.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/windows	#\t\t\t"InstallSHIELD Software Corporation  (c) 1990-1997"
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	#\tsearch and display 1st name in sfnt font which is often copyright text
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	#      /^# Copyright /
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/biosig	#    Copyright (C) 2018 Alois Schloegl <alois.schloegl@gmail.com>
+line	1	file-5.46.tar.gz:file-5.46/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	file-5.46.tar.gz:file-5.46/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	file-5.46.tar.gz:file-5.46/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	file-5.46.tar.gz:file-5.46/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	2	file-5.46.tar.gz:file-5.46/config.guess	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/os9	# 1. Redistributions of source code must retain the above copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/os9	# 2. Redistributions in binary form must reproduce the above copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/map	# 2nd title like Copyright 1995-2018 by GARMIN Corporation.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/erlang	# 4.2 version may have a copyright notice!
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/images	# Copyright
+line	1	file-5.46.tar.gz:file-5.46/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	6	file-5.46.tar.gz:file-5.46/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	4	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/diff	# Copyright (C) 2001 by Martin Pool.  You may do whatever you want with
+line	6	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/compress	# Copyright (C) 2003 by Andrew Tridgell.  You may do whatever you want with
+line	1	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	2	file-5.46.tar.gz:file-5.46/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/os9	# Copyright (c) 1996 Ignatios Souvatzis. All rights reserved.
+line	1	file-5.46.tar.gz:file-5.46/install-sh	# Copyright 1991 by the Massachusetts Institute of Technology
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/map	# Copyright record size
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/windows	# SYSTEMREC[].RecordType type of data in record; 1~help file title 2~COPYRIGHT 3~TOPICOFFSET Contents 4~Macro 5~*.ICO 6~HPJ-structure
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/icc	# but no copyright tag in linearSRGB.icc
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/map	# copyright message
+line	1	file-5.46.tar.gz:file-5.46/install-sh	# copyright notice and this permission notice appear in supporting
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/console	# copyright string like: empty "1991 Titus" "2001 Imagineer/KT.Kodansha/P&B" "2000 Newline, Ubisoft, D. Eclip."
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/windows	# copyright text like:\t"Stirling Technologies, Inc.  (c) 1990-1994"
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/frame	# copyright, but this file is "published" as witness the following:
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	# dfCopyright 60 byte null padded Copyright string. uncomment it to get old looking
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/filesystems	# followed by string like "6.50 (c) 1993-2004 Gilles Vollant"
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/msvc	# internal module name like: _DllGetVersion DllGetVersion BezierTerminationTest Copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/ole2compounddocs	# look for "File Format (C) Copyright 1993 Banner Blue Software Inc. - All Rights Reserved" in GENERAL.DB
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	# often 0~copyright, 1~font, 2~font subfamily, 5~version, 13~license, 19~sample, ...
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	# often copyright string that starts like \\251 2006 The Monotype Corporation
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/msvc	# or title like "87INIT" in FP87.LIB or "ACOSASIN" in MATHC.LIB or "Copyright" in calc-bcc.lib
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/icc	# shall contain the profileDescriptionTag "desc" , copyrightTag "cprt"
+line	1	file-5.46.tar.gz:file-5.46/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	file-5.46.tar.gz:file-5.46/install-sh	# the above copyright notice appear in all copies and that both that
+line	2	file-5.46.tar.gz:file-5.46/magic/Magdir/msdos	# then there is a copyright notice
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/animation	##>3     byte            &0x08          \\b, Copyrighted
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/geos	#>168\tstring\t>\\0\t\\b, copyright "%s"
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/animation	#>3     byte            &0x08           \\b, Copyrighted
+line	5	file-5.46.tar.gz:file-5.46/magic/Magdir/animation	#>3     byte            &0x08          \\b, Copyrighted
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/msdos	#>49\tstring\tCOPYRIGHT\\ (c)\\ 1985\\ by\\ Novell,\\ Inc.
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/asf	#>>28\tleshort\tcopyright length %d
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/map	#>>>0x39\t\t\tuleshort\tx\t\\b, copyright record size %u
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/animation	#>>>3\tbyte\t\t&0x08\t\t\\b, Copyrighted
+line	1	file-5.46.tar.gz:file-5.46/doc/libmagic.man	.\\" 1. Redistributions of source code must retain the above copyright
+line	1	file-5.46.tar.gz:file-5.46/doc/libmagic.man	.\\" 2. Redistributions in binary form must reproduce the above copyright
+line	1	file-5.46.tar.gz:file-5.46/doc/libmagic.man	.\\" Copyright (c) Christos Zoulas 2003, 2018, 2022
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	0\tstring\t\t\\007\\001\\001\\000Copyright\\ (c)\\ 199\tAdobe Multiple Master font
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/fonts	0\tstring\t\t\\012\\001\\001\\000Copyright\\ (c)\\ 199\tAdobe Multiple Master font
+line	2	file-5.46.tar.gz:file-5.46/COPYING	1. Redistributions of source code must retain the above copyright
+line	2	file-5.46.tar.gz:file-5.46/COPYING	2. Redistributions in binary form must reproduce the above copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/msdos	>0x1e\tstring\tCopyright\\ 1989-1990\\ PKWARE\\ Inc.\t\\b, Self-extracting PKZIP archive
+line	2	file-5.46.tar.gz:file-5.46/magic/Magdir/audio	>0x56\tstring\t\t>\\0\t\t\tcopyright: "%s"
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/audio	>46\tstring\t\t>\\0\t\t%s, copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/console	>48\tstring\t\t>\\0\t%.32s, copyright
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/images	>>(8.l)\tstring\t\tx\t\t\\b, copyright=%s
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/animation	>>4    byte            &0x80          \\b, Copyrighted
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/audio	>>>>&1\tstring\t\t>\\0\t\t\\b, copyright %s
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/icc	>>>>132\tdefault\t\tx\t\t\\b, no copyright tag
+line	1	file-5.46.tar.gz:file-5.46/magic/Magdir/filesystems	>>>>>>>387\tstring\tCopyright\\ (c)\\ 1984,1998
+line	1	file-5.46.tar.gz:file-5.46/INSTALL	Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005,
+line	1	file-5.46.tar.gz:file-5.46/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	file-5.46.tar.gz:file-5.46/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/COPYING	Copyright (c) Ian F. Darwin 1986, 1987, 1989, 1990, 1991, 1992, 1994, 1995.
+line	1	file-5.46.tar.gz:file-5.46/python/LICENSE	Copyright (c) Ian F. Darwin 1986-1995.
+line	1	file-5.46.tar.gz:file-5.46/doc/file.man	Copyright (c) Ian F. Darwin, Toronto, Canada, 1986-1999.
+line	2	file-5.46.tar.gz:file-5.46/config.guess	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/doc/file.man	Covered by the standard Berkeley Software Distribution copyright; see the file
+line	1	file-5.46.tar.gz:file-5.46/src/vasprintf.c	Redistributions of source code must retain the above copyright notice, this
+line	1	file-5.46.tar.gz:file-5.46/README.md	This is Release 5.x of Ian Darwin's (copyright but distributable)
+line	1	file-5.46.tar.gz:file-5.46/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	file-5.46.tar.gz:file-5.46/m4/visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2012 Free Software Foundation, Inc.
+line	1	file-5.46.tar.gz:file-5.46/src/vasprintf.c	form must reproduce the above copyright notice, this list of conditions and
+binary-head	file-5.46.tar.gz:file-5.46/tests/CVE-2014-1943.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/HWP2016.hwp.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/HWP2016.hwpx.zip.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/HWP97.hwp.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/JW07022A.mp3.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/android-vdex-1.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/android-vdex-2.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/arj.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/bcachefs.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/bcachefs2.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/cl8m8ocofedso.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/dsd64-dff.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/dsd64-dsf.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/escapevel.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/ext4.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/fit-map-data.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/gpkg-1-zst.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/hddrawcopytool.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/hello-racket_rkt.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/issue311docx.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/issue359xlsx.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/keyman-0.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/keyman-1.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/keyman-2.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/matilde.arm.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pcjr.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v2-phil.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v3-lutz.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-dsa.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-ecc-no-userid-secret.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-ecc-secret-key.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-rsa-key.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-rsa-no-userid-secret.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pgp-binary-key-v4-rsa-secret-key.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/pnm2.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/registry-pol.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/rpm-v3.0-bin-aarch64.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/rpm-v3.0-bin-powerpc64.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/rpm-v3.0-bin-s390x.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/rpm-v3.0-bin-x86_64.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/rpm-v3.0-src.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/uf2.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/utf16xmlsvg.testfile
+binary-head	file-5.46.tar.gz:file-5.46/tests/xclbin.testfile

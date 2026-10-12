@@ -1,0 +1,126 @@
+# chio.attribution-lines.v8 origin=linux-pam files=733 files_with_lines=241 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_tty_audit/pam_tty_audit.c	      copyright notices, this list of conditions, and the following
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	      the GNU GPL and the restrictions contained in a BSD-style copyright.)
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/po/meson.build	    '--copyright-holder=Linux-PAM Project',
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	    <title>Copyright information for this document</title>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_tty_audit/pam_tty_audit.c	   1. Redistributions of source code must retain any existing copyright
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/tests/tst-dlopen.c	   Copyright (C) Nalin Dahyabhai <nalin@redhat.com> 2003
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/tests/tst-pam_mkargv.c	   Copyright (C) Thorsten Kukuk <kukuk@suse.de> 2009
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_mkhomedir/pam_mkhomedir.c	   Copyright (c) Red Hat, Inc. 2009
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_mkhomedir/mkhomedir_helper.c	   Copyright (c) Red Hat, Inc., 2009
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_setquota/pam_setquota.c	   Copyright © 2006 Ruslan Savchenko <savrus@mexmat.net>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_setquota/pam_setquota.c	   Copyright © 2010 Shane Tzen <shane@ict.usc.edu>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_setquota/pam_setquota.c	   Copyright © 2012-2020 Sven Hartge <sven@svenhartge.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_setquota/pam_setquota.c	   Copyright © 2016 Keller Fuchs <kellerfuchs@hashbang.sh>
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/COPYING	   copyright notices, this list of conditions, and the following
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_tty_audit/pam_tty_audit.c	   restrictions contained in a BSD-style copyright.)
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	  <chapter xml:id="adg-copyright">
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/mwg/Linux-PAM_MWG.xml	  <chapter xml:id="mwg-copyright">
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/sag/Linux-PAM_SAG.xml	  <chapter xml:id="sag-copyright">
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faildelay/pam_faildelay.c	 *    copyright notices, this list of conditions, and the following
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/pam_namespace.c	 * (C) Copyright IBM Corporation 2005
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/pam_namespace.h	 * (C) Copyright Red Hat 2006
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/pam_namespace.c	 * (C) Copyright Red Hat, Inc. 2006, 2008
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faildelay/pam_faildelay.c	 * 1. Redistributions of source code must retain any existing copyright
+line	98	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * 1. Redistributions of source code must retain the above copyright
+line	98	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * 2. Redistributions in binary form must reproduce the above copyright
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_private.h	 * Copyright (C) 1995 by Red Hat Software, Marc Ewing
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_passwd.c	 * Copyright (C) 1996.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_tokens.h	 * Copyright (C) 1998,2001 Andrew G. Morgan <morgan@kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_ext.h	 * Copyright (C) 2005, 2006, 2008, 2009 Thorsten Kukuk.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_keyinit/pam_keyinit.c	 * Copyright (C) 2006 Red Hat, Inc. All Rights Reserved.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_modules.h	 * Copyright (C) Andrew Morgan, 1996-8.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_private.h	 * Copyright (c) 1996-8,2001 by Andrew G. Morgan <morgan@kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_dispatch.c	 * Copyright (c) 1998, 2005 Andrew G. Morgan <morgan@kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpamc/pamc_load.c	 * Copyright (c) 1999 Andrew G. Morgan <morgan@ftp.kernel.org>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpamc/include/security/pam_client.h	 * Copyright (c) 1999 Andrew G. Morgan <morgan@linux.kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_modutil_private.h	 * Copyright (c) 2001 Andrew Morgan <morgan@kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_modutil.h	 * Copyright (c) 2001-2002 Andrew Morgan <morgan@kernel.org>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_timestamp/pam_timestamp.c	 * Copyright (c) 2002 Red Hat, Inc.
+line	5	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_selinux/pam_selinux_check.c	 * Copyright (c) 2003 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_selinux/pam_selinux.c	 * Copyright (c) 2003-2008 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_echo/pam_echo.c	 * Copyright (c) 2005, 2006 Thorsten Kukuk <kukuk@suse.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_umask/pam_umask.c	 * Copyright (c) 2005, 2006, 2007, 2010, 2013 Thorsten Kukuk <kukuk@thkukuk.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faildelay/pam_faildelay.c	 * Copyright (c) 2006 Thorsten Kukuk <kukuk@thkukuk.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_exec/pam_exec.c	 * Copyright (c) 2006, 2008 Thorsten Kukuk <kukuk@thkukuk.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_sepermit/pam_sepermit.c	 * Copyright (c) 2007, 2008, 2009 Red Hat, Inc.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_pwhistory/opasswd.c	 * Copyright (c) 2008 Thorsten Kukuk <kukuk@suse.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_pwhistory/pam_pwhistory.c	 * Copyright (c) 2008, 2012 Thorsten Kukuk
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/main.c	 * Copyright (c) 2010 Red Hat, Inc.
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/faillock.c	 * Copyright (c) 2010 Tomas Mraz <tmraz@redhat.com>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/faillock.c	 * Copyright (c) 2010, 2016, 2017 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/pam_faillock.c	 * Copyright (c) 2010, 2017, 2019 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/pam_faillock.c	 * Copyright (c) 2010, 2017, 2019 Tomas Mraz <tmraz@redhat.com>
+line	4	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_pwhistory/opasswd.c	 * Copyright (c) 2013 Red Hat, Inc.
+line	15	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/pam_cc_compat.h	 * Copyright (c) 2020 Dmitry V. Levin <ldv@altlinux.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_usertype/pam_usertype.c	 * Copyright (c) 2020 Red Hat, Inc.
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_env/tst-pam_env-retval.c	 * Copyright (c) 2020-2022 Dmitry V. Levin <ldv@altlinux.org>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_timestamp/hmac_openssl_wrapper.c	 * Copyright (c) 2021 Red Hat, Inc.
+line	4	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/faillock_config.c	 * Copyright (c) 2022 Iker Pedrosa <ipedrosa@redhat.com>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_env/tst-pam_env-retval.c	 * Copyright (c) 2022 Stefan Schubert <schubi@suse.de>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faillock/faillock_config.c	 * Copyright (c) 2022 Tomas Mraz <tm@t8m.info>
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_canonicalize_user/pam_canonicalize_user.c	 * Copyright (c) 2023 Dmitry V. Levin <ldv@strace.io>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_pwhistory/tst-pam_pwhistory-retval.c	 * Copyright (c) 2023 Stefan Schubert <schubi@suse.de>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_succeed_if/tst-pam_succeed_if-retval.c	 * Copyright (c) 2024 Tobias Stoeckmann <tobias@stoeckmann.org>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright (c) Alex O. Yuriev, 1996.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright (c) Andrew G. Morgan 1996-8.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/conf/pam_conv1/pam_conv_l.l	 * Copyright (c) Andrew G. Morgan 1997 <morgan@parc.power.net>
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpamc/libpamc.h	 * Copyright (c) Andrew G. Morgan <morgan@ftp.kernel.org>
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_delay.c	 * Copyright (c) Andrew G. Morgan <morgan@kernel.org> 1996-9
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_misc.c	 * Copyright (c) Andrew G. Morgan <morgan@kernel.org> 2000-2003
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * Copyright (c) Andrew G. Morgan <morgan@linux.kernel.org>, 1996-8
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_env.c	 * Copyright (c) Andrew G. Morgan <morgan@parc.power.net> 1996,1997
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/unix_chkpwd.c	 * Copyright (c) Andrew G. Morgan, 1996. All rights reserved
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright (c) Cristian Gafton 1996.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_wheel/pam_wheel.c	 * Copyright (c) Cristian Gafton <gafton@redhat.com>, 1996, 1997
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_userdb/pam_userdb.c	 * Copyright (c) Cristian Gafton <gafton@redhat.com>, 1999
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_limits/pam_limits.c	 * Copyright (c) Cristian Gafton, 1996-1997, <gafton@redhat.com>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright (c) Jan Rękorajski 1999.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_passwd.c	 * Copyright (c) Jan Rękorajski, 1999.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright (c) Red Hat, Inc. 1996, 2007, 2008.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.h	 * Copyright (c) Red Hat, Inc. 2007.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_passwd.c	 * Copyright (c) Red Hat, Inc., 2007, 2008.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/unix_update.c	 * Copyright (c) Red Hat, Inc., 2007, 2008. All rights reserved
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/unix_chkpwd.c	 * Copyright (c) Red Hat, Inc., 2007,2008. All rights reserved
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_access/pam_access.c	 * Copyright 1995 by Wietse Venema. All rights reserved. Individual files
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_issue/pam_issue.c	 * Copyright 1999 by Ben Collins <bcollins@debian.org>
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/argv_parse.c	 * Copyright 1999 by Theodore Ts'o.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_localuser/pam_localuser.c	 * Copyright 2001, 2004 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_xauth/pam_xauth.c	 * Copyright 2001-2003 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_timestamp/hmacfile.c	 * Copyright 2003,2004 Red Hat, Inc.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_loginuid/pam_loginuid.c	 * Copyright 2005 Red Hat Inc., Durham, North Carolina.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_auth.c	 * Copyright Alexander O. Yuriev, 1996.  All rights reserved.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_acct.c	 * Copyright Elliot Lee, 1996.  All rights reserved.
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/pam_unix_acct.c	 * Copyright Jan Rękorajski, 1999.  All rights reserved.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * Copyright Theodore Ts'o, 1996.  All rights reserved.
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/passverify.c	 * Copyright information at end of file.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_unix/unix_chkpwd.c	 * Copyright information is located at the end of the file.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_access/pam_access.c	 * Copyright message from logdaemon-5.6 (original file name DISCLAIMER)
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_modules.h	 * GNU GPL and the restrictions contained in a BSD-style copyright.)
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_appl.h	 * Note, the copyright information is at end of file.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * Note, the copyright+license information is at end of file.
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_private.h	 * Please see end of file for copyright.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faildelay/pam_faildelay.c	 * Portions Copyright (c) 2005 Darren Tucker <dtucker at zip com au>.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_limits/pam_limits.c	 * See end for Copyright information
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_userdb/pam_userdb.c	 * See the end of the file for Copyright Information
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/pam_namespace.c	 * The above copyright notice and this permission notice (including the next
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_access/pam_access.c	 * may be covered by other copyrights (as noted in the file itself.)
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_access/pam_access.c	 * provided that this entire copyright notice is duplicated in all such
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_faildelay/pam_faildelay.c	 * restrictions contained in a BSD-style copyright.)
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/argv_parse.c	 * the above copyright notice and this permission notice appear in all
+line	97	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/_pam_types.h	 * the restrictions contained in a BSD-style copyright.)
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_namespace/md5.c	 * written by Colin Plumb in 1993, no copyright is claimed.
+line	83	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/po/Linux-PAM.pot	# Copyright (C) YEAR Linux-PAM Project
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/ci/install-dependencies.sh	# Copyright (c) 2018-2019 The strace developers.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/ci/build.sh	# Copyright (c) 2018-2024 The strace developers.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/pam_audit.c	/* (C) 2005-2006 Red Hat, Inc. -- Licensing details are in the COPYING
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpam/include/security/pam_modules.h	/* Copyright (C) Theodore Ts'o, 1996.
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_tty_audit/pam_tty_audit.c	/* Copyright © 2007, 2008 Red Hat, Inc. All rights reserved.
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/COPYING	1. Redistributions of source code must retain any existing copyright
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	1. Redistributions of source code must retain the above copyright
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	2. Redistributions in binary form must reproduce the above copyright
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/modules/pam_succeed_if/pam_succeed_if.8.xml	<!--  Copyright 2003, 2004 Red Hat, Inc. -->
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	Copyright (c) 1996-2002 Andrew G. Morgan &lt;morgan@kernel.org&gt;
+line	3	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/doc/adg/Linux-PAM_ADG.xml	Copyright (c) 2006 Thorsten Kukuk &lt;kukuk@thkukuk.de&gt;
+line	1	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/libpamc/License	copyright.)
+line	2	Linux-PAM-1.7.0.tar.xz:Linux-PAM-1.7.0/COPYING	restrictions contained in a BSD-style copyright.)

@@ -1,0 +1,8 @@
+tree 15fc2a33889ed28a754879f36eb475956f6b7008
+parent 0893fc7670ff44be692cd6ac97f733feff079f69
+author Natanael Copa <ncopa@alpinelinux.org> 1735923737 +0100
+committer Natanael Copa <ncopa@alpinelinux.org> 1735923921 +0100
+
+main: remove my contributor comment
+
+git log is enough for me

@@ -1,0 +1,313 @@
+# chio.attribution-lines.v8 origin=expat files=173 files_with_lines=143 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	        /^Copyright /!{
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	        retain copyright and to distribute it with Expat. This version has been
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	    </copyright>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	    <copyright>
+line	29	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmltchar.h	   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/ascii.h	   Copyright (c) 1999-2000 Thai Open Source Software Center Ltd
+line	28	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.h	   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/nametab.h	   Copyright (c) 2000 Clark Cooper <coopercc@users.sourceforge.net>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2000-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2000-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	   Copyright (c) 2001      Scott Bronson <bronson@rinspin.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/unixfilemap.c	   Copyright (c) 2001-2002 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat_external.h	   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+line	5	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2001-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/readfilemap.c	   Copyright (c) 2001-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	19	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2001-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	17	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.h	   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlrole.c	   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlrole.h	   Copyright (c) 2002      Karl Waclawek <karl@waclawek.net>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2002-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/chardata.h	   Copyright (c) 2002-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok.h	   Copyright (c) 2002-2005 Karl Waclawek <karl@waclawek.net>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat_external.h	   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/readfilemap.c	   Copyright (c) 2002-2009 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2002-2012 Karl Waclawek <karl@waclawek.net>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+line	21	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2003      Greg Stein <gstein@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/benchmark/benchmark.c	   Copyright (c) 2003-2006 Karl Waclawek <karl@waclawek.net>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/minicheck.h	   Copyright (c) 2004-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2004-2006 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2004-2009 Karl Waclawek <karl@waclawek.net>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.h	   Copyright (c) 2005      Karl Waclawek <karl@waclawek.net>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.c	   Copyright (c) 2005-2006 Karl Waclawek <karl@waclawek.net>
+line	25	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2005-2007 Steven Solie <steven@solie.ca>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlrole.c	   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+line	19	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2005-2012 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/unixfilemap.c	   Copyright (c) 2006      Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/minicheck.h	   Copyright (c) 2006-2012 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/ascii.h	   Copyright (c) 2007      Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	   Copyright (c) 2009      Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	   Copyright (c) 2016      Ardo van Rangelrooij <ardo@debian.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat_external.h	   Copyright (c) 2016      Cristian Rodríguez <crrodriguez@opensuse.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok.c	   Copyright (c) 2016      Don Lewis <truckman@apache.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2016      Ed Schouten <ed@nuxi.nl>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2016      Eric Rahm <erahm@mozilla.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2016      Gaurav <g.gupta@samsung.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/chardata.c	   Copyright (c) 2016      Gilles Espinasse <g.esp@free.fr>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2016      Gustavo Grieco <gustavo.grieco@imag.fr>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok.c	   Copyright (c) 2016      Pascal Cuoq <cuoq@trust-in-soft.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2016      Thomas Beutlich <tc@tbeu.de>
+line	5	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.h	   Copyright (c) 2016-2017 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlmime.c	   Copyright (c) 2016-2018 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.c	   Copyright (c) 2016-2019 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmltchar.h	   Copyright (c) 2016-2021 Sebastian Pipping <sebastian@pipping.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/examples/elements.c	   Copyright (c) 2016-2022 Sebastian Pipping <sebastian@pipping.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/tests/ns_tests.c	   Copyright (c) 2016-2023 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/examples/element_declarations.c	   Copyright (c) 2016-2024 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat_external.h	   Copyright (c) 2016-2025 Sebastian Pipping <sebastian@pipping.org>
+line	31	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/unixfilemap.c	   Copyright (c) 2016-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok.c	   Copyright (c) 2017      Alexander Bluhm <alexander.bluhm@gmx.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok.c	   Copyright (c) 2017      Benbuck Nason <bnason@netflix.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_getrandom.c	   Copyright (c) 2017      Chanho Park <chanho61.park@samsung.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/readfilemap.c	   Copyright (c) 2017      Franek Korta <fkorta@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2017      Hans Wennborg <hans@chromium.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2017      Jakub Wilk <jwilk@jwilk.net>
+line	20	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2017      Joe Orton <jorton@redhat.com>
+line	20	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2017      José Gutiérrez de la Concha <jose@zeroc.com>
+line	22	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmltchar.h	   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
+line	5	expat-2.8.5.tar.xz:expat-2.8.5/lib/latin1tab.h	   Copyright (c) 2017      Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2017      Viktor Szakats <commit@vsz.me>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2017      Václav Slavík <vaclav@slavik.io>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/structdata.h	   Copyright (c) 2017 Rhodri James <rhodri@wildebeest.org.uk>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/nametab.h	   Copyright (c) 2017 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok_impl.h	   Copyright (c) 2017-2019 Sebastian Pipping <sebastian@pipping.org>
+line	20	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/tests/memcheck.c	   Copyright (c) 2017-2023 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/benchmark/benchmark.c	   Copyright (c) 2017-2025 Sebastian Pipping <sebastian@pipping.org>
+line	8	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2017-2026 Sebastian Pipping <sebastian@pipping.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2018      Anton Maklakov <antmak.pub@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+line	22	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlmime.c	   Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2018      Mariusz Zaborski <oshogbo@vexillium.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat_external.h	   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_rand_s.c	   Copyright (c) 2019      Ben Wagner <bungeman@chromium.org>
+line	29	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/codepage.c	   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_rand_s.c	   Copyright (c) 2019      Vadim Zeitlin <vadim@zeitlins.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/examples/element_declarations.c	   Copyright (c) 2019      Zhongyuan Zhou <zhouzhongyuan@huawei.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_rand_s.h	   Copyright (c) 2019 David Loffredo <loffredo@steptools.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2019-2020 Ben Wagner <bungeman@chromium.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_rand_s.c	   Copyright (c) 2019-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmltok_impl.c	   Copyright (c) 2020      Boris Kolpackov <boris@codesynthesis.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2020      Joe Orton <jorton@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2020      Kleber Tarcísio <klebertarcisio@yahoo.com.br>
+line	19	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2020      Tim Gates <tim.gates@iress.com>
+line	23	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2021      Nicolas Cavallari <nicolas.cavallari@green-communications.fr>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/style.css	   Copyright (c) 2021      Sebastian Pipping <sebastian@pipping.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2021      Tim Bray <tbray@textuality.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2021      Tomas Korbar <tkorbar@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2022      Jann Horn <jannh@google.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2022      Jeffrey Walton <noloader@gmail.com>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/win32filemap.c	   Copyright (c) 2022      Martin Ettl <ettl.martin78@googlemail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/minicheck.h	   Copyright (c) 2022      Rhodri James <rhodri@wildebeest.org.uk>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2022      Samanta Navarro <ferivoz@riseup.net>
+line	9	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2022      Sean McBride <sean@rogue-research.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2022      Thijs Schreijer <thijs@thijsschreijer.nl>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/fuzz/xml_lpm_fuzzer.proto	   Copyright (c) 2022 Mark Brand <markbrand@google.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xcsinc.c	   Copyright (c) 2022-2026 Sebastian Pipping <sebastian@pipping.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2023      Hanno Böck <hanno@gentoo.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/winconfig.h	   Copyright (c) 2023      Orgad Shaneh <orgad.shaneh@audiocodes.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2023      Owain Davies <owaind@bath.edu>
+line	9	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2023      Sony Corporation / Snild Dolkow <snild@sony.com>
+line	7	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2023-2024 Sony Corporation / Snild Dolkow <snild@sony.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/reference.html	   Copyright (c) 2023-2025 Hanno Böck <hanno@gentoo.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2024      Hanno Böck <hanno@gentoo.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2024      Taichi Haradaguchi <20001722@ymail.ne.jp>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2024-2025 Berkay Eren Ürün <berkay.ueruen@siemens.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/basic_tests.c	   Copyright (c) 2024-2026 Berkay Eren Ürün <berkay.ueruen@siemens.com>
+line	6	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2025      Alfonso Gregory <gfunni234@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2025      Atrem Borovik <polzovatellllk@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/misc_tests.c	   Copyright (c) 2025      Berkay Eren Ürün <berkay.ueruen@siemens.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/readfilemap.c	   Copyright (c) 2025      Hanno Böck <hanno@gentoo.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/expat.h	   Copyright (c) 2025      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/fuzz/xml_lpm_fuzzer.proto	   Copyright (c) 2025 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2025-2026 Matthew Fernandez <matthew.fernandez@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/basic_tests.c	   Copyright (c) 2026      Afonso Januário <afonso-januario@hotmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2026      Alberto Maschietto <albertomaschietto9@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/handlers.c	   Copyright (c) 2026      Berkay Eren Ürün <berkay.ueruen@siemens.com>
+line	5	expat-2.8.5.tar.xz:expat-2.8.5/tests/basic_tests.c	   Copyright (c) 2026      Braian Plaku <braianplaku@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/nsalloc_tests.c	   Copyright (c) 2026      Christian Ng <christianrng@berkeley.edu>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/misc_tests.c	   Copyright (c) 2026      Darren Carreras <carrerasdarren@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/misc_tests.c	   Copyright (c) 2026      Evgeny Kotkov <kotkov@apache.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/internal.h	   Copyright (c) 2026      Florian Schmaus <florian.schmaus@codasip.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/basic_tests.c	   Copyright (c) 2026      Francesco Bertolaccini
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2026      Haris Hussain <hextheshadow0x@gmail.com>
+line	9	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlfile.c	   Copyright (c) 2026      Kartik Kenchi <netliomax25@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/memcheck.c	   Copyright (c) 2026      Leo Camus <leo.camus23@gmail.com>
+line	18	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/unixfilemap.c	   Copyright (c) 2026      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/internal.h	   Copyright (c) 2026      Matthew Wozniczka <mattheww@simba.com>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf.c	   Copyright (c) 2026      Nick Begg <nick@stunttruck.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2026      Rosen Penev <rosenp@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/xmlparse.c	   Copyright (c) 2026      Stan Ulbrych <stan@python.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/basic_tests.c	   Copyright (c) 2026      Zeyou Liu <zeyouliu@tencent.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/fuzz/xml_lpm_fuzzer.cpp	   Copyright (c) 2026 Braian Plaku <braianplaku@gmail.com>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/lib/random_getentropy.c	   Copyright (c) 2026 Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/lib/fallthrough.h	   Copyright (c) 2026 Nick Begg <nick@stunttruck.net>
+line	12	expat-2.8.5.tar.xz:expat-2.8.5/tests/hash_tests.c	   Copyright (c) 2026 Sebastian Pipping <sebastian@pipping.org>
+line	84	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmltchar.h	   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	84	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmltchar.h	   The above copyright  notice and this permission notice  shall be included
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/doc/xmlwf.xml	   this file is copyrighted under the GNU Free Documentation License 1.1.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/fuzz/xml_parse_fuzzer.c	 * Copyright (C) 2016 The Android Open Source Project
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	#      /^# Copyright /
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-check-compile-flag.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2026 Free Software
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2026 Free Software Foundation,
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2026 Free
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2008 Benjamin Kosnik <bkoz@redhat.com>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-check-compile-flag.m4	#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+line	5	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-append-compile-flags.m4	#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2012 Zack Weinberg <zackw@panix.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-require-defined.m4	#   Copyright (c) 2014 Mike Frysinger <vapier@gentoo.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2014, 2015 Google Inc.; contributed by Alexey Sokolov <sokolov@google.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2015 Moritz Klammler <moritz@klammler.eu>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   Copyright (c) 2015 Paul Norman <penorman@mac.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx.m4	#   Copyright (c) 2016, 2018 Krzesimir Nowak <qdlacz@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/expatcfg-compiler-supports-visibility.m4	#   Copyright (c) 2018 The Expat Authors.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx.m4	#   Copyright (c) 2019 Enji Cooper <yaneurabeya@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx.m4	#   Copyright (c) 2020 Jason Merrill <jason@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-check-compile-flag.m4	#   Copyright (c) 2020 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx.m4	#   Copyright (c) 2021 Jörn Heusipp <osmanx@problemloesungsmaschine.de>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/expatcfg-compiler-supports-visibility.m4	#   are permitted in  any medium without royalty  provided the copyright
+line	7	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ax-cxx-compile-stdcxx-11.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/install-sh	# Copyright (C) 1994 X Consortium
+line	7	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/Makefile.in	# Copyright (C) 1994-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	# Copyright (C) 1996-2019, 2021-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/missing	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 1996-2026 Free Software Foundation, Inc.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 1997-2026 Free Software Foundation, Inc.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/compile	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 1999-2026 Free Software Foundation, Inc.
+line	6	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2001-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2002-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2003-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	# Copyright (C) 2004-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2004-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2006-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2009-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	# Copyright (C) 2010-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ar-lib	# Copyright (C) 2010-2021 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2011-2026 Free Software Foundation, Inc.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2022-2026 Free Software Foundation, Inc.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/m4/libtool.m4	# Copyright (C) 2025-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/aclocal.m4	# Copyright (C) 2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2002      Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/get-version.sh	# Copyright (c) 2002 Greg Stein <gstein@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2002-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2008-2019 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2010      Patrick Spendrin <ps_ml@gmx.de>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2012      Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2016      Ben Boeckel <ben.boeckel@kitware.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2016      Björn Lindahl <bjorn.lindahl@foi.se>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2016      Sergei Nikulov <sergey.nikulov@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2016      Tobias Taschner <github@tc84.de>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2016-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2017      Franek Korta <fkorta@gmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/doc/Makefile.in	# Copyright (c) 2017      Joe Orton <jorton@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/doc/Makefile.in	# Copyright (c) 2017      Stephen Groat <stephen@groat.us>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/Makefile.in	# Copyright (c) 2017      Tomasz Kłoczko <kloczek@fedoraproject.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/get-version.sh	# Copyright (c) 2017 Kerin Millar <kfm@plushkava.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/udiffer.py	# Copyright (c) 2017 Rhodri James <rhodri@wildebeest.org.uk>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/test-driver-wrapper.sh	# Copyright (c) 2017 Sebastian Pipping <sebastian@pipping.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/Makefile.in	# Copyright (c) 2017-2021 Sebastian Pipping <sebastian@pipping.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/run.sh.in	# Copyright (c) 2017-2022 Sebastian Pipping <sebastian@pipping.org>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/doc/Makefile.in	# Copyright (c) 2017-2024 Sebastian Pipping <sebastian@pipping.org>
+line	6	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2017-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2018      Frank Rast <frank.rast@gefeg.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2018      KangLin <kl222@126.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/buildconf.sh	# Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2018      pedro-vicente <pedro.vicente@space-research.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2018      userwithuid <userwithuid@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2019      Bhargava Shastry <bhargava.shastry@ethereum.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2019      Kishore Kunche <kishore.kunche@intel.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2019      Mohammed Khajapasha <mohammed.khajapasha@intel.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2019      xantares <xantares09@hotmail.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/cmake/mingw-toolchain-win32.cmake	# Copyright (c) 2019 Expat development team
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/test-driver-wrapper.sh	# Copyright (c) 2019 Jeffrey Walton <noloader@gmail.com>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf_helpgen.py	# Copyright (c) 2019-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2020      Gulliver <gulliver@traumkristalle.net>
+line	4	expat-2.8.5.tar.xz:expat-2.8.5/examples/Makefile.in	# Copyright (c) 2020      Jeffrey Walton <noloader@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2020      Maciej Sroczyński <macieksroczynski@poczta.fm>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2020      Thomas Beutlich <tc@tbeu.de>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/tests/benchmark/Makefile.in	# Copyright (c) 2020 Jeffrey Walton <noloader@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2021      Alex Richardson <Alexander.Richardson@cl.cam.ac.uk>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/xmlwf_helpgen.py	# Copyright (c) 2021      Tim Bray <tbray@textuality.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2022      David Faure <david.faure@kdab.com>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2022      Johnny Jazeix <jazeix@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2022      Mark Brand <markbrand@google.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2023      Sony Corporation / Snild Dolkow <snild@sony.com>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2024      Alexander Bluhm <alexander.bluhm@gmx.net>
+line	6	expat-2.8.5.tar.xz:expat-2.8.5/Makefile.in	# Copyright (c) 2024      Dag-Erling Smørgrav <des@des.dev>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/doc/Makefile.in	# Copyright (c) 2024      Tomas Korbar <tkorbar@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2025      Alfonso Gregory <gfunni234@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2025      Hanno Böck <hanno@gentoo.org>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2026      Gordon Messmer <gordon.messmer@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/tests/xmltest.sh	# Copyright (c) 2026      Huang Wenbin <huangwenbin@kylinos.cn>
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/lib/Makefile.in	# Copyright (c) 2026      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	3	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2026      Nick Begg <nick@stunttruck.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# Copyright (c) 2026      Rosen Penev <rosenp@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/cmake/mingw-toolchain-win64.cmake	# Copyright (c) 2026 Expat development team
+line	26	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/Makefile.in	# NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	26	expat-2.8.5.tar.xz:expat-2.8.5/xmlwf/Makefile.in	# The above copyright  notice and this permission notice  shall be included
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/install-sh	# following copyright and license.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/CMakeLists.txt	# this file is copyrighted under the BSD-license for buildsystem files of KDE.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2001      Tim Peters <tim.peters@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2001-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2006-2017 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2007-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2022      Johnny Jazeix <jazeix@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; Copyright (c) 2024      Dag-Erling Smørgrav <des@des.dev>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	; The above copyright  notice and this permission notice  shall be included
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/expat.iss	AppCopyright=Copyright © 1997-2025 Thai Open Source Software Center, Clark Cooper, and the Expat maintainers
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/conftools/ltmain.sh	Copyright (C) $year Free Software Foundation, Inc.
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/m4/libtool.m4	Copyright (C) 2025-2026 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/COPYING	Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/COPYING	Copyright (c) 2001-2025 Expat maintainers
+line	2	expat-2.8.5.tar.xz:expat-2.8.5/conftools/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/COPYING	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/build_expat_iss.bat	REM Copyright (c) 2019-2025 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/build_expat_iss.bat	REM NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/win32/build_expat_iss.bat	REM The above copyright  notice and this permission notice  shall be included
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/COPYING	The above copyright notice and this permission notice shall be included
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2001-2003 Greg Stein <gstein@users.sourceforge.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2006-2012 Karl Waclawek <karl@waclawek.net>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2016-2026 Sebastian Pipping <sebastian@pipping.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2017      S. P. Zeidler <spz@netbsd.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2017      Stephen Groat <stephen@groat.us>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2017-2020 Joe Orton <jorton@redhat.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2018      KangLin <kl222@126.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2019      Kishore Kunche <kishore.kunche@intel.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2019      Mohammed Khajapasha <mohammed.khajapasha@intel.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2020      Jeffrey Walton <noloader@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2024      Dag-Erling Smørgrav <des@des.dev>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2024      Ferenc Géczi <ferenc.gm@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2025      Alfonso Gregory <gfunni234@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2025      Matthew Fernandez <matthew.fernandez@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2026      Fabio Scaccabarozzi <fsvm88@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2026      Gordon Messmer <gordon.messmer@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   Copyright (c) 2026      Rosen Penev <rosenp@gmail.com>
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	expat-2.8.5.tar.xz:expat-2.8.5/configure.ac	dnl   The above copyright  notice and this permission notice  shall be included

@@ -1,0 +1,692 @@
+# chio.attribution-lines.v8 origin=cmake files=26228 files_with_lines=3342 binary_heads=126 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\t\t    &(iso9660->copyright_file_identifier),
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\t\t    COPYRIGHT_FILE_SIZE, key, value);
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\t\tiso9660->opt.copyright_file = r == ARCHIVE_OK;
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\t    KEY_STR, iso9660->copyright_file_identifier.s);
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\tif (strcmp(key, "copyright-file") == 0) {
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t\tset_option_info(&info, &opt, "copyright-file",
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t    "Copyright File", 0, D_CHAR);
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t    &(iso9660->copyright_file_identifier),
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t * COMPAT : mkisofs -copyright <value>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t * Specifies Copyright Filename.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t * Usage  : copyright-file=<value>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t * and containing a copyright statement.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\t/* Copyright File Identifier */
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.OSXX11.Info.plist.in	\t<key>NSHumanReadableCopyright</key>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/AppleInfo.plist	\t<string>${APPLE_GUI_COPYRIGHT}</string>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/MacOSXBundleInfo.plist.in	\t<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.OSXX11.Info.plist.in	\t<string>@CPACK_APPLE_GUI_COPYRIGHT@</string>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/mfc1.rc	\tID_APP_ABOUT            "Display program information, version number and copyright\\nAbout"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/mfc1.rc	\tLTEXT           "Copyright (C) 2011",IDC_STATIC,40,25,119,8
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tarchive_string_free(&(iso9660->copyright_file_identifier));
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tarchive_string_init(&(iso9660->copyright_file_identifier));
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tif (iso9660->opt.copyright_file != OPT_COPYRIGHT_FILE_DEFAULT)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tiso9660->opt.copyright_file = OPT_COPYRIGHT_FILE_DEFAULT;
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tstruct archive_string\t copyright_file_identifier;
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	\tunsigned int\t copyright_file:1;
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindPython/Support.cmake	                                       "import sys; sys.stdout.write(sys.copyright)"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindPython/Support.cmake	                               OUTPUT_VARIABLE ${_PYTHON_PREFIX}_COPYRIGHT
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/cpack_gen/nuget.rst	              CPACK_NUGET_<compName>_PACKAGE_COPYRIGHT
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindPython/Support.cmake	              if (${_PYTHON_PREFIX}_COPYRIGHT MATCHES "ActiveState")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/mfc1.rc	            VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	          that You distribute, all copyright, patent, trademark, and
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	        " ${copyright_line}\\n"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.NuGet.nuspec.in	        @_CPACK_NUGET_COPYRIGHT_TAG@
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      "Licensor" shall mean the copyright owner or entity authorized by
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindMPI.cmake	      # The Intel MPI wrappers on Windows prefix their output with some copyright boilerplate.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/libcurl.rc	      VALUE "LegalCopyright",   "Copyright (C) " LIBCURL_COPYRIGHT "\\0"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/libcurl.rc	      VALUE "License",          "https://curl.se/docs/copyright.html\\0"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      You may add Your own copyright statement to Your modifications and
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmDocumentation.cxx	      cmSystemTools::Message("Warning: --copyright no longer supported");
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      copyright license to reproduce, prepare Derivative Works of,
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      copyright notice that is included in or attached to the work
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      designated in writing by the copyright owner as "Not a Contribution."
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	      message(FATAL_ERROR "Copyright.txt contains\\n"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	      message(STATUS "PASSED: Copyright.txt contains\\n"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      same "printed page" as the copyright notice for easier
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindMPI.cmake	      string(REGEX REPLACE "^[^ ]+ for the Intel\\\\(R\\\\) MPI Library [^\\n]+ for Windows\\\\*\\nCopyright\\\\(C\\\\) [^\\n]+, Intel Corporation\\\\. All rights reserved\\\\.\\n\\n" ""
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      submitted to Licensor for inclusion in the Work by the copyright owner
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      the copyright owner that is granting the License.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	      the copyright owner. For the purposes of this definition, "submitted"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	     * Redistributions of source code must retain the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmbzip2/bzip2.c	    "   Copyright (C) 1996-2019 by Julian Seward.\\n"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CFBundleTest/Localized.r	    "${FBSTRING_LegalCopyright}",
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeTests/ModuleNoticesTest.cmake.in	    "Some modules do not have a valid copyright notice:\\n${notice_missing}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetupDialog.cxx	    "The Qt Toolkit is Copyright (C) The Qt Company Ltd.\\n"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/MSBuild/FlagTables/v10_MARMASM.json	    "comment": "Suppress the copyright banner.",
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CFBundleTest/Info.plist.in	    <string>${PLUGIN_NAME} ${FBSTRING_PLUGIN_VERSION}, ${FBSTRING_LegalCopyright}</string>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeLists.txt	    COMMAND ${CMAKE_CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/CMakeCopyright.cmake)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	    Copyright (C) <year>  <name of author>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	    LIMIT_COUNT 1 REGEX "${copyright_line_regex}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeLists.txt	    LIMIT_COUNT 1 REGEX "^Copyright 2000-20[0-9][0-9] Kitware")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeLists.txt	    MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPackNuGet.cmake	    _cpack_nuget_variable_fallback_and_wrap_into_element(copyright COPYRIGHT)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	    copyright the Internet Systems Consortium, Inc., and licensed under the ISC
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmliblzma/COPYING	    even though it contains no copyrighted code from the XZ Utils source
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	    if(copyright_year LESS version_year)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	    message(FATAL_ERROR "Copyright.txt has no Copyright line of expected format!")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmliblzma/COPYING	    pieces that are copyrighted. Thus, it is possible that e.g. liblzma
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Scripts/update-zlib.bash	    sed -n '/^ (C) 1995-/,+19 {s/^  \\?//;p}' README >> Copyright.txt
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	    set(copyright_year "${CMAKE_MATCH_1}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmliblzma/COPYING	    the lack of copyright legally problematic, you have too many
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmDocumentation.cxx	    } else if (strcmp(argv[i], "--copyright") == 0) {
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/deflate.c	   " deflate 1.3.1 Copyright 1995-2024 Jean-loup Gailly and Mark Adler ";
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inftrees.c	   " inflate 1.3.1 Copyright 1995-2024 Mark Adler ";
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	   2. Grant of Copyright License. Subject to the terms and conditions of
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	8	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/LexerParser/cmCommandArgumentParser.cxx	   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+line	14	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmbzip2/blocksort.c	   Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/LexerParser/cmFortranLexer.cxx	   Copyright (C) 2000--2006 Erik Edelmann <erik.edelmann@iki.fi>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmpdcurses/pdcurses/scanw.c	   Copyright (c) 1990-1992 by Eberhard Mattes, who has kindly agreed to
+line	14	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/asciitab.h	   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   Copyright (c) 1999-2000 Thai Open Source Software Center Ltd
+line	16	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/nametab.h	   Copyright (c) 2000 Clark Cooper <coopercc@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat_external.h	   Copyright (c) 2000-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2000-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2001-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	9	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/winconfig.h	   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlrole.h	   Copyright (c) 2002      Karl Waclawek <karl@waclawek.net>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/internal.h	   Copyright (c) 2002-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.h	   Copyright (c) 2002-2005 Karl Waclawek <karl@waclawek.net>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat_external.h	   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/internal.h	   Copyright (c) 2003      Greg Stein <gstein@users.sourceforge.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/winconfig.h	   Copyright (c) 2005      Karl Waclawek <karl@waclawek.net>
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   Copyright (c) 2007      Karl Waclawek <karl@waclawek.net>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2016      Cristian Rodríguez <crrodriguez@opensuse.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2016      Don Lewis <truckman@apache.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2016      Ed Schouten <ed@nuxi.nl>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2016      Eric Rahm <erahm@mozilla.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2016      Gaurav <g.gupta@samsung.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2016      Gustavo Grieco <gustavo.grieco@imag.fr>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2016      Pascal Cuoq <cuoq@trust-in-soft.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2016      Thomas Beutlich <tc@tbeu.de>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat_external.h	   Copyright (c) 2016-2019 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok_impl.c	   Copyright (c) 2016-2022 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlrole.c	   Copyright (c) 2016-2023 Sebastian Pipping <sebastian@pipping.org>
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2016-2024 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2017      Alexander Bluhm <alexander.bluhm@gmx.net>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2017      Benbuck Nason <bnason@netflix.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017      Chanho Park <chanho61.park@samsung.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017      Hans Wennborg <hans@chromium.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2017      José Gutiérrez de la Concha <jose@zeroc.com>
+line	6	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   Copyright (c) 2017      Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017      Viktor Szakats <commit@vsz.me>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017      Václav Slavík <vaclav@slavik.io>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/nametab.h	   Copyright (c) 2017 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok_impl.h	   Copyright (c) 2017-2019 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok_ns.c	   Copyright (c) 2017-2021 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/winconfig.h	   Copyright (c) 2017-2023 Sebastian Pipping <sebastian@pipping.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlrole.h	   Copyright (c) 2017-2024 Sebastian Pipping <sebastian@pipping.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2018      Anton Maklakov <antmak.pub@gmail.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2018      Mariusz Zaborski <oshogbo@vexillium.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat_external.h	   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/internal.h	   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2019      Vadim Zeitlin <vadim@zeitlins.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2019-2020 Ben Wagner <bungeman@chromium.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok_impl.c	   Copyright (c) 2020      Boris Kolpackov <boris@codesynthesis.com>
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2022      Jann Horn <jannh@google.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2022      Jeffrey Walton <noloader@gmail.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmltok.c	   Copyright (c) 2022      Martin Ettl <ettl.martin78@googlemail.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2022      Samanta Navarro <ferivoz@riseup.net>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2022      Sean McBride <sean@rogue-research.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2022      Thijs Schreijer <thijs@thijsschreijer.nl>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2023      Hanno Böck <hanno@gentoo.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/winconfig.h	   Copyright (c) 2023      Orgad Shaneh <orgad.shaneh@audiocodes.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/xmlparse.c	   Copyright (c) 2023      Owain Davies <owaind@bath.edu>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2023      Sony Corporation / Snild Dolkow <snild@sony.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/internal.h	   Copyright (c) 2023-2024 Sony Corporation / Snild Dolkow <snild@sony.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/expat.h	   Copyright (c) 2024      Taichi Haradaguchi <20001722@ymail.ne.jp>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_blake2.h	   Copyright 2012, Samuel Neves <sneves@dei.uc.pt>.  You may use this under the
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/LICENSE	   Copyright [yyyy] [name of copyright owner]
+line	18	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	18	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/lib/ascii.h	   The above copyright  notice and this permission notice  shall be included
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv3.txt	   c) For a Combined Work that displays copyright notices during
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	   copyright notice, this list of conditions and the following disclaimer
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv3.txt	   execution, include the copyright notice for the Library among
+line	1222	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CMakeVersion.rc.in	   file Copyright.txt or https://cmake.org/licensing for details.  */
+line	61	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/Base64.c	   file Copyright.txt or https://cmake.org/licensing#kwsys for details.  */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeCPack.cmake	  "${CPACK_PACKAGE_NAME} Copyright;${CPACK_RESOURCE_FILE_LICENSE}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/CTestCustom.cmake.in	  "ld: warning: symbol .(deflate|inflate)_copyright. has differing sizes" # system libz and QtCore disagree
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/dev/documentation.rst	  # file Copyright.txt or https://cmake.org/licensing for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zconf.h	  #pragma map(inflate_copyright,"INCOPY")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/qnx.c	  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/include/kwiml/abi.h	  * Redistributions in binary form must reproduce the above copyright
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/include/kwiml/abi.h	  * Redistributions of source code must retain the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/qnx.c	  * The above copyright notice and this permission notice shall be included in
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	  - pthread-fixes.c, copyright Google Inc. and Sony Mobile Communications AB.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	  - stdint-msvc2008.h (from msinttypes), copyright Alexander Chemeris. Three
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	  - tree.h (from FreeBSD), copyright Niels Provos. Two clause BSD license.
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/include/kwiml/abi.h	  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zlib.h	  Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/MD5.c	  Copyright (C) 1999, 2000, 2002 Aladdin Enterprises.  All rights reserved.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/ParseImplicitData/windows_x86_64-C-MSVC-19.38.33130.0-VS.input	  Copyright (C) Microsoft Corporation.  All rights reserved.
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/include/kwiml/abi.h	  Copyright 2010-2018 Kitware, Inc.
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/test/test.c	  Copyright Kitware, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	  LIMIT_COUNT 1 REGEX "${copyright_line_regex}")
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/test/test.c	  See accompanying file Copyright.txt for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/prop_tgt/MACOSX_BUNDLE_INFO_PLIST.rst	  Sets ``NSHumanReadableCopyright``.
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/include/kwiml/abi.h	  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	  We protect your rights with a two-step method: (1) we copyright the
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	  a 3-clause UC Regents copyright; please read the individual source
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeLists.txt	  add_test(NAME CMake.Copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	  and documentation files are subject to the copyright notice reproduced
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmLocalGenerator.cxx	  cmLGInfoProp(mf, target, "MACOSX_BUNDLE_COPYRIGHT");
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/deflate.c	  copyright string in the executable of your product.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/MD5.c	  copyrighted.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.STGZ_Header.sh.in	  echo "@CPACK_PACKAGE_NAME@ Installer Version: @CPACK_PACKAGE_VERSION@, Copyright (c) @CPACK_PACKAGE_VENDOR@"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/bootstrap	  echo "CMake ${cmake_version}, ${cmake_copyright}"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	  file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/../Copyright.txt" copyright_line
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeLists.txt	  file(STRINGS "${CMake_SOURCE_DIR}/Copyright.txt" copyright_line
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/LexerParser/cmFortranLexer.cxx	  from the copyright holder has been obtained to distribute this
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	  if(copyright_line MATCHES "${copyright_line_regex}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/CMakeLists.txt	  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/Copyright.txt
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeLists.txt	  install(FILES Copyright.txt DESTINATION ${CMAKE_DOC_DIR})
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	  set(conf_copyright "${CMAKE_MATCH_1}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	  set(conf_copyright "Kitware, Inc.")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeCopyright.cmake	  set(copyright_line_regex "^Copyright 2000-(20[0-9][0-9]) Kitware")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeLib/testUTF8.cxx	  { "\\xC2\\xA9", 0x00A9 },           /* Copyright.  */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeLib/testXMLSafe.cxx	  { "copyright \\xC2\\xA9", "copyright \\xC2\\xA9" },
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/dev/documentation.rst	 # file Copyright.txt or https://cmake.org/licensing for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/README	 (C) 1995-2024 Jean-loup Gailly and Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/RegularExpression.cxx	 *      Copyright (c) 1986 by University of Toronto.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/X11/HelloWorldX11.cxx	 *  Copyright (c) 2004 __MyCompanyName__. All rights reserved.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/lib/common/xxhash.c	 *  Copyright (c) Meta Platforms, Inc. and affiliates.
+line	159	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/krb5.c	 * 1. Redistributions of source code must retain the above copyright
+line	159	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/krb5.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	113	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv.h	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inffast.h	 * Copyright (C) 1995-2003, 2010 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/uncompr.c	 * Copyright (C) 1995-2003, 2010, 2014, 2016 Jean-loup Gailly, Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inftrees.h	 * Copyright (C) 1995-2005, 2010 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/compress.c	 * Copyright (C) 1995-2005, 2014, 2016 Jean-loup Gailly, Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/adler32.c	 * Copyright (C) 1995-2011, 2016 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zutil.c	 * Copyright (C) 1995-2017 Jean-loup Gailly
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inffast.c	 * Copyright (C) 1995-2017 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inflate.h	 * Copyright (C) 1995-2019 Mark Adler
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/crc32.c	 * Copyright (C) 1995-2022 Mark Adler
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/deflate.h	 * Copyright (C) 1995-2024 Jean-loup Gailly
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/deflate.c	 * Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zconf.h	 * Copyright (C) 1995-2024 Jean-loup Gailly, Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inftrees.c	 * Copyright (C) 1995-2024 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/inet_ntop.c	 * Copyright (C) 1996-2022  Internet Software Consortium.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/gzclose.c	 * Copyright (C) 2004, 2010 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/gzread.c	 * Copyright (C) 2004-2017 Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/gzwrite.c	 * Copyright (C) 2004-2019 Mark Adler
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/gzguts.h	 * Copyright (C) 2004-2024 Mark Adler
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSAndroid/jni/first.c	 * Copyright (C) 2009 The Android Open Source Project
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/smb.c	 * Copyright (C) Bill Nagel <wnagel@tycoint.com>, Exacq Technologies
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/mqtt.c	 * Copyright (C) Björn Stenberg, <bjorn@haxx.se>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/krb5.c	 * Copyright (C) Daniel Stenberg
+line	324	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/CMake/CurlTests.c	 * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_sha512_256.c	 * Copyright (C) Evgeny Grin (Karlson2k), <k2k@narod.ru>.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_sha256.h	 * Copyright (C) Florin Petriuc, <petriuc.florin@gmail.com>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/mbedtls.c	 * Copyright (C) Hoi-Ho Chan, <hoiho.chan@gmail.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_rtmp.c	 * Copyright (C) Howard Chu, <hyc@highlandsun.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/openldap.c	 * Copyright (C) Howard Chu, <hyc@openldap.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/rustls.c	 * Copyright (C) Jacob Hoffman-Andrews,
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/cipher_suite.c	 * Copyright (C) Jan Venekamp, <jan@venekamp.net>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/conncache.c	 * Copyright (C) Linus Nielsen Feltzing, <linus@haxx.se>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/schannel.c	 * Copyright (C) Marc Hoersken, <info@marc-hoersken.de>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/schannel.h	 * Copyright (C) Marc Hoersken, <info@marc-hoersken.de>, et al.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/schannel.c	 * Copyright (C) Mark Salisbury, <mark.salisbury@hp.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/socks_gssapi.c	 * Copyright (C) Markus Moeller, <markus_moeller@compuserve.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/bearssl.c	 * Copyright (C) Michael Forney, <mforney@mforney.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/sectransp.c	 * Copyright (C) Nick Zitzmann, <nickzman@gmail.com>.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vssh/libssh.c	 * Copyright (C) Red Hat, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vauth/gsasl.c	 * Copyright (C) Simon Josefsson, <simon@josefsson.org>, et al.
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_des.c	 * Copyright (C) Steve Holme, <steve_holme@hotmail.com>.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/vtls/rustls.c	 * Copyright (C) kpcyrd, <kpcyrd@archlinux.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_compress.c	 * Copyright (c) 1985, 1986, 1992, 1993
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.c	 * Copyright (c) 1993
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/krb5.c	 * Copyright (c) 1995, 1996, 1997, 1998, 1999 Kungliga Tekniska Högskolan
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_random.c	 * Copyright (c) 1996, David Mazieres <dm@uun.org>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmelf/elf32.h	 * Copyright (c) 1996-1998 John D. Polstra.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/inet.c	 * Copyright (c) 1996-1999 by Internet Software Consortium.
+line	37	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/eti.h	 * Copyright (c) 1998 Free Software Foundation, Inc.                        *
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmelf/elf_common.h	 * Copyright (c) 1998 John D. Polstra.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_pack_dev.c	 * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/mf_common.h	 * Copyright (c) 1998,2000 Free Software Foundation, Inc.                   *
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmelf/elf_common.h	 * Copyright (c) 2000, 2001, 2008, 2011, David E. O'Brien
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/md5.c	 * Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_rb.c	 * Copyright (c) 2001 The NetBSD Foundation, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_path.c	 * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_endian.h	 * Copyright (c) 2002 Thomas Moestl <tmm@FreeBSD.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.h	 * Copyright (c) 2003-2006 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	 * Copyright (c) 2003-2007 Kees Zeelenberg
+line	61	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.c	 * Copyright (c) 2003-2007 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.h	 * Copyright (c) 2003-2008 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_xz.c	 * Copyright (c) 2003-2008 Tim Kientzle and Miklos Vajna
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/lib/dictBuilder/divsufsort.c	 * Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_disk_acl_freebsd.c	 * Copyright (c) 2003-2009 Tim Kientzle
+line	12	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive.h	 * Copyright (c) 2003-2010 Tim Kientzle
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read.c	 * Copyright (c) 2003-2011 Tim Kientzle
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_append_filter.c	 * Copyright (c) 2003-2012 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_getdate.h	 * Copyright (c) 2003-2015 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_tar.c	 * Copyright (c) 2003-2023 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/inet.c	 * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_zip.c	 * Copyright (c) 2004-2013 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio_newc.c	 * Copyright (c) 2006 Rudolf Marek SYSGO s.r.o.
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_program.c	 * Copyright (c) 2007 Joerg Sonnenberger
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_ar.c	 * Copyright (c) 2007 Kai Wang
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_ar.c	 * Copyright (c) 2007 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/md5.c	 * Copyright (c) 2007, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_zip.c	 * Copyright (c) 2008 Anselm Strauss
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_mtree.c	 * Copyright (c) 2008 Joerg Sonnenberger
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/byte_order.c	 * Copyright (c) 2008, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_random.c	 * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_lha.c	 * Copyright (c) 2008-2014 Michihiro NAKAJIMA
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c	 * Copyright (c) 2009 Andreas Henriksson <andreas@fatal.se>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_crc32.h	 * Copyright (c) 2009 Joerg  Sonnenberger
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_zip.c	 * Copyright (c) 2009 Joerg Sonnenberger
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_rpm.c	 * Copyright (c) 2009 Michihiro NAKAJIMA
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_uu.c	 * Copyright (c) 2009-2011 Michihiro NAKAJIMA
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_zstd.c	 * Copyright (c) 2009-2011 Sean Purcell
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c	 * Copyright (c) 2009-2012 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_util.c	 * Copyright (c) 2009-2012,2014 Michihiro NAKAJIMA
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_gnutar.c	 * Copyright (c) 2010 Nokia Corporation and/or its subsidiary(-ies).
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/sha256.c	 * Copyright (c) 2010, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry_sparse.c	 * Copyright (c) 2010-2011 Michihiro NAKAJIMA
+line	9	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_disk_acl_freebsd.c	 * Copyright (c) 2010-2012 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry_locale.h	 * Copyright (c) 2011 Michihiro NAKAJIMA
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_options.c	 * Copyright (c) 2011 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/algorithms.c	 * Copyright (c) 2011, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_mtree.c	 * Copyright (c) 2011-2012 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/build/utils/gen_archive_string_composition_h.sh	 * Copyright (c) 2011-2012 libarchive Project
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_zip.c	 * Copyright (c) 2011-2012,2014 Michihiro NAKAJIMA
+line	12	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_cmdline_private.h	 * Copyright (c) 2012 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_cmdline.c	 * Copyright (c) 2012 Michihiro NAKAJIMA\x20
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_add_filter.c	 * Copyright (c) 2012 Ondrej Holy
+line	18	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_frame.h	 * Copyright (c) 2012 Tatsuhiro Tsujikawa
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_map.c	 * Copyright (c) 2012 nghttp2 contributors
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/includes/nghttp2/nghttp2ver.h	 * Copyright (c) 2012, 2013 Tatsuhiro Tsujikawa
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	 * Copyright (c) 2012, Google Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_zip.c	 * Copyright (c) 2013 Konrad Kleine
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_raw.c	 * Copyright (c) 2013 Marek Kubica
+line	6	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_frame.c	 * Copyright (c) 2013 Tatsuhiro Tsujikawa
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/includes/nghttp2/nghttp2.h	 * Copyright (c) 2013, 2014 Tatsuhiro Tsujikawa
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/sha3.c	 * Copyright (c) 2013, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_random.c	 * Copyright (c) 2014 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_warc.c	 * Copyright (c) 2014 Sebastian Freundt
+line	10	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_buf.c	 * Copyright (c) 2014 Tatsuhiro Tsujikawa
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_filter_by_ext.c	 * Copyright (c) 2015 Okhotnikov Kirill
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_http.c	 * Copyright (c) 2015 Tatsuhiro Tsujikawa
+line	6	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_acl.c	 * Copyright (c) 2016 Martin Matuska
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_debug.c	 * Copyright (c) 2016 Tatsuhiro Tsujikawa
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/lib/common/threading.c	 * Copyright (c) 2016 Tino Reichardt
+line	6	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_disk_acl_darwin.c	 * Copyright (c) 2017 Martin Matuska
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_add_filter_zstd.c	 * Copyright (c) 2017 Sean Purcell
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_map.c	 * Copyright (c) 2017 ngtcp2 contributors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmelf/elf_common.h	 * Copyright (c) 2017, 2018 Dell EMC
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_by_code.c	 * Copyright (c) 2020 Martin Matuska
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/librhash/util.c	 * Copyright (c) 2020, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_extpri.c	 * Copyright (c) 2022 nghttp2 contributors
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/nghttp2_extpri.c	 * Copyright (c) 2022 nghttp3 contributors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_add_filter_zstd.c	 * Copyright (c) 2023-2024 Klara, Inc.
+line	66	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/lib/common/allocations.h	 * Copyright (c) Meta Platforms, Inc. and affiliates.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv/tree.h	 * Copyright 2002 Niels Provos <provos@citi.umich.edu>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmUVStreambuf.h	 * Copyright 2007 Edd Dawson.
+line	38	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/eti.h	 * Except as contained in this notice, the name(s) of the above copyright   *
+line	21	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/adler32.c	 * For conditions of distribution and use, see copyright notice in zlib.h
+line	38	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/eti.h	 * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/md5.c	 * In case this attempt to disclaim copyright and place the software in the
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/lib/dictBuilder/divsufsort.c	 * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+line	48	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/includes/nghttp2/nghttp2.h	 * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	 * Portions Copyright (c) 1996-2008, PostgreSQL Global Development Group
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/LICENSE	 * Redistributions in binary form must reproduce the above copyright notice,
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/LICENSE	 * Redistributions of source code must retain the above copyright notice, this
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmUVStreambuf.h	 * SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/fty_alnum.c	 * THIS CODE IS SPECIFICALLY EXEMPTED FROM THE NCURSES PACKAGE COPYRIGHT.
+line	50	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/lib/includes/nghttp2/nghttp2.h	 * The above copyright notice and this permission notice shall be
+line	38	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CursesDialog/form/eti.h	 * The above copyright notice and this permission notice shall be included  *
+line	113	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv.h	 * The above copyright notice and this permission notice shall be included in
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmUVStreambuf.h	 * The copyright notices in the Software and this entire statement, including
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_getdate.c	 * This code is in the public domain and has no copyright.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/md4.c	 * This software was written by Alexander Peslyak in 2001. No copyright is
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/c-hyper.c	 * are also available at https://curl.haxx.se/docs/copyright.html.
+line	341	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/CMake/CurlTests.c	 * are also available at https://curl.se/docs/copyright.html.
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/curl_path.c	 * copyright notice and this permission notice appear in all copies.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/md4.c	 * domain is deemed null and void, then the software is Copyright (c) 2001
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.c	 * is subject to the following copyright notice.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_filter_compress.c	 * protected by the following copyright.  (Clause 3 dropped by request
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	 * subject to the copyright below.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/md4.c	 * this attempt to disclaim copyright and place the software in the public
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.cpp	 **   * Redistributions in binary form must reproduce the above copyright
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.cpp	 **   * Redistributions of source code must retain the above copyright
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.cpp	 ** A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.cpp	 ** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.cpp	 ** THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv3.txt	 Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/cpack_gen/nuget.rst	 Copyright details for the package.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	"copyright" line and a pointer to where the full notice is found.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/CMakeLists.txt	#                              such as copyright information.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA.cmake	#   Copyright (c) 2007-2009
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA.cmake	#   Copyright (c) 2008 - 2009 NVIDIA Corporation.  All rights reserved.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA/make2cmake.cmake	#  Copyright (c) 2007-2009
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA/make2cmake.cmake	#  Copyright (c) 2008 - 2009 NVIDIA Corporation.  All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zconf.h	#  define deflate_copyright     z_deflate_copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/zconf.h	#  define inflate_copyright     z_inflate_copyright
+line	33	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/CMake/CMakeConfigurableFile.in	# Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/build/cmake/CheckTypeExists.cmake	# Copyright (c) 2006, Alexander Neundorf, <neundorf@kde.org>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/build/cmake/CheckFileOffsetBits.cmake	# Copyright (c) 2009, Michihiro NAKAJIMA
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Scripts/update-third-party.bash	# Copyright 2015-2016 Kitware, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Scripts/clang-format.bash	# Copyright 2015-2017 Kitware, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/FindBoost/CMakePackageFixtures/Boost-1.70.0/BoostConfig.cmake	# Copyright 2019 Peter Dimov
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/CMakeLists.txt	# Copyright Kitware, Inc.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/CMakeLists.txt	# See accompanying file Copyright.txt for details.
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA.cmake	# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/FindCUDA.cmake	# The above copyright notice and this permission notice shall be included
+line	33	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/CMake/CMakeConfigurableFile.in	# are also available at https://curl.se/docs/copyright.html.
+line	919	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeCPack.cmake	# file Copyright.txt or https://cmake.org/licensing for details.
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/CMakeLists.txt	# file Copyright.txt or https://cmake.org/licensing#kwsys for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeTests/ModuleNoticesTest.cmake.in	# file Copyright\\.txt or https://cmake\\.org/licensing for details\\.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	#define COPYRIGHT_FILE_SIZE\t\t37
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/include/curl/curlver.h	#define LIBCURL_COPYRIGHT "Daniel Stenberg, <daniel@haxx.se>."
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_format_iso9660.c	#define OPT_COPYRIGHT_FILE_DEFAULT\t0\t/* Not specified */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c	#define PVD_abstract_file_id_offset (PVD_copyright_file_id_offset + PVD_copyright_file_id_size)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c	#define PVD_copyright_file_id_offset (PVD_application_id_offset + PVD_application_id_size)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_iso9660.c	#define PVD_copyright_file_id_size 37
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/cm_zlib_mangle.h	#define deflate_copyright     cm_zlib_deflate_copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/cm_zlib_mangle.h	#define inflate_copyright     cm_zlib_inflate_copyright
+line	8	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_cryptor.c	* 1. Redistributions of source code must retain the above copyright
+line	8	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_cryptor.c	* 2. Redistributions in binary form must reproduce the above copyright
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/getnameinfo.c	* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_digest.c	* Copyright (c) 2003-2007 Tim Kientzle
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_digest.c	* Copyright (c) 2011 Andres Mejia
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_digest.c	* Copyright (c) 2011 Michihiro NAKAJIMA
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_cryptor.c	* Copyright (c) 2014 Michihiro NAKAJIMA
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_support_format_rar5.c	* Copyright (c) 2018 Grzegorz Antoniak (http://antoniak.org)
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	* Redistributions in binary form must reproduce the above copyright
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	* Redistributions of source code must retain the above copyright
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/getnameinfo.c	* The above copyright notice and this permission notice shall be included in
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.h	**   * Redistributions in binary form must reproduce the above copyright
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.h	**   * Redistributions of source code must retain the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_getdate.c	**  This code is in the public domain and has no copyright.
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.h	** A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.h	** Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/QtAutogen/Complex/calwidget.h	** THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Packaging/QtSDK/qt.tools.cmake.xx.qs.in	** file Copyright.txt or https://cmake.org/licensing for details.
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/CONTRIBUTING.rst	.. _`Copyright.txt`: Copyright.txt
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/cpack_gen/nuget.rst	.. variable:: CPACK_NUGET_PACKAGE_COPYRIGHT
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_options.3	.It Cm copyright-file Ns = Ns Ar filename
+line	41	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.3	.\\" 1. Redistributions of source code must retain the above copyright
+line	41	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.3	.\\" 2. Redistributions in binary form must reproduce the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/mtree.5	.\\" Copyright (c) 1989, 1990, 1993
+line	8	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.3	.\\" Copyright (c) 2003-2007 Tim Kientzle
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_disk.3	.\\" Copyright (c) 2003-2009 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_options.3	.\\" Copyright (c) 2003-2010 Tim Kientzle
+line	18	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_data.3	.\\" Copyright (c) 2003-2011 Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/cpio.5	.\\" Copyright (c) 2007 Tim Kientzle
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry.3	.\\" Copyright (c) 2010 Joerg Sonnenberger
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_set_options.3	.\\" Copyright (c) 2011 Tim Kientzle
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_read_add_passphrase.3	.\\" Copyright (c) 2014 Michihiro NAKAJIMA
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry_acl.3	.\\" Copyright (c) 2016 Martin Matuska
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_entry_misc.3	.\\" Copyright (c) 2019 Martin Matuska
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/idna.c	/* Copyright (c) 2011, 2018 Ben Noordhuis <info@bnoordhuis.nl>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/heap-inl.h	/* Copyright (c) 2013, Ben Noordhuis <info@bnoordhuis.nl>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/unix/pthread-fixes.c	/* Copyright (c) 2013, Sony Mobile Communications AB
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/lib/inet_pton.c	/* Copyright (c) Internet Software Consortium.
+line	79	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv.h	/* Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/random.c	/* Copyright libuv contributors. All rights reserved.
+line	29	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv/os390.h	/* Copyright libuv project contributors. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/src/win/snprintf.c	/* Copyright the libuv project contributors. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/include/curl/curlver.h	/* This is the global package copyright */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv/stdint-msvc2008.h	//   1. Redistributions of source code must retain the above copyright notice,
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv/stdint-msvc2008.h	//   2. Redistributions in binary form must reproduce the above copyright
+line	5	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/FindBoost/CMakePackage_LowerCaseTargetPrefix/include/boost/version.hpp	//  (C) Copyright John maddock 1999. Distributed under the Boost
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/include/uv/stdint-msvc2008.h	//  Copyright (c) 2006-2008 Alexander Chemeris
+line	7	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/iOSNavApp/Classes/NavApp3AppDelegate.h	//  Copyright 2011 Kitware, Inc. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmvssetup/Setup.Configuration.h	// </copyright>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmvssetup/Setup.Configuration.h	// <copyright file="Setup.Configuration.h" company="Microsoft Corporation">
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/RegularExpression.cxx	// Copyright (C) 1991 Texas Instruments Incorporated.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/src/lib_json/json_reader.cpp	// Copyright (C) 2016 InfoTeCS JSC. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmvssetup/Setup.Configuration.h	// Copyright (C) Microsoft Corporation. All rights reserved.
+line	11	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/include/json/allocator.h	// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/src/lib_json/json_reader.cpp	// Copyright 2007-2011 Baptiste Lepilleur and The JsonCpp Authors
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/src/lib_json/json_value.cpp	// Copyright 2011 Baptiste Lepilleur and The JsonCpp Authors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmcldeps.cxx	// Copyright 2011 Google Inc. All Rights Reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/DelphiCoverage/src/UTCovTest.pas	// Copyright 2012 The Open Source Electronic Health Record Agent
+line	40	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/include/dap/any.h	// Copyright 2019 Google LLC
+line	8	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/include/dap/dap.h	// Copyright 2020 Google LLC
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/include/dap/traits.h	// Copyright 2021 Google LLC
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/src/jsoncpp_json_serializer.cpp	// Copyright 2023 Google LLC
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/RegularExpression.hxx.in	// Original Copyright notice:
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/RegularExpression.cxx	// and distribute this software, provided that this complete copyright and
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/RegularExpression.cxx	// whose copyright statement appears below.  It has been changed to work
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmbzip2/LICENSE	1. Redistributions of source code must retain the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	2. Redistributions in binary form must reproduce the above copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	2010), this software is Copyright (c) 2007-2010 by Baptiste Lepilleur and
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Auxiliary/cmake-mode.el	; file Copyright.txt or https://cmake.org/licensing for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/DelphiCoverage/UTCovTest(UTCovTest.pas).html.in	<tr class="nocodegen"><td>2</td><td><pre style="display:inline;">// Copyright 2012 The Open Source Electronic Health Record Agent</pre></td></tr>
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	Baptiste Lepilleur and The JsonCpp Authors explicitly disclaim copyright in all
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	COPYRIGHT AND PERMISSION NOTICE
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Scripts/update-zlib.bash	Copyright " > Copyright.txt
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/Copyright.txt	Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmbzip2/README	Copyright (C) 1996-2019 Julian Seward <jseward@acm.org>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/xxhash.c	Copyright (C) 2012-2014, Yann Collet.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/ParseImplicitLinkInfo/ld-v/msvc14.36-link.bash	Copyright (C) Microsoft Corporation.  All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	Copyright (c) 1996 - 2024, Daniel Stenberg, <daniel@haxx.se>, and many
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/COPYING	Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/COPYING	Copyright (c) 2001-2022 Expat maintainers
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	Copyright (c) 2003-2018 <author(s)>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibrhash/COPYING	Copyright (c) 2005, Aleksey Kravchenko <rhash.admin@gmail.com>
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	Copyright (c) 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/COPYING	Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/COPYING	Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	Copyright (c) 2015-present libuv project contributors.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/LICENSE	Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/Copyright.txt	Copyright 2000-2016 Kitware, Inc. and Contributors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	Copyright 2000-2024 Kitware, Inc. and Contributors
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/Copyright.txt	Copyright 2010-2018 Kitware, Inc.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcppdap/NOTICE	Copyright Google LLC
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	Copyright Joyent, Inc. and other Node contributors. All rights reserved.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/README	Copyright notice:
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/LICENSE	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CommandLineTest/CMakeLists.txt	EXEC_CMAKE_COMMAND(--copyright "${CMAKE_CURRENT_BINARY_DIR}/Copyright.txt")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CommandLineTest/CMakeLists.txt	EXEC_CTEST_COMMAND(--copyright)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	Except as contained in this notice, the name of a copyright holder shall not
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/README.md	Files used only for build and test purposes contain a copyright notice and
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/COPYING	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmnghttp2/COPYING	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CFBundleTest/InfoPlist.strings.in	NSHumanReadableCopyright = "${FBSTRING_LegalCopyright}";
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	Portions Copyright (c) 1994, The Regents of the University of California
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	Portions Copyright (c) 1996-2008, PostgreSQL Global Development Group
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/CONTRIBUTING.rst	See `Copyright.txt`_ for details.
+line	4	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzstd/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	The above copyright and license notice applies to distributions of
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	The above copyright notice and this permission notice shall be
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmexpat/COPYING	The above copyright notice and this permission notice shall be included
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibuv/LICENSE	The above copyright notice and this permission notice shall be included in
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	The libarchive distribution as a whole is Copyright by Tim Kientzle
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/CONTRIBUTING.rst	We do not require any formal copyright assignment or contributor license
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/README.md	[Copyright.txt]: Copyright.txt
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/VS10Project/CSharpSourceGroup/cmake/AssemblyInfo.cs.in	[assembly: AssemblyCopyright("")]
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/prop_tgt/MACOSX_BUNDLE_INFO_PLIST.rst	``MACOSX_BUNDLE_COPYRIGHT``
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	and is subject to the copyright notice reproduced at the bottom of
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/build/utils/gen_archive_string_composition_h.sh	append_copyright
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/build/utils/gen_archive_string_composition_h.sh	append_copyright()
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	appropriate copyright notice and disclaimer of warranty; keep intact
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmpdcurses/README.md	are subject to copyright under various licenses.  Each directory
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_write_set_options.3	as holding the copyright for this volume.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	certain countries either by patents or by copyrighted interfaces, the
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/bootstrap	cmake_copyright="`grep '^Copyright .* Kitware' "${cmake_source_dir}/Copyright.txt"`"
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/deflate.c	const char deflate_copyright[] =
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/inftrees.c	const char inflate_copyright[] =
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/conf.py.in	copyright = '@conf_copyright@'
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	copyright law: that is to say, a work containing the Library or a
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/README.md	copyright notice and license text.  This makes them suitable for distribution
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	copyright notice for the Library among them, as well as a reference
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/xxhash.c	copyright notice, this list of conditions and the following disclaimer
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	copyright/licensing statement at the beginning of the file.  If any do
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	copyrighted by the Free Software Foundation, write to the Free
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Auxiliary/cmake.m4	dnl file Copyright.txt or https://cmake.org/licensing for details.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmbzip2/LICENSE	documentation, are copyright (C) 1996-2019 Julian R Seward.  All
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	during execution displays copyright notices, you must include the
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/cmDependencyProvider.h	file Copyright.txt or https://cmake.org/licensing for details.  */
+line	2	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CPack/cmCPackInnoSetupGenerator.cxx	file Copyright.txt or https://cmake.org/licensing for details. */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/ISComponents.pas	file Copyright.txt or https://cmake.org/licensing for details. }
+line	3	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/testConfigure.cxx	file Copyright.txt or https://cmake.org/licensing#kwsys for details.  */
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	file(STRINGS "${CMake_SOURCE_DIR}/Copyright.txt" copyright_line
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	if(copyright_line MATCHES "${copyright_line_regex}")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	in this Software without prior written authorization of the copyright holder.
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmzlib/CMakeLists.txt	install(FILES Copyright.txt DESTINATION ${CMAKE_DOC_DIR}/cmzlib)
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/COPYING	intended to summarize the copyright status of the individual files;
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmlibarchive/libarchive/archive_windows.c	is hereby granted, provided that the above copyright notice and this
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmjsoncpp/LICENSE	minor nuisance of being required to keep the above copyright notice
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	original copyright holder who places the Library under this License may add
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	program which contains a notice placed by the copyright holder or
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Scripts/update-zlib.bash	readonly tag="v1.3.1" # When updating, sync Copyright.txt below!
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/KWIML/README.md	reference [Copyright.txt][] for details.  Headers meant for installation and
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Licenses/LGPLv2.1.txt	school, if any, to sign a "copyright disclaimer" for the library, if
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeCPack.cmake	set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/Copyright.txt")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeCPack.cmake	set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/Copyright.txt")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CFBundleTest/PluginConfig.cmake	set(FBSTRING_LegalCopyright "Copyright 2010 Firebreath Dev Team")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/CMakeLists.txt	set(copyright_line_regex "^Copyright (2000-20[0-9][0-9] Kitware.*)")
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Copyright.txt	with CMake under compatible licenses provide their own copyright notices
+line	1	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/cmcurl/COPYING	with or without fee is hereby granted, provided that the above copyright
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/CMakeLogo.gif
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/guide/user-interaction/GUI-Add-Entry.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/guide/user-interaction/GUI-Choose-Generator.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/guide/user-interaction/GUI-Configure-Dialog.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/guide/user-interaction/GUI-Source-Binary.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Help/guide/user-interaction/VS-Choose-Arch.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.DS_Store.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.OSXX11.main.scpt.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.VolumeIcon.icns.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Modules/Internal/CPack/CPack.background.png.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Packaging/CMakeDMGBackground.tif
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/CPack/OSXLauncherScript.scpt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetup.icns
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetup.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetup128.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetup32.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/CMakeSetup64.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/Delete16.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/QtDialog/Plus16.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Source/kwsys/testSystemTools.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/CMakeVSMacros1.vsmacros
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/CMakeVSMacros2.vsmacros
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/ApplicationIcon.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/Logo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/SmallLogo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/SmallLogo44x44.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/SplashScreen.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/StoreLogo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Templates/Windows/Windows_TemporaryKey.pfx
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/BundleGeneratorTest/BundleIcon.icns
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/BundleGeneratorTest/CustomVolumeIcon.icns
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CFBundleTest/Localized.rsrc
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CMakeTests/FileUploadInput.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackIFWGenerator/ApplicationIcon.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackIFWGenerator/BundleIcon.icns
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackIFWGenerator/SplashScreen.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackIFWGenerator/install.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackInnoSetupGenerator/my_bitmap.bmp
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackNSISGenerator/header-icon.bmp
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackNSISGenerator/header-image.bmp
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackNSISGenerator/install.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/CPackNSISGenerator/uninstall.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/cvsrepo.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/gitrepo-sub-rec.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/gitrepo-sub.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/gitrepo.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/hgrepo.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProject/svnrepo.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1.tar
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1.tar.bz2
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1.zip
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1NoDir.tar
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1NoDir.tar.bz2
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1NoDir.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectLocal/Step1NoDir.zip
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ExternalProjectUpdate/gitrepo.tgz
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/res/Toolbar.bmp
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/res/mfc1.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/MFC/mfc1/res/mfc1Doc.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/ObjectLibrary/dummy.obj
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/CPackSymlinks/testcpacksym.tar
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/CommandLine/E_cat_binary_files/binary.obj
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/CommandLine/E_cat_good_binary_cat-stdout.txt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/CommandLine/cmake_depends/test_UTF-16LE.h
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/BOM-UTF-16-BE.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/BOM-UTF-16-LE.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/BOM-UTF-32-BE.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/BOM-UTF-32-LE.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/NullAfterBackslash.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/Syntax/NullTerminatedArgument.cmake
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/VsNugetPackageRestore/Repository/NuGetTestProject/1.0.0/nugettestproject.1.0.0.nupkg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/cmake_host_system_information/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/cmake_host_system_information/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/configure_file/UTF16BE-BOM.txt.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/configure_file/UTF16LE-BOM.txt.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/configure_file/UTF32BE-BOM.txt.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/configure_file/UTF32LE-BOM.txt.in
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-DOWNLOAD/input.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/ELF/elf32lsb.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/ELF/elf32msb.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/ELF/elf64lsb-static.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/ELF/elf64lsb.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/ELF/elf64msb.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/XCOFF/xcoff32.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/file-RPATH/XCOFF/xcoff64.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_file/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_file/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_library/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_library/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_package/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_package/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_path/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_path/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_program/registry_host32bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/find_program/registry_host64bit.reg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/string/UTF-16BE.txt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/string/UTF-16LE.txt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/string/UTF-32BE.txt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/RunCMake/string/UTF-32LE.txt
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/StringFileTest/test.bin
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/ApplicationIcon.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Logo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/SmallLogo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/SmallLogo44x44.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/SplashScreen.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/StoreLogo.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Tiles/FlipCycleTileLarge.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Tiles/FlipCycleTileMedium.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Tiles/FlipCycleTileSmall.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Tiles/IconicTileMediumLarge.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Assets/Tiles/IconicTileSmall.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/Direct3DApp1_TemporaryKey.pfx
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/SimplePixelShader.cso
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSWinStorePhone/Direct3DApp1/SimpleVertexShader.cso
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSXaml/Assets/Logo.scale-100.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSXaml/Assets/SmallLogo.scale-100.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSXaml/Assets/SplashScreen.scale-100.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSXaml/Assets/StoreLogo.scale-100.png
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Tests/VSXaml/VSXaml_TemporaryKey.pfx
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Release/CMakeInstall.bmp
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Release/CMakeLogo.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Release/WiX/ui_banner.jpg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Release/WiX/ui_dialog.jpg
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/static/cmake-favicon.ico
+binary-head	cmake-3.31.7.tar.gz:cmake-3.31.7/Utilities/Sphinx/static/cmake-logo-16.png

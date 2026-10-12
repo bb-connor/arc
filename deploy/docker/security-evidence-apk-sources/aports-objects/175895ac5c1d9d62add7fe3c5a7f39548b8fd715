@@ -1,0 +1,15 @@
+tree bcb458c1a1bd1a0acbd0d23b5de9a42f374d4b48
+parent 34a2f06f60d44ba6a056a9f0fd173d6b24395f67
+author Natanael Copa <ncopa@alpinelinux.org> 1727968215 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1727968430 +0200
+
+Revert "Reapply "main/fortify-headers: upgrade to 2.3.1""
+
+To many issues, and it blocks us. Lets revert it again til issues are
+fixed upstream.
+
+This reverts commit 27c61439719b54e6a61befe50f896e2fcaa066c0.
+This reverts commit eb4c10b9c69ca20b8cb812c2a3c7ab9fe069f3fe.
+This reverts commit 0920eac441c152c1feeeb8d04fe2930baedd8455.
+This reverts commit bd6dc56ca9c8edbf887ef7af7ca4a26fc94cb5a9.
+This reverts commit 52fd5614b7aa7cd4d56b84e88f4b6f9f317b9cac.

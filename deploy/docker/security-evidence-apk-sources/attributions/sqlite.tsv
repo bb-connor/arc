@@ -1,0 +1,35 @@
+# chio.attribution-lines.v8 origin=sqlite files=51 files_with_lines=26 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/sqlite3.rc	      VALUE "LegalCopyright", "http://www.sqlite.org/copyright.html"
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/LICENSE	   copyright notice, this list of conditions and the following
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/win/nmakehlp.c	 * Copyright (c) 2002 by David Gravereaux.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/win/nmakehlp.c	 * Copyright (c) 2006 by Pat Thoyts
+line	2	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup-config.sub	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/tclconfig/install-sh	# Copyright (C) 1994 X Consortium
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/Makefile.in	# Copyright (c) 1999 Scriptics Corporation.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/tclconfig/tcl.m4	# Copyright (c) 1999-2000 Ajuba Solutions.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/win/rules.vc	# Copyright (c) 2001-2003 David Gravereaux.
+line	2	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/tclconfig/tcl.m4	# Copyright (c) 2002-2005 ActiveState Corporation.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/win/rules.vc	# Copyright (c) 2003-2008 Patrick Thoyts
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2006 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2006-2010 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2006-2011 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2007-2010 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2010 WorkWare Systems http://workware.net.au/
+line	9	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/system.tcl	# Copyright (c) 2010 WorkWare Systems http://www.workware.net.au/
+line	2	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/cc-db.tcl	# Copyright (c) 2011 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup	# Copyright (c) 2012 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/pkg-config.tcl	# Copyright (c) 2016 WorkWare Systems http://www.workware.net.au/
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/win/rules.vc	# Copyright (c) 2017      Ashok P. Nadkarni
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/tclconfig/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/proj.tcl	# The author disclaims copyright to this source code.  In place of
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/tclconfig/install-sh	# following copyright and license.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/sqlite3.c	** The author disclaims copyright to this source code.
+line	180	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/sqlite3.c	** The author disclaims copyright to this source code.  In place of
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/LICENSE	1. Redistributions of source code must retain the above copyright
+line	2	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/tea/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/LICENSE	Copyright (c) 2010-2011, WorkWare Systems <http://workware.net.au/>
+line	2	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/autosetup/autosetup-config.sub	Copyright 1992-2024 Free Software Foundation, Inc.
+line	2	sqlite-3490200-LICENSE.md	The author disclaims copyright to this source code.  In place of
+line	1	sqlite-3490200-LICENSE.md	[Public Domain](https://sqlite.org/copyright.html).
+line	1	sqlite-autoconf-3490200.tar.gz:sqlite-autoconf-3490200/Replace.cs	[assembly: AssemblyCopyright("Public Domain")]

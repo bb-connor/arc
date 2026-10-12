@@ -1,0 +1,9 @@
+tree 7a1e18918c6e1faff0efe8f2e86d46ef09a2ce6b
+parent 7d9ba0548ad50022f76684c2bd1d870eae9bb9c0
+author omni <omni+alpine@hack.org> 1788613668 +0000
+committer omni <omni+alpine@hack.org> 1788613871 +0000
+
+main/util-linux: patch CVE-2026-78408
+
+- https://www.openwall.com/lists/oss-security/2026/09/05/2
+- https://github.com/util-linux/util-linux/commit/485dbb67f1b6bb18e08b1b77f4aa2373ff3a705b

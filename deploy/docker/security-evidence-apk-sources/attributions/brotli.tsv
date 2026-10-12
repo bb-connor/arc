@@ -1,0 +1,17 @@
+# chio.attribution-lines.v8 origin=brotli files=136 files_with_lines=101 binary_heads=1 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/setup.py	# Copyright 2015 The Brotli Authors. All rights reserved.
+line	7	brotli-1.1.0.tar.gz:brotli-1.1.0/python/Makefile	# Copyright 2016 The Brotli Authors. All rights reserved.
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/compiler_config_setting.bzl	# Copyright 2018 Google Inc. All Rights Reserved.
+line	8	brotli-1.1.0.tar.gz:brotli-1.1.0/c/enc/entropy_encode.c	/* Copyright 2010 Google Inc. All Rights Reserved.
+line	44	brotli-1.1.0.tar.gz:brotli-1.1.0/c/common/constants.c	/* Copyright 2013 Google Inc. All Rights Reserved.
+line	4	brotli-1.1.0.tar.gz:brotli-1.1.0/c/enc/block_encoder_inc.h	/* Copyright 2014 Google Inc. All Rights Reserved.
+line	14	brotli-1.1.0.tar.gz:brotli-1.1.0/c/dec/state.c	/* Copyright 2015 Google Inc. All Rights Reserved.
+line	9	brotli-1.1.0.tar.gz:brotli-1.1.0/c/common/constants.h	/* Copyright 2016 Google Inc. All Rights Reserved.
+line	8	brotli-1.1.0.tar.gz:brotli-1.1.0/c/common/shared_dictionary.c	/* Copyright 2017 Google Inc. All Rights Reserved.
+line	2	brotli-1.1.0.tar.gz:brotli-1.1.0/c/enc/hash_composite_inc.h	/* Copyright 2018 Google Inc. All Rights Reserved.
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/c/enc/state.h	/* Copyright 2022 Google Inc. All Rights Reserved.
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/LICENSE	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/LICENSE	Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/LICENSE	The above copyright notice and this permission notice shall be included in
+line	1	brotli-1.1.0.tar.gz:brotli-1.1.0/CONTRIBUTING.md	copyright to your changes, even after your contribution becomes part of our
+binary-head	brotli-1.1.0.tar.gz:brotli-1.1.0/tests/testdata/ukkonooa.compressed
