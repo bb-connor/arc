@@ -11,19 +11,6 @@
 //!   - Ipv6UlaDenied (fd00::/8 internal target),
 //!   - RedirectLimitExceeded (chained redirect SSRF),
 //!   - ResponseTooLarge (oversized response body amplification).
-//!
-//! Revert-to-prove-it-fails recipe: flip an early-return guard inside
-//! `enforce_url` in `crates/protocol/chio-egress-contract/src/lib.rs` to return
-//! `Ok(())` for one of the loopback / link-local / ULA / redirect /
-//! body-size checks. The deny-arm assertion that pinned the affected
-//! variant fails because the production contract no longer blocks
-//! the corresponding SSRF target.
-//!
-//! Targeted mutation recipe: replace
-//! `HttpEgressContract::enforce_ip_address_class` with `Ok(())`.
-//! Literal internal addresses then bypass address-class enforcement, and the
-//! corresponding deny assertions MUST fail. The public-authority positive
-//! control MUST remain admitted.
 
 use std::collections::BTreeSet;
 

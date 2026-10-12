@@ -14,12 +14,6 @@
 //
 // Production call site:
 // `crates/trust/chio-custody-hw/src/capability.rs:179` (`require_audience`).
-//
-// Revert-to-prove-it-fails recipe: replace the body of
-// `PasskeyCapability::require_audience` in
-// `crates/trust/chio-custody-hw/src/capability.rs` with `Ok(())` (drop the
-// audience comparison). Both deny-arm assertions below then fail
-// because the verifier accepts the cross-audience capability.
 
 use std::sync::Arc;
 

@@ -28,17 +28,17 @@ fn bound_intent() -> Value {
 }
 
 #[test]
-fn bound_tool_invocation_schema_accepts_bound_and_legacy_intents() -> TestResult {
+fn bound_tool_invocation_schema_accepts_bound_and_bodyless_intents() -> TestResult {
     let path = schema_path();
     let schema = chio_spec_validate::load_json(&path)?;
-    let mut legacy = bound_intent();
-    legacy
+    let mut bodyless = bound_intent();
+    bodyless
         .as_object_mut()
         .ok_or("intent is not an object")?
         .remove("body");
-    let mut explicit_legacy = legacy.clone();
-    explicit_legacy["body"] = json!({"kind": "tool_invocation"});
-    for doc in [bound_intent(), legacy, explicit_legacy] {
+    let mut explicit_default_body = bodyless.clone();
+    explicit_default_body["body"] = json!({"kind": "tool_invocation"});
+    for doc in [bound_intent(), bodyless, explicit_default_body] {
         chio_spec_validate::validate_value(&path, &schema, &PathBuf::from("<inline>"), &doc)?;
     }
     Ok(())

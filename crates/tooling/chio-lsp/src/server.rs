@@ -145,7 +145,7 @@ impl LanguageServer for ChioLanguageServer {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        // We negotiated FULL sync; the client sends one change with the
+        // The server negotiates FULL sync; the client sends one change with the
         // entire document body.
         if let Some(change) = params.content_changes.into_iter().next() {
             if let Some(entry) = self.documents.replace(

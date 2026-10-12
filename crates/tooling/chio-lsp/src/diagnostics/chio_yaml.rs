@@ -105,7 +105,7 @@ mod tests {
         let diags = validate("version: 1\n  bad: indent\n");
         assert_eq!(diags.len(), 1);
         assert_eq!(first_code(&diags), URN_CHIO_YAML_INVALID);
-        // Parser reports a 1-based line; we translate to 0-based.
+        // Parser reports a 1-based line, translated to 0-based.
         assert!(diags[0].range.start.line >= 1);
     }
 

@@ -57,7 +57,7 @@ def clock_roots(root):
     """Cover complete crates that contain a reviewed boundary or TCB library.
 
     Whole-crate coverage prevents a sibling module from escaping the inventory.
-    The legacy roots retain fixture coverage while catalogs evolve.
+    The fixed roots add fixture coverage.
     """
     boundaries = json.loads(
         (root / "docs/security/trust-boundary-inventory.json").read_text()

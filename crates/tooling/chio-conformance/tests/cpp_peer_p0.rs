@@ -2,9 +2,8 @@
 //
 // The C++ peer P0 surface is locked to `mcp_core` and `auth` only.
 // `chio-extensions`, `tasks`, `nested_callbacks`, and `notifications`
-// are deferred and are NOT exercised here. If you need to extend the
-// C++ peer's coverage, add a separate integration test rather than
-// expanding this one (its purpose is to be the immutable P0 gate).
+// are not exercised here. Coverage beyond `mcp_core` and `auth` belongs in
+// a separate integration test; this one stays the fixed P0 gate.
 //
 // The C++ peer is the conformance-peer binary built from
 // `sdks/cpp/chio-cpp` via CMake; that binary links against

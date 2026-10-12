@@ -8,7 +8,7 @@ visible to the compiler:
 
 One value, one declaration. When the same bytes are declared in a producer crate
 and again in a verifier crate, the strings agree until the day one is bumped to
-`.v2`. Then the producer and the verifier disagree about identity, silently,
+a new version. Then the producer and the verifier disagree about identity, silently,
 with no compile error anywhere. Names do not protect against this: the same
 bytes already carry four different constant names here, so only a search by
 value finds the duplication.

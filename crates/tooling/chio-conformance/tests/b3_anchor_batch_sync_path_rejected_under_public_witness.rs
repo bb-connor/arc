@@ -148,9 +148,9 @@ fn sync_wrapper_gate_fires_before_structural_verify() {
     let mut batch = build_anchor_batch(checkpoint_ids, witness, 1_700_000_000, &kp).unwrap();
     // Forge the tree_root and witness root in a paired way so that the
     // signature still verifies but a structural Merkle re-compute would
-    // fail. We bypass `AnchorBatch::sign` (which would itself reject the
-    // forged body) by constructing the AnchorBatch directly with a
-    // signature over the forged body. Since the gate fires BEFORE
+    // fail. `AnchorBatch::sign` would itself reject the forged body, so
+    // the AnchorBatch is constructed directly with a signature over the
+    // forged body. Since the gate fires BEFORE
     // structural verify, the test exercises the gate ordering invariant.
     let forged_root = sha256(b"chio.anchor_batch.v1::b3-tampered");
     batch.body.tree_root = forged_root;

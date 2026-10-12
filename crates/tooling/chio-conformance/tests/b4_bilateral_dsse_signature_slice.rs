@@ -491,7 +491,7 @@ fn hot_path_emits_both_artifacts_and_each_verifies() {
 
     // The DualSignedReceipt verifier ONLY accepts a `DualSignedReceipt`; trying to
     // hand it a `DsseEnvelope` is a structural type error and so cannot
-    // even compile. We document the intent in a runtime check instead:
+    // even compile. A runtime check states the intent instead:
     // the DualSignedReceipt preimage bytes do not appear inside the DSSE preimage,
     // so a DSSE envelope cannot be re-interpreted as a DualSignedReceipt artifact.
     let cosigning_body_preimage =
@@ -648,8 +648,8 @@ fn dsse_envelope_with_two_subjects_is_rejected() {
     let new_statement_bytes = chio_core::canonical::canonical_json_bytes(&statement).unwrap();
     envelope.payload = BASE64_STANDARD.encode(&new_statement_bytes);
 
-    // Note: signatures no longer verify over the new payload, but we
-    // still expect the multi-subject check to fire BEFORE PAE
+    // Signatures do not verify over the new payload, but the
+    // multi-subject check fires BEFORE PAE
     // verification so the diagnostic is structural rather than
     // signature-cryptographic.
     let outcome = verify_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key());

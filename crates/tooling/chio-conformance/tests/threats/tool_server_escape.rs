@@ -60,23 +60,6 @@
 // all yielding typed `WasmGuardError`). This conformance test replays
 // two of those escape classes through the same production backend so
 // the threat row carries both file-existence and runtime evidence.
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/guards/chio-wasm-guards/src/runtime.rs`, locate the
-// `validate_imports` (or equivalently named) helper used by
-// `WasmtimeBackend::load_module` to reject non-`chio.*` imports.
-// Replace its body with `Ok(())`. Re-run
-// `cargo test -p chio-conformance --test threats -- tool_server_escape`
-// and the
-// `assert!(matches!(err, WasmGuardError::ImportViolation { .. }))`
-// arm in `undeclared_host_import_rejected_at_load` MUST then fail
-// because production now admits modules with arbitrary host imports.
-// For the kernel mediation arm, replace `grant_matches_request` in
-// `crates/kernel/chio-kernel/src/request_matching.rs` with `Ok(true)`.
-// The pivot denial or unchanged invocation-count assertion MUST fail.
-// Replacing `grant_covers` in
-// `crates/kernel/chio-kernel-core/src/scope.rs` with `Ok(true)` MUST fail the
-// matching portable pivot assertion.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
