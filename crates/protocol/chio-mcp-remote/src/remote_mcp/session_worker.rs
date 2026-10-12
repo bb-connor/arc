@@ -28,6 +28,15 @@ pub(super) async fn receive(
     }
 }
 
+impl RemoteSession {
+    /// Monotonic bound on a dispatched request's wait for its terminal response.
+    pub(super) fn response_deadline(&self) -> tokio::time::Sleep {
+        tokio::time::sleep(Duration::from_millis(
+            self.lifecycle_policy.request_response_timeout_millis,
+        ))
+    }
+}
+
 pub(super) async fn acquire_request_owner(
     session: &RemoteSession,
 ) -> Option<tokio::sync::OwnedMutexGuard<()>> {

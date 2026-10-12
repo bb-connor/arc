@@ -516,6 +516,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         return remote_session_send_error(error.into_error());
     }
 
+    let mut response_deadline = Box::pin(session.response_deadline());
     let session_for_stream = session.clone();
     let stream = stream! {
         let _stream_lock = stream_lock;
@@ -527,7 +528,20 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         );
 
         loop {
-            match session_worker::receive(&session_for_stream, &mut event_rx).await {
+            let received = tokio::select! {
+                biased;
+                received = session_worker::receive(&session_for_stream, &mut event_rx) => Some(received),
+                () = response_deadline.as_mut() => None,
+            };
+            let Some(received) = received else {
+                warn!(session_id = %session_for_stream.session_id, "remote MCP request exceeded its response deadline");
+                session_worker::close(&state, &session_for_stream).await;
+                let failure = json!({"jsonrpc":"2.0","id":request_id,
+                    "error":{"code":-32603,"message":"request response deadline exceeded; session closed; effect is uncertain"}});
+                yield Ok(Event::default().data(failure.to_string()));
+                break;
+            };
+            match received {
                 Ok(event) => {
                     // HTTP ownership can change while an older actor request is
                     // still running. Its origin survives disconnect and id reuse.
@@ -627,9 +641,22 @@ async fn handle_initialize_post(
         return remote_session_send_error(error);
     }
 
+    let mut response_deadline = Box::pin(session.response_deadline());
     let mut buffered_events = Vec::new();
     loop {
-        match session_worker::receive(&session, &mut event_rx).await {
+        let received = tokio::select! {
+            biased;
+            received = session_worker::receive(&session, &mut event_rx) => received,
+            () = response_deadline.as_mut() => {
+                warn!(session_id = %session.session_id, "remote initialize exceeded its response deadline");
+                session_worker::close(&state, &session).await;
+                return plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "remote MCP initialize response deadline exceeded",
+                );
+            }
+        };
+        match received {
             Ok(event) => {
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);

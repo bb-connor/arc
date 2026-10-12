@@ -130,6 +130,9 @@ Hosted session lifecycle tuning now uses these canonical env names:
 - `CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS`
 - `CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS`
 - `CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS`
+- `CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS` (default 15 minutes): a
+  dispatched request with no terminal response by this bound closes its
+  session and receives an outcome-unknown error
 
 ## 2. Initial Deployment Procedure
 

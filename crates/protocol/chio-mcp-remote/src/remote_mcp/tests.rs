@@ -1067,6 +1067,7 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         drain_grace_millis: 1_000,
         reaper_interval_millis: 100,
         tombstone_retention_millis: 10_000,
+        request_response_timeout_millis: 10_000,
     };
     let session = RemoteSession::new(RemoteSessionInit {
         clock: RemoteClock::new(Arc::new(

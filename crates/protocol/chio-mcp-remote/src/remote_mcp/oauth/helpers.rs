@@ -121,6 +121,10 @@ pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
             SESSION_TOMBSTONE_RETENTION_ENV,
             DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
         ),
+        request_response_timeout_millis: read_env_u64(
+            REQUEST_RESPONSE_TIMEOUT_ENV,
+            DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
+        ),
     }
 }
 

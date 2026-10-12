@@ -121,6 +121,7 @@ fn session_init(clock: RemoteClock) -> RemoteSessionInit {
             drain_grace_millis: 100,
             reaper_interval_millis: 10,
             tombstone_retention_millis: 10_000,
+            request_response_timeout_millis: 10_000,
         },
         protocol_version: None,
         peer_capabilities: None,

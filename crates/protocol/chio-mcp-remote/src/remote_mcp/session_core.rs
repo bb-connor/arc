@@ -120,6 +120,7 @@ const DEFAULT_SESSION_IDLE_EXPIRY_MILLIS: u64 = 15 * 60 * 1000;
 const DEFAULT_SESSION_DRAIN_GRACE_MILLIS: u64 = 5 * 1000;
 const DEFAULT_SESSION_REAPER_INTERVAL_MILLIS: u64 = 250;
 const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
+const DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS: u64 = 15 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
@@ -133,6 +134,7 @@ const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
 const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
 const SESSION_TOMBSTONE_RETENTION_ENV: &str = "CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
+const REQUEST_RESPONSE_TIMEOUT_ENV: &str = "CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS";
 const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
@@ -247,6 +249,8 @@ struct SessionLifecyclePolicy {
     drain_grace_millis: u64,
     reaper_interval_millis: u64,
     tombstone_retention_millis: u64,
+    /// Bound on a dispatched request's wait for its terminal response.
+    request_response_timeout_millis: u64,
 }
 
 impl SessionLifecyclePolicy {
