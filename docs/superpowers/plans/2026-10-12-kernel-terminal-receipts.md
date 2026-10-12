@@ -10,6 +10,56 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-typed-reservations-design.md`, phase 1; `2026-10-04-pure-admission-machine-design.md`, M20; `2026-10-04-durable-stop-epoch-design.md`, S15.
 
+## Qualified local candidate
+
+Candidate `cef8fdbe66` contains production repairs through `0e1e7792e2` and
+current main `bb3b4c51a1`. The implementation tasks below are locally qualified.
+Publication, Claude's final composed review and hosted checks remain open.
+Earlier checkpoints retain their original results; this section supersedes their
+pending local-gate status.
+
+| Gate | Result |
+| --- | --- |
+| Full kernel library | 1,786 passed, zero failed or ignored |
+| Full `durable_admission_sqlite` integration target | 40 passed, zero failed or ignored |
+| Dispatch-failure matrix | Eight passed, including the unconfirmed-cleanup owner |
+| Final SQLite restart controls | Four passed after lint-only test cleanup |
+| Strict kernel Clippy, all targets | Passed after removing two `expect_err` calls and an unused test helper |
+| Workspace formatting and Rust file hygiene | Passed |
+| Escape-hatch inventory | 113 entries in 57 files, no additions |
+| Reviewed formal source anchors | 271 entries match |
+| Generated proof coverage | 65 rows and 179 artifacts match |
+| Flow gate selector contract | 69 exact inventories pass |
+
+Commands use Rust 1.95.0, `--locked`, two build jobs and disabled incremental
+compilation. The full suite logs are `/tmp/kern2-final-full-lib.log` and
+`/tmp/kern2-final-sqlite.log`. Final strict and restart logs are
+`/tmp/kern2-final-strict-v2.log` and `/tmp/kern2-final-sqlite-v2.log`.
+The only changes after the full runs are equivalent test error extraction,
+removal of an unused test helper, and generated coverage. No production Rust
+changed after those runs. The earlier CLI failure-receipt run passed ten tests;
+the kernel/store/CLI strict run also passed before the final kernel-only repair.
+
+The three bounded-review findings are repaired: Reusable requires an
+authenticated replay-key absence check; Retained requires the typed unknown
+result of a submitted durable mutation; unconfirmed cleanup preserves the
+original durable owner. Originals at `7dcbbdcfbd` and `e1a6007de9` failed at runtime
+before repair. The corresponding repaired controls pass in the full suite.
+Independent review found no remaining P0/P1/P2 in those repair deltas and no
+lost state, custody, accounting or invocation assertions in the revised tests.
+This is a bounded review, not Claude's final composed approval.
+
+The acknowledgement-fault SQLite test exercises a contained clock panic followed
+by reopen and recovery. It does not simulate OS process termination. Durable
+nonce-preflight cleanup has no dedicated public Original in the generic fixture;
+that fixture cannot provide the required qualified participant. Existing nonce
+controls and the real SQLite caller-nonce tests pass.
+
+Remaining boundaries: the in-memory evidence buffer is not crash-durable;
+generic kernel-independent idle durable finalization remains outside this unit.
+Formal anchor and coverage checks do not establish model refinement or execute
+proofs. KERN-2 stays in the private landing queue until a published slot is free.
+
 ## Global constraints
 
 - Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `bb3b4c51a1`, composed in `39883cf4a6`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
@@ -22,7 +72,7 @@
 - Root owns this implementation and the M20 helper. Claude owns KERN-1 stop and KERN-4 session entry; agree shared-file hunks before integration.
 - One source unit for KERN-2. Do not publish partial phase-1 behavior as completion. No broad proof campaign or schema-slot change.
 
-## Reconciled source
+## Original source assessment
 
 `evaluation/return_recording.rs` disarms the non-durable guard before ordinary finalization. Both evaluators use it. Security outcome release occurs before return recording. Durable return failure currently terminalizes unknown and writes a separate Deny; Drop similarly writes a cancellation before terminalizing. The capture-error and non-settled payment branches discard release outcomes.
 
@@ -43,9 +93,9 @@
 **Interfaces:** Produce `IdentityDisposition::{Reusable, Retained, Terminal}` and `with_identity_disposition(Option<Value>, IdentityDisposition) -> Option<Value>`. The producing transition chooses the enum. The helper writes the snake-case signed field while preserving other kernel metadata. KERN-1 derives `retryable_after_resume` from `disposition == Reusable`; it never chooses Retained for a definite stop.
 
 - [x] Run the new evaluator controls on Original: malformed redaction leaves zero receipts after one actual invocation; caller `receipt_context` is accepted. Keep a successful one-receipt control.
-- [ ] Add producing-row controls: early reusable denial, persisted compensated terminal, unknown submitted-commit retained denial, post-effect terminal, Allow and pending-approval exceptions. Include duplicate request ids in distinct authenticated namespaces.
+- [x] Add producing-row controls: early reusable denial, persisted compensated terminal, unknown submitted-commit retained denial, post-effect terminal, Allow and pending-approval exceptions. Include duplicate request ids in distinct authenticated namespaces.
 - [x] Implement the typed helper, reserve `receipt_context`, and derive namespace metadata from the existing authenticated replay binding. Do not classify by error text or infer Terminal from the verdict alone.
-- [ ] Run focused identity tests. Expected: correct disposition and unchanged existing metadata; caller forgery denied before invocation. Commit the task without publishing the incomplete unit.
+- [x] Run focused identity tests. Expected: correct disposition and unchanged existing metadata; caller forgery denied before invocation. Commit the task without publishing the incomplete unit.
 
 ### Task 2: Make append acknowledgement explicit
 
@@ -56,7 +106,7 @@
 - [x] Add a store fixture that commits then returns a timeout, plus a fixture whose queued append commits after timeout. Assert no replacement terminal is appended while original completion is unresolved.
 - [x] Separate the append acknowledgement from trace allocation, settlement observation, federation co-signing, provenance and nonce creation. Keep all existing ordering and authority checks before the append.
 - [x] Return post-commit delivery failures without re-entering fault-receipt construction. Unknown writes require completion/readback; unsupported authoritative readback keeps the obligation latched.
-- [ ] Run publication, federation, settlement and nonce-focused controls. Expected: one persisted terminal id for every acknowledged/late commit. Commit.
+- [x] Run publication, federation, settlement and nonce-focused controls. Expected: one persisted terminal id for every acknowledged/late commit. Commit.
 
 ### Task 3: Reserve and recover non-durable evidence
 
@@ -67,7 +117,7 @@
 - [x] Add slot-exhaustion and shared-host two-slot/three-session controls. Assert refusal before invocation and permit retention while buffering.
 - [x] Add failing-clock/signer/store controls plus recovery while no new requests arrive. Assert cleanup and session reports remain usable while dispatch is latched.
 - [x] Implement fixed capacity, reserved-slot ownership, bounded fault templates, single-flight flushing with backoff and controlled shutdown. Preserve the original append identity until its outcome is settled.
-- [ ] Add latch/dispatch and worker-exit races to existing concurrency tests. Run focused tests, including no-progress and recovery cases. Commit.
+- [x] Add latch/dispatch and worker-exit races to existing concurrency tests. Run focused tests, including no-progress and recovery cases. Commit.
 
 ### Task 4: Own both evaluators through discharge
 
@@ -75,8 +125,8 @@
 
 **Interfaces:** `post_effect(obligation, returned) -> Discharged`; private discharge construction; `Discharged::deliver(self) -> Result<ToolCallResponse, KernelError>`. Ownership includes charge, admission, child receipts, security handles and the reserved evidence slot. Bind discharge to authenticated namespace, request id, operation id when present, and matched grant.
 
-- [ ] Extend Originals across transport failures, child flush, credential commitment and durable return-recording failure. Retain the existing pre-dispatch compensation controls.
-- [ ] Move the post-dispatch half of each evaluator under the obligation. Keep pre-dispatch Drop compensation unchanged. Durable Drop retains the original saga for the existing recovery driver and never writes a competing receipt. A generic kernel-independent idle driver remains open under the ruling below.
+- [x] Extend Originals across transport failures, child flush, credential commitment and durable return-recording failure. Retain the existing pre-dispatch compensation controls.
+- [x] Move the post-dispatch half of each evaluator under the obligation. Preserve pre-dispatch compensation. Unconfirmed cleanup keeps its durable owner and may emit only a signed observation without an execution decision. Durable Drop retains the original saga for the existing recovery driver and never writes a competing receipt. A generic kernel-independent idle driver remains open under the ruling below.
 - [x] Move `record_released` and final lifecycle release after discharge; signed terminal truth survives either callback failing. Contain callback and destructor panics.
 - [x] Add receipt-binding mismatch controls and compiler-checked negative Clone/Default assertions for both owners, plus the exact post-effect return signature. These passed in the full library run. Field/module privacy is source-reviewed; no separate UI compile-fail suite is claimed. Final review repairs still require the composed evaluator and durable/drop/security suites.
 
@@ -88,7 +138,7 @@
 
 - [x] Add a real evaluator control with a failing capture adapter: invocation happened, capture attempted, release was never attempted, positive authorization retained and terminal metadata truthful. Add rejected/non-settled release success/failure controls.
 - [x] Remove release on capture error; preserve the current denial of non-settled output. Resolve the spec's Pending/Captured open decision with Claude before changing that policy.
-- [ ] Run the final post-effect matrix, durable admission, security dispatch, payment and receipt-focused suites, then strict owning Clippy. Reconcile touched formal-source anchors without claiming proof execution.
+- [x] Run the final post-effect matrix, durable admission, security dispatch, payment and receipt-focused suites, then strict owning Clippy. Reconcile touched formal-source anchors without claiming proof execution.
 - [ ] Send exact source SHA, commands, outcomes and remaining acceptance to Claude. Rebase once on actual main, verify composition, then publish one KERN-2 PR.
 
 ## Progress
@@ -217,18 +267,18 @@ No caller gains retry authority from a Terminal or Retained response. The remain
 The bounded source review found three P2 defects in the producer implementation.
 Complete them in the existing candidate before publication:
 
-- [ ] Require an authenticated replay-key lookup before signing Reusable. A live
+- [x] Require an authenticated replay-key lookup before signing Reusable. A live
   or terminal row refuses that new receipt; a failed lookup cannot attest absence.
   Use the admission mutation sequencer for the lookup. The observation does not
   grant permission for any later request.
-- [ ] Sign Retained only for the typed unknown result of a submitted durable
+- [x] Sign Retained only for the typed unknown result of a submitted durable
   commit. Known pre-write errors propagate without minting a competing receipt.
   Apply this to caller nonce reservation, nonce issuance and capture preparation.
-- [ ] Preserve the original owner when runtime or payment cleanup is unconfirmed.
+- [x] Preserve the original owner when runtime or payment cleanup is unconfirmed.
   Drop fault evidence is a signed TraceObservation with its fault and hold IDs,
   without an execution decision or identity disposition. Confirmed compensation
   still permits its ordinary terminal response.
-- [ ] Run the Original controls, focused repaired controls, the full kernel
+- [x] Run the Original controls, focused repaired controls, the full kernel
   library suite and strict owning Clippy. Refresh reviewed source anchors and
   generated coverage only after the repair source is complete.
 
