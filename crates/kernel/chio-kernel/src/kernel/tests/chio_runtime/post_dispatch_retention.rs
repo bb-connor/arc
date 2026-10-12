@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::tests::evidence_recovery::wait_for_post_effect_evidence;
 
 #[test]
 fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_failure(
@@ -346,6 +347,7 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
     eval.abort();
     assert!(eval.await.is_err(), "aborted evaluation must not complete");
 
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(
         receipt_log.len(),
@@ -359,7 +361,15 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
     let Some(Decision::Cancelled { reason }) = &receipt.decision else {
         return Err("expected a cancelled decision on the drop receipt".into());
     };
-    assert_eq!(reason, "tool evaluation future dropped after admission");
+    assert_eq!(reason, "post-effect finalization failed; output withheld");
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .unwrap()
+            .pointer("/chio_runtime/post_effect_fault/code"),
+        Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP"))
+    );
     assert!(
         receipt.verify_signature()?,
         "drop receipt signature must verify"

@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::tests::evidence_recovery::wait_for_post_effect_evidence;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dropping_async_evaluate_after_monetary_dispatch_retains_budget_and_payment_hold(
@@ -88,6 +89,7 @@ async fn dropping_async_evaluate_after_monetary_dispatch_retains_budget_and_paym
         0
     );
 
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log
@@ -190,6 +192,7 @@ fn dropping_nested_evaluate_after_monetary_dispatch_retains_budget_and_payment_h
         payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
         0
     );
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log

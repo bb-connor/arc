@@ -155,6 +155,10 @@ fn wait_until(mut condition: impl FnMut() -> bool) {
     }
 }
 
+pub(super) fn wait_for_post_effect_evidence(kernel: &ChioKernel) {
+    wait_until(|| kernel.ensure_post_effect_evidence_latch_clear().is_ok());
+}
+
 #[test]
 fn unknown_append_recovers_while_idle_without_a_competing_receipt() {
     let (kernel, receipt, state) = fixture();

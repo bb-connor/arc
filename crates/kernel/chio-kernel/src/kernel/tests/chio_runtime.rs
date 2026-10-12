@@ -894,6 +894,7 @@ impl ReceiptStore for ChildAppendTimeoutStore {
 /// flush retries. Parent (chio) receipt appends always succeed.
 struct ChildAppendFailsOnceStore {
     child_appends: std::sync::Arc<AtomicU64>,
+    receipts: Mutex<Vec<ChildRequestReceipt>>,
 }
 
 impl ReceiptStore for ChildAppendFailsOnceStore {
@@ -908,7 +909,7 @@ impl ReceiptStore for ChildAppendFailsOnceStore {
     }
     fn append_child_receipt_with_timeout(
         &self,
-        _receipt: &ChildRequestReceipt,
+        receipt: &ChildRequestReceipt,
         _budget: std::time::Duration,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         if self.child_appends.fetch_add(1, Ordering::SeqCst) == 0 {
@@ -917,7 +918,25 @@ impl ReceiptStore for ChildAppendFailsOnceStore {
                 timeout_ms: 0,
             });
         }
+        self.receipts.lock().unwrap().push(receipt.clone());
         Ok(Some(1))
+    }
+
+    fn flush_receipt_writes(&self) -> Result<crate::ReceiptFlushReport, ReceiptStoreError> {
+        Ok(crate::ReceiptFlushReport::default())
+    }
+
+    fn load_retained_child_receipt(
+        &self,
+        id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        Ok(self
+            .receipts
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|receipt| receipt.id == id)
+            .cloned())
     }
 }
 

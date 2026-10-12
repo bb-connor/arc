@@ -151,13 +151,24 @@ fn nested_security_callbacks_preserve_the_effect_boundary() -> TestResult {
         );
         match fault {
             Fault::None => assert_eq!(result?.verdict, Verdict::Allow),
-            Fault::Record | Fault::Release => assert!(
-                matches!(
-                    result,
-                    Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
-                ),
-                "{fault:?}: {result:?}"
-            ),
+            Fault::Record | Fault::Release => {
+                let expected_step = if matches!(fault, Fault::Record) {
+                    crate::ReceiptDeliveryStep::SecurityOutcome
+                } else {
+                    crate::ReceiptDeliveryStep::SecurityRelease
+                };
+                let receipts = kernel.receipt_log();
+                let original_id = &receipts.get(0).expect("committed terminal").id;
+                assert!(
+                    matches!(
+                        &result,
+                        Err(KernelError::DeliveryFailedAfterReceipt { receipt_id, step, source })
+                            if receipt_id == original_id && *step == expected_step
+                            && matches!(source.as_ref(), KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
+                    ),
+                    "{fault:?}: {result:?}"
+                );
+            }
             _ => assert_eq!(result?.verdict, Verdict::Deny, "{fault:?}"),
         }
         if matches!(fault, Fault::Record | Fault::Release) {
