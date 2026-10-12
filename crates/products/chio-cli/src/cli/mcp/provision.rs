@@ -23,8 +23,13 @@ use artifact_io::{require_canonical_json, sync_directory, write_report_to_stdout
 mod discovery;
 #[path = "provision/linkage.rs"]
 mod linkage;
+#[path = "provision/private_files.rs"]
+mod private_files;
+use private_files::{restrict_private_file, validate_private_handle};
 #[path = "provision/reference_runtime.rs"]
 mod reference_runtime;
+#[path = "provision/shared_objects.rs"]
+mod shared_objects;
 
 pub(crate) use reference_runtime::{
     cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs,
@@ -541,37 +546,37 @@ fn require_static_position_independent(path: &Path, label: &str) -> Result<(), C
     }
 }
 
-/// A target the cage launches is static, or declares its interpreter and
-/// every shared object it needs as runtime files.
+/// A target the cage launches is static, or declares as runtime files its
+/// interpreter and a provider for every DT_NEEDED entry.
 fn require_target_linkage_declared(
     target: &Path,
     runtime_files: &BTreeSet<PathBuf>,
 ) -> Result<(), CliError> {
     let image =
         read_bounded_regular_file(target, MAX_EXECUTABLE_BYTES, false, "target executable")?;
-    match linkage::inspect_executable_linkage(&image) {
-        Ok(linkage::ExecutableLinkage::Static { .. }) => Ok(()),
-        Ok(linkage::ExecutableLinkage::Dynamic {
-            interpreter,
-            needed,
-        }) => {
-            let declared_interpreter = interpreter
-                .as_ref()
-                .map(|path| declared_runtime_interpreter(path, runtime_files))
-                .transpose()?
-                .unwrap_or(true);
-            if runtime_files.is_empty() || !declared_interpreter {
-                return Err(CliError::cli_other_error(format!(
-                    "target executable is {}; declare its interpreter and shared objects with --runtime-file, or build it static",
-                    linkage::ExecutableLinkage::Dynamic { interpreter, needed }
-                )));
-            }
-            Ok(())
+    let linkage = linkage::inspect_executable_linkage(&image)
+        .map_err(|error| CliError::cli_other_error(format!("target executable: {error}")))?;
+    let linkage::ExecutableLinkage::Dynamic {
+        interpreter,
+        needed,
+    } = &linkage
+    else {
+        return Ok(());
+    };
+    let mut missing = Vec::new();
+    if let Some(interpreter) = interpreter {
+        if !declared_runtime_interpreter(interpreter, runtime_files)? {
+            missing.push(interpreter.display().to_string());
         }
-        Err(error) => Err(CliError::cli_other_error(format!(
-            "target executable: {error}"
-        ))),
     }
+    missing.extend(shared_objects::undeclared(needed, runtime_files)?);
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(CliError::cli_other_error(format!(
+        "target executable is {linkage}; no --runtime-file provides {}; declare its interpreter and shared objects with --runtime-file, or build it static",
+        missing.join(", ")
+    )))
 }
 
 fn declared_runtime_interpreter(
@@ -588,30 +593,8 @@ fn declared_runtime_interpreter(
 }
 
 #[cfg(all(test, unix))]
-mod runtime_linkage_tests {
-    use super::*;
-
-    #[test]
-    fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let root = tempfile::tempdir()?;
-        let loader = root.path().join("loader");
-        let other = root.path().join("other");
-        let alias = root.path().join("interpreter");
-        std::fs::write(&loader, b"loader")?;
-        std::fs::write(&other, b"other")?;
-        std::os::unix::fs::symlink(&loader, &alias)?;
-        let declared = BTreeSet::from([loader.canonicalize()?]);
-        assert!(declared_runtime_interpreter(&alias, &declared)?);
-        assert!(!declared_runtime_interpreter(&alias, &BTreeSet::new())?);
-        std::fs::remove_file(&alias)?;
-        std::os::unix::fs::symlink(&other, &alias)?;
-        assert!(!declared_runtime_interpreter(&alias, &declared)?);
-        std::fs::remove_file(&alias)?;
-        assert!(declared_runtime_interpreter(&alias, &declared).is_err());
-        Ok(())
-    }
-}
+#[path = "provision/runtime_linkage_tests.rs"]
+mod runtime_linkage_tests;
 
 fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
     let parent = inputs.output_directory.parent().ok_or_else(|| {
@@ -1726,14 +1709,7 @@ fn read_bounded_regular_file(
 }
 
 fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<File, CliError> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    }
-    let file = options.open(path).map_err(|error| {
+    let file = open_without_following(path).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to open {label} {}: {error}",
             path.display()
@@ -1762,23 +1738,20 @@ fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<
     Ok(file)
 }
 
+fn open_without_following(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    options.open(path)
+}
+
 fn validate_private_regular_file(path: &Path, max_bytes: u64, label: &str) -> Result<(), CliError> {
     let file = open_regular_file(path, true, label)?;
-    let length = file
-        .metadata()
-        .map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to inspect {label} {}: {error}",
-                path.display()
-            ))
-        })?
-        .len();
-    if length == 0 || length > max_bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} is empty or exceeds {max_bytes} bytes"
-        )));
-    }
-    Ok(())
+    validate_private_handle(&file, path, max_bytes, label)
 }
 
 fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliError> {
@@ -1814,23 +1787,12 @@ fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliE
             path.display()
         ))
     })?;
-    set_private_file_permissions(path)
+    restrict_private_file(&file, path, label)
 }
 
 fn set_private_file_permissions(path: &Path) -> Result<(), CliError> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(
-            |error| {
-                CliError::cli_io_error(format!(
-                    "failed to set private permissions on {}: {error}",
-                    path.display()
-                ))
-            },
-        )?;
-    }
-    validate_private_regular_file(path, MAX_MIGRATION_DATABASE_BYTES, "provisioned artifact")
+    let file = open_regular_file(path, false, "provisioned artifact")?;
+    restrict_private_file(&file, path, "provisioned artifact")
 }
 
 fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliError> {
@@ -1838,12 +1800,12 @@ fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliErr
         let mut sidecar = database_path.as_os_str().to_os_string();
         sidecar.push(suffix);
         let sidecar = PathBuf::from(sidecar);
-        match std::fs::symlink_metadata(&sidecar) {
-            Ok(_) => set_private_file_permissions(&sidecar)?,
+        match open_without_following(&sidecar) {
+            Ok(file) => restrict_private_file(&file, &sidecar, "migration database sidecar")?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(CliError::cli_io_error(format!(
-                    "failed to inspect migration database sidecar {}: {error}",
+                    "failed to open migration database sidecar {}: {error}",
                     sidecar.display()
                 )))
             }
@@ -1855,15 +1817,20 @@ fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliErr
 fn set_private_directory_permissions(path: &Path) -> Result<(), CliError> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).map_err(
-            |error| {
+        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(path)
+            .and_then(|directory| {
+                directory.set_permissions(std::fs::Permissions::from_mode(0o700))
+            })
+            .map_err(|error| {
                 CliError::cli_io_error(format!(
                     "failed to set private directory permissions on {}: {error}",
                     path.display()
                 ))
-            },
-        )?;
+            })?;
     }
     Ok(())
 }
@@ -1880,10 +1847,10 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::MetadataExt as _;
-        if metadata.mode() & 0o777 != 0o700 {
-            return Err(tampered("demo output directory mode is not 0700"));
-        }
+        // SAFETY: geteuid takes no arguments and only reads the calling
+        // process identity.
+        let operator = unsafe { libc::geteuid() };
+        private_files::require_private_directory_metadata(&metadata, operator)?;
     }
     Ok(())
 }
@@ -1960,3 +1927,6 @@ fn tampered(message: &str) -> CliError {
 #[cfg(test)]
 #[path = "provision/document_tests.rs"]
 mod document_tests;
+#[cfg(all(test, unix))]
+#[path = "provision/private_artifact_tests.rs"]
+mod private_artifact_tests;

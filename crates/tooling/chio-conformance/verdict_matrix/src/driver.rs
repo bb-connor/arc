@@ -891,6 +891,7 @@ fn replay_reason_code(error: &ExecutionNonceError) -> &'static str {
         | ExecutionNonceError::BadSchema { .. }
         | ExecutionNonceError::Encoding(_)
         | ExecutionNonceError::Store(_) => REASON_REPLAY_DRIFT,
+        ExecutionNonceError::Missing => REASON_REPLAY_TRACE_MISSING,
     }
 }
 

@@ -702,7 +702,7 @@ fn register_with_initial_state(
         ));
     }
     registration.validate()?;
-    if now_unix_seconds > registration.nonce_expires_at_unix_seconds {
+    if now_unix_seconds >= registration.nonce_expires_at_unix_seconds {
         return Err(BrokerError::AuthorizationDenied(
             "request proof nonce is already expired".to_string(),
         ));
@@ -1447,6 +1447,32 @@ mod tests {
                 .register_attempt(&registration, 11)
                 .test_expect("retry"),
             RegisterAttemptOutcome::ExactRetry(_)
+        ));
+    }
+
+    #[test]
+    fn nonce_registration_window_is_half_open() {
+        let store = SqliteAttemptStore::open_in_memory().test_expect("store");
+        let at_deadline = registration("nonce-at-the-deadline");
+        assert!(matches!(
+            store.register_intent(&at_deadline, 100),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
+        assert!(matches!(
+            store.register_attempt(&at_deadline, 100),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
+
+        let registration = registration("nonce-abcdefghijkl");
+        assert!(matches!(
+            store
+                .register_attempt(&registration, 99)
+                .test_expect("register before the nonce deadline"),
+            RegisterAttemptOutcome::Inserted(_)
+        ));
+        assert!(matches!(
+            store.register_attempt(&registration, 100),
+            Err(BrokerError::AuthorizationDenied(_))
         ));
     }
 

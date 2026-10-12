@@ -1,5 +1,5 @@
 //! Integration test that enforces the regenerate-only policy on every file
-//! under `crates/chio-core-types/src/_generated/`.
+//! under `crates/core/chio-core-types/src/_generated/`.
 //!
 //! For each `*.rs` file under `_generated/` (recursively), we check:
 //!
@@ -77,7 +77,7 @@ fn generated_mod_rs_exists() {
 }
 
 fn generated_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR points at `crates/chio-core-types`.
+    // CARGO_MANIFEST_DIR points at `crates/core/chio-core-types`.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("_generated")

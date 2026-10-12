@@ -119,6 +119,7 @@ All agent-to-kernel frames are JSON objects with a `type` discriminator.
 | `threshold_approval_proposal` | optional `ThresholdApprovalProposal` | Returned proposal, requiring at least one collected vote |
 | `supplemental_authorization` | optional opaque authorization object | Kernel-verified authorization extension |
 | `execution_nonce` | optional `SignedExecutionNonce` | Exact preflight retry token in supported execution-nonce profiles |
+| `dpop_proof` | optional `DpopProof` | Subject-signed invocation proof (`chio.dpop_proof.v1` or `chio.dpop_proof.v2`), verified before dispatch; required when the matched grant sets `dpop_required` |
 
 #### 2.4.2 KernelMessage
 

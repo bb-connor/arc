@@ -6,7 +6,7 @@
 //
 // Manual edits will be overwritten by the next regeneration; the
 // `_generated_check` integration test enforces this header on every file
-// under `crates/chio-core-types/src/_generated/`.
+// under `crates/core/chio-core-types/src/_generated/`.
 
 pub mod agent_heartbeat {
     /// Error types.

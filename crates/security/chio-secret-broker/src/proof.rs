@@ -86,6 +86,9 @@ pub fn issue_request_proof(
     })
 }
 
+/// A proof is issued inside the capability's half-open `[not_before,
+/// expires_at)`, no further ahead of `now` than the allowed skew, and is
+/// expired from `issued_at + nonce_ttl` on.
 pub fn verify_request_proof(
     proof: &RequestProof,
     capability: &SignedBrokerCapability,
@@ -118,7 +121,7 @@ pub fn verify_request_proof(
     if proof.body.issued_at_unix_seconds < capability.body.not_before_unix_seconds
         || proof.body.issued_at_unix_seconds >= capability.body.expires_at_unix_seconds
         || proof.body.issued_at_unix_seconds > future_limit
-        || now_unix_seconds > latest
+        || now_unix_seconds >= latest
     {
         return Err(BrokerError::AuthorizationDenied(
             "request proof is outside the capability interval, stale, or from the future"
@@ -314,6 +317,40 @@ mod tests {
             verify_request_proof(&proof, &capability, &request, 21, 2),
             Err(BrokerError::AuthorizationDenied(_))
         ));
+    }
+
+    #[test]
+    fn request_proof_lifetime_is_half_open() {
+        let (caller, capability, request) = fixture();
+        let proof_at = |issued_at| {
+            issue_request_proof(
+                &capability,
+                &request,
+                "nonce-abcdefghijkl".to_string(),
+                issued_at,
+                &caller,
+            )
+            .test_expect("proof")
+        };
+        let denied = |proof: &RequestProof, now| {
+            matches!(
+                verify_request_proof(proof, &capability, &request, now, 0),
+                Err(BrokerError::AuthorizationDenied(_))
+            )
+        };
+
+        let at_not_before = proof_at(10);
+        verify_request_proof(&at_not_before, &capability, &request, 10, 0)
+            .test_expect("a proof issued at not_before is valid");
+        verify_request_proof(&at_not_before, &capability, &request, 39, 0)
+            .test_expect("a proof is valid until its nonce deadline");
+        assert!(denied(&at_not_before, 40), "issued_at + ttl is expired");
+        assert!(denied(&proof_at(9), 10), "issued before not_before");
+
+        let last_second = proof_at(99);
+        verify_request_proof(&last_second, &capability, &request, 99, 0)
+            .test_expect("a proof issued before expires_at is valid");
+        assert!(denied(&proof_at(100), 100), "issued at expires_at");
     }
 
     #[test]

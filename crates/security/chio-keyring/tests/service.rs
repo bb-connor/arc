@@ -4,7 +4,7 @@ use std::io::{BufReader, Cursor};
 
 use chio_core_types::{Ed25519Backend, Keypair, SigningBackend};
 use chio_keyring::{
-    load_key_log_policy, load_witness_seed_backend, read_bounded_json_line,
+    load_key_log_policy, load_witness_seed_backend, read_bounded_json_line, KeyringError,
     KEY_LOG_POLICY_DOCUMENT_SCHEMA, MAX_CANONICAL_RECORD_BYTES,
 };
 
@@ -132,9 +132,66 @@ fn witness_seed_loader_rejects_links_and_permissive_modes() {
 
     let symlink_path = trusted_temp_path(&directory, "witness-link.seed");
     symlink(&seed_path, &symlink_path).test_unwrap();
-    assert!(load_witness_seed_backend(&symlink_path).is_err());
+    assert_refused_with(load_witness_seed_backend(&symlink_path), "regular file");
 
     let hardlink_path = trusted_temp_path(&directory, "witness-hardlink.seed");
     std::fs::hard_link(&seed_path, &hardlink_path).test_unwrap();
-    assert!(load_witness_seed_backend(&seed_path).is_err());
+    assert_refused_with(load_witness_seed_backend(&seed_path), "one hard link");
+}
+
+#[cfg(unix)]
+fn assert_refused_with(result: chio_keyring::Result<Ed25519Backend>, expected: &str) {
+    match result {
+        Err(KeyringError::StateInvariant(message)) => {
+            assert!(
+                message.contains(expected),
+                "expected a refusal naming `{expected}`, got `{message}`"
+            );
+        }
+        Err(other) => panic!("expected a refusal naming `{expected}`, got `{other}`"),
+        Ok(_) => panic!("expected a refusal naming `{expected}`, but the seed loaded"),
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn witness_seed_loader_refuses_group_or_other_access_before_reading_content() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = private_tempdir().test_unwrap();
+    let seed_path = trusted_temp_path(&directory, "witness.seed");
+    for (mode, contents) in [
+        (0o640, vec![9_u8; 32]),
+        (0o604, vec![9_u8; 32]),
+        (0o640, vec![9_u8; 64]),
+        (0o604, Vec::new()),
+    ] {
+        write_private_file(&seed_path, &contents).test_unwrap();
+        std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(mode)).test_unwrap();
+        assert_refused_with(load_witness_seed_backend(&seed_path), "mode 0600");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn witness_seed_loader_refuses_a_fifo_or_directory_without_blocking() {
+    let directory = private_tempdir().test_unwrap();
+    let fifo_path = trusted_temp_path(&directory, "witness-fifo.seed");
+    let status = std::process::Command::new("mkfifo")
+        .arg(&fifo_path)
+        .status()
+        .test_unwrap();
+    assert!(status.success());
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(load_witness_seed_backend(&fifo_path));
+    });
+    let result = receiver
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .test_unwrap();
+    assert_refused_with(result, "regular file");
+
+    let directory_path = trusted_temp_path(&directory, "witness-directory.seed");
+    std::fs::create_dir(&directory_path).test_unwrap();
+    assert_refused_with(load_witness_seed_backend(&directory_path), "regular file");
 }

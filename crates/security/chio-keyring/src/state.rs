@@ -834,6 +834,9 @@ impl KeyLogState {
         self.pending_event_id.as_ref()
     }
 
+    /// A verification-only key verifies artifacts anchored in the half-open
+    /// interval `[activated_at, min(deactivated_at, verify_until))`, the same
+    /// exclusive deadline live verification applies.
     pub fn verification_key_for_artifact(
         &self,
         key_id: &KeyId,
@@ -856,7 +859,7 @@ impl KeyLogState {
                         .is_some_and(|deactivated| time_evidence.anchored_at() < deactivated)
                     && record
                         .verify_until
-                        .is_some_and(|until| time_evidence.anchored_at() <= until)
+                        .is_some_and(|until| time_evidence.anchored_at() < until)
             }
             KeyStatus::Pending | KeyStatus::Retired | KeyStatus::Revoked => false,
         };

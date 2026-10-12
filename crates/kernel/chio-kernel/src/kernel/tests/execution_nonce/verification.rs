@@ -609,7 +609,14 @@ fn require_presented_nonce_denies_when_missing_in_strict_mode() {
     let err = kernel
         .require_presented_execution_nonce(&request, &cap)
         .unwrap_err();
-    assert!(matches!(err, KernelError::Internal(_)), "{err:?}");
+    assert!(
+        matches!(
+            &err,
+            KernelError::ExecutionNonce(cause)
+                if cause.code() == "urn:chio:error:kernel:execution-nonce-missing"
+        ),
+        "{err:?}"
+    );
 }
 
 #[test]

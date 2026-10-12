@@ -23,6 +23,24 @@ license and exact patch inventories are distributed with this source tree. The
 `nono-chio` adapter is compiled into `chio-cage-init`; the upstream nono crate
 is not compiled into any Chio artifact.
 
+seccompiler 0.5.0
+Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Upstream repository: https://github.com/rust-vmm/seccompiler
+Reviewed upstream commit: c3cf77d65815037931ae5bc2fca010713defdc8c
+Licensed under the Apache License, Version 2.0 or the BSD 3-Clause License
+(Apache-2.0 OR BSD-3-Clause).
+
+Chio includes a modified copy of the upstream crate under
+`third_party/seccompiler-chio`. Chio changed `src/lib.rs` to reject filter
+lengths that do not fit the kernel `sock_fprog` length field (with one
+documentation indentation fix), added regression tests to
+`tests/integration_tests.rs`, marked both manifests unpublished and standalone,
+added a tracked `Cargo.lock` (removing it from `.gitignore`), and normalized
+whitespace in `.platform` and `tools/generate_syscall_tables.sh`.
+`CHIO-PATCH.md` describes the production change and its tests. The source and
+both original license texts are distributed with this source tree. The fork is
+compiled into `chio-cage-init` on Linux.
+
 sigstore-verify 0.6.3
 Copyright 2025 prefix.dev GmbH
 Upstream repository: https://github.com/prefix-dev/sigstore-rust

@@ -232,11 +232,9 @@ impl ChioKernel {
         if !self.execution_nonce_required() && presented.is_none() {
             return Ok(None);
         }
-        let presented = presented.ok_or_else(|| {
-            KernelError::Internal(
-                "execution nonce required but not presented on tool call".to_string(),
-            )
-        })?;
+        let presented = presented.ok_or(KernelError::ExecutionNonce(
+            crate::execution_nonce::ExecutionNonceError::Missing,
+        ))?;
         let _store = self.execution_nonce_store.as_deref().ok_or_else(|| {
             KernelError::Internal("execution nonce store is not installed".to_string())
         })?;

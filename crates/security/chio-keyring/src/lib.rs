@@ -206,15 +206,46 @@ pub fn read_custody_sensitive_file(
     path: impl AsRef<std::path::Path>,
     maximum_bytes: usize,
 ) -> Result<Vec<u8>> {
-    read_custody_sensitive_file_with_metadata(path.as_ref(), maximum_bytes).map(|(bytes, _)| bytes)
+    read_custody_file(path.as_ref(), maximum_bytes, CustodyFileAccess::SharedRead)
+        .map(|mut bytes| std::mem::take(&mut *bytes))
 }
 
-pub(crate) fn read_custody_sensitive_file_with_metadata(
+/// Who besides the trusted owner may access a custody file.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum CustodyFileAccess {
+    /// Group and other may read; only the owner may write.
+    SharedRead,
+    /// Only the owner may access the file: mode 0600 or stricter.
+    OwnerOnly,
+}
+
+impl CustodyFileAccess {
+    #[cfg(unix)]
+    fn validate(self, file: &std::fs::File, metadata: &std::fs::Metadata) -> Result<()> {
+        match self {
+            Self::SharedRead => validate_custody_sensitive_file_security(file, metadata),
+            Self::OwnerOnly => {
+                validate_trusted_file_security(file, metadata).map_err(|error| match error {
+                    KeyringError::StateInvariant(_) => KeyringError::StateInvariant(
+                        "owner-only custody input must have trusted ownership, mode 0600 or stricter, no extended ACL, and one hard link",
+                    ),
+                    other => other,
+                })
+            }
+        }
+    }
+}
+
+/// Read a custody file through a retained, trusted parent-directory
+/// descriptor. The file's type, ownership, mode, link count and ACL are
+/// checked against `access` on the opened descriptor before any content is
+/// read, and again after the read. The returned buffer, and every partial
+/// buffer on an error path, is wiped when dropped.
+pub(crate) fn read_custody_file(
     path: &std::path::Path,
     maximum_bytes: usize,
-) -> Result<(Vec<u8>, std::fs::Metadata)> {
-    use std::io::Read as _;
-
+    access: CustodyFileAccess,
+) -> Result<zeroize::Zeroizing<Vec<u8>>> {
     if !path.is_absolute() {
         return Err(KeyringError::StateInvariant(
             "custody-sensitive input path must be absolute",
@@ -261,7 +292,10 @@ pub(crate) fn read_custody_sensitive_file_with_metadata(
         let descriptor = rustix::fs::openat(
             &parent,
             file_name,
-            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::OFlags::RDONLY
+                | rustix::fs::OFlags::NOFOLLOW
+                | rustix::fs::OFlags::NONBLOCK
+                | rustix::fs::OFlags::CLOEXEC,
             rustix::fs::Mode::empty(),
         )
         .map_err(|error| KeyringError::Io(error.into()))?;
@@ -282,13 +316,15 @@ pub(crate) fn read_custody_sensitive_file_with_metadata(
     }
     #[cfg(unix)]
     {
-        validate_custody_sensitive_file_security(&file, &metadata_before)?;
+        access.validate(&file, &metadata_before)?;
         if !unix_metadata_identity_matches(&path_metadata_before, &metadata_before) {
             return Err(KeyringError::StateInvariant(
                 "custody-sensitive input changed while it was opened",
             ));
         }
     }
+    #[cfg(not(unix))]
+    let _ = access;
 
     let maximum_bytes_u64 = u64::try_from(maximum_bytes).map_err(|_| KeyringError::NumericRange)?;
     if metadata_before.len() > maximum_bytes_u64 {
@@ -296,16 +332,7 @@ pub(crate) fn read_custody_sensitive_file_with_metadata(
             "custody-sensitive input exceeds its byte limit".to_string(),
         ));
     }
-    let read_limit = maximum_bytes_u64
-        .checked_add(1)
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(maximum_bytes);
-    (&mut file).take(read_limit).read_to_end(&mut bytes)?;
-    if bytes.len() > maximum_bytes {
-        return Err(KeyringError::Canonical(
-            "custody-sensitive input exceeds its byte limit".to_string(),
-        ));
-    }
+    let bytes = read_bounded_zeroizing(&mut file, maximum_bytes)?;
 
     let metadata_after = file.metadata()?;
     let path_metadata_after = std::fs::symlink_metadata(path)?;
@@ -320,7 +347,7 @@ pub(crate) fn read_custody_sensitive_file_with_metadata(
     }
     #[cfg(unix)]
     {
-        validate_custody_sensitive_file_security(&file, &metadata_after)?;
+        access.validate(&file, &metadata_after)?;
         if !unix_metadata_identity_matches(&metadata_before, &metadata_after)
             || !unix_metadata_identity_matches(&path_metadata_after, &metadata_after)
             || !unix_metadata_revision_matches(&metadata_before, &metadata_after)
@@ -338,7 +365,43 @@ pub(crate) fn read_custody_sensitive_file_with_metadata(
             ));
         }
     }
-    Ok((bytes, metadata_after))
+    Ok(bytes)
+}
+
+/// Read at most `maximum_bytes` from `file` into a buffer that is wiped when
+/// dropped, refusing a longer file. The buffer is allocated once at
+/// `maximum_bytes + 1` and never grows, so no reallocation leaves an unwiped
+/// copy of the content behind.
+pub(crate) fn read_bounded_zeroizing(
+    file: &mut std::fs::File,
+    maximum_bytes: usize,
+) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    use std::io::Read as _;
+
+    let capacity = maximum_bytes
+        .checked_add(1)
+        .ok_or(KeyringError::NumericRange)?;
+    let mut bytes = zeroize::Zeroizing::new(vec![0_u8; capacity]);
+    let mut filled = 0_usize;
+    while let Some(window) = bytes.get_mut(filled..).filter(|window| !window.is_empty()) {
+        match file.read(window) {
+            Ok(0) => break,
+            Ok(count) => {
+                filled = filled
+                    .checked_add(count)
+                    .ok_or(KeyringError::NumericRange)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(KeyringError::Io(error)),
+        }
+    }
+    if filled > maximum_bytes {
+        return Err(KeyringError::Canonical(
+            "custody-sensitive input exceeds its byte limit".to_string(),
+        ));
+    }
+    bytes.truncate(filled);
+    Ok(bytes)
 }
 
 #[cfg(unix)]
@@ -607,10 +670,27 @@ fn validate_trusted_file_security(
     use std::os::unix::fs::MetadataExt;
 
     let effective_uid = rustix::process::geteuid().as_raw();
-    if (metadata.uid() != effective_uid && metadata.uid() != TRUSTED_ROOT_UID)
-        || metadata.mode() & 0o077 != 0
-        || metadata.nlink() != 1
-        || trusted_file_has_extended_acl(file)?
+    validate_trusted_file_security_values(
+        metadata.uid(),
+        effective_uid,
+        metadata.mode(),
+        metadata.nlink(),
+        trusted_file_has_extended_acl(file)?,
+    )
+}
+
+#[cfg(unix)]
+fn validate_trusted_file_security_values(
+    owner_uid: u32,
+    effective_uid: u32,
+    mode: u32,
+    link_count: u64,
+    has_extended_acl: bool,
+) -> Result<()> {
+    if (owner_uid != effective_uid && owner_uid != TRUSTED_ROOT_UID)
+        || mode & 0o077 != 0
+        || link_count != 1
+        || has_extended_acl
     {
         return Err(KeyringError::StateInvariant(
             "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link",
@@ -627,7 +707,7 @@ mod storage_identity_tests {
     use super::open_trusted_unix_directory_chain;
     use super::{
         open_durable_sqlite_file, validate_custody_sensitive_file_security_values,
-        validate_trusted_parent_security,
+        validate_trusted_file_security_values, validate_trusted_parent_security,
     };
 
     fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
@@ -688,9 +768,43 @@ mod storage_identity_tests {
     }
 
     #[test]
-    fn trusted_file_policy_rejects_group_or_world_readability() {
-        assert_ne!(0o644 & 0o077, 0);
-        assert_eq!(0o600 & 0o077, 0);
+    fn trusted_file_policy_rejects_group_or_world_access_foreign_owner_links_and_acl() {
+        assert!(validate_trusted_file_security_values(501, 501, 0o100600, 1, false).is_ok());
+        assert!(validate_trusted_file_security_values(501, 501, 0o100400, 1, false).is_ok());
+        assert!(validate_trusted_file_security_values(0, 501, 0o100600, 1, false).is_ok());
+        for mode in [
+            0o100640, 0o100620, 0o100610, 0o100604, 0o100602, 0o100601, 0o100644, 0o100666,
+        ] {
+            assert!(
+                validate_trusted_file_security_values(501, 501, mode, 1, false).is_err(),
+                "mode {mode:o} must be refused"
+            );
+        }
+        assert!(validate_trusted_file_security_values(502, 501, 0o100600, 1, false).is_err());
+        assert!(validate_trusted_file_security_values(501, 501, 0o100600, 2, false).is_err());
+        assert!(validate_trusted_file_security_values(501, 501, 0o100600, 1, true).is_err());
+    }
+
+    #[test]
+    fn retained_sqlite_descriptor_rejects_group_or_world_access_to_the_database_file(
+    ) -> std::io::Result<()> {
+        let directory = private_tempdir()?;
+        let trusted_directory = std::fs::canonicalize(directory.path())?;
+        let database = trusted_directory.join("key-log.sqlite3");
+        let retained =
+            open_durable_sqlite_file(&database, true, true).map_err(std::io::Error::other)?;
+        assert!(retained.validate().is_ok());
+
+        for mode in [0o640, 0o604] {
+            std::fs::set_permissions(&database, std::fs::Permissions::from_mode(mode))?;
+            assert!(
+                retained.validate().is_err(),
+                "mode {mode:o} must be refused"
+            );
+        }
+        std::fs::set_permissions(&database, std::fs::Permissions::from_mode(0o600))?;
+        assert!(retained.validate().is_ok());
+        Ok(())
     }
 
     #[test]

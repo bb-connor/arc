@@ -541,11 +541,10 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
               ) IS NOT NULL;
 
         -- Multi-tenant receipt isolation: hydrate tenant_id
-        -- from the canonical receipt body. Pre-multitenant receipts (NULL-tagged)
-        -- that were stored before the field existed stay NULL, which
-        -- means "public / visible to any tenant under the default
-        -- compat query mode". Operators who want to purge those
-        -- pre-multitenant rows can enable strict tenant isolation on queries.
+        -- from the canonical receipt body. Receipts whose body carries no
+        -- tenant_id stay NULL. Tenant-scoped reads match tenant_id exactly,
+        -- so NULL-tagged rows are invisible to every tenant; only
+        -- administrative reads without a tenant filter return them.
         --
         -- The receipt body uses snake_case field names (no rename_all),
         -- so the JSON key is `tenant_id`, not `tenantId`.
