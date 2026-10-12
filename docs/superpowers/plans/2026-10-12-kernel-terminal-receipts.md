@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- Base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
+- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `9de7cb4823`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
 - Non-durable acceptance is one committed terminal receipt OR one buffered evidence obligation with dispatch latched. Persistence eventually requires a healthy clock, signer and store. The in-memory buffer is not crash-durable.
 - A durable call leaves terminal truth to its saga. Never append a competing cancellation or deny after handing off that operation.
 - Unknown append outcomes retain the original receipt identity. Absence on an early read cannot establish that an in-flight write will never commit.
@@ -107,3 +107,14 @@
 - Ruling: a pending durable known return remains owned by the persistent admission saga, with `DurableOutcomePending`. There is no generic kernel-independent idle finalization driver. Do not claim that acceptance or add a no-op scheduler. A durable nested call separately reserves child-evidence capacity before the first child; `ChildrenOnly` recovery never mints a competing parent terminal.
 - Ruling: unknown child append resolution requires a complete retained-history API with an unsupported default. Legacy `load_child_receipt` defaults to an ambiguous miss and SQLite's implementation is live-only. The additive readback is prepared in `fix/retained-child-receipts`; no mutable-row-only absence proof is permitted.
 - Evidence capacity measures retained canonical payload bytes with bounded envelope headroom. Fault templates retain complete valid action parameters; oversized templates are refused before dispatch. Child admission reserves count and byte capacity before beginning a child. Fault-only oversized financial references must carry explicit omission plus their original digest, never silent truncation or invented settlement truth.
+
+## Integration checkpoint (2026-10-12)
+
+- Identity #1242 merged as `0ab30ba50e`; publication #1244 merged as `74570d7ff7`; payment outcomes #1248 merged as `cfee00fa7d`. The payment entrypoint rejects non-object caller metadata before effects. Its final x86 evidence is nine outcome tests, 27 simulated-payment tests and strict owning Clippy.
+- Four callback/clock/publication Originals failed at `2af82c3e31`. Repair `2f87578f49` passed those controls and the same binary passed 39 ownership, recovery, publication and payment tests. This is bounded evidence, not qualification of later changes.
+- Shutdown and child-client Originals at `52b86d4cfb` both failed at runtime. Repairs `b1762428e5` and `92361a9403` retain the waiter synchronization and the unsigned child before entering the client. Their composed GREEN is pending.
+- Terminal binding now includes evaluation identity, authenticated namespace, request, capability, matched grant, server, tool, policy and input. An acknowledged receipt whose private discharge binding mismatches is retained by its original id and content digest. Delivery remains withheld. New preparation and two-tenant controls await the final focused run.
+- The composed strict run found unchecked internal Option invariants and oversized delivery/error variants. They are being repaired without lint waivers. The stage-label control is checking that a post-commit execution-nonce failure is not relabeled as provenance.
+- Retained-child readback uses complete authenticated live/archive history with an unsupported default. Original `b0b6ce674c` and repair `f8696157fc` are awaiting the corrected SQLite qualification. The two earlier wrong-import attempts are compile refusals, not runtime evidence.
+- The prepayment retry repair remains separate. Its first GREEN run exposed cleanup of a replayed hold (four passing controls, one failing); the next repair derives Fresh/Replayed/Unknown cleanup custody atomically from the authorizing store. Unknown or replayed custody cannot authorize compensation.
+- The historical PostAdmissionDropGuard abstraction does not prove the new retained-child recovery transitions. Source-anchor reconciliation preserves that distinction. Generic durable idle finalization also remains open; the original admission saga remains the durable owner.
