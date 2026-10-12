@@ -20,3 +20,10 @@ pause flag is not an acknowledgement of completion of an in-flight iteration.
    Review the complete patch before one replacement push. Preserve the hosted
    failure; require fresh checks on the replacement. No production API change,
    skipped test, timing tolerance, authority mutation or gate waiver.
+
+Local completion: the deterministic Original failed on the intended timestamp
+mismatch. The repaired three health controls, 25 repeated held-lock controls,
+strict all-target Clippy and static gates passed. Claude approved the complete
+source with no P0/P1/P2 findings. Exact source and evidence are recorded in
+`docs/security/audits/receipt-health-sample-20261012.json`. Replacement hosted
+qualification remains required; the original hosted failure is preserved.

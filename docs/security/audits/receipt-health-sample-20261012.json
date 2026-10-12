@@ -1,0 +1,51 @@
+{
+  "schema": "chio.security.local-repair-qualification.v1",
+  "requirements": [
+    "CI-1201-HEALTH-SAMPLE"
+  ],
+  "base": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+  "original": "034e7d017e",
+  "hosted_failure": {
+    "run": 38186776842,
+    "job": 114610685186,
+    "log_sha256": "5b84f42b48849e89f63ee9a2d165b624242d899eb63c6a10693b85e4d7002534"
+  },
+  "status": "locally_qualified_independently_reviewed",
+  "source_patch_sha256": "fa564cd23d6df6be4df6b0e77d111aed967606028050c0c285d6fac7924e6364",
+  "source_sha256": {
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs": "eae19cd3a6d74644da6d0e4ff5470cb6c4d3a24aaff1c84223af4d0e37060f25",
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/health_tests.rs": "09d29044d0321673524eb9f67a63ad216770c183d31f4ad8f56f6ce8993714d8"
+  },
+  "design": [
+    "A cfg(test) parked acknowledgement drains the walker iteration before health fixtures acquire their locks.",
+    "The held-lock control advances live metadata by one millisecond to ensure it differs from the last published sample.",
+    "The oracle requires full cached watermark and resource-field equality, zero reader admission, bounded nonblocking response, and stopped state. Production API and scheduling semantics are unchanged."
+  ],
+  "results": {
+    "genuine_original": "0 passed, 1 intended runtime failure",
+    "focused": "3 passed, 0 failed",
+    "repeated_held_lock_control": "25 passed, 0 failed",
+    "owning_strict": "all-target Clippy pass",
+    "static": "format, Rust file hygiene, trust boundaries, negative assertions, security clocks and security CI contract pass"
+  },
+  "retained_refusals": [
+    "Initial static wrapper invoked a nonexistent check-rust-hygiene.py; corrected to the existing check-rust-file-hygiene.py. No checker modification.",
+    "Fresh checkout inherited group-write umask modes. Exactly18 security execution boundary inventory paths were normalized to the existing required644/755 modes before final qualification. No content or Git executable-mode change."
+  ],
+  "review": {
+    "reviewer": "Claude",
+    "observed": "2026-10-12T06:32:13Z",
+    "decision": "approve",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0
+  },
+  "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/receipt-health-sample-20261012",
+  "archive_manifest_sha256": "3dbd38c34ebaef7ede14e4c48682c764db3f67da79773ee706a19fe864fd9324",
+  "remaining_acceptance": [
+    "Replacement exact-head hosted required checks and current review. Local aarch64 evidence does not replace hosted x86_64 qualification."
+  ],
+  "production_behavior_changed": false,
+  "authority_changes": false,
+  "gate_waivers": false
+}
