@@ -8,6 +8,7 @@ impl ChioKernel {
         &self,
         input: &DurablePaymentCompensationInput<'_>,
         journal: PaymentJournalRecord,
+        mutation_lock: &mut ExternalCallLock<'_>,
     ) -> Result<
         (
             PaymentJournalRecord,
@@ -25,6 +26,7 @@ impl ChioKernel {
             }
             let cancelled = self.advance_compensation_payment(
                 input,
+                mutation_lock,
                 &journal,
                 &PaymentJournalTransition::CancelBeforeAuthorization,
                 None,
@@ -35,14 +37,20 @@ impl ChioKernel {
             (unwind.authorization_id.clone(), Some(unwind.clone()))
         } else {
             let adapter = self.compensation_payment_adapter(&journal)?;
-            let state = run_payment_adapter_operation("recover authorization", || {
-                adapter.settlement_state(&journal.operation_id, None)
-            })
-            .map_err(payment_error)?;
+            // A status query has no effect to journal first. Its answer is
+            // recorded only against the journal it was asked about.
+            let state = mutation_lock
+                .call_unlocked(input.operation, input.lease, || {
+                    run_payment_adapter_operation("recover authorization", || {
+                        adapter.settlement_state(&journal.operation_id, None)
+                    })
+                })?
+                .map_err(payment_error)?;
             match state {
                 RailSettlementState::NoAuthorization => {
                     let cancelled = self.advance_compensation_payment(
                         input,
+                        mutation_lock,
                         &journal,
                         &PaymentJournalTransition::CancelBeforeAuthorization,
                         None,
@@ -106,7 +114,8 @@ impl ChioKernel {
                 PaymentJournalTransition::PrepaymentSettled { authorization_id }
             }
         };
-        let recovered = self.advance_compensation_payment(input, &journal, &transition, None)?;
+        let recovered =
+            self.advance_compensation_payment(input, mutation_lock, &journal, &transition, None)?;
         Ok((recovered, unwind))
     }
 }

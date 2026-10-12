@@ -1036,6 +1036,23 @@ impl ChioKernel {
                 evaluation.validate_replay_contract(&plan.frozen_steps, &normalized_context)
             })
             .map_err(tool_outcome_error)?;
+        let mut mutation_lock = ExternalCallLock::new(
+            runtime,
+            mutation_guard,
+            &admission.operation,
+            trusted_now_unix_ms,
+        )?;
+        // Begin evaluation durably before oracle I/O. Relocking validates the
+        // original claim and samples fresh trusted time before pricing uses
+        // the quote. Resolved replays retain their committed pricing.
+        let prefetched_rate = if finalization_resolved || delivery_evaluation.denial.is_some() {
+            None
+        } else {
+            mutation_lock.call_unlocked(&admission.operation, &lease, || {
+                self.prefetch_durable_payment_rate(admission, runtime, &tool_return.raw)
+            })??
+        };
+        let trusted_now_unix_ms = mutation_lock.trusted_now_unix_ms();
         if !finalization_resolved && delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
@@ -1125,6 +1142,7 @@ impl ChioKernel {
             trusted_now_unix_ms,
             delivery_denied,
             retained: retained_disposition,
+            prefetched_rate,
         })?;
         let payment_pricing = payment_plan.as_ref().and_then(|plan| plan.pricing.clone());
         let settlement_disposition = payment_plan
@@ -1287,16 +1305,19 @@ impl ChioKernel {
         };
         let payment_terminal = payment_plan
             .map(|plan| {
-                self.settle_durable_payment(DurablePaymentSettlementInput {
-                    admission,
-                    runtime,
-                    lease: &lease,
-                    journal: plan.journal,
-                    disposition: &settlement_disposition,
-                    context: &context,
-                    purchase: purchase.as_ref(),
-                    trusted_now_unix_ms,
-                })
+                self.settle_durable_payment(
+                    DurablePaymentSettlementInput {
+                        admission,
+                        runtime,
+                        lease: &lease,
+                        journal: plan.journal,
+                        disposition: &settlement_disposition,
+                        context: &context,
+                        purchase: purchase.as_ref(),
+                        trusted_now_unix_ms,
+                    },
+                    &mut mutation_lock,
+                )
             })
             .transpose()?;
         if let Some(binding) = purchase.as_ref() {
@@ -1310,7 +1331,7 @@ impl ChioKernel {
         // mutate current security state. Never invoke or dispose of that owner
         // under the kernel sequencer. The checkpoint transaction revalidates
         // the original lease and records before publishing its acknowledgement.
-        drop(mutation_guard);
+        drop(mutation_lock);
         self.complete_durable_security_release(
             DurableSecurityReleaseInput {
                 admission,
