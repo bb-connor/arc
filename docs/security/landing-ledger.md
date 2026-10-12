@@ -34,6 +34,13 @@ heads. None of those 57 heads is an ancestor of the squash commit. Their landing
 link is the verified source/merge tree identity, not invented main ancestry or
 automatic closure of their review obligations.
 
+The installed native recovery job `114591814902` passed on source `29327c5d7c`.
+Both operator scenarios passed the unchanged ten-second policy, three successful
+HTTP requests, eight verified receipts, replay and failure controls. This renews
+that scenario only; the earlier failed run and broader latency, concurrency and
+cold-state acceptance remain distinct. The audit retains the artifact and log
+hashes.
+
 Trusted-definition and authorization setup, incomplete Kani proofs and
 operational acceptance remain open. The post-merge audit job failed before
 executing its auditor because the pinned `c009ace` definition lacks the script.

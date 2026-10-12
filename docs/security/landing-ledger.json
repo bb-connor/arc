@@ -133917,7 +133917,7 @@
 "cognition_ci_extraction_20261011":{"source":"326d10e667a4aea50617d1cc5c469836bbd3ff27","audit":"docs/security/audits/cognition-ci-extraction-20261011.json","audit_sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","requirements_preserved":2025,"qualification":"source-qualified-reviewed; replacement hosted and landing pending","source_scope":"No production Rust delta; exact test commands/feature graphs/serial profiles/budgets preserved.","verification":"Full13affectedcommands across Claude andRoot; same executable/configuration inputs after composition;216 Bash controls; complete unaffected job/step preservation."},
   "foundation_postmerge_20261011": {
     "path": "docs/security/audits/foundation-postmerge-20261011.json",
-    "sha256": "620c6e6fee42e76be91de893ef7c88b72bc086a54a3a43af9b3aba83d714737d",
+    "sha256": "dd514c248b24ff01e1417907762ff4e61789e1e5d45d2020e3140d415175e8f8",
     "observed_utc": "2026-10-11T23:28:37.266324+00:00",
     "state": "merged-qualification-incomplete",
     "source": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
