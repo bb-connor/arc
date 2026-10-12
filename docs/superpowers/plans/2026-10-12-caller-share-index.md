@@ -30,30 +30,43 @@ snapshot. No cap, schema, clock, authority or proof waiver.
 
 ## Task 1: Genuine current Originals
 
-- [ ] Port the cfg(test) decoded-operation counter and existing O1 work control,
+- [x] Port the cfg(test) decoded-operation counter and existing O1 work control,
   without the index repair. Require evidence of 8 then 16 unrelated decodes.
-- [ ] Review and integrate Claude's isolated O2 fixture: funded parent A
+- [x] Review and integrate Claude's isolated O2 fixture: funded parent A
   corruption through the owning test connection must leave actual parent B
   shares readable, while A refuses. Keep external-writer refusal as a separate
   positive security control. Do not add a public injection API.
-- [ ] Run current-base runtime Originals and preserve failures and successful
+- [x] Run current-base runtime Originals and preserve failures and successful
   controls. Compile/environment refusals are separate evidence.
 
 ## Task 2: Compose and verify the preserved v37 repair
 
-- [ ] Apply the single producer semantically on current source; keep current
+- [x] Apply the single producer semantically on current source; keep current
   security fixes, canonical data, arithmetic checks and trusted clock usage.
-- [ ] Run O1/O2 to green plus index-once, unresolved refusal, parent parity,
+- [x] Run O1/O2 to green plus index-once, unresolved refusal, parent parity,
   indexed query plan, v36 migration and missing/forged-row restart controls.
-- [ ] Renew external-write omission/tamper controls against the final candidate;
+- [x] Renew external-write omission/tamper controls against the final candidate;
   retain the withdrawn allegation and the trusted-owner model explicitly.
 
 ## Task 3: Owning qualification and review
 
-- [ ] Run admission-store owning tests, execution_nonce_caller_execution,
+- [x] Run admission-store owning tests, execution_nonce_caller_execution,
   strict owning Clippy, formatting, clock/trust-boundary/static gates.
-- [ ] Obtain independent complete-source review; repair confirmed P0/P1/P2
+- [x] Obtain independent complete-source review; repair confirmed P0/P1/P2
   findings and renew affected evidence without ratchet exceptions.
-- [ ] Freeze the private candidate with a source/evidence audit, update the
+- [x] Freeze the private candidate with a source/evidence audit, update the
   board/mailbox and release claims. Actual-main composition and exact-head
   hosted qualification remain future acceptance.
+
+## Local completion
+
+Both current Original controls failed at their intended assertions. The repaired
+index and delegated-share controls passed, followed by the owning store and
+caller execution suites and strict all-target Clippy. Claude approved the full
+source with no P0/P1/P2 findings. The unchanged trust-boundary checker passes
+after a separately reviewed, order-preserving correction to inherited F041
+and F071 metadata. No raw debt or gate contract was weakened.
+
+The source, review, failed attempts and command evidence are bound by
+`docs/security/audits/caller-share-index-20261012.json`. This candidate stays
+private pending actual-main composition, fresh hosted qualification and landing.

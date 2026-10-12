@@ -198,7 +198,9 @@ pub(crate) fn append_operation_commit_with_participant(
             next,
         )
         .map_err(|error| invariant(error.to_string()))?;
-    Ok(())
+    // Every persisted operation version passes through this commit, so the
+    // caller-share parent index cannot miss an operation that funds a share.
+    super::caller_budget::index_funded_share(transaction, operation)
 }
 
 pub(crate) fn load_admission_commit_head(

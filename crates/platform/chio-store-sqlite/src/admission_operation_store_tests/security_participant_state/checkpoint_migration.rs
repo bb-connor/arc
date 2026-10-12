@@ -99,7 +99,7 @@ fn native_journal_migration_v35_preserves_populated_recovery_and_native_bytes() 
         .map(|table| table_rows(&connection, table))
         .collect::<AnchoredTestResult<Vec<_>>>()?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",[],|row|row.get::<_,i32>(0))?,36);
+    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",[],|row|row.get::<_,i32>(0))?,crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
     for (table, rows) in tables.iter().zip(before) {
         assert_eq!(table_rows(&connection, table)?, rows, "preserved {table}");
     }

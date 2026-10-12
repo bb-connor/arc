@@ -20,6 +20,7 @@ mod migration_v33;
 mod migration_v34;
 mod migration_v35;
 mod migration_v36;
+mod migration_v37;
 
 #[cfg(test)]
 pub(crate) fn pre_caller_wait_schema_fixture() -> String {
@@ -140,7 +141,10 @@ fn migrate_schema(
     if on_disk < 35 {
         migration_v35::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v36::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 36 {
+        migration_v36::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v37::verify_pre_migration_schema(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -246,6 +250,7 @@ fn migrate_schema(
     transaction
         .execute_batch(super::security_participant_state::checkpoint::sql())
         .map_err(sqlite_error)?;
+    migration_v37::migrate(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -574,7 +579,8 @@ pub(crate) fn verify_admission_operation_invariants(
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
 
-    verify_admission_operation_data_invariants(connection)?;
+    verify_operation_data(connection, CallerShareIndex::Current)?;
+    super::caller_budget::verify_ownership(connection)?;
     super::runtime_participant::verify_all(connection)?;
     super::governed_approval_claim::verify_all(connection)?;
     super::dpop_claim::verify_all(connection)?;
@@ -724,6 +730,11 @@ fn expected_admission_operation_schema(
     if version >= 36 {
         expected
             .execute_batch(super::security_participant_state::checkpoint::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 37 {
+        expected
+            .execute_batch(super::caller_budget::SCHEMA)
             .map_err(sqlite_error)?;
     }
     Ok(expected)
@@ -876,8 +887,23 @@ pub(super) fn verify_admission_commit_chronology(
     Ok(())
 }
 
+/// Whether the store being verified carries the caller-share parent index.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CallerShareIndex {
+    Predecessor,
+    Current,
+}
+
+/// Verify a predecessor schema's rows before migrating them.
 fn verify_admission_operation_data_invariants(
     connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    verify_operation_data(connection, CallerShareIndex::Predecessor)
+}
+
+fn verify_operation_data(
+    connection: &Connection,
+    caller_shares: CallerShareIndex,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_commit_chronology(connection)?;
     let history = CheckedHistoryScope::from_verified_chain(
@@ -904,7 +930,11 @@ fn verify_admission_operation_data_invariants(
         let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
         verify_latest_commit(connection, &stored)?;
         super::execution_nonce::verify_reservation(connection, &stored.operation)?;
-        super::retained_request::load_retained_request_tx(connection, &stored.operation)?;
+        let retained =
+            super::retained_request::load_retained_request_tx(connection, &stored.operation)?;
+        if caller_shares == CallerShareIndex::Current {
+            super::caller_budget::verify_indexed(connection, &stored.operation, retained.as_ref())?;
+        }
         super::caller_dispatch_context::load(connection, &stored.operation)?;
         super::security_participant_state::dispatch_ledger::verify_capture_attachment(
             connection,
