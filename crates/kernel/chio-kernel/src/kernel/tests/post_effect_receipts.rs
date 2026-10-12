@@ -104,6 +104,87 @@ fn successful_call_has_one_allow_receipt() {
 }
 
 #[test]
+fn equal_request_ids_in_distinct_tenants_keep_separate_terminal_bindings() {
+    let (kernel, request, invocations) = fixture();
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_grant("receipt-test", "read_file")]),
+        300,
+    );
+    let mut receipts = Vec::new();
+    for tenant in ["tenant-a", "tenant-b"] {
+        let session = kernel
+            .open_session(agent.public_key().to_hex(), vec![capability.clone()])
+            .unwrap();
+        kernel
+            .set_session_auth_context(
+                &session,
+                super::multi_tenant_receipt::oauth_auth_with_enterprise_tenant(tenant),
+            )
+            .unwrap();
+        kernel.activate_session(&session).unwrap();
+        let context =
+            make_operation_context(&session, &request.request_id, &agent.public_key().to_hex());
+        let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+            dpop_proof: None,
+            capability: capability.clone(),
+            server_id: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            arguments: request.arguments.clone(),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            execution_nonce: None,
+            model_metadata: None,
+            extra_metadata: None,
+        }));
+        let response = session_tool_call(
+            kernel
+                .evaluate_session_operation(&context, &operation)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(response.verdict, Verdict::Allow);
+        assert_eq!(response.receipt.tenant_id.as_deref(), Some(tenant));
+        assert!(response.receipt.verify_signature().unwrap());
+        receipts.push(response.receipt);
+    }
+    assert_eq!(invocations.load(Ordering::SeqCst), 2);
+    assert_eq!(kernel.receipt_log().len(), 2);
+    assert_ne!(receipts[0].id, receipts[1].id);
+    for receipt in &receipts {
+        assert_eq!(
+            receipt
+                .metadata
+                .as_ref()
+                .unwrap()
+                .pointer("/receipt_context/request_id"),
+            Some(&serde_json::json!(request.request_id)),
+        );
+    }
+    for field in ["request_namespace_digest", "evaluation_id"] {
+        let pointer = format!("/receipt_context/{field}");
+        let first = receipts[0]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .pointer(&pointer)
+            .unwrap();
+        let second = receipts[1]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .pointer(&pointer)
+            .unwrap();
+        assert_ne!(first, second, "tenant-scoped {field}");
+    }
+}
+
+#[test]
 fn caller_cannot_supply_receipt_namespace_or_disposition() {
     for key in ["receipt_context", "chio_runtime"] {
         let (kernel, request, invocations) = fixture();
