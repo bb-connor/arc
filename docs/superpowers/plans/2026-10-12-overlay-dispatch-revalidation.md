@@ -19,3 +19,10 @@ Tests live in `crates/security/chio-security-kernel/tests/dispatch_revalidation.
 ## Boundaries
 
 This repairs the last read-only dispatch check. It is not a same-writer closure fence and does not claim linearization across an independent remote store write. D5 delegated mint authority and the broader KSPEC-04 closure/drain phases remain separate work. Do not introduce an optional delegation wrapper or claim control over offline signature construction.
+
+## Qualification
+
+- Original `e0f694afcc`: two unchanged-authority controls passed; six late active, unavailable or malformed authority cases failed after one actual tool invocation.
+- Repair `06721c1db2`: all eight focused tests passed across 64 ordinary/nested, direct/pipeline and Ready/delayed cells. The full owning integration suite passed 93 tests.
+- The first strict run rejected an ambiguous test `RequestId` glob import. `0541a42da7` makes session imports explicit. Actual-main composition `6e265388eb` includes the prepayment custody repair and the new repository rules; its focused tests and strict lint remain pending.
+- Claude reviews the 28-line production delta. No proof, same-writer linearization or closure/drain acceptance is implied.
