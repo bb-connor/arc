@@ -46,14 +46,12 @@ const val CHIO_PASSTHROUGH_ATTRIBUTE = "chioPassthrough"
  *
  * @param sidecarUrl Base URL of the Chio sidecar kernel.
  * @param timeoutSeconds HTTP timeout for sidecar calls.
- * @param onSidecarError Reserved no-op option. The filter always denies sidecar errors.
  * @param identityExtractor Custom identity extraction function.
  * @param routeResolver Custom route pattern resolver.
  */
 data class ChioFilterConfig(
     val sidecarUrl: String = System.getenv("CHIO_SIDECAR_URL") ?: "http://127.0.0.1:9090",
     val timeoutSeconds: Long = 5,
-    val onSidecarError: String = "deny",
     val identityExtractor: IdentityExtractorFn = ::defaultIdentityExtractor,
     val routeResolver: (String, String) -> String = { _, path -> path },
 )

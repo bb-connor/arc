@@ -51,7 +51,6 @@ callback. The available options are:
 | ------------------- | ------------------------------------------------------------------ |
 | `SidecarUrl`        | Sidecar base URL; defaults to `CHIO_SIDECAR_URL` env var.          |
 | `TimeoutSeconds`    | Sidecar HTTP timeout (default `5`).                                |
-| `OnSidecarError`    | Reserved no-op setting. Sidecar errors always fail closed.         |
 | `IdentityExtractor` | Custom caller extraction; defaults to header-based extraction.     |
 | `RouteResolver`     | Map `(method, path)` to a route pattern such as `/pets/{petId}`.   |
 
@@ -59,7 +58,6 @@ callback. The available options are:
 builder.Services.AddChioProtection(opts =>
 {
     opts.SidecarUrl = "http://127.0.0.1:9090";
-    opts.OnSidecarError = "deny";
     opts.RouteResolver = (method, path) =>
         path.StartsWith("/pets/") ? "/pets/{petId}" : path;
 });
