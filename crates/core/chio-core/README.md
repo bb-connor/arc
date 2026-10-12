@@ -1,66 +1,61 @@
 # chio-core
 
-Unified import surface for the Chio protocol. `chio-core` re-exports the
-canonical protocol types from `chio-core-types` (capabilities, receipts,
-canonical JSON, signing, Merkle proofs, sessions) alongside the economic and
-trust domain crates, and owns three contracts that belong to no single
-lower-level crate: the extension and official-stack model, the public identity
-and wallet network model, and the portable-standards catalog.
+`chio-core` is Chio's unified import surface for protocol primitives and
+selected economy and trust domains. It re-exports `chio-core-types` and domain
+crates, and implements extension contracts, public identity-network contracts,
+and portable identity binding descriptions locally.
 
-The crate is pure data and cryptography. It performs no I/O and holds no runtime
-state, so it compiles for WASM, embedded, and `alloc`-only targets, and forbids
-`unsafe`. Reach for `chio-kernel` when you need request evaluation and receipt
-signing rather than the types alone.
+## Usage
 
-## Responsibilities
+Sign an already typed JSON value and retain the exact canonical bytes:
 
-- Expose one `chio_core::*` import path over `chio-core-types` and the domain
-  crates, so consumers depend on a single entry point instead of a dozen.
-- Own the extension contract (`extension`): which Chio surfaces are canonical
-  truth, which seams are replaceable, and how third-party implementations
-  negotiate against the official stack.
-- Own the identity network contract (`identity_network`): public identity
-  profiles, wallet directory entries, and routing manifests that widen outward
-  identity without replacing the native `did:chio` provenance anchor.
-- Own the portable standards (`standards`): claim catalog, portable identity
-  binding, and governed-authorization binding constants.
+```rust
+use chio_core::Keypair;
+use serde_json::json;
 
-## Public API
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let key = Keypair::from_seed(&[7; 32]);
+    let (signature, bytes) = key.sign_canonical(&json!({"b": 2, "a": 1}))?;
+    assert_eq!(bytes, br#"{"a":1,"b":2}"#);
+    assert!(key.public_key().verify_strict(&bytes, &signature));
+    Ok(())
+}
+```
 
-Re-exported from `chio-core-types`:
+The fixed seed makes this example reproducible. Applications must manage their
+own signing keys and trusted issuer selection.
 
-- `canonical` - RFC 8785 canonical JSON (`canonical_json_bytes`, `CanonicalBytes`).
-- `capability`, `session`, `message`, `manifest`, `receipt` - protocol artifacts.
-- `crypto` - Ed25519 signing backends, `Keypair`, `SignedCanonicalPayload`; the
-  `pq` feature adds ML-DSA-65 and hybrid backends.
-- `hashing`, `merkle` - `sha256`, `Hash`, `MerkleTree`, `MerkleProof`.
-- `signed_artifact` - the signed-artifact schema registry.
-- `AgentId`, `CapabilityId`, `ServerId`.
+## Features
 
-Re-exported domain crates: `appraisal`, `autonomy`, `credit`, `federation`,
-`governance`, `listing`, `market`, `open_market`, `underwriting`, `web3`.
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default`  | Yes | Empty; the facade's dependencies retain their declared defaults. |
+| `pq`  | No | Enables `chio-core-types/pq` and exposes PQ types through this facade. |
 
-Owned in this crate:
+## Guarantees
 
-- `extension::{validate_extension_inventory, validate_official_stack_package,
-  validate_extension_manifest, negotiate_extension, validate_qualification_matrix}`
-- `identity_network::{validate_public_identity_profile,
-  validate_public_wallet_directory_entry, validate_public_wallet_routing_manifest,
-  validate_identity_interop_qualification_matrix}`
-- `standards::{ChioPortableClaimCatalog, ChioPortableIdentityBinding,
-  ChioGovernedAuthorizationBinding}`
+- `Keypair::sign_canonical` serializes once and returns the bytes it signs.
+- `validate_extension_inventory` rejects writable canonical truth surfaces
+  and inconsistent evidence-mode policy activation requirements.
+- `negotiate_extension` reports malformed inventories, packages, and manifests
+  as rejection reasons before compatibility negotiation.
+- `validate_public_identity_profile` checks supported families, provenance
+  methods, references, and binding policy.
 
-## Feature flags
+## Status
 
-| Flag | Effect |
-|------|--------|
-| `pq` | Enables post-quantum signing via `chio-core-types/pq` (ML-DSA-65 and hybrid backends). |
+This is an implemented workspace facade with `publish = false`.
+Its local modules use `std`; use `chio-core-types` directly when configuring a
+portable `no_std + alloc` consumer. Re-exported domain types retain the
+validation and operational boundaries of their owning crates. Importing an
+artifact type does not activate a runtime or establish release certification.
 
-## Testing
+## Related
 
-`cargo test -p chio-core`
+- [Architecture](ARCHITECTURE.md)
+- [Protocol scope and compatibility](../../../spec/PROTOCOL.md#2-scope-and-compatibility)
+- [Portable substrate](../chio-core-types/README.md)
 
-## See also
+## License
 
-- `chio-core-types` - defines the canonical protocol types re-exported here.
-- `chio-kernel` - request evaluation, guard pipeline, and receipt signing built on these types.
+See the workspace [license](../../../LICENSE).

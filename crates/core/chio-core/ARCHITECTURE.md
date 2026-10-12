@@ -1,57 +1,72 @@
 # chio-core architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-core` sits at the base of the dependency graph as a pure protocol crate:
-in-memory types, validation, and cryptography with no I/O and no runtime state.
-It plays two roles. It is a facade that re-exports `chio-core-types` and the
-economic and trust domain crates under one `chio_core::*` path, and it owns three
-cross-cutting contracts (`extension`, `identity_network`, `standards`) that
-constrain how the protocol is extended without belonging to any single
-lower-level crate.
+The crate owns a unified Rust import surface and three local contract modules.
+`src/lib.rs` re-exports portable primitives from `chio-core-types` and domain
+APIs from appraisal, autonomy, credit, federation, governance, listing, market,
+open-market, underwriting, and web3 crates.
+Re-exporting preserves each dependency's implementation and error semantics.
+The facade does not implement tool execution, receipt persistence, or runtime
+admission for those domains.
+Consumers needing the small portable substrate can depend on `chio-core-types`.
+Local contract modules use standard-library collections.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Facade. Re-exports `chio-core-types` modules and the domain crates, and declares the three owned modules. Additive compatibility surface. |
-| `src/extension/model.rs` | Data models: extension inventory, official-stack package, extension manifest, negotiation report, qualification matrix. |
-| `src/extension/validation.rs` | Fail-closed shape, reference, guardrail, and qualification validation. |
-| `src/extension/negotiation.rs` | Compatibility negotiation and rejection-report construction. |
-| `src/extension/error.rs` | `ExtensionContractError` reporting. |
-| `src/identity_network/types.rs` | Public identity profile, wallet directory entry, and routing manifest artifacts. |
-| `src/identity_network/validation.rs` | Entry-point validators for identity and wallet artifacts. |
-| `src/identity_network/validators.rs` | Shared field-level checks used by the validators. |
-| `src/standards.rs` | Portable claim catalog, portable identity binding, governed-auth binding, and provenance-anchor constants. |
+`extension/model.rs` defines inventory, stack, manifest, and qualification data.
+`extension/validation.rs` checks structural rules and guardrails.
+`extension/negotiation.rs` compares validated contracts and builds a report.
+`extension/error.rs` preserves contract failure categories.
+`identity_network/types.rs` defines public identity and wallet artifacts.
+Its `validation.rs` and `validators.rs` check profiles, references, URLs,
+binding policies, and routing guardrails.
+`standards.rs` owns portable claim catalogs and identity/auth binding contracts.
+Module-local tests exercise extension and identity validation.
 
-## Boundaries
+## Data and control flow
 
-`chio-core` performs no I/O, launches no runtime, reads no policy files, and
-holds no kernel state. Validation compares in-memory artifacts only. The public
-re-export set is a compatibility contract: exported names are additive, and
-removing or narrowing one is a breaking change that requires a deliberate
-migration.
+A caller constructs or deserializes an artifact and invokes its validator.
+Extension negotiation first validates the inventory, official stack, and custom
+manifest, collecting malformed-input reasons into the resulting report.
+It then resolves the named extension point and checks compatibility inputs.
+The returned report describes compatibility; runtime policy activation remains
+a separate responsibility.
+Public identity profile validation checks declared methods and families before
+accepting the profile's contract.
+The canonical signing example uses a re-exported substrate API:
+serialize the typed value, sign the canonical buffer, and retain both outputs.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- Every validator fails closed on malformed schema, missing fields, duplicate
-  identifiers, unknown references, privilege widening, truth mutation, and
-  extension evidence modes without local policy activation.
-- Official-stack agreement is bidirectional. A package component names its
-  extension points and an inventory point names its official components; if
-  either side asserts a point-to-component edge the other does not reciprocate,
-  validation rejects before negotiation.
-- `negotiate_extension` assumes the three artifact validators have already run.
-  It reports compatibility for valid-but-incompatible artifacts and does not
-  re-check shape.
-- `validate_qualification_matrix` is shape-only; contextual matrix validation is
-  not wired.
+`validate_extension_inventory` forbids extensions from writing canonical truth.
+It rejects duplicate IDs and missing allowed modes or privileges.
+Evidence-capable modes require consistent local policy activation declarations.
+`validate_public_identity_profile` requires `did:chio` provenance support
+for subjects and issuers and at least one additional identity method.
+Artifact validation establishes the rules checked by that function.
+Callers still select trusted signers and verify signatures where required.
+Typed canonical serialization assumes earlier parsing preserved the intended
+value; strict raw JSON readers belong at untrusted signing boundaries.
 
 ## Dependencies
 
-Internal: `chio-core-types` holds the actual protocol definitions; the domain
-crates `chio-appraisal`, `chio-autonomy`, `chio-credit`, `chio-federation`,
-`chio-governance`, `chio-listing`, `chio-market`, `chio-open-market`,
-`chio-underwriting`, and `chio-web3` supply the economic and trust artifacts this
-crate re-exports. External: `serde`/`serde_json` for artifacts, `ed25519-dalek`,
-`sha2`, `hex` for signing and hashing, and `url` for identity references.
+`chio-core-types` supplies canonical bytes, hashes, signing, and protocol data.
+Dedicated domain crates supply their own artifact and evaluation surfaces.
+Serde and serde_json support local serializable contract representations.
+`url` supports identity endpoint validation; `thiserror` supplies local errors.
+The `pq` feature forwards to the substrate and gates additional re-exports.
+There is no facade feature for disabling `std`.
+
+## Verification
+
+`src/extension/tests.rs` and `src/identity_network/tests.rs` exercise local rules.
+`tests/forward_compat.rs` checks additive fields in compatible artifacts and
+closed signed-manifest boundaries.
+`tests/property_invariants.rs` exercises protocol invariant properties.
+`benches/core_primitives.rs` measures canonicalization, signing, capabilities,
+and Merkle operations through the facade.
+Run `cargo test -p chio-core` for the default implementation.
+Run `cargo test -p chio-core --features pq` for gated PQ coverage.
+These checks validate crate behavior; runtime deployment acceptance requires
+its own evidence.
