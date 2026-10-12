@@ -482,7 +482,7 @@ fn run_finding_admission(
     let bundle_store = SqliteFindingOperatorBundleStore::open(&paths.operator_database)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let artifact_indexes =
-        finding_operator_bundle_artifact_indexes(&finalization.bundle, Some(&profile.market))
+        finding_operator_bundle_artifact_indexes(&finalization.bundle, &profile.market)
             .map_err(CliError::cli_other_error)?;
     bundle_store
         .put_with_artifact_indexes(&draft.finding.finding_id, &bundle_bytes, &artifact_indexes)

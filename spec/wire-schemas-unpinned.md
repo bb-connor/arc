@@ -143,11 +143,11 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs:8` `DECLASSIFIED_FORMAT` = `chio.native-security-output-join.v2`
 - `crates/platform/chio-store-sqlite/src/channel_release_publisher_store.rs:51` `CHANNEL_ROOT_PUBLICATION_RESULT_SCHEMA` = `chio.channel.root-publication-result.v1`
 - `crates/platform/chio-store-sqlite/src/economic_state_cache.rs:49` `ADMISSION_TERMINAL_EFFECT_RESULT_SCHEMA` = `chio.admission.terminal-effect-result.v1`
-- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:143` `DISPUTE_BOND_FUNDING_DOMAIN` = `chio.finding.dispute-bond-funding.v1`
-- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:144` `DISPUTE_BOND_RETURN_DOMAIN` = `chio.finding.dispute-bond-return.v1`
-- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:145` `EFFECT_FEE_DOMAIN` = `chio.finding.effect.fee.v1`
-- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:146` `DISPUTE_FEE_OPERATION_DOMAIN` = `chio.finding.dispute-fee-operation.v1`
-- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:147` `DISPUTE_FEE_RETURN_OPERATION_DOMAIN` = `chio.finding.dispute-fee-return-operation.v1`
+- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:131` `DISPUTE_BOND_FUNDING_DOMAIN` = `chio.finding.dispute-bond-funding.v1`
+- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:132` `DISPUTE_BOND_RETURN_DOMAIN` = `chio.finding.dispute-bond-return.v1`
+- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:133` `EFFECT_FEE_DOMAIN` = `chio.finding.effect.fee.v1`
+- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:134` `DISPUTE_FEE_OPERATION_DOMAIN` = `chio.finding.dispute-fee-operation.v1`
+- `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:135` `DISPUTE_FEE_RETURN_OPERATION_DOMAIN` = `chio.finding.dispute-fee-return-operation.v1`
 - `crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs:29` `CUSTODY_AAD_FORMAT` = `chio.frost.ceremony-custody-aad.v2`
 - `crates/platform/chio-store-sqlite/src/frost_store/signer.rs:34` `SIGNER_AAD_FORMAT` = `chio.frost.signer-nonce-aad.v1`
 - `crates/platform/chio-store-sqlite/src/security_state/participant_source/evidence.rs:10` `SCHEMA` = `chio.security-participant-source-fingerprint.v1`

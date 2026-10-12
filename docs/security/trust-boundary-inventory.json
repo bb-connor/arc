@@ -1341,7 +1341,6 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::audit_round::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::governance_policy_for_profile::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::indexed_bundle::from_wire",
-    "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::new::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::retained_policy::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::venue_policy_for_admission::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_canonical_request::from_wire",
@@ -2333,7 +2332,6 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value",
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value",
-    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::cmd_finding_operator_repair_challenge_retention::from_value",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice",
     "crates/products/chio-cli/src/cli/input.rs::literal::from_value",
     "crates/products/chio-cli/src/cli/input.rs::project::from_value",
@@ -4837,7 +4835,6 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str": "Bounded original RawValue slices preserve strict decoding for capability, nonce, approval, signed plan/outcome and delivery credentials. Arguments, parameters, governed context and normalized runtime evidence use unsigned document numbers. Reserved callChainUpstreamProof and callChainContinuation context members are validated from their original signed slices. Complete-document duplicate rejection precedes typed projection or authority; raw field maps never authorize requests.",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value": "CLI directory schema selection uses bounded original native JSON and forwards the native input cause to the relay error. Existing signed directory/trusted issuer validation remains mandatory.",
-    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::cmd_finding_operator_repair_challenge_retention::from_value": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes.",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion.",
     "crates/products/chio-cli/src/cli/input.rs::literal::from_value": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority.",
     "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority.",
@@ -6098,9 +6095,6 @@
     ],
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs": [
       "parse_relay_peer_directory_json::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs": [
-      "cmd_finding_operator_repair_challenge_retention::from_value"
     ],
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs": [
       "load_verification_market::from_slice"
@@ -9021,22 +9015,6 @@
       "readers": [
         {
           "reader": "parse_relay_peer_directory_json",
-          "decoders": [
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value"
-          ],
-          "checked": true
-        }
-      ]
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs": {
-      "kind": "reviewed-bounded-input",
-      "contract": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes.",
-      "readers": [
-        {
-          "reader": "cmd_finding_operator_repair_challenge_retention",
           "decoders": [
             "from_value"
           ],
@@ -16701,7 +16679,6 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::audit_round::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::governance_policy_for_profile::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::indexed_bundle::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::new::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::retained_policy::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::venue_policy_for_admission::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_canonical_request::from_wire#1::decode_signed",
@@ -18241,7 +18218,6 @@
       "audit_round::original-json-reader::UntrustedJsonText",
       "governance_policy_for_profile::original-json-reader::UntrustedJsonText",
       "indexed_bundle::original-json-reader::UntrustedJsonText",
-      "new::original-json-reader::UntrustedJsonText",
       "retained_policy::original-json-reader::UntrustedJsonText",
       "venue_policy_for_admission::original-json-reader::UntrustedJsonText"
     ],
@@ -19552,7 +19528,6 @@
       "get_retained_challenge_policy::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json",
       "get_terminal::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_terminal",
       "list::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle",
-      "list_without_complete_artifact_index::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle",
       "put_audit_round::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json",
       "put_proof::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json",
       "put_purchase_job::shared-reader::crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json",
