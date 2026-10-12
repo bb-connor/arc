@@ -36,6 +36,11 @@ mod issuance;
 mod issuer_trust;
 #[path = "validation/lineage.rs"]
 mod lineage;
+#[path = "validation/payment_outcome.rs"]
+mod payment_outcome;
+use payment_outcome::{
+    payment_error_code, release_unsettled_payment_metadata, retained_payment_capture_metadata,
+};
 #[path = "validation/payment_amount.rs"]
 mod payment_amount;
 #[path = "validation/portable.rs"]
@@ -48,43 +53,6 @@ mod revocation_trace;
 pub(crate) struct ReservedPrepayment {
     pub(crate) authorization: PaymentAuthorization,
     pub(crate) payment_reference: Option<String>,
-}
-
-fn payment_error_code(error: &PaymentError) -> &'static str {
-    match error {
-        PaymentError::Unavailable(_) => "unavailable",
-        PaymentError::RailError(_) => "rail_error",
-        PaymentError::Declined(_) => "declined",
-        PaymentError::InsufficientFunds => "insufficient_funds",
-    }
-}
-
-fn retained_payment_capture_metadata(
-    request: &ToolCallRequest,
-    authorization: &PaymentAuthorization,
-    error: &PaymentError,
-) -> serde_json::Value {
-    let error_code = payment_error_code(error);
-    warn!(
-        request_id = %request.request_id,
-        authorization_id = %authorization.authorization_id,
-        error_code,
-        reason = %redacted!(error),
-        audit_fault = "post_execution_payment_capture_outcome_unknown",
-        "payment capture outcome is unknown; retaining the positive authorization"
-    );
-    serde_json::json!({
-        "financial": {
-            "authorization_id": authorization.authorization_id,
-            "payment_reference": authorization.authorization_id,
-            "settlement_status": SettlementStatus::Failed,
-            "release_outcome": "not_released",
-            "payment_authorization_retained": true,
-            "payment_capture_ambiguous": true,
-            "payment_capture_error_code": error_code,
-            "payment_capture_attempt_reference": request.request_id
-        }
-    })
 }
 
 impl ChioKernel {
@@ -1821,87 +1789,12 @@ impl ChioKernel {
                         }
                     };
                     if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
-                        let mut financial = serde_json::Map::from_iter([
-                            (
-                                "authorization_id".into(),
-                                serde_json::json!(authorization.authorization_id),
-                            ),
-                            (
-                                "payment_reference".into(),
-                                serde_json::json!(result.transaction_id),
-                            ),
-                            (
-                                "capture_status".into(),
-                                serde_json::json!(result.settlement_status),
-                            ),
-                            (
-                                "settlement_status".into(),
-                                serde_json::json!(result.settlement_status.to_receipt_status()),
-                            ),
-                            (
-                                "payment_release_attempt_reference".into(),
-                                serde_json::json!(request.request_id),
-                            ),
-                        ]);
-                        match adapter.release(&authorization.authorization_id, &request.request_id)
-                        {
-                            Ok(release) => {
-                                let released = release.settlement_status
-                                    == crate::payment::RailSettlementStatus::Released;
-                                financial.insert(
-                                    "release_outcome".into(),
-                                    serde_json::json!(release.settlement_status),
-                                );
-                                financial.insert(
-                                    "payment_release_reference".into(),
-                                    serde_json::json!(release.transaction_id),
-                                );
-                                financial.insert(
-                                    "payment_release_confirmed".into(),
-                                    serde_json::json!(released),
-                                );
-                                financial.insert(
-                                    "payment_authorization_retained".into(),
-                                    serde_json::json!(!released),
-                                );
-                                if !released {
-                                    warn!(
-                                        request_id = %request.request_id,
-                                        authorization_id = %authorization.authorization_id,
-                                        release_status = ?release.settlement_status,
-                                        audit_fault = "post_execution_payment_release_unconfirmed",
-                                        "payment release returned an unconfirmed terminal state"
-                                    );
-                                }
-                            }
-                            Err(error) => {
-                                let error_code = payment_error_code(&error);
-                                financial.insert(
-                                    "release_outcome".into(),
-                                    serde_json::json!("outcome_unknown"),
-                                );
-                                financial.insert(
-                                    "payment_release_error_code".into(),
-                                    serde_json::json!(error_code),
-                                );
-                                financial.insert(
-                                    "payment_release_confirmed".into(),
-                                    serde_json::json!(false),
-                                );
-                                financial.insert(
-                                    "payment_authorization_retained".into(),
-                                    serde_json::json!(true),
-                                );
-                                warn!(
-                                    request_id = %request.request_id,
-                                    authorization_id = %authorization.authorization_id,
-                                    error_code,
-                                    reason = %redacted!(&error),
-                                    audit_fault = "post_execution_payment_release_outcome_unknown",
-                                    "payment release outcome is unknown; retaining the authorization"
-                                );
-                            }
-                        }
+                        let financial = release_unsettled_payment_metadata(
+                            adapter.as_ref(),
+                            request,
+                            authorization,
+                            &result,
+                        );
                         extra_metadata = merge_metadata_objects(
                             extra_metadata,
                             Some(serde_json::json!({ "financial": financial })),
