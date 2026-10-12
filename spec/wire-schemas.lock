@@ -395,22 +395,12 @@ files = ["crates/platform/chio-control-plane/src/security/event_consumer/admissi
 first_seen = "b39b131271"
 
 [[schema]]
-value = "chio.authority-lifecycle.v2"
+value = "chio.authority-lifecycle.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
+first_seen = "95dc6dadcf"
 
 [[schema]]
 value = "chio.authority-replication-anchor.v1"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "0fd0a9d66d"
-
-[[schema]]
-value = "chio.authority-replication-anchor.v2"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
-
-[[schema]]
-value = "chio.authority-rotation.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
 first_seen = "0fd0a9d66d"
 
@@ -423,11 +413,6 @@ first_seen = "b39b131271"
 value = "chio.authority-snapshot.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
 first_seen = "0fd0a9d66d"
-
-[[schema]]
-value = "chio.authority-snapshot.v2"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
 
 [[schema]]
 value = "chio.autonomous-comparison-report.v1"

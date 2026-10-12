@@ -2,7 +2,7 @@
 use super::{AuthoritySnapshot, AuthorityStoreError, AuthorityTrustedKeySnapshot};
 use serde::{Deserialize, Serialize};
 
-/// Conservative maximum overlap for newly rotated and legacy verification keys.
+/// Maximum verification overlap between a rotated issuer and its successor.
 pub const DEFAULT_ISSUER_VERIFICATION_GRACE_SECONDS: u64 = 3600;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +33,8 @@ pub enum AuthorityLifecycleChange {
     Recover,
 }
 
-/// Legacy bytes stay unchanged; their trust window does not remain unbounded.
+/// A key without an explicit lifecycle derives one from its successor, with a
+/// bounded verification window.
 pub fn key_lifecycle(
     state: &AuthoritySnapshot,
     index: usize,
