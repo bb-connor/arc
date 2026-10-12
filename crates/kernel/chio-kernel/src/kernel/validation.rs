@@ -1768,26 +1768,49 @@ impl ChioKernel {
                         }
                     };
                     if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
-                        let mut financial = serde_json::json!({
-                            "authorization_id": authorization.authorization_id,
-                            "payment_reference": result.transaction_id,
-                            "capture_status": result.settlement_status,
-                            "settlement_status": result.settlement_status.to_receipt_status(),
-                            "payment_release_attempt_reference": request.request_id
-                        });
+                        let mut financial = serde_json::Map::from_iter([
+                            (
+                                "authorization_id".into(),
+                                serde_json::json!(authorization.authorization_id),
+                            ),
+                            (
+                                "payment_reference".into(),
+                                serde_json::json!(result.transaction_id),
+                            ),
+                            (
+                                "capture_status".into(),
+                                serde_json::json!(result.settlement_status),
+                            ),
+                            (
+                                "settlement_status".into(),
+                                serde_json::json!(result.settlement_status.to_receipt_status()),
+                            ),
+                            (
+                                "payment_release_attempt_reference".into(),
+                                serde_json::json!(request.request_id),
+                            ),
+                        ]);
                         match adapter.release(&authorization.authorization_id, &request.request_id)
                         {
                             Ok(release) => {
                                 let released = release.settlement_status
                                     == crate::payment::RailSettlementStatus::Released;
-                                financial["release_outcome"] =
-                                    serde_json::json!(release.settlement_status);
-                                financial["payment_release_reference"] =
-                                    serde_json::json!(release.transaction_id);
-                                financial["payment_release_confirmed"] =
-                                    serde_json::json!(released);
-                                financial["payment_authorization_retained"] =
-                                    serde_json::json!(!released);
+                                financial.insert(
+                                    "release_outcome".into(),
+                                    serde_json::json!(release.settlement_status),
+                                );
+                                financial.insert(
+                                    "payment_release_reference".into(),
+                                    serde_json::json!(release.transaction_id),
+                                );
+                                financial.insert(
+                                    "payment_release_confirmed".into(),
+                                    serde_json::json!(released),
+                                );
+                                financial.insert(
+                                    "payment_authorization_retained".into(),
+                                    serde_json::json!(!released),
+                                );
                                 if !released {
                                     warn!(
                                         request_id = %request.request_id,
@@ -1800,12 +1823,22 @@ impl ChioKernel {
                             }
                             Err(error) => {
                                 let error_code = payment_error_code(&error);
-                                financial["release_outcome"] = serde_json::json!("outcome_unknown");
-                                financial["payment_release_error_code"] =
-                                    serde_json::json!(error_code);
-                                financial["payment_release_confirmed"] = serde_json::json!(false);
-                                financial["payment_authorization_retained"] =
-                                    serde_json::json!(true);
+                                financial.insert(
+                                    "release_outcome".into(),
+                                    serde_json::json!("outcome_unknown"),
+                                );
+                                financial.insert(
+                                    "payment_release_error_code".into(),
+                                    serde_json::json!(error_code),
+                                );
+                                financial.insert(
+                                    "payment_release_confirmed".into(),
+                                    serde_json::json!(false),
+                                );
+                                financial.insert(
+                                    "payment_authorization_retained".into(),
+                                    serde_json::json!(true),
+                                );
                                 warn!(
                                     request_id = %request.request_id,
                                     authorization_id = %authorization.authorization_id,
