@@ -33,6 +33,9 @@ mod attestation_authentication_tests;
 #[path = "router_tests/behavioral_signing_custody.rs"]
 mod behavioral_signing_custody;
 
+#[path = "router_tests/federation_reputation_trust.rs"]
+mod federation_reputation_trust;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),
