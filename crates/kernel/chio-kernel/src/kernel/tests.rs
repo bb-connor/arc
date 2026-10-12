@@ -317,3 +317,5 @@ mod financial_accounting;
 #[path = "../../tests/support/treaty_dsse.rs"]
 mod treaty_dsse;
 use treaty_dsse::TreatyDsseAdmissionHook;
+
+mod receipt_publication;
