@@ -71,7 +71,6 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     /// dispatch. Owned by the guard (rather than the evaluation stack frame) so
     /// a post-dispatch drop can still flush them onto the append-only log,
     /// preserving receipt-completeness for nested child operations.
-    child_receipts: Vec<ChildRequestReceipt>,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `Ok(true)` from `admit_capability_budget`). `false` means the
     /// capability had no parent to admit against, so there is no lease to drop.
@@ -109,7 +108,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
             budget_mutation,
             payment_authorization,
             receipt_context,
-            child_receipts: Vec::new(),
             budget_lease_acquired,
             durable_operation: None,
             post_dispatch_reason: POST_ADMISSION_DROP_REASON,
@@ -124,29 +122,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
     ) -> Self {
         self.durable_operation = operation;
         self
-    }
-
-    /// Borrow the buffered child-receipt sink so the nested-flow bridge can push
-    /// signed child receipts into it while dispatch is in flight. The guard owns
-    /// the buffer so a post-dispatch drop can still flush it (see
-    /// `flush_buffered_child_receipts_from_drop`).
-    pub(crate) fn child_receipts_mut(&mut self) -> &mut Vec<ChildRequestReceipt> {
-        &mut self.child_receipts
-    }
-
-    /// Record the buffered child receipts on the normal (non-drop) path,
-    /// removing each from the buffer only once it is durably persisted. If a
-    /// bounded append fails, the not-yet-persisted receipts stay buffered so the
-    /// still-armed drop path flushes them onto the append-only log instead of
-    /// discarding them with the dropped future. The guard must stay armed until
-    /// this returns `Ok`; the caller disarms only on success, so the disarmed
-    /// drop then flushes an empty buffer and never double-records.
-    pub(crate) fn record_buffered_child_receipts(&mut self) -> Result<(), KernelError> {
-        while let Some(receipt) = self.child_receipts.first() {
-            self.kernel.record_child_receipt(receipt)?;
-            self.child_receipts.remove(0);
-        }
-        Ok(())
     }
 
     /// Mark that the tool-server dispatch await has been entered. After this
@@ -333,31 +308,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
     }
 
-    /// Flush the child receipts the nested-flow bridge buffered during dispatch
-    /// onto the append-only log. The receipts are ALREADY SIGNED, so this
-    /// persists each through the same synchronous per-receipt record path the
-    /// normal exit uses. Called only from the post-dispatch drop branch (a child
-    /// operation can only have run once dispatch started); a pre-dispatch drop
-    /// leaves the buffer empty. Each receipt is recorded independently and a
-    /// failure does NOT abandon the receipts queued behind it: a saturated or
-    /// wedged writer that fails one bounded append must not discard the rest,
-    /// which a stop-at-first-failure batch record would. Best-effort from Drop:
-    /// a per-receipt failure logs an `audit_fault` and never panics, and the
-    /// buffer is drained unconditionally so the guard cannot re-record on a
-    /// later drop.
-    fn flush_buffered_child_receipts_from_drop(&mut self) {
-        for receipt in std::mem::take(&mut self.child_receipts) {
-            if let Err(error) = self.kernel.record_child_receipt(&receipt) {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(&error),
-                    audit_fault = "post_admission_drop_child_receipts_unrecorded",
-                    "failed to flush a buffered nested child receipt on post-admission drop"
-                );
-            }
-        }
-    }
-
     /// Record a signed cancellation receipt documenting a pre-dispatch cleanup
     /// fault. Best-effort from Drop: clock, construction or append failure is
     /// logged with the `audit_fault` field. The failing steps and the reserved
@@ -423,14 +373,6 @@ impl Drop for PostAdmissionDropGuard<'_> {
             self.handle_pre_dispatch_drop();
             return;
         }
-
-        // Flush the buffered nested child receipts FIRST. The child operations
-        // completed and were signed before the parent evaluation was cancelled,
-        // so on the append-only log they precede the parent cancellation
-        // receipt recorded below. Without this flush the already-signed child
-        // receipts would be discarded with the dropped future, leaving the
-        // completed child requests off the log and breaking receipt-completeness.
-        self.flush_buffered_child_receipts_from_drop();
 
         // An original durable admission is the terminal owner. Legacy guard
         // callers never append a competing cancellation alongside its saga.

@@ -6,7 +6,9 @@
 
 use chio_log_redact::redacted;
 
-use self::responses::{AllowResponseNonce, FinalizeToolOutputCostContext};
+use self::responses::AllowResponseNonce;
+#[cfg(test)]
+use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 use crate::admission_operation::{
     AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionOperationState,
@@ -1681,6 +1683,7 @@ impl ChioKernel {
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
+    #[cfg(test)]
     pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,

@@ -6,6 +6,7 @@
 use chio_log_redact::redacted;
 
 use self::delivery_preparation::PreparedToolDelivery;
+#[cfg(test)]
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 

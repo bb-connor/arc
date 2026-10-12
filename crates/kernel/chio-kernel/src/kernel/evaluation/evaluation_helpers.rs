@@ -5,28 +5,6 @@ use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
 impl ChioKernel {
-    /// Share the exact denial vocabulary and guard evidence after a completed
-    /// tool's finding status changes, for both normal and nested evaluation.
-    pub(super) fn deny_changed_ordinary_recovery_status(
-        &self,
-        request: &ToolCallRequest,
-        matched_grant_index: usize,
-        metadata: &Option<serde_json::Value>,
-        evidence: &[chio_core::receipt::metadata::GuardEvidence],
-        payee: Option<&VerifiedGovernedPayeeBinding>,
-        denial: &crate::finding_denial::FindingDenial,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let prepared = self.prepare_changed_ordinary_recovery_status(
-            request,
-            matched_grant_index,
-            metadata,
-            evidence,
-            payee,
-            denial,
-        )?;
-        self.publish_prepared_response(request, prepared)
-    }
-
     pub(in crate::kernel) fn prepare_changed_ordinary_recovery_status(
         &self,
         request: &ToolCallRequest,
@@ -142,6 +120,7 @@ pub(super) struct ExecutionNonceReservingResponse<'a> {
     pub(super) nonce: PreflightNonceSource,
 }
 
+#[cfg(test)]
 pub(crate) struct OrdinaryRecoveryFinalization<'a> {
     pub(crate) request: &'a ToolCallRequest,
     pub(crate) output: ToolServerOutput,
@@ -269,6 +248,7 @@ pub(crate) fn delivery_commitment_denial(
 }
 
 impl ChioKernel {
+    #[cfg(test)]
     pub(crate) fn finalize_ordinary_recovery_response(
         &self,
         finalization: OrdinaryRecoveryFinalization<'_>,

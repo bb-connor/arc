@@ -1304,13 +1304,6 @@ impl PreExecutionBudgetMutation {
             Self::Invocation { .. } | Self::None => None,
         }
     }
-
-    fn into_charge_result(self) -> Option<BudgetChargeResult> {
-        match self {
-            Self::Charge(charge) => Some(charge),
-            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
-        }
-    }
 }
 
 /// Extract a guard name from a `GuardDenied` error message shaped like
