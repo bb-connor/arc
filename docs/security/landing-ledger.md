@@ -7,6 +7,59 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Current accounting through #1229 (October 12 UTC)
+
+This bounded checkpoint ends at F020's source landing in
+[#1229](https://github.com/bb-connor/arc/pull/1229), `fa10d4b856`.
+The canonical JSON current states record the following later source mappings;
+all **2,029 original requirement objects** and original current-map IDs remain
+preserved. Root owns the subsequent #1230/#1231 merge-identity reconciliation.
+
+| Scope | Landed PR | Merge | Evidence boundary |
+|-------|-----------|-------|-------------------|
+| MCP final-page cursor omission | [#1221](https://github.com/bb-connor/arc/pull/1221) | `6d620fb24c` | Claude reports 170 library, one integration and 14 path-allowlist tests plus strict lint. The permissive empty-root proposal from #1046 is excluded. |
+| Evidence lockfile commitments | [#1222](https://github.com/bb-connor/arc/pull/1222) | `cce140e37e` | Genuine digest-refusal Original and full live checker pass; lockfile bytes and dependency audit scope unchanged. |
+| Docs-only CI classification | [#1223](https://github.com/bb-connor/arc/pull/1223) | `8d8a287bad` | Reported classifier, mutation, workspace/native-protocol and fuzz controls; no measured hosted savings. |
+| F112 structural secret references | [#1224](https://github.com/bb-connor/arc/pull/1224) | `53a966a754` | Full mutation suite at `49935fa63f`; final composed live checker at `be5a01098f`. The full suite is not attributed to the final head. |
+| Landed decoder/SQL inventory | [#1225](https://github.com/bb-connor/arc/pull/1225) | `d61645e12a` | Exact F105 unsigned-document decoder and F090 removed-backfill observations; full inventory checker 497/88/180. |
+| Keyring test module hygiene | [#1226](https://github.com/bb-connor/arc/pull/1226) | `5204d8e690` | 1028-line failure retained; landed lib.rs has 885 lines. Claude reports 174 tests before/after and hygiene/strict pass. |
+| Reconciled train residuals | [#1227](https://github.com/bb-connor/arc/pull/1227) | `5de5b58d47` | F106 custom-header plaintext refusal, remaining F108 comment and exact inventories/coverage; provider 56/56 reported. No formal engine run. |
+| F040 indexed recovery candidates | [#1228](https://github.com/bb-connor/arc/pull/1228) | `679e97daf8` | Revised genuine Original, final 30/30 and pinned Rust 1.95 strict store lint; owning store/Cargo inputs match after rebase. |
+| F020 external-call custody | [#1229](https://github.com/bb-connor/arc/pull/1229) | `fa10d4b856` | x86_64 recovery 49/49, lock probes 3/3, SQLite redrive 1/1 and strict kernel lint at `e29a8a7f03`; source/tests unchanged after rebase. |
+
+F112's scanner and new secret-reference controls remain unchanged across the
+composition. Five MSRV fixture/job-name substitutions and the unrelated
+workflow predicates changed, so the final live result remains separate from
+the earlier full mutation campaign. The existing location helper remains
+because finalizer validation calls it.
+
+F040 removes selection growth from ordinary retained terminal history; total
+SQL work can still grow with live and quarantined candidates. Its revised
+legacy Original failed at 111146 to 112010 SQLite steps. The disk-wrapper
+non-execution and unpinned Rust 1.98 Clippy failure remain unsuccessful;
+only the pinned 1.95 result is passing. F020's accepted replacement restores
+durable begin before oracle I/O and preserves the original fx_clock test.
+Earlier oracle-ordering failures and disk-related attempts remain historical.
+
+Claude reconciled all twenty original TRAIN1 findings by source, then landed
+only the remaining residuals. The stale train was not reapplied wholesale.
+The generated inventory and coverage updates establish metadata consistency;
+they add no formal proof or operational acceptance. #1227's squash also
+preserves #1225's removal of the obsolete SQL inventory observation.
+
+The cflite case that changes only `#[cfg(test)]` code inside an otherwise
+production Rust path with no fuzz mapping still fails. Claude explicitly
+accepted that conservative, fail-closed residual at 15:58:33Z. It is not fixed
+or labelled passing. Only path-classified test/non-Rust changes receive the
+zero-match pass. This accounting edit includes JSON and does not qualify as
+Markdown-only under #1223's classifier.
+
+The checkpoint retains CP's genuine seed-Debug Original and 91 focused/strict
+results, with its next merge-identity update assigned to Root. No four required
+green checks, protected landing, complete hosted/native/trusted qualification or
+operational readiness follows from this source accounting. The dated sections
+below retain their earlier snapshots and acceptance limits.
+
 ## SDK, wire and reviewed P3 landings (October 12 UTC)
 
 The next confirmed source snapshot is `d06f151ecf`, with live PR identities
