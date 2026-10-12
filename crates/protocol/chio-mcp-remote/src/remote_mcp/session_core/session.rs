@@ -137,9 +137,13 @@ impl RemoteSession {
                     .ok_or(ClockError::InvalidWindow)?
                     .remaining(self.clock.read()?)?;
             }
+            // An ephemeral stateless session never leaves Initializing; the
+            // edge opens its kernel session from the request itself.
             RemoteSessionState::Initializing
-                if message.get("method").and_then(Value::as_str) == Some("initialize")
-                    && message.get("id").is_some() => {}
+                if message.get("id").is_some()
+                    && (message.get("method").and_then(Value::as_str) == Some("initialize")
+                        || chio_mcp_adapter::edge::stateless::requested_protocol_version(message)
+                            .is_some()) => {}
             _ => {
                 return Err(chio_kernel::KernelError::GovernedTransactionDenied(
                     "remote MCP session does not admit this message in its current state".into(),

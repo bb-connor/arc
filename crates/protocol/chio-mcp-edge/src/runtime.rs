@@ -71,6 +71,8 @@ mod requests;
 mod runtime_flow;
 #[path = "runtime/state.rs"]
 mod state;
+#[path = "runtime/stateless.rs"]
+mod stateless;
 #[path = "runtime/tasks.rs"]
 mod tasks;
 #[path = "runtime/tool_calls.rs"]
@@ -82,6 +84,7 @@ use jsonrpc::negotiate_protocol_version;
 use nested_flow::*;
 use protocol::*;
 use state::{EdgeAction, EdgeState, LogLevel, PendingActionRoute};
+use stateless::RequestEra;
 use tasks::{EdgeTask, EdgeTaskFinalOutcome, EdgeTaskStatus, ToolCallEdgeOutcome};
 #[cfg(test)]
 use tool_calls::{
@@ -89,7 +92,7 @@ use tool_calls::{
     BridgeMcpToolCallRequest,
 };
 
-const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+const MCP_PROTOCOL_VERSION: &str = crate::stateless::LEGACY_PROTOCOL_VERSION;
 const SUPPORTED_MCP_PROTOCOL_VERSIONS: &[&str] = &[MCP_PROTOCOL_VERSION];
 const JSONRPC_INVALID_REQUEST: i64 = -32600;
 const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
@@ -154,6 +157,8 @@ pub struct ChioMcpEdge {
     child_request_counter: u64,
     client_request_counter: u64,
     state: EdgeState,
+    /// The session was opened by a stateless request, not `initialize`.
+    stateless: bool,
     minimum_log_level: LogLevel,
     pending_actions: Vec<EdgeAction>,
     pending_action_route: PendingActionRoute,
@@ -242,6 +247,7 @@ impl ChioMcpEdge {
             child_request_counter: 0,
             client_request_counter: 0,
             state: EdgeState::Uninitialized,
+            stateless: false,
             minimum_log_level: LogLevel::Info,
             pending_actions: Vec::new(),
             pending_action_route: PendingActionRoute::Immediate,
@@ -404,9 +410,34 @@ impl ChioMcpEdge {
                 if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
                     return Some(response);
                 }
-                Some(self.handle_request(id, &method, params))
+                Some(
+                    self.dispatch_request(id, &method, params, |edge, id, method, params| {
+                        edge.handle_request(id, method, params)
+                    }),
+                )
             }
             None => self.handle_known_notification(&method, params),
+        }
+    }
+
+    fn dispatch_request(
+        &mut self,
+        id: Value,
+        method: &str,
+        params: Value,
+        handle: impl FnOnce(&mut Self, Value, &str, Value) -> Value,
+    ) -> Value {
+        match self.admit_request_era(&id, method, &params) {
+            Err(refusal) => refusal,
+            Ok(RequestEra::Handshake) => handle(self, id, method, params),
+            Ok(RequestEra::Stateless) => {
+                let response = if method == "server/discover" {
+                    self.handle_server_discover(id, &params)
+                } else {
+                    handle(self, id, method, params)
+                };
+                self.finish_stateless_response(method, response)
+            }
         }
     }
 
@@ -436,9 +467,13 @@ impl ChioMcpEdge {
                 if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
                     return Some(response);
                 }
-                Some(self.handle_request_with_transport_channel(
-                    id, &method, params, client_rx, cancel_rx, writer,
-                ))
+                Some(
+                    self.dispatch_request(id, &method, params, |edge, id, method, params| {
+                        edge.handle_request_with_transport_channel(
+                            id, method, params, client_rx, cancel_rx, writer,
+                        )
+                    }),
+                )
             }
             None => self.handle_known_notification(&method, params),
         }

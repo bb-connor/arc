@@ -36,7 +36,10 @@ an already decoded `Value`; callers own the original-byte decoding boundary.
 The runtime forms a request digest, parses the envelope, and routes the method.
 Initialization moves state from uninitialized to waiting for initialized.
 `notifications/initialized` permits ready-state operations.
-Protocol negotiation supports version `2025-11-25`.
+Protocol negotiation supports version `2025-11-25` through `initialize`.
+Revision `2026-07-28` is served statelessly: a request naming it in
+`_meta` opens the kernel session on an uninitialized edge, with no
+server-initiated flows, and an edge opened by one era refuses the other.
 
 Discovery projects retained manifest tools into MCP names and schemas.
 Duplicate exposed names across manifests reject construction.

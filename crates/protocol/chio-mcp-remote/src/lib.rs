@@ -37,6 +37,8 @@ mod remote_mcp_approvals;
 mod remote_mcp_session_credentials;
 #[path = "remote_mcp/session_worker.rs"]
 mod session_worker;
+#[path = "remote_mcp/stateless_http.rs"]
+mod stateless_http;
 use http_body::read_limited_mcp_post_body;
 #[path = "remote_mcp/session_store.rs"]
 mod remote_mcp_session_store;

@@ -376,6 +376,18 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             return response;
         }
     }
+    if stateless_http::is_stateless_post(&headers, &message) {
+        let (message, _reservation) = message.into_parts();
+        let names_session = ingress_session.is_some();
+        return stateless_http::handle_post(
+            state,
+            request_auth_context,
+            &headers,
+            names_session,
+            message,
+        )
+        .await;
+    }
     let response_method = message
         .get("method")
         .and_then(Value::as_str)

@@ -48,8 +48,11 @@ There is no declared default feature set.
 
 ## Status
 
-Implements MCP protocol version `2025-11-25`, initialization state, tools,
+Implements MCP protocol version `2025-11-25` with initialization state, tools,
 resources, prompts, completions, logging, tasks, and negotiated nested flows.
+Also serves the stateless revision `2026-07-28` through per-request `_meta`:
+`server/discover`, tools, resources, prompts and completions, without
+server-initiated flows.
 Unit and loopback tests cover dispatch and refusal boundaries. Callers own
 transport authentication and durable kernel-store configuration.
 
