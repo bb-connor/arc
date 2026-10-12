@@ -1309,3 +1309,5 @@ mod receipt_producer_policy_coverage;
 mod recovery_worker_readiness;
 mod teardown_overlay_wait;
 mod terminal_response_refusal;
+
+mod siem_delivery;
