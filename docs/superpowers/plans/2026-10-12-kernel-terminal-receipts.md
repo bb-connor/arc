@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `85b74cf023`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
+- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `bb3b4c51a1`, composed in `39883cf4a6`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
 - Non-durable acceptance is one committed terminal receipt OR one buffered evidence obligation with dispatch latched. Persistence eventually requires a healthy clock, signer and store. The in-memory buffer is not crash-durable.
 - A durable call leaves terminal truth to its saga. Never append a competing cancellation or deny after handing off that operation.
 - Unknown append outcomes retain the original receipt identity. Absence on an early read cannot establish that an in-flight write will never commit.
@@ -202,3 +202,11 @@ No caller gains retry authority from a Terminal or Retained response. The remain
 - The previous aggregate-budget unit test never reached quota exhaustion: its single-operation fixture rejected the second request as a replay conflict. The replacement uses the public SQLite integration boundary and must prove a distinct compensated second operation, no second invocation, no second-grant usage, and an unchanged first terminal operation. Its initial payment-specific observer was unsuitable for this non-monetary test; neither that failure nor the earlier cyclic unit-test compile refusal is qualification.
 - Resource refusal Original `f01093074f` requires signed Reusable metadata bound to the exact request ID and authenticated tenant namespace. This test and the corrected SQLite aggregate control remain pending.
 - The standalone cancellation repair is rebased onto main as `a45d6b8e70`; its three focused cancellation tests pass. Strict Clippy remains in progress. The predecessor `bfff9e712e` passed all 1,725 kernel library tests and strict Clippy on x86_64.
+
+## Composed candidate
+
+- The resource-refusal repair `983bd1d832` passes its actual authenticated-session control. Its request ID and tenant namespace are signed with Reusable; the Original at `aeb535ab20` failed on the missing request ID.
+- The corrected real SQLite aggregate control passes at `aeb535ab20`, proving two distinct operation identities, compensation of the refused second operation, no second invocation or grant usage, and an unchanged first terminal operation.
+- `39883cf4a6` composes current main, including the independently landed subscription-authority extraction. The broad owning gates run on this composed candidate. The earlier gate driver was stopped after the resource control, before its broad run.
+- The metric-isolation fix already landed in #1273 (`5f28da106f`, head `2e6ec654e2`). Duplicate #1275 was closed after verifying identical source and no unresolved review threads; its branch is preserved. No hosted qualification is inferred from that closure.
+- Cancellation #1277 is published at `a45d6b8e70`, with three focused tests and strict all-target kernel Clippy passing. Claude owns review and merge; the additional matching-saga Replayed control remains in its isolated lane.
