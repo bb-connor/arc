@@ -99,3 +99,69 @@ fn healthy_allow_remains_signed_and_executes_once() {
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert!(response.receipt.verify_signature().unwrap());
 }
+
+#[test]
+fn reusable_refusals_bind_identical_request_ids_to_distinct_tenants() {
+    let (kernel, request, invocations) = fixture();
+    let mut contexts = Vec::new();
+    for tenant in ["tenant-a", "tenant-b"] {
+        let session = kernel
+            .open_session(request.agent_id.clone(), vec![request.capability.clone()])
+            .unwrap();
+        kernel
+            .set_session_auth_context(
+                &session,
+                super::multi_tenant_receipt::oauth_auth_with_enterprise_tenant(tenant),
+            )
+            .unwrap();
+        kernel.activate_session(&session).unwrap();
+        contexts.push((
+            tenant,
+            make_operation_context(&session, &request.request_id, &request.agent_id),
+        ));
+    }
+    kernel
+        .emergency_stop("namespace isolation control")
+        .unwrap();
+    let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
+        capability: request.capability.clone(),
+        server_id: request.server_id.clone(),
+        tool_name: request.tool_name.clone(),
+        arguments: request.arguments.clone(),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        execution_nonce: None,
+        model_metadata: None,
+        extra_metadata: None,
+    }));
+    let mut namespaces = Vec::new();
+    for (tenant, context) in contexts {
+        let response = session_tool_call(
+            kernel
+                .evaluate_session_operation(&context, &operation)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(response.receipt.tenant_id.as_deref(), Some(tenant));
+        assert!(response.receipt.verify_signature().unwrap());
+        let metadata = response.receipt.metadata.as_ref().unwrap();
+        assert_eq!(
+            metadata["receipt_context"]["request_id"],
+            request.request_id
+        );
+        assert_eq!(metadata["chio_runtime"]["identity_disposition"], "reusable");
+        namespaces.push(
+            metadata["receipt_context"]["request_namespace_digest"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        );
+    }
+    assert_ne!(namespaces[0], namespaces[1]);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}

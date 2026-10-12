@@ -774,9 +774,12 @@ fn a_missing_nested_session_root_compensates_the_durable_admission() {
             .and_then(serde_json::Value::as_str),
         Some("terminal"),
     );
-    assert!(metadata
-        .pointer("/receipt_context/request_namespace_digest")
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|value| !value.is_empty()));
+    let operation = store.operation();
+    assert_eq!(
+        metadata
+            .pointer("/receipt_context/request_namespace_digest")
+            .and_then(serde_json::Value::as_str),
+        Some(operation.binding().request_namespace_digest().as_str()),
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
