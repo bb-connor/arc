@@ -19,7 +19,8 @@ The full set of required check contexts (the `name:` values GitHub branch
 rulesets match on) is four jobs, not one:
 
 - "Build, lint, test" (the `check` job, containing the four steps above)
-- "MSRV build and test" (the `msrv` job; see below for its coverage caveats)
+- "MSRV build and test" (the `msrv` job, which requires the `msrv-workspace`
+  lane; see below for its coverage caveats)
 - "cargo-vet (locked supply-chain audit)" (the `cargo-vet` job)
 - "cargo-deny (supply-chain bans/advisories/licenses)" (the `cargo-deny` job)
 
@@ -32,6 +33,24 @@ The regression-test deletion guard and its scratch-repository self-test also
 run inside "Build, lint, test". On pull requests, a deletion or rename from a
 guarded regression path fails that required context unless a separate same-line
 issue reference names each affected file.
+
+## Documentation-only pull requests
+
+The `classify` job runs `scripts/classify-docs-only-pr.py` on the pull
+request merge commit. It reports `docs_only=true` only when every changed path
+is a regular `.md` file outside `.github/`, `claims/`, `compliance/`,
+`contracts/`, `formal/`, `fuzz/`, `spec/`, `tests/`, and `third_party/`, and no
+tracked non-Markdown file names its path, its last two path components, or
+(inside its owning Cargo package) its file name. A push, any other change, or
+a classification error runs every lane.
+
+With `docs_only=true`, `build-lint`, `workspace-tests`, `cognition-market`, and
+`msrv-workspace` are skipped and "Documentation gates" runs the
+Markdown-reading structural gates. "Build, lint, test" and "MSRV build and
+test" then pass only when the classifier succeeded, the documentation gates
+passed, and each skipped lane reports `skipped`. Otherwise they require every
+lane to succeed. The Kani, formal proof, Apalache, threat-model, nonce/FIPS,
+and enterprise security contracts run on every pull request.
 
 ## Formal PR smoke checks are present but not required
 
@@ -186,7 +205,7 @@ integration tests.
 
 ### The MSRV job does not fully test the workspace
 
-The "MSRV build and test" job (`msrv` in `ci.yml`) runs `cargo build
+The MSRV workspace lane (`msrv-workspace` in `ci.yml`) runs `cargo build
 --workspace` on the pinned MSRV toolchain, but its test command does **not**
 cover the whole workspace. It runs:
 

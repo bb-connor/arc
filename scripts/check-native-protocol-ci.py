@@ -114,7 +114,7 @@ def validate(
         ("build-lint", "Protocol peer-negotiation gate", COMMON_ENV),
         ("workspace-tests", "Workspace tests", COMMON_ENV),
         (
-            "msrv",
+            "msrv-workspace",
             "MSRV workspace lane",
             {**COMMON_ENV, "CARGO_TARGET_DIR": "${{ runner.temp }}/chio-msrv-target"},
         ),
@@ -124,6 +124,7 @@ def validate(
             job_id,
             consumer,
             {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION, "env": env},
+            "needs.classify.outputs.docs_only != 'true'",
         )
     validate_consumer(
         process,

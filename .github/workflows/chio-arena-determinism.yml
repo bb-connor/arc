@@ -17,6 +17,7 @@ name: chio-arena-determinism
 
 on:
   pull_request:
+    paths-ignore: ["**/*.md"]
   push:
     branches:
       - main

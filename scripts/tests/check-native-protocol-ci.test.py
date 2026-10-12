@@ -31,7 +31,7 @@ LIVE = (
 CONSUMERS = (
     (0, "build-lint", "Protocol peer-negotiation gate"),
     (0, "workspace-tests", "Workspace tests"),
-    (0, "msrv", "MSRV workspace lane"),
+    (0, "msrv-workspace", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
     (3, "conformance", "Run live C++ conformance areas"),
     (4, "native", "Exercise the public worker role and actual native process host"),

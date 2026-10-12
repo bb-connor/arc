@@ -1203,28 +1203,90 @@ EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
     "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
 )
 
-# The required context accepts only the three unconditional producing jobs.
+# Producers run unless the classifier proves a documentation-only pull
+# request; the required contexts then accept only the documentation gates.
+RUN_UNLESS_DOCS_ONLY = "needs.classify.outputs.docs_only != 'true'"
 BUILD_LINT_TEST_NEEDS = ("build-lint", "workspace-tests", "cognition-market")
-BUILD_LINT_TEST_PRODUCERS = (
+DOCS_SKIPPABLE_PRODUCERS = (
     ("build-lint", "Build and lint"),
     ("workspace-tests", "Workspace tests"),
     ("cognition-market", "Cognition market promoted default"),
+    ("msrv-workspace", "MSRV workspace lane"),
 )
 EXPECTED_BUILD_LINT_TEST_JOB = {
     "name": "Build, lint, test",
     "if": "${{ always() }}",
-    "needs": list(BUILD_LINT_TEST_NEEDS),
+    "needs": ["classify", "docs-gates", *BUILD_LINT_TEST_NEEDS],
     "runs-on": "ubuntu-latest",
     "steps": [{
         "name": "Require build, lint, workspace and cognition market tests",
         "run": (
             "set -euo pipefail\n"
-            "test '${{ needs.build-lint.result }}' = success\n"
-            "test '${{ needs.workspace-tests.result }}' = success\n"
-            "test '${{ needs.cognition-market.result }}' = success"
+            "test '${{ needs.classify.result }}' = success\n"
+            "if [ '${{ needs.classify.outputs.docs_only }}' = true ]; then\n"
+            "  test '${{ needs.docs-gates.result }}' = success\n"
+            "  test '${{ needs.build-lint.result }}' = skipped\n"
+            "  test '${{ needs.workspace-tests.result }}' = skipped\n"
+            "  test '${{ needs.cognition-market.result }}' = skipped\n"
+            "else\n"
+            "  test '${{ needs.docs-gates.result }}' = skipped\n"
+            "  test '${{ needs.build-lint.result }}' = success\n"
+            "  test '${{ needs.workspace-tests.result }}' = success\n"
+            "  test '${{ needs.cognition-market.result }}' = success\n"
+            "fi"
         ),
     }],
 }
+EXPECTED_MSRV_JOB = {
+    "name": "MSRV build and test",
+    "if": "${{ always() }}",
+    "needs": ["classify", "msrv-workspace"],
+    "runs-on": "ubuntu-latest",
+    "steps": [{
+        "name": "Require the MSRV workspace lane",
+        "run": (
+            "set -euo pipefail\n"
+            "test '${{ needs.classify.result }}' = success\n"
+            "if [ '${{ needs.classify.outputs.docs_only }}' = true ]; then\n"
+            "  test '${{ needs.msrv-workspace.result }}' = skipped\n"
+            "else\n"
+            "  test '${{ needs.msrv-workspace.result }}' = success\n"
+            "fi"
+        ),
+    }],
+}
+EXPECTED_CLASSIFY_JOB = {
+    "name": "Classify changed files",
+    "runs-on": "ubuntu-latest",
+    "timeout-minutes": "10",
+    "outputs": {"docs_only": "${{ steps.classify.outputs.docs_only }}"},
+    "steps": [
+        {
+            "uses": "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "with": {"fetch-depth": "2"},
+        },
+        {
+            "name": "Classify documentation-only pull request",
+            "id": "classify",
+            "env": {
+                "EVENT_NAME": "${{ github.event_name }}",
+                "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+            },
+            "run": "python3 scripts/classify-docs-only-pr.py",
+        },
+    ],
+}
+EXPECTED_DOCS_GATES_RUN = """
+set -euo pipefail
+python3 scripts/tests/classify-docs-only-pr.test.py
+python3 scripts/check-stub-surfaces.py
+python3 scripts/check-rust-file-hygiene.py
+python3 scripts/check-architecture-docs.py
+python3 scripts/check-rust-public-surface.py
+python3 ./scripts/check-mcp-admin-credential-contract.py
+bash ./scripts/check-security-provenance.sh
+bash ./scripts/check-chio-proof-room-release-truth.sh
+""".strip()
 EXPECTED_WORKSPACE_TESTS_RUN = "cargo test --workspace --no-fail-fast --exclude chio-wasm-guards"
 # Preserve tool versions and native authority preparation before the unchanged suite.
 EXPECTED_WORKSPACE_TEST_SETUP = [
@@ -5287,15 +5349,34 @@ def validate_build_lint_test(ci: dict) -> None:
     }
     if observed != EXPECTED_BUILD_LINT_TEST_JOB:
         raise ContractError("Build, lint, test changes its exact fail-closed body")
-    for identifier, name in BUILD_LINT_TEST_PRODUCERS:
+    if stripped_runs(job(ci, "msrv")) != EXPECTED_MSRV_JOB:
+        raise ContractError("MSRV build and test changes its exact fail-closed body")
+    if stripped_runs(job(ci, "classify")) != EXPECTED_CLASSIFY_JOB:
+        raise ContractError("documentation-only classifier job changed")
+    docs_gates = job(ci, "docs-gates")
+    if (
+        set(docs_gates) != {"name", "needs", "if", "runs-on", "timeout-minutes", "steps"}
+        or docs_gates.get("name") != "Documentation gates"
+        or docs_gates.get("needs") != "classify"
+        or docs_gates.get("if") != "needs.classify.outputs.docs_only == 'true'"
+    ):
+        raise ContractError("documentation gates job changes its execution contract")
+    validate_exact_steps(
+        docs_gates,
+        (("Markdown content gates", EXPECTED_DOCS_GATES_RUN),),
+        "documentation-only content gates",
+    )
+    for identifier, name in DOCS_SKIPPABLE_PRODUCERS:
         producer = job(ci, identifier)
         if (
-            set(producer) != {"name", "runs-on", "timeout-minutes", "steps"}
+            set(producer) != {"name", "needs", "if", "runs-on", "timeout-minutes", "steps"}
             or producer.get("name") != name
+            or producer.get("needs") != "classify"
+            or producer.get("if") != RUN_UNLESS_DOCS_ONLY
             or producer.get("runs-on") != "ubuntu-latest"
             or producer.get("timeout-minutes") != "360"
         ):
-            raise ContractError(f"{identifier} changes its unconditional execution contract")
+            raise ContractError(f"{identifier} changes its execution contract")
     tests = job(ci, "workspace-tests")
     validate_exact_steps(
         tests,
@@ -5340,6 +5421,21 @@ def validate_build_lint_test(ci: dict) -> None:
                 raise ContractError(
                     f"cognition market suite must run only in cognition-market: {identifier}"
                 )
+
+
+def stripped_runs(job_body: dict[str, object]) -> dict[str, object]:
+    steps = job_body.get("steps")
+    if not isinstance(steps, list):
+        return job_body
+    return {
+        **job_body,
+        "steps": [
+            {**step, "run": step["run"].strip()}
+            if isinstance(step, dict) and isinstance(step.get("run"), str)
+            else step
+            for step in steps
+        ],
+    }
 
 
 def validate_nonce_fips_contract(root: Path) -> None:
@@ -5483,7 +5579,7 @@ def validate(root: Path) -> None:
         set(advisory) != {"name", "run-name", "on", "permissions", "env", "jobs"}
         or advisory.get("name") != "Security nextest advisory"
         or advisory.get("run-name") != "Security nextest advisory E=${{ github.event.pull_request.head.sha || github.sha }}"
-        or advisory.get("on") != {"push": {"branches": ["main"]}, "pull_request": {"branches": ["main"], "types": ["opened", "synchronize", "reopened"]}}
+        or advisory.get("on") != {"push": {"branches": ["main"]}, "pull_request": {"branches": ["main"], "types": ["opened", "synchronize", "reopened"], "paths-ignore": ["**/*.md"]}}
         or advisory.get("permissions") != {"contents": "read"}
         or advisory.get("env") != EXPECTED_ADVISORY_ENV
         or set(workflow_jobs(advisory)) != {"nextest-security"}
@@ -8722,18 +8818,25 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("security aggregate changes its exact fail-closed body")
 
-    for identifier in (*BUILD_LINT_TEST_NEEDS, *REQUIRED_AGGREGATE_NEEDS, "security-contract-required"):
+    for identifier in (
+        "classify",
+        "docs-gates",
+        "msrv-workspace",
+        *BUILD_LINT_TEST_NEEDS,
+        *REQUIRED_AGGREGATE_NEEDS,
+        "security-contract-required",
+    ):
         if contains_key(job(ci, identifier), "continue-on-error"):
             raise ContractError(f"required CI job uses continue-on-error: {identifier}")
 
-    if job(ci, "msrv").get("timeout-minutes") != "360":
+    if job(ci, "msrv-workspace").get("timeout-minutes") != "360":
         raise ContractError("MSRV serial workspace budget must be exactly 360 minutes")
 
     check_job = job(ci, "build-lint")
     for identifier, boundary in (
         ("build-lint", "Workspace structural gates"),
         ("workspace-tests", "Workspace tests"),
-        ("msrv", "MSRV workspace lane"),
+        ("msrv-workspace", "MSRV workspace lane"),
     ):
         python_job = job(ci, identifier)
         validate_exact_steps(
@@ -8822,7 +8925,7 @@ def validate(root: Path) -> None:
         "formal proof evidence",
     )
     validate_exact_steps(
-        job(ci, "msrv"),
+        job(ci, "msrv-workspace"),
         (("MSRV workspace lane", EXPECTED_MSRV_RUN),),
         "MSRV evidence",
         EXPECTED_MSRV_EXTRAS,
