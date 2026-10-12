@@ -33,6 +33,7 @@ impl RemoteSession {
                 reading,
             )?);
         }
+        let resume_envelope = ResumeEnvelopeRatchet::new(init.lifecycle_policy.resume_envelope_floor);
         Ok(Self {
             clock: init.clock,
             session_id: init.session_id,
@@ -62,6 +63,7 @@ impl RemoteSession {
             session_store_lease: init.session_store_lease,
             resume_hmac_keyring: init.resume_hmac_keyring,
             resume_generation: AtomicU64::new(init.resume_generation),
+            resume_envelope,
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
@@ -365,6 +367,8 @@ impl RemoteSession {
                 self.session_id
             ))
         })?;
+        let subscriptions = Vec::new();
+        let envelope = self.resume_envelope.select(&subscriptions);
         let resume_generation = crate::clock::next_counter(&self.resume_generation)?;
         let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
@@ -379,9 +383,11 @@ impl RemoteSession {
             peer_capabilities,
             initialize_params,
             issued_capabilities: self.issued_capabilities.clone(),
+            subscriptions,
             resume_generation,
             resume_integrity: keyring.empty_tag_for_current(),
         };
+        record.resume_integrity.envelope = envelope;
         record.resume_integrity.tag =
             compute_resume_record_integrity_tag(&keyring.current, &record)?;
         Ok(record)

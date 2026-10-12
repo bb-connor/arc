@@ -23,6 +23,8 @@ mod clock_custody;
 mod dpop_replay;
 #[path = "tests/protocol_refusal.rs"]
 mod protocol_refusal;
+#[path = "tests/resume_envelope.rs"]
+mod resume_envelope;
 #[path = "tests/session_recovery.rs"]
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
@@ -525,6 +527,7 @@ fn sample_resume_record_with_keyring(
             peer_capabilities: PeerCapabilities::default(),
             initialize_params: json!({}),
             issued_capabilities: Vec::new(),
+            subscriptions: Vec::new(),
             resume_generation: 1,
             resume_integrity: keyring.empty_tag_for_current(),
         },
@@ -1068,6 +1071,7 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         reaper_interval_millis: 100,
         tombstone_retention_millis: 10_000,
         request_response_timeout_millis: 10_000,
+        resume_envelope_floor: RemoteSessionEnvelope::V3,
     };
     let session = RemoteSession::new(RemoteSessionInit {
         clock: RemoteClock::new(Arc::new(

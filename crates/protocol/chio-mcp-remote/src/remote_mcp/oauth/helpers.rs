@@ -125,6 +125,20 @@ pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
             REQUEST_RESPONSE_TIMEOUT_ENV,
             DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
         ),
+        resume_envelope_floor: read_resume_envelope_floor(),
+    }
+}
+
+/// `v2` is accepted only for an upgrade window in which an older binary may
+/// still open the store. Any other value keeps the `v3` default.
+fn read_resume_envelope_floor() -> RemoteSessionEnvelope {
+    match std::env::var(RESUME_RECORD_ENVELOPE_FLOOR_ENV) {
+        Ok(value) if value == "v2" => RemoteSessionEnvelope::V2,
+        Ok(value) if value != "v3" => {
+            warn!(value = %value, "unknown resume record envelope floor; signing v3");
+            RemoteSessionEnvelope::V3
+        }
+        _ => RemoteSessionEnvelope::V3,
     }
 }
 

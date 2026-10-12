@@ -190,8 +190,7 @@ async fn restored_incarnations_refuse_cursors_from_earlier_incarnations(
 }
 
 #[tokio::test]
-async fn restore_refuses_a_generation_that_exhausts_the_event_id_space(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn restore_retains_records_it_cannot_serve() -> Result<(), Box<dyn std::error::Error>> {
     let (directory, path) = private_test_session_database("cursor-seed-bound");
     let mut config = test_remote_config();
     config.policy_path = directory.join("policy.yaml");
@@ -230,6 +229,19 @@ async fn restore_refuses_a_generation_that_exhausts_the_event_id_space(
     assert!(factory
         .restore_session(&sign_test_resume_record(record, &keyring))?
         .is_none());
+
+    let mut subscribed = fresh.resume_record()?.ok_or("fresh record")?;
+    assert_eq!(
+        subscribed.resume_integrity.envelope,
+        RemoteSessionEnvelope::V3
+    );
+    subscribed.subscriptions = vec![PersistedSubscription::Standard {
+        uri: "file:///workspace/notes.txt".into(),
+        capability_id: "capability-subscribe".into(),
+    }];
+    subscribed.resume_integrity.tag =
+        compute_resume_record_integrity_tag(&keyring.current, &subscribed)?;
+    assert!(factory.restore_session(&subscribed)?.is_none());
 
     drop((fresh, last, factory));
     std::fs::remove_dir_all(directory)?;
