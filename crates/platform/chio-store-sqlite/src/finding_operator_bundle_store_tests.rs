@@ -713,3 +713,47 @@ fn seller_artifact_capacity_bounds_database_and_file_storage() {
         .release_seller_artifact_capacity(&second_request, "seller-1", &request_sha256,)
         .unwrap());
 }
+
+#[test]
+fn bundle_schema_other_than_current_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("operator.db");
+    drop(SqliteFindingOperatorBundleStore::open(&path).unwrap());
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    crate::stamp_schema_version(&conn, SCHEMA_KEY, 0).unwrap();
+    drop(conn);
+    assert_eq!(
+        SqliteFindingOperatorBundleStore::open(&path)
+            .err()
+            .unwrap()
+            .to_string(),
+        "finding operator bundle store is unavailable: database schema version 0 is not the \
+         current schema version 1; refusing to open"
+    );
+}
+
+#[test]
+fn current_stamp_over_a_retired_bundle_table_shape_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("operator.db");
+    drop(SqliteFindingOperatorBundleStore::open(&path).unwrap());
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "DROP TABLE chio_finding_operator_seller_artifact_capacity;
+         CREATE TABLE chio_finding_operator_seller_artifact_capacity (
+             request_id TEXT PRIMARY KEY,
+             principal_id TEXT NOT NULL,
+             reserved_bytes INTEGER NOT NULL
+         );",
+    )
+    .unwrap();
+    drop(conn);
+    assert_eq!(
+        SqliteFindingOperatorBundleStore::open(&path)
+            .err()
+            .unwrap()
+            .to_string(),
+        "finding operator bundle store is unavailable: finding operator bundle schema differs \
+         from the canonical definition"
+    );
+}

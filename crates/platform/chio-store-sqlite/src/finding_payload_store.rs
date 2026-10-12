@@ -24,18 +24,47 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
+fn verify_schema(connection: &rusqlite::Connection) -> Result<(), FindingPayloadStoreError> {
+    if crate::schema_catalog::matches_canonical_schema(
+        connection,
+        FINDING_PAYLOAD_SCHEMA,
+        FINDING_PAYLOAD_SCHEMA_TABLES,
+    )? {
+        Ok(())
+    } else {
+        Err(FindingPayloadStoreError::Unavailable(
+            "finding payload schema differs from the canonical definition".to_owned(),
+        ))
+    }
+}
+
 use crate::encrypted_blob::{
     decrypt_blob_with_aad, try_encrypt_blob_with_aad, BlobStoreError, EncryptedBlob, TenantId,
     TenantKey,
 };
 
 const FINDING_PAYLOAD_SCHEMA_KEY: &str = "finding_payload";
-const FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const FINDING_PAYLOAD_SCHEMA_VERSION: i32 = 1;
 const FINDING_PAYLOAD_SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_bundles",
     "chio_finding_payloads",
     "chio_finding_operator_payments",
 ];
+const FINDING_PAYLOAD_SCHEMA_TABLES: &[&str] = &["chio_finding_payloads"];
+const FINDING_PAYLOAD_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS chio_finding_payloads (
+    finding_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    payload_sha256 TEXT NOT NULL CHECK(length(payload_sha256) = 64),
+    nonce BLOB NOT NULL CHECK(length(nonce) = 12),
+    ciphertext BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chio_finding_payloads_tenant
+    ON chio_finding_payloads(tenant_id, created_at);
+"#;
 const MAX_FINDING_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
 
 /// One decrypted payload resolved for an authorized reveal.
@@ -128,7 +157,7 @@ impl SqliteFindingPayloadStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -148,45 +177,35 @@ impl SqliteFindingPayloadStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), FindingPayloadStoreError> {
-        let conn = self.pool.get()?;
-        crate::check_schema_version(
+    fn initialize_schema(&self) -> Result<(), FindingPayloadStoreError> {
+        let mut conn = self.pool.get()?;
+        let state = crate::check_current_schema(
             &conn,
             FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION,
+            FINDING_PAYLOAD_SCHEMA_VERSION,
             FINDING_PAYLOAD_SCHEMA_ANCHORS,
         )
         .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
         conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS chio_finding_payloads (
-                finding_id TEXT PRIMARY KEY,
-                tenant_id TEXT NOT NULL,
-                media_type TEXT NOT NULL,
-                payload_sha256 TEXT NOT NULL CHECK(length(payload_sha256) = 64),
-                nonce BLOB NOT NULL CHECK(length(nonce) = 12),
-                ciphertext BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_finding_payloads_tenant
-                ON chio_finding_payloads(tenant_id, created_at);
-            "#,
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
+        if state == crate::SchemaState::Current {
+            return verify_schema(&conn);
+        }
+        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute_batch(FINDING_PAYLOAD_SCHEMA)?;
         crate::stamp_schema_version(
-            &conn,
+            &transaction,
             FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION,
+            FINDING_PAYLOAD_SCHEMA_VERSION,
         )
         .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
+        verify_schema(&transaction)?;
+        transaction.commit()?;
         Ok(())
     }
 
@@ -393,6 +412,46 @@ impl SqliteFindingPayloadStore {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn payload_schema_other_than_current_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("operator.db");
+        drop(SqliteFindingPayloadStore::open(&path).unwrap());
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        crate::stamp_schema_version(&conn, FINDING_PAYLOAD_SCHEMA_KEY, 0).unwrap();
+        drop(conn);
+        assert_eq!(
+            SqliteFindingPayloadStore::open(&path)
+                .err()
+                .unwrap()
+                .to_string(),
+            "finding payload store is unavailable: database schema version 0 is not the \
+             current schema version 1; refusing to open"
+        );
+    }
+
+    #[test]
+    fn current_stamp_over_a_retired_payload_table_shape_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("operator.db");
+        drop(SqliteFindingPayloadStore::open(&path).unwrap());
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "DROP INDEX idx_chio_finding_payloads_tenant;
+             CREATE INDEX idx_chio_finding_payloads_tenant ON chio_finding_payloads(tenant_id);",
+        )
+        .unwrap();
+        drop(conn);
+        assert_eq!(
+            SqliteFindingPayloadStore::open(&path)
+                .err()
+                .unwrap()
+                .to_string(),
+            "finding payload store is unavailable: finding payload schema differs from the \
+             canonical definition"
+        );
+    }
 
     fn tenant() -> TenantId {
         TenantId::new("operator-alpha")
