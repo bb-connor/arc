@@ -1054,17 +1054,16 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs"
 rust_symbols = [
   "PostAdmissionDropGuard",
   "PostAdmissionDropGuard::new",
-  "PostAdmissionDropGuard::mark_dispatch_started",
   "PostAdmissionDropGuard::disarm",
   "PostAdmissionDropGuard::handle_pre_dispatch_drop",
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
+# Cleanup source reviewed at 9b2c8e2b9c; final digest renewal remains pending.
 normalized_sha256 = "5efc4b3db4e65ee9848e8d43812dff44d9b818f23f1f5728d12a1a3f8db67aa9"
 symbol_sha256 = [
   { symbol = "PostAdmissionDropGuard", sha256 = "ecdcaa0b5da7f49de41575f1f1caf7435807c4781f1979b582266ee5c488d38a" },
   { symbol = "PostAdmissionDropGuard::new", sha256 = "29487da88a8ac4e6f663370823d148b7f11a898b6fca1b132132f5790e7788c6" },
-  { symbol = "PostAdmissionDropGuard::mark_dispatch_started", sha256 = "576227841b59ff010c30ace530f1a39760275ed07f05ab5225346f7ab8c158fa" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
   { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "1ee920b401ffec48a1aaa329050f265ada92298a4c3321cc2f55a9d2a5a347e5" },
   { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "ed39a4785d10067d698766bd199665597354e85efa45151e1feb0b3cae8b2c32" },
@@ -1097,6 +1096,7 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
+# Cleanup source reviewed at 9b2c8e2b9c; final digest renewal remains pending.
 normalized_sha256 = "8afcc84db14548de0010bf111946dd58aa93d297467eea4e7e4d02a8b6217205"
 symbol_sha256 = [
   { symbol = "PostAdmissionReceiptContext", sha256 = "84155728c35fa1783115e17afdf15eed7941dec248d0f059a62f4cdfe5523c5f" },
@@ -4610,6 +4610,7 @@ rust_symbols = [
   "Discharged::drop",
   "run_post_effect",
 ]
+# Cleanup source reviewed at 9b2c8e2b9c; final digest renewal remains pending.
 normalized_sha256 = "4b2946c9295267362c73ec1e3909538dee9e310d50219e7b46186bfdf0755cde"
 symbol_sha256 = [
   { symbol = "PostEffectError", sha256 = "580fdad417efb5965bfd3118c466e412f7f108bbcc0e1ff4f265f0da468e21ef" },
@@ -4783,6 +4784,7 @@ rust_symbols = [
   "PostEffectObligation::commit_terminal_receipt",
   "Discharged::deliver",
 ]
+# Cleanup source reviewed at 9b2c8e2b9c; final digest renewal remains pending.
 normalized_sha256 = "0da2a097c3dad7170f659c89319bdd463a875e8759b8e0c6f2382f2c0819a0a3"
 symbol_sha256 = [
   { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "2c0baf6d6dffc2aed01c5dc5ddcbd116982bf16d2da96abf12632e586178d00e" },
@@ -4830,6 +4832,7 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
 rust_symbols = ["PostEffectObligation::commit_terminal_receipt"]
+# Cleanup source reviewed at 9b2c8e2b9c; final digest renewal remains pending.
 normalized_sha256 = "db377324b7f8d5af83f6827d98ac002a3c03b96bbc0ca1b843c163d9137f0f9c"
 symbol_sha256 = [
   { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "2c0baf6d6dffc2aed01c5dc5ddcbd116982bf16d2da96abf12632e586178d00e" },
@@ -4845,4 +4848,16 @@ normalized_sha256 = "de1c065f1ae303ea18222405d5da1056067e97d10687437e6031c6b0ae2
 symbol_sha256 = [
   { symbol = "ChioKernel::authenticated_receipt_namespace", sha256 = "d182a80d82fd583533d7421b312a5d5042c10582df43785e0ea55028a1325418" },
   { symbol = "ChioKernel::receipt_request_namespace_digest", sha256 = "fbb22f0f1ad6ff7213e678d8c3509aa79916c5c1415ab0cd7e6109aa8888adfd" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/KernelTransitionCancelSafe.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
+rust_symbols = ["PostEffectObligation::enter"]
+# Pending Root final-source digest renewal; this anchor records handoff context.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PostEffectObligation::enter", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
