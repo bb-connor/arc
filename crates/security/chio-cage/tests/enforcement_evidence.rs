@@ -9,6 +9,10 @@ use chio_cage::{
     CAGE_ENFORCEMENT_RECORD_SCHEMA, ENFORCEMENT_PREPARED_SCHEMA, EXEC_TRANSITION_OBSERVED_SCHEMA,
     NONO_PATCH_VERSION, PINNED_NONO_VERSION, PINNED_SECCOMPILER_VERSION,
 };
+use chio_cage::{
+    render_tool_confinement, ConfinementBackendKind, ConfinementDisclosure, UnconfinedReason,
+    NATIVE_LAUNCH_METADATA_KEY,
+};
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_test_support::prelude::*;
 
@@ -429,4 +433,239 @@ fn cage_receipt_tampering_and_sink_failure_fail_closed() {
         Err(CageReceiptPersistenceError::Invalid(_))
     ));
     assert!(!called);
+}
+
+fn signed_launch(
+    record: CageEnforcementRecord,
+    signer: &Keypair,
+) -> chio_core::receipt::body::ChioReceipt {
+    let bindings = (record.state == CageEnforcementState::BootstrapFailed)
+        .then(|| CageReceiptBindings::from_prepared(&prepared()));
+    let body = CageReceiptBody::new("attempt-dispatch", bindings, record, 900, 1_002)
+        .test_expect("launch receipt body");
+    sign_cage_receipt(
+        body,
+        &signing_context(),
+        &Ed25519Backend::new(signer.clone()),
+    )
+    .test_expect("signed launch receipt")
+}
+
+fn fully_enforced_launch(signer: &Keypair) -> chio_core::receipt::body::ChioReceipt {
+    signed_launch(
+        CageEnforcementRecord::fully_enforced(evidence()).test_expect("enforced record"),
+        signer,
+    )
+}
+
+fn launch_reference(launch: &chio_core::receipt::body::ChioReceipt) -> serde_json::Value {
+    let bytes = chio_core::canonical_json_bytes(launch).test_expect("canonical launch");
+    serde_json::json!({
+        "receipt_id": launch.id,
+        "receipt_sha256": chio_core::sha256_hex(&bytes),
+    })
+}
+
+fn tool_receipt(
+    kernel: &Keypair,
+    tool_server: &str,
+    native_launch: Option<serde_json::Value>,
+) -> chio_core::receipt::body::ChioReceipt {
+    use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+    use chio_core::receipt::decision::{Decision, ToolCallAction};
+    use chio_core::receipt::kinds::ToolOrigin;
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: "tool-call-receipt".to_string(),
+            timestamp: 2,
+            capability_id: "capability-1".to_string(),
+            tool_server: tool_server.to_string(),
+            tool_name: "read".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .test_expect("tool action"),
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: ToolOrigin::HostExecutedUnmediated,
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: digest('a'),
+            policy_hash: digest('b'),
+            evidence: Vec::new(),
+            metadata: native_launch
+                .map(|reference| serde_json::json!({ NATIVE_LAUNCH_METADATA_KEY: reference })),
+            trust_level: Default::default(),
+            tenant_id: None,
+            kernel_key: kernel.public_key(),
+            bbs_projection_version: None,
+        },
+        kernel,
+    )
+    .test_expect("signed tool receipt")
+}
+
+const UNCONFINED: ConfinementDisclosure =
+    ConfinementDisclosure::Unconfined(UnconfinedReason::HostExecuted);
+
+#[test]
+fn fully_enforced_launch_bound_at_dispatch_renders_confined() {
+    let kernel = Keypair::from_seed(&[101; 32]);
+    let launcher = Keypair::from_seed(&[102; 32]);
+    let launch = fully_enforced_launch(&launcher);
+    let receipt = tool_receipt(&kernel, "native-server", Some(launch_reference(&launch)));
+    let disclosure = render_tool_confinement(
+        &receipt,
+        Some(&launch),
+        &kernel.public_key(),
+        &launcher.public_key(),
+    );
+    assert_eq!(
+        disclosure,
+        ConfinementDisclosure::Confined(ConfinementBackendKind::LinuxCage)
+    );
+    assert_eq!(disclosure.to_string(), "confined by Chio (Linux cage)");
+}
+
+#[test]
+fn missing_unverified_or_partial_launch_renders_unconfined() {
+    let kernel = Keypair::from_seed(&[103; 32]);
+    let launcher = Keypair::from_seed(&[104; 32]);
+    let attacker = Keypair::from_seed(&[105; 32]);
+    let launch = fully_enforced_launch(&launcher);
+    let bound = tool_receipt(&kernel, "native-server", Some(launch_reference(&launch)));
+    let render = |receipt: &chio_core::receipt::body::ChioReceipt,
+                  launch: Option<&chio_core::receipt::body::ChioReceipt>| {
+        render_tool_confinement(
+            receipt,
+            launch,
+            &kernel.public_key(),
+            &launcher.public_key(),
+        )
+    };
+
+    assert_eq!(render(&bound, None), UNCONFINED);
+    assert_eq!(
+        render(&tool_receipt(&kernel, "native-server", None), Some(&launch)),
+        UNCONFINED
+    );
+    assert_eq!(
+        UNCONFINED.to_string(),
+        "unconfined: host-executed; not sandboxed by Chio"
+    );
+
+    let mut wrong_digest = launch_reference(&launch);
+    wrong_digest["receipt_sha256"] = serde_json::json!(digest('c'));
+    let mut extra_field = launch_reference(&launch);
+    extra_field["state"] = serde_json::json!("fully_enforced");
+    for reference in [wrong_digest, extra_field] {
+        let receipt = tool_receipt(&kernel, "native-server", Some(reference));
+        assert_eq!(render(&receipt, Some(&launch)), UNCONFINED);
+    }
+
+    let other_server = tool_receipt(&kernel, "other-server", Some(launch_reference(&launch)));
+    assert_eq!(render(&other_server, Some(&launch)), UNCONFINED);
+
+    let forged_kernel = tool_receipt(&attacker, "native-server", Some(launch_reference(&launch)));
+    assert_eq!(render(&forged_kernel, Some(&launch)), UNCONFINED);
+    let mut tampered = bound.clone();
+    tampered.tool_name = "write".to_string();
+    assert_eq!(render(&tampered, Some(&launch)), UNCONFINED);
+
+    let untrusted_launch = fully_enforced_launch(&attacker);
+    let receipt = tool_receipt(
+        &kernel,
+        "native-server",
+        Some(launch_reference(&untrusted_launch)),
+    );
+    assert_eq!(render(&receipt, Some(&untrusted_launch)), UNCONFINED);
+
+    let partial = CageEnforcementRecord::bootstrap_failed(
+        CageEnforcementFailure::new(CageEnforcementFailureCode::LandlockPartial, "landlock")
+            .test_expect("partial enforcement failure"),
+    )
+    .test_expect("partial record");
+    let rejected = CageEnforcementRecord::rejected(
+        CageEnforcementFailure::new(CageEnforcementFailureCode::InvalidPlan, "admission")
+            .test_expect("rejection"),
+    )
+    .test_expect("rejection record");
+    let exited = CageEnforcementRecord::exited(
+        evidence(),
+        ProcessExitEvidence {
+            process_id: 42,
+            exit_code: Some(0),
+            signal: None,
+            exited_at_unix_ms: 1_002,
+        },
+    )
+    .test_expect("exit record");
+    for record in [partial, rejected, exited] {
+        let state = record.state;
+        let launch = signed_launch(record, &launcher);
+        let receipt = tool_receipt(&kernel, "native-server", Some(launch_reference(&launch)));
+        assert_eq!(render(&receipt, Some(&launch)), UNCONFINED, "{state:?}");
+    }
+}
+
+#[test]
+fn confinement_backend_kinds_are_closed_at_decode() {
+    for (kind, wire) in [
+        (ConfinementBackendKind::LinuxCage, "linux_cage"),
+        (
+            ConfinementBackendKind::FirecrackerGuest,
+            "firecracker_guest",
+        ),
+        (
+            ConfinementBackendKind::ProcessContainer,
+            "process_container",
+        ),
+        (ConfinementBackendKind::AgentHostBwrap, "agent_host_bwrap"),
+        (ConfinementBackendKind::Seatbelt, "seatbelt"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(kind).test_expect("encode backend kind"),
+            wire
+        );
+        assert_eq!(
+            serde_json::from_value::<ConfinementBackendKind>(wire.into())
+                .test_expect("decode backend kind"),
+            kind
+        );
+    }
+    for unknown in ["microkernel", "LinuxCage", "best_effort", ""] {
+        let error = serde_json::from_value::<ConfinementBackendKind>(unknown.into())
+            .test_unwrap_err()
+            .to_string();
+        assert!(error.starts_with("unknown variant"), "{error}");
+    }
+    let error = serde_json::from_value::<ConfinementDisclosure>(serde_json::json!({
+        "status": "confined",
+        "detail": "gvisor",
+    }))
+    .test_unwrap_err()
+    .to_string();
+    assert!(error.starts_with("unknown variant `gvisor`"), "{error}");
+}
+
+#[test]
+fn unconfined_reason_follows_signed_tool_origin() {
+    use chio_core::receipt::kinds::ToolOrigin;
+    for (origin, reason) in [
+        (ToolOrigin::ChioInternal, UnconfinedReason::InProcess),
+        (ToolOrigin::CallerExecuted, UnconfinedReason::CallerExecuted),
+        (
+            ToolOrigin::HostExecutedProviderReported,
+            UnconfinedReason::HostExecuted,
+        ),
+        (
+            ToolOrigin::HostExecutedUnmediated,
+            UnconfinedReason::HostExecuted,
+        ),
+    ] {
+        let disclosure = ConfinementDisclosure::Unconfined(origin.into());
+        assert_eq!(disclosure, ConfinementDisclosure::Unconfined(reason));
+        assert!(!disclosure.is_confined());
+        assert!(disclosure.to_string().starts_with("unconfined: "));
+    }
 }

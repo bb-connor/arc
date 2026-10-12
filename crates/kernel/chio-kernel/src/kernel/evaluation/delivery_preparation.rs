@@ -5,6 +5,8 @@ use super::*;
 pub(super) struct PreparedToolDelivery {
     pub waited: bool,
     pub connection: Option<Arc<dyn ToolServerConnection>>,
+    /// Captured only after preparation proved the launched server is live.
+    pub launch: Option<chio_core::receipt::body::ChioReceipt>,
 }
 
 impl PreparedToolDelivery {
@@ -28,14 +30,18 @@ impl PreparedToolDelivery {
         &self,
         metadata: &mut Option<serde_json::Value>,
     ) -> Result<(), KernelError> {
-        let Some(receipt) = self
-            .connection
-            .as_ref()
-            .and_then(|server| server.prepared_native_launch_receipt())
-        else {
+        let Some(receipt) = &self.launch else {
             return Ok(());
         };
-        let bytes = chio_core::canonical_json_bytes(&receipt)
+        if receipt.decision != Some(chio_core::receipt::decision::Decision::Allow)
+            || receipt.action.parameters.get("state")
+                != Some(&serde_json::Value::from("fully_enforced"))
+        {
+            return Err(KernelError::ToolServerError(
+                "prepared tool launch is not fully enforced".into(),
+            ));
+        }
+        let bytes = chio_core::canonical_json_bytes(receipt)
             .map_err(|error| KernelError::Internal(error.to_string()))?;
         let reference = serde_json::json!({
             "receipt_id": receipt.id,
@@ -76,6 +82,7 @@ impl ChioKernel {
             return Ok(PreparedToolDelivery {
                 waited: runtime_waited,
                 connection: None,
+                launch: None,
             });
         };
         let server = server.ok_or_else(|| {
@@ -104,9 +111,14 @@ impl ChioKernel {
         // Even an immediately ready preparation is an external callback. Do
         // not infer that authorization remained unchanged because it did not
         // visibly yield to this executor.
+        let launch = match &connection {
+            Some(prepared) => prepared.prepared_native_launch_receipt(),
+            None => server.prepared_native_launch_receipt(),
+        };
         Ok(PreparedToolDelivery {
             waited: true,
             connection,
+            launch,
         })
     }
 }

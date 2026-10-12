@@ -496,3 +496,155 @@ fn immediately_ready_delivery_still_revalidates_runtime_admission() -> TestResul
     );
     Ok(())
 }
+
+struct LaunchedServer {
+    launch: chio_core::receipt::body::ChioReceipt,
+    invocations: Arc<AtomicU64>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for LaunchedServer {
+    fn server_id(&self) -> &str {
+        "durable-server"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".to_owned()]
+    }
+
+    fn prepared_native_launch_receipt(&self) -> Option<chio_core::receipt::body::ChioReceipt> {
+        Some(self.launch.clone())
+    }
+
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        Ok(serde_json::json!({"mutated": true}))
+    }
+}
+
+fn launch_receipt(
+    state: &str,
+    decision: Option<chio_core::receipt::decision::Decision>,
+) -> Result<chio_core::receipt::body::ChioReceipt, Box<dyn std::error::Error>> {
+    let keypair = chio_core::crypto::Keypair::from_seed(&[47; 32]);
+    let (receipt_kind, boundary_class, observation_outcome, trust_level) = if decision.is_some() {
+        (
+            chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+            chio_core::receipt::kinds::BoundaryClass::Prevent,
+            None,
+            chio_core::receipt::kinds::TrustLevel::Mediated,
+        )
+    } else {
+        (
+            chio_core::receipt::kinds::ReceiptKind::TraceObservation,
+            chio_core::receipt::kinds::BoundaryClass::DetectOnly,
+            Some(chio_core::receipt::kinds::ObservationOutcome::Observed),
+            chio_core::receipt::kinds::TrustLevel::Verified,
+        )
+    };
+    Ok(chio_core::receipt::body::ChioReceipt::sign(
+        chio_core::receipt::body::ChioReceiptBody {
+            id: format!("launch-{state}"),
+            timestamp: 1,
+            capability_id: "launch-capability".to_owned(),
+            tool_server: "durable-server".to_owned(),
+            tool_name: "launch".to_owned(),
+            action: chio_core::receipt::decision::ToolCallAction::from_parameters(
+                serde_json::json!({"attempt_id": "attempt-1", "stage": "enforcement", "state": state}),
+            )?,
+            decision,
+            receipt_kind,
+            boundary_class,
+            observation_outcome,
+            tool_origin: chio_core::receipt::kinds::ToolOrigin::ChioInternal,
+            redaction_mode: chio_core::receipt::kinds::RedactionMode::Summary,
+            actor_chain: Vec::new(),
+            content_hash: sha256_hex(b"launch-content"),
+            policy_hash: sha256_hex(b"launch-policy"),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level,
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        },
+        &keypair,
+    )?)
+}
+
+#[test]
+fn long_lived_server_binds_its_fully_enforced_launch_at_dispatch() -> TestResult {
+    let (mut kernel, request, store, invocations) = durable_admission_fixture("launched-delivery");
+    let launch = launch_receipt(
+        "fully_enforced",
+        Some(chio_core::receipt::decision::Decision::Allow),
+    )?;
+    kernel.register_tool_server(Box::new(LaunchedServer {
+        launch: launch.clone(),
+        invocations: invocations.clone(),
+    }));
+    let response = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow, "{response:?}");
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("receipt metadata")?;
+    assert_eq!(
+        metadata["native_launch"],
+        serde_json::json!({
+            "receipt_id": launch.id,
+            "receipt_sha256": sha256_hex(&chio_core::canonical_json_bytes(&launch)?),
+        })
+    );
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
+    Ok(())
+}
+
+#[test]
+fn launch_without_full_enforcement_is_never_bound_and_denies_dispatch() -> TestResult {
+    let deny = || chio_core::receipt::decision::Decision::Deny {
+        reason: "native cage launch did not reach full enforcement".to_owned(),
+        guard: "chio-cage".to_owned(),
+    };
+    for (state, decision) in [
+        ("bootstrap_failed", Some(deny())),
+        ("rejected", Some(deny())),
+        ("exited", None),
+        ("fully_enforced", Some(deny())),
+    ] {
+        let (mut kernel, request, store, invocations) =
+            durable_admission_fixture("unenforced-delivery");
+        kernel.register_tool_server(Box::new(LaunchedServer {
+            launch: launch_receipt(state, decision)?,
+            invocations: invocations.clone(),
+        }));
+        let response = kernel.evaluate_tool_call_blocking(&request)?;
+        assert_eq!(response.verdict, Verdict::Deny, "{state}: {response:?}");
+        assert_eq!(invocations.load(Ordering::SeqCst), 0, "{state}");
+        assert!(response
+            .reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("not fully enforced"));
+        assert!(response
+            .receipt
+            .metadata
+            .as_ref()
+            .is_none_or(|metadata| metadata.get("native_launch").is_none()));
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+    }
+    Ok(())
+}
