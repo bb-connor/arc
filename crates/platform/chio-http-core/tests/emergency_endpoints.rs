@@ -243,6 +243,25 @@ fn missing_admin_token_returns_unauthorized() {
 }
 
 #[test]
+fn admin_token_accepts_exact_match_and_refuses_equal_and_different_length_tokens() {
+    let admin = admin(build_kernel());
+    let body = serde_json::to_vec(&serde_json::json!({"reason": "token check"})).unwrap();
+
+    let same_length = "x".repeat(ADMIN_TOKEN.len());
+    let shorter = &ADMIN_TOKEN[..ADMIN_TOKEN.len() - 1];
+    let longer = format!("{ADMIN_TOKEN}x");
+    for wrong in [same_length.as_str(), shorter, longer.as_str(), ""] {
+        let error = handle_emergency_stop(&admin, Some(wrong), &body)
+            .expect_err("a token that differs from the configured token must be refused");
+        assert_eq!(error, EmergencyHandlerError::Unauthorized);
+        assert!(!admin.kernel().is_emergency_stopped());
+    }
+
+    handle_emergency_stop(&admin, Some(ADMIN_TOKEN), &body).expect("exact token must be accepted");
+    assert!(admin.kernel().is_emergency_stopped());
+}
+
+#[test]
 fn unusable_configured_admin_token_never_authorizes_matching_header() {
     let blank_admin = EmergencyAdmin::new(Arc::new(build_kernel()), String::new());
     let body = serde_json::to_vec(&serde_json::json!({"reason": "blank token"})).unwrap();
