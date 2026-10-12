@@ -18,7 +18,8 @@ use preparation::{fault_response, DischargeBinding};
 pub(in crate::kernel) use preparation::{PostEffectPreparation, PreparedPostEffect};
 use publication::{ReceiptAppendFailure, ReceiptCommit};
 use recovery::{
-    PendingPostEffectEvidence, PendingPostEffectRecord, PreparedFaultReceipt, UnknownChildAppend,
+    PendingChildReceipt, PendingPostEffectEvidence, PendingPostEffectRecord, PreparedFaultReceipt,
+    UnknownChildAppend,
 };
 
 pub(in crate::kernel) type ObservedToolReturn =
@@ -45,7 +46,7 @@ pub(in crate::kernel) struct PostEffectInputs<'a> {
 
 struct ObligationParts<'a> {
     inputs: PostEffectInputs<'a>,
-    children: Vec<ChildRequestReceipt>,
+    children: Vec<PendingChildReceipt>,
     unknown_child: Option<UnknownChildAppend>,
 }
 
@@ -138,7 +139,7 @@ impl<'a> PostEffectObligation<'a> {
 
     pub(in crate::kernel) fn nested_receipt_sinks(
         &mut self,
-    ) -> (&mut Vec<ChildRequestReceipt>, &mut Option<EvidenceSlot>) {
+    ) -> (&mut Vec<PendingChildReceipt>, &mut Option<EvidenceSlot>) {
         let parts = self
             .parts
             .as_mut()

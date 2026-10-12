@@ -41,7 +41,37 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
         .parts
         .as_mut()
         .unwrap_or_else(|| unreachable!("live obligation parts"));
-    while let Some(receipt) = parts.children.first() {
+    while !parts.children.is_empty() {
+        if let Some(PendingChildReceipt::Unsigned(body)) = parts.children.first() {
+            let now = obligation
+                .kernel
+                .read_authority_time()
+                .map_err(|error| failure("child_receipt_flush", error))?;
+            let body = ChildRequestReceiptBody {
+                timestamp: now.as_secs(),
+                ..body.clone()
+            };
+            let signed = ChildRequestReceipt::sign(body, &obligation.kernel.config.keypair)
+                .map_err(|error| {
+                    failure(
+                        "child_receipt_flush",
+                        KernelError::ReceiptSigningFailed(error.to_string()),
+                    )
+                })?;
+            let first = parts.children.first_mut().ok_or_else(|| {
+                failure(
+                    "child_receipt_flush",
+                    KernelError::Internal("child evidence queue lost its first entry".into()),
+                )
+            })?;
+            *first = PendingChildReceipt::Signed(signed);
+        }
+        let Some(PendingChildReceipt::Signed(receipt)) = parts.children.first() else {
+            return Err(failure(
+                "child_receipt_flush",
+                KernelError::Internal("child evidence was not signed".into()),
+            ));
+        };
         let canonical = chio_core::canonical::canonical_json_bytes(receipt).map_err(|error| {
             failure(
                 "child_receipt_flush",
@@ -75,7 +105,12 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
                 .map_err(|error| failure("child_receipt_flush", KernelError::from(error)))?;
             parts.unknown_child = None;
         }
-        let receipt = parts.children.remove(0);
+        let PendingChildReceipt::Signed(receipt) = parts.children.remove(0) else {
+            return Err(failure(
+                "child_receipt_flush",
+                KernelError::Internal("acknowledged child lost its signed evidence".into()),
+            ));
+        };
         drop(write);
         let mut log = obligation
             .kernel

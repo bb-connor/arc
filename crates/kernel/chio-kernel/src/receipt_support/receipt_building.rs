@@ -11,6 +11,30 @@ pub(crate) fn build_child_request_receipt(
     outcome_payload: serde_json::Value,
     now: chio_security_types::clock::UnixMillis,
 ) -> Result<ChildRequestReceipt, KernelError> {
+    let body = prepare_child_request_receipt(
+        policy_hash,
+        keypair.public_key(),
+        context,
+        operation_kind,
+        terminal_state,
+        outcome_payload,
+    )?;
+    let body = ChildRequestReceiptBody {
+        timestamp: now.as_secs(),
+        ..body
+    };
+    ChildRequestReceipt::sign(body, keypair)
+        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+}
+
+pub(crate) fn prepare_child_request_receipt(
+    policy_hash: &str,
+    kernel_key: chio_core::PublicKey,
+    context: &OperationContext,
+    operation_kind: OperationKind,
+    terminal_state: OperationTerminalState,
+    outcome_payload: serde_json::Value,
+) -> Result<ChildRequestReceiptBody, KernelError> {
     let outcome_hash = canonical_json_bytes(&outcome_payload)
         .map(|bytes| sha256_hex(&bytes))
         .map_err(|error| {
@@ -21,9 +45,9 @@ pub(crate) fn build_child_request_receipt(
         KernelError::ReceiptSigningFailed("child receipt requires parent request lineage".into())
     })?;
 
-    let body = ChildRequestReceiptBody {
+    Ok(ChildRequestReceiptBody {
         id: next_receipt_id("child-rcpt")?,
-        timestamp: now.as_secs(),
+        timestamp: 0,
         session_id: context.session_id.clone(),
         parent_request_id,
         request_id: context.request_id.clone(),
@@ -32,11 +56,8 @@ pub(crate) fn build_child_request_receipt(
         outcome_hash,
         policy_hash: policy_hash.to_string(),
         metadata,
-        kernel_key: keypair.public_key(),
-    };
-
-    ChildRequestReceipt::sign(body, keypair)
-        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+        kernel_key,
+    })
 }
 
 pub(crate) fn next_receipt_id(prefix: &str) -> Result<String, KernelError> {
@@ -65,7 +86,12 @@ fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_j
                     serde_json::Value::String(message.to_string()),
                 );
             }
-            for key in ["message_sha256", "message_truncated"] {
+            for key in [
+                "message_sha256",
+                "message_truncated",
+                "encoding_error_code",
+                "original_payload_omitted",
+            ] {
                 if let Some(value) = outcome_payload.get(key) {
                     metadata.insert(key.into(), value.clone());
                 }

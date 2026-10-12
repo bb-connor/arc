@@ -5,7 +5,7 @@ use super::*;
 pub(super) struct SessionNestedFlowBridge<'a, C> {
     pub(super) clock: Arc<dyn chio_security_types::clock::Clock>,
     pub(super) sessions: &'a DashMap<SessionId, Arc<Session>>,
-    pub(super) child_receipts: &'a mut Vec<ChildRequestReceipt>,
+    pub(super) child_receipts: &'a mut Vec<super::effect_obligation::recovery::PendingChildReceipt>,
     pub(super) evidence_slot: &'a mut Option<super::effect_obligation::evidence::EvidenceSlot>,
     pub(super) kernel: &'a ChioKernel,
     pub(super) started_children: usize,
@@ -34,7 +34,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
         let diagnostic = "\0".repeat(512);
         let body = ChildRequestReceiptBody {
             id: "child-rcpt-00000000-0000-0000-0000-000000000000".into(),
-            timestamp: u64::MAX,
+            timestamp: 9_007_199_254_740_991,
             session_id: self.parent_context.session_id.clone(),
             parent_request_id: self.parent_context.request_id.clone(),
             request_id: request_id.clone(),
@@ -114,8 +114,46 @@ impl<C> SessionNestedFlowBridge<'_, C> {
         operation_kind: OperationKind,
         result: &Result<T, KernelError>,
     ) -> Result<(), KernelError> {
-        let now = self.clock.unix_millis()?;
         let terminal_state = child_terminal_state(&child_context.request_id, result);
+        let mut encoding_failed = false;
+        let encoding_notice = || {
+            serde_json::json!({
+                "outcome": "result_encoding_unavailable",
+                "encoding_error_code": "CHIO-KERNEL-RECEIPT-SIGNING-FAILED",
+                "original_payload_omitted": true
+            })
+        };
+        let payload = match child_outcome_payload(result) {
+            Ok(payload) => payload,
+            Err(_) => {
+                encoding_failed = true;
+                encoding_notice()
+            }
+        };
+        let body = match prepare_child_request_receipt(
+            self.policy_hash,
+            self.kernel_keypair.public_key(),
+            child_context,
+            operation_kind,
+            terminal_state.clone(),
+            payload,
+        ) {
+            Ok(body) => body,
+            Err(_) => {
+                encoding_failed = true;
+                prepare_child_request_receipt(
+                    self.policy_hash,
+                    self.kernel_keypair.public_key(),
+                    child_context,
+                    operation_kind,
+                    terminal_state.clone(),
+                    encoding_notice(),
+                )?
+            }
+        };
+        let index = self.child_receipts.len();
+        self.child_receipts
+            .push(super::effect_obligation::recovery::PendingChildReceipt::Unsigned(body));
         complete_session_request_with_terminal_state_in_sessions(
             self.sessions,
             &child_context.session_id,
@@ -123,16 +161,31 @@ impl<C> SessionNestedFlowBridge<'_, C> {
             terminal_state.clone(),
         )?;
 
-        let receipt = build_child_request_receipt(
-            self.policy_hash,
-            self.kernel_keypair,
-            child_context,
-            operation_kind,
-            terminal_state,
-            child_outcome_payload(result)?,
-            now,
-        )?;
-        self.child_receipts.push(receipt);
+        let now = self.clock.unix_millis()?;
+        let Some(super::effect_obligation::recovery::PendingChildReceipt::Unsigned(body)) =
+            self.child_receipts.get(index)
+        else {
+            return Err(KernelError::Internal(
+                "nested child lost its unsigned evidence owner".into(),
+            ));
+        };
+        let body = ChildRequestReceiptBody {
+            timestamp: now.as_secs(),
+            ..body.clone()
+        };
+        let signed = ChildRequestReceipt::sign(body, self.kernel_keypair)
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+        let child = self.child_receipts.get_mut(index).ok_or_else(|| {
+            KernelError::Internal("nested child lost its reserved evidence position".into())
+        })?;
+        *child = super::effect_obligation::recovery::PendingChildReceipt::Signed(signed);
+        if encoding_failed {
+            tracing::warn!(request_id = %child_context.request_id, audit_fault = "child_outcome_encoding_unavailable",
+                "child completed but its outcome could not be encoded");
+            return Err(KernelError::ReceiptSigningFailed(
+                "completed child outcome encoding is unavailable".into(),
+            ));
+        }
         Ok(())
     }
 }
