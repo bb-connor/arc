@@ -1,6 +1,7 @@
 //! Inputs that must be valid and bounded before a non-durable effect starts.
 
 use super::*;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 use crate::kernel::responses::PreparedResponse;
 
 pub(super) const FAULT_RESERVE_HEADROOM: usize = 64 * 1024;
@@ -147,12 +148,12 @@ impl ChioKernel {
             Some(serde_json::json!({
                 "receipt_context": { "request_namespace_digest": binding.namespace, "evaluation_id": binding.evaluation_id },
                 "chio_runtime": {
-                    "identity_disposition": "terminal",
                     "evaluation_started_at": input.evaluation_started_at,
                     "post_effect_fault": { "step": "drop", "code": "CHIO-KERNEL-POST-EFFECT-DROP", "original_receipt_id": null }
                 }
             })),
         );
+        let metadata = with_identity_disposition(metadata, IdentityDisposition::Terminal);
         let request_metadata = request_receipt_metadata_with_payee_binding(
             input.request,
             self.attestation_trust_policy.as_ref(),

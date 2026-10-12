@@ -1,6 +1,7 @@
 //! All fallible post-dispatch preparation returns to the same owning obligation.
 
 use super::*;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 
 fn failure(step: &'static str, error: KernelError) -> PostEffectError {
     PostEffectError::at(step, error)
@@ -225,10 +226,10 @@ fn prepare_ordinary(
     let metadata = merge_metadata_objects(
         inputs.metadata.clone(),
         Some(serde_json::json!({
-        "receipt_context": { "request_namespace_digest": inputs.prepared.binding.namespace, "evaluation_id": inputs.prepared.binding.evaluation_id },
-            "chio_runtime": { "identity_disposition": "terminal" }
+        "receipt_context": { "request_namespace_digest": inputs.prepared.binding.namespace, "evaluation_id": inputs.prepared.binding.evaluation_id }
         })),
     );
+    let metadata = with_identity_disposition(metadata, IdentityDisposition::Terminal);
     let prepared = kernel.with_pre_invocation_guard_evidence(&inputs.evidence, || {
         match observed {
             Ok(((output, reported_cost), elapsed)) => {
