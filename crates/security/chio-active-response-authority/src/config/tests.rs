@@ -189,22 +189,22 @@ fn deployment_rejects_mode_substitution_under_the_original_digest() {
 }
 
 #[test]
-fn deployment_rejects_unknown_modes_and_legacy_schema_versions() {
+fn deployment_rejects_unknown_modes_and_schema_ids() {
     let mut encoded = serde_json::to_value(deployment()).test_expect("deployment value");
     encoded["responseAuthority"]["responseExecutionMode"] = serde_json::json!("automatic");
     let error = serde_json::from_value::<ActiveDefenseDeploymentConfig>(encoded)
         .test_expect_err("unknown execution mode");
     assert!(error.to_string().contains("unknown variant `automatic`"));
 
-    let mut legacy_runtime = deployment();
-    legacy_runtime.response_authority.schema =
-        "chio.active-response-authority.runtime-config.v1".to_string();
-    assert!(matches!(legacy_runtime.compute_deployment_digest(),
+    let mut unknown_runtime = deployment();
+    unknown_runtime.response_authority.schema =
+        "chio.active-response-authority.runtime-config.v0".to_string();
+    assert!(matches!(unknown_runtime.compute_deployment_digest(),
         Err(AuthorityError::InvalidConfig(message)) if message.starts_with("runtime schema,")));
 
-    let mut legacy_deployment = deployment();
-    legacy_deployment.schema = "chio.active-defense.deployment-config.v1".to_string();
-    assert!(matches!(legacy_deployment.compute_deployment_digest(),
+    let mut unknown_deployment = deployment();
+    unknown_deployment.schema = "chio.active-defense.deployment-config.v0".to_string();
+    assert!(matches!(unknown_deployment.compute_deployment_digest(),
         Err(AuthorityError::InvalidConfig(message)) if message.starts_with("deployment digest,")));
 }
 

@@ -304,15 +304,15 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
     });
     assert!(serde_json::from_value::<ActiveResponseAuthorityResult>(unbounded_rejection).is_err());
 
-    let retired_v1_request = serde_json::json!({
-        "schema": "chio.active-response-policy-authority.v1",
-        "requestId": "retired-v1",
+    let digestless_request = serde_json::json!({
+        "schema": ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+        "requestId": "digestless",
         "issuedAtUnixSeconds": 1_700_000_000_u64,
         "client": Keypair::from_seed(&[42; 32]).public_key(),
         "operation": { "operation": "health" }
     });
     assert!(
-        serde_json::from_value::<ActiveResponseAuthorityRequestBody>(retired_v1_request).is_err()
+        serde_json::from_value::<ActiveResponseAuthorityRequestBody>(digestless_request).is_err()
     );
 }
 
@@ -355,16 +355,16 @@ fn request_and_response_wire_golden_vectors_are_exact() {
         .test_expect("golden request signing input");
     assert_eq!(
         request_input,
-        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.request.v2\u0000"}"#
+        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.request.v1\u0000"}"#
     );
     assert_eq!(
         sha256_hex(&request_input),
-        "21a2dad26aa27e91644e42672bedeb4a53d79babf37bde6df787a4a1db9e6ba9"
+        "16bd6d08e999ae270a20e294db8b48a00f2ec9e94bb965eb1659d6e80134e6be"
     );
     let request_signature = client.sign(&request_input);
     assert_eq!(
         request_signature.to_hex(),
-        "02d48ca1e692a6a1fa5fe74c84c0a376fb425e3ef5dd5b968f0d6e5bcefde9496b1dd0c5699f6498d135d848601b74e16f377fec36ddf74fa63c96ead5eb040d"
+        "ba04ee2d0b42ba52e7bdd967668bf167058cbca1c588269d4d19bf0567be851c707c7aff212ace615b696f5e3ea5c36299362b9a53cc3fb0aac3d51a4daf2009"
     );
     let request = SignedActiveResponseAuthorityRequest {
         body: request_body,
@@ -374,11 +374,11 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     let request_wire = canonical_json_bytes(&request).test_expect("golden request wire");
     assert_eq!(
         request_wire,
-        br#"{"algorithm":"ed25519","body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"02d48ca1e692a6a1fa5fe74c84c0a376fb425e3ef5dd5b968f0d6e5bcefde9496b1dd0c5699f6498d135d848601b74e16f377fec36ddf74fa63c96ead5eb040d"}"#
+        br#"{"algorithm":"ed25519","body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"ba04ee2d0b42ba52e7bdd967668bf167058cbca1c588269d4d19bf0567be851c707c7aff212ace615b696f5e3ea5c36299362b9a53cc3fb0aac3d51a4daf2009"}"#
     );
     assert_eq!(
         sha256_hex(&request_wire),
-        "304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a"
+        "1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3"
     );
 
     let authority = Keypair::from_seed(&[45_u8; 32]);
@@ -400,16 +400,16 @@ fn request_and_response_wire_golden_vectors_are_exact() {
         .test_expect("golden response signing input");
     assert_eq!(
         response_input,
-        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.response.v2\u0000"}"#
+        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.response.v1\u0000"}"#
     );
     assert_eq!(
         sha256_hex(&response_input),
-        "d0a40ca55a5afb3d1180f61f1529074c3e55f130dacee49756c669e6e3412fa1"
+        "c73f7b01b48e8765b0e47203c471f822190cae86770c5cd491e2c10e3b65dbea"
     );
     let response_signature = authority.sign(&response_input);
     assert_eq!(
         response_signature.to_hex(),
-        "5fcd20eed180c2d8fe5ebc6609a7a6309776753eb97b050b42616bd63cbfb669a2e5466d43e6ab0537d8a51c14446654abf4c7b551a1daddfc24980b64ae5704"
+        "bd8313dbed5f053678871fc41c8d455f88a830501be2e817b77d218e0784a9548f5a55748fd6e1dbf44bdfd031bc4f20e1ad187708e3e00bbd059758a8dd0301"
     );
     let response = SignedActiveResponseAuthorityResponse {
         body: response_body,
@@ -419,11 +419,11 @@ fn request_and_response_wire_golden_vectors_are_exact() {
     let response_wire = canonical_json_bytes(&response).test_expect("golden response wire bytes");
     assert_eq!(
         response_wire,
-        br#"{"algorithm":"ed25519","body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"304d457e32d70d35606dae6fe894209573755cb317c23cafb0af71d2cd369a5a","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v2","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"5fcd20eed180c2d8fe5ebc6609a7a6309776753eb97b050b42616bd63cbfb669a2e5466d43e6ab0537d8a51c14446654abf4c7b551a1daddfc24980b64ae5704"}"#
+        br#"{"algorithm":"ed25519","body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"bd8313dbed5f053678871fc41c8d455f88a830501be2e817b77d218e0784a9548f5a55748fd6e1dbf44bdfd031bc4f20e1ad187708e3e00bbd059758a8dd0301"}"#
     );
     assert_eq!(
         sha256_hex(&response_wire),
-        "8e764b1901729fc5eb0435f9d258d307d70be24d584b29c8fa7eaa90aa60909d"
+        "47b355e030609545faa0ee13a5460761ecd4138c3f9ba7f923a7bf4934d195f1"
     );
 }
 

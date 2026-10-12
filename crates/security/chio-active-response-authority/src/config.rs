@@ -16,11 +16,11 @@ use sha2::{Digest, Sha256};
 use crate::{AuthorityError, Result};
 
 pub const AUTHORITY_RUNTIME_CONFIG_SCHEMA: &str =
-    "chio.active-response-authority.runtime-config.v2";
+    "chio.active-response-authority.runtime-config.v1";
 pub const ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA: &str =
-    "chio.active-defense.deployment-config.v2";
+    "chio.active-defense.deployment-config.v1";
 const ACTIVE_DEFENSE_DEPLOYMENT_DIGEST_DOMAIN: &[u8] =
-    b"chio.active-defense.deployment-config.digest.v2\0";
+    b"chio.active-defense.deployment-config.digest.v1\0";
 const MAX_DEPLOYMENT_CONFIG_BYTES: u64 = 1_048_576;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

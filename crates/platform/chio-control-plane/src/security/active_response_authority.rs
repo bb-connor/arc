@@ -45,9 +45,9 @@ pub use protocol::{
 };
 
 pub const ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN: &str =
-    "chio.active-response-policy-authority.request.v2\0";
+    "chio.active-response-policy-authority.request.v1\0";
 pub const ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN: &str =
-    "chio.active-response-policy-authority.response.v2\0";
+    "chio.active-response-policy-authority.response.v1\0";
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_ACTIVE_RESPONSE_AFFECTED_IDS: usize = 4_096;
