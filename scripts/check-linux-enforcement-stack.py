@@ -2,9 +2,14 @@
 
 import argparse
 import hashlib
+import io
+import json
+import re
+import stat
 import sys
+import tarfile
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 REQUIRED_FEATURES = {
@@ -59,6 +64,11 @@ SECCOMPILER_PATCH_CHANGES = {
     "reject unrepresentable sock_fprog lengths before changing process state",
     "cover calling-thread and all-thread installation APIs",
 }
+SECCOMPILER_FORK = Path("third_party/seccompiler-chio")
+SECCOMPILER_ARCHIVE = Path("third_party/provenance/archives/seccompiler-0.5.0.crate")
+SECCOMPILER_FORK_METADATA = {"CHIO-PATCH.md", "CHIO-PATCH.patch.json"}
+ARCHIVE_LIMIT = 8 * 1024 * 1024
+HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@\n")
 
 
 def load_toml(path: Path) -> dict:
@@ -117,26 +127,151 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def seccompiler_source_sha256(root: Path) -> str:
-    package = root / "third_party/seccompiler-chio"
-    paths = [
-        package / "Cargo.toml",
-        package / "Cargo.toml.orig",
-        package / "CHIO-PATCH.md",
-        package / "LICENSE-APACHE",
-        package / "LICENSE-BSD-3-Clause",
-        *package.glob("src/**/*.rs"),
-        *package.glob("tests/**/*.rs"),
-    ]
-    digest = hashlib.sha256()
-    for path in sorted(paths):
-        relative = path.relative_to(package).as_posix().encode()
-        contents = path.read_bytes()
-        digest.update(len(relative).to_bytes(8, "big"))
-        digest.update(relative)
-        digest.update(len(contents).to_bytes(8, "big"))
-        digest.update(contents)
-    return digest.hexdigest()
+class ReconstructionError(ValueError):
+    pass
+
+
+def regular_tree(root: Path) -> dict[str, bytes]:
+    if root.is_symlink() or not root.is_dir():
+        raise ReconstructionError(f"fork root is not a real directory: {root}")
+    files = {}
+    for path in root.rglob("*"):
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            continue
+        relative = path.relative_to(root).as_posix()
+        if not stat.S_ISREG(mode):
+            raise ReconstructionError(f"fork contains a non-regular file: {relative}")
+        files[relative] = path.read_bytes()
+    return files
+
+
+def crate_files(data: bytes, prefix: str) -> dict[str, bytes]:
+    files = {}
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+        for member in archive:
+            name = PurePosixPath(member.name)
+            if name.is_absolute() or ".." in name.parts or not member.name.startswith(prefix):
+                raise ReconstructionError(f"unexpected archive member: {member.name}")
+            if member.isdir():
+                continue
+            relative = member.name[len(prefix):]
+            if not member.isfile() or not relative or relative in files:
+                raise ReconstructionError(f"invalid archive member: {member.name}")
+            reader = archive.extractfile(member)
+            if reader is None:
+                raise ReconstructionError(f"unreadable archive member: {member.name}")
+            files[relative] = reader.read()
+    return files
+
+
+def patch_path(header: str, marker: str, side: str) -> str | None:
+    if not header.startswith(marker):
+        raise ReconstructionError(f"malformed patch file header: {header.rstrip()}")
+    value = header[len(marker):-1]
+    if value == "/dev/null":
+        return None
+    name = value.removeprefix(side)
+    pure = PurePosixPath(name)
+    if value == name or not name or pure.is_absolute() or ".." in pure.parts:
+        raise ReconstructionError(f"unsafe patch path: {value}")
+    return name
+
+
+def mark_missing_newline(entries: list[list[str]], line: str) -> None:
+    if line != "\\ No newline at end of file\n" or not entries or not entries[-1][1].endswith("\n"):
+        raise ReconstructionError("malformed end-of-file marker in patch")
+    entries[-1][1] = entries[-1][1][:-1]
+
+
+def apply_patch(files: dict[str, bytes], lines: list[str]) -> dict[str, bytes]:
+    result = dict(files)
+    patched = set()
+    index = 0
+    while index < len(lines):
+        if index + 1 >= len(lines):
+            raise ReconstructionError("patch ends inside a file header")
+        old_name = patch_path(lines[index], "--- ", "a/")
+        new_name = patch_path(lines[index + 1], "+++ ", "b/")
+        index += 2
+        name = new_name or old_name
+        if name is None or (old_name and new_name and old_name != new_name) or name in patched:
+            raise ReconstructionError(f"invalid patch file pair: {name}")
+        if (old_name is None) == (name in result):
+            raise ReconstructionError(f"patch does not match the upstream file set: {name}")
+        patched.add(name)
+        source = result.pop(name, b"").decode("utf-8").splitlines(keepends=True)
+        output: list[str] = []
+        cursor = 0
+        hunks = 0
+        while index < len(lines) and lines[index].startswith("@@"):
+            header = HUNK_HEADER.fullmatch(lines[index])
+            if header is None:
+                raise ReconstructionError(f"malformed hunk header in {name}")
+            old_start = int(header[1])
+            old_left = old_count = int(header[2] or 1)
+            new_left = int(header[4] or 1)
+            index += 1
+            entries: list[list[str]] = []
+            while old_left or new_left:
+                if index >= len(lines):
+                    raise ReconstructionError(f"truncated hunk in {name}")
+                line = lines[index]
+                index += 1
+                kind = line[:1]
+                if kind == "\\":
+                    mark_missing_newline(entries, line)
+                    continue
+                if kind not in (" ", "-", "+"):
+                    raise ReconstructionError(f"malformed hunk line in {name}")
+                old_left -= kind != "+"
+                new_left -= kind != "-"
+                if old_left < 0 or new_left < 0:
+                    raise ReconstructionError(f"hunk length mismatch in {name}")
+                entries.append([kind, line[1:]])
+            if index < len(lines) and lines[index].startswith("\\"):
+                mark_missing_newline(entries, lines[index])
+                index += 1
+            start = old_start - 1 if old_count else old_start
+            old = [text for kind, text in entries if kind != "+"]
+            if start < cursor or source[start:start + old_count] != old:
+                raise ReconstructionError(f"patch hunk does not apply to {name}")
+            output.extend(source[cursor:start])
+            output.extend(text for kind, text in entries if kind != "-")
+            cursor = start + old_count
+            hunks += 1
+        if not hunks:
+            raise ReconstructionError(f"patch file entry has no hunks: {name}")
+        output.extend(source[cursor:])
+        if new_name is not None:
+            result[name] = "".join(output).encode("utf-8")
+        elif output:
+            raise ReconstructionError(f"patch deletion leaves content behind: {name}")
+    return result
+
+
+def seccompiler_fork_drift(root: Path) -> list[str]:
+    archive_path = root / SECCOMPILER_ARCHIVE
+    if archive_path.is_symlink():
+        raise ReconstructionError("seccompiler registry archive must be a regular file")
+    with archive_path.open("rb") as source:
+        archive = source.read(ARCHIVE_LIMIT + 1)
+    if len(archive) > ARCHIVE_LIMIT or hashlib.sha256(archive).hexdigest() != SECCOMPILER_PIN["checksum"]:
+        raise ReconstructionError("seccompiler registry archive does not match the reviewed checksum")
+    upstream = crate_files(archive, f"{SECCOMPILER_PIN['name']}-{SECCOMPILER_PIN['version']}/")
+    fork = root / SECCOMPILER_FORK
+    lines = json.loads((fork / "CHIO-PATCH.patch.json").read_text(encoding="utf-8"))
+    if not isinstance(lines, list) or not all(
+        isinstance(line, str) and line.endswith("\n") and line.count("\n") == 1 for line in lines
+    ):
+        raise ReconstructionError("seccompiler patch must be a JSON array of newline-terminated lines")
+    expected = apply_patch(upstream, lines)
+    actual = {
+        name: data
+        for name, data in regular_tree(fork).items()
+        if name not in SECCOMPILER_FORK_METADATA
+    }
+    return sorted(name for name in expected.keys() | actual.keys() if expected.get(name) != actual.get(name))
 
 
 def nono_source_sha256(root: Path) -> str:
@@ -253,9 +388,6 @@ def validate_record(data: dict) -> list[str]:
                 errors.append("the seccompiler fork patch identity is invalid")
             if set(patch.get("changes", [])) != SECCOMPILER_PATCH_CHANGES:
                 errors.append("the seccompiler fork patch inventory is incomplete")
-            digest = patch.get("source_sha256")
-            if not isinstance(digest, str) or len(digest) != 64:
-                errors.append("the seccompiler fork source digest is invalid")
     return errors
 
 
@@ -413,14 +545,16 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
         errors,
         "seccompiler BSD license",
     )
-    expected_digest = data.get("seccompiler", {}).get("patch", {}).get("source_sha256")
     try:
-        actual_digest = seccompiler_source_sha256(root)
-    except OSError as error:
-        errors.append(f"cannot hash seccompiler fork source: {error}")
+        drift = seccompiler_fork_drift(root)
+    except (OSError, ValueError, tarfile.TarError) as error:
+        errors.append(f"cannot reconstruct seccompiler fork: {error}")
     else:
-        if expected_digest != actual_digest:
-            errors.append("seccompiler fork source digest does not match provenance")
+        if drift:
+            errors.append(
+                "seccompiler fork differs from the registry release plus recorded patch: "
+                + ", ".join(drift)
+            )
     for required in [
         ".try_into()",
         "BackendError::FilterTooLarge(bpf_filter.len())",
