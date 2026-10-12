@@ -272,6 +272,43 @@ struct RemoteSessionDiagnosticRecord {
     #[serde(default)]
     ownership: RemoteSessionOwnershipSnapshot,
     terminal_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_reason: Option<TerminalReason>,
+}
+
+/// Why a session became terminal. A `v3` terminal record carries it, so the
+/// two subscription failures stay distinct from an ordinary close.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TerminalReason {
+    Deleted,
+    Expired,
+    Closed,
+    /// A standard subscription failed re-authorization before activation.
+    SubscriptionNotRestored,
+    /// A standard subscription lost its authority after activation.
+    SubscriptionAuthorityLost,
+}
+
+impl TerminalReason {
+    fn state(self) -> RemoteSessionState {
+        match self {
+            Self::Deleted => RemoteSessionState::Deleted,
+            Self::Expired => RemoteSessionState::Expired,
+            Self::Closed | Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost => {
+                RemoteSessionState::Closed
+            }
+        }
+    }
+
+    /// A `v2` record has no reason field, so only the `v3` envelope can say
+    /// which subscription failure ended the session.
+    fn requires_v3(self) -> bool {
+        matches!(
+            self,
+            Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -342,6 +379,8 @@ struct RemoteSessionTerminalFence {
     session_id: String,
     terminal_at: u64,
     terminal_state: RemoteSessionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_reason: Option<TerminalReason>,
     resume_generation: u64,
     terminal_epoch: u64,
     resume_integrity: RemoteSessionIntegrityTag,

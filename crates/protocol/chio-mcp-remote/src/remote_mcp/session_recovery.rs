@@ -149,8 +149,20 @@ async fn expire_record(
         protocol_version: record.protocol_version.clone(),
         ownership: RemoteSessionOwnershipSnapshot::default(),
         terminal_at,
+        terminal_reason: None,
     };
-    let (tombstone, fence) = sign_terminal_session_records(keyring, diagnostic, epoch, epoch)?;
+    let envelope = record
+        .resume_integrity
+        .envelope
+        .max(sessions.lifecycle_policy.resume_envelope_floor);
+    let (tombstone, fence) = sign_terminal_session_records(
+        keyring,
+        diagnostic,
+        TerminalReason::Expired,
+        envelope,
+        epoch,
+        epoch,
+    )?;
     prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
     finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)?;
     sessions

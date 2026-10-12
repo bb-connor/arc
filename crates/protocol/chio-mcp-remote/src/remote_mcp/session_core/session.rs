@@ -579,6 +579,7 @@ impl RemoteSession {
             protocol_version: self.protocol_version(),
             ownership: self.ownership_snapshot(),
             terminal_at: self.lifecycle_snapshot().last_seen_at,
+            terminal_reason: None,
         }
     }
 
