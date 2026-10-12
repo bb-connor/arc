@@ -1,74 +1,60 @@
 # chio-governance
 
-`chio-governance` defines and verifies Chio's governance authorization
-artifacts: capability leases, destructive-action governance receipts, and
-generic governance charters and cases (dispute, freeze, sanction, appeal) that
-attach to a `chio-listing` identity. It builds on `chio-listing` for listing
-and trust-activation identity, and is re-exported by `chio-core` and
-`chio-open-market` as `governance`.
+`chio-governance` defines signed governance charters, registry cases, capability
+leases, and destructive-action receipts. Registry evaluation computes a local
+case result; workflow callers use separate lease and receipt checks.
 
-Callers construct and sign artifacts themselves; this crate owns validation,
-signature verification, and the fail-closed evaluation logic, not artifact
-custody or persistence.
+## Usage
 
-## Responsibilities
+Sign and verify a scoped lease with a deterministic fixture key. A deployment
+must additionally pin the signer and bind issuer and subject to its own policy.
 
-- Define capability lease artifacts and action classes (`ScopedObservation`,
-  `DelegatedAction`, `NarrowDestructive`), and verify a signed lease's schema,
-  signature, validity window, and scope digest.
-- Define destructive-action governance receipts, and verify them against an
-  expected lease id, workflow id, and step hash before a destructive step is
-  allowed to proceed.
-- Define generic governance charters and cases scoped to a namespace and
-  governing operator, with builders that mint unsigned charter/case bodies
-  from an issue request.
-- Evaluate a signed governance case against its charter, listing, and optional
-  trust activation into an effective state (clear, disputed, frozen,
-  sanctioned, appealed) and an admission-blocking decision.
-- Re-export `chio-listing` as `listing`, since every artifact here references
-  a listing or trust-activation identity defined there.
+```rust
+use chio_governance::crypto::Keypair;
+use chio_governance::lease::{
+    CapabilityLeaseArtifact, CapabilityLeaseActionClass, SignedCapabilityLease,
+    CAPABILITY_LEASE_SCHEMA_V1, verify_capability_lease,
+};
 
-## Public API
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let signer = Keypair::from_seed(&[11; 32]);
+    let scope = "a".repeat(64);
+    let lease = SignedCapabilityLease::sign(CapabilityLeaseArtifact {
+        schema: CAPABILITY_LEASE_SCHEMA_V1.into(),
+        lease_id: "lease-1".into(), issuer: "operator-1".into(),
+        subject: "agent-1".into(), scope_digest: scope.clone(),
+        action_class: CapabilityLeaseActionClass::ScopedObservation,
+        issued_at_unix_ms: 1_000, expires_at_unix_ms: 2_000,
+    }, &signer)?;
+    verify_capability_lease(&lease, 1_500, Some(scope))?;
+    Ok(())
+}
+```
 
-Re-exported from `chio_core_types`: `canonical_json_bytes`, `crypto`,
-`receipt`.
+## Guarantees
 
-Re-exported from `chio_listing` as `listing`: `SignedGenericListing`,
-`SignedGenericTrustActivation`, `GenericRegistryPublisher`,
-`GenericListingActorKind`, `normalize_namespace`, and the rest of the listing
-surface.
+- `verify_capability_lease` checks schema, required fields, signature, lifetime,
+  and an optional expected scope digest. Expiration is exclusive.
+- `verify_destructive_authorization` adds exact lease, workflow, and step-hash
+  matching to receipt signature and lifetime checks.
+- `evaluate_generic_governance_case` checks signed artifacts and case bindings.
+  Only enforced freeze or sanction cases set `blocks_admission` to true.
+- Failed case evaluation can return `Ok` with findings and
+  `blocks_admission: false`. Callers must inspect findings before admitting work.
 
-Owned in this crate:
+## Status
 
-- `lease::{CapabilityLeaseArtifact, CapabilityLeaseActionClass,
-  SignedCapabilityLease, verify_capability_lease,
-  CAPABILITY_LEASE_SCHEMA_V1}`
-- `authorization::{GovernanceReceiptArtifact, GovernanceReceiptCaseKind,
-  SignedGovernanceReceipt, verify_destructive_authorization,
-  verify_step_governance_boundary, GOVERNANCE_RECEIPT_SCHEMA_V1}`
-- `generic::{GenericGovernanceCharterArtifact, GenericGovernanceCaseArtifact,
-  GenericGovernanceAuthorityScope, GenericGovernanceCaseKind,
-  GenericGovernanceCaseState, GenericGovernanceEffectiveState,
-  GenericGovernanceEvidenceReference, GenericGovernanceFinding,
-  GenericGovernanceFindingCode, GenericGovernanceCharterIssueRequest,
-  GenericGovernanceCaseIssueRequest, GenericGovernanceCaseEvaluationRequest,
-  GenericGovernanceCaseEvaluation, SignedGenericGovernanceCharter,
-  SignedGenericGovernanceCase, build_generic_governance_charter_artifact,
-  build_generic_governance_case_artifact}`
-- `evaluation::evaluate_generic_governance_case` - the case-evaluation entry
-  point.
-- `error::GovernanceAuthorizationError` - shared error for lease and receipt
-  verification.
+The artifact and evaluation APIs are implemented. They perform no persistence,
+revocation lookup, global arbitration, or automatic sanction propagation.
+Envelope verification uses its carried signer key; external authority pinning
+and applying the result to current admission state belong to the caller.
 
-## Testing
+## Related
 
-`cargo test -p chio-governance`
+- [Architecture](ARCHITECTURE.md)
+- [Protocol certification and registry](../../../spec/PROTOCOL.md#12-certification-contract)
+- [Listing artifacts](../../economy/chio-listing/README.md)
 
-## See also
+## License
 
-- `chio-listing` - listing and trust-activation identity referenced by
-  governance charters and cases.
-- `chio-core` - re-exports this crate as `governance`.
-- `chio-open-market` - also re-exports this crate as `governance`.
-- `chio-federation-authority` - issues the governance-authority keys this
-  crate's receipts and leases verify against.
+[Workspace license](../../../LICENSE)

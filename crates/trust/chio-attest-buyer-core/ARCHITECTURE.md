@@ -1,116 +1,80 @@
-# chio-attest-buyer-core architecture
+# Architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-attest-buyer-core` is a pure, offline verification library: no network
-I/O, no filesystem access beyond the JSON strings a caller provides, and
-`#![forbid(unsafe_code)]`. It is the hardened core behind the public boundary
-crate `chio-attest-buyer`, but kernel-side code (`chio-runtime-core`,
-`chio-runtime-harness`) and tooling (`chio-cli`) also call it directly, so its
-types and JSON codecs are public rather than crate-internal.
+The crate verifies one `ChioProofPackage` against an already validated
+`ChioVerifierTrustBundle` and a `ChioVerificationContext`. It owns offline
+proof composition checks and their report. It performs no network lookup,
+capability issuance, settlement, or persistent replay consumption.
 
-The design treats the proof package as untrusted input end to end: every
-artifact it references (peer, vendor, lease authority, governance authority,
-BBS issuer, workflow intersection) must independently resolve against, and
-match, the verifier's own trust bundle. The package's self-reported hints are
-never authoritative on their own.
+`verify_package` returns an error on rejection. `verify_package_report`
+returns a report for either outcome, including checks completed before the
+failure. Callers inspecting reports must use `accepted` and `failure`.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public module declarations; `#![forbid(unsafe_code)]`. |
-| `src/proof_package.rs` | `ChioProofPackage`, its JSON codec and canonical hash, and proof-claim support checks. |
-| `src/trust_bundle.rs` | `ChioVerifierTrustBundleDocument` / `ChioVerifierTrustBundle`: parses and indexes trusted issuers, peers, vendors, action classes, workflow intersections, lease/governance authorities, disclosure policy, and the signed revocation checkpoint. |
-| `src/context.rs` | `ChioVerificationContext`: audience/challenge/purpose binding and the derived BBS proof nonce. |
-| `src/report.rs` | Verification orchestration (`verify_package`, `verify_package_report`), the per-phase checks, and `VerifierReport` construction with stable failure codes/phases. |
-| `src/claims.rs` | Proof claim flags, peer/vendor key bindings, workflow-intersection artifact shapes, `LeaseScopeBindingArtifact` and its scope-digest preimage. |
-| `src/disclosure.rs` | `ChioDisclosurePolicy` validation and BBS projection selection/contract checks. |
-| `src/revocation.rs` | Revocation checkpoint schema, signature verification, revoked-fingerprint set construction. |
-| `src/issuer.rs` | `TrustedIssuerRegistry`: BBS issuer fingerprint to public key lookup. |
-| `src/oracle.rs` | `OfflineRevocationOracle`, a `RevocationOracle` adapter over the trust bundle's revoked-key set. The module is declared `pub` but exports nothing outside the crate (the struct is `pub(crate)`). |
-| `src/validation.rs` | `pub(crate)` field, hash, and lifecycle validation helpers shared across modules. |
-| `src/error.rs` | `ChioPackageError`, the crate's unified error type. |
-| `src/tests.rs` | Verifier behavior tests, driven by fixtures under `examples/chio-3vendor/fixtures/`. |
+| Module | Responsibility |
+| --- | --- |
+| `proof_package`, `claims` | Artifact family, supported claims, scope digest |
+| `context` | Audience/challenge/purpose window and BBS nonce derivation |
+| `trust_bundle`, `issuer` | Validated peer, vendor, authority, and BBS pins |
+| `revocation`, `oracle` | Signed checkpoint and offline revoked-key lookup |
+| `disclosure` | Projection, reveal-set policy, subject and nonce checks |
+| `report` | Ordered workflow, governance, federation, and BBS verification |
+| `input`, `validation`, `error` | Bounded JSON and shared invariant checks |
 
-## Verification lifecycle
+## Data and control flow
 
-`report::verify_package_inner` runs these phases in order, appending a
-`VerifierCheck` as each one passes:
+Package parsing uses signed original-input decoding and permits typed
+construction before semantic verification. Trust-bundle construction requires
+issuers, peers, vendors, action classes, workflow intersections, runtime policy
+issuers, lease authorities, and governance authorities. It validates unique
+bindings and builds keyed maps for later lookup.
 
-1. Schema and claims: the package schema must be `PROOF_PACKAGE_SCHEMA`, and
-   `verify_claims` rejects any package claim this verifier does not support.
-2. Context freshness: the context validates, its issue/expiry window brackets
-   the trust bundle's pinned checkpoint time, and the checkpoint is still
-   active just before the context expires.
-3. Workflow signature: the workflow receipt's kernel signature verifies.
-4. Trust hints: every peer and vendor binding in the package matches a
-   non-revoked, non-stale trust bundle entry.
-5. Workflow intersection: the intersection artifact hash-matches a trusted
-   intersection; its vendor signers and peers must be trusted, and its
-   step-class bindings must match the workflow receipt's steps and the trust
-   bundle's action classes.
-6. Vendor cosignatures: the vendor signatures required by the trusted
-   intersection verify against the workflow receipt.
-7. Step links: each workflow step cross-checks against its DSSE envelope,
-   tool receipt, and capability lease, with parent-hash chaining across steps
-   and destructive-flag agreement with the lease's action class.
-8. Lease scope bindings: each binding validates, and its canonical scope
-   digest matches the lease it names.
-9. Capability leases: each lease is signed by a trusted, time-valid lease
-   authority for its action class and passes `verify_capability_lease` against
-   its scope digest.
-10. Governance receipts and destructive steps: governance receipts come from
-    trusted, time-valid authorities, and every destructive step's
-    receipt/lease pair passes `verify_destructive_authorization`.
-11. Bilateral envelopes: each DSSE envelope verifies under
-    `chio_federation::bilateral_verifier` with an `allow` joint verdict.
-12. Selective disclosure: the BBS issuer is trusted and non-revoked, the proof
-    satisfies the trust bundle's disclosure policy, and the BBS signature
-    verifies.
+Verification checks supported claims, context, and checkpoint coverage before
+workflow signature and externally pinned package hints. It then validates the
+workflow intersection hash, vendor cosignatures, step links, lease scope
+bindings, trusted leases, governance receipts, and destructive steps.
 
-`verify_package` returns `Err` at the first failed phase. `verify_package_report`
-always returns a `VerifierReport`, mapping any error to a stable `code` and
-`phase` (`failure_code`, `failure_phase`) while preserving the checks completed
-before failure.
+The verifier hydrates in-memory receipt, lease, and governance stores and
+passes them with peer pins and the offline revocation oracle to
+`verify_chio_bilateral_invocation`. Every bilateral joint verdict must allow.
+Finally, it validates disclosure projection, externally trusted issuer key,
+revocation, reveal-set policy, context nonce, and BBS proof.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- Fail closed on shape: every artifact type derives
-  `#[serde(deny_unknown_fields)]`, so unrecognized fields in a package, trust
-  bundle, checkpoint, or context are a parse error.
-- The package's own trust hints are never sufficient; each must resolve to,
-  and match, a corresponding trust bundle entry.
-- Revocation is enforced against a signed `ChioRevocationCheckpoint`; peer,
-  vendor, lease/governance authority keys, and the BBS issuer fingerprint are
-  all checked against its revoked set before use.
-- Lease and governance authorities require an explicit `keyId` matching their
-  public key fingerprint, an `Active` status, and a `[validFrom, validUntil)`
-  window covering both the verifier's current time and the artifact's issue
-  time.
-- Destructive workflow steps must carry a governance receipt id matching both
-  the workflow step and the DSSE predicate; non-destructive steps must carry
-  none.
-- `oracle::OfflineRevocationOracle` is this crate's only implementation of
-  `chio_federation`'s `RevocationOracle` trait. It ignores the epoch height
-  argument and treats a fingerprint as active unless the trust bundle's
-  checkpoint lists it as revoked.
+Package hints must match selected trust entries by key and ladder reference.
+The trust bundle may contain unrelated entries; package material cannot add
+its own roots. Lease and governance key identifiers must match public-key
+fingerprints, with explicit active lifecycle and permitted action classes.
+A checkpoint authenticates its envelope signature; choosing its signer and
+installing that checkpoint as trusted input remains the caller's boundary.
+
+The effective verification time is the signed checkpoint's issuance time.
+The context must be active there and the checkpoint must cover the entire
+context window. No wall clock is read by the package verifier. Applications
+must prevent selection of stale but internally consistent historical input.
+
+The BBS nonce is the ASCII SHA-256 hex of canonical context fields.
+JSON input is bounded to 16 MiB and retains full-width native integers.
+Unknown schemas and unsupported claims fail during verification.
 
 ## Dependencies
 
-- `chio-core-types` - canonical JSON, SHA-256 hashing, `PublicKey`, and the
-  `ChioReceipt` / `SignedExportEnvelope` types packages and checkpoints embed.
-- `chio-federation` - bilateral DSSE envelopes, the bilateral verifier (peer
-  pins, receipt/lease/governance stores, the `RevocationOracle` trait), and
-  ladder-manifest trust establishment.
-- `chio-governance` - capability lease and governance-receipt verification
-  (`verify_capability_lease`, `verify_destructive_authorization`,
-  `verify_step_governance_boundary`).
-- `chio-workflow` - `WorkflowReceipt` and vendor signature requirements.
-- `chio-selective-disclosure` (`bbs` feature) - BBS+ projection, signing, and
-  proof verification for selective disclosure.
-- `serde` / `serde_json`, `thiserror` - artifact (de)serialization and the
-  crate's error type.
+`chio-federation` verifies strict bilateral DSSE and pinned evidence.
+`chio-governance` verifies leases and destructive authorization.
+`chio-workflow` verifies aggregate/vendor signatures; `chio-selective-disclosure`
+provides BBS projection and proof verification. Core types supply canonical
+encoding, receipt shapes, hashing, and envelope signature verification.
 
-No dependency aliasing: every `chio-*` dependency name matches the crate path
-used in source (`chio_core_types::`, `chio_federation::`, and so on).
+## Verification
+
+Run `cargo test -p chio-attest-buyer-core` and
+`cargo test -p chio-attest-buyer-core --doc`.
+`src/tests.rs` covers committed fixtures, forged authority keys, revoked roots,
+context mismatch, disclosure policy, and original-input ambiguity.
+`cargo bench -p chio-attest-buyer-core --bench buyer_verify` measures the
+fixed three-vendor package after checking that its baseline is accepted.
+
+[README](README.md) | [Protocol](../../../spec/PROTOCOL.md#9-trust-control-contract)

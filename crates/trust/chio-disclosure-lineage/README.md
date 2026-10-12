@@ -1,82 +1,64 @@
 # chio-disclosure-lineage
 
-Verifier for Chio selective-disclosure bundles. It checks that a disclosure
-capsule, its privacy profile, its signed lineage subgraph, its leakage
-ledger, and an optional crypto context report are internally consistent,
-digest-bound, signature-verified, and compliant with the privacy profile's
-policy, returning a `DisclosureLineageVerifierReport` or a
-`DisclosureLineageError`. It lives in the trust layer (`crates/trust`): it
-verifies evidence about a disclosure, it does not produce BBS proofs
-(`chio-selective-disclosure`) or index the system-wide provenance graph
-(`chio-lineage`).
+`chio-disclosure-lineage` verifies disclosure capsules against supplied lineage,
+privacy profiles, leakage ledgers, and signed crypto-context reports. It exports
+artifact types and a verifier report consumed by selective-disclosure workflows.
 
-## Responsibilities
+## Usage
 
-- Define the disclosure-lineage artifact types and their schema tags:
-  `DisclosureCapsule`, `DisclosureVerifierPrivacyProfile`,
-  `SignedLineageSubgraph`, `DisclosureLeakageLedger`,
-  `DisclosureCryptoContextReport`, `DisclosureLineageBundle`,
-  `DisclosureLineageVerifierReport`.
-- Recompute and check the lineage subgraph's frontier, checkpoint-inclusion,
-  and subgraph digests, and verify its Ed25519 signature against a
-  caller-supplied trusted key set.
-- Verify a crypto context report's Ed25519 signature and its binding to the
-  capsule (ref identity, verdict, claim whitelist, disclosed-field-set
-  equality).
-- Enforce the privacy profile's leakage budget and allow/forbid lists against
-  the capsule's disclosed fields and hidden predicates, and hold the fixed
-  catalog of supported hidden predicates (`SUPPORTED_HIDDEN_PREDICATES`).
-- Enforce leakage-ledger completeness and score accounting: every disclosed
-  field, hidden predicate, and required derived fact needs a matching,
-  policy-allowed ledger entry, with entry scores summing to the declared
-  total within the profile's maximum.
-- Validate the lineage subgraph's graph closure (parent/depth/edge
-  consistency, root-receipt shape) and an evidence-class floor every node
-  must meet.
+Sign a local crypto-context report and verify its signature with a pinned key.
+This helper authenticates report bytes; bundle verification adds policy and
+reference checks. The report producer is responsible for its proof verdict.
 
-## Public API
+```rust
+use chio_core_types::Keypair;
+use chio_disclosure_lineage::{
+    DisclosureCryptoContextReport, DisclosureContextVerdict,
+    DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1, sign_crypto_context_report,
+    verify_crypto_context_report_signature_with_trust,
+};
 
-- `verify_disclosure_lineage_bundle`, `verify_disclosure_lineage_bundle_with_trust` -
-  verify a `DisclosureLineageBundle`, returning a
-  `DisclosureLineageVerifierReport` or a `DisclosureLineageError`.
-- `DisclosureLineageVerifierTrust` - two independent trusted-signer key sets,
-  built with `with_trusted_lineage_signer_keys` and
-  `with_trusted_crypto_context_report_signer_keys`.
-- `sign_lineage_subgraph`, `compute_signed_lineage_subgraph_digest`,
-  `sign_crypto_context_report`, `verify_crypto_context_report_signature`,
-  `verify_crypto_context_report_signature_with_trust` - digest, sign, and
-  verify the two signed artifact kinds.
-- Artifact types: `DisclosureLineageBundle`, `DisclosureCapsule`,
-  `DisclosureHiddenPredicate`, `DisclosureVerifierPrivacyProfile`,
-  `DisclosureProfileLeakageBudget`, `DisclosureSensitivityClass`,
-  `SignedLineageSubgraph`, `DisclosureSignedLineageNode`,
-  `DisclosureSignedLineageEdge`, `DisclosureSignedLineageRedaction`,
-  `DisclosureLeakageLedger`, `DisclosureLeakageLedgerEntry`,
-  `DisclosureCryptoContextReport`, `DisclosureContextVerdict`,
-  `DisclosureContextCheck`, `TransparencyState`,
-  `DisclosureLineageVerifierReport`, `DisclosureLineageError`.
-- Schema tags: `DISCLOSURE_CAPSULE_SCHEMA_V1`, `LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1`,
-  `DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1`,
-  `DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1`,
-  `DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1`,
-  `DISCLOSURE_LINEAGE_VERIFIER_REPORT_SCHEMA_V1`.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let signer = Keypair::from_seed(&[7; 32]);
+    let mut report = DisclosureCryptoContextReport {
+        schema: DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1.into(),
+        id: "report-1".into(), context_id: "context-1".into(),
+        artifact_ref: "artifact-1".into(), projection_manifest_ref: "projection-1".into(),
+        verdict: DisclosureContextVerdict::Rejected,
+        evidence_class: "verifier_context".into(), cryptographic_proof_verified: false,
+        verified_claims: vec![], rejected_checks: vec![], disclosed_fields: vec![],
+        signature: None,
+    };
+    report.signature = Some(sign_crypto_context_report(&report, &signer)?);
+    verify_crypto_context_report_signature_with_trust(&report, &[signer.public_key()])?;
+    Ok(())
+}
+```
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-disclosure-lineage`. The lib target sets `test = false`;
-all coverage lives in `tests/disclosure_lineage.rs`, which is unaffected by
-that setting.
+- `verify_disclosure_lineage_bundle_with_trust` checks schemas, graph structure,
+  reference bindings, reveal allowlists, leakage counts, and ledger coverage.
+- Lineage and crypto-context signatures require explicitly trusted signer keys.
+  Convenience verification with empty trust rejects signed artifacts.
+- Graph closure checks declared parents and increasing depths. Node and edge
+  digest checks hash supplied identifiers and statement strings.
+- The verifier requires a signed verified crypto-context report. It does not
+  execute BBS verification, prove an amount bound, or fetch source receipts.
 
-## See also
+## Status
 
-- `chio-core-types` - canonical JSON, sha256 hashing, and the Ed25519
-  `Keypair`/`PublicKey`/`Signature` types this crate signs and verifies with.
-- `chio-selective-disclosure` - depends on this crate and re-exports its
-  bundle types and verifier; produces the `DisclosureCryptoContextReport`
-  this crate verifies by evaluating the profile's key-epoch, revocation,
-  nonce, holder-binding, and transparency-state policy.
-- `chio-lineage` - an unrelated provenance/lineage DAG indexer for
-  observability (OTEL ingest, replay corpus, guard-version diffing); no
-  shared code or types despite the similar name.
-- `chio-proof-room` - verifies disclosure lineage bundles as part of its
-  transaction-passport proof surface.
+Bundle and signature checks are implemented without storage or networking.
+Privacy coverage is limited to the supplied reveal set and ledger. Callers must
+establish report producer authority, source completeness, signer freshness, and
+any real checkpoint inclusion or hidden-predicate proof.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol disclosure family](../../../spec/PROTOCOL.md#645-disclosure-and-lineage-family)
+- [Selective disclosure](../chio-selective-disclosure/README.md)
+
+## License
+
+[Workspace license](../../../LICENSE)

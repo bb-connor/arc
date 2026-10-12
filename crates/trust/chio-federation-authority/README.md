@@ -1,72 +1,84 @@
 # chio-federation-authority
 
-Local issuer for signed Chio federation authority artifacts. An operator
-supplies an authority profile (which lease, governance, BBS, and revocation
-authorities are trusted, with their public keys and validity windows), local
-signing seeds, and a request; the crate validates every input fail-closed,
-binds each local seed to the public key its profile entry declares, and signs
-the resulting capability leases, governance receipts, revocation checkpoints,
-and verifier trust bundles.
+`chio-federation-authority` issues signed capability leases, destructive-action
+governance receipts, and revocation checkpoints from local authority profiles.
+It assembles verifier trust bundles and provides authenticated FROST key
+ceremony, signer, and coordinator APIs for federation integrations.
 
-It sits in `crates/trust/` alongside `chio-federation` (the admission and
-reputation-clearing contract types this crate's output feeds) and
-`chio-federation-transport-iroh` (a network accept-time admission gate with no
-dependency on this crate). This crate does no networking or storage; it is
-pure validation and signing over documents it is given.
+## Usage
 
-## Responsibilities
+Start one participant's round of a two-party FROST ceremony entirely offline.
+The fixed signing and sealing seeds below are example keys. Deployment requires
+protected key custody and a cryptographic random source.
 
-- Define the JSON document schemas an authority operator supplies: authority
-  profile, issuance request, local signing keys, revocation publication
-  request, and peer pins (`*_SCHEMA` constants).
-- Validate every document fail-closed (schema match, required fields,
-  SHA-256/hex shape, duplicate rejection, validity windows) before signing.
-- Bind local signing seeds to the authority profile: a seed signs only after
-  its derived public key matches the profile's declared public key.
-- Issue signed capability leases and lease-scope bindings per requested step,
-  plus a signed governance receipt for destructive steps.
-- Publish signed revocation checkpoints with monotonic epoch enforcement.
-- Assemble a verifier trust bundle and confirm it parses through
-  `chio-attest-buyer-core`'s strict verifier parser before returning it.
+```rust
+use chio_core_types::Keypair;
+use chio_federation_authority::{
+    begin_frost_ceremony, FrostCeremonyConfig, FrostCeremonyParticipant,
+    FrostDkgRound, FrostSealingKey,
+};
+use rand_core::OsRng;
+use zeroize::Zeroizing;
 
-## Public API
+let signing = [Keypair::from_seed(&[1; 32]), Keypair::from_seed(&[2; 32])];
+let sealing = [
+    FrostSealingKey::from_custody_bytes(Zeroizing::new([3; 32])),
+    FrostSealingKey::from_custody_bytes(Zeroizing::new([4; 32])),
+];
+let mut participants = Vec::new();
+for i in 0..2 {
+    participants.push(FrostCeremonyParticipant {
+        participant_id: format!("operator-{i}"),
+        transport_key_id: format!("signing-{i}"),
+        transport_public_key: signing[i].public_key(),
+        sealing_key_id: format!("sealing-{i}"),
+        sealing_public_key: sealing[i].public_key()?,
+    });
+}
+let config = FrostCeremonyConfig {
+    scope_id: "treaty-example".into(), key_epoch: 1, threshold: 2,
+    predecessor_roster_digest: None, participants,
+    local_participant_id: "operator-0".into(),
+};
+let round = begin_frost_ceremony(&config, &signing[0], &sealing[0], &mut OsRng)?;
+assert_eq!(round.package.round(), FrostDkgRound::Round1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-- `AuthorityProfileDocument`, `LocalAuthoritySigningKeysDocument`,
-  `ChioIssuanceRequest` / `ChioIssuanceStepRequest`, `ChioIssuanceBundle`,
-  `RevocationPublicationRequest`, `PeerPinsDocument`, `ChioRevocationAuthority`,
-  `NamedSeedHex` - document types, each with a `validate()` method.
-- `authority_profile_from_json`, `issuance_request_from_json`,
-  `signing_keys_from_json`, `revocation_publication_request_from_json`,
-  `peer_pins_from_json` - parse and validate a document in one step.
-- `authority_profile_json`, `issuance_request_json`, `signing_keys_json`,
-  `issuance_bundle_json`, `revocation_publication_request_json`,
-  `peer_pins_json`, `signed_revocation_checkpoint_json` - pretty-printed
-  serialization.
-- `issue_authority_bundle(profile, request, signing_keys) ->
-  Result<ChioIssuanceBundle, ChioAuthorityError>` - signs capability leases,
-  lease-scope bindings, and governance receipts for one issuance request.
-- `publish_revocation_checkpoint(profile, request, signing_keys) ->
-  Result<SignedChioRevocationCheckpoint, ChioAuthorityError>`.
-- `assemble_verifier_trust_bundle(profile, peer_pins, workflow_intersection,
-  disclosure_policy, checkpoint) ->
-  Result<ChioVerifierTrustBundleDocument, ChioAuthorityError>`.
-- `ChioAuthorityError` - fail-closed error type (`Profile`, `Request`,
-  `SigningKeys`, `Issuance`, `Revocation`, `TrustBundle`, `Json`, `Canonical`),
-  convertible into `chio_attest_buyer_core::error::ChioPackageError`.
+Complete ceremonies through `advance_frost_ceremony` and
+`complete_frost_ceremony`, exchanging authenticated public packages and retaining
+secret custody records. The crate leaves delivery and durable custody to callers.
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-federation-authority`
+- `issue_authority_bundle` validates profile, request, and local keys; requires
+  active authorities, matching signing keys, allowed action classes, and
+  contained validity intervals before signing leases and governance receipts.
+- `publish_revocation_checkpoint` requires the active pinned authority and
+  validates the request. Epoch monotonicity uses the optional supplied previous
+  height; callers retain and authenticate the actual previous checkpoint.
+- `begin_frost_ceremony` binds scope, epoch, participants, signing keys, and
+  sealing keys. Round transitions authenticate transcript packages; round-two
+  plaintext is available only through recipient-bound authenticated opening.
+- `create_frost_signature_share` consumes its nonce object and checks the exact
+  authorized message digest and prepared commitment. `aggregate_frost_authorization`
+  checks the signing set and verifies shares before producing the group proof.
+- Local seed documents and FROST secret types redact debug output and use
+  secret or zeroizing storage. Private custody export requires explicit APIs.
 
-## See also
+## Status
 
-- `chio-attest-buyer-core` - owns the verifier trust-bundle, disclosure, and
-  revocation-checkpoint types this crate assembles and issues into.
-- `chio-federation` - owns the peer/quorum/admission contracts this crate's
-  authorities and peer pins feed.
-- `chio-governance` - owns the capability-lease and governance-receipt
-  artifact definitions this crate signs.
-- `chio-attest-loopback` - re-exports this crate's issuance surface for its
-  deterministic buyer/auditor loopback harness.
-- `chio-cli` - hosts the `federation authority issue` / `checkpoint` /
-  `trust-bundle assemble` commands built directly on this crate.
+These are library issuance and cryptographic workflow APIs. Publication,
+operator authorization, checkpoint history, and durable nonce consumption are
+integration responsibilities. Trust-bundle assembly runs the buyer verifier's
+bundle loader; execution still requires current evidence and admission checks.
+This crate declares no Cargo features.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Federation contracts](../chio-federation/README.md)
+- [Governance](../chio-governance/README.md)
+- [Portable trust and federation](../../../spec/PROTOCOL.md#10-portable-trust-and-federation)
+
+[License](../../../LICENSE)

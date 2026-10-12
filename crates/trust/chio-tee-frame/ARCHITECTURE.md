@@ -1,70 +1,79 @@
-# chio-tee-frame architecture
+# Architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-tee-frame` is a pure data crate: in-memory types, schema validation, and
-canonical-JSON codec logic, with no I/O and no runtime state
-(`#![forbid(unsafe_code)]`). It defines the `chio-tee-frame.v1` wire format:
-the signed capture record `chio-tee` emits per kernel evaluation. The
-`schema` module also owns the reference Ed25519 signing-payload and
-verification logic for a frame's `tenant_sig`, so the same canonical-payload
-construction covers both the signing and verifying side of a captured frame.
+The crate owns the typed `Frame` capture format and its validation routines.
+It exports construction, canonicalization, parsing, signing preimages, and
+tenant-signature verification. It has no file writer, redactor, encrypted
+store, tenant-key resolver, or kernel policy evaluator.
 
-## Module map
+A frame commits metadata about redacted request and response blobs. The
+consumer supplies the trusted public key and independently verifies the blobs
+and their provenance before relying on them during replay.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public module declarations, crate-root re-exports, and the `FRAME_VERSION` schema-name constant. |
-| `src/frame.rs` | `Frame` and nested types (`Upstream`, `UpstreamSystem`, `Provenance`, `Otel`, `Verdict`), `FrameError`, `Frame::build`, `canonicalize`, `parse`. |
-| `src/schema.rs` | `SchemaError`, the per-field `validate_*` checks, `validate`, `validate_signed`, `signing_payload`, `verify_tenant_sig`. |
+## Structure
 
-## Frame lifecycle
+| Module | Responsibility |
+| --- | --- |
+| `frame` | `Frame`, `FrameInputs`, upstream/provenance/verdict types, codec |
+| `schema` | Version/id constants, patterns, reason gate, Ed25519 checks |
+| `lib` | Public re-exports and `FRAME_VERSION` label |
+| `tests/property_roundtrip` | Property-based canonical codec invariants |
 
-1. A caller builds a `FrameInputs` and calls `Frame::build`, or constructs a
-   `Frame` struct literal directly (every field is `pub`).
-2. `Frame::build`, `canonicalize`, and `parse` each call `schema::validate`
-   before returning; a `Frame` assembled as a bare struct literal and never
-   passed through one of these three is never validated.
-3. `canonicalize` re-validates, then serializes through
-   `chio_core::canonical::canonical_json_bytes` (RFC 8785) for a
-   deterministic, sorted-key byte encoding.
-4. `parse` decodes with `serde_json::from_slice` under
-   `#[serde(deny_unknown_fields)]`, then validates the result. Malformed or
-   unrecognized JSON fails as `FrameError::Json`; a well-formed frame that
-   violates an invariant fails as `FrameError::Schema`.
-5. `signing_payload` re-serializes the frame to a `serde_json::Value`, strips
-   `tenant_sig`, and canonicalizes the remaining fields. `verify_tenant_sig`
-   decodes the `ed25519:<base64>` signature and checks it against that
-   payload with a caller-supplied public key. `validate_signed` composes
-   `validate` and `verify_tenant_sig`.
+`UpstreamSystem` enumerates OpenAI, Anthropic, AWS Bedrock, MCP, A2A, and ACP.
+`Provenance` carries trace/span identifiers plus optional opaque supply-chain
+JSON. `Verdict` carries allow, deny, or rewrite.
 
-## Invariants and failure modes
+## Data and control flow
 
-- Every `validate_*` check in `schema.rs` fails closed: unknown enum values,
-  out-of-range lengths, pattern mismatches, and non-canonical casing all
-  reject rather than coerce or truncate.
-- `deny_reason` is gated on `verdict`: required and pattern-checked when
-  `verdict` is `deny` or `rewrite`, forbidden when `verdict` is `allow`
-  (`validate_deny_reason_gate`).
-- `schema_version` is pinned to the literal `"1"`; this module has no
-  migration path for a future schema version.
-- `Frame`'s fields are all `pub`, so the type alone does not enforce
-  well-formedness. Validation is a property of the entry points
-  (`Frame::build`, `canonicalize`, `parse`, `validate`, `validate_signed`),
-  not of the type itself.
-- `invocation` is stored as an opaque `serde_json::Value` and is only checked
-  for being a JSON object; the canonical-JSON `ToolInvocation` validator is
-  the source of truth for its contents.
-- `ts` must match the fixed-width `YYYY-MM-DDTHH:MM:SS.mmmZ` pattern and parse
-  as a real RFC3339 instant (checked with `chrono::DateTime::parse_from_rfc3339`
-  after the byte-position pattern check).
+`Frame::build` supplies schema version `1` and calls `validate`.
+`canonicalize` validates before RFC 8785 encoding. `parse` runs signed
+original-input decoding with a 16 MiB limit, then validates the typed frame.
+It accepts structurally valid JSON without requiring the input to already
+be canonical. Re-encoding produces the canonical representation.
+
+`signing_payload` serializes the frame, removes `tenant_sig`, and canonicalizes
+the remaining object. `verify_tenant_sig` reconstructs that payload, decodes
+the standard-base64 Ed25519 signature, and checks it with the supplied raw
+32-byte public key. `validate_signed` runs structural validation first.
+
+## Trust and invariants
+
+Structural validation requires exact schema version, uppercase Crockford
+base32 event-id characters, UTC millisecond timestamp, deployment id pattern,
+operation/api-version bounds, object invocation, lowercase trace/span ids,
+and lowercase 64-character blob hashes. The event id is checked as a string
+pattern; the validator does not compare its embedded time with `ts`.
+
+Deny and rewrite must carry a bounded lowercase namespaced reason.
+Allow must omit that reason. `would_have_blocked` is carried as a boolean;
+the crate does not know the mode needed to derive its semantic value.
+Supply-chain provenance remains opaque.
+
+`validate` checks the signature's prefix, base64 character shape, and encoded
+length. It does not decode or cryptographically authenticate the signature.
+`verify_tenant_sig` additionally requires exactly 64 decoded bytes and an
+Ed25519 signature accepted under the provided key.
+Callers choose that key independently of untrusted frame material.
+
+The signed frame commits claimed hashes. No function retrieves redacted
+blobs or recomputes those hashes here. Timestamp format validation also adds
+no age or replay-consumption policy.
 
 ## Dependencies
 
-`chio-core` is aliased to `chio-core-types` in `Cargo.toml`
-(`chio_core::` in code resolves to that crate) and supplies
-`canonical::canonical_json_bytes` and the `crypto::{PublicKey, Signature}`
-Ed25519 primitives. `serde`/`serde_json` handle (de)serialization, `chrono`
-parses and validates RFC3339 timestamps, `base64` decodes the `tenant_sig`
-payload, and `thiserror` derives `FrameError` and `SchemaError`. Dev-only:
-`proptest` drives the round-trip property suite in `tests/`.
+The aliased `chio-core-types` dependency supplies canonical encoding,
+original-input JSON, and Ed25519 types. Serde carries wire types and opaque
+JSON values. Chrono validates real RFC 3339 dates; Base64 decodes signatures.
+Proptest generates codec cases for development tests.
+
+## Verification
+
+Run `cargo test -p chio-tee-frame` and
+`cargo test -p chio-tee-frame --doc`.
+Schema unit tests cover field patterns, invalid dates, reason gates, valid
+signatures, tampered signed fields, and wrong keys. Codec unit tests cover
+bounded/ambiguous input. Property tests exercise frame round trips and verdict
+combinations. The README example signs and verifies one fixture frame locally.
+
+[README](README.md) | [Serialization](../../../spec/PROTOCOL.md#41-canonical-json)

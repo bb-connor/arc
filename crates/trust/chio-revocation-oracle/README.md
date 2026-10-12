@@ -1,91 +1,66 @@
 # chio-revocation-oracle
 
-Chio's revocation oracle: an append-only Merkle accumulator of revoked
-`(subject, epoch_nonce)` keys, published as a signed, timestamped `EpochRoot`
-on every epoch tick. Federation and custody components consult it to answer
-whether a subject is revoked as of a given epoch, within a caller-configured
-freshness window.
-
-The crate is a pure library: no async runtime, no network I/O, no dependency
-on `chio-kernel-core`. Transport (federation gossip, catch-up) and mint-time
-enforcement (hardware custody) are built by callers on top of the traits and
-types here.
-
-## Responsibilities
-
-- Define the `RevocationOracle` trait and ship its only implementation,
-  `InMemoryRevocationOracle`: insert a key, answer `contains`, and produce
-  inclusion / non-inclusion proofs against the current `EpochRoot`.
-- Sign and verify epoch roots (`EpochRootSigner` / `EpochRootVerifier`) with
-  Ed25519 over domain-separated, RFC 8785 canonical JSON, so a verify-only
-  deployment holds only a pinned public key and can never forge a root.
-- Drive the epoch broadcast tick (`tick_and_broadcast`) that signs the
-  current root and publishes it to every registered `EpochBroadcaster`.
-- Enforce freshness windows (`verify_fresh_epoch_root`) so a stale or
-  future-dated root is rejected before a caller treats it as current.
-- Bridge `chio-credentials` passport-revocation events onto oracle inserts
-  (`passport_bridge`) without the oracle depending on `chio-credentials`.
-
-## Public API
-
-- `RevocationOracle`, `RevocationKey`, `SubjectId`, `EpochNonce`, `EpochRoot`,
-  `RootSignature`, `InclusionProof`, `NonInclusionProof`,
-  `RevocationOracleError`, `Result` - core types and the oracle trait.
-- `sparse_merkle::InMemoryRevocationOracle` - the shipped oracle
-  implementation.
-- `signer::{Ed25519RootSigner, Ed25519RootVerifier, EpochRootSigner,
-  EpochRootVerifier, ALGORITHM_ED25519, DOMAIN_SEPARATION_CONTEXT}` - signing
-  and verification.
-- `epoch::{SignedEpochRoot, EpochBroadcaster, InMemoryEpochBroadcaster,
-  tick_and_broadcast, DEFAULT_EPOCH_TICK_MS}` - epoch ticking and broadcast.
-- `freshness::{FreshnessConfig, verify_fresh_epoch_root}` - staleness gating.
-- `passport_bridge::{PassportRevocationEvent, apply_passport_revocation,
-  PassportRevocationBridgeError}` - passport-lifecycle bridge.
+`chio-revocation-oracle` provides an in-memory append-only revocation log,
+Ed25519-signed epoch roots, freshness checks, and a passport event bridge.
+It also implements a separate sparse map for portable finding-status proofs.
 
 ## Usage
 
+Insert a revoked key and verify its inclusion proof and signed root locally.
+The deterministic key is a fixture; production receivers pin their oracle key.
+
 ```rust
+use chio_core_types::Keypair;
 use chio_revocation_oracle::{
-    Ed25519RootSigner, EpochNonce, InMemoryRevocationOracle, RevocationKey,
-    RevocationOracle, SubjectId,
+    Ed25519RootSigner, EpochNonce, InMemoryRevocationOracle,
+    RevocationKey, RevocationOracle, FreshnessConfig, verify_fresh_epoch_root,
 };
 
-fn revoke_and_prove() -> chio_revocation_oracle::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let signer = Ed25519RootSigner::new("oracle-1", Keypair::from_seed(&[7; 32]));
     let mut oracle = InMemoryRevocationOracle::new();
-    let key = RevocationKey::new(SubjectId::from("did:chio:subject-7"), EpochNonce::new(1));
-    oracle.insert(key.clone(), 1_700_000_000_000)?;
-
+    let key = RevocationKey::new("subject-1", EpochNonce::new(4));
+    let root = oracle.insert(key.clone(), 1_000)?;
     let proof = oracle.inclusion_proof(&key)?;
     InMemoryRevocationOracle::verify_inclusion(&proof)?;
-
-    let signer = Ed25519RootSigner::from_signing_key("oracle-a", "generate")?;
-    let signed = oracle.signed_epoch_root(&signer)?;
-    signed.verify(&signer.verifier())
+    oracle.signed_epoch_root(&signer)?.verify(&signer.verifier())?;
+    verify_fresh_epoch_root(&root, 1_000, FreshnessConfig::fail_closed())?;
+    assert!(oracle.contains(&key));
+    Ok(())
 }
 ```
 
-## Feature flags
+## Features
 
-| Flag | Effect |
-|------|--------|
-| `delegation` | Dev-only. Enables the `swarm_revocation_e2e` and `receipt_chain_proof` integration test targets; no library-side behavior changes. |
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Empty | Enables no optional functionality. |
+| `delegation` | Off | Enables swarm and receipt-chain integration test targets; library APIs are unchanged. |
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-revocation-oracle` runs the unit, freshness, and property
-tests. `cargo test -p chio-revocation-oracle --features delegation` adds the
-3-tier swarm acceptance test (500ms median revoke-to-deny budget) and its
-receipt-chain proof reader. `cargo bench -p chio-revocation-oracle` asserts a
-200us p99 insert-plus-proof budget over 10k subjects before recording the
-Criterion benchmark.
+- `insert` rejects duplicate or padded/empty subject keys, advances the epoch,
+  and keeps issuance time nondecreasing when the supplied clock moves backward.
+- `Ed25519RootVerifier` checks pinned signer ID, algorithm, signature size, and
+  domain-separated canonical root bytes. Freshness is a separate check.
+- `verify_fresh_epoch_root` rejects future roots and excessive age. Its default
+  permits zero age; configured staleness and offline grace are added together.
+- General `NonInclusionProof` checks require the originating oracle state.
+  Finding-status sparse proofs independently verify a 256-sibling path.
 
-## See also
+## Status
 
-- `chio-core-types` - supplies the `Keypair` / `PublicKey` / `Signature` and
-  canonical-JSON primitives `signer` builds on.
-- `chio-federation`, `chio-federation-transport-iroh` - gossip and transport
-  layers that push, verify, and merge `SignedEpochRoot`s between kernels.
-- `chio-custody-hw` - layers a transactional revocation cascade over
-  `InMemoryRevocationOracle` to gate hardware-custody capability minting.
-- `chio-credentials` - source of the passport-lifecycle events
-  `passport_bridge` consumes.
+Storage is in memory. Broadcasters are caller-driven, and the included queue
+can drop its oldest root when full. No scheduler or network transport runs here.
+Passport bridge keys use subject and revocation timestamp; passport ID is
+metadata and does not distinguish keys for equal subject/timestamp pairs.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol verification rules](../../../spec/PROTOCOL.md#53-verification-rules)
+- [Credentials](../chio-credentials/README.md)
+
+## License
+
+[Workspace license](../../../LICENSE)

@@ -1,73 +1,66 @@
 # chio-attest-buyer-core
 
-Offline verifier for Chio buyer/auditor proof packages. Given a proof package,
-a verifier trust bundle, and a verification context, it replays every
-cryptographic and policy check a buyer needs to accept a workflow's proof of
-execution, with no network access. It is the hardened verification core behind
-the public boundary crate `chio-attest-buyer`; most callers should depend on
-that crate instead of this one directly.
-
-## Responsibilities
-
-- Parse, canonically hash, and (de)serialize proof packages, verifier trust
-  bundles, verification contexts, trusted-issuer registries, and revocation
-  checkpoints (`proof_package`, `trust_bundle`, `context`, `issuer`,
-  `revocation`).
-- Replay a proof package end to end: workflow kernel signature and vendor
-  cosignatures, step-to-DSSE-to-receipt linkage, lease scope bindings and
-  capability leases, governance receipts and destructive-step authorization,
-  bilateral DSSE envelopes, and BBS selective-disclosure proofs (`report`).
-- Enforce revocation: verify a signed revocation checkpoint and reject any
-  peer, vendor, lease authority, governance authority, or BBS issuer key that
-  checkpoint revokes (`revocation`, `trust_bundle`).
-- Validate BBS disclosure policy and bind proof nonces to the verifier context
-  (`disclosure`, `context`).
-- Produce a `VerifierReport` that records which checks passed, or a stable
-  failure code and phase on rejection (`report`).
-
-## Public API
-
-- `proof_package::{ChioProofPackage, proof_package_from_json, package_json, package_sha256}`
-- `trust_bundle::{ChioVerifierTrustBundle, ChioVerifierTrustBundleDocument, verifier_trust_bundle_from_json, verifier_trust_bundle_json, verifier_trust_bundle_document_sha256}`
-- `context::{ChioVerificationContext, verification_context_from_json, verification_context_json, verification_context_sha256}`
-- `report::{VerifierReport, verify_package, verify_package_report, report_json, verifier_report_from_json}` - `verify_package` returns `Err` on the first failed check; `verify_package_report` always returns a report.
-- `issuer::{TrustedIssuerRegistry, TrustedIssuerRegistryDocument, trusted_issuer_registry_from_json, trusted_issuer_registry_json}`
-- `revocation::{ChioRevocationCheckpoint, ChioPinnedRevocationEpoch, ChioRevocationMaterial, SignedChioRevocationCheckpoint}`
-- `claims::{ChioProofClaims, PeerLadderBinding, VendorKeyBinding, WorkflowIntersectionArtifact, LeaseScopeBindingArtifact}`
-- `error::ChioPackageError`
+Offline verification of Chio workflow proof packages binds receipts,
+bilateral DSSE, leases, governance, and BBS disclosure to verifier-owned
+trust material and a challenge context. The crate returns an audit report
+without contacting a service or mutating admission authority.
 
 ## Usage
 
+Verify the repository's signed three-vendor fixture with its matching
+fixture trust bundle and context:
+
 ```rust
-use chio_attest_buyer_core::context::verification_context_from_json;
-use chio_attest_buyer_core::proof_package::proof_package_from_json;
-use chio_attest_buyer_core::report::verify_package_report;
-use chio_attest_buyer_core::trust_bundle::verifier_trust_bundle_from_json;
-
-let package = proof_package_from_json(&package_json)?;
-let trust_bundle = verifier_trust_bundle_from_json(&trust_bundle_json)?;
-let context = verification_context_from_json(&context_json)?;
-
-let report = verify_package_report(&package, &trust_bundle, &context);
-assert!(report.accepted);
+use chio_attest_buyer_core::{
+    context::verification_context_from_json,
+    proof_package::proof_package_from_json,
+    report::verify_package,
+    trust_bundle::verifier_trust_bundle_from_json,
+};
+let package = proof_package_from_json(include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+)))?;
+let trust = verifier_trust_bundle_from_json(include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../examples/chio-3vendor/fixtures/verifier-trust-bundle.json"
+)))?;
+let context = verification_context_from_json(include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../examples/chio-3vendor/fixtures/verification-context.json"
+)))?;
+assert!(verify_package(&package, &trust, &context)?.accepted);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Testing
+Production callers choose trust material independently of the submitted
+package and provide a fresh audience, challenge, purpose, and time window.
 
-`cargo test -p chio-attest-buyer-core`
+## Guarantees
 
-Tests load fixtures from `examples/chio-3vendor/fixtures/` via `include_str!`
-(proof package, verifier trust bundle, verification context), so those files
-must stay in sync with this crate's schemas.
+- `verify_package` checks workflow signatures and step links, pinned peer
+  and vendor hints, trusted leases and governance receipts, strict bilateral
+  invocation verification, and the context-bound BBS disclosure contract.
+- `ChioVerifierTrustBundle::from_document` requires nonempty trust families,
+  explicit active authority lifecycles, disclosure policy, and a signed
+  revocation checkpoint. Historical unsigned epoch input is rejected.
+- `verify_package_report` retains successful checks before a failure and
+  records hashes of the package, trust document, and context when available.
+- JSON readers apply a 16 MiB original-input bound and signed decoding.
+  `proof_package_from_json` parses; verification checks its schema and claims.
 
-## See also
+## Status
 
-- `chio-attest-buyer` - the public boundary crate; most callers should depend
-  on it instead of this crate directly.
-- `chio-runtime-core`, `chio-runtime-harness` - kernel-side and test-harness
-  callers that invoke this verifier directly for proof assembly and parity
-  checks.
-- `chio-selective-disclosure` - supplies the BBS+ projection, signing, and
-  proof primitives this crate verifies against.
-- `chio-cli` - uses these types and JSON codecs directly to build and inspect
-  trust-bundle and checkpoint documents.
+Implemented offline verifier with repository fixtures and a Criterion
+verification benchmark. Supported disclosure uses a BBS reveal set.
+Hidden range predicates, VC Data Integrity BBS interoperability, and zkVM
+claims are rejected. Verification time is pinned to checkpoint issuance;
+applications own wall-clock freshness and trusted checkpoint selection.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [chio-attest-buyer](../chio-attest-buyer/README.md)
+
+[License](../../../LICENSE)

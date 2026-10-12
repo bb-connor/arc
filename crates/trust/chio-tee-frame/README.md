@@ -1,54 +1,68 @@
 # chio-tee-frame
 
-`chio-tee-frame` defines the `chio-tee-frame.v1` wire format: the signed
-capture record a TEE runner emits per kernel decision. It owns the Rust types
-that mirror the JSON schema field-for-field (`frame`) and the structural,
-pattern, and signing invariants that gate construction and parsing (`schema`).
+Typed capture records and validation for `chio-tee-frame.v1`. The wire crate
+connects the `chio-tee` observation sidecar to replay consumers through
+canonical JSON, redacted blob hashes, verdict metadata, and tenant signatures.
 
-The crate is pure data: no I/O, no runtime state, `#![forbid(unsafe_code)]`.
-Encoding reuses `chio_core::canonical::canonical_json_bytes` (RFC 8785) so a
-frame signed in Rust round-trips byte-for-byte to verifiers in other
-languages. Capture itself lives in `chio-tee`; this crate only defines and
-validates the frame shape.
+## Usage
 
-## Responsibilities
+Create and sign a local frame, then validate it against the chosen tenant key:
 
-- Define `Frame` and its nested types (`Upstream`, `UpstreamSystem`,
-  `Provenance`, `Otel`, `Verdict`) matching the v1 JSON schema field-for-field.
-- Validate every structural and pattern invariant in the v1 schema
-  (`schema::validate`) and fail closed on the first violation.
-- Canonicalize a frame to RFC 8785 bytes and parse bytes back into a validated
-  `Frame` (`canonicalize`, `parse`).
-- Compute the canonical Ed25519 signing payload for a frame and verify an
-  embedded `tenant_sig` against a tenant public key (`signing_payload`,
-  `verify_tenant_sig`, `validate_signed`).
+```rust
+use base64::{engine::general_purpose::STANDARD, Engine};
+use chio_core::crypto::Keypair;
+use chio_tee_frame::{
+    canonicalize, parse, signing_payload, validate_signed,
+    Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict,
+};
+let key = Keypair::from_seed(&[7; 32]);
+let mut frame = Frame::build(FrameInputs {
+    event_id: "01H7ZZZZZZZZZZZZZZZZZZZZZZ".into(),
+    ts: "2026-04-25T18:02:11.418Z".into(), tee_id: "tee-local".into(),
+    upstream: Upstream {
+        system: UpstreamSystem::Mcp, operation: "tool.call".into(),
+        api_version: "1".into(),
+    },
+    invocation: serde_json::json!({"tool": "read"}),
+    provenance: Provenance {
+        otel: Otel { trace_id: "0".repeat(32), span_id: "0".repeat(16) },
+        supply_chain: None,
+    },
+    request_blob_sha256: "a".repeat(64), response_blob_sha256: "b".repeat(64),
+    redaction_pass_id: "local@1".into(), verdict: Verdict::Allow,
+    deny_reason: None, would_have_blocked: false,
+    tenant_sig: format!("ed25519:{}", STANDARD.encode([0u8; 64])),
+})?;
+frame.tenant_sig = format!("ed25519:{}",
+    STANDARD.encode(key.sign(&signing_payload(&frame)?).to_bytes()));
+let decoded = parse(&canonicalize(&frame)?)?;
+validate_signed(&decoded, &key.public_key_bytes())?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-## Public API
+The sample hashes are fixture metadata. Consumers separately retrieve and
+rehash referenced blobs, select trusted tenant keys, and enforce freshness.
 
-- `Frame`, `FrameInputs`, `FrameError` - the frame type, its builder input,
-  and build/parse errors. `Frame::build` validates before returning.
-- `Upstream`, `UpstreamSystem`, `Provenance`, `Otel`, `Verdict` - nested frame
-  types, re-exported at the crate root from `frame`.
-- `canonicalize(&Frame) -> Result<Vec<u8>, FrameError>`,
-  `parse(&[u8]) -> Result<Frame, FrameError>` - validate-and-encode to
-  canonical JSON, and decode-and-validate back.
-- `schema::{validate, validate_signed, verify_tenant_sig, signing_payload,
-  SchemaError, SCHEMA_ID, SCHEMA_VERSION}` - re-exported at the crate root;
-  `schema::upstream_system_from_str` is not.
-- `FRAME_VERSION` - the schema name literal `"chio-tee-frame.v1"`, distinct
-  from the wire `schema_version` field (`"1"`).
+## Guarantees
 
-## Testing
+- `Frame::build`, `parse`, and `canonicalize` validate structural invariants:
+  schema, identifiers, time format, object invocation, hashes, and reason gate.
+- `parse` bounds original JSON to 16 MiB and rejects duplicate members.
+- `signing_payload` excludes only `tenant_sig` from canonical frame bytes.
+  `validate_signed` adds Ed25519 verification using a caller-resolved key.
+- Deny/rewrite require a namespaced reason; allow requires its absence.
 
-`cargo test -p chio-tee-frame` runs the unit tests plus the round-trip
-proptest suite in `tests/property_roundtrip.rs` (256 cases per property by
-default; set `PROPTEST_CASES` to override).
+## Status
 
-## See also
+Implemented capture schema, canonical encoding, and signed validation.
+Structural parsing checks signature shape only. Signature verification does
+not authenticate external blob contents, supply-chain metadata, or verdict
+provenance; consumers provide those checks at their replay boundary.
 
-- `chio-core-types` (imported as `chio_core`) - supplies canonical JSON
-  encoding and Ed25519 verification primitives.
-- `chio-tee` - the shadow runner that captures kernel decisions and emits
-  `chio-tee-frame.v1` records using these types.
-- `chio-cli`, `chio-replay-corpus`, `chio-arena` - replay, corpus, and
-  scenario-promotion tooling that consumes captured frames.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol contract](../../../spec/PROTOCOL.md#41-canonical-json)
+- [chio-tee](../chio-tee/README.md)
+
+[License](../../../LICENSE)
