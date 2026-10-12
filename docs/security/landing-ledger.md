@@ -7,6 +7,63 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## October 12 follow-up landing wave
+
+The current source snapshot ends at [#1215](https://github.com/bb-connor/arc/pull/1215),
+merged as `be3f67aeb9` at 15:01:22Z. Live GitHub identities were checked at
+15:14Z. The JSON checkpoint `landing_wave_20261012` binds the full PR heads,
+merge commits, mapped-file hashes and retained evidence. All **2,029 original
+requirement objects** remain byte-exact and semantically unchanged. Their
+current mappings advance separately. Supplemental observations include T12
+without enrolling the scheduler plan's whole checklist or closing all of F007.
+
+| Scope | Landed PR | Merge | Scoped evidence |
+|-------|-----------|-------|-----------------|
+| Auditor REST/squash and release/nightly Drogon | [#1202](https://github.com/bb-connor/arc/pull/1202) | `6f681143e0` | 109 auditor regressions, workflow contracts and retained local C++/HTTP smoke. |
+| Recovery 100 ms lease fixture | [#1207](https://github.com/bb-connor/arc/pull/1207) | `af3f63f21d` | Claude reports a genuine 250 ms-delay Original, fixed-clock pass and strict lint. |
+| Cage default signals and ioctl, F103/F104 | [#1208](https://github.com/bb-connor/arc/pull/1208) | `bf5a1764c3` | Claude reports aarch64 cage-init 3/0, cage 35/0 (one ignored), strict lint and x86_64 OCI enforcement 40/40. |
+| Test-path/non-Rust fuzz zero-match disposition | [#1209](https://github.com/bb-connor/arc/pull/1209) | `f73d9a0afe` | Reported path controls, fuzz-selector, hard-halt and security-contract checks. |
+| SIEM alert delivery, F041 | [#1210](https://github.com/bb-connor/arc/pull/1210) | `e0dd757896` | Final 12/0 focused controls and strict all-target control-plane lint. |
+| Cage inventory companion | [#1211](https://github.com/bb-connor/arc/pull/1211) | `3d8e60cfb9` | Pins 114 all-target tests, 104 lane tests and 40 marker probes, with both new probes required by name; x86 inventory check reported. |
+| Producer tenant and cleanup admission, F045/T12 | [#1212](https://github.com/bb-connor/arc/pull/1212) | `9900a42a44` | 11/0 focused controls and strict all-target control-plane lint; tested and published Rust/Cargo inputs match. |
+| Seccompiler reconstruction, F080 | [#1213](https://github.com/bb-connor/arc/pull/1213) | `b925558bc1` | Claude reports 37/0 fork tests, four negative controls and strict lint on aarch64. |
+| Cage runtime fixture modes | [#1214](https://github.com/bb-connor/arc/pull/1214) | `ee3f8b2728` | Explicit 0644 fixtures and reported strict x86_64-target lint; repaired runtime campaign unestablished here. |
+| Caller-share index, F038 | [#1215](https://github.com/bb-connor/arc/pull/1215) | `be3f67aeb9` | 7/0 index/isolation and 17/0 delegated controls, strict all-target store lint, with the earlier 645 owning tests retained separately. |
+
+These merges followed Connor's October 12 instruction: Claude source review,
+relevant local focused checks and strict lint, without full hosted waits.
+The live API reports no rulesets and `main` unprotected. The wave does not
+establish four required green checks or protected landing. Greptile's quota-only
+responses contain no source-review verdict; the independent Claude/Root source
+reviews and actual-main handoffs remain preserved. Local logs are hash-bound
+in the JSON; earlier owning and reported native results retain their stated
+source and environment limits.
+
+F111's five protocol-primitive Loom models already have explicit nightly-only
+entries in `.loom/harnesses.toml`, a fail-closed manifest runner and advisory
+release posture. The current disposition retires the PR-tier step without
+restoring duplicate execution. It records source coverage, not a new Loom run
+or proof of production synchronization primitives.
+
+F060 remains addressed by the newer `FINAL-REVIEW-TRIPWIRE-INPUT` repair landed
+in #1160. All five component hashes still match through this source boundary;
+the older proposal remains superseded. F077 is retired by Connor's merge-policy
+decision. Its proposed test-merge-SHA gating behavior remains **unproved**.
+Future protection activation needs its own App/ruleset qualification.
+
+The three cage `UnsafeRuntimeFile` fixture failures remain historical failed
+evidence alongside #1214's source repair. The 104-test inventory pin does not
+claim that the complete native lane passed. F038 still incurs same-parent and
+unresolved funded-history costs; its external-writer omission allegation remains
+withdrawn. #1209 still rejects cfg(test)-only edits inside production files,
+including the original #1201 case.
+
+SDK/process corpus, wire contracts, F040 recovery-history bounds, F020 payment
+lock release and remaining P3 compositions are pending at this checkpoint.
+Trusted authorization and definition activation, committed Linux evidence,
+open proofs, broader native and cold-state acceptance, and operational readiness
+remain separate. Source landing does not complete those obligations.
+
 ## Auditor replacement composed on landed main (October 12 UTC)
 
 PR #1201 landed as squash `659283481e` at 14:19:10Z.
