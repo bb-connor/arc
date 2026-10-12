@@ -6,5 +6,6 @@ use super::{IdentityDisposition, KernelError};
 pub(crate) struct AdmissionStartFailure {
     #[source]
     pub(in crate::kernel) error: Box<KernelError>,
-    pub(in crate::kernel) disposition: IdentityDisposition,
+    /// A live operation cannot produce a new terminal refusal.
+    pub(in crate::kernel) receipt_disposition: Option<IdentityDisposition>,
 }

@@ -189,20 +189,14 @@ fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization
     }));
 
     let retained = store.operation();
-    let denial = recovered_kernel
+    let error = recovered_kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("identity substitution must produce a signed denial");
-    assert_eq!(denial.verdict, Verdict::Deny);
-    assert!(denial.output.is_none());
-    assert!(denial.receipt.verify_signature().expect("denial signature"));
+        .expect_err("identity substitution must preserve the original finalization");
     assert_eq!(
-        denial.reason.as_deref(),
-        Some(
-            format!(
-                "durable admission failed: request id conflicts with retained operation {}",
-                retained.binding().operation_id().as_str()
-            )
-            .as_str()
+        error.to_string(),
+        format!(
+            "durable admission failed: request id conflicts with retained operation {}",
+            retained.binding().operation_id().as_str()
         )
     );
     assert_eq!(store.operation(), retained);

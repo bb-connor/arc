@@ -570,7 +570,7 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
         transport: DispatchTransport,
     ) -> Result<Option<DurableToolAdmission>, AdmissionStartFailure> {
-        let mut disposition = IdentityDisposition::Reusable;
+        let mut receipt_disposition = Some(IdentityDisposition::Reusable);
         let result = (|| -> Result<_, KernelError> {
             self.validate_security_invocation_context_binding(request, security_context, None)?;
             let security_binding = self.admission_security_binding(security_context)?;
@@ -805,6 +805,7 @@ impl ChioKernel {
                 trusted_now_unix_ms / 1000,
             )?;
             let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+            receipt_disposition = None;
             let live_owner = runtime
                 .mutation_sequencer
                 .try_own_operation(prepared.binding().operation_id())?
@@ -828,7 +829,6 @@ impl ChioKernel {
                 .map_err(durable_store_error)?;
             let mutation_guard = runtime.lock_mutations()?;
             let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-            disposition = IdentityDisposition::Retained;
             let begun = match retained_request.as_ref() {
                 Some(retained) => runtime.store.begin_with_retained_tool_request(
                     &prepared,
@@ -841,7 +841,6 @@ impl ChioKernel {
                     .begin(&prepared, &runtime.fence, trusted_now_unix_ms),
             }
             .map_err(durable_store_error)?;
-            disposition = IdentityDisposition::Terminal;
             let operation = match begun {
                 AdmissionBeginResult::Created(operation) => operation,
                 AdmissionBeginResult::ExactReplay { operation, .. }
@@ -1034,7 +1033,9 @@ impl ChioKernel {
                     &operation,
                     trusted_now_unix_ms / 1_000,
                 ) {
-                    self.retire_expired_parked_admission(&operation, trusted_now_unix_ms)?;
+                    if self.retire_expired_parked_admission(&operation, trusted_now_unix_ms)? {
+                        receipt_disposition = Some(IdentityDisposition::Terminal);
+                    }
                     return Err(error);
                 }
             }
@@ -1050,9 +1051,23 @@ impl ChioKernel {
                 nonce_preflight,
             }))
         })();
-        result.map_err(|error| AdmissionStartFailure {
-            error: Box::new(error),
-            disposition,
+        result.map_err(|error| {
+            if matches!(
+                &error,
+                KernelError::AdmissionRecovery(failure)
+                    if matches!(
+                        failure.as_ref(),
+                        crate::admission_operation::AdmissionRecoveryError::Store(
+                            crate::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_)
+                        )
+                    )
+            ) {
+                receipt_disposition = Some(IdentityDisposition::Retained);
+            }
+            AdmissionStartFailure {
+                error: Box::new(error),
+                receipt_disposition,
+            }
         })
     }
 

@@ -433,6 +433,9 @@ impl ChioKernel {
         ) {
             Ok(admission) => admission,
             Err(error) => {
+                let Some(disposition) = error.receipt_disposition else {
+                    return Err(*error.error);
+                };
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable admission denied (nested flow)");
                 return self.build_deny_response_with_metadata(
@@ -442,7 +445,7 @@ impl ChioKernel {
                     None,
                     RefusalReceiptMetadata::new(
                         error.error.denied_metadata(&extra_metadata),
-                        error.disposition,
+                        disposition,
                     ),
                 );
             }

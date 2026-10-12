@@ -208,14 +208,14 @@ impl ChioKernel {
         &self,
         operation: &AdmissionOperationV1,
         trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
+    ) -> Result<bool, KernelError> {
         let deadline_unix_ms = operation
             .parked_approval_deadline_unix_ms()
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         let Some(deadline_unix_ms) =
             deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
         else {
-            return Ok(());
+            return Ok(false);
         };
         self.compensate_durable_admission_before_dispatch(
             operation,
@@ -226,7 +226,8 @@ impl ChioKernel {
             }),
             trusted_now_unix_ms,
             None,
-        )
+        )?;
+        Ok(true)
     }
 
     /// Terminalize a dispatch-committed admission whose outcome is unknown.
