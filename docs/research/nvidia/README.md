@@ -22,7 +22,7 @@ Statements about NVIDIA, OpenShell, the Open Delegation & Identity Standard (ODI
 | design doc | Chio | A design, proposal, specification draft or paper with no implementation. |
 | roadmap | Chio | Stated direction with no design behind it. Every plan task, demo, date and estimate is roadmap. |
 
-"Not documented" means the sources read say nothing on the point. Plan IDs (LW, D30, D60, D90, Q2, L) name tasks in [06-strategy-and-roadmap.md](06-strategy-and-roadmap.md), and F-1 to F-17 name the founder decisions listed below. Day 1 of the plan is 2026-09-30, and Q2 means days 91 to 180 (2026-12-29 to 2027-03-28), not a calendar quarter.
+"Not documented" means the sources read say nothing on the point. Plan IDs (LW, D30, D60, D90, Q2, L) name tasks in [06-strategy-and-roadmap.md](06-strategy-and-roadmap.md), and F-1 to F-16 name (F-17 is voided) the founder decisions listed below. Day 1 of the plan is 2026-09-30, and Q2 means days 91 to 180 (2026-12-29 to 2027-03-28), not a calendar quarter.
 
 ## The answer in one page
 
@@ -132,7 +132,7 @@ The recommendations are ours (INFERRED). Reasons and dependencies are in [06](06
 | F-14 | Sentry, DOCA and BlueField | No code before NVIDIA publishes an interface; take NVIDIA evidence through the Cloud Native Computing Foundation (CNCF) Confidential Containers Trustee | Yes |
 | F-15 | Co-signer custody | Backbay never hosts both co-signers. Treaty lanes (Chio's cross-organization federation lanes) enter the bounded release gate with the two-keys wording ("two distinct configured keys signed the same predicate"), and the relay or mTLS lane lands before 2026-12-31. | Yes |
 | F-16 | Kill-or-continue on 2027-03-26 | Hold it for the relying-party and cross-organization seats | Yes |
-| F-17 | Portfolio boundary, written by day 14 | Chio owns delegated authority and evidence. Backbay's Clawdstrike owns sensing, EDR (endpoint detection and response), response and any Sentry or DOCA detection work. HushSpec, published at [backbay-labs/hush](https://github.com/backbay-labs/hush/tree/6ca599ca8322a7cae6050086718ed5f3417c97e1), is the policy specification. | Yes |
+| F-17 | Voided | Withdrawn 2026-10-12. Clawdstrike is prior art that Chio absorbs, not a peer, so no portfolio boundary with it is written. HushSpec remains the policy specification. | Not applicable |
 
 ## Document map
 

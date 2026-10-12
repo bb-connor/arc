@@ -547,6 +547,7 @@ impl SqliteBudgetStore {
             self,
             request.clone(),
             outcome,
+            chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh,
             event_seq,
             event.recorded_at,
             usage_after,

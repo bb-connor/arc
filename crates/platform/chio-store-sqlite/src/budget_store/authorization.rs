@@ -187,7 +187,11 @@ impl SqliteBudgetStore {
                     "budget authorization event disappeared during transaction".to_string(),
                 )
             })?;
-            let decision = Self::authorize_event_decision(self, event)?;
+            let decision = Self::authorize_event_decision(
+                self,
+                event,
+                chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed,
+            )?;
             transaction.commit()?;
             return Ok(decision);
         }
@@ -313,7 +317,11 @@ impl SqliteBudgetStore {
             exposed_after,
             realized_after,
         )?;
-        let decision = Self::authorize_event_decision(self, event)?;
+        let decision = Self::authorize_event_decision(
+            self,
+            event,
+            chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh,
+        )?;
         transaction.commit()?;
         Ok(decision)
     }
@@ -437,6 +445,7 @@ impl SqliteBudgetStore {
     fn authorize_event_decision(
         &self,
         event: BudgetMutationRecord,
+        cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let committed_cost_units_after = checked_committed_cost_units(
             event.total_cost_exposed_after,
@@ -456,6 +465,7 @@ impl SqliteBudgetStore {
         if event.allowed == Some(true) {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
                 BudgetHoldAuthorizationRecord {
+                    cleanup_custody,
                     hold_id: event.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: event.exposure_units,

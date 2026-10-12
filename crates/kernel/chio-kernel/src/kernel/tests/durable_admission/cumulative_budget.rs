@@ -60,6 +60,18 @@ fn cumulative_approval_membership_does_not_change_operation_identity() {
 #[test]
 fn cumulative_approval_resumes_the_same_hold_and_dispatches_once(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    exercise_cumulative_approval(false)
+}
+
+#[test]
+fn cumulative_approval_cleanup_remains_owned_by_original_durable_admission(
+) -> Result<(), Box<dyn std::error::Error>> {
+    exercise_cumulative_approval(true)
+}
+
+fn exercise_cumulative_approval(
+    compensate_before_dispatch: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (mut kernel, mut request, store, invocations) =
         durable_admission_fixture("cumulative-approval-dispatch");
     let approver_a = CoreKeypair::generate();
@@ -178,11 +190,82 @@ fn cumulative_approval_resumes_the_same_hold_and_dispatches_once(
     approved.threshold_approval_proposal = Some(proposal);
     approved.approval_tokens = approval_tokens;
 
+    if compensate_before_dispatch {
+        let matching = resolve_required_matching_grants(
+            &approved.capability,
+            &approved.tool_name,
+            &approved.server_id,
+            &approved.arguments,
+            approved.model_metadata.as_ref(),
+        )?;
+        let now = current_unix_timestamp_ms();
+        let mut admission = kernel
+            .begin_durable_tool_admission(&approved, &matching, now)?
+            .expect("original cumulative admission");
+        let (_, mutation) = kernel
+            .check_and_increment_budget(
+                &approved,
+                &approved.capability,
+                &matching,
+                false,
+                Some(&mut admission),
+                now,
+            )?
+            .into_authorized()?;
+        let charge = mutation
+            .durable_hold_result()
+            .expect("approved cumulative hold");
+        assert_eq!(
+            charge.cleanup_custody,
+            crate::budget_store::BudgetHoldCleanupCustody::Unknown
+        );
+        assert!(kernel
+            .reverse_budget_charge(&approved.capability.id, charge)
+            .is_err());
+        assert_eq!(
+            admission.operation().state(),
+            AdmissionOperationState::BudgetAuthorized
+        );
+        kernel.compensate_durable_admission_before_dispatch(
+            admission.operation(),
+            serde_json::json!({"authority": "original-cumulative-admission-owner"}),
+            now + 1,
+            None,
+        )?;
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+        let budget = store.budget_store();
+        assert_eq!(
+            budget
+                .get_budget_hold(&charge.budget_hold_id)?
+                .expect("owned hold")
+                .disposition,
+            crate::budget_store::BudgetHoldDispositionView::Reversed
+        );
+        let usage = budget
+            .get_cumulative_approval_operation_usage(&operation_id)?
+            .expect("released cumulative operation");
+        assert_eq!(
+            usage.state,
+            crate::budget_store::BudgetCumulativeApprovalState::ReversedBeforeDispatch
+        );
+        assert_eq!(usage.reserved_authorized_after.units, 0);
+        assert_eq!(usage.captured_authorized_after.units, 0);
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        return Ok(());
+    }
+
     let response = kernel
         .evaluate_tool_call_blocking(&approved)
         .expect("approved cumulative dispatch");
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
     assert_eq!(
         store.operation().binding().operation_id().as_str(),
         operation_id

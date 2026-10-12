@@ -1232,6 +1232,7 @@ pub(crate) struct MatchingGrant<'a> {
 ///
 /// Carries the accounting info needed to populate FinancialReceiptMetadata.
 pub(crate) struct BudgetChargeResult {
+    cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody,
     grant_index: usize,
     cost_charged: u64,
     currency: String,

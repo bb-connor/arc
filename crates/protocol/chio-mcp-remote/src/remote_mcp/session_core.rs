@@ -276,41 +276,6 @@ struct RemoteSessionDiagnosticRecord {
     terminal_reason: Option<TerminalReason>,
 }
 
-/// Why a session became terminal. A `v3` terminal record carries it, so the
-/// two subscription failures stay distinct from an ordinary close.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum TerminalReason {
-    Deleted,
-    Expired,
-    Closed,
-    /// A standard subscription failed re-authorization before activation.
-    SubscriptionNotRestored,
-    /// A standard subscription lost its authority after activation.
-    SubscriptionAuthorityLost,
-}
-
-impl TerminalReason {
-    fn state(self) -> RemoteSessionState {
-        match self {
-            Self::Deleted => RemoteSessionState::Deleted,
-            Self::Expired => RemoteSessionState::Expired,
-            Self::Closed | Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost => {
-                RemoteSessionState::Closed
-            }
-        }
-    }
-
-    /// A `v2` record has no reason field, so only the `v3` envelope can say
-    /// which subscription failure ended the session.
-    fn requires_v3(self) -> bool {
-        matches!(
-            self,
-            Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost
-        )
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct RemoteSessionResumeRecord {
     session_id: String,
@@ -331,30 +296,6 @@ struct RemoteSessionResumeRecord {
     subscriptions: Vec<PersistedSubscription>,
     resume_generation: u64,
     resume_integrity: RemoteSessionIntegrityTag,
-}
-
-/// A client subscription the resume record carries across restore.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-enum PersistedSubscription {
-    /// A standard MCP `resources/subscribe`, keyed by URI within the session.
-    Standard { uri: String, capability_id: String },
-}
-
-/// Integrity envelope a signed session record names. An absent value is `v2`,
-/// so records written before the discriminator keep their exact bytes.
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum RemoteSessionEnvelope {
-    #[default]
-    V2,
-    V3,
-}
-
-impl RemoteSessionEnvelope {
-    fn is_v2(&self) -> bool {
-        *self == Self::V2
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -1114,6 +1055,16 @@ mod session_core_factory;
 mod session_core_ledger;
 #[path = "session_core/session.rs"]
 mod session_core_session;
+
+#[path = "session_core/envelope.rs"]
+mod session_core_envelope;
+use session_core_envelope::{PersistedSubscription, RemoteSessionEnvelope, ResumeEnvelopeRatchet};
+#[path = "session_core/terminal_reason.rs"]
+mod session_core_terminal_reason;
+use session_core_terminal_reason::{
+    sign_terminal_session_records, validate_terminal_fence_integrity,
+    validate_terminal_tombstone_integrity, TerminalReason,
+};
 
 #[path = "session_core/writer.rs"]
 mod session_core_writer;

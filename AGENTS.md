@@ -52,6 +52,7 @@ cargo fmt --all -- --check
 - **Serialization**: canonical JSON (RFC 8785) for all signed payloads.
 - **Commit messages**: conventional commits (`feat:`, `fix:`, `docs:`, `test:`, etc.).
 - **No em dashes** in code, comments, or documentation. Use hyphens or parentheses.
+- **No legacy or backward compatibility.** Chio has not shipped, so nothing outside this repository depends on an old API, wire format or schema. When an interface changes, change every caller and delete the old path in the same PR. Do not add legacy adapters, deprecated aliases, dual APIs, default trait methods that preserve an old shape, `Legacy*` test doubles, version fallbacks for unshipped formats, or migrations from unshipped schema versions. The one exception is interop with an external protocol revision that Chio must speak (for example an older MCP revision a current client still sends); name the external revision in the code.
 
 ## Key Files
 

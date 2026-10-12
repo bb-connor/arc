@@ -1086,6 +1086,9 @@ impl ChioKernel {
         ),
         PreDispatchMonetaryUnwindFailure,
     > {
+        if let Some(charge) = charge_result {
+            super::validation::ensure_fresh_budget_cleanup_custody(charge)?;
+        }
         let mut unwind_evidence = None;
         if let Some(authorization) = payment_authorization {
             // Authorization and crash recovery use the immutable operation ID.

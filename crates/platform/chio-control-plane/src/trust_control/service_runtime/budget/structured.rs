@@ -291,6 +291,7 @@ impl RemoteBudgetStore {
                     ));
                 }
                 BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
+                    cleanup_custody: response.cleanup_custody,
                     hold_id: mutation.hold_id.clone(),
                     admission_binding: mutation.admission_binding.clone(),
                     authorized_exposure_units: mutation.exposure_units,

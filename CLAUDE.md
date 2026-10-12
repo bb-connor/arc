@@ -24,6 +24,7 @@ Run this before declaring a change ready. `cargo build --workspace` can take sev
 
 - No em dashes (U+2014) anywhere in code, comments, or documentation. Use hyphens (`-`) or parentheses.
 - Fail-closed: errors deny access. Invalid policies reject at load time.
+- No legacy or backward compatibility: Chio has not shipped. Change every caller and delete the old path in the same PR; no legacy adapters, deprecated aliases, dual APIs, compat default methods, `Legacy*` test doubles, or migrations from unshipped formats. Only interop with an external protocol revision is allowed, and it must name that revision. See AGENTS.md.
 - Clippy: `unwrap_used = "deny"` and `expect_used = "deny"` are enforced workspace-wide.
 - Commits follow conventional commits (`feat:`, `fix:`, `docs:`, `test:`, etc.).
 

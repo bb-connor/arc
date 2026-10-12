@@ -695,6 +695,7 @@ fn assert_package_valid_allow_receipt(
 
 pub(super) fn make_fabricated_drop_charge() -> BudgetChargeResult {
     BudgetChargeResult {
+        cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody::Fresh,
         grant_index: 0,
         cost_charged: 5,
         currency: "USD".to_string(),
