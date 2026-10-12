@@ -15,6 +15,21 @@ struct RequiredSource {
 // checks. Keep their callers: a forwarding wrapper cannot cover a helper body.
 const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs",
+        symbols: &[
+            "EvidenceRecovery::acquire",
+            "EvidenceRecovery::acquire_for_dispatched_child",
+            "EvidenceRecovery::ensure_worker_running",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation/runtime.rs",
+        symbols: &[
+            "ChioKernel::acquire_post_effect_evidence_slot_for",
+            "ChioKernel::acquire_dispatched_child_evidence_slot",
+        ],
+    },
+    RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/receipt_namespace.rs",
         symbols: &[
             "ChioKernel::authenticated_receipt_namespace",
