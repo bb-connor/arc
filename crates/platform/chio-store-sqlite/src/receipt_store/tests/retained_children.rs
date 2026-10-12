@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use chio_core::ChildRequestReceipt;
+use chio_core::receipt::lineage::ChildRequestReceipt;
 use chio_kernel::{ReceiptStore, ReceiptStoreError};
 
 use super::support::{
