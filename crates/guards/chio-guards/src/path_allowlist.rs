@@ -622,6 +622,18 @@ mod tests {
     }
 
     #[test]
+    fn allowlist_pattern_forms_that_reach_absolute_paths() {
+        let wide = PathAllowlistGuard::with_config(enabled_config(vec!["**"], vec![], vec![]));
+        assert!(wide.is_file_access_allowed("/workspace/project/src/lib.rs"));
+        assert!(wide.is_file_access_allowed("README.md"));
+
+        let rooted =
+            PathAllowlistGuard::with_config(enabled_config(vec!["/workspace/**"], vec![], vec![]));
+        assert!(rooted.is_file_access_allowed("/workspace/project/src/lib.rs"));
+        assert!(!rooted.is_file_access_allowed("/etc/passwd"));
+    }
+
+    #[test]
     fn session_roots_allow_in_root_access_when_other_checks_pass() {
         let guard = PathAllowlistGuard::new();
         let kp = chio_core::crypto::Keypair::generate();

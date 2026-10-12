@@ -320,13 +320,11 @@ impl ChioMcpEdge {
             .map(|binding| serde_json::to_value(&binding.tool).unwrap_or_else(|_| json!({})))
             .collect::<Vec<_>>();
 
-        jsonrpc_result(
-            id,
-            json!({
-                "tools": tools,
-                "nextCursor": next_cursor,
-            }),
-        )
+        let mut result = serde_json::Map::new();
+        result.insert("tools".to_string(), Value::Array(tools));
+        insert_next_cursor(&mut result, next_cursor);
+
+        jsonrpc_result(id, Value::Object(result))
     }
 
     pub(super) fn handle_resources_list(&mut self, id: Value, params: Value) -> Value {

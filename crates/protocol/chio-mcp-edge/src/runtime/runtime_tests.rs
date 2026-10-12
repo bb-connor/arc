@@ -1964,6 +1964,44 @@ fn initialize_rejects_non_object_params_without_opening_session() {
 }
 
 #[test]
+fn tools_list_includes_next_cursor_only_when_another_page_remains() {
+    let mut edge = make_edge(1);
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }));
+
+    let first_page = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }))
+        .unwrap();
+    assert_eq!(first_page["result"]["tools"].as_array().unwrap().len(), 1);
+    assert_eq!(first_page["result"]["nextCursor"], "1");
+
+    let last_page = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/list",
+            "params": { "cursor": "1" }
+        }))
+        .unwrap();
+    assert_eq!(last_page["result"]["tools"].as_array().unwrap().len(), 1);
+    assert!(last_page["result"].get("nextCursor").is_none());
+}
+
+#[test]
 fn tools_list_is_paginated() {
     let mut edge = make_edge(2);
     let _ = edge.handle_jsonrpc(json!({
@@ -1987,7 +2025,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(first_page["result"]["tools"].as_array().unwrap().len(), 2);
-    assert!(first_page["result"]["nextCursor"].is_null());
+    assert!(first_page["result"].get("nextCursor").is_none());
     assert!(
         first_page["result"]["tools"][0]["annotations"]["readOnlyHint"]
             .as_bool()
@@ -2011,7 +2049,7 @@ fn tools_list_is_paginated() {
         }))
         .unwrap();
     assert_eq!(second_page["result"]["tools"].as_array().unwrap().len(), 0);
-    assert!(second_page["result"]["nextCursor"].is_null());
+    assert!(second_page["result"].get("nextCursor").is_none());
 }
 
 #[test]
