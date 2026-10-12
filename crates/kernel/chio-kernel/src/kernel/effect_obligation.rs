@@ -71,8 +71,8 @@ pub(in crate::kernel) struct Discharged<'a> {
 enum Delivery<'a> {
     Receipt(Box<ReceiptDelivery<'a>>),
     Durable(Box<DurableDelivery<'a>>),
-    Buffered,
-    Saga,
+    Buffered(Option<Box<KernelError>>),
+    Saga(Option<Box<KernelError>>),
     OwnershipFailure(Box<KernelError>),
 }
 
@@ -97,13 +97,15 @@ struct DurableDelivery<'a> {
 struct PostEffectError {
     step: &'static str,
     code: String,
+    source: KernelError,
 }
 
 impl PostEffectError {
-    fn at(step: &'static str, error: &KernelError) -> Self {
+    fn at(step: &'static str, error: KernelError) -> Self {
         Self {
             step,
             code: error.report().code,
+            source: error,
         }
     }
 }
@@ -185,7 +187,7 @@ impl<'a> PostEffectObligation<'a> {
                 obligation: self,
                 error: PostEffectError::at(
                     "receipt_binding",
-                    &KernelError::Internal("post-effect owner lost its live custody".into()),
+                    KernelError::Internal("post-effect owner lost its live custody".into()),
                 ),
                 original: None,
             }));
@@ -195,7 +197,7 @@ impl<'a> PostEffectObligation<'a> {
         if let Err(error) = binding.validate_receipt(receipt) {
             return Err(Box::new(Undischarged {
                 obligation: self,
-                error: PostEffectError::at("receipt_binding", &error),
+                error: PostEffectError::at("receipt_binding", error),
                 original: None,
             }));
         }
@@ -206,7 +208,7 @@ impl<'a> PostEffectObligation<'a> {
                     obligation: self,
                     error: PostEffectError::at(
                         "receipt_content",
-                        &KernelError::ReceiptSigningFailed(error.to_string()),
+                        KernelError::ReceiptSigningFailed(error.to_string()),
                     ),
                     original: None,
                 }))
@@ -222,7 +224,7 @@ impl<'a> PostEffectObligation<'a> {
             Err(error) => {
                 return Err(Box::new(Undischarged {
                     obligation: self,
-                    error: PostEffectError::at("append", &error),
+                    error: PostEffectError::at("append", error),
                     original: None,
                 }))
             }
@@ -261,13 +263,17 @@ impl<'a> PostEffectObligation<'a> {
                         self.submitted = None;
                         (error, None)
                     }
-                    ReceiptAppendFailure::OutcomeUnknown { source, .. } => {
-                        (source, self.submitted.take())
-                    }
+                    ReceiptAppendFailure::OutcomeUnknown { source, .. } => (
+                        KernelError::ReceiptAppendOutcomeUnknown {
+                            receipt_id: receipt.id.clone(),
+                            source: Box::new(source),
+                        },
+                        self.submitted.take(),
+                    ),
                 };
                 return Err(Box::new(Undischarged {
                     obligation: self,
-                    error: PostEffectError::at("append", &error),
+                    error: PostEffectError::at("append", error),
                     original,
                 }));
             }
@@ -279,7 +285,7 @@ impl<'a> PostEffectObligation<'a> {
                 obligation: self,
                 error: PostEffectError::at(
                     "append_acknowledgement",
-                    &KernelError::Internal("acknowledged receipt lost its live custody".into()),
+                    KernelError::Internal("acknowledged receipt lost its live custody".into()),
                 ),
                 original: Some(original),
             }));
@@ -302,6 +308,7 @@ impl<'a> PostEffectObligation<'a> {
     }
 
     fn fail(mut self, error: PostEffectError, original: Option<UnknownAppend>) -> Discharged<'a> {
+        let PostEffectError { step, code, source } = error;
         if original.is_some() {
             self.submitted.clone_from(&original);
         }
@@ -310,13 +317,30 @@ impl<'a> PostEffectObligation<'a> {
                 return self.ownership_failure("durable_fault_handoff");
             };
             let binding = parts.inputs.prepared.binding.clone();
+            if let Some(admission) = parts.inputs.admission.as_ref() {
+                // This commits only the original saga's incident. The helper
+                // refuses when a tool outcome already exists, so an uncertain
+                // return write cannot create a competing unknown terminal.
+                if let Err(terminal_error) = self.kernel.terminalize_dispatch_committed_admission(
+                    admission.operation(),
+                    parts
+                        .inputs
+                        .prepared
+                        .evaluation_timestamp
+                        .saturating_mul(1_000),
+                ) {
+                    tracing::warn!(request_id = %binding.request_id, code = %terminal_error.report().code,
+                        audit_fault = "durable_unknown_terminal_pending",
+                        "original saga retains its incident or recorded return");
+                }
+            }
             buffer_durable_children(self.kernel, &mut parts);
-            tracing::warn!(request_id = %binding.request_id, step = error.step, code = %error.code,
+            tracing::warn!(request_id = %binding.request_id, step, code = %code,
                 audit_fault = "durable_post_effect_reconciliation", "durable saga retains terminal ownership");
             return Discharged {
                 kernel: self.kernel,
                 binding,
-                delivery: Some(Delivery::Saga),
+                delivery: Some(Delivery::Saga(Some(Box::new(source)))),
             };
         }
         let Some(parts) = self.parts.as_mut() else {
@@ -325,10 +349,26 @@ impl<'a> PostEffectObligation<'a> {
         let Some(fault) = parts.inputs.prepared.fault.as_mut() else {
             return self.ownership_failure("reserved_fault_template");
         };
+        let deferred_error =
+            step == "credential_commit" || matches!(&source, KernelError::Clock(_));
+        if step == "credential_commit" {
+            fault.body.decision = Some(Decision::Cancelled {
+                reason: "dispatch credential commit failed after tool execution".into(),
+            });
+            fault.body.metadata = merge_metadata_objects(
+                fault.body.metadata.take(),
+                Some(serde_json::json!({
+                    "chio_runtime": {
+                        "dispatch_credential_retention_outcome_unknown": true,
+                        "payment_credential_disposition": "retention_outcome_unknown"
+                    }
+                })),
+            );
+        }
         fault.body.metadata = merge_metadata_objects(
             fault.body.metadata.take(),
             Some(serde_json::json!({
-                "chio_runtime": { "post_effect_fault": { "step": error.step, "code": error.code,
+                "chio_runtime": { "post_effect_fault": { "step": step, "code": code,
                     "original_receipt_id": original.as_ref().map(|identity| identity.id.as_str()) } }
             })),
         );
@@ -339,12 +379,7 @@ impl<'a> PostEffectObligation<'a> {
                 .map_err(KernelError::from)
                 .and_then(|now| {
                     fault.body.timestamp = now.as_secs();
-                    fault.body.metadata = merge_metadata_objects(
-                        fault.body.metadata.take(),
-                        Some(serde_json::json!({
-                            "chio_runtime": { "post_effect_fault": { "observed_at": now.get() } }
-                        })),
-                    );
+                    fault.observe_fault_timestamp(now.get());
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         if !self
                             .kernel
@@ -376,16 +411,28 @@ impl<'a> PostEffectObligation<'a> {
                 });
             if let Ok(receipt) = signed {
                 let prepared = fault_response(receipt, &parts.inputs.request.request_id);
-                match self.commit_terminal_receipt(prepared, false, None) {
+                match self.commit_terminal_receipt(
+                    prepared,
+                    false,
+                    deferred_error.then_some(source),
+                ) {
                     Ok(discharged) => return discharged,
-                    Err(failed) => return failed.obligation.buffer(failed.original),
+                    Err(failed) => {
+                        return failed
+                            .obligation
+                            .buffer(failed.original, Some(failed.error.source))
+                    }
                 }
             }
         }
-        self.buffer(original)
+        self.buffer(original, Some(source))
     }
 
-    fn buffer(mut self, original: Option<UnknownAppend>) -> Discharged<'a> {
+    fn buffer(
+        mut self,
+        original: Option<UnknownAppend>,
+        source: Option<KernelError>,
+    ) -> Discharged<'a> {
         if original.is_some() {
             self.submitted.clone_from(&original);
         }
@@ -418,7 +465,7 @@ impl<'a> PostEffectObligation<'a> {
         Discharged {
             kernel: self.kernel,
             binding,
-            delivery: Some(Delivery::Buffered),
+            delivery: Some(Delivery::Buffered(source.map(Box::new))),
         }
     }
 }
@@ -543,16 +590,18 @@ impl<'a> Discharged<'a> {
                 Self {
                     kernel: self.kernel,
                     binding: expected,
-                    delivery: Some(Delivery::Buffered),
+                    delivery: Some(Delivery::Buffered(None)),
                 }
             }
             Some(Delivery::Durable(_)) => Self {
                 kernel: self.kernel,
                 binding: expected,
-                delivery: Some(Delivery::Saga),
+                delivery: Some(Delivery::Saga(None)),
             },
             Some(
-                delivery @ (Delivery::Buffered | Delivery::Saga | Delivery::OwnershipFailure(_)),
+                delivery @ (Delivery::Buffered(_)
+                | Delivery::Saga(_)
+                | Delivery::OwnershipFailure(_)),
             ) => {
                 // Non-receipt discharges already transferred their evidence to
                 // the buffer or durable saga. Withhold delivery on the mismatch.
@@ -576,10 +625,14 @@ impl<'a> Discharged<'a> {
         })?;
         match delivery {
             Delivery::OwnershipFailure(error) => Err(*error),
-            Delivery::Buffered => Err(KernelError::PostEffectFaultLatched {
-                request_id: self.binding.request_id.clone(),
-            }),
-            Delivery::Saga => Err(match self.binding.operation_id.clone() {
+            Delivery::Buffered(source) => Err(source.map_or_else(
+                || KernelError::PostEffectFaultLatched {
+                    request_id: self.binding.request_id.clone(),
+                },
+                |source| *source,
+            )),
+            Delivery::Saga(Some(source)) => Err(*source),
+            Delivery::Saga(None) => Err(match self.binding.operation_id.clone() {
                 Some(operation_id) => KernelError::DurableOutcomePending { operation_id },
                 None => {
                     KernelError::Internal("durable discharge lost its operation binding".into())
@@ -683,9 +736,7 @@ impl<'a> Discharged<'a> {
                     Err(error) => {
                         tracing::warn!(operation_id = %admission.operation_id(), code = %error.report().code,
                             audit_fault = "durable_post_effect_finalization_pending", "original durable return retains terminal ownership");
-                        Err(KernelError::DurableOutcomePending {
-                            operation_id: admission.operation_id().to_owned(),
-                        })
+                        Err(error)
                     }
                 }
             }

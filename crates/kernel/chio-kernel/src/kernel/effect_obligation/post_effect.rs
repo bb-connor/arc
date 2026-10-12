@@ -3,7 +3,7 @@
 use super::*;
 
 fn failure(step: &'static str, error: KernelError) -> PostEffectError {
-    PostEffectError::at(step, &error)
+    PostEffectError::at(step, error)
 }
 
 pub(super) fn run<'a>(

@@ -231,6 +231,24 @@ pub(super) fn fault_response(receipt: ChioReceipt, request_id: &str) -> Prepared
 }
 
 impl PreparedFaultReceipt {
+    pub(in crate::kernel) fn observe_fault_timestamp(&mut self, observed_at: u64) {
+        let mut fault = self
+            .body
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/post_effect_fault"))
+            .and_then(serde_json::Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        retain_bounded_reference(&mut fault, "observed_at", &serde_json::json!(observed_at));
+        self.body.metadata = merge_metadata_objects(
+            self.body.metadata.take(),
+            Some(serde_json::json!({
+                "chio_runtime": { "post_effect_fault": fault }
+            })),
+        );
+    }
+
     pub(in crate::kernel) fn observe_payment_result(
         &mut self,
         authorization: &PaymentAuthorization,

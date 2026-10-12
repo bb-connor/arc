@@ -188,6 +188,39 @@ fn release_replaces_an_omitted_capture_reference_without_stale_companions() {
 }
 
 #[test]
+fn fault_timestamp_retains_the_deciding_step_code_and_original_identity() {
+    let (_, mut fault, keypair) = fixture();
+    fault.body.metadata = merge_metadata_objects(
+        fault.body.metadata.take(),
+        Some(serde_json::json!({
+            "chio_runtime": { "post_effect_fault": {
+                "step": "append", "code": "CHIO-KERNEL-RECEIPT-PERSISTENCE",
+                "original_receipt_id": "original-acknowledgement"
+            }}
+        })),
+    );
+    fault.observe_fault_timestamp(1_700_000_001_000);
+    let receipt = ChioReceipt::sign(fault.body, &keypair).unwrap();
+    let metadata = receipt.metadata.unwrap();
+    assert_eq!(
+        metadata.pointer("/chio_runtime/post_effect_fault/step"),
+        Some(&serde_json::json!("append"))
+    );
+    assert_eq!(
+        metadata.pointer("/chio_runtime/post_effect_fault/code"),
+        Some(&serde_json::json!("CHIO-KERNEL-RECEIPT-PERSISTENCE"))
+    );
+    assert_eq!(
+        metadata.pointer("/chio_runtime/post_effect_fault/original_receipt_id"),
+        Some(&serde_json::json!("original-acknowledgement"))
+    );
+    assert_eq!(
+        metadata.pointer("/chio_runtime/post_effect_fault/observed_at"),
+        Some(&serde_json::json!(1_700_000_001_000_u64))
+    );
+}
+
+#[test]
 fn unpredictable_payment_references_are_bounded_and_exactly_hashed() {
     let (_, mut fault, keypair) = fixture();
     let reference = "é".repeat(257);
