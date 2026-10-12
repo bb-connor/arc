@@ -1,0 +1,190 @@
+{
+ "version": 1,
+ "network_policies": {
+  "echo_guarded": {
+   "name": "echo guarded",
+   "endpoints": [
+    {
+     "host": "host.openshell.internal",
+     "port": 27604,
+     "protocol": "rest",
+     "enforcement": "enforce",
+     "rules": [
+      {
+       "allow": {
+        "method": "POST",
+        "path": "/echo"
+       }
+      },
+      {
+       "allow": {
+        "method": "GET",
+        "path": "/echo"
+       }
+      }
+     ]
+    }
+   ],
+   "binaries": [
+    {
+     "path": "/usr/bin/curl"
+    },
+    {
+     "path": "/usr/local/bin/python3.13"
+    }
+   ]
+  },
+  "echo_baseline": {
+   "name": "echo baseline",
+   "endpoints": [
+    {
+     "host": "host.docker.internal",
+     "port": 27604,
+     "protocol": "rest",
+     "enforcement": "enforce",
+     "rules": [
+      {
+       "allow": {
+        "method": "POST",
+        "path": "/echo"
+       }
+      },
+      {
+       "allow": {
+        "method": "GET",
+        "path": "/echo"
+       }
+      }
+     ]
+    }
+   ],
+   "binaries": [
+    {
+     "path": "/usr/bin/curl"
+    },
+    {
+     "path": "/usr/local/bin/python3.13"
+    }
+   ]
+  },
+  "mcp_guarded": {
+   "name": "mcp guarded",
+   "endpoints": [
+    {
+     "host": "host.openshell.internal",
+     "port": 27605,
+     "path": "/mcp",
+     "protocol": "mcp",
+     "enforcement": "enforce",
+     "rules": [
+      {
+       "allow": {
+        "method": "initialize"
+       }
+      },
+      {
+       "allow": {
+        "method": "notifications/initialized"
+       }
+      },
+      {
+       "allow": {
+        "method": "tools/list"
+       }
+      },
+      {
+       "allow": {
+        "method": "ping"
+       }
+      },
+      {
+       "allow": {
+        "method": "tools/call",
+        "tool": "file_read"
+       }
+      }
+     ],
+     "deny_rules": [
+      {
+       "method": "tools/call",
+       "tool": "delete_resource"
+      }
+     ]
+    }
+   ],
+   "binaries": [
+    {
+     "path": "/usr/bin/curl"
+    },
+    {
+     "path": "/usr/local/bin/python3.13"
+    }
+   ]
+  },
+  "chio_edge": {
+   "name": "chio edge real",
+   "endpoints": [
+    {
+     "host": "host.openshell.internal",
+     "port": 27607,
+     "path": "/mcp",
+     "protocol": "mcp",
+     "enforcement": "enforce",
+     "rules": [
+      {
+       "allow": {
+        "method": "initialize"
+       }
+      },
+      {
+       "allow": {
+        "method": "notifications/initialized"
+       }
+      },
+      {
+       "allow": {
+        "method": "tools/list"
+       }
+      },
+      {
+       "allow": {
+        "method": "ping"
+       }
+      },
+      {
+       "allow": {
+        "method": "tools/call"
+       }
+      }
+     ]
+    }
+   ],
+   "binaries": [
+    {
+     "path": "/usr/bin/curl"
+    },
+    {
+     "path": "/usr/local/bin/python3.13"
+    }
+   ]
+  }
+ },
+ "network_middlewares": {
+  "chio-authority": {
+   "name": "Chio authority kernel spike",
+   "middleware": "chio-spike",
+   "order": 10,
+   "on_error": "fail_closed",
+   "endpoints": {
+    "include": [
+     "host.openshell.internal"
+    ]
+   },
+   "config": {
+    "mode": "chio",
+    "trusted_issuers": [],
+    "policy_ref": "chio-pol-A"
+   }
+  }
+ }
+}

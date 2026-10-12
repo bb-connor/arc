@@ -1,0 +1,10 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+capabilities:
+  default:
+    tools:
+      - server: chio-files
+        tool: echo_json
+        operations: [invoke]
+        ttl: 300
