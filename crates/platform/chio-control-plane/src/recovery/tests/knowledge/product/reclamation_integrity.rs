@@ -171,12 +171,12 @@ async fn refuses_corrupt_retained_terminal(fault: TerminalFault) -> TestResult {
         TerminalFault::ProjectionLoss => {
             let trigger: String = connection.query_row(
                 "SELECT sql FROM main.sqlite_schema WHERE type='trigger'
-                 AND name='admission_operation_recovery_no_delete'",
+                 AND name='admission_operation_recovery_records_no_delete'",
                 [],
                 |row| row.get(0),
             )?;
             connection.pragma_update(None, "foreign_keys", false)?;
-            connection.execute_batch("DROP TRIGGER main.admission_operation_recovery_no_delete")?;
+            connection.execute_batch("DROP TRIGGER main.admission_operation_recovery_records_no_delete")?;
             assert_eq!(
                 connection.execute(
                     "DELETE FROM main.admission_operation_recovery_records WHERE record_key=?1",

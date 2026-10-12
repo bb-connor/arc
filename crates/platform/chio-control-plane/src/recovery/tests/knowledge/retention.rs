@@ -495,11 +495,11 @@ fn reference_readiness_refusal(remove: bool) -> TestResult {
     if remove {
         let trigger: String = connection.query_row(
             "SELECT sql FROM sqlite_master WHERE type='trigger'
-             AND name='admission_operation_recovery_no_delete'",
+             AND name='admission_operation_recovery_records_no_delete'",
             [],
             |row| row.get(0),
         )?;
-        connection.execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+        connection.execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete")?;
         assert_eq!(
             connection.execute(
                 "DELETE FROM admission_operation_recovery_records WHERE record_key=?1",

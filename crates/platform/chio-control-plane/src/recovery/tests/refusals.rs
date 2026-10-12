@@ -49,7 +49,7 @@ async fn recovery_protected_identity_and_history_tampering_fail_closed() -> Test
     for mutation in [
         "UPDATE admission_operation_recovery_records SET payload=CAST(replace(CAST(payload AS TEXT),'private-canary','foreign-canary') AS BLOB) WHERE kind='workflow'",
         "UPDATE admission_operation_recovery_records SET native_namespace=NULL,native_request=NULL WHERE kind='workflow'",
-        "DROP TRIGGER admission_operation_recovery_no_delete; DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
+        "DROP TRIGGER admission_operation_recovery_records_no_delete; DELETE FROM admission_operation_recovery_records WHERE kind='workflow'",
         "DROP TRIGGER admission_operation_recovery_event_no_update; UPDATE admission_operation_recovery_events SET event_digest=printf('%064d',0) WHERE sequence=1",
     ] {
         let f = RecoveryFixture::new(false)?;

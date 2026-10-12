@@ -1701,7 +1701,7 @@ fn damage_retained_review_source(
     let tx = connection.transaction()?;
     let trigger = match damage {
         RetainedSourceDamage::EventDigest => "admission_operation_recovery_event_no_update",
-        RetainedSourceDamage::WorkflowProjection => "admission_operation_recovery_no_delete",
+        RetainedSourceDamage::WorkflowProjection => "admission_operation_recovery_records_no_delete",
     };
     let actual_sql: String = tx.query_row(
         "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name=?1",
@@ -1722,7 +1722,7 @@ fn damage_retained_review_source(
             )?
         }
         RetainedSourceDamage::WorkflowProjection => {
-            tx.execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+            tx.execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete")?;
             tx.execute(
                 "DELETE FROM admission_operation_recovery_records
                  WHERE record_key=?1 AND kind='workflow'",

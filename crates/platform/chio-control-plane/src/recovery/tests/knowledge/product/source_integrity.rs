@@ -244,7 +244,7 @@ async fn a_current_native_reader_gets_unavailable_when_retained_report_projectio
     assert!(physical.5.is_none() && physical.6.is_none());
     assert_eq!(physical.4, chio_core_types::canonical_json_bytes(&first)?);
     let trigger: String = connection.query_row(
-        "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name='admission_operation_recovery_no_delete'",
+        "SELECT sql FROM sqlite_schema WHERE type='trigger' AND name='admission_operation_recovery_records_no_delete'",
         [], |row| row.get(0),
     )?;
     connection.pragma_update(None, "foreign_keys", false)?;
@@ -256,7 +256,7 @@ async fn a_current_native_reader_gets_unavailable_when_retained_report_projectio
     // Simulate one lost projection in this owned fixture. This grants no native
     // mutation or recovery role, and neither reseals nor erases retained history.
     eprintln!("retained source phase=isolated current projection loss");
-    connection.execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+    connection.execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete")?;
     assert_eq!(
         connection.execute(
             "DELETE FROM admission_operation_recovery_records WHERE record_key=?1",

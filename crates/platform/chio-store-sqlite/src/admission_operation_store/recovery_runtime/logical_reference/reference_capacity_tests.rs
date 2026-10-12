@@ -214,7 +214,7 @@ fn reference_counter_projection_loss_cannot_initialize_zero() -> TestResult {
     fixture.advanced()?;
     fixture
         .connection
-        .execute_batch("DROP TRIGGER admission_operation_recovery_no_delete")?;
+        .execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete")?;
     let (key, _) = identity(&fixture.scope)?;
     fixture.connection.execute(
         "DELETE FROM admission_operation_recovery_records WHERE record_key=?1",

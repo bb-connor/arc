@@ -67,7 +67,7 @@ impl SqliteAdmissionOperationStore {
         let trigger: String = tx
             .query_row(
                 "SELECT sql FROM sqlite_schema WHERE type='trigger'
-             AND name='admission_operation_recovery_no_delete'",
+             AND name='admission_operation_recovery_records_no_delete'",
                 [],
                 |row| row.get(0),
             )
@@ -80,7 +80,7 @@ impl SqliteAdmissionOperationStore {
         let probe = (|| {
             tx.execute_batch(
                 "PRAGMA defer_foreign_keys=ON;
-                DROP TRIGGER admission_operation_recovery_no_delete",
+                DROP TRIGGER admission_operation_recovery_records_no_delete",
             )
             .map_err(sqlite_error)?;
             if tx
@@ -119,7 +119,7 @@ impl SqliteAdmissionOperationStore {
         let restored_trigger: String = tx
             .query_row(
                 "SELECT sql FROM sqlite_schema WHERE type='trigger'
-             AND name='admission_operation_recovery_no_delete'",
+             AND name='admission_operation_recovery_records_no_delete'",
                 [],
                 |row| row.get(0),
             )

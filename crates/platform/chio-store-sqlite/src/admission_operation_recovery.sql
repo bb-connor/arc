@@ -23,7 +23,7 @@ WHEN NEW.record_key<>OLD.record_key OR NEW.scope_key<>OLD.scope_key OR NEW.kind<
  OR (OLD.native_request IS NOT NULL AND (NEW.native_request IS NOT OLD.native_request
        OR NEW.native_namespace IS NOT OLD.native_namespace))
 BEGIN SELECT RAISE(ABORT,'recovery identity is immutable'); END;
-CREATE TRIGGER IF NOT EXISTS admission_operation_recovery_no_delete
+CREATE TRIGGER IF NOT EXISTS admission_operation_recovery_records_no_delete
 BEFORE DELETE ON admission_operation_recovery_records
 BEGIN SELECT RAISE(ABORT,'recovery ownership cannot be deleted'); END;
 CREATE TABLE IF NOT EXISTS admission_operation_recovery_events (

@@ -2672,7 +2672,7 @@ async fn recovery_captured_deployment_snapshot_is_immutable_and_required() -> Te
                 DROP TRIGGER admission_operation_recovery_identity;
                 UPDATE admission_operation_recovery_records SET payload=cast('null' AS blob) WHERE record_key GLOB 'deployment-history:*';")?;
         } else {
-            db.execute_batch("DROP TRIGGER admission_operation_recovery_no_delete;
+            db.execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete;
                 DELETE FROM admission_operation_recovery_records WHERE record_key GLOB 'deployment-history:*';")?;
         }
         db.execute_batch(include_str!(
