@@ -3,7 +3,7 @@
 use super::*;
 
 impl ChioKernel {
-    pub(super) fn authenticated_receipt_namespace(
+    pub(in crate::kernel) fn authenticated_receipt_namespace(
         &self,
         request_id: &str,
     ) -> Result<AuthenticatedRequestNamespace, KernelError> {
