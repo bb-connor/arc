@@ -346,6 +346,25 @@ impl PreparedFaultReceipt {
             }
             observed.insert("financial".into(), serde_json::Value::Object(bounded));
         }
+        // A replacement value also replaces its bounded representation. Preserve
+        // unrelated authority fields, but never carry a prior value's digest or
+        // omission marker into the new observation.
+        if let Some(previous) = self.body.metadata.as_mut() {
+            for (section, replacement) in &observed {
+                if let (Some(previous), Some(replacement)) = (
+                    previous
+                        .get_mut(section)
+                        .and_then(serde_json::Value::as_object_mut),
+                    replacement.as_object(),
+                ) {
+                    for field in replacement.keys() {
+                        for suffix in ["sha256", "decimal", "omitted"] {
+                            previous.remove(&format!("{field}_{suffix}"));
+                        }
+                    }
+                }
+            }
+        }
         self.body.metadata = merge_metadata_objects(
             self.body.metadata.take(),
             Some(serde_json::Value::Object(observed)),

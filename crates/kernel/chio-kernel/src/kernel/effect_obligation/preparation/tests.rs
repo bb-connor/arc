@@ -188,6 +188,41 @@ fn release_replaces_an_omitted_capture_reference_without_stale_companions() {
 }
 
 #[test]
+fn replacing_bounded_values_preserves_only_current_companions() {
+    for reference in [serde_json::json!("short"), serde_json::Value::Null] {
+        let (_, mut fault, keypair) = fixture();
+        fault.observe_economics(Some(&serde_json::json!({
+            "financial": {
+                "payment_reference": "x".repeat(513),
+                "cost_charged": u64::MAX,
+                "authorization_id": "authority-a"
+            },
+            "budget_authority": { "hold_id": "h".repeat(513), "budget_term": "term-a" }
+        })));
+        fault.observe_economics(Some(&serde_json::json!({
+            "financial": { "payment_reference": reference, "cost_charged": 0 },
+            "budget_authority": { "hold_id": "hold-a" }
+        })));
+        let receipt = ChioReceipt::sign(fault.body, &keypair).unwrap();
+        let metadata = receipt.metadata.unwrap();
+        assert_eq!(metadata["financial"]["payment_reference"], reference);
+        assert_eq!(metadata["financial"]["cost_charged"], 0);
+        assert_eq!(metadata["financial"]["authorization_id"], "authority-a");
+        assert_eq!(metadata["budget_authority"]["hold_id"], "hold-a");
+        assert_eq!(metadata["budget_authority"]["budget_term"], "term-a");
+        for (section, field) in [
+            ("financial", "payment_reference"),
+            ("financial", "cost_charged"),
+            ("budget_authority", "hold_id"),
+        ] {
+            for suffix in ["sha256", "decimal", "omitted"] {
+                assert!(metadata[section].get(format!("{field}_{suffix}")).is_none());
+            }
+        }
+    }
+}
+
+#[test]
 fn fault_timestamp_retains_the_deciding_step_code_and_original_identity() {
     let (_, mut fault, keypair) = fixture();
     fault.body.metadata = merge_metadata_objects(
