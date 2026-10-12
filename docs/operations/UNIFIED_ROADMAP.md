@@ -385,6 +385,12 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - KDEF-N1 and N15 become rebase gates, at the #1173 and #1179 merges respectively.
   - KDEF-D7, N6, D11 and D12 each get an owner.
   - **Exit:** a hosted run URL with every required job passing is recorded, the Mechanism D and clock gates fail on violating fixtures and pass on main, and the KDEF register names an owner for each of D7, N6, D11 and D12.
+  - **Status on 2026-10-12:**
+    - N4 is met: the Mechanism D gate is on main (#1262, `85b74cf023`). Its test fails on nine violating fixtures and passes on main.
+    - Owners are named in the register. N6 goes to Root (Codex) under CT-CTRL. D7, D11 and D12 go to Root (Codex) as proposals, because each one needs an owner decision: wiring or deleting `ApprovalGuard` (D7), ADR-0035's scope under SHARE-4 (D11), and whether a production lineage store ships before KSPEC-04 phase 4 (D12).
+    - N1 is enforced at the #1173 merge by `scripts/check-security-clocks.py`, which no longer lists `chio-process/src/worker.rs`, so a reverted wall-clock read fails, and by `chio-process/tests/worker_protocol/authority_clock.rs`.
+    - N15 is enforced at the #1179 merge by the same clock gate. `chio-control-plane` is in its scope, and the gate refuses inventory entries absent from the pinned scope evidence, so the three new `SystemTime::now()` sites cannot be listed.
+    - GT1 is not met. No ci.yml run on main has completed with every job passing since #1160. The last completed run, [38183162158](https://github.com/bb-connor/arc/actions/runs/38183162158) on `28d826e3e`, was cancelled after two hours. In it, cargo-deny, cargo-vet, four apalache jobs, the threat-model coverage gate, the three nonce/FIPS jobs and the enterprise portable contracts passed. Two jobs failed on setup: enterprise real Linux enforcement and enterprise adversarial evidence both stopped at the trusted-file pin, because the repository variable `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` still names the #1160 review head `d0496c14d`. Build, lint, test, Security contract and apalache-subset failed only as aggregates of cancelled or failed jobs. Seventeen jobs, including Workspace tests, MSRV, Build and lint and kani-public-pr, were cancelled with no verdict, and one was skipped. The 68 runs on main since then are queued and none has started.
 
 **Owners still to be assigned** for primitives that no spec owns:
 
@@ -890,7 +896,7 @@ Dates are calendar dates only; a bare "Q2" is never used.
   | D11 | Still present | `chio-kernel/Cargo.toml:92` takes `chio-settle` with default `web3` (alloy, reqwest); `:106` takes `ureq`; `:53` takes `chio-core`. Sigstore arrives through `chio-weights` (`:81`) and `chio-attest-verify`, not `chio-core` as the register says. |
   | D12 | Still present | `crates/security/chio-security-types/src/ports/lineage.rs:294`; only test implementations exist. |
   | N2 | Still present; moved | `outcome.record_released()` runs right after dispatch, before finalization (`async_evaluation_core.rs:1768-1773`; nested `nested_flow_evaluation.rs:1517-1521`). |
-  | N4 | Still present | No Mechanism D gate exists in `scripts`, `xtask` or `.github`; the landing ledger keeps it `open-acceptance`. |
+  | N4 | Gate on main (#1262) | `scripts/check-escape-hatches.py` pins 112 hatches in `scripts/escape-hatch-inventory.json` (`85b74cf023`) and runs in CI's workspace structural gates step. The landing ledger still records the spec requirement as `open-acceptance`. |
   | N5 (GT1) | Not met | #1160 merged with build/lint/test and MSRV incomplete; no whole CI run on main has completed since (section 2). |
   | N6 | Still present | `crates/products/chio-api-protect/src/proxy/state.rs:445` builds the collector only with a context resolver, which defaults to `None` and is set only in a test. |
   | N22 | Still present | `crates/platform/chio-http-core/src/routes.rs:33`; `emergency_route_registrations` (`:114-124`) and `handle_emergency_*` have no consumer outside `chio-http-core` and its tests. |

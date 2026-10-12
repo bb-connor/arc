@@ -263,16 +263,16 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked. Ea
 | D4 | Restore reseeds event ids at 0 | Open | M:/V: `session_core/factory.rs:468`, `:684` | Spec 5 Part A, section 5 |
 | D5 | The issuance freeze is never consulted with `Delegate` | Open | M:/V: `issuance_freeze.rs:1290` implements `Delegate` handling, but no production code constructs a `CapabilityIssuanceOperation::Delegate` query; only tests do. The cited line is the implementation anchor, not the missing caller | Active defense. Spec 2 covers remedies only |
 | D6 | Overlay guards do not revalidate at dispatch | Open | M: `kernel/mod.rs:882` | Spec 4 section 4.2 |
-| D7 | `ApprovalGuard` is unwired, with a stale doc reference | Open | M: `approval.rs:15` | HITL owners |
+| D7 | `ApprovalGuard` is unwired, with a stale doc reference | Open | M: `approval.rs:15` | HITL owners. Owner (proposed): Root (Codex), lane KERNEL bug-fix lane; the owner decides whether `ApprovalGuard` is wired into evaluation or deleted, then the stale link goes with it |
 | D8 | Gemini adapter request ids collide | Open | M:/V: `chio-gemini-tools-adapter/src/adapter.rs:263` | Spec 6 rule 1 |
-| D11 | Network and chain stacks sit in the kernel closure: `reqwest`, `hyper` and sigstore, alloy through `chio-settle` and `chio-core`, and in-crate `ureq` | Open | M: `chio-kernel/Cargo.toml:109` | Spec 1 R13 |
-| D12 | There is no production `CausalLineageStore` | Open | M: `chio-security-types/src/ports/lineage.rs:294` | Spec 4 phase 4 |
+| D11 | Network and chain stacks sit in the kernel closure: `reqwest`, `hyper` and sigstore, alloy through `chio-settle` and `chio-core`, and in-crate `ureq` | Open | M: `chio-kernel/Cargo.toml:109` | Spec 1 R13. Owner (proposed): Root (Codex), UR-SHARE-4 (x402 and ACP clients out of the kernel, `web3` off by default); ADR-0035's scope is an owner decision |
+| D12 | There is no production `CausalLineageStore` | Open | M: `chio-security-types/src/ports/lineage.rs:294` | Spec 4 phase 4. Owner (proposed): Root (Codex), KSPEC-04 phase 4 after the success test; whether a production store ships before then is an owner decision |
 | N1 | V:'s `chio-process/src/worker.rs` reverts M's authority-clock fix (`dcae5d7ba`) | Open (merge) | M:/V: `worker.rs` | Merge owners |
 | N2 | The security recorder records `Released` before finalization | Open | M: `async_evaluation_core.rs:1727` | Spec 3 |
 | N3 | Caged long-lived `AdaptedMcpServer` receipts carry no `native_launch` | Open | M: `chio-mcp-adapter/src/server.rs:141` | Spec 7 section 5.1 |
-| N4 | The Mechanism D escape-hatch gate was never built | Open | M: `unrepresentable-defects-design.md:503-518` | Spec 3 builds it |
+| N4 | The Mechanism D escape-hatch gate was never built | Gate on main (#1262) | M: `unrepresentable-defects-design.md:503-518`; gate `scripts/check-escape-hatches.py` over `scripts/escape-hatch-inventory.json` | Spec 3 builds it |
 | N5 | GT1: at the M baseline the hardening gates did not run in hosted CI. At #1160 head `89e4641f6`, hosted job `111748798722` passed the structural, formal-traceability and temporal-security gate steps and then failed at workspace tests | Open (qualification) | M: `hardening-toolchain-spec.md:506-521`; GitHub Actions job `111748798722` | Rollout blocker until a whole hosted run passes |
-| N6 | The default sidecar threshold collector lacks its production request-context source | Open | M: `threshold-approval-collection.md:282-283` | Approval owners |
+| N6 | The default sidecar threshold collector lacks its production request-context source | Open | M: `threshold-approval-collection.md:282-283` | Approval owners. Owner: Root (Codex), `chio api protect` sidecar under UR-CT-CTRL, before G1 claims the sidecar |
 | N9 | Container launch evidence is unsigned | Open | Spec 7 section 5.3 | Spec 7 |
 | N10 | W2 plans HTTPS co-signing, while V: ships `IrohBilateralCoSigner` | Open | V: `lanes/bilateral.rs:795` | Work owners |
 | N13 | Two incompatible `chio.process.abi.v3` definitions: M: `2a4c2fbe4` (broker routes) and W: (knowledge and recovery). A union must be v4 | Open (merge) | M: `chio-process/src/lib.rs:65`; W: `chio-process/src/lib.rs:54` | Spec 1 L1; spec 5 open decision 1 |
