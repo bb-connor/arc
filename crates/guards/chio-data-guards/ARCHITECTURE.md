@@ -57,7 +57,7 @@ Empty SQL policies deny unless explicitly opened. SQL predicate and output
 PII pattern constructors enforce count, length, complexity, and compiled-size
 bounds. `SqlQueryGuard::try_new` and `QueryResultGuard::new` expose load errors;
 the infallible SQL constructor substitutes a deny-all SQL configuration.
-Predicate matching uses normalized SQL text, not signed canonical JSON.
+Predicate matching compares normalized SQL text.
 
 Classification results bind SHA-256 and length of the original payload.
 Constructors validate classifier identity, categories, confidence, finding
