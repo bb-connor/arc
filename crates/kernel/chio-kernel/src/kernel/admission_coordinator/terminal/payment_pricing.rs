@@ -36,9 +36,54 @@ pub(super) struct DurablePaymentDispositionInput<'a> {
         &'a SettlementDispositionV1,
         Option<&'a DurablePaymentPricing>,
     )>,
+    pub(super) prefetched_rate: Option<DurablePrefetchedRate>,
+}
+
+/// A price oracle answer obtained before the mutation lock, bound to the
+/// exact reported cost and journal currency it was requested for.
+pub(super) struct DurablePrefetchedRate {
+    units: u64,
+    currency: String,
+    journal_currency: String,
+    rate: Result<chio_link::ExchangeRate, KernelError>,
 }
 
 impl ChioKernel {
+    /// Ask the oracle, without any lock, for the one quote a fresh
+    /// disposition could convert with. The journal currency is immutable, so
+    /// reading it here selects the same pair the locked disposition prices.
+    pub(super) fn prefetch_durable_payment_rate(
+        &self,
+        admission: &DurableToolAdmission,
+        runtime: &DurableAdmissionRuntime,
+        raw: &RawInvocationOutcomeV1,
+    ) -> Result<Option<DurablePrefetchedRate>, KernelError> {
+        if !admission.requires_payment() {
+            return Ok(None);
+        }
+        let Some(cost) = raw.reported_cost().filter(|cost| cost.units != 0) else {
+            return Ok(None);
+        };
+        let Some(journal) = runtime
+            .store
+            .load_payment_journal(admission.operation_id(), &runtime.fence)
+            .map_err(payment_store_error)?
+        else {
+            return Ok(None);
+        };
+        if journal.rail_mode != crate::payment::PaymentRailMode::ReversibleHold
+            || cost.currency == journal.currency
+        {
+            return Ok(None);
+        }
+        Ok(Some(DurablePrefetchedRate {
+            units: cost.units,
+            currency: cost.currency.clone(),
+            rate: self.fetch_cross_currency_rate(&cost.currency, &journal.currency),
+            journal_currency: journal.currency,
+        }))
+    }
+
     pub(super) fn durable_payment_disposition(
         &self,
         input: DurablePaymentDispositionInput<'_>,
@@ -50,6 +95,7 @@ impl ChioKernel {
             trusted_now_unix_ms,
             delivery_denied,
             retained,
+            prefetched_rate,
         } = input;
         if !admission.requires_payment() {
             if retained.is_some_and(|(disposition, pricing)| {
@@ -135,7 +181,8 @@ impl ChioKernel {
                                 currency: cost.currency.clone(),
                                 breakdown: None,
                             };
-                            match self.resolve_cross_currency_cost(
+                            match prefetched_conversion(
+                                prefetched_rate,
                                 &cost,
                                 &journal.currency,
                                 trusted_now_unix_ms / 1_000,
@@ -181,6 +228,33 @@ impl ChioKernel {
             pricing: Some(pricing),
         }))
     }
+}
+
+/// Never asks the oracle. A quote for any other cost or pair is unusable and
+/// leaves the capture capped at the original exposure.
+fn prefetched_conversion(
+    prefetched: Option<DurablePrefetchedRate>,
+    cost: &ToolInvocationCost,
+    journal_currency: &str,
+    trusted_now_unix_secs: u64,
+) -> Result<(u64, chio_core::web3::anchors::OracleConversionEvidence), KernelError> {
+    let prefetched = prefetched
+        .filter(|prefetched| {
+            prefetched.units == cost.units
+                && prefetched.currency == cost.currency
+                && prefetched.journal_currency == journal_currency
+        })
+        .ok_or_else(|| {
+            KernelError::CrossCurrencyOracle(
+                "no exchange rate was resolved for this reported cost".into(),
+            )
+        })?;
+    ChioKernel::convert_cross_currency_cost(
+        cost,
+        journal_currency,
+        &prefetched.rate?,
+        trusted_now_unix_secs,
+    )
 }
 
 impl DurablePaymentPricing {

@@ -238,6 +238,79 @@ impl DurableAdmissionRuntime {
     }
 }
 
+/// The fence mutation lock held by an admission step that calls a payment
+/// rail. Each rail call runs with the lock released, so a slow rail never
+/// blocks other admissions on the fence. Reacquiring the lock resamples
+/// trusted time and rechecks the exact operation and its original recovery
+/// claim without renewing either, so an expired or superseded worker cannot
+/// record the rail result.
+///
+/// The durable claim alone does not exclude workers of this process, which
+/// share one claimant. Evaluation, caller reports and recovery pages each own
+/// the operation's live token before they reach such a step, so a duplicate
+/// defers instead of calling the rail again. A caller without that token
+/// takes it here for the life of this lock.
+struct ExternalCallLock<'r> {
+    runtime: &'r DurableAdmissionRuntime,
+    guard: Option<AdmissionMutationGuard<'r>>,
+    trusted_now_unix_ms: u64,
+    _live_owner: Option<crate::admission_operation::AdmissionLiveOperation>,
+}
+
+impl<'r> ExternalCallLock<'r> {
+    fn new(
+        runtime: &'r DurableAdmissionRuntime,
+        guard: AdmissionMutationGuard<'r>,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Self, KernelError> {
+        let live_owner = runtime
+            .mutation_sequencer
+            .try_own_operation(operation.binding().operation_id())?;
+        Ok(Self {
+            runtime,
+            guard: Some(guard),
+            trusted_now_unix_ms,
+            _live_owner: live_owner,
+        })
+    }
+
+    /// Trusted time sampled under the currently held lock.
+    fn trusted_now_unix_ms(&self) -> u64 {
+        self.trusted_now_unix_ms
+    }
+
+    /// Run one external call without the mutation lock. The caller must have
+    /// made the call's intent durable first; nothing the call returns is
+    /// recorded unless the original claim is still current after relocking.
+    fn call_unlocked<T>(
+        &mut self,
+        operation: &AdmissionOperationV1,
+        lease: &crate::admission_operation::AdmissionRecoveryLease,
+        call: impl FnOnce() -> T,
+    ) -> Result<T, KernelError> {
+        let runtime = self.runtime;
+        self.guard = None;
+        let output = call();
+        self.guard = Some(runtime.lock_mutations()?);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(self.trusted_now_unix_ms)?;
+        self.trusted_now_unix_ms = trusted_now_unix_ms;
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runtime.store.revalidate_recovery_claim(
+                operation,
+                lease.untrusted_claim(),
+                trusted_now_unix_ms,
+                &runtime.fence,
+            )
+        }))
+        .map_err(|_| {
+            KernelError::DurableAdmission("external call lease readback callback panicked".into())
+        })?
+        .map_err(durable_store_error)?;
+        Ok(output)
+    }
+}
+
 impl ChioKernel {
     /// Durable authority identity for runtimes that persist stable request ids.
     /// A process journal must stay bound to this store across restarts, since
@@ -1632,7 +1705,7 @@ impl ChioKernel {
         confirmed_payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
+        let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let current = runtime
             .store
@@ -1651,6 +1724,8 @@ impl ChioKernel {
                 "pre-dispatch compensation operation changed".to_owned(),
             ));
         }
+        let mut mutation_lock =
+            ExternalCallLock::new(runtime, mutation_guard, &current, trusted_now_unix_ms)?;
         let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
         // Runtime replay custody must be physically released before any
         // compensation can assert no effect or unwind a monetary participant.
@@ -1666,15 +1741,17 @@ impl ChioKernel {
             coordinator_lease_epoch: lease.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
-        self.compensate_retained_payment(payment_compensation::DurablePaymentCompensationInput {
-            operation: &current,
-            runtime,
-            lease: &lease,
-            context: &context,
-            verifier_policy: &verifier_policy,
-            confirmed_unwind: confirmed_payment_unwind,
-            trusted_now_unix_ms,
-        })?;
+        self.compensate_retained_payment(
+            payment_compensation::DurablePaymentCompensationInput {
+                operation: &current,
+                runtime,
+                lease: &lease,
+                context: &context,
+                verifier_policy: &verifier_policy,
+                confirmed_unwind: confirmed_payment_unwind,
+            },
+            &mut mutation_lock,
+        )?;
         self.release_finding_pool_claim_before_dispatch(
             current.binding().operation_id().as_str(),
             trusted_now_unix_ms,

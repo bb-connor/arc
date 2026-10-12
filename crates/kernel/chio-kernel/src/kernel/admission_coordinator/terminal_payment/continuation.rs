@@ -8,7 +8,7 @@ impl ChioKernel {
         runtime: &DurableAdmissionRuntime,
         lease: &crate::admission_operation::AdmissionRecoveryLease,
         mut journal: crate::payment::PaymentJournalRecord,
-        trusted_now_unix_ms: u64,
+        mutation_lock: &mut ExternalCallLock<'_>,
     ) -> Result<Option<crate::payment::PaymentJournalRecord>, KernelError> {
         journal.validate().map_err(payment_record_error)?;
         if journal.operation_id != operation.binding().operation_id().as_str() {
@@ -53,22 +53,28 @@ impl ChioKernel {
                 "durable payment adapter changed before settlement",
             ));
         }
-        let result = run_payment_adapter_operation("retained settlement", || match settle_action {
-            crate::payment::PaymentSettleAction::Capture => adapter.capture(
-                authorization_id,
-                journal.settle_amount_units.ok_or_else(|| {
-                    PaymentError::RailError(
-                        "capture journal omitted its settlement amount".to_owned(),
-                    )
-                })?,
-                &journal.currency,
-                &journal.operation_id,
-            ),
-            crate::payment::PaymentSettleAction::Release => {
-                adapter.release(authorization_id, &journal.operation_id)
-            }
-        })
-        .map_err(payment_error)?;
+        // The settlement intent and its budget reconcile are durable before
+        // this call, so a lost rail result is re-driven from the journal.
+        let result = mutation_lock
+            .call_unlocked(operation, lease, || {
+                run_payment_adapter_operation("retained settlement", || match settle_action {
+                    crate::payment::PaymentSettleAction::Capture => adapter.capture(
+                        authorization_id,
+                        journal.settle_amount_units.ok_or_else(|| {
+                            PaymentError::RailError(
+                                "capture journal omitted its settlement amount".to_owned(),
+                            )
+                        })?,
+                        &journal.currency,
+                        &journal.operation_id,
+                    ),
+                    crate::payment::PaymentSettleAction::Release => {
+                        adapter.release(authorization_id, &journal.operation_id)
+                    }
+                })
+            })?
+            .map_err(payment_error)?;
+        let trusted_now_unix_ms = mutation_lock.trusted_now_unix_ms();
         let compatible = matches!(
             (settle_action, result.settlement_status),
             (

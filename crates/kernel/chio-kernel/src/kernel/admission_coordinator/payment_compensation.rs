@@ -19,13 +19,13 @@ pub(super) struct DurablePaymentCompensationInput<'a> {
     pub(super) context: &'a AdmissionProjectionContext,
     pub(super) verifier_policy: &'a serde_json::Value,
     pub(super) confirmed_unwind: Option<&'a PreDispatchPaymentUnwindEvidence>,
-    pub(super) trusted_now_unix_ms: u64,
 }
 
 impl ChioKernel {
     pub(super) fn compensate_retained_payment(
         &self,
         input: DurablePaymentCompensationInput<'_>,
+        mutation_lock: &mut ExternalCallLock<'_>,
     ) -> Result<(), KernelError> {
         let operation = input.operation;
         if operation
@@ -60,7 +60,7 @@ impl ChioKernel {
         let mut recovered_unwind = None;
         if journal.state == PaymentJournalState::HoldPlaced {
             let (recovered, unwind) =
-                self.recover_pre_dispatch_payment_authorization(&input, journal)?;
+                self.recover_pre_dispatch_payment_authorization(&input, journal, mutation_lock)?;
             journal = recovered;
             recovered_unwind = unwind;
         }
@@ -110,6 +110,7 @@ impl ChioKernel {
                 };
                 journal = self.advance_compensation_payment(
                     &input,
+                    mutation_lock,
                     &journal,
                     &transition,
                     Some(&evidence),
@@ -131,20 +132,28 @@ impl ChioKernel {
             unwind.transaction_id.clone()
         } else {
             let adapter = self.compensation_payment_adapter(&journal)?;
-            let result =
-                run_payment_adapter_operation("pre-dispatch unwind", || match journal.rail_mode {
-                    PaymentRailMode::ReversibleHold => {
-                        adapter.release(authorization_id, &journal.operation_id)
-                    }
-                    PaymentRailMode::PrepaidFinal => adapter.refund(
-                        authorization_id,
-                        journal.authorized_amount_units.ok_or_else(|| {
-                            PaymentError::RailError("original prepayment debit is absent".into())
-                        })?,
-                        &journal.currency,
-                        &journal.operation_id,
-                    ),
-                })
+            // The no-effect unwind intent is journaled before this call, so a
+            // lost rail result is re-driven from the journal on a later pass.
+            let result = mutation_lock
+                .call_unlocked(input.operation, input.lease, || {
+                    run_payment_adapter_operation("pre-dispatch unwind", || {
+                        match journal.rail_mode {
+                            PaymentRailMode::ReversibleHold => {
+                                adapter.release(authorization_id, &journal.operation_id)
+                            }
+                            PaymentRailMode::PrepaidFinal => adapter.refund(
+                                authorization_id,
+                                journal.authorized_amount_units.ok_or_else(|| {
+                                    PaymentError::RailError(
+                                        "original prepayment debit is absent".into(),
+                                    )
+                                })?,
+                                &journal.currency,
+                                &journal.operation_id,
+                            ),
+                        }
+                    })
+                })?
                 .map_err(payment_error)?;
             let expected_status = match journal.rail_mode {
                 PaymentRailMode::ReversibleHold => RailSettlementStatus::Released,
@@ -172,7 +181,8 @@ impl ChioKernel {
                 PaymentJournalTransition::PrepaymentRefunded { transaction_id }
             }
         };
-        journal = self.advance_compensation_payment(&input, &journal, &transition, None)?;
+        journal =
+            self.advance_compensation_payment(&input, mutation_lock, &journal, &transition, None)?;
         if !journal.is_compensated_before_dispatch() {
             return Err(KernelError::DurableAdmission(
                 "pre-dispatch payment unwind is not durable".into(),
@@ -184,6 +194,7 @@ impl ChioKernel {
     fn advance_compensation_payment(
         &self,
         input: &DurablePaymentCompensationInput<'_>,
+        mutation_lock: &ExternalCallLock<'_>,
         journal: &PaymentJournalRecord,
         transition: &PaymentJournalTransition,
         release_evidence: Option<&crate::tool_outcome::MonetaryReleaseEvidenceV1>,
@@ -198,7 +209,7 @@ impl ChioKernel {
                 transition,
                 release_evidence,
                 active_fence: &input.runtime.fence,
-                trusted_now_unix_ms: input.trusted_now_unix_ms,
+                trusted_now_unix_ms: mutation_lock.trusted_now_unix_ms(),
             })
             .map_err(super::recovery::failure::payment_store_error)
     }

@@ -61,6 +61,7 @@ impl ChioKernel {
     pub(super) fn settle_durable_payment(
         &self,
         input: DurablePaymentSettlementInput<'_>,
+        mutation_lock: &mut ExternalCallLock<'_>,
     ) -> Result<DurablePaymentTerminal, KernelError> {
         let DurablePaymentSettlementInput {
             admission,
@@ -218,7 +219,7 @@ impl ChioKernel {
                 runtime,
                 lease,
                 journal,
-                trusted_now_unix_ms,
+                mutation_lock,
             )?
             .ok_or_else(|| {
                 super::super::recovery::failure::item_failure(
