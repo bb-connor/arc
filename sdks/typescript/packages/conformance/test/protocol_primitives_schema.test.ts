@@ -79,6 +79,50 @@ describe("protocol primitive generated schemas", () => {
         expect(JSON.parse(JSON.stringify(fixture.instance))).toEqual(fixture.instance);
       }
     }
+
+    const activeResponse = corpus.cases.find((fixture) => fixture.name === "active-response-intent");
+    expect(activeResponse?.valid).toBe(true);
+    const activeResponseSchema = JSON.parse(
+      readFileSync(resolve(schemaRoot, "agent/active-response-governed-intent.schema.json"), "utf8"),
+    ) as { $id: string };
+    const structuralBounds: Record<string, Record<string, unknown>> = {
+      "duplicate effects": { ordered_effects: ["throttle_session", "throttle_session"] },
+      "empty target binding": { target_binding: {} },
+      "empty rollback binding": { rollback_binding: {} },
+      "empty plan body": { canonical_plan_body: {} },
+      "camel-case hashed plan body": { canonical_plan_body: { action: "throttle", planHash: "a" } },
+      "snake-case hashed plan body": { canonical_plan_body: { action: "throttle", plan_hash: "a" } },
+    };
+    for (const [label, mutation] of Object.entries(structuralBounds)) {
+      expect(
+        validateWire(activeResponseSchema.$id, { ...activeResponse?.instance, ...mutation }),
+        label,
+      ).toBe(false);
+    }
+    const bindingSchema = JSON.parse(readFileSync(
+      resolve(schemaRoot, "capability/security-binding.schema.json"), "utf8",
+    ));
+    const bindingVectors = JSON.parse(readFileSync(resolve(
+      workspaceRoot, "tests/bindings/vectors/capability/security-binding-v1.json",
+    ), "utf8"));
+    const binding = JSON.parse(bindingVectors.cases[0].caveats[0].predicate);
+    const validateBinding = createWireSchemaValidator([bindingSchema]);
+    // These are format characters, not Unicode White_Space or control characters.
+    for (const marker of ["\uFEFF", "\u200B", "\u2060"]) {
+      for (const value of [`${marker}id`, `id${marker}`]) {
+        expect(validateWire(activeResponseSchema.$id, { ...activeResponse?.instance, plan_id: value }), value).toBe(true);
+        expect(validateBinding(bindingSchema.$id, { ...binding, tenantId: value }), value).toBe(true);
+      }
+    }
+    for (const marker of [
+      " ", "\t", "\u0085", "\u00A0", "\u1680", "\u2000",
+      "\u2028", "\u202F", "\u205F", "\u3000",
+    ]) {
+      for (const value of [`${marker}id`, `id${marker}`]) {
+        expect(validateWire(activeResponseSchema.$id, { ...activeResponse?.instance, plan_id: value }), value).toBe(false);
+        expect(validateBinding(bindingSchema.$id, { ...binding, tenantId: value }), value).toBe(false);
+      }
+    }
   });
 
   for (const fixture of corpus.raw_cases) {

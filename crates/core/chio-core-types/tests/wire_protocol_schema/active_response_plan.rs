@@ -46,6 +46,15 @@ fn active_response_schema_matches_native_plan_bounds() {
     );
     assert!(schema_accepts(&base), "schema rejected the base plan");
 
+    // Match native Unicode White_Space, not ECMAScript's broader `\s` class.
+    for marker in ['\u{feff}', '\u{200b}', '\u{2060}'] {
+        for value in [format!("{marker}id"), format!("id{marker}")] {
+            let instance = with(&base, "plan_id", json!(value));
+            assert!(native_accepts(&instance), "native rejected {value:?}");
+            assert!(schema_accepts(&instance), "schema rejected {value:?}");
+        }
+    }
+
     let all_effects = json!([
         "throttle_session",
         "restrict_egress",

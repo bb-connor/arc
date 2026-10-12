@@ -62,7 +62,9 @@
       ]
     },
     "caveats": {
+      "description": "At most one caveat, which must be bind_security_context.",
       "type": "array",
+      "maxItems": 1,
       "items": {
         "$ref": "#/$defs/caveat"
       }
@@ -352,6 +354,7 @@
           ]
         },
         "predicate": {
+          "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
           "type": "string",
           "minLength": 1
         },
@@ -359,7 +362,26 @@
           "type": "string",
           "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "bind_security_context"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "sig"
+              ]
+            }
+          },
+          "else": false
+        }
+      ]
     },
     "attenuationProof": {
       "type": "object",

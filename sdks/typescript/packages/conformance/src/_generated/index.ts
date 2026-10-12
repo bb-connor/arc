@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: e419015f6043565519de9036b8f265c77ac9cd64a1fc27a065c2bb712186a6f7
+// Schema SHA: 2e5e0fb4ca5ecb7f1ddfb6bce82eaa22361eb383a30a6ac3a5f70de875d8c3e9
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -17,23 +17,61 @@
 export namespace Agent_ActiveResponseGovernedIntent {
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
 }
@@ -68,23 +106,61 @@ export namespace Agent_GovernedTransactionIntent {
   }
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
   export interface ChioBoundToolInvocation {
@@ -155,7 +231,12 @@ export namespace Agent_ToolCallRequest {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -178,6 +259,22 @@ export namespace Agent_ToolCallRequest {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   /**
    * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
@@ -329,17 +426,6 @@ export namespace Agent_ToolCallRequest {
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
-  }
   export interface AttenuationProof {
     parentScopeHash: string;
     childScopeHash: string;
@@ -384,23 +470,61 @@ export namespace Agent_ToolCallRequest {
   }
   export interface ChioGovernedActiveResponseIntentBody {
     plan_schema: "chio.response-plan.v1";
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     plan_id: string;
+    /**
+     * At most 256 UTF-8 bytes, without control characters or surrounding whitespace.
+     */
     operator_capability_id: string;
     operator_capability_hash: string;
     operator_capability_expires_at: number;
     executor_subject: string;
+    /**
+     * Plan body hashed into plan_body_hash. Its RFC 8785 canonical form is at most 65536 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     canonical_plan_body: {};
     plan_body_hash: string;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     target_binding: {};
     /**
      * @minItems 1
-     * @maxItems 32
+     * @maxItems 5
      */
-    ordered_effects: [
-      "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
-      ...("throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance")[]
-    ];
+    ordered_effects:
+      | ["throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ]
+      | [
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance",
+          "throttle_session" | "restrict_egress" | "suspend_session" | "suspend_capability_set" | "freeze_issuance"
+        ];
+    /**
+     * Must not exceed operator_capability_expires_at.
+     */
     expires_at: number;
+    /**
+     * Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.
+     */
     rollback_binding: {};
   }
   export interface ChioBoundToolInvocation {
@@ -761,6 +885,31 @@ export namespace Capability_Revocation {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/security-binding.schema.json
+export namespace Capability_SecurityBinding {
+  export type SecurityBindingText = string;
+
+  /**
+   * Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.
+   */
+  export interface ChioCapabilitySecurityBinding {
+    schema: "chio.capability-security-binding.v1";
+    tenantId: SecurityBindingText;
+    lineageId: SecurityBindingText;
+    sessionId: SecurityBindingText;
+    principalId: SecurityBindingText;
+    isolationEpochId: SecurityBindingText;
+    contextGeneration: number;
+    workloadId: SecurityBindingText;
+    serverId: SecurityBindingText;
+    /**
+     * Canonical lowercase PublicKey hex form, without a 0x prefix.
+     */
+    workloadSignerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/supplemental-authorization.schema.json
 export namespace Capability_SupplementalAuthorization {
   export interface ChioOpaqueSupplementalAuthorization {
@@ -814,7 +963,12 @@ export namespace Capability_Token {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -843,6 +997,22 @@ export namespace Capability_Token {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   /**
    * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
@@ -979,17 +1149,6 @@ export namespace Capability_Token {
     };
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
-  }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
   }
   export interface AttenuationProof {
     parentScopeHash: string;
@@ -1395,7 +1554,12 @@ export namespace Kernel_CapabilityList {
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    caveats?: Caveat[];
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
     scope_attenuations?: {
       type: string;
       [k: string]: unknown;
@@ -1418,6 +1582,22 @@ export namespace Kernel_CapabilityList {
         max_invocations: number;
         root_binding: ChioAggregateBudgetRootBinding;
       };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
 
   export interface ChioKernelMessageCapabilityList {
     type: "capability_list";
@@ -1572,17 +1752,6 @@ export namespace Kernel_CapabilityList {
     };
     algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
-  }
-  export interface Caveat {
-    kind:
-      | "restrict_tool"
-      | "bind_session"
-      | "restrict_audience"
-      | "restrict_geo"
-      | "restrict_time_window"
-      | "bind_security_context";
-    predicate: string;
-    sig?: string;
   }
   export interface AttenuationProof {
     parentScopeHash: string;
