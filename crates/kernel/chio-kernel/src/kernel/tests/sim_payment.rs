@@ -580,8 +580,8 @@ fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
     );
     assert_eq!(
         payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "a fail-closed deny must void the unsettled hold so the payer's funds are not left frozen"
+        0,
+        "a post-execution capture error retains the positive authorization for reconciliation"
     );
 }
 
