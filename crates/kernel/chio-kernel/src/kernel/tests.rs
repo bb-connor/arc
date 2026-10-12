@@ -334,3 +334,5 @@ mod receipt_namespace;
 
 #[path = "tests/evidence_recovery.rs"]
 mod evidence_recovery;
+#[path = "tests/obligation_capacity.rs"]
+mod obligation_capacity;
