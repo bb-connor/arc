@@ -313,11 +313,11 @@ fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart(
         drop(store);
 
         let store = reopen(&path);
-        assert_eq!(
+        super::cleanup_custody::assert_replayed_authorization(
+            authorized,
             store
                 .authorize_budget_hold(owned(&store, request.clone()))
                 .expect("replay authorization"),
-            authorized
         );
         let capture_request = capture_request(id);
         let captured = store
@@ -609,11 +609,11 @@ fn v9_event_quota_projection_migrates_without_losing_history() {
         )
         .expect("load event quota table definition");
     assert!(table_sql.contains("max_invocations >= 0"));
-    assert_eq!(
+    super::cleanup_custody::assert_replayed_authorization(
+        authorized,
         migrated
             .authorize_budget_hold(owned(&migrated, request))
             .expect("replay authorization after v9 migration"),
-        authorized
     );
     drop(migrated);
     let _ = fs::remove_dir_all(path);

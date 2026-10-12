@@ -1557,6 +1557,7 @@ pub(super) fn authorization_decision(
     store: &SqliteBudgetStore,
     request: BudgetAuthorizeHoldRequest,
     outcome: BudgetAuthorizationOutcome,
+    cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     event_seq: u64,
     recorded_at: i64,
     usage: BudgetUsageRecord,
@@ -1628,6 +1629,7 @@ pub(super) fn authorization_decision(
         ),
         BudgetAuthorizationOutcome::Authorized => Ok(BudgetAuthorizeHoldDecision::Authorized(
             BudgetHoldAuthorizationRecord {
+                cleanup_custody,
                 hold_id: request.hold_id,
                 admission_binding: request.admission_binding,
                 authorized_exposure_units: request.requested_exposure_units,
@@ -1662,6 +1664,7 @@ pub(super) fn decision_from_persisted_event(
         store,
         request,
         outcome,
+        chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed,
         event.event_seq,
         event.recorded_at,
         BudgetUsageRecord {

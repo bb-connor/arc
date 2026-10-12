@@ -556,20 +556,32 @@ impl ChioKernel {
             runtime_admission_metadata,
         );
         let runtime_admission_metadata = lease_release.metadata;
-        let reverse_result = match denial.payment_authorization {
-            Some(payment_authorization) => self
-                .unwind_pre_dispatch_monetary_invocation_with_evidence(
-                    denial.request,
-                    denial.cap,
-                    denial.budget_mutation.charge_result(),
-                    Some(payment_authorization),
-                    denial.durable_operation,
-                    credential_disposition,
-                ),
-            None => self
-                .reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)
-                .map(|reverse| (reverse, None))
-                .map_err(PreDispatchMonetaryUnwindFailure::from),
+        let cleanup_custody = denial
+            .budget_mutation
+            .durable_hold_result()
+            .map(|charge| charge.cleanup_custody);
+        let custody_check = denial
+            .budget_mutation
+            .durable_hold_result()
+            .map(crate::kernel::validation::ensure_fresh_budget_cleanup_custody)
+            .transpose();
+        let reverse_result = match custody_check {
+            Err(error) => Err(PreDispatchMonetaryUnwindFailure::from(error)),
+            Ok(_) => match denial.payment_authorization {
+                Some(payment_authorization) => self
+                    .unwind_pre_dispatch_monetary_invocation_with_evidence(
+                        denial.request,
+                        denial.cap,
+                        denial.budget_mutation.charge_result(),
+                        Some(payment_authorization),
+                        denial.durable_operation,
+                        credential_disposition,
+                    ),
+                None => self
+                    .reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)
+                    .map(|reverse| (reverse, None))
+                    .map_err(PreDispatchMonetaryUnwindFailure::from),
+            },
         };
         let (reverse, unwind_evidence) = match reverse_result {
             Ok(result) => result,
@@ -596,6 +608,9 @@ impl ChioKernel {
                     Some(serde_json::json!({
                         "budget_authority": {
                             "pre_dispatch_cleanup_unconfirmed": true,
+                            "cleanup_custody": cleanup_custody,
+                            "cleanup_retains_prior_hold": cleanup_custody.is_some_and(|custody|
+                                custody != crate::budget_store::BudgetHoldCleanupCustody::Fresh),
                             "admission_release_unconfirmed": true,
                             "admission_may_be_retained": true,
                             "cleanup_mutation_kind": match denial.budget_mutation {

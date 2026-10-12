@@ -892,6 +892,8 @@ impl StructuredBudgetProjectionContractView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct StructuredBudgetAuthorizeResponse {
+    #[serde(default)]
+    pub(crate) cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     pub(crate) schema: String,
     pub(crate) capability_id: String,
     pub(crate) grant_index: u32,
@@ -913,6 +915,13 @@ impl StructuredBudgetAuthorizeResponse {
         decision: BudgetAuthorizeHoldDecision,
         usage: StructuredBudgetUsageView,
     ) -> Result<Self, String> {
+        let cleanup_custody = match &decision {
+            BudgetAuthorizeHoldDecision::Authorized(value) => value.cleanup_custody,
+            BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
+                chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed
+            }
+            _ => chio_kernel::budget_store::BudgetHoldCleanupCustody::Unknown,
+        };
         let (decision, projection) = match decision {
             BudgetAuthorizeHoldDecision::Authorized(value) => (
                 StructuredBudgetAuthorizeDecisionView::Authorized,
@@ -935,6 +944,7 @@ impl StructuredBudgetAuthorizeResponse {
             StructuredBudgetProjectionContractView::from_projection(&projection, &usage)?;
         Ok(Self {
             schema: STRUCTURED_BUDGET_RESPONSE_SCHEMA.to_string(),
+            cleanup_custody,
             capability_id,
             grant_index,
             request_hold_id,

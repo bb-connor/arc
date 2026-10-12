@@ -261,6 +261,7 @@ pub(crate) async fn handle_try_charge_cost(
     // the replay unless the original exists, matches, and came from this
     // authority; it never admits a new mutation.
     let replay_under = authority.as_ref().filter(|_| replayed_event);
+    let mut cleanup_custody = chio_kernel::budget_store::BudgetHoldCleanupCustody::Unknown;
     let (already_captured, admission, denied) = if payload.hold_id.is_none() {
         let charged = match replay_under {
             Some(current) => store.replay_cost_charge(
@@ -376,28 +377,34 @@ pub(crate) async fn handle_try_charge_cost(
             Err(error) => return budget_internal_error(&error, "budget authorization failed"),
         };
         match decision {
-            BudgetAuthorizeHoldDecision::Authorized(authorized) => (
-                false,
-                Some((
-                    authorized.metadata,
-                    authorized.authorized_exposure_units,
-                    0,
-                    authorized.invocation_count_after,
-                    authorized.committed_cost_units_after,
-                )),
-                None,
-            ),
-            BudgetAuthorizeHoldDecision::AlreadyCaptured(mutation) => (
-                true,
-                Some((
-                    mutation.metadata,
-                    mutation.exposure_units,
-                    mutation.realized_spend_units,
-                    mutation.invocation_count_after,
-                    mutation.committed_cost_units_after,
-                )),
-                None,
-            ),
+            BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                cleanup_custody = authorized.cleanup_custody;
+                (
+                    false,
+                    Some((
+                        authorized.metadata,
+                        authorized.authorized_exposure_units,
+                        0,
+                        authorized.invocation_count_after,
+                        authorized.committed_cost_units_after,
+                    )),
+                    None,
+                )
+            }
+            BudgetAuthorizeHoldDecision::AlreadyCaptured(mutation) => {
+                cleanup_custody = chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed;
+                (
+                    true,
+                    Some((
+                        mutation.metadata,
+                        mutation.exposure_units,
+                        mutation.realized_spend_units,
+                        mutation.invocation_count_after,
+                        mutation.committed_cost_units_after,
+                    )),
+                    None,
+                )
+            }
             BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
                 return plain_http_error(
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -439,6 +446,7 @@ pub(crate) async fn handle_try_charge_cost(
         let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index)
         {
             Ok(Some(usage)) => Some(TryChargeCostResponse {
+                cleanup_custody,
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
                 allowed: !already_captured,
@@ -517,6 +525,7 @@ pub(crate) async fn handle_try_charge_cost(
                     .get_usage(&payload.capability_id, payload.grant_index)
                     .map_err(|error| budget_internal_error(&error, "budget usage lookup failed"))?;
                 Ok(Some(TryChargeCostResponse {
+                    cleanup_custody,
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
                     allowed: false,

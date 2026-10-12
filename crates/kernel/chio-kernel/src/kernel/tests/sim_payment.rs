@@ -1036,16 +1036,16 @@ fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment
     );
     assert_eq!(
         payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "the unsettled prepaid hold must be released so the payer's funds are not frozen"
+        0,
+        "an ambiguous prepayment capture retains its positive authorization for reconciliation"
     );
-    // The reserved budget hold was reversed, not stranded open: a later
-    // authorization on the fully-bounded grant is not blocked by a dead reservation.
+    // The capture may have completed, so the authorized budget exposure remains
+    // reserved until the payment owner confirms the rail outcome.
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(
         usage.committed_cost_units().unwrap(),
-        0,
-        "a denied MustPrepay reserve must leave no committed exposure"
+        100,
+        "an ambiguous MustPrepay capture retains its authorized budget exposure"
     );
 }
 
@@ -1694,6 +1694,7 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
 // per-invocation ceiling would produce alongside a MustPrepay quote.
 fn make_provisional_charge(cost_charged: u64, currency: &str) -> BudgetChargeResult {
     BudgetChargeResult {
+        cleanup_custody: crate::budget_store::BudgetHoldCleanupCustody::Fresh,
         grant_index: 0,
         cost_charged,
         currency: currency.to_string(),
