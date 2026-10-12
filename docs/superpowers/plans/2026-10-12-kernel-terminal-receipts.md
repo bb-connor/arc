@@ -12,7 +12,7 @@
 
 ## Global constraints
 
-- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `61bb9eb715`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
+- Original base: `b1d0ee30dfcf10bdd363023522fe678f2f45febb`. Integration includes main through `85b74cf023`. Preserve already-landed admission custody, payment journaling and bounded receipt writer repairs.
 - Non-durable acceptance is one committed terminal receipt OR one buffered evidence obligation with dispatch latched. Persistence eventually requires a healthy clock, signer and store. The in-memory buffer is not crash-durable.
 - A durable call leaves terminal truth to its saga. Never append a competing cancellation or deny after handing off that operation.
 - Unknown append outcomes retain the original receipt identity. Absence on an early read cannot establish that an in-flight write will never commit.
@@ -78,7 +78,7 @@
 - [ ] Extend Originals across transport failures, child flush, credential commitment and durable return-recording failure. Retain the existing pre-dispatch compensation controls.
 - [ ] Move the post-dispatch half of each evaluator under the obligation. Keep pre-dispatch Drop compensation unchanged. Durable Drop retains the original saga for the existing recovery driver and never writes a competing receipt. A generic kernel-independent idle driver remains open under the ruling below.
 - [x] Move `record_released` and final lifecycle release after discharge; signed terminal truth survives either callback failing. Contain callback and destructor panics.
-- [ ] Add binding mismatch and compile-fail controls for forgeable/cloneable discharge and early return. Run evaluator failure matrix and existing durable/drop/security suites. Expected: one terminal owner, no premature release. Commit.
+- [x] Add receipt-binding mismatch controls and compiler-checked negative Clone/Default assertions for both owners, plus the exact post-effect return signature. These passed in the full library run. Field/module privacy is source-reviewed; no separate UI compile-fail suite is claimed. Final review repairs still require the composed evaluator and durable/drop/security suites.
 
 ### Task 5: Preserve payment outcomes and qualify the whole unit
 
@@ -113,7 +113,7 @@
 - Identity #1242 merged as `0ab30ba50e`; publication #1244 merged as `74570d7ff7`; payment outcomes #1248 merged as `cfee00fa7d`. The payment entrypoint rejects non-object caller metadata before effects. Its final x86 evidence is nine outcome tests, 27 simulated-payment tests and strict owning Clippy.
 - Four callback/clock/publication Originals failed at `2af82c3e31`. Repair `2f87578f49` passed those controls and the same binary passed 39 ownership, recovery, publication and payment tests. This is bounded evidence, not qualification of later changes.
 - Shutdown and child-client Originals at `52b86d4cfb` both failed at runtime. Repairs `b1762428e5` and `92361a9403` retain the waiter synchronization and the unsigned child before entering the client. Their composed GREEN is pending.
-- Terminal binding now includes evaluation identity, authenticated namespace, request, capability, matched grant, server, tool, policy and input. An acknowledged receipt whose private discharge binding mismatches is retained by its original id and content digest. Delivery remains withheld. New preparation and two-tenant controls await the final focused run.
+- Terminal binding now includes evaluation identity, authenticated namespace, request, capability, matched grant, server, tool, policy and input. DischargeBinding::validate_receipt rejects mismatched terminal identity before append. The later Discharged comparison duplicated the same cloned binding and was removed after review. Preparation and two-tenant controls passed in the 1753-test library run.
 - The composed strict run found unchecked internal Option invariants and oversized delivery/error variants. They are being repaired without lint waivers. The stage-label control is checking that a post-commit execution-nonce failure is not relabeled as provenance.
 - Retained-child readback uses complete authenticated live/archive history with an unsupported default. Original `b0b6ce674c` and repair `f8696157fc` are awaiting the corrected SQLite qualification. The two earlier wrong-import attempts are compile refusals, not runtime evidence.
 - The prepayment retry repair remains separate. Its first GREEN run exposed cleanup of a replayed hold (four passing controls, one failing); the next repair derives Fresh/Replayed/Unknown cleanup custody atomically from the authorizing store. Unknown or replayed custody cannot authorize compensation.
@@ -127,3 +127,35 @@
 - Retained-child #1256 merged as `df30bfd62c`. Original `b0b6ce674c`: kernel unsupported-default control passed, SQLite live control passed and five retained-history cases failed. Repair `f8696157fc`: kernel control and all six SQLite cases passed, as did strict Clippy for both owners.
 - Prepayment cleanup is a separate candidate. Original `8146595f2a` has two passing controls and five runtime failures. Complete repair `9cad87bd0d`, followed by the original-saga cancellation control `0fdaefa7e8`, is under x86 qualification. The earlier `032c689803` attempt did not compile and is not GREEN evidence.
 - Formal review adds mandatory source anchors for the actual fault observation and saga incident helpers. Historical model transitions and evidence remain unchanged. Source-drift acceptance does not prove retained recovery liveness, strict production timestamp order or a generic durable idle finalizer.
+
+## Review repair checkpoint
+
+- `69894cc084`: full kernel library 1753 passed, zero failed or ignored.
+  Strict Clippy found two oversized post-effect error returns; `8f7321b9ac`
+  boxes the source error without changing its classification. Later source
+  changes are not covered by that earlier full run.
+- P2-1 and P2-3: `f70c35efcb` removes the unreachable discharge comparison and
+  the unused legacy post-dispatch Drop branch. `abd57871c0` moves the eight-cell
+  disposition control and direct reservation test onto the actual post-effect
+  owner. Missing reserved fault/child custody now emits an audit fault.
+- P2-2 and P3-6: Original `67a84bb0e2` is under qualification. Controls require
+  320 real simultaneously pending ordinary calls, coherent host byte capacity,
+  checked overflow, independent explicit byte bounds, and continuation of an
+  already-dispatched durable parent while another call latches new dispatch.
+- P3-7: both latch checks remain. The early check avoids acquiring budget,
+  payment and credentials under a known latch. The dispatch-time check closes
+  the race while admission waits. Claude accepted this distinction.
+- Prepayment custody #1261 merged as `0accc90c72` and is composed here. Its
+  exact source has focused kernel/store/control-plane tests and strict Clippy
+  passing on x86; replayed or unknown holds cannot authorize generic cleanup.
+- The new escape-hatch gate explicitly inventories the cfg(test)
+  `EvidenceQueue::empty_for_test` constructor. It creates an empty queue for
+  capacity/shutdown controls; it cannot be called by a production build.
+- `3577c7c62c` adds the real SQLite incident/return version-fence control. Both
+  write orderings must preserve the winning operation and refuse mutation by
+  the loser. This test-only addition still awaits its focused run.
+- Remaining qualification: capacity/continuation repair, final owning suites
+  and strict Clippy, refreshed reviewed source anchors and their checker tests,
+  file hygiene, and Claude's exact-source review. Generic durable idle
+  finalization and crash durability of the memory buffer remain outside this
+  source unit; neither is claimed complete.
