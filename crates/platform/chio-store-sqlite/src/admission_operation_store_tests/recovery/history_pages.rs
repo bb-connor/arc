@@ -203,7 +203,7 @@ fn legacy_tail_probe_does_not_walk_retained_terminal_history() -> AnchoredTestRe
     let at = 1_800_000_500_000;
     let _clock = chio_test_support::clock::scope_unix_secs(at / 1_000);
     let fixture = fixture();
-    let mut candidates = (0..256 + TERMINAL_HISTORY)
+    let mut candidates = (0..256 + TERMINAL_HISTORY + 1)
         .map(|index| {
             let request = format!("legacy-tail-request-{index:03}");
             let capability = format!("legacy-tail-capability-{index:03}");
@@ -228,12 +228,10 @@ fn legacy_tail_probe_does_not_walk_retained_terminal_history() -> AnchoredTestRe
         let (_, status) = defer(&fixture, operation, at)?;
         assert!(status.deferral.retry_not_before_unix_ms > at + 2_000);
     }
-    let (before, before_steps) = count_sql_steps(&fixture, || {
-        Ok(fixture.store.list_recoverable(at + 2_000, 1)?)
-    })?;
-    assert!(before.is_empty());
-
-    for (index, (expected, request, capability)) in terminal_tail.iter().enumerate() {
+    let retain = |index: usize| -> AnchoredTestResult {
+        let (expected, request, capability) = terminal_tail
+            .get(index)
+            .ok_or("terminal history fixture index")?;
         let operation = finalizing_tool_operation(&fixture, request, capability, at);
         assert_eq!(
             operation.binding().operation_id(),
@@ -251,6 +249,19 @@ fn legacy_tail_probe_does_not_walk_retained_terminal_history() -> AnchoredTestRe
             .commit_terminal_projection(&projection)?
             .state
             .is_terminal());
+        Ok(())
+    };
+    // Keep the terminal index boundary present in both measurements. Creating
+    // that boundary adds one range-end check to each legacy page independently
+    // of how many terminal operations the history contains.
+    retain(0)?;
+    let (before, before_steps) = count_sql_steps(&fixture, || {
+        Ok(fixture.store.list_recoverable(at + 2_000, 1)?)
+    })?;
+    assert!(before.is_empty());
+
+    for index in 1..terminal_tail.len() {
+        retain(index)?;
     }
     let (after, after_steps) = count_sql_steps(&fixture, || {
         Ok(fixture.store.list_recoverable(at + 2_000, 1)?)
