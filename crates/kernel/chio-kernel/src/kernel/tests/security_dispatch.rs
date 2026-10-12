@@ -160,6 +160,14 @@ fn nested_security_callbacks_preserve_the_effect_boundary() -> TestResult {
             ),
             _ => assert_eq!(result?.verdict, Verdict::Deny, "{fault:?}"),
         }
+        if matches!(fault, Fault::Record | Fault::Release) {
+            let receipts = kernel.receipt_log();
+            assert_eq!(receipts.len(), 1, "{fault:?}: exactly one terminal receipt");
+            assert!(
+                receipts.get(0).is_some_and(|receipt| receipt.is_allowed()),
+                "{fault:?}: security release must follow the committed Allow receipt"
+            );
+        }
         let dispatched = matches!(fault, Fault::None | Fault::Record | Fault::Release);
         assert_eq!(
             invocations.load(Ordering::SeqCst),
