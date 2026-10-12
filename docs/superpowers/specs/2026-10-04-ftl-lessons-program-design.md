@@ -33,7 +33,7 @@ The unified roadmap (`docs/operations/UNIFIED_ROADMAP.md`, PR #1196) gives every
 | KSPEC-04 | Authority-space teardown | `2026-10-04-authority-space-teardown-design.md` | Phases 1 and 2 are UR-KERN-3, with KDEF-D6 and D5; phases 3 and 4 follow the success test |
 | KSPEC-05 | Unified event queue | `2026-10-04-unified-event-queue-design.md` | Part A is UR-KERN-4 (KDEF-D3, D4, N26, N30); Part B follows the success test |
 | KSPEC-06 | Opaque adapter context | `2026-10-04-opaque-adapter-context-design.md` | No KERNEL rung; KDEF-D8 stays in this program's bug-fix lane (section 6) |
-| KSPEC-07 | Isolation and confinement evidence | `2026-10-04-microkernel-isolation-backend-design.md` | Steps 1 and 2 are UR-KERN-5. The roadmap's `AgentHostBwrap` and `Seatbelt` kinds are not yet in KSPEC-07's closed `ConfinementBackendKind`; a KSPEC-07 amendment must add them (KSPEC-07 open decision 8) before UR-KERN-5 can claim them |
+| KSPEC-07 | Isolation and confinement evidence | `2026-10-04-microkernel-isolation-backend-design.md` | Steps 1 and 2 are UR-KERN-5. KSPEC-07 revision 6 adds the roadmap's `AgentHostBwrap` and `Seatbelt` kinds to its closed `ConfinementBackendKind`; neither verifies until its native record and binding land (KSPEC-07 section 5.2.1) |
 | KSPEC-08 | Durable stop epoch | `2026-10-04-durable-stop-epoch-design.md` | Phases 0 and 1 are UR-KERN-1 (AC6; KDEF-D2, N22, N23); phases 2 to 7 follow the success test |
 | KSPEC-09 | Pure admission machine | `2026-10-04-pure-admission-machine-design.md` | Keystone, after the success test (its M20 delta lands earlier, with UR-KERN-2) |
 | KSPEC-10 | Crossing primitive | `2026-10-04-crossing-primitive-design.md` | Keystone, after the success test |

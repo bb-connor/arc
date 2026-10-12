@@ -1,6 +1,6 @@
 # Design: confinement evidence for tool servers and workers (microkernel backend exploratory)
 
-- Status: EXPLORATORY (revision 5, 2026-10-05, after the second independent review on PR #1174; revision 4 after Codex review; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
+- Status: EXPLORATORY (revision 6, 2026-10-12, agent-host backend kinds for UR-KERN-5; revision 5, 2026-10-05, after the second independent review on PR #1174; revision 4 after Codex review; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
   - Sections 5, 6, and 7 are PROPOSED and can be reviewed for implementation.
   - Sections 8 and 9 (the microkernel backend and its spike) stay EXPLORATORY. No implementation is authorized there, and the spike is throwaway.
 - Date: 2026-10-04
@@ -35,6 +35,11 @@ Citation convention:
 | FTL | FTL checkout | |
 
 All five count as shipped for this revision. W1-W4 and R: APIs whose code does not exist are labeled "assumed shipped (contract anchor)".
+
+## Revision 6 changes
+
+- **Agent-host backend kinds (open decision 8).** `ConfinementBackendKind` gains `AgentHostBwrap` and `Seatbelt` (section 5.2.1). The enum stays closed. Neither kind has a native record or a dispatch binding yet, so neither can render confined until its qualification lands.
+- **Rendering rule.** A tool-call receipt renders confined only when its kernel-bound launch reference names a verified `FullyEnforced` record (rule 5.1.7). The kernel binds `native_launch` for a long-lived server as well as for an invocation-owned connection, and refuses dispatch when the prepared launch is not `FullyEnforced` (rules 5.1.3 and 5.1.4).
 
 ## Revision 5 changes
 
@@ -241,6 +246,8 @@ absent(receipt.native_launch) and absent(receipt.confinement_launch)
 
 6. **Backend-neutral reference.** A tool-lane backend other than the Linux cage (`FirecrackerGuest` today) claims confinement only through `confinement_launch { record_schema, record_sha256, attempt_id }`. The kernel binds it from the connection's prepared delivery under rules 1, 3 and 5, exactly as it binds `native_launch`: only when the referenced record verifies, is `FullyEnforced`, and has not exited at dispatch readiness. Until a backend's dispatch path binds this reference, its records cannot cover production receipts (section 7 rule 3).
 
+7. **Rendering.** A tool-call receipt renders "confined by Chio (backend)" only when all of the following hold: the receipt verifies under a pinned kernel key; its kernel-bound launch reference (`native_launch`, or `confinement_launch` once a backend binds it) names the presented record by id and canonical digest; that record verifies under a pinned launch signer, names the same tool server, and is `FullyEnforced`. Every other receipt renders "unconfined" with the `tool_origin` reason from rule 2, including a receipt whose reference is present but does not verify. The vocabulary lives in `chio-cage-plan` (`ConfinementBackendKind`, `ConfinementDisclosure`), and the `LinuxCage` check is `chio_cage::render_tool_confinement`.
+
 ### 5.2 Confinement record (verifier-side projection)
 
 The projection is computed by exporters and verifiers from native records. It is never stored in tool-call receipts.
@@ -249,7 +256,7 @@ The projection is computed by exporters and verifiers from native records. It is
 pub const CONFINEMENT_RECORD_SCHEMA: &str = "chio.confinement.record.v1";
 
 #[serde(rename_all = "snake_case")]
-pub enum ConfinementBackendKind { LinuxCage, FirecrackerGuest, ProcessContainer } // closed
+pub enum ConfinementBackendKind { LinuxCage, FirecrackerGuest, ProcessContainer, AgentHostBwrap, Seatbelt } // closed
 
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceObserver { HostParent, HostVmm, GuestSupervisor, SameDomain }
@@ -298,6 +305,14 @@ Mapping per backend:
 | inherited_authority | fd table | `Absent`: no broker IPC, no read or write grants, no credential | device set | mounts plus socket inode |
 | resources | plan rlimits, `HostParent` | limits plus pidfd deadline (W:`confinement/execution.rs:121-132`), `HostParent` | in-guest cgroup, `GuestSupervisor` (with `HostVmm`) | fixed container limits, `HostParent` |
 | output_channels | `NotEnforced` (kernel output guards apply) | `Value` bounded by `ReturnContractV1`; all other channels withheld, `HostParent` | `NotEnforced` | `NotEnforced` |
+
+### 5.2.1 Agent-host backend kinds
+
+These kinds confine an agent harness process (the worker lane) rather than a tool server. They are thin adapters over OS mechanisms for hosts with no qualified runtime, and they rank below `LinuxCage` and `FirecrackerGuest` in assurance.
+
+**`AgentHostBwrap`.** The Linux bubblewrap restricted launcher that HOST-M2 harnesses (the Pi plugin profile) run under. Bubblewrap unshares the user, mount, PID, IPC and network namespaces, builds the mount set from explicit binds, and installs a caller-supplied seccomp filter, all from the host parent before the harness executes. Its native record will be a signed agent-host launch record carrying the bwrap argument vector digest, the namespace set, the mount set, the seccomp filter digest and the harness executable digest, with every surface observed by `HostParent`. Network is `Absent` only when the network namespace is unshared with no veth or socket bind. The broker and gateway sockets the harness is granted appear in `inherited_authority`. Until that record, its qualification predicate, its schema vectors and its `confinement_launch` binding land, no `AgentHostBwrap` record verifies, so no receipt renders confined under it.
+
+**`Seatbelt`.** The macOS `sandbox-exec` restricted launcher used by the Seatbelt-only harnesses. The host parent applies a deny-default SBPL profile with fork denied before the harness executes. Its native record will be a signed launch record carrying the compiled profile digest, the harness executable digest and code-signing identity, and the effective policy load result. A profile that fails to load, or an expected denial that does not occur, records `Rejected` or `BootstrapFailed` and never retries unsandboxed. Qualification must cover the macOS channels a profile can leave open (Mach and XPC services, Automation, Accessibility, pasteboard, capture and Input Monitoring) as `Enforced`, `Absent` or `NotEnforced` surfaces under rule 5.2.2, so a profile that leaves one open cannot be `FullyEnforced`. Until that record and its binding land, no `Seatbelt` record verifies, and the disclosure stays "not confined by Chio".
 
 ### 5.3 Process container launch record
 
@@ -586,7 +601,7 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 5. **Microkernel scope.** Pin a future backend to FTL, or open it to any capability guest that meets Q1-Q13?
 6. **Confined export authority.** Should the P5 export be a new `RecoveryPermission` (for example `confined.export`), or ride the existing review read? The review read already carries review-custody semantics. A separate permission keeps exporting distinct from approving.
 7. **Merge of the cage changes.** W:'s P5 adds cage APIs: `ObservedCageExit`, `enforce_deadline`, `try_wait_verified`, `base_plan_digest`, and `base_profile_digest`, in W:`crates/security/chio-cage/src/launch.rs`. It also edits `chio-cage` internals (`lib_parts/part_01.rs`, `launch/linux_parts/part_01_sections/bootstrap.inc`, `launch/linux_parts/part_02.rs`). W:'s base `f25cd61f4` predates M:'s split into `chio-cage`, `chio-cage-plan`, and `chio-cage-init`. Who ports these APIs into the split crates, and in which order relative to the M:/V: union?
-8. **Agent-host backends for UR-KERN-5.** The roadmap's UR-KERN-5 also names `AgentHostBwrap` (the Linux bubblewrap restricted launcher for HOST-M2 harnesses) and `Seatbelt` (the macOS sandbox that the Seatbelt-only harnesses use). Neither is designed here: `ConfinementBackendKind` stays closed at three variants, and rollout steps 1 and 2 cover the adapted-server binding and the process-container record. Adding them is an additive amendment to this spec that must land before UR-KERN-5 claims them: one variant each, a section 5.2 column (native record, evidence observer, surface statuses), a qualification predicate, schema vectors, and unit and conformance tests. Until it lands, neither kind is representable, and no isolation claim may cite either.
+8. **Agent-host backends for UR-KERN-5.** Resolved in revision 6: `ConfinementBackendKind` carries `AgentHostBwrap` and `Seatbelt` (section 5.2.1) and stays closed. Still open per kind: the signed native record, a section 5.2 mapping column, the qualification predicate, schema vectors, the `confinement_launch` binding, and conformance tests. Until those land for a kind, no record of that kind verifies and no isolation claim may cite it.
 
 Refinements to the review directives, recorded with evidence:
 - The directive "map `ConfinementRecord` into `RuntimeAssuranceBacking`" is kept, but the record cannot be mapped directly. The facet only accepts a signed runtime-attestation envelope plus a signed appraisal from pinned authorities (V:`verify.rs:1481-1515`). Section 7 therefore wraps the record set in that envelope.
