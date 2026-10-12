@@ -1,9 +1,9 @@
 use super::{
     canonical_json_bytes, sha256, ActionId, Arc, BTreeMap, Clock, DeclassificationOutboxHealth,
-    EffectPort, LeaseOwnerId, Mutex, OsRng, PortError, PortErrorKind,
+    EffectPort, LeaseOwnerId, Mutex, PortError, PortErrorKind,
     ProductionDeclassificationReceiptOutbox, RecordId, ResponseDispatchStore, ResponseExecutor,
     ResponseScheduler, ResponseSchedulerStore, ResponseWorkerPort, ResponseWorkerTick,
-    ResponseWorkerTickError, RngCore, ScheduledResponseExecutor, ScheduledWork, SchedulerError,
+    ResponseWorkerTickError, ScheduledResponseExecutor, ScheduledWork, SchedulerError,
     SchedulerHealthPort, SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
     SecurityAlertPort, SecurityReceiptSink, Serialize, SqliteSecurityStateStore, TenantId,
     WORKER_CLAIM_DOMAIN,
@@ -436,13 +436,9 @@ pub(super) struct WorkerClaimCommitment<'a> {
 }
 
 pub(super) fn response_worker_claim_incarnation_id() -> Result<RecordId, ResponseWorkerTickError> {
-    let mut incarnation_bytes = [0_u8; 32];
-    OsRng
-        .try_fill_bytes(&mut incarnation_bytes)
-        .map_err(|_| PortError::unavailable())?;
     RecordId::new(format!(
         "response-worker-incarnation-{}",
-        hex::encode(incarnation_bytes)
+        crate::security::os_random::hex_256()?
     ))
     .map_err(PortError::from)
     .map_err(ResponseWorkerTickError::from)

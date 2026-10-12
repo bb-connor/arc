@@ -1,4 +1,4 @@
-use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, SigningBackend};
+use chio_core::{canonical_json_bytes, sha256_hex, PublicKey, SigningBackend};
 use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
 use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
 #[cfg(target_os = "linux")]
@@ -185,7 +185,7 @@ impl ProductionActiveResponseAuthorityClient {
             schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
             deployment_digest: self.config.deployment_digest,
             store_digest: self.config.store_digest,
-            request_id: RequestId::new(Keypair::generate().public_key().to_hex())
+            request_id: RequestId::new(crate::security::os_random::hex_256()?)
                 .map_err(PortError::from)?,
             issued_at_unix_seconds,
             client: expected_client.clone(),
