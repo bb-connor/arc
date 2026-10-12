@@ -38,6 +38,7 @@ impl ErrorKind {
 enum Mode {
     CaptureError(ErrorKind),
     CapturedThenAcknowledgementLost,
+    CapturedThenPanicked,
     Settled,
     AuthorizeDeclined,
 }
@@ -102,6 +103,12 @@ impl PaymentAdapter for PrepaymentAdapter {
                     .externally_captured
                     .store(true, Ordering::SeqCst);
                 Err(PaymentError::Unavailable(SENSITIVE_ERROR.to_string()))
+            }
+            Mode::CapturedThenPanicked => {
+                self.counters
+                    .externally_captured
+                    .store(true, Ordering::SeqCst);
+                panic!("{SENSITIVE_ERROR}");
             }
             Mode::Settled => {
                 self.counters
@@ -300,6 +307,14 @@ fn captured_then_lost_ack_retains_custody_without_execution_nonce() -> TestResul
     let response = fixture.reserve()?;
     assert!(fixture.counters.externally_captured.load(Ordering::SeqCst));
     fixture.assert_capture_failure_retained(&response, "unavailable")
+}
+
+#[test]
+fn captured_then_panicked_retains_custody_without_execution_nonce() -> TestResult {
+    let fixture = Fixture::new(Mode::CapturedThenPanicked)?;
+    let response = fixture.reserve()?;
+    assert!(fixture.counters.externally_captured.load(Ordering::SeqCst));
+    fixture.assert_capture_failure_retained(&response, "rail_error")
 }
 
 #[test]
