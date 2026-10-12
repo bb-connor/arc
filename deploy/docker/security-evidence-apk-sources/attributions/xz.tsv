@@ -1,0 +1,206 @@
+# chio.attribution-lines.v8 origin=xz files=509 files_with_lines=52 binary_heads=97 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po4a/update-po	\t--copyright-holder="The XZ Utils authors and contributors" \\
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/windows/build.bash	\techo "copyright and license notices of the MinGW-w64 runtime" >&2
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/windows/README-Windows.txt	                      copyright and license information.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING	        Copyright (C) The XZ Utils authors and contributors
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/NEWS	      retaining or reproducing copyright or license notices when
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	    <program>  Copyright (C) <year>  <name of author>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/README	    COPYING               XZ Utils copyright and license information
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/windows/README-Windows.txt	    COPYING.MinGW-w64-runtime.txt for copyright and license
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	    Copyright (C) 2006 Timo Lindfors
+line	3	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	    Copyright (C) <year>  <name of author>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	    Gnomovision version 69, Copyright (C) year name of author
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING	    a copyright notice is needed, the following is sufficient:
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	    announcement including an appropriate copyright notice and a
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/windows/INSTALL-MinGW-w64_with_CMake.txt	    any copyright or license notices to be included when distributing
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/windows/INSTALL-MinGW-w64_with_Autotools.txt	    to this directory. It contains copyright and license notices that
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	   # Copyright (C) 1998, 1999, 2001  Henry Spencer.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	   $ ./scanlzma 0 < WA2204-FW1.4.1/linux-1.4.bin | lzma -c -d | strings | grep -i "copyright"
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/lib/getopt.c	   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+line	7	xz-5.8.4.tar.gz:xz-5.8.4/lib/getopt-cdefs.h	   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/INSTALL.generic	   Copyright (C) 1994-1996, 1999-2002, 2004-2016 Free Software
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	   Copyright (C) 2005 Philipp Benner.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	   UpdateDD version 2.5, Copyright (C) 2005 Philipp Benner.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/extra/scanlzma/scanlzma.c	   mawk 1.3%s%s %s, Copyright (C) Michael D. Brennan
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	  "The Program" refers to any copyrightable work licensed under this
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	  A "contributor" is a copyright holder who authorizes use under this
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	  Moreover, your license from a particular copyright holder is
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	  We protect your rights with a two-step method: (1) we copyright the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	  We protect your rights with two steps: (1) copyright the software, and
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	 Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	"aggregate" if the compilation and its resulting copyright are not
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	"copyright" line and a pointer to where the full notice is found.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/ax_pthread.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/ax_pthread.m4	#   Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/ax_pthread.m4	#   Copyright (c) 2011 Daniel Richard G. <skunk@iSKUNK.ORG>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/ax_pthread.m4	#   Copyright (c) 2019 Marc Stevens <marc.stevens@cwi.nl>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/src/scripts/xzmore.in	# Copyright (C) 1992, 1993 Jean-loup Gailly
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/src/scripts/xzdiff.in	# Copyright (C) 1993 Jean-loup Gailly
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/src/scripts/xzgrep.in	# Copyright (C) 1998, 2001, 2002, 2006, 2007 Free Software Foundation
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/src/scripts/xzdiff.in	# Copyright (C) 1998, 2002, 2006, 2007 Free Software Foundation
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/src/scripts/xzmore.in	# Copyright (C) 2001, 2002, 2007 Free Software Foundation
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# Copyright (C) 2003-2019 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/ko.po	# Copyright (C) 2019, 2022, 2023, 2024, 2025, 2026 the last and past translators
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po4a/fr.po	# Copyright (C) 2021 Debian French l10n team <debian-l10n-french@lists.debian.org>
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/es.po	# Copyright (C) 2024, 2025 The XZ Utils authors and contributors
+line	7	xz-5.8.4.tar.gz:xz-5.8.4/po/hr.po	# Copyright (C) 2026 the last and past translators
+line	6	xz-5.8.4.tar.gz:xz-5.8.4/po/ca.po	# Copyright (C) The XZ Utils authors and contributors
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po4a/sr.po	# Copyright (©) The XZ Utils authors and contributors
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/po/de.po	# Copyright © 2022, 2023, 2024, 2025, 2026 the last and past translators
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po4a/sv.po	# Copyright © The XZ Utils authors and contributors
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	# their copyright.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/lib/Makefile.am	## Copyright (C) 2004-2007 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	(1) assert copyright on the software, and (2) offer you this License
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/po/Makevars	COPYRIGHT_HOLDER = The XZ Utils authors and contributors
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	a notice placed by the copyright holder saying it may be distributed
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	add to a covered work, you may (if authorized by the copyright holders of
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	appropriate copyright notice and disclaimer of warranty; keep intact
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	appropriately publish on each copy an appropriate copyright notice;
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/INSTALL.generic	are permitted in any medium without royalty provided the copyright
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	author or copyright holder as a result of your choosing to follow a
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	certain countries either by patents or by copyrighted interfaces, the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	copyright holder, and you cure the violation prior to 30 days after
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	copyright law: that is to say, a work containing the Library or a
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	copyright notice and disclaimer of warranty; keep intact all the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	copyright notice for the Library among them, as well as a reference
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	copyright on the Program, and are irrevocable provided the stated
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	copyrighted by the Free Software Foundation, write to the Free
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/getopt.m4	dnl Copyright (C) 2002-2006, 2008-2023 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2024 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/m4/posix-shell.m4	dnl Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	during execution displays copyright notices, you must include the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	finally terminates your license, and (b) permanently, if the copyright
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	for which you have or can give appropriate copyright permission.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	in a fashion requiring copyright permission, other than the making of an
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	infringement under applicable copyright law, except executing it on a
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	license from a particular copyright holder is reinstated (a)
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	means either the Program or any derivative work under copyright law:
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	modify any covered work.  These actions infringe copyright if you do
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	not control copyright.  Those thus making or running the covered works
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	original copyright holder who places the Library under this License may add
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	original copyright holder who places the Program under this License
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	program which contains a notice placed by the copyright holder or
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	provisionally, unless and until the copyright holder explicitly and
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	reinstated permanently if the copyright holder notifies you of the
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	rights of fair use or other equivalent, as provided by copyright law.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.LGPLv2.1	school, if any, to sign a "copyright disclaimer" for the library, if
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	school, if any, to sign a "copyright disclaimer" for the program, if
+line	2	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	the "copyright" line and a pointer to where the full notice is found.
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv2	to ask for permission.  For software which is copyrighted by the Free
+line	1	xz-5.8.4.tar.gz:xz-5.8.4/COPYING.GPLv3	your copyrighted material outside their relationship with you.
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-backward_size.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-empty-truncated.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-footer_magic.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-header_magic.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-index-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0-nonempty_index.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0cat-alone.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0cat-header_magic.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0catpad-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-0pad-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-4.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-5.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-block_header-6.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-check-crc32-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-check-crc32.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-check-crc64.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-check-sha256.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-index-huge-uncomp.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-10.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-11.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-4.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-5.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-6.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-7.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-8.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-lzma2-9.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-stream_flags-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-stream_flags-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-stream_flags-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v0-uncomp-size.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-crc32.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-dict-1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-dict-2.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-magic-1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-magic-2.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-member-size.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-trailing-magic.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-v1-uncomp-size.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-vli-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-1-vli-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-compressed_data_padding.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-index-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-index-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-index-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-index-4.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-2-index-5.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-3-index-uncomp-overflow.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-too_big_size-with_eopm.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-too_small_size-without_eopm-1.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-too_small_size-without_eopm-2.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-too_small_size-without_eopm-3.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/bad-unknown_size-without_eopm.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-0-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-0cat-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-0catpad-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-0pad-empty.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-3delta-lzma2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-arm64-lzma2-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-arm64-lzma2-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-block_header-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-block_header-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-block_header-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-check-crc32.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-check-crc64.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-check-none.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-check-sha256.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-delta-lzma2.tiff.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-empty-bcj-lzma2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-lzma2-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-lzma2-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-lzma2-3.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-lzma2-4.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-lzma2-5.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-v0-trailing-1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-v0.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-v1-trailing-1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-v1-trailing-2.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-1-v1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-2-lzma2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-2-v0-v1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-2-v1-v0.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-2-v1-v1.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-known_size-with_eopm.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-known_size-without_eopm.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/good-unknown_size-with_eopm.lzma
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-1-v234.lz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-block_header.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-check.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-filter_flags-1.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-filter_flags-2.xz
+binary-head	xz-5.8.4.tar.gz:xz-5.8.4/tests/files/unsupported-filter_flags-3.xz

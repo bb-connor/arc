@@ -1,0 +1,119 @@
+# chio.attribution-lines.v8 origin=protobuf files=3016 files_with_lines=2095 binary_heads=14 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/cmake/version.rc.in	            VALUE "LegalCopyright", "Copyright 2008 Google Inc.  All rights reserved.\\0"
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/kotlin_osgi.bzl	        "bundle_copyright": attr.string(),
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/compiler/objectivec/names.cc	      // character must be not lower case (Copyright vs CopyFoo vs Copy_Foo).
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/OsgiWrapper.java	      description = "Copyright string for the bundle")
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/OsgiWrapper.java	      names = {"--bundle_copyright"},
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/LICENSE	    * Redistributions of source code must retain the above copyright
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/csharp/src/Google.Protobuf/Google.Protobuf.csproj	    <Copyright>Copyright 2015, Google Inc.</Copyright>
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/csharp/Google.Protobuf.Tools.nuspec	    <copyright>Copyright 2015, Google Inc.</copyright>
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/lunit.lua	    Copyright (c) 2004, 2006-2010 Michael Roth <mroth@nessie.de>
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/console.lua	    Copyright (c) 2006-2008 Michael Roth <mroth@nessie.de>
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/console.lua	    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/console.lua	    The above copyright notice and this permission notice shall be\x20
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/OsgiWrapper.java	    analyzer.setProperty(Analyzer.BUNDLE_COPYRIGHT, bundleCopyright);
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/kotlin_osgi.bzl	    args.add("--bundle_copyright", ctx.attr.bundle_copyright)
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/upb/bazel/amalgamate.py	    has_copyright = lines[0].startswith(
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/upb/bazel/amalgamate.py	    if has_copyright:
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/UTF-8-demo.txt	  abcdefghijklmnopqrstuvwxyz £©µÀÆÖÞßéöÿ
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/java/osgi/OsgiWrapper.java	  private String bundleCopyright;
+line	14	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyDescriptor.java	 *     * Redistributions of source code must retain the above copyright
+line	14	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyDescriptor.java	 * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	12	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyDescriptor.java	 * Copyright 2014 Google Inc.  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyMethodDescriptor.java	 * Copyright 2024 Google Inc.  All rights reserved.
+line	14	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyDescriptor.java	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	14	protobuf-29.4.tar.gz:protobuf-29.4/ruby/src/main/java/com/google/protobuf/jruby/RubyDescriptor.java	 * copyright notice, this list of conditions and the following disclaimer
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/proto.vim	"     * Redistributions of source code must retain the above copyright
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/proto.vim	" A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/proto.vim	" Copyright 2008 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/proto.vim	" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/proto.vim	" copyright notice, this list of conditions and the following disclaimer
+line	20	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/BUILD.googleapis	#     * Redistributions of source code must retain the above copyright
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/python/docs/conf.py	#   * Redistributions of source code must retain the above copyright
+line	22	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/BUILD.googleapis	# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	30	protobuf-29.4.tar.gz:protobuf-29.4/bazel/BUILD.bazel	# Copyright (c) 2009-2021, Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/python/dist/BUILD.bazel	# Copyright (c) 2009-2022, Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/upb/mini_table/BUILD	# Copyright (c) 2009-2023, Google LLC
+line	8	protobuf-29.4.tar.gz:protobuf-29.4/bazel/java_lite_proto_library.bzl	# Copyright (c) 2009-2024, Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/lua/lua_proto_library.bzl	# Copyright (c) 2023, Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/hpb/bazel/hpb_proto_library.bzl	# Copyright (c) 2024 Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/python/google/protobuf/__init__.py	# Copyright 2007 Google Inc. All Rights Reserved.
+line	88	protobuf-29.4.tar.gz:protobuf-29.4/bazel/private/bazel_proto_library_rule.bzl	# Copyright 2008 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/compiler/zip_output_unittest.sh	# Copyright 2009 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/cmake/protobuf-configure-target.cmake	# Copyright 2013 Google LLC  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/DevTools/pddm.py	# Copyright 2015 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/python/docs/conf.py	# Copyright 2019 Google LLC.  All rights reserved.
+line	12	protobuf-29.4.tar.gz:protobuf-29.4/ruby/lib/google/protobuf/ffi/descriptor.rb	# Copyright 2022 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/BUILD.bazel	# Copyright 2022 Google LLC
+line	6	protobuf-29.4.tar.gz:protobuf-29.4/editions/defaults.bzl	# Copyright 2023 Google Inc.  All rights reserved.
+line	21	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/BUILD.googleapis	# Copyright 2023 Google LLC.  All rights reserved.
+line	14	protobuf-29.4.tar.gz:protobuf-29.4/bazel/common/proto_common.bzl	# Copyright 2024 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/rust/upb/BUILD	# Copyright 2024 Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/rust/cargo/Cargo.toml	# Copyright 2024 Google LLC.  All rights reserved.
+line	22	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/BUILD.googleapis	# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	22	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/BUILD.googleapis	# copyright notice, this list of conditions and the following disclaimer
+line	84	protobuf-29.4.tar.gz:protobuf-29.4/csharp/compatibility_tests/v3.0.0/src/Google.Protobuf.Test/ByteStringTest.cs	#region Copyright notice and license
+line	25	protobuf-29.4.tar.gz:protobuf-29.4/java/kotlin-lite/src/main/kotlin/com/google/protobuf/ExtendableMessageLiteExtensions.kt	//     * Redistributions of source code must retain the above copyright
+line	25	protobuf-29.4.tar.gz:protobuf-29.4/java/kotlin-lite/src/main/kotlin/com/google/protobuf/ExtendableMessageLiteExtensions.kt	// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	3	protobuf-29.4.tar.gz:protobuf-29.4/upb_generator/common/names.cc	// Copyright (c) 2009-2024, Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/bridge/message_set.proto	// Copyright 2007 Google Inc.  All rights reserved.
+line	1125	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/descriptor.proto	// Copyright 2008 Google Inc.  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/text_format.cc	// Copyright 2008 Google LLC.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/repeated_ptr_field_unittest.cc	// Copyright 2008, 2024 Google Inc.  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/compiler/code_generator_lite.cc	// Copyright 2008-2024 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/unittest_enormous_descriptor.proto	// Copyright 2009 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/Tests/unittest_objc.proto	// Copyright 2011 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/src/google/protobuf/stubs/platform_macros.h	// Copyright 2012 Google Inc.  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/Tests/GPBObjectiveCPlusPlusTest.mm	// Copyright 2013 Google Inc.  All rights reserved.
+line	13	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/Tests/GPBConcurrencyTests.m	// Copyright 2014 Google Inc.  All rights reserved.
+line	97	protobuf-29.4.tar.gz:protobuf-29.4/conformance/conformance_objc.m	// Copyright 2015 Google Inc.  All rights reserved.
+line	17	protobuf-29.4.tar.gz:protobuf-29.4/csharp/compatibility_tests/v3.0.0/src/Google.Protobuf.Test/TestProtos/ForeignMessagePartial.cs	// Copyright 2016 Google Inc.  All rights reserved.
+line	17	protobuf-29.4.tar.gz:protobuf-29.4/csharp/compatibility_tests/v3.0.0/src/Google.Protobuf.Test/Program.cs	// Copyright 2017 Google Inc.  All rights reserved.
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/csharp/src/Google.Protobuf.Test/Reflection/DescriptorDeclarationTest.cs	// Copyright 2018 Google Inc.  All rights reserved.
+line	7	protobuf-29.4.tar.gz:protobuf-29.4/csharp/src/Google.Protobuf.Test/ParsingPrimitivesTest.cs	// Copyright 2022 Google Inc.  All rights reserved.
+line	3	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/fuzz/utf8_validity_fuzzer.cc	// Copyright 2022 Google LLC
+line	80	protobuf-29.4.tar.gz:protobuf-29.4/editions/codegen_tests/proto2_enum.proto	// Copyright 2023 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/utf8_range.c	// Copyright 2023 Google LLC
+line	412	protobuf-29.4.tar.gz:protobuf-29.4/benchmarks/benchmark.cc	// Copyright 2023 Google LLC.  All rights reserved.
+line	16	protobuf-29.4.tar.gz:protobuf-29.4/conformance/test_protos/test_messages_edition2023.proto	// Copyright 2024 Google Inc.  All rights reserved.
+line	60	protobuf-29.4.tar.gz:protobuf-29.4/hpb/arena.h	// Copyright 2024 Google LLC.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/java/core/src/test/java/com/google/protobuf/ConcurrentDescriptorsTest.java	// Copyright 2025 Google Inc.  All rights reserved.
+line	25	protobuf-29.4.tar.gz:protobuf-29.4/java/kotlin-lite/src/main/kotlin/com/google/protobuf/ExtendableMessageLiteExtensions.kt	// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	25	protobuf-29.4.tar.gz:protobuf-29.4/java/kotlin-lite/src/main/kotlin/com/google/protobuf/ExtendableMessageLiteExtensions.kt	// copyright notice, this list of conditions and the following disclaimer
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/protobuf-mode.el	;;     * Redistributions of source code must retain the above copyright
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/protobuf-mode.el	;; A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/protobuf-mode.el	;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/editors/protobuf-mode.el	;; copyright notice, this list of conditions and the following disclaimer
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/LICENSE	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/LICENSE	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/CONTRIBUTING.md	Agreement. You (or your employer) retain the copyright to your contribution,
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/lunit.lua	Copyright (c) 2004-2009 Michael Roth <mroth@nessie.de>
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/LICENSE	Copyright (c) 2004-2010 Michael Roth <mroth@nessie.de>
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/LICENSE	Copyright (c) 2019 Yibo Cai
+line	7	protobuf-29.4.tar.gz:protobuf-29.4/conformance/README.md	Copyright 2008 Google Inc.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/LICENSE	Copyright 2008 Google Inc.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/LICENSE	Copyright 2022 Google LLC
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/README.md	Copyright 2023 Google LLC
+line	2	protobuf-29.4.tar.gz:protobuf-29.4/lua/test_upb.lua	Copyright 2023 Google LLC.  All rights reserved.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/LICENSE	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/lunit/LICENSE	The above copyright notice and this permission notice shall be\x20
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/LICENSE	The above copyright notice and this permission notice shall be included in all
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/python/README.md	Type "help", "copyright", "credits" or "license" for more information.
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/python/docs/conf.py	copyright = u"2008, Google LLC"
+line	1	protobuf-29.4.tar.gz:protobuf-29.4/LICENSE	copyright notice, this list of conditions and the following disclaimer
+line	89	protobuf-29.4.tar.gz:protobuf-29.4/csharp/compatibility_tests/v3.0.0/src/Google.Protobuf.Test/CodedInputStreamExtensions.cs	\xef\xbb\xbf#region Copyright notice and license
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/compatibility/v3.25.0/generic_test_protos-speed.srcjar
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/compatibility/v3.25.0/java_test_protos-speed.srcjar
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/compatibility/v3.25.0/lite_test_protos-speed.srcjar
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/csharp/keys/Google.Protobuf.public.snk
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/csharp/keys/Google.Protobuf.snk
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/csharp/src/Google.Protobuf.Test/testprotos.pb
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/docs/design/editions/images/editions-life-of-a-featureset-image-01.png
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/docs/design/editions/images/editions-life-of-a-featureset-image-03.png
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/docs/design/editions/images/editions-life-of-a-featureset-image-04.png
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/Tests/golden_message
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/objectivec/Tests/golden_packed_fields_message
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/php/src/GPBMetadata/Google/Protobuf/Struct.php
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/php/src/GPBMetadata/Google/Protobuf/Type.php
+binary-head	protobuf-29.4.tar.gz:protobuf-29.4/third_party/utf8_range/utf8_corpus_dir/utf8_corpus_kuhn.txt

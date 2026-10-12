@@ -1,0 +1,6 @@
+tree d5f02a5a48cb4e2f99f4a7e9081d6835dbfad780
+parent 8820dd507c7c6c5b6ffa6cabb4c063ba8d14eae0
+author omni <omni+alpine@hack.org> 1788305910 +0000
+committer omni <omni+alpine@hack.org> 1788305918 +0000
+
+main/jq: security upgrade to 1.8.2

@@ -1,0 +1,31 @@
+# chio.attribution-lines.v8 origin=perl-error files=45 files_with_lines=6 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	     Copyright Holder to include your modifications in the Standard
+line	2	Error-0.17030.tar.gz:Error-0.17030/LICENSE	     d) make other distribution arrangements with the Copyright Holder.
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	     or has been modified in accordance with the wishes of the Copyright
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	     will not be required to justify it to the Copyright Holder, but only to the
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	    announcement including an appropriate copyright notice and a
+line	1	Error-0.17030.tar.gz:Error-0.17030/ChangeLog	  - Added the "COPYRIGHT" section to the POD with the correct
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	  We protect your rights with two steps: (1) copyright the software, and
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	Error-0.17030.tar.gz:Error-0.17030/lib/Error.pm	# Copyright (c) 1997-8 Graham Barr <gbarr@ti.com>. All rights reserved.
+line	1	Error-0.17030.tar.gz:Error-0.17030/lib/Error/Simple.pm	# Copyright (c) 2006 Shlomi Fish <shlomif@shlomifish.org>.
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	-    "Copyright Holder" is whoever is named in the copyright or copyrights for
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	-    "Package" refers to the collection of files distributed by the Copyright
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	8. The name of the Copyright Holder may not be used to endorse or promote
+line	1	Error-0.17030.tar.gz:Error-0.17030/lib/Error.pm	=head1 COPYRIGHT
+line	2	Error-0.17030.tar.gz:Error-0.17030/lib/Error.pm	=head1 COPYRIGHT AND LICENSE
+line	1	Error-0.17030.tar.gz:Error-0.17030/lib/Error.pm	Copyright (c) 1997-8  Graham Barr. All rights reserved.
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	3	Error-0.17030.tar.gz:Error-0.17030/README	This software is copyright (c) 2025 by Shlomi Fish ( http://www.shlomifish.org/ ).
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	a notice placed by the copyright holder saying it may be distributed
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	all of the original copyright notices and associated disclaimers.
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	certain countries either by patents or by copyrighted interfaces, the
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	copyright notice and disclaimer of warranty; keep intact all the
+line	1	Error-0.17030.tar.gz:Error-0.17030/dist.ini	copyright_holder = Shlomi Fish ( http://www.shlomifish.org/ )
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	may be copied, such that the Copyright Holder maintains some semblance of
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	means either the Program or any derivative work under copyright law:
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	original copyright holder who places the Program under this License
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	the Public Domain or from the Copyright Holder. A Package modified in such a
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	the programs of this Package do not automatically fall under the copyright of this
+line	1	Error-0.17030.tar.gz:Error-0.17030/LICENSE	to ask for permission.  For software which is copyrighted by the Free

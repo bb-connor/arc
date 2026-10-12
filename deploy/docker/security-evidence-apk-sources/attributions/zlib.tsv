@@ -1,0 +1,130 @@
+# chio.attribution-lines.v8 origin=zlib files=255 files_with_lines=114 binary_heads=5 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/qnx/package.qpg	               <QPM:ReleaseCopyright>No License</QPM:ReleaseCopyright>
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzappend.c	            "gzappend 1.2 (11 Oct 2012) Copyright (C) 2003, 2012 Mark Adler\\n"
+line	10	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	         Copyright (C) 1998-2026 Gilles Vollant (minizip) ( https://www.winimage.com/zLibDll/minizip.html )
+line	4	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	         Copyright (C) 2007-2008 Even Rouault
+line	10	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	         Copyright (C) 2009-2010 Mathias Svensson ( https://result42.com )
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	        Copyright (C) 2007-2008 Even Rouault
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gun.c	        fprintf(stderr, "Copyright (C) 2003-2010 Mark Adler\\n");
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/win32/zlib1.rc	      VALUE "LegalCopyright",\t"(C) 1995-2026 Jean-loup Gailly & Mark Adler\\0"
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/nuget/nuget.csproj	    <Copyright>(C) 1995-2026 Jean-loup Gailly and Mark Adler</Copyright>
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip	    copyright notice, definition, disclaimer, and this list of conditions.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zlib.map	    deflate_copyright;
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	    if (unz_copyright[0]!=' ')
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zlib.map	    inflate_copyright;
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip	    reproduce the above copyright notice, definition, disclaimer, and this list
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/deflate.c	   " deflate 1.3.2 Copyright 1995-2026 Jean-loup Gailly and Mark Adler ";
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/inftrees.c	   " inflate 1.3.2 Copyright 1995-2026 Mark Adler ";
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/infback9/inftree9.c	   " inflate9 1.3.2 Copyright 1995-2026 Mark Adler ";
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	   " unzip 1.01 Copyright 1998-2004 Gilles Vollant - https://www.winimage.com/zLibDll/minizip.html";
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/crypt.h	   Copyright (C) 1998-2026 Gilles Vollant
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/doc/rfc1952.txt	   Copyright (c) 1996 L. Peter Deutsch
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/doc/rfc1950.txt	   Copyright (c) 1996 L. Peter Deutsch and Jean-Loup Gailly
+line	3	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/fitblk.c	   Not copyrighted -- provided to the public domain
+line	3	zlib-1.3.2.tar.gz:zlib-1.3.2/doc/rfc1952.txt	   copyright notice and this notice are preserved, and that any
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/zconf.h.in	  #pragma map(inflate_copyright,"INCOPY")
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/win32/README-WIN32.txt	  (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/.cmake-format.yaml	  - your copyright/license statements.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/readme.txt	  Copyright (C) 1995-2003 Jean-loup Gailly and Mark Adler.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/readme.txt	  Copyright (C) 1995-2003 by Jean-loup Gailly.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zlib.h	  Copyright (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	  Copyright (C) 1998 - 2010 Gilles Vollant, Even Rouault, Mathias Svensson
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/readme.txt	  Copyright (C) 1998 by Bob Dellaca.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/readme.txt	  Copyright (C) 1998,1999,2000 by Jacques Nomssi Nzali.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/puff/puff.h	  Copyright (C) 2002-2013 Mark Adler, all rights reserved
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/readme.txt	  Copyright (C) 2003 by Cosmin Truta.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzappend.c	  Copyright (C) 2003, 2012 Mark Adler, all rights reserved
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/blast/blast.h	  Copyright (C) 2003, 2012, 2013 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzjoin.c	  Copyright (C) 2004, 2005, 2012 Mark Adler, all rights reserved
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzlog.h	  Copyright (C) 2004, 2008, 2012 Mark Adler, all rights reserved
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	  Copyright (c) 1990-2000 Info-ZIP.  All rights reserved.
+line	3	zlib-1.3.2.tar.gz:zlib-1.3.2/deflate.c	  copyright string in the executable of your product.
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/LICENSE	 (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzappend.c	 *                      - Add version and copyright to help
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/example.pas	 * Copyright (C) 1995-2003 Jean-loup Gailly.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/infback9/inflate9.h	 * Copyright (C) 1995-2003 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/inffast.h	 * Copyright (C) 1995-2003, 2010 Mark Adler
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/infback9/infback9.c	 * Copyright (C) 1995-2008 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/adler32.c	 * Copyright (C) 1995-2011, 2016 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/inflate.h	 * Copyright (C) 1995-2019 Mark Adler
+line	5	zlib-1.3.2.tar.gz:zlib-1.3.2/test/example.c	 * Copyright (C) 1995-2026 Jean-loup Gailly
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/deflate.c	 * Copyright (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	5	zlib-1.3.2.tar.gz:zlib-1.3.2/zutil.h	 * Copyright (C) 1995-2026 Jean-loup Gailly, Mark Adler
+line	7	zlib-1.3.2.tar.gz:zlib-1.3.2/inftrees.h	 * Copyright (C) 1995-2026 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/example.pas	 * Copyright (C) 1998 by Jacques Nomssi Nzali.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/puff/puff.c	 * Copyright (C) 2002-2013 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/puff/pufftest.c	 * Copyright (C) 2002-2026 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/zlibpas.pas	 * Copyright (C) 2003 Cosmin Truta.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/infback9/infback9.h	 * Copyright (C) 2003 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/example.pas	 * Copyright (C) 2003 by Cosmin Truta.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gun.c	 * Copyright (C) 2003, 2005, 2008, 2010, 2012 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/blast/blast.c	 * Copyright (C) 2003, 2012, 2013 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzlog.c	 * Copyright (C) 2004, 2008, 2012, 2016, 2019 Mark Adler, all rights reserved
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/gzclose.c	 * Copyright (C) 2004, 2010 Mark Adler
+line	4	zlib-1.3.2.tar.gz:zlib-1.3.2/gzread.c	 * Copyright (C) 2004-2026 Mark Adler
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/zran.h	 * Copyright (C) 2005, 2012, 2018, 2023, 2024, 2025 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/enough.c	 * Copyright (C) 2007, 2008, 2012, 2018, 2024 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/test/infcover.c	 * Copyright (C) 2011, 2016, 2024 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gznorm.c	 * Copyright (C) 2018 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/ints.h	 * Copyright (C) 2024 Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/iostream2/zstream.h	 * Copyright (c) 1997
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/blast/blast.c	 * For conditions of distribution and use, see copyright notice in blast.h
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/gzlog.c	 * For conditions of distribution and use, see copyright notice in gzlog.h
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/puff/pufftest.c	 * For conditions of distribution and use, see copyright notice in puff.h
+line	3	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/pascal/example.pas	 * For conditions of distribution and use, see copyright notice in readme.txt
+line	36	zlib-1.3.2.tar.gz:zlib-1.3.2/zutil.h	 * For conditions of distribution and use, see copyright notice in zlib.h
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/ints.h	 * For conditions of distribution and use, see the copyright notice in zlib.h
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/iostream2/zstream.h	 * provided that the above copyright notice appear in all copies and
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/iostream2/zstream.h	 * that both that copyright notice and this permission notice appear
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/BUILD.bazel	#      * Redistributions of source code must retain the above copyright
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/BUILD.bazel	#  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/BUILD.bazel	#  Copyright 2008 Google Inc.  All rights reserved.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/BUILD.bazel	#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/BUILD.bazel	#  copyright notice, this list of conditions and the following disclaimer
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/zconf.h.in	#  define deflate_copyright     z_deflate_copyright
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/zconf.h.in	#  define inflate_copyright     z_inflate_copyright
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/msdos/Makefile.emx	# Copyright (C) 1995-1998 Jean-loup Gailly.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/Makefile.in	# Copyright (C) 1995-2026 Jean-loup Gailly, Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/win32/Makefile.gcc	# Copyright (C) 1995-2026 Jean-loup Gailly.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/amiga/Makefile.pup	# Copyright (C) 1998 by Andreas R. Kleinert
+line	4	zlib-1.3.2.tar.gz:zlib-1.3.2/msdos/Makefile.emx	# For conditions of distribution and use, see copyright notice in zlib.h
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/amiga/Makefile.sas	# Modified from the standard UNIX Makefile Copyright Jean-loup Gailly
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/win32/Makefile.msc	# zlib is copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/ChangeLog	- Update copyright dates on modified source files
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/ada/zlib.ads	--              Copyright (C) 2002-2004 Dmitriy Anisimkov                   --
+line	7	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/ada/zlib-streams.ads	--  Copyright (C) 2002-2003 Dmitriy Anisimkov                 --
+line	2	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/ada/buffer_demo.adb	--  Copyright (C) 2002-2004 Dmitriy Anisimkov                 --
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/skipset.h	// *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / www.pcg-random.org
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/skipset.h	// Copyright (C) 2024-2026 Mark Adler
+line	7	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/DotZLib/GZipStream.cs	// \xa9 Copyright Henrik Ravn 2004\r
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/DotZLib/UnitTests.cs	// © Copyright Henrik Ravn 2004\r
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/gcc_gvmat64/gvmat64.S	; Copyright (C) 1995-2010 Jean-loup Gailly, Brian Raiter and Gilles Vollant.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/zlib_how.html	<!--  Copyright (c) 2004-2026 Mark Adler.  -->
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/examples/zlib_how.html	Copyright &#169; 2004-2026 Mark Adler</i><br>
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zlib.3	Copyright (C) 1995-2026 Jean-loup Gailly and Mark Adler
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip	Copyright (c) 1990-2009 Info-ZIP. All rights reserved.
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/readme.txt	Copyright (c) Henrik Ravn 2004\r
+line	3	zlib-1.3.2.tar.gz:zlib-1.3.2/LICENSE	Copyright notice:
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip	For the purposes of this copyright and license, "Info-ZIP" is defined as the
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/MiniZip64_info.txt	MiniZip - Copyright (c) 1998-2026 - by Gilles Vollant - version 1.1 64 bits from Mathias Svensson
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/LICENSE_1_0.txt	SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE\r
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/LICENSE_1_0.txt	The copyright notices in the Software and this entire statement, including\r
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/delphi/readme.txt	The original ZLib unit is Copyright (c) 1997,99 Borland Corp.,
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/DotZLib/AssemblyInfo.cs	[assembly: AssemblyCopyright("(c) 2004 by Henrik Ravn")]\r
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/deflate.c	const char deflate_copyright[] =
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/infback9/inftree9.c	const char inflate9_copyright[] =
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/inftrees.c	const char inflate_copyright[] =
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.c	const char unz_copyright[] =
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/zip.c	const char zip_copyright[] =" zip 1.01 Copyright 1998-2004 Gilles Vollant - https://www.winimage.com/zLibDll/minizip.html";
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/os400/make.sh	echo '#pragma comment(copyright, "Copyright (C) 1995-2026 Jean-Loup Gailly, Mark Adler. OS/400 version by P. Monnerat.")' >> os400.c
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zutil.h	extern const char deflate_copyright[];
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zutil.h	extern const char inflate9_copyright[];
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/zutil.h	extern const char inflate_copyright[];
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/unzip.h	extern const char unz_copyright[];
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/minizip/zip.h	extern const char zip_copyright[];
+line	1	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/delphi/ZLib.pas	{       Copyright (c) 1997,99 Borland Corporation       }
+binary-head	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/blast/test.pk
+binary-head	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/dotzlib/DotZLib.chm
+binary-head	zlib-1.3.2.tar.gz:zlib-1.3.2/contrib/puff/zeros.raw
+binary-head	zlib-1.3.2.tar.gz:zlib-1.3.2/doc/crc-doc.1.0.pdf
+binary-head	zlib-1.3.2.tar.gz:zlib-1.3.2/zlib.3.pdf

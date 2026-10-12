@@ -1,0 +1,90 @@
+# chio.attribution-lines.v8 origin=libcap-ng files=92 files_with_lines=54 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	        /^Copyright /!{
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	    Copyright (C) <year>  <name of author>
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	    Gnomovision version 69, Copyright (C) year  name of author
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	    announcement including an appropriate copyright notice and a
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	  We protect your rights with a two-step method: (1) we copyright the
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	  We protect your rights with two steps: (1) copyright the software, and
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/utils/captest.c	 * Copyright (c) 2009, 2013, 2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/utils/pscap.c	 * Copyright (c) 2009,2012,2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/utils/filecap.c	 * Copyright (c) 2009-10,2012,2017,2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/utils/netcap.c	 * Copyright (c) 2009-10,2012,2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/src/capng_swig.i	 * Copyright 2009 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/lookup_table.c	 * Copyright 2009, 2013 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/captab.h	 * Copyright 2009,2011-14,2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/test/lib_test.c	 * Copyright 2009,2012-13 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/cap-ng.h	 * Copyright 2009,2013,2020-23 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/cap-ng.c	 * Copyright 2009-10, 2013, 2017, 2020-21 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/libdrop_ambient.c	 * Copyright 2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/cap-ng.m4	# \tCopyright (c) 2009 Steve Grubb sgrubb@redhat.com
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	#      /^# Copyright /
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/config.sub	#   Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/install-sh	# Copyright (C) 1994 X Consortium
+line	10	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/python3/test/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	4	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/missing	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	6	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/compile	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/py-compile	# Copyright (C) 2000-2021 Free Software Foundation, Inc.
+line	6	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/Makefile.in	# Copyright 2009 Red Hat Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/Makefile.in	# Copyright 2009 Red Hat Inc., Durham, North Carolina.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/test/Makefile.in	# Copyright 2009,10,15 Red Hat Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/python3/Makefile.in	# Copyright 2009,2014-17 Red Hat Inc.
+line	4	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/Makefile.in	# Copyright 2009,2015 Red Hat Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/src/Makefile.in	# Copyright 2009,2015,2020 Red Hat Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/docs/Makefile.in	# Copyright 2009,2020 Red Hat Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/src/Makefile.in	# Copyright 2015 Red Hat Inc., Durham, North Carolina.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/bindings/python3/test/Makefile.in	# Copyright 2023 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/install-sh	# following copyright and license.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure.ac	### Copyright 2009-2023 Steve Grubb <sgrubb@redhat.com>
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure.ac	### THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure.ac	### The above copyright notice and this permission notice shall be included
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/utils/proc-llist.h	* Copyright (c) 2009, 2020 Red Hat Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/config.sub	Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	a notice placed by the copyright holder saying it may be distributed
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	appropriate copyright notice and disclaimer of warranty; keep intact
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/INSTALL	are permitted in any medium without royalty provided the copyright
+line	2	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	certain countries either by patents or by copyrighted interfaces, the
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	copyright law: that is to say, a work containing the Library or a
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	copyright notice and disclaimer of warranty; keep intact all the
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	copyright notice for the Library among them, as well as a reference
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	copyrighted by the Free Software Foundation, write to the Free
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	during execution displays copyright notices, you must include the
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	have at least the "copyright" line and a pointer to where the full
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	means either the Program or any derivative work under copyright law:
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	original copyright holder who places the Library under this License
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	original copyright holder who places the Program under this License
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	program which contains a notice placed by the copyright holder or
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING.LIB	school, if any, to sign a "copyright disclaimer" for the library, if
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	1	libcap-ng-0.8.5.tar.gz:libcap-ng-0.8.5/COPYING	to ask for permission.  For software which is copyrighted by the Free

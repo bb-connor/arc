@@ -1,0 +1,140 @@
+# chio.attribution-lines.v8 origin=attr files=122 files_with_lines=77 binary_heads=11 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/po/Makefile.in.in	\t      --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/CHANGES	\t- Update SGI copyright/licence notices
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	        /^Copyright /!{
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	    Copyright (C) <year>  <name of author>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	    Gnomovision version 69, Copyright (C) year name of author
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	    announcement including an appropriate copyright notice and a
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2021 Free
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/tools/setfattr.c	  Copyright (C) 2001-2002 Andreas Gruenbacher <andreas.gruenbacher@gmail.com>
+line	3	attr-2.5.2.tar.gz:attr-2.5.2/tools/setfattr.c	  Copyright (C) 2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/libattr/attr_copy_file.c	  Copyright (C) 2002 Andreas Gruenbacher <agruen@suse.de>, SuSE Linux AG.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/libattr/attr_copy_check.c	  Copyright (C) 2003 Andreas Gruenbacher <agruen@suse.de>, SuSE Linux AG.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/libmisc/quote.c	  Copyright (C) 2003 Andreas Gruenbacher <andreas.gruenbacher@gmail.com>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/libattr/attr_copy_action.c	  Copyright (C) 2006 Andreas Gruenbacher <agruen@suse.de>, SuSE Linux AG.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/libmisc/walk_tree.c	  Copyright (C) 2007 Andreas Gruenbacher <a.gruenbacher@computer.org>
+line	5	attr-2.5.2.tar.gz:attr-2.5.2/examples/copyattr.c	  Copyright (C) 2009  Andreas Gruenbacher <agruen@suse.de>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/libattr/syscalls.c	  Copyright (C) 2015  Dmitry V. Levin <ldv@altlinux.org>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	  We protect your rights with a two-step method: (1) we copyright the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	  We protect your rights with two steps: (1) copyright the software, and
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/tools/attr.c	 * Copyright (c) 2000-2002,2004 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/include/attributes.h	 * Copyright (c) 2001-2002,2004 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/libattr/libattr.c	 * Copyright (c) 2001-2003,2005 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	 Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	"copyright" line and a pointer to where the full notice is found.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	#      /^# Copyright /
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2022 Free Software
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2022 Free
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2022 Free
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/config.sub	#   Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/config.rpath	#   Copyright 1996-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/test/run	# 1. Redistributions of source code must retain the above copyright
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/install-sh	# Copyright (C) 1994 X Consortium
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makefile.in.in	# Copyright (C) 1995-1997, 2000-2007, 2009-2010 by Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	# Copyright (C) 1996-2019, 2021-2022 Free Software Foundation, Inc.
+line	4	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/missing	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	5	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/compile	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/de.po	# Copyright (C) 2000  Free Software Foundation, Inc.
+line	6	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/de.po	# Copyright (C) 2002, 2003  Andreas Grünbacher <a.gruenbacher@computer.org>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/exports	# Copyright (C) 2003, 2006  Andreas Gruenbacher <agruen@suse.de>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/exports	# Copyright (C) 2003, 2006  Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/pl.po	# Copyright (C) 2004  Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/nl.po	# Copyright (C) 2004  Luk Claes <luk.claes@ugent.be>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2022 Free Software
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	# Copyright (C) 2004-2019, 2021 Bootstrap Authors
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/fr.po	# Copyright (C) 2005  Guilhelm Panaget <guilhelm.panaget@free.fr>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/sv.po	# Copyright (C) 2006  Daniel Nylander <po@danielnylander.se>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/sv.po	# Copyright (C) 2006  Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/po/gl.po	# Copyright (C) 2007  Antonio Trueba <atrueba@users.sourceforge.net>
+line	3	attr-2.5.2.tar.gz:attr-2.5.2/po/gl.po	# Copyright (C) 2007  Free Software Foundation
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/cs.po	# Copyright (C) 2008  Petr Pisar <petr.pisar@atlas.cz>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/configure.ac	# Copyright (C) 2009  Andreas Gruenbacher <agruen@suse.de>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	# Copyright (C) 2010-2019, 2021 Bootstrap Authors
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ar-lib	# Copyright (C) 2010-2021 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/nl.po	# Copyright (C) 2019  Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/fr.po	# Copyright (C) 2019, French l10n team <debian-l10n-french@lists.debian.org>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/ka.po	# Copyright (C) 2022 Silicon Graphics, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/po/en@quot.po	# Copyright (C) 2024 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/attr.pot	# Copyright (C) YEAR Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/test/run	# Copyright (c) 2007, 2008 Andreas Gruenbacher.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/install-sh	# following copyright and license.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	# their copyright.
+line	3	attr-2.5.2.tar.gz:attr-2.5.2/man/man3/attr_remove.3	.\\" Copyright (C) 2001, 2002, 2003, 2006 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man3/attr_get.3	.\\" Copyright (C) 2001, 2002, 2003, 2006, 2008 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man3/attr_list.3	.\\" Copyright (C) 2001, 2002, 2006 Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man1/attr.1	.\\" Copyright (C) 2001, 2002, 2006, 2007  Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man1/setfattr.1	.\\" Copyright (C) 2002, 2004  Andreas Gruenbacher <agruen@suse.de>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man1/setfattr.1	.\\" Copyright (C) 2002, 2004  Silicon Graphics, Inc. Al rights reserved.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man1/getfattr.1	.\\" Copyright (C) 2002, 2004, 2007  Andreas Gruenbacher <agruen@suse.de>
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/man/man1/getfattr.1	.\\" Copyright (C) 2002, 2004, 2007  Silicon Graphics, Inc. All rights reserved.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/po/Makevars	COPYRIGHT_HOLDER = Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/build-aux/config.sub	Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	a notice placed by the copyright holder saying it may be distributed
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	appropriate copyright notice and disclaimer of warranty; keep intact
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/INSTALL	are permitted in any medium without royalty provided the copyright
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	certain countries either by patents or by copyrighted interfaces, the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	copyright law: that is to say, a work containing the Library or a
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	copyright notice and disclaimer of warranty; keep intact all the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	copyright notice for the Library among them, as well as a reference
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	copyrighted by the Free Software Foundation, write to the Free
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2013 Free Software Foundation,
+line	2	attr-2.5.2.tar.gz:attr-2.5.2/m4/po.m4	dnl Copyright (C) 1995-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/lib-link.m4	dnl Copyright (C) 2001-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/visibility_hidden.m4	dnl Copyright (C) 2003, 2008  Silicon Graphics, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/m4/intlmacosx.m4	dnl Copyright (C) 2004-2013 Free Software Foundation, Inc.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	during execution displays copyright notices, you must include the
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	means either the Program or any derivative work under copyright law:
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	original copyright holder who places the Library under this License may add
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	original copyright holder who places the Program under this License
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	program which contains a notice placed by the copyright holder or
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING.LGPL	school, if any, to sign a "copyright disclaimer" for the library, if
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	1	attr-2.5.2.tar.gz:attr-2.5.2/doc/COPYING	to ask for permission.  For software which is copyrighted by the Free
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/cs.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/de.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/en@boldquot.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/en@quot.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/es.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/fr.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/gl.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/ka.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/nl.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/pl.gmo
+binary-head	attr-2.5.2.tar.gz:attr-2.5.2/po/sv.gmo

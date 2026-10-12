@@ -1,0 +1,8 @@
+tree 564e1326e5e2b28405b41d52ff0e2266f47a3eff
+parent 3ca8acba021a2f368b06c0a4af6563c900a137fb
+author Daniel Néri <dne+alpine@mayonnaise.net> 1746521816 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1746535506 +0000
+
+main/ncurses: upgrade to 6.5_p20250503
+
+https://invisible-island.net/ncurses/NEWS.html#index-t20250503

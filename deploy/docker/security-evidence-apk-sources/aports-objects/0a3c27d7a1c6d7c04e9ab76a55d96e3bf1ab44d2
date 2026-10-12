@@ -1,0 +1,8 @@
+tree 74d847cf0b02e1dd93c1917167e7ca957e4ee44b
+parent 1a35754438100e04deef7ee485ab2117137da19e
+author fossdd <fossdd@pwned.life> 1745607894 +0000
+committer Natanael Copa <ncopa@alpinelinux.org> 1746777648 +0000
+
+main/libuv: upgrade to 1.51.0
+
+https://github.com/libuv/libuv/releases/tag/v1.51.0

@@ -1,0 +1,311 @@
+# chio.attribution-lines.v8 origin=libarchive files=1490 files_with_lines=765 binary_heads=44 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\t\t    &(iso9660->copyright_file_identifier),
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\t\t    COPYRIGHT_FILE_SIZE, key, value);
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\t\tiso9660->opt.copyright_file = r == ARCHIVE_OK;
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/text/archive_write_set_options.3.txt	\t\t       the ISO9660 metadata as holding the copyright for  this
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\t    KEY_STR, iso9660->copyright_file_identifier.s);
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\tif (strcmp(key, "copyright-file") == 0) {
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t\tset_option_info(&info, &opt, "copyright-file",
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/text/archive_write_set_options.3.txt	\t       1mcopyright-file22m=4mfilename0m
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t    "Copyright File", 0, D_CHAR);
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t    &(iso9660->copyright_file_identifier),
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t * COMPAT : mkisofs -copyright <value>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_7zip.c	\t * Copyright (C) The XZ Embedded authors and contributors
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_7zip.c	\t * Copyright (C) The XZ Utils authors and contributors
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t * Specifies Copyright Filename.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t * Usage  : copyright-file=<value>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t * and containing a copyright statement.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\t/* Copyright File Identifier */
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tarchive_string_free(&(iso9660->copyright_file_identifier));
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tarchive_string_init(&(iso9660->copyright_file_identifier));
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tif (iso9660->opt.copyright_file != OPT_COPYRIGHT_FILE_DEFAULT)
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tiso9660->opt.copyright_file = OPT_COPYRIGHT_FILE_DEFAULT;
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tstruct archive_string\t copyright_file_identifier;
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	\tunsigned int\t copyright_file:1;
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	        /^Copyright /!{
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_blake2s_ref.c	   Copyright 2012, Samuel Neves <sneves@dei.uc.pt>.  You may use this under the
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	  a 3-clause UC Regents copyright; please read the individual source
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	  and documentation files are subject to the copyright notice reproduced
+line	474	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/lafe_err.h	 * 1. Redistributions of source code must retain the above copyright
+line	474	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/lafe_err.h	 * 2. Redistributions in binary form must reproduce the above copyright
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_warc.c	 * Copyright (C) 2014 Sebastian Freundt
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_ar_mode.c	 * Copyright (C) 2024 by наб <nabijaczleweli@nabijaczleweli.xyz>
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_filter_compress.c	 * Copyright (c) 1985, 1986, 1992, 1993
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/la_queue.h	 * Copyright (c) 1991, 1993
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry.c	 * Copyright (c) 1993
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_random.c	 * Copyright (c) 1996, David Mazieres <dm@uun.org>
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_pack_dev.c	 * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/passphrase.c	 * Copyright (c) 2000-2002, 2007, 2010
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_rb.c	 * Copyright (c) 2001 The NetBSD Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_endian.h	 * Copyright (c) 2002 Thomas Moestl <tmm@FreeBSD.org>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_nested.c	 * Copyright (c) 2003,2014 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_windows.h	 * Copyright (c) 2003-2006 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_windows.c	 * Copyright (c) 2003-2007 Kees Zeelenberg
+line	232	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/lafe_platform.h	 * Copyright (c) 2003-2007 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_large.c	 * Copyright (c) 2003-2007,2013 Tim Kientzle
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_disk_secure746.c	 * Copyright (c) 2003-2007,2016 Tim Kientzle
+line	29	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/cmdline.c	 * Copyright (c) 2003-2008 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_filter_xz.c	 * Copyright (c) 2003-2008 Tim Kientzle and Miklos Vajna
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_too_many_filters.c	 * Copyright (c) 2003-2008,2015 Tim Kientzle
+line	20	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_empty_mtree.c	 * Copyright (c) 2003-2009 Tim Kientzle
+line	27	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_owner.c	 * Copyright (c) 2003-2010 Tim Kientzle
+line	6	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_string.c	 * Copyright (c) 2003-2011 Tim Kientzle
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/test_utils/test_utils.c	 * Copyright (c) 2003-2012 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_leading_slash.c	 * Copyright (c) 2003-2014 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_rar_invalid1.c	 * Copyright (c) 2003-2016 Tim Kientzle
+line	9	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test.h	 * Copyright (c) 2003-2017 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_rar_encryption.c	 * Copyright (c) 2003-2018
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_extra_padding.c	 * Copyright (c) 2003-2018 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_rar_filter.c	 * Copyright (c) 2003-2021 Wei-Cheng Pan
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_tar_pax_large_attr.c	 * Copyright (c) 2003-2023 Tim Kientzle
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_filter_gzip_recursive.c	 * Copyright (c) 2003-2024 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_gtar_sparse_length.c	 * Copyright (c) 2003-2025 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_zip.c	 * Copyright (c) 2004-2013 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_cpio_newc.c	 * Copyright (c) 2006 Rudolf Marek SYSGO s.r.o.
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/filter_fork_posix.c	 * Copyright (c) 2007 Joerg Sonnenberger
+line	5	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_ar.c	 * Copyright (c) 2007 Kai Wang
+line	11	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_ar.c	 * Copyright (c) 2007 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/bsdunzip.c	 * Copyright (c) 2007-2008 Dag-Erling Smørgrav
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_filter_lzip.c	 * Copyright (c) 2007-2009 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_truncated_filter.c	 * Copyright (c) 2007-2010 Tim Kientzle
+line	11	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_empty_zip64.c	 * Copyright (c) 2008 Anselm Strauss
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/contrib/shar/shar.c	 * Copyright (c) 2008 Jaakko Heinonen
+line	5	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/subst.c	 * Copyright (c) 2008 Joerg Sonnenberger
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_gtar_lzma.c	 * Copyright (c) 2008 Miklos Vajna
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/line_reader.c	 * Copyright (c) 2008 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_lha.c	 * Copyright (c) 2008, 2010 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_random.c	 * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_lha.c	 * Copyright (c) 2008-2014 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_iso9660.c	 * Copyright (c) 2009 Andreas Henriksson <andreas@fatal.se>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_crc32.h	 * Copyright (c) 2009 Joerg  Sonnenberger
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/lafe_err.h	 * Copyright (c) 2009 Joerg Sonnenberger
+line	23	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.h	 * Copyright (c) 2009 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/bsdunzip.c	 * Copyright (c) 2009, 2010 Joerg Sonnenberger <joerg@NetBSD.org>
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_iso9660.c	 * Copyright (c) 2009,2010 Michihiro NAKAJIMA
+line	7	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_windows.c	 * Copyright (c) 2009-2011 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_filter_zstd.c	 * Copyright (c) 2009-2011 Sean Purcell
+line	5	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/filter_fork_windows.c	 * Copyright (c) 2009-2012 Michihiro NAKAJIMA
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_util.c	 * Copyright (c) 2009-2012,2014 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/line_reader.c	 * Copyright (c) 2010 Joerg Sonnenberger
+line	6	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_filter_lzip.c	 * Copyright (c) 2010 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_gnutar.c	 * Copyright (c) 2010 Nokia Corporation and/or its subsidiary(-ies).
+line	14	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_newer_than.c	 * Copyright (c) 2010 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_xar_empty.c	 * Copyright (c) 2010-2011 Michihiro NAKAJIMA
+line	11	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_disk_acl_freebsd.c	 * Copyright (c) 2010-2012 Michihiro NAKAJIMA
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_rar.c	 * Copyright (c) 2011 Andres Mejia
+line	22	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_print_longpath.c	 * Copyright (c) 2011 Michihiro NAKAJIMA
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/la_getline.h	 * Copyright (c) 2011 The NetBSD Foundation, Inc.
+line	21	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_options_private.h	 * Copyright (c) 2011 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_archive_read_multiple_data_objects.c	 * Copyright (c) 2011-2012 Andres Mejia
+line	17	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_string.c	 * Copyright (c) 2011-2012 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_string_composition.h	 * Copyright (c) 2011-2012 libarchive Project
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_zip.c	 * Copyright (c) 2011-2012,2014 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/cat/bsdcat.c	 * Copyright (c) 2011-2014, Mike Kazantsev
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/test_utils/test_utils.c	 * Copyright (c) 2012 Andres Mejia
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_filter_program.c	 * Copyright (c) 2012 Michhiro NAKAJIMA
+line	86	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/write.c	 * Copyright (c) 2012 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_cmdline.c	 * Copyright (c) 2012 Michihiro NAKAJIMA\x20
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_add_filter.c	 * Copyright (c) 2012 Ondrej Holy
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/cat/test/test_expand_lz4.c	 * Copyright (c) 2012, 2014 Michihiro NAKAJIMA
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_extract_tar_lz4.c	 * Copyright (c) 2012,2014 Michihiro NAKAJIMA
+line	13	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_7zip_encryption_header.c	 * Copyright (c) 2013 Konrad Kleine
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_raw_b64.c	 * Copyright (c) 2013 Marek Kubica
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_padded.c	 * Copyright (c) 2013 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_tar_concatenated.c	 * Copyright (c) 2014 Kevin Locke
+line	24	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/passphrase.c	 * Copyright (c) 2014 Michihiro NAKAJIMA
+line	9	libarchive-3.8.3.tar.xz:libarchive-3.8.3/cat/test/test_expand_Z.c	 * Copyright (c) 2014 Mike Kazantsev
+line	6	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_warc.c	 * Copyright (c) 2014 Sebastian Freundt
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_zip64.c	 * Copyright (c) 2014 Tim Kientzle
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/contrib/android/config/linux_host.h	 * Copyright (c) 2014 Trevor Drake
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/cat/bsdcat.h	 * Copyright (c) 2014, Mike Kazantsev
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_warn_missing_hardlink_target.c	 * Copyright (c) 2015 Graham Percival
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_archive_write_set_format_filter_by_ext.c	 * Copyright (c) 2015 Okhotnikov Kirill
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_pax_xattr_schily.c	 * Copyright (c) 2016 IBM Corporation
+line	12	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry.h	 * Copyright (c) 2016 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_jar.c	 * Copyright (c) 2016 Peter Wu
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_missing_file.c	 * Copyright (c) 2016 Tim Kientzle
+line	12	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_acls.c	 * Copyright (c) 2017 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_with_invalid_traditional_eocd.c	 * Copyright (c) 2017 Phillip Berndt
+line	10	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_zstd.c	 * Copyright (c) 2017 Sean Purcell
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_rar5.c	 * Copyright (c) 2018 Grzegorz Antoniak
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_crlf_mtree.c	 * Copyright (c) 2018 The FreeBSD Foundation
+line	6	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_exclude_vcs.c	 * Copyright (c) 2019 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_zip_7075_utf8_paths.c	 * Copyright (c) 2019 Mike Frysinger
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_tar_invalid_pax_size.c	 * Copyright (c) 2020 Ben Wagner
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_safe_writes.c	 * Copyright (c) 2020 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_entry_size_unset.c	 * Copyright (c) 2021 Jia Cheong Tan
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_disk_fixup.c	 * Copyright (c) 2021 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_short_writes.c	 * Copyright (c) 2021 Red Hat, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_ignore_zeros.c	 * Copyright (c) 2021 Ryan Libby
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_compat_tar_directory.c	 * Copyright (c) 2021 Samanta Navarro
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/test/test_I.c	 * Copyright (c) 2023 Aaron Lindros
+line	18	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/test/test_t.c	 * Copyright (c) 2023 Adrian Vovk
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_filter_uudecode_raw.c	 * Copyright (c) 2023 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/bsdunzip.h	 * Copyright (c) 2023, Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_add_filter_zstd.c	 * Copyright (c) 2023-2024 Klara, Inc.
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_compression_zstd.c	 * Copyright (c) 2024 ARJANEN Loïc Jean David
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_owner.c	 * Copyright (c) 2024 Haelwenn (lanodan) Monnier
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_xar_doublelink.c	 * Copyright (c) 2024 Martin Matuska
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_P_upper.c	 * Copyright (c) 2024 Mostyn Bramley-Moore <mostyn@antipode.se>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_list_item.c	 * Copyright (c) 2024 Tarsnap Backup Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_gtar_redundant_L.c	 * Copyright (c) 2024 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_archive_read.c	 * Copyright (c) 2024 Tobias Stoeckmann
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_zip_windows_path.c	 * Copyright (c) 2024 Yang Zhou
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_write_format_mtree_preset_digests.c	 * Copyright (c) 2025 Nicholas Vinson
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/test/test_read_format_tar_V_negative_size.c	 * Copyright (c) 2025 Tim Kientzle
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_platform_stat.h	 * Copyright (c) 2025 Tobias Stoeckmann
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/test/test_option_mtime.c	 * Copyright (c) 2025 Zhaofeng Li
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_time.c	 * Copyright © 2025 ARJANEN Loïc Jean David
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.c	 * Portions Copyright (c) 1996-2008, PostgreSQL Global Development Group
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_parse_date.c	 * This code is in the public domain and has no copyright.
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive_fe/passphrase.c	 * copyright notice and this permission notice appear in all copies.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry.c	 * is subject to the following copyright notice.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_filter_compress.c	 * protected by the following copyright.  (Clause 3 dropped by request
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.c	 * subject to the copyright below.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	#      /^# Copyright /
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/m4_ax_compile_check_sizeof.m4	#   As a special exception, the respective Autoconf Macro's copyright owner
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	#   Copyright (C) 1996-2001, 2003-2019, 2021-2024 Free Software
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	#   Copyright (C) 2004, 2011-2019, 2021-2024 Free Software Foundation,
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2019, 2021-2024 Free
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2019, 2021-2024 Free
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ax_check_compile_flag.m4	#   Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/m4_ax_compile_check_sizeof.m4	#   Copyright (c) 2008 Kaveh Ghazi <ghazi@caip.rutgers.edu>
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ax_append_compile_flags.m4	#   Copyright (c) 2011 Maarten Bosmans <mkbosmans@gmail.com>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ax_require_defined.m4	#   Copyright (c) 2014 Mike Frysinger <vapier@gentoo.org>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/m4_ax_compile_check_sizeof.m4	#   Copyright (c) 2017 Reini Urban <rurban@cpan.org>
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/config.guess	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/config.rpath	#   Copyright 1996-2011 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ax_require_defined.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/install-sh	# Copyright (C) 1994 X Consortium
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/Makefile.in	# Copyright (C) 1994-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	# Copyright (C) 1996-2019, 2021-2024 Free Software Foundation, Inc.
+line	5	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 1996-2024 Free Software Foundation, Inc.
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 1997-2024 Free Software Foundation, Inc.
+line	5	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 1999-2024 Free Software Foundation, Inc.
+line	6	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2002-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2003-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2019, 2021-2024 Free Software
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	# Copyright (C) 2004-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2004-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	# Copyright (C) 2010-2019, 2021, 2023-2024 Bootstrap Authors
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/test-driver	# Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/contrib/android/Android.mk	# Copyright (C) 2014 Trevor Drake
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	# Copyright (C) 2022-2024 Free Software Foundation, Inc.
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/configure	# Copyright (C) 2024 Free Software Foundation, Inc.
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/mdoc2man.awk	# Copyright (c) 2003 Peter Stuge <stuge-mdoc2man@cdy.org>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/cmake/CheckTypeExists.cmake	# Copyright (c) 2006, Alexander Neundorf, <neundorf@kde.org>
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/cmake/CheckFileOffsetBits.cmake	# Copyright (c) 2009, Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/install-sh	# The above copyright notice and this permission notice shall be included in
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/mdoc2man.awk	# copyright notice and this permission notice appear in all copies.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/install-sh	# following copyright and license.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	# starting with '# Written by ' and ending with '# Copyright'.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	#define COPYRIGHT_FILE_SIZE\t\t37
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_format_iso9660.c	#define OPT_COPYRIGHT_FILE_DEFAULT\t0\t/* Not specified */
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_iso9660.c	#define PVD_abstract_file_id_offset (PVD_copyright_file_id_offset + PVD_copyright_file_id_size)
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_iso9660.c	#define PVD_copyright_file_id_offset (PVD_application_id_offset + PVD_application_id_size)
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_iso9660.c	#define PVD_copyright_file_id_size 37
+line	8	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_digest_private.h	* 1. Redistributions of source code must retain the above copyright
+line	8	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_digest_private.h	* 2. Redistributions in binary form must reproduce the above copyright
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_digest_private.h	* Copyright (c) 2003-2007 Tim Kientzle
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_digest_private.h	* Copyright (c) 2011 Andres Mejia
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_digest.c	* Copyright (c) 2011 Michihiro NAKAJIMA
+line	4	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_cryptor.c	* Copyright (c) 2014 Michihiro NAKAJIMA
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_support_format_rar5.c	* Copyright (c) 2018 Grzegorz Antoniak (http://antoniak.org)
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/xxhash.c	* Redistributions of source code must retain the above copyright
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_parse_date.c	**  This code is in the public domain and has no copyright.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_options.3	.It Cm copyright-file Ns = Ns Ar filename
+line	42	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry_perms.3	.\\" 1. Redistributions of source code must retain the above copyright
+line	42	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry_perms.3	.\\" 2. Redistributions in binary form must reproduce the above copyright
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/mtree.5	.\\" Copyright (c) 1989, 1990, 1993
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/contrib/shar/shar.1	.\\" Copyright (c) 1990, 1993
+line	10	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar.1	.\\" Copyright (c) 2003-2007 Tim Kientzle
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_disk.3	.\\" Copyright (c) 2003-2009 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_write_set_options.3	.\\" Copyright (c) 2003-2010 Tim Kientzle
+line	18	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_data.3	.\\" Copyright (c) 2003-2011 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/cpio.5	.\\" Copyright (c) 2007 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/unzip/bsdunzip.1	.\\" Copyright (c) 2007-2008 Dag-Erling Smørgrav
+line	7	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry_perms.3	.\\" Copyright (c) 2010 Joerg Sonnenberger
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/libarchive_changes.3	.\\" Copyright (c) 2011 Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/cat/bsdcat.1	.\\" Copyright (c) 2011-2014, Mike Kazantsev
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_read_add_passphrase.3	.\\" Copyright (c) 2014 Michihiro NAKAJIMA
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/tar.5	.\\" Copyright (c) 2016 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar.1	.\\" Copyright (c) 2017 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/archive_entry_misc.3	.\\" Copyright (c) 2019 Martin Matuska
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	1. Redistributions of source code must retain the above copyright
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	2. Redistributions in binary form must reproduce the above copyright
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/wiki/ManPageArchiveWriteSetOptions3.wiki	</dd><dt>'''copyright-file'''=''filename''</dt><dd>\x20
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/html/archive_write_set_options.3.html	<p><b>copyright-file</b>=<i>filename</i></p>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/xxhash.c	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/ltmain.sh	Copyright (C) $year Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/xxhash.c	Copyright (C) 2012-2014, Yann Collet.
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	Copyright (C) 2024 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	Copyright (c) 2003-2018 <author(s)>
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/config.guess	Copyright 1992-2024 Free Software Foundation, Inc.
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.c	Portions Copyright (c) 1994, The Regents of the University of California
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.c	Portions Copyright (c) 1996-2008, PostgreSQL Global Development Group
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/xxhash.c	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	The libarchive distribution as a whole is Copyright by Tim Kientzle
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/man/archive_write_set_options.3	\\fBcopyright-file\\fP=\\fIfilename\\fP
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	and is subject to the copyright notice reproduced at the bottom of
+line	2	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/man/archive_write_set_options.3	as holding the copyright for this volume.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/wiki/ManPageArchiveWriteSetOptions3.wiki	as holding the copyright for this volume.\x20
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/libarchive/xxhash.c	copyright notice, this list of conditions and the following disclaimer
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	copyright/licensing statement at the beginning of the file.  If any do
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2011 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2011 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/build/autoconf/lib-link.m4	dnl Copyright (C) 2001-2011 Free Software Foundation, Inc.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/aclocal.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/COPYING	intended to summarize the copyright status of the individual files;
+line	3	libarchive-3.8.3.tar.xz:libarchive-3.8.3/tar/bsdtar_windows.c	is hereby granted, provided that the above copyright notice and this
+line	1	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/html/archive_write_set_options.3.html	the copyright for this volume. Default: none.</p>
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/contrib/oss-fuzz/corpus.zip
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_acl.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_linkify.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_misc.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_paths.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_perms.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_stat.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_entry_time.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_add_passphrase.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_data.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_disk.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_extract.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_filter.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_format.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_free.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_header.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_new.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_open.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_read_set_options.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_util.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_blocksize.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_data.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_disk.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_filter.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_finish_entry.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_format.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_free.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_header.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_new.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_open.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_set_options.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/archive_write_set_passphrase.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/bsdcpio.1.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/bsdtar.1.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/cpio.5.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/libarchive-formats.5.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/libarchive.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/libarchive_changes.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/libarchive_internals.3.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/mtree.5.pdf
+binary-head	libarchive-3.8.3.tar.xz:libarchive-3.8.3/doc/pdf/tar.5.pdf

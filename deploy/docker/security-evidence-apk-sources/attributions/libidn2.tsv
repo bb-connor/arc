@@ -1,0 +1,700 @@
+# chio.attribution-lines.v8 origin=libidn2 files=1641 files_with_lines=457 binary_heads=263 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	\t\t\t 'copyright' => $copyright,
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/Makefile.am	\t\t\t-copyright "2002-2024 Simon Josefsson" \\
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makefile.in.in	\t      --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	\t    print "are permitted in any medium without royalty provided the copyright\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t  | $(update-copyright-env) xargs $(srcdir)/$(_build-aux)/$@
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t$(AM_V_GEN)$(GREP) -l -w Copyright                               \\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/Makefile.in	\t$(top_srcdir)/build-aux/update-copyright \\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	\t$copyright = shift @ARGV;
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t's/^Copyright.+?Free\\sSoftware\\sFoundation,\\sInc\\.\\n//ms'\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t@require='# Copyright \\(C\\) '$$(date +%Y)' Free'\t\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t@require='Copyright @copyright\\{} .*'$$(date +%Y)\t\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\t@require='enum { COPYRIGHT_YEAR = '$$(date +%Y)' };'\t\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tAdd update-copyright gnulib module.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tBump copyright years.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tFix copyright line for 'idn2 --version'
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tFix copyright year.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tFix copyright years.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tREADME.md: removed copyright information and extended description
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tREADME.md: removed copyright information and extended description\r
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tThe copyright information in the README file were a distraction from
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUpdate copyright headers.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUpdate copyright lines.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUpdate copyright years, and enable copyright-check to notice it in the future.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUpdate copyright years.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUpdate copyright years.  Add custom my-update-copyright rule.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/ChangeLog	\tUse update-copyright intervals.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\thalt='out of date copyright in $(sample-test); update it'\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\thalt='out of date copyright in $(texi); update it'\t\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	\thalt='out of date copyright in $(v_etc_file); update it'\t\\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/cfg.mk	\tmake update-copyright update-copyright-env='UPDATE_COPYRIGHT_HOLDER="Simon Josefsson" UPDATE_COPYRIGHT_USE_INTERVALS=2'
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/cfg.mk	\tmake update-copyright update-copyright-env='UPDATE_COPYRIGHT_HOLDER="Tim Ruehsen" UPDATE_COPYRIGHT_USE_INTERVALS=2'
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	\tprint ".SH COPYRIGHT\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	\tprint "Copyright \\\\(co ". $args{'copyright'} . ".\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	                       |Copyright-paperwork-exempt:[ ]
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	                $ENV{UPDATE_COPYRIGHT_USE_INTERVALS} == 2
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	            # Replace the old copyright statement.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	            if (!$ENV{UPDATE_COPYRIGHT_USE_INTERVALS})
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	          quotemeta($leading) . "($copyright_re$stmt_remainder_re)";
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/announce-gen	         print "Copyright (C) $copyright_year Free Software Foundation, Inc.\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	        if ($final_year != $this_year || $ENV{'UPDATE_COPYRIGHT_FORCE'})
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	      # Format 'Copyright-paperwork-exempt: Yes' as a standard ChangeLog
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gnupload	      echo "$copyright"
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	      my $tiny = (grep (/^(?:Copyright-paperwork-exempt|Tiny-change):\\s+[Yy]es$/, @line)
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/src/idn2.c	     symbol suitable for this locale, and %d is the copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	    ChangeLog header to mark a change that does not require a copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	    Copyright (C) <year>  <name of author>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	    Copyright © 1991-2016 Unicode, Inc. All rights reserved.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	    Gnomovision version 69, Copyright (C) year name of author
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	    announcement including an appropriate copyright notice and a
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	    if ($args{'copyright'}) {
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	    print "         [ -bugsto address ] [ -seeinfo infonode ] [ -copyright notice]\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	    print STDERR "$ARGV: warning: copyright statement not found\\n";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	    } elsif ($cmd eq "-copyright") {
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/getopt.c	   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+line	7	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/getopt-cdefs.in.h	   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/basename-lgpl.c	   Copyright (C) 1990, 1998-2001, 2003-2006, 2009-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/error.c	   Copyright (C) 1990-1998, 2000-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/xalloc-oversized.h	   Copyright (C) 1990-2000, 2003-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/cloexec.c	   Copyright (C) 1991, 2004-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/pathmax.h	   Copyright (C) 1992, 1999, 2001, 2003, 2005, 2009-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/getdelim.c	   Copyright (C) 1994, 1996-1998, 2001, 2003, 2005-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/alloca.in.h	   Copyright (C) 1995, 1999, 2001-2004, 2006-2024 Free Software Foundation,
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stdlib.in.h	   Copyright (C) 1995, 2001-2004, 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/c-strcase.h	   Copyright (C) 1995-1996, 2001, 2003, 2005, 2009-2024 Free Software
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/string.in.h	   Copyright (C) 1995-1996, 2001-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/error.in.h	   Copyright (C) 1995-1997, 2003, 2006, 2008-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/gettext.h	   Copyright (C) 1995-1998, 2000-2002, 2004-2006, 2009-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/strverscmp.c	   Copyright (C) 1997-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/basename-lgpl.h	   Copyright (C) 1998, 2001, 2003-2006, 2009-2024 Free Software Foundation,
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/c-strcasecmp.c	   Copyright (C) 1998-1999, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	6	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u-cpy.h	   Copyright (C) 1999, 2002, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u-cpy-alloc.h	   Copyright (C) 1999, 2002, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.h	   Copyright (C) 1999, 2003, 2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/dup2.c	   Copyright (C) 1999, 2004-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u8-mblen.c	   Copyright (C) 1999-2000, 2002, 2006-2007, 2009-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconv.c	   Copyright (C) 1999-2001, 2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u8-mbtouc-unsafe.c	   Copyright (C) 1999-2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.c	   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unictype/bitmap.h	   Copyright (C) 2000-2002, 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/c-ctype.h	   Copyright (C) 2000-2003, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/localcharset.h	   Copyright (C) 2000-2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/localcharset.c	   Copyright (C) 2000-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr.in.h	   Copyright (C) 2001-2002, 2005-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u8-mbtouc-aux.c	   Copyright (C) 2001-2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/c-strcaseeq.h	   Copyright (C) 2001-2002, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/uninorm.in.h	   Copyright (C) 2001-2002, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/progname.c	   Copyright (C) 2001-2003, 2005-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/uninorm/decomposition-table.h	   Copyright (C) 2001-2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/progname.h	   Copyright (C) 2001-2004, 2006, 2009-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconveh.h	   Copyright (C) 2001-2007, 2009-2024 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/filename.h	   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/striconveha.c	   Copyright (C) 2002, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/striconveha.h	   Copyright (C) 2002, 2005, 2007-2024 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unistr/u32-uctomb.c	   Copyright (C) 2002, 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unictype.in.h	   Copyright (C) 2002, 2005-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/uninorm/composition.c	   Copyright (C) 2002, 2006, 2009, 2011-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unictype/combiningclass.c	   Copyright (C) 2002, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unictype/bidi_of.c	   Copyright (C) 2002, 2006, 2011-2024 Free Software Foundation, Inc.
+line	15	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/uniconv/u-strconv-from-enc.h	   Copyright (C) 2002, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/test-compat-punycode.c	   Copyright (C) 2002-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/free.c	   Copyright (C) 2003, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/malloca.c	   Copyright (C) 2003, 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/strchrnul.c	   Copyright (C) 2003, 2007-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/malloca.h	   Copyright (C) 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/unistd.in.h	   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stdio.in.h	   Copyright (C) 2004, 2007-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/cloexec.h	   Copyright (C) 2004, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stat-time.h	   Copyright (C) 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/verify.h	   Copyright (C) 2005-2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/getline.c	   Copyright (C) 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/sys_stat.in.h	   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/fcntl.in.h	   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconv_open-solaris.gperf	   Copyright (C) 2007, 2009, 2020-2024 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconv_close.c	   Copyright (C) 2007, 2009-2024 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconv_open-aix.gperf	   Copyright (C) 2007, 2020-2024 Free Software Foundation, Inc.
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/open.c	   Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	7	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/close.c	   Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	18	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/arg-nonnull.h	   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	6	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/c++defs.h	   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+line	11	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/_Noreturn.h	   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	25	libidn2-2.3.7.tar.gz:libidn2-2.3.7/examples/lookup.c	   Copyright (C) 2011-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/src/idn2.c	   Copyright (C) 2011-2024 Simon Josefsson, Tim Ruehsen
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stat-time.c	   Copyright (C) 2012-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/examples/decode.c	   Copyright (C) 2016 Tim Rühsen
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/tr46map.c	   Copyright (C) 2016-2017 Tim Rühsen
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/getprogname.c	   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/gentr46map.c	   Copyright (C) 2016-2024 Tim Ruehsen
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/test-tounicode.c	   Copyright (C) 2017 Tim Rühsen
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stat-w32.c	   Copyright (C) 2017-2024 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/lookup.c	   Copyright (C) 2017-2024 Tim Ruehsen
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/gendata.c	   Copyright (C) 2019 Orivej Desh
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/test-glibc.c	   Copyright (C) 2019 Red Hat, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/iconv_open-zos.gperf	   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/idx.h	   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/gendata.c	   Copyright (C) 2022-2024 Simon Josefsson
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/limits.in.h	   Copyright 2016-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/libc-config.h	   Copyright 2017-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/attribute.h	   Copyright 2020-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stdckdint.in.h	   Copyright 2022-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/cdefs.h	   Copyright The GNU Toolchain Authors.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/INSTALL	   Copyright © 1994–1996, 1999–2002, 2004–2017, 2020–2024 Free Software
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/libidn2.info	   Copyright © 2011–2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.LESSERv3	   c) For a Combined Work that displays copyright notices during
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.LESSERv3	   execution, include the copyright notice for the Library among
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/src/idn2.c	  "Copyright %s 2011-%d Simon Josefsson, Tim Ruehsen.";
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/version.c	  "Copyright (C) 2011-2024  Simon Josefsson";
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	  # Code from module update-copyright:
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/src/idn2.c	  /* Do *not* mark this string for translation.  %s is a copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.c	  /* TRANSLATORS: Translate "(C)" to the copyright symbol
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	  Copyright-paperwork-exempt: Yes
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	  We protect your rights with two steps: (1) copyright the software, and
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright{}}%
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/texinfo.tex	  \\commondummyword\\copyright        {copyright}%
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/texinfo.tex	  \\gdefchar^^a9{\\copyright{}}
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/gnulib-comp.m4	  build-aux/update-copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.c	  fprintf (stream, version_etc_copyright, _("(C)"), COPYRIGHT_YEAR);
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/gnulib-cache.m4	  update-copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/src/idn2_cmd.c	  we make no copyright claims on it.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/fuzzer.h	 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/fuzzer.h	 * Copyright(c) 2017 Tim Ruehsen
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/fuzzer.h	 * The above copyright notice and this permission notice shall be included in
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	 Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.LESSERv3	 Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#        C. @copyright{}
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#        E. ©
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	#       For man pages, and when the -copyright parameter is used,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	#       For man pages, include a copyright section with the given
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      If UPDATE_COPYRIGHT_USE_INTERVALS=2, convert a sequence with gaps
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      Set UPDATE_COPYRIGHT_MAX_LINE_LENGTH to use a different length.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      UPDATE_COPYRIGHT_YEAR.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	#      [ -seeinfo infonode ] [ -copyright notice ] [ -verbatimcopying ]
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      and then the name of the copyright holder.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      beginning of each remaining line within the FSF copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      copyright year intervals in a reformatted FSF copyright statement
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      copyright years (such as 90, 1991, 1992-2007, 2008) in a
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      following conditions.  Subsequent copyright statements are
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      reformatted FSF copyright statement is collapsed to a single
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      within the FSF copyright statement.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#      year.  If unset or set to 0, only updated FSF copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#    * Copyright &copy; 90,2005,2007-2009
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   # Copyright (C) 1990-2005, 2007-2009 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   ## Copyright (C) 1990-2005, 2007-2009 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   1. If UPDATE_COPYRIGHT_FORCE=1, a recognized FSF copyright statement
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   1. It is the first copyright statement that meets all of the
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   2. If UPDATE_COPYRIGHT_USE_INTERVALS=1, every series of consecutive
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   2. Its format is "Copyright (C)", then a list of copyright years,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   3. Expand copyright year intervals.  (See "Environment variables"
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   4. The "Copyright" appears at the beginning of a line, except that it
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   4. The default maximum line length for a copyright line is 72.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   5. Set UPDATE_COPYRIGHT_HOLDER if the copyright holder is other
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   7. Each copyright year is 2 or 4 digits, and years are separated by
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/libtool.m4	#   Copyright (C) 1996-2001, 2003-2015 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ltversion.m4	#   Copyright (C) 2004, 2011-2015 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/lt~obsolete.m4	#   Copyright (C) 2004-2005, 2007, 2009, 2011-2015 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ltoptions.m4	#   Copyright (C) 2004-2005, 2007-2009, 2011-2015 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_check_gnu_make.m4	#   Copyright (c) 2008 John Darrington <j.darrington@elvis.murdoch.edu.au>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_file_escapes.m4	#   Copyright (c) 2008 Tom Howard <tomhoward@users.sf.net>
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_ac_append_to_file.m4	#   Copyright (c) 2009 Allan Caffee <allan.caffee@gmail.com>
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_add_am_macro_static.m4	#   Copyright (c) 2009 Tom Howard <tomhoward@users.sf.net>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2012 Christian Persch
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2012 Dan Winship
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2012 Paolo Borelli
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2012 Xan Lopez
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2012, 2016 Philip Withnall
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_check_gnu_make.m4	#   Copyright (c) 2015 Enrico M. Crisostomo <enrico.m.crisostomo@gmail.com>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_code_coverage.m4	#   Copyright (c) 2015,2018 Bastien ROUCARIES
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/config.guess	#   Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/config.rpath	#   Copyright 1996-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	#   Copyright @copyright{} 1990-2005, 2007-2009 Free Software
+line	6	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ax_ac_append_to_file.m4	#   permitted in any medium without royalty provided the copyright notice
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	#  -copyright notice
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/Makefile.am	#  update-copyright \\
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# A warning is printed for every file for which no copyright
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/Makefile.am	# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/gtk-doc.m4	# As a special exception, the above copyright owner gives unlimited
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2023 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/install-sh	# Copyright (C) 1994 X Consortium
+line	10	libidn2-2.3.7.tar.gz:libidn2-2.3.7/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makefile.in.in	# Copyright (C) 1995-1997, 2000-2007, 2009-2010 by Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/mdate-sh	# Copyright (C) 1995-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/error.m4	# Copyright (C) 1996-1998, 2001-2004, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/ltmain.sh	# Copyright (C) 1996-2015 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/stat-time.m4	# Copyright (C) 1998-1999, 2001, 2003, 2005-2007, 2009-2024 Free Software
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/depcomp	# Copyright (C) 1999-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/time_h.m4	# Copyright (C) 2000-2001, 2003-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/GNUmakefile	# Copyright (C) 2001, 2003, 2006-2024 Free Software Foundation, Inc.
+line	6	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	9	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/announce-gen	# Copyright (C) 2002-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ro.po	# Copyright (C) 2003 - 2022 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/Makefile.in	# Copyright (C) 2003 James Henstridge
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/extensions.m4	# Copyright (C) 2003, 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/free.m4	# Copyright (C) 2003-2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/de.po	# Copyright (C) 2004 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/it.po	# Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/pl.po	# Copyright (C) 2004, 2007, 2008, 2011, 2017, 2019, 2021, 2022 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/ltsugar.m4	# Copyright (C) 2004-2005, 2007-2008, 2011-2015 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/ltmain.sh	# Copyright (C) 2004-2015 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gnupload	# Copyright (C) 2004-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ja.po	# Copyright (C) 2006 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/vc-list-files	# Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/cs.po	# Copyright (C) 2007 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/git-version-gen	# Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/id.po	# Copyright (C) 2008 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2008-2021 Free Software Foundation, Inc.
+line	4	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gitlog-to-changelog	# Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/do-release-commit-and-tag	# Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/ltmain.sh	# Copyright (C) 2010-2015 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/libunistring.valgrind	# Copyright (C) 2010-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/uk.po	# Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/test-driver	# Copyright (C) 2011-2021 Free Software Foundation, Inc.
+line	17	libidn2-2.3.7.tar.gz:libidn2-2.3.7/Makefile.am	# Copyright (C) 2011-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/hr.po	# Copyright (C) 2012 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/eo.po	# Copyright (C) 2012, 2020 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	# Copyright (C) 2014 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/hu.po	# Copyright (C) 2014, 2019 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/getprogname.m4	# Copyright (C) 2016-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/es.po	# Copyright (C) 2017, 2018, 2019, 2020, 2021, 2022 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fur.po	# Copyright (C) 2018 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/da.po	# Copyright (C) 2019 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/pt_BR.po	# Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/pt_BR.po	# Copyright (C) 2021 Simon Josefsson
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ka.po	# Copyright (C) 2022 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/test-idn2.sh	# Copyright (C) 2022-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/standalone.sh	# Copyright (C) 2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/libidn2.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/Makefile.am	# Copyright (c) 2017-2024 Tim Ruehsen
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/largefile.m4	# Copyright 1992-1996, 1998-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gendocs.sh	# Copyright 2003-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/Idna2008-15.0.0.txt	# Copyright 2022 Unicode, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fr.po	# Copyright © 1996 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/pkg.m4	# Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fi.po	# Copyright © 2007 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fi.po	# Copyright © 2008, 2009, 2011 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/vi.po	# Copyright © 2014 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/sv.po	# Copyright © 2016, 2018, 2019, 2021, 2022 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/sr.po	# Copyright © 2020 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# Each file's copyright statement must be formatted correctly in
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# For example, you might wish to use the update-copyright target rule
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# However, any correctly formatted copyright statement following
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	# If you want to set UPDATE_COPYRIGHT_* environment variables,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# Iff a copyright statement is recognized in a file and the final
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	# Make sure that the copyright date in $(v_etc_file) is up to date.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# The exact conditions that a file's copyright statement must meet
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# This script updates an FSF copyright year list to include the current year.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# Update an FSF copyright year list to include the current year.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# Usage: update-copyright [FILE...]
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# a non-matching copyright statements would be recognized.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	# add it in cfg.mk along with a line 'update-copyright: prereq'.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# any other name by using the "UPDATE_COPYRIGHT_HOLDER" environment
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makefile.in.in	# are permitted in any medium without royalty provided the copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	# copyright statements to be updated.  The copyright holder's name
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/install-sh	# following copyright and license.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	# in the file .x-update-copyright.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	# their copyright.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	# to update all FSF copyright year lists in your project.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/tests/IdnaTest.txt	# © 2017 Unicode®, Inc.\r
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/DerivedNormalizationProps.txt	# © 2022 Unicode®, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	## Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	## Copyright (c) 1998 Michael Zucchi
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	## Copyright (c) 2001, 2002 Nikos Mavrogiannopoulos
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	## Copyright (c) 2002-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/gdoc	## Copyright (c) 2013 Adam Sampson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/Makefile.am	## begin gnulib module update-copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/Makefile.am	## end   gnulib module update-copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/texinfo.tex	% Copyright 1985, 1986, 1988, 1990-2023 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	(a) this copyright and permission notice appear with all copies
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	(b) this copyright and permission notice appear in associated
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	.PHONY: update-copyright
+line	20	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/idn2.1	.SH COPYRIGHT
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/cdefs.h	/* Copyright (C) 1992-2024 Free Software Foundation, Inc.
+line	9	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/unictype/bidi_of.h	/* Copyright (C) 2000-2022 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/stdint.in.h	/* Copyright (C) 2001-2002, 2004-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/inttypes.in.h	/* Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/uninorm/composition-table.gperf	/* Copyright (C) 2009-2022 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/IdnaMappingTable.txt	00A9          ; valid                  ;      ; NV8    # 1.1  COPYRIGHT SIGN
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/IdnaMappingTable.txt	2117..2118    ; valid                  ;      ; NV8    # 1.1  SOUND RECORDING COPYRIGHT..SCRIPT CAPITAL P
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	A. Unicode Copyright.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/README.md	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	COPYRIGHT AND PERMISSION NOTICE
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/Makevars	COPYRIGHT_HOLDER = Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/do-release-commit-and-tag	Copyright (C) $year Free Software Foundation, Inc,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/git-version-gen	Copyright (C) ${year} Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/libtool.m4	Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING	Copyright (C) 2011-2016 Simon Josefsson
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/CONTRIBUTING.md	Copyright (C) 2011-2024 Simon Josefsson
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/NEWS	Copyright (C) 2018-2024 Tim Ruehsen
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/configure	Copyright (C) 2023 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/README.md	Copyright (c) 2017-2024 Tim Ruehsen
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/config.guess	Copyright 1992-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gendocs.sh	Copyright 2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/libidn2.texi	Copyright @copyright{} 2011--2024 Simon Josefsson
+line	19	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/man/idn2_check_version.3	Copyright \\(co 2002-2024 Simon Josefsson.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/idn2.1	Copyright \\(co 2011\\-2024 Simon Josefsson, Tim Ruehsen.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/INSTALL	Copyright notice
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	Copyright © 1991-2016 Unicode, Inc. All rights reserved.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	Distributed under the Terms of Use in http://www.unicode.org/copyright.html.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/Makefile.am	EXTRA_DIST += $(top_srcdir)/build-aux/update-copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	Except as contained in this notice, the name of a copyright holder
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/README.md	The above copyright notice and this permission notice shall be included in
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	a notice placed by the copyright holder saying it may be distributed
+line	20	libidn2-2.3.7.tar.gz:libidn2-2.3.7/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	certain countries either by patents or by copyrighted interfaces, the
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/lib/version.c	const char version_etc_copyright[] =
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	copyright notice and disclaimer of warranty; keep intact all the
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gnupload	copyright="Copyright (C) ${copyright_year} Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/gnupload	copyright_year=`echo "$scriptversion" | sed -e 's/[^0-9].*//'`
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2014, 2016 Free Software
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/gettext.m4	dnl Copyright (C) 1995-2014, 2016 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2016 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/error_h.m4	dnl Copyright (C) 1996-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/getline.m4	dnl Copyright (C) 1998-2003, 2005-2007, 2009-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/codeset.m4	dnl Copyright (C) 2000-2002, 2006, 2008-2014, 2016, 2019-2024 Free Software
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014, 2016-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/ssize_t.m4	dnl Copyright (C) 2001-2003, 2006, 2010-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/stdint.m4	dnl Copyright (C) 2001-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/localcharset.m4	dnl Copyright (C) 2002, 2004, 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/dup2.m4	dnl Copyright (C) 2002, 2005, 2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/strverscmp.m4	dnl Copyright (C) 2002, 2005-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/strerror.m4	dnl Copyright (C) 2002, 2007-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/pathmax.m4	dnl Copyright (C) 2002-2003, 2005-2006, 2009-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/wchar_t.m4	dnl Copyright (C) 2002-2003, 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/alloca.m4	dnl Copyright (C) 2002-2004, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/getopt.m4	dnl Copyright (C) 2002-2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/host-cpu-c-abi.m4	dnl Copyright (C) 2002-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/locale-fr.m4	dnl Copyright (C) 2003, 2005-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/strchrnul.m4	dnl Copyright (C) 2003, 2007, 2009-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/rawmemchr.m4	dnl Copyright (C) 2003, 2007-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/eealloc.m4	dnl Copyright (C) 2003, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/malloca.m4	dnl Copyright (C) 2003-2004, 2006-2007, 2009-2024 Free Software Foundation,
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/errno_h.m4	dnl Copyright (C) 2004, 2006, 2008-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/m4/intlmacosx.m4	dnl Copyright (C) 2004-2014, 2016 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/visibility.m4	dnl Copyright (C) 2005, 2008, 2010-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/nocrash.m4	dnl Copyright (C) 2005, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/getdelim.m4	dnl Copyright (C) 2005-2007, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/sys_socket_h.m4	dnl Copyright (C) 2005-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/double-slash-root.m4	dnl Copyright (C) 2006, 2008-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/fcntl-o.m4	dnl Copyright (C) 2006, 2009-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/fcntl_h.m4	dnl Copyright (C) 2006-2007, 2009-2024 Free Software Foundation, Inc.
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/absolute-header.m4	dnl Copyright (C) 2006-2024 Free Software Foundation, Inc.
+line	8	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/gnulib-common.m4	dnl Copyright (C) 2007-2024 Free Software Foundation, Inc.
+line	8	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/close.m4	dnl Copyright (C) 2008-2024 Free Software Foundation, Inc.
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/00gnulib.m4	dnl Copyright (C) 2009-2024 Free Software Foundation, Inc.
+line	3	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/warn-on-use.m4	dnl Copyright (C) 2010-2024 Free Software Foundation, Inc.
+line	5	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/assert_h.m4	dnl Copyright (C) 2011-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/off_t.m4	dnl Copyright (C) 2012-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/musl.m4	dnl Copyright (C) 2019-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/zzgnulib.m4	dnl Copyright (C) 2020-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/unistring/m4/unictype_h.m4	dnl Copyright (C) 2023-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/extern-inline.m4	dnl Copyright 2012-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/limits-h.m4	dnl Copyright 2016-2024 Free Software Foundation, Inc.
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/__inline.m4	dnl Copyright 2017-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/m4/c-bool.m4	dnl Copyright 2022-2024 Free Software Foundation, Inc.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.c	enum { COPYRIGHT_YEAR = 2024 };
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/gl/version-etc.h	extern const char version_etc_copyright[];
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	means either the Program or any derivative work under copyright law:
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	my $circle_c_re = '(?:\\([cC]\\)|@copyright\\{}|\\\\\\\\\\(co|&copy;|©)';
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	my $copyright_re = 'Copyright';
+line	2	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/announce-gen	my $copyright_year = '2022';
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	my $holder = $ENV{UPDATE_COPYRIGHT_HOLDER};
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	my $margin = $ENV{UPDATE_COPYRIGHT_MAX_LINE_LENGTH};
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	my $this_year = $ENV{UPDATE_COPYRIGHT_YEAR};
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/cfg.mk	my-update-copyright:
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	original copyright holder who places the Program under this License
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	sc_copyright_check:
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	the "copyright" line and a pointer to where the full notice is found.
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYINGv2	to ask for permission.  For software which is copyrighted by the Free
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	update-copyright-env ?=
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/maint.mk	update-copyright:
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/build-aux/update-copyright	while (/(^|\\n)(.{0,$prefix_max})$copyright_re/cg)
+line	1	libidn2-2.3.7.tar.gz:libidn2-2.3.7/COPYING.unicode	written authorization of the copyright holder.
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/home.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/left-insensitive.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/left.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/right-insensitive.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/right.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/up-insensitive.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/doc/reference/html/up.png
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/00b6a0179b54693e37beb5142dce63bb852b8a0b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/040fb8e2fb424827c75bd2f51c39ce91d7520f2e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/076a109fb7b32dd6c0387e088057d0889b148e60
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/07e02b685c9dd8ec6b4e0eb604a43710c8e339c2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/0ac2d06802f52df8766ad6a80c1d65135aed5a11
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/0d470967b282574ed5bc79373fa4248357b43e96
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/128ccab55540f794d4f5bf2dc0d9336f967868c8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/1448e365495ecce95ee542d009049d67cf9a2d24
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/1670935c3463011aa6d40871386d8a2cc24aba43
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/16ee74d81cac6fcc91edd1cb4f5331eb87d2afdd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/172220765ee4cefa4e9bcd457eb6f40ead478cd2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/1b50ee99140dac4fec28c5c610579b352a547a01
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/1ee681e8d0cb886942455138b962df4370f4fbb8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/206df73e01a8819d0b926e315b80e455949784ca
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/23903d0c7ab2c6cb771250310ef07fa662988b13
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/23a7affd87e16bced0946bff09b62ce88b06f787
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/2646f0e0848cbbfa67db860773800b069a8ddfa0
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/29fb7dab406dcd09fd56e44ac58cbb5d1530761e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/2b4d7e4164964ff71cd634cff4d5c5cf3a6b238e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/2f27eae61adea8376207d2e11c4fcf903c79323d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3137dc87687cfe6f7aad9130ec14ea5b0cdbb9ba
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/32b44f01d3559df5e79ffee7d71d396592b35474
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3420c2e0ad5f863f9f927f12e538c58ce17f1a82
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/35b9e1d8349d5b6ee91a5d0d8b77d6b6dad35a22
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/36b2dfef60fbb1a4137edd459200a185b843d2f3
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/38a7b08d5a7df6354f716671427a9c13a3adeee2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/397a8e5ac9d32ecdcfae92bb9bbd2cba320a26a6
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3b6b5accc778a5d597b8b7a39c9895d2f3b9dd0d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3c0ce585a6f0179d94763222603a780c339eb7d7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3d30ef304a69ccbb6432b6f37c1dbea63e231533
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3f6ba09cc35e4fce77318944e6acf30182b8eb80
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3f9c2aabaeafd9d2d78dc51793c3c39024a3b920
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/3ffb93bcb87089e21da7f8d778e4e311929171d5
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/41084eb57b876f6c5b531f606c936399c503a836
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/41fe8e7fd9224e36595f0c8182d964325e274664
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/43d0edbc213d64fd5af5de5d8054a3d49646bb4e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/440045751c8e9c9b49f6d827a93a8d13381e6b8d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4635c2eaabc89b24ae808000ca5e768f9a6f6abd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/467a65471e65fdfd589fbceb4ee46a8216100e58
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/47437cd8728298e416fd18c57bc87fa6c5566357
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4913e0a15f997e4fee2ba8ffb5b0ad8dd7cdf093
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/49d1717aff8f650091f7f40e5c0a9c8648332d88
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4bc3ab343f3543d478cee0d1f21228e77d415425
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4e01b4960e2998d6fe1145aced4e37a45b9671d1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4ec811e378f4e81d6541d0e7e79fbd13640df898
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/4f77e97ce7865d290803a0c6bbf66388eddd1728
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/50381d1ee06a5b5c9764e23336cfcaad933b8cf5
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/53b2cf24910199da53816f78c853201bd32ec6a3
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/56f1d1788345aea13d2fc264e381cee3dd2125f4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/58bf0953b16baffb2b089ecf29c8acfeb928223b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/59ca9ce879c5d11448602f9bd14f8c66e9f26900
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/59d01efc03a12885e4e4fd2a656b4321bd944acb
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5a17b1334ac7123e8dde2caf4e745c3c1fe8599f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5ba6e4c84d4ba94e7191c0dc151e46b32b097e97
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5ba93c9db0cff93f52b521d7420e43f6eda2784f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5c605ac41c9e222f5ea9cc93da680c2a135ebc86
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5d9597203f3b1898bd1d74bd0a024827972428e2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5db8708bdad89437a567bced9f7556a678a9efe3
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/5f0af91e75a78923bc35752d8e537b705411bc87
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/60e31e766b08032c28e4f1a565e4b816f65f94ba
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/614d37f37869376c351aa1ad29ccd85094144fc9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/61c028432270dd8cfa5c2136133d76ec9db63ba0
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/6543433d8cd620c2623880ead22ff027d4a02b2f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/67c24693c30478d5a4e1538bd5ba3ea5bf4a6e57
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/686fd2790ab261514c8bc56ebdbf5d65b26ba842
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/6e59da763ec5b1c3c91d11fe4bd1f2e049c27650
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/6eed5c6b5bd7f003241f6533a09f52f14dc68965
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/71031f1237359d789455e1aedb176a16a2245f8d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/736297cce5c3d7758fdcac90975ff7d139fb7e26
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/75798ebb1515112b98fd710b5769322a379ed4c7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/75f05df54f1b6d7c1f7cf117e04b60a485407606
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/765bb83251fd0b010812a376e4a120ec499e5ad3
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/7c3a300d1e6af28d14cf63e0efb2e6eac07c468f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/7cc3ca92505c2b306856c144f2e65946e0c04d3e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/80f6a50236a2af7fe6f8c8d765431dda132b2254
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/81026e4dab20c4a5ab1c73abe279108f491d524f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/858cc9d041dfda14497cb5f29745a92116dacee1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8a51cdf5b86f59b44cf7dff088ef4ad849cf30cc
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8b84ddc895e159653f118dc103488e0acb912917
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8d0282d8fb8ea59dcd1ec17c13db207c27220bbd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8d616a2e524cf40e0328b656848ded54e6d08000
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8e5bbf028796664177a12829ec7a4bfa9f6e150d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/8ec9b26ba8d50505e1fbf2538a6793035dfb6bdd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/9154025ccf183b6cb32a8ec551266b4ea0d8c2b0
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/91b7c0c6240b975f7e0a6f73bc24aa3f94a8ff2d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/9322ad1f2cd15d534f1a160191452ed32c004dd6
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/93e14ef71910b667753e81a48ca01ec93e9e1782
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/94b2351ae1a0d6bb0a4fa46dff93e33f6ad2c08b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/957591869c3468eaa18ef4883c31f730b4bb6ca7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/95b5e91b1641929da3a310b5897b3d76ddc53510
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/96551012d211f1e4d05139fe89b317a5a3d9fefd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/97779a948a0aaf69a169fc4e8e5a5ed6816c9540
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/9bd70ad5eb79ff741ff87b3b7346b374359114a2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/9d8c88087ff81195fcded5de243fe45aedd376fc
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/9d97dffb5faed8dec14e223fb6a2779021b6d16a
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/a0a9137e73184dfa64479193dd88600131b5ea8b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/a4e687a069e3467fb8872295f47eb8f5e3dfd324
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/a5e86fa8449bf58317c981e71a5108b258b251cd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/a8fae04e37a5cbdc96e406100c011ed63dc5bf6d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/acd4df69a2cea72a26617e4182f0bc644f95182b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/ad8d902b9fca1b8ef70c29e98b6dcb9774962344
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/af59eaccf0541743ce1d79f7b0f9aab74afe1d62
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/b719794ae9120bff4d6feb19e067e0bc465de781
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/b9bf18af5450a0993a39123ccd928b86f3704145
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/be066a2acdd05a368865e8f7bb6fc01d08a4246e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/bfc59cd8666e44d3c9e14e6b32332db74431e92e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/c21e5536955392155a475b72007f8cc750cde4cf
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/cc8644a668e6e7899a4024dbea7a1387297cae0c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/cde10632ee6d3693f9c992dd61e5d064197327ee
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/ce6263a321c1a9ceea93be70e7db499e686e222b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/cf55a26e89cabac362f9161f8e73139f9a2545a4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/d10f8b1f1ab565d17254c5ba7a3a0d5df11b63c7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/d1969b9fedd267bc3bce5d65b4db488b91b75694
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/d3580d4e81a5ec026274bbd4b29020f113799e55
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/d50818ac6e1401fe474045beeb1e5b47d49847a8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/dcb3e36f13555ec5ee127a46f81d8a2049211ce9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/dd551e802e078bb0c8268d6f2c4f6962f9232681
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/de73a7ef2eaded6d8fe9c2c1b0c1c5648ddaa7e9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/df664c5ff76ee2244f9f0716c9ccfef3b3631519
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e2f733df192631af8875666a0264bd16594ef6e9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e47e3395e9a79ee725b650f823ca25ee1b1a4de9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e6533c978747db3c2e63c1f2b96af6620cc34310
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e866303696fbb2d496089526b13ccebd7df20fee
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e973a95d7bea4f4214cf6e2a812aeff6e06357b4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/e9991968985c9adbb68d31f6abdb91611bb29931
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/ea72cb97544bae8c1a6d6aa9ae51f9060fb4ebf0
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/eb3451666764a6e3ce858d2948033b2ca9172458
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/efdf6d23393c87dcf1c60980ea97015cb6b6224b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f2b48bb27ff2f55eccb7f0a8ec7d31dd19b4565c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f33df4d48507adb538db799ae18dbf2c98b14fb3
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f50beb464cc75859f6601c0c60b9d01b6f731ce4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f743545990233c67d53b3b58f5f4c57ab2a89873
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f79ef52f7e3d3d27a3b64806a3115a748ee5629d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f8e01a7a8a52e457021ff982e45e970c7bdae86d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/f90949f0c58da4861f49d92286b6b42f3f23e1bb
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_register_fuzzer.in/fcc35244d4f5a2c55911e09c55c99a0aef294329
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/00b5bf5b68b857af2da22cbb05815109793abee8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/015a907618ec16cd6e6d933a5d08d472600c68cf
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/01776e0baa9568f255efd02ab8071540e6ce8dd8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/02577003b9d7c805862b3641a8a22a01f4573cf7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/0590e701a3c2cdcaabbf74fb89810cf5a109d4a8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/078635c440f41de7356bf550e9351676477a6aca
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/09b35401bbddabab30b17ad0ec6d16be534a26d9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/0aaf76f425c6e0f43a36197de768e67d9e035abb
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/12b438b8c958066643a5fe2c5f86db985fa9a155
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/135627033801cb7cfc4c29d42a0d771a2a20fd3e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/178a676c51a64b21f5d44590da4967a3b53fff62
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/19f29f7a8c46d3b6c598b6841b5682b6e018becf
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/1a00c650bfc08e8499377738043b7027dbb79d7d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/1a60358900c48b5daf9096a85c5585fc90d7f45d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/1e73588cd6c0cd33638b971052f378c176765bf9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/21b8e6a0fc60c15f8c1eed7d5470347e314d30a4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/25a47f75935ab9f5e0f83a5611b513fcfa8be24f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/2a8b191f1330ca7f287ad5baa4d2cecf0ccbb895
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/3048c4ca9ebfe116e00a5593326fc4fba20e6f0d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/30b3a1b1494d644a0bb5e0a20bffbfaa456231ca
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/32ecbfc04da0123d377d1bc6846ace435e14dbeb
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/346500699351e06653f3f1ffd40d0346765dd5eb
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/34c053affef96c61840466d6f28919541f6c52f4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/38fac16cd010c09f92de73ce8c57391ecacb04ba
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/3a950da4aeca8d63e4967c5c57c0ecad2916f680
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/43f4a1b17a8737ce73e4662ec38ac1ce4d2d8139
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/476416db7d4fc44bc0a3d41c803eaa0c833445f6
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/4b1c66cfbf930fe3e112d394fe3206449b729061
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/53e22b44b5ae2eb1c22ed370aff12e62cc20180c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/5c27f4e57d77d29b68ff5b24ce20532e31f5b75c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/5cac5667fe71418f3194ddb6a9dba8023e2814f1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/605ba07999600259d232bed26c7a3deaaacf28cd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/615cffb63ebdc04f08dfc45de74ad18c55388142
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/62df97738804aee6efed600816180d73d367b54b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/64801cbaeb4440430949a9f13c23fd1eec61ff44
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/68493db6a2e12259edcadffe84f2f82623853d95
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/695acf399d172638c197df44c5d5ac5dee6bcf7b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/6965d355c0e6e485d6f5b0418c2afe1b92f50598
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/6c1c4cdd0b059219100c74b8bdb1f874aeee9bc1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/6d4d6289bf2a5ebbdcd6a34dac80ad91d0a38e22
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/6ec7b78a7204f4e3bb369a355a4eda1003b83c17
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/71ec3c8d1ee694e89a1ce54e2231f02f1b7d474c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/73f30ff2f8bf86312dc449cbf05e05e9871f49b1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/7579b0796579dc1ace29895383ab2701159ee210
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/7b9e44142df2cd56090d6431f96182818d749a0a
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/7c13a2bd9411bf0a05f224d48f01cb6b14512f8d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/80730244fb1899693935a7b26d8682b3e5b38568
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/850ddf7807abb303e1d0ad22814ba021d067a8e8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/86bd2630291fdca7cfdf54644dea392aac64d2bf
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/871582f42b16f90957757c59b258ee1e62cd7cb8
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/9120f0f734f9200a0bd42e0a9158b8f09cc820a4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/95985a6605c16005e473f7e36b36165fad2b4801
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/988a89cc9056577f8cc19f5582d5b30ba75ab948
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/9becea2d519ae153411a4f59f7f8e89fccbfb84e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a2694a3f5679c6efe157542a763060f40b07a823
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a2c3e0017bd9a8c2b77edbb8a2f4be13f3ee4f68
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a51b1fa647fd6869a9d25f4dfee066500e4028d2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a636ee4ed8d721ea30db0cfbc7637b3bde5b4fa9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a83d251c86cdc4747c3a43a687a88401bcdd772b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a8c3e15bff7117824b80ad2a17869b31a2ae534d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/a9b880e415aa4d96a35cd16e8682c23d532bd727
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/aa617de5f91a61a70fd65da35c92d4f91caf0a7e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/b12f874c12b890ddcd07437fc740fd71ecd96ab1
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/b1fc4e216c883706a67564aa5a00637b000c67a7
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/b334fdc36ee60c014dd2e43a356721b73c74ca3d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/b7a23164679ada883c443a3a4cfc7bcec0961ccf
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/badf7ac188cec175273a9bd7f67797225e0fa53c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/bb6f5a321b9d3109122ba4ee421c2e455d40e758
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/be067426dbd78332a386a5128f3af39254b70bb9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/c4b69c6b0dddf1f52a58b12f82e81f9662082707
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/c7ee5e6b663e4a1c1424c231b9201d3d7b773d99
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/d50cd418bb2b3b7fc21bfbd5130a55630ec93272
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/d74f76ccafe79ce362250551ad6bcbea34f35dc4
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/db1bf156c3df5247d98a02431d34acbf584c43bd
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/dbadea12f524c0a5530d70c86986828e935f18e2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/ddb7d26c0f2ec7c7fa7ac9da043d0539b4f4985c
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/de32e0ce37995377cc73de8f5d7dbc44f5d352ce
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/deb92f0f61fd2b2c4180dafd43410e54f98dc1be
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/e03b825842152094a606f1fe8f34dfad126cc3fe
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/e62b24eccdd54255318c4aa64c1847ed1b7d4ee0
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/e6c2d0885665466b7a4ca31533b10900855d205f
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/efbf6ed21d2e5d49ef9c83c6755e0e0b9c552e6b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/f1eed34ca0386e7390f480388628614db3d584e9
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/f3b9bb0aca2a6f6f604afb8874c09f21141814d2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/f956574ce3424da7ae2a1530274e0c8295222ed2
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/f9f8bd1ee86d197854fee3ea24df4bd90d1066cc
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.in/fc898fabda29d08aaa37b73e0f409a4807f371dc
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_ascii_8z_fuzzer.repro/clusterfuzz-testcase-5644466457673728
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/216a81777787e5f7c5caa07f9e2f668d20db1636
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/444edcf8f949d51df3acdde4cd8cdff1b08ad98d
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/932c6c0d8ba13003e39db9c0e25b75dce405101e
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/9e9de12d6e1c5976887320fb1feaea86a72ef6b5
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/bcbe7cd55000d55e334e71b85ee3ce1a422062c5
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/c4d7a0eb95daf8665b8220f22d82f970fb30781b
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/fuzz/libidn2_to_unicode_8z8z_fuzzer.in/cf5567ea891117c5876776c06950e1d8c9589d97
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/cs.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/da.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/de.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/eo.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/es.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fi.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fr.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/fur.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/hr.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/hu.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/id.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/it.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ja.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ka.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ko.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/nl.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/pl.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/pt_BR.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ro.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/ru.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/sr.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/sv.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/uk.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/vi.gmo
+binary-head	libidn2-2.3.7.tar.gz:libidn2-2.3.7/po/zh_CN.gmo

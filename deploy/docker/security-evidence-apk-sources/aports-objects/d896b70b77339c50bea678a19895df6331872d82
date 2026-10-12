@@ -1,0 +1,14 @@
+tree c384bf94c6b4c60e545b0a1434ad3804c7f855e1
+parent 8c92bb319bae6246b87254f89e80f084af9c623c
+author Daniel Néri <dne+alpine@mayonnaise.net> 1752048927 +0200
+committer Daniel Néri <dne+alpine@mayonnaise.net> 1752048927 +0200
+gpgsig -----BEGIN SSH SIGNATURE-----
+ U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgOMu493YNSMtf7QPDIUHZAI1P/a
+ r3aZ7jboW/n0thKz4AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5
+ AAAAQOTp40YErOSabQZhUNDJ2tAPSlXjiVcVtEBT6jHKMcqtxJtU3WwT65W1/Vj+hI6CIW
+ r8f2IMiXVSLLLUtGh7aww=
+ -----END SSH SIGNATURE-----
+
+main/git: security upgrade to 2.49.1
+
+https://raw.githubusercontent.com/git/git/master/Documentation/RelNotes/2.49.1.adoc

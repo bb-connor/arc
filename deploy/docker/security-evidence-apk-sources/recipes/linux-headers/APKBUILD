@@ -1,0 +1,56 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=linux-headers
+pkgver=6.14.2 # Follow the latest Linux stable
+_kernver=${pkgver%.*}
+pkgrel=0
+pkgdesc="Linux system headers"
+url="https://kernel.org/"
+arch="all" # Headers are architecture specific
+license="GPL-2.0-only"
+makedepends="perl"
+options="!check !dbg !strip !tracedeps !archcheck"
+source="https://kernel.org/pub/linux/kernel/v6.x/linux-$_kernver.tar.xz
+	revert-broken-uapi.patch
+	0003-remove-inclusion-of-sysinfo.h-in-kernel.h.patch
+	"
+if [ "${pkgver%.0}" = "$pkgver" ]; then
+	source="
+		patch-$pkgver.patch.xz::https://cdn.kernel.org/pub/linux/kernel/v${pkgver%%.*}.x/patch-$pkgver.xz
+		$source
+		"
+fi
+builddir="$srcdir/linux-$_kernver"
+
+_carch="$CARCH"
+case "$_carch" in
+aarch64*) _carch="arm64" ;;
+arm*) _carch="arm" ;;
+mips*) _carch="mips" ;;
+s390*) _carch="s390" ;;
+ppc*) _carch="powerpc" ;;
+riscv*) _carch="riscv" ;;
+loongarch*) _carch="loongarch" ;;
+# not sure about this --	ppc64*) _carch="powerpc64" ;;
+esac
+
+build() {
+	make headers ARCH="$_carch"
+}
+
+package() {
+	mkdir -p "$pkgdir"/usr/
+	cp -a usr/include/ "$pkgdir"/usr/include/
+
+	msg "purging non header files.."
+	find "$pkgdir"/usr/include/ ! -iname "*.h" -type f -exec rm -v {} \+
+
+	# provided by libdrm
+	rm -rf "$pkgdir"/usr/include/drm
+}
+
+sha512sums="
+0896871dd2bdbdfb624190c59e8a11d81009b8efb6701772e08a00bb48175aad38047f1163d8dff5998ea86bfeeed5bd45a4d51c00f573285e7df36a6a39703a  patch-6.14.2.patch.xz
+71dcaa3772d8d9797c3ae30cae9c582b11a7047a3bbcb8dfd479a4dffb40ff0da74cf3d45175f50cc9992e338bcadd46c9c570f54054ca3bde6661768d3d22eb  linux-6.14.tar.xz
+c1fc9a8a0b42dacad51ceb13785f54dfce89369fe082e6457b80a1f75b02704415d397b5df48ca3fdf361ec8c1b72c196b5033bca0325e39d026bcc357d89452  revert-broken-uapi.patch
+607c074d72aca88fea9ecdbd62198d8f7857daca75e5d027966e0a9997338d6ac8ce0a1e9114b19232b390751d05acca09e28b0cfad2a12d5942f5575a9f4684  0003-remove-inclusion-of-sysinfo.h-in-kernel.h.patch
+"

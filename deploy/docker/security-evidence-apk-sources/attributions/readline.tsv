@@ -1,0 +1,227 @@
+# chio.attribution-lines.v8 origin=readline files=176 files_with_lines=127 binary_heads=7 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2html	\t       'copyright', '(C)',
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.0	\x1b[1mCOPYRIGHT\x1b[0m
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	          adjacent to the other copyright notices.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	       Copyright (C)  YEAR  YOUR NAME.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	       D. Preserve all the copyright notices of the Document.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	       E. Add an appropriate copyright notice for your modifications
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	       F. Include, immediately after the copyright notices, a license
+line	1	readline-8.2.tar.gz:readline-8.2/doc/readline.0	       Readline is Copyright (C) 1989-2020 Free Software Foundation,  Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/history.0	       The GNU History Library is Copyright (C) 1989-2020 by the Free Software
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     Copyright (C) 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     Moreover, your license from a particular copyright holder is
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     World Wide Web server that publishes copyrightable works and also
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     copyright holder fails to notify you of the violation by some
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     copyright notices, and the license notice saying this License
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     copyright resulting from the compilation is not used to limit the
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     license from a particular copyright holder is reinstated (a)
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     permission from their copyright holders, but you may include
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     provisionally, unless and until the copyright holder explicitly and
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     reinstated permanently if the copyright holder notifies you of the
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     requiring permission under copyright law.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     site means any set of copyrightable works thus published on the MMC
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     that contains a notice placed by the copyright holder saying it can
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	     that copyright holder, and you cure the violation prior to 30 days
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2html	    $things_map{'copyright'} = "&copy;";
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	    <program>  Copyright (C) <year>  <name of author>
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	    Copyright (C) <year>  <name of author>
+line	1	readline-8.2.tar.gz:readline-8.2/parse-colors.h	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012 Free Software Foundation,
+line	1	readline-8.2.tar.gz:readline-8.2/colors.h	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012, 2015
+line	1	readline-8.2.tar.gz:readline-8.2/parse-colors.c	   Copyright (C) 1985, 1988, 1990-1991, 1995-2010, 2012, 2017
+line	1	readline-8.2.tar.gz:readline-8.2/colors.c	   Copyright (C) 1985, 1988, 1990-1991, 1995-2021
+line	4	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	  "The Program" refers to any copyrightable work licensed under this
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	  A "contributor" is a copyright holder who authorizes use under this
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	  Copyright (C)  @var{year}  @var{your name}.
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rl-fgets.c	  Copyright (C)\xa92003-2004 Harold Levy.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	  Moreover, your license from a particular copyright holder is
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright}
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	  \\def\\copyright{copyright}%
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	  \\definedummyword\\copyright
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	  \\gdef^^a9{\\copyright}
+line	2	readline-8.2.tar.gz:readline-8.2/vi_keymap.c	  { ISFUNC, rl_insert },\t/* Copyright sign */
+line	1	readline-8.2.tar.gz:readline-8.2/examples/readlinebuf.h	 * (c) 2001 by Dimitris Vyzovitis [vyzo@media.mit.edu]
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rlfe/rlfe.c	 * Copyright (C) 2004, 1999  Per Bothner
+line	4	readline-8.2.tar.gz:readline-8.2/examples/rlfe/config.h.in	 * Copyright (c) 1987 Oliver Laumann
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rlfe/config.h.in	 * Copyright (c) 1993-2000
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	 Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2html	 verbose => 'if set, ISO8879 characters are used for special symbols (like copyright, etc)',
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	"aggregate" if the compilation and its resulting copyright are not
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2html	#    Copyright (C) 1999, 2000  Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/examples/Inputrc	#   Copyright (C) 1989-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/shobj-conf	#   Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/config.sub	#   Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/config.guess	#   Copyright 1992-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/config.rpath	#   Copyright 1996-2018 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/configure.ac	# Copyright (C) 1987-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rlfe/configure	# Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001,
+line	1	readline-8.2.tar.gz:readline-8.2/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	readline-8.2.tar.gz:readline-8.2/examples/Makefile.in	# Copyright (C) 1994,2008,2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/Makefile.in	# Copyright (C) 1994-2018 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/support/mkdist	# Copyright (C) 1996-2002 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/Makefile.in	# Copyright (C) 1996-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/shlib/Makefile.in	# Copyright (C) 1998-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/install.sh	# Copyright 1991 by the Massachusetts Institute of Technology
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2dvi	# Copyright 1992-2019 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/install.sh	# copyright notice and this permission notice appear in supporting
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2html	# if set, ISO8879 characters are used for special symbols (like copyright, etc)
+line	1	readline-8.2.tar.gz:readline-8.2/support/install.sh	# the above copyright notice appear in all copies and that both that
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texinfo.tex	% Copyright 1985, 1986, 1988, 1990, 1991, 1992, 1993, 1994, 1995,
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%%Creator: dvips(k) 2022.1 (TeX Live 2022)  Copyright 2022 Radical Eye Software
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMBX12.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMCSC10.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI10.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI12.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMMI9.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMR10.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMR9.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSL10.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSLTT10.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSS10.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMSY10.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTI10.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTT10.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: (<http://www.ams.org>), with Reserved Font Name CMTT9.
+line	36	readline-8.2.tar.gz:readline-8.2/doc/history.ps	%Copyright: Copyright (c) 1997, 2009 American Mathematical Society
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	(1) assert copyright on the software, and (2) offer you this License
+line	1	readline-8.2.tar.gz:readline-8.2/doc/readline_3.ps	(\\()2.5 E F3(const c)A(har *pr)-.15 E(ompt)-.45 E F0(\\);)A F1(COPYRIGHT)
+line	1	readline-8.2.tar.gz:readline-8.2/doc/history_3.ps	(history \\255 GNU History Library)108 96 Q F1(COPYRIGHT)72 112.8 Q F0
+line	1	recipe:fix-rl_do_undo-crash.patch	+/* Copyright (C) 1989-2009,2021-2023 Free Software Foundation, Inc.
+line	1	recipe:fix-rl_do_undo-crash.patch	+/* Copyright (C) 1989-2023 Free Software Foundation, Inc.
+line	1	recipe:fix-rl_do_undo-crash.patch	-/* Copyright (C) 1989-2009,2021-2022 Free Software Foundation, Inc.
+line	1	recipe:fix-rl_do_undo-crash.patch	-/* Copyright (C) 1989-2021 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.3	.SH COPYRIGHT
+line	1	readline-8.2.tar.gz:readline-8.2/doc/readline.3	.if n Readline is Copyright (C) 1989\\-2020 Free Software Foundation,  Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/history.3	.if n The GNU History Library is Copyright (C) 1989-2020 by the Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/readline.3	.if t Readline is Copyright \\(co 1989\\-2020 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/history.3	.if t The GNU History Library is Copyright \\(co 1989-2020 by the Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/parens.c	/* Copyright (C) 1987, 1989, 1992-2015, 2017, 2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/keymaps.h	/* Copyright (C) 1987, 1989, 1992-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/posixdir.h	/* Copyright (C) 1987,1991,2012,2019,2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/posixjmp.h	/* Copyright (C) 1987,1991-2015 Free Software Foundation, Inc.
+line	8	readline-8.2.tar.gz:readline-8.2/examples/rlcat.c	/* Copyright (C) 1987-2009 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/vi_keymap.c	/* Copyright (C) 1987-2017 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/posixstat.h	/* Copyright (C) 1987-2019 Free Software Foundation, Inc.
+line	8	readline-8.2.tar.gz:readline-8.2/text.c	/* Copyright (C) 1987-2021 Free Software Foundation, Inc.
+line	6	readline-8.2.tar.gz:readline-8.2/misc.c	/* Copyright (C) 1987-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/keymaps.c	/* Copyright (C) 1988,1989-2009,2017 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/tilde.c	/* Copyright (C) 1988-2020 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/histsearch.c	/* Copyright (C) 1989, 1992-2009,2017,2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/histlib.h	/* Copyright (C) 1989-2009,2021-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/histfile.c	/* Copyright (C) 1989-2019 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/history.c	/* Copyright (C) 1989-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/history.h	/* Copyright (C) 1989-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/xfree.c	/* Copyright (C) 1991-2010,2017 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/xmalloc.c	/* Copyright (C) 1991-2017 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/tilde.h	/* Copyright (C) 1992-2009,2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/rlconf.h	/* Copyright (C) 1992-2015 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/rltty.c	/* Copyright (C) 1992-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/ansi_stdlib.h	/* Copyright (C) 1993 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/rlstdc.h	/* Copyright (C) 1993-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/macro.c	/* Copyright (C) 1994-2009,2017 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/chardefs.h	/* Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/rltty.h	/* Copyright (C) 1995-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/tcap.h	/* Copyright (C) 1996-2015 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/nls.c	/* Copyright (C) 1996-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/rlwinsize.h	/* Copyright (C) 1997-2009 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/shell.c	/* Copyright (C) 1997-2009,2017,2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/savestring.c	/* Copyright (C) 1998,2003,2017 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/xmalloc.h	/* Copyright (C) 1999-2009,2010-2021 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/posixtime.h	/* Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/rlprivate.h	/* Copyright (C) 1999-2022 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/rltypedefs.h	/* Copyright (C) 2000-2021 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/rlmbutil.h	/* Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/posixselect.h	/* Copyright (C) 2009 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/examples/hist_erasedups.c	/* Copyright (C) 2011 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rl-timeout.c	/* Copyright (C) 2021 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/examples/rlfe/pty.c	/* Copyright (c) 1993-2002
+line	1	readline-8.2.tar.gz:readline-8.2/examples/rlfe/config.h.in	/* Copyright 2004 Per Bothner <per@bothner.com>
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMBX12.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMCSC10.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI10.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI12.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMMI9.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMR10.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMR9.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSL10.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSLTT10.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSS10.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMSY10.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTI10.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTT10.) readonly def
+line	3	readline-8.2.tar.gz:readline-8.2/doc/history.ps	/Notice (Copyright \\050c\\051 1997, 2009 American Mathematical Society \\050<http://www.ams.org>\\051, with Reserved Font Name CMTT9.) readonly def
+line	2	readline-8.2.tar.gz:readline-8.2/doc/readline_3.ps	/brokenbar/section/dieresis/copyright/ordfeminine/guilsinglleft
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	readline-8.2.tar.gz:readline-8.2/doc/rluserman.ps	680 y Fb(Copyright)42 b(\\(C\\))79 b Fa(year)g(your)40
+line	2	readline-8.2.tar.gz:readline-8.2/doc/history.ps	680 y Fe(Copyright)42 b(\\(C\\))79 b Fc(year)g(your)40
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	</li><li> Add an appropriate copyright notice for your modifications
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	</li><li> Include, immediately after the copyright notices, a license notice
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	</li><li> Preserve all the copyright notices of the Document.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	<p>Moreover, your license from a particular copyright holder is
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	<pre class="display">Copyright &copy; 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	<pre class="example">  Copyright (C)  <var>year</var>  <var>your name</var>.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	Add an appropriate copyright notice for your modifications
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluser.texi	Copyright (C) 1988--2022 Free Software Foundation, Inc.
+line	4	readline-8.2.tar.gz:readline-8.2/doc/readline.html	Copyright (C) 1988-2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/version.texi	Copyright (C) 1988-2022 Free Software Foundation, Inc.\x20
+line	1	readline-8.2.tar.gz:readline-8.2/examples/excallback.c	Copyright (C) 1999 Jeff Solomon
+line	2	readline-8.2.tar.gz:readline-8.2/examples/rlfe/configure	Copyright (C) 2010 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/texi2dvi	Copyright (C) 2019 Free Software Foundation, Inc.
+line	2	readline-8.2.tar.gz:readline-8.2/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/config.sub	Copyright 1992-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/support/config.guess	Copyright 1992-2022 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rlman.texi	Copyright @copyright{} 1988--2022 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	Copyright @copyright{} 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluser.texi	GNU Copyright statement is available to the distributee, and provided that
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	Include, immediately after the copyright notices, a license notice
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	Moreover, your license from a particular copyright holder is
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	Preserve all the copyright notices of the Document.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	World Wide Web server that publishes copyrightable works and also
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	add to a covered work, you may (if authorized by the copyright holders of
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	adjacent to the other copyright notices.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	appropriately publish on each copy an appropriate copyright notice;
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	author or copyright holder as a result of your choosing to follow a
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	contains a notice placed by the copyright holder saying it can be
+line	5	readline-8.2.tar.gz:readline-8.2/COPYING	copyright holder, and you cure the violation prior to 30 days after
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	copyright notices, and the license notice saying this License applies
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	copyright on the Program, and are irrevocable provided the stated
+line	3	readline-8.2.tar.gz:readline-8.2/doc/readline.html	distribution medium, is called an &ldquo;aggregate&rdquo; if the copyright
+line	1	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	distribution medium, is called an ``aggregate'' if the copyright
+line	1	readline-8.2.tar.gz:readline-8.2/aclocal.m4	dnl Copyright (C) 1987-2021 Free Software Foundation, Inc.
+line	1	readline-8.2.tar.gz:readline-8.2/m4/codeset.m4	dnl Copyright (C) 2000-2002, 2006, 2008-2014, 2016, 2019 Free Software
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	finally terminates your license, and (b) permanently, if the copyright
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	for which you have or can give appropriate copyright permission.
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	from a particular copyright holder is reinstated (a) provisionally,
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	in a fashion requiring copyright permission, other than the making of an
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	infringement under applicable copyright law, except executing it on a
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	license from a particular copyright holder is reinstated (a)
+line	1	readline-8.2.tar.gz:readline-8.2/doc/readline.info	manual provided the copyright notice and this permission notice pare
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	modify any covered work.  These actions infringe copyright if you do
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	not control copyright.  Those thus making or running the covered works
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	permission from their copyright holders, but you may include
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluser.texi	provided the copyright notice and this permission notice are preserved on
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	provisionally, unless and until the copyright holder explicitly and
+line	5	readline-8.2.tar.gz:readline-8.2/COPYING	reinstated permanently if the copyright holder notifies you of the
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	rights of fair use or other equivalent, as provided by copyright law.
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	site means any set of copyrightable works thus published on the MMC
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	terminates your license, and (b) permanently, if the copyright holder
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	the License in the document and put the following copyright and
+line	3	readline-8.2.tar.gz:readline-8.2/doc/rluserman.info	the License in the document and put the following copyright and license
+line	1	readline-8.2.tar.gz:readline-8.2/doc/rltech.texi	this manual provided the copyright notice and this permission notice
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	under copyright law.
+line	4	readline-8.2.tar.gz:readline-8.2/doc/fdl.texi	unless and until the copyright holder explicitly and finally
+line	1	readline-8.2.tar.gz:readline-8.2/COPYING	your copyrighted material outside their relationship with you.
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/history.dvi
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/history.pdf
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/readline.dvi
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/readline.pdf
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/rluserman.dvi
+binary-head	readline-8.2.tar.gz:readline-8.2/doc/rluserman.pdf
+binary-head	readline-8.2.tar.gz:readline-8.2/examples/rlwrap-0.30.tar.gz

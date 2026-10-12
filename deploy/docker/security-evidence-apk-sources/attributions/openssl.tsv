@@ -1,0 +1,804 @@
+# chio.attribution-lines.v8 origin=openssl files=5780 files_with_lines=4105 binary_heads=105 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/mkrc.pl	            VALUE "LegalCopyright", "Copyright 1998-$YEAR The OpenSSL Authors. All rights reserved.\\\\0"
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	          that You distribute, all copyright, patent, trademark, and
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/CONTRIBUTING.md	        Copyright 20xx-20yy The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	        if $contents !~ /Copyright .* The OpenSSL Project Authors/;
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	        if $contents =~ /head1 COPYRIGHT.*=head/ms;
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	        my ($histsect, undef) = split('=head1 COPYRIGHT\\s*', $rest);
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      "Licensor" shall mean the copyright owner or entity authorized by
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      You may add Your own copyright statement to Your modifications and
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      copyright license to reproduce, prepare Derivative Works of,
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      copyright notice that is included in or attached to the work
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      designated in writing by the copyright owner as "Not a Contribution."
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      submitted to Licensor for inclusion in the Work by the copyright owner
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      the copyright owner that is granting the License.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	      the copyright owner. For the purposes of this definition, "submitted"
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	     such as ftp.uu.net, or by allowing the Copyright Holder to include your
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	    '*' => [ 'NAME', 'COPYRIGHT' ],
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	    Copyright (C) 19yy  <name of author>
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	    Gnomovision version 69, Copyright (C) 19xx name of author
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	    announcement including an appropriate copyright notice and a notice
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	    err($id, "Copyright not last")
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	    err($id, "Missing copyright")
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	    not be required to justify it to the Copyright Holder, but only to the
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	    or has been modified in accordance with the wishes of the Copyright
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/perl/OpenSSL/copyright.pm	    return $ENV{'OSSL_COPYRIGHT_YEAR'} if defined $ENV{'OSSL_COPYRIGHT_YEAR'};
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/LICENSE.txt	   2. Grant of Copyright License. Subject to the terms and conditions of
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/siphash/siphash.c	   Copyright (c) 2012-2014 Daniel J. Bernstein
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/siphash/siphash.c	   Copyright (c) 2012-2016 Jean-Philippe Aumasson
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/siphash/siphash.c	   To the extent possible under law, the author(s) have dedicated all copyright
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/CHANGES.md	   copyright notice in crypto/bn/bn_gf2m.c before enabling it).
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/CHANGES.md	   o merged COPYRIGHT into LICENSE
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/NEWS.md	  * Copyright text was shrunk to a boilerplate that points to the license
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	  - "Copyright Holder" is whoever is named in the copyright or copyrights for
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	  - "Package" refers to the collection of files distributed by the Copyright
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	  We protect your rights with two steps: (1) copyright the software, and
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	  Yoyodyne, Inc., hereby disclaims all copyright interest in the
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	  d) make other distribution arrangements with the Copyright Holder.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/sslecho/main.c	 *  Copyright 2022-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/guide/quic-multi-stream.c	 *  Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/guide/quic-client-block.c	 *  Copyright 2023-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/guide/tls-server-block.c	 *  Copyright 2024 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/guide/quic-server-block.c	 *  Copyright 2024-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_nyi.c	 * 1. Redistributions of source code must retain the above copyright
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_nyi.c	 * 2. Redistributions in binary form must reproduce the above copyright
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_unix.c	 * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/include/openssl/srtp.h	 * Copyright (C) 2006, Network Resonance, Inc. Copyright (C) 2011, RTFM, Inc.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aria/aria.c	 * Copyright (C) 2017 National Security Research Institute. All Rights Reserved.
+line	44	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ecparam.c	 * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/x509/v3_pci.c	 * Copyright (c) 2004 Kungliga Tekniska Högskolan
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_unix.c	 * Copyright (c) 2004, 2018, Richard Levitte <richard@levitte.org>
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/srp.c	 * Copyright (c) 2004, EdelKey Project. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_nyi.c	 * Copyright (c) 2004, Richard Levitte <richard@levitte.org>
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/seed/seed.c	 * Copyright (c) 2007 KISA(Korea Information Security Agency). All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp.c	 * Copyright (c) 2012, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/rehash.c	 * Copyright (c) 2013-2014 Timo Teräs <timo.teras@gmail.com>
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistz256.c	 * Copyright (c) 2014, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistz256.c	 * Copyright (c) 2015, CloudFlare, Inc.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rbtree/rbtree.c	 * Copyright (c) 2016 David Gwynne <david@gwynne.id.au>
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aria/aria.c	 * Copyright (c) 2017, Oracle and/or its affiliates.  All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/include/crypto/sha.h	 * Copyright (c) 2018, Oracle and/or its affiliates.  All rights reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_rsa_fips186_4.c	 * Copyright (c) 2018-2019, Oracle and/or its affiliates.  All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/evp_kdf_test.c	 * Copyright (c) 2018-2020, Oracle and/or its affiliates.  All rights reserved.
+line	20	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/param_build.c	 * Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/ffc_internal_test.c	 * Copyright (c) 2019-2020, Oracle and/or its affiliates.  All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp.h	 * Copyright (c) 2020, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp_x2.c	 * Copyright (c) 2020-2021, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/implementations/ciphers/cipher_aes_gcm_hw_vaes_avx512.inc	 * Copyright (c) 2021, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/chacha_riscv.c	 * Copyright (c) 2023, Jerry Shih <jerry.shih@sifive.com>
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/progs.pl	 * Copyright 1995-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/a_octet.c	 * Copyright 1995-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_print.c	 * Copyright 1995-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/errstr.c	 * Copyright 1995-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/kdf/kdf_err.c	 * Copyright 1995-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	69	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/apps_ui.c	 * Copyright 1995-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	93	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/app_libctx.c	 * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	27	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ciphers.c	 * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	49	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/dhparam.c	 * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	62	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ca.c	 * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	61	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/asn1parse.c	 * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	94	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/dgst.c	 * Copyright 1995-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_prime.pl	 * Copyright 1998-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/des/ncbc_enc.c	 * Copyright 1998-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/comp/comp_lib.c	 * Copyright 1998-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_prime.h	 * Copyright 1998-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/x_algor.c	 * Copyright 1998-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_blind.c	 * Copyright 1998-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/rand.c	 * Copyright 1998-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/testdsa.h	 * Copyright 1998-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/timeouts.h	 * Copyright 1999-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/include/openssl/pem2.h	 * Copyright 1999-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/tbl_standard.h	 * Copyright 1999-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	17	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/nseq.c	 * Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bss_bio.c	 * Copyright 1999-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/pkcs8.c	 * Copyright 1999-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	16	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/p5_pbev2.c	 * Copyright 1999-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/smime.c	 * Copyright 1999-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	20	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/pkcs12.c	 * Copyright 1999-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/charmap.pl	 * Copyright 2000-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/tasn_typ.c	 * Copyright 2000-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/x_long.c	 * Copyright 2000-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/charmap.h	 * Copyright 2000-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_sqrt.c	 * Copyright 2000-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/rsautl.c	 * Copyright 2000-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/passwd.c	 * Copyright 2000-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/engine.c	 * Copyright 2000-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/tasn_dec.c	 * Copyright 2000-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/pem/pem_x509.c	 * Copyright 2001-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/engine/eng_all.c	 * Copyright 2001-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/engine/eng_fat.c	 * Copyright 2001-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	23	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ec_cvt.c	 * Copyright 2001-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_smpl.c	 * Copyright 2001-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/engine/eng_ctrl.c	 * Copyright 2001-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ec_local.h	 * Copyright 2001-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_mont.c	 * Copyright 2001-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ocsp.c	 * Copyright 2001-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/mem_clr.c	 * Copyright 2002-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/x86_64-gcc.c	 * Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/aes_cbc.c	 * Copyright 2002-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/aes_local.h	 * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/aes_core.c	 * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ec.c	 * Copyright 2002-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_nist.c	 * Copyright 2002-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/ecparam.c	 * Copyright 2002-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/asn1_gen.c	 * Copyright 2002-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/x509/v3_pcons.c	 * Copyright 2003-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/err/err_mark.c	 * Copyright 2003-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/o_str.c	 * Copyright 2003-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/mem_sec.c	 * Copyright 2004-2014, Akamai Technologies. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_nyi.c	 * Copyright 2004-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/e_old.c	 * Copyright 2004-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/srp.c	 * Copyright 2004-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/prime.c	 * Copyright 2004-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_unix.c	 * Copyright 2004-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/sha256.c	 * Copyright 2004-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/x509/x509_vpm.c	 * Copyright 2004-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/x509/pcy_cache.c	 * Copyright 2004-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	18	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/tlssrp_depr.c	 * Copyright 2005 Nokia. All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/whrlpool/wp_local.h	 * Copyright 2005-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/include/openssl/whrlpool.h	 * Copyright 2005-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/asn1_local.h	 * Copyright 2005-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bio_local.h	 * Copyright 2005-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rsa/rsa_pss.c	 * Copyright 2005-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/ssl/d1_msg.c	 * Copyright 2005-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bss_dgram.c	 * Copyright 2005-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/camellia/camellia.c	 * Copyright 2006 NTT (Nippon Telegraph and Telephone Corporation) .
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/camellia/cmll_local.h	 * Copyright 2006-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/igetest.c	 * Copyright 2006-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ts/ts_lib.c	 * Copyright 2006-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/aes_ige.c	 * Copyright 2006-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/pkeyparam.c	 * Copyright 2006-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/ameth_lib.c	 * Copyright 2006-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/pkey.c	 * Copyright 2006-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/dsa/dsa_ameth.c	 * Copyright 2006-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/genpkey.c	 * Copyright 2006-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/pkeyutl.c	 * Copyright 2006-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/e_seed.c	 * Copyright 2007-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_util.c	 * Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_status.c	 * Copyright 2007-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_hdr.c	 * Copyright 2007-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_asn.c	 * Copyright 2007-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/cmp.c	 * Copyright 2007-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/cts128.c	 * Copyright 2008-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/aes_wrap.c	 * Copyright 2008-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cms/cms_dd.c	 * Copyright 2008-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cms/cms_cd.c	 * Copyright 2008-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/bio_ndef.c	 * Copyright 2008-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cms/cms_att.c	 * Copyright 2008-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/cms.c	 * Copyright 2008-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/asn_mime.c	 * Copyright 2008-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_ppc.c	 * Copyright 2009-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/chacha_ppc.c	 * Copyright 2009-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ppccap.c	 * Copyright 2009-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_ppc.c	 * Copyright 2009-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/vms_decc_init.c	 * Copyright 2010-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/tasn_scn.c	 * Copyright 2010-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/include/crypto/modes.h	 * Copyright 2010-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistp224.c	 * Copyright 2010-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmac/cmac.c	 * Copyright 2010-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/mips_arch.h	 * Copyright 2011-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/ccm128.c	 * Copyright 2011-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_x931p.c	 * Copyright 2011-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ec2_oct.c	 * Copyright 2011-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistp521.c	 * Copyright 2011-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/arm_arch.h	 * Copyright 2011-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/implementations/rands/drbg.c	 * Copyright 2011-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/armcap.c	 * Copyright 2011-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/implementations/digests/blake2_impl.h	 * Copyright 2012, Samuel Neves <sneves@dei.uc.pt>
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/evp_cnf.c	 * Copyright 2012-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/fuzz/v3name.c	 * Copyright 2012-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/asn_mstbl.c	 * Copyright 2012-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/ssl/ssl_conf.c	 * Copyright 2012-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/cipher/ariacbc.c	 * Copyright 2012-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/e_aes_cbc_hmac_sha256.c	 * Copyright 2013-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/dh/dh_kdf.c	 * Copyright 2013-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp.c	 * Copyright 2013-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/cipher/aesccm.c	 * Copyright 2013-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp.h	 * Copyright 2013-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cms/cms_kari.c	 * Copyright 2013-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_32/f_impl32.c	 * Copyright 2014 Cryptography Research, Inc.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_32/f_impl.h	 * Copyright 2014-2016 Cryptography Research, Inc.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistz256_table.c	 * Copyright 2014-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/constant_time_test.c	 * Copyright 2014-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/testutil/output.h	 * Copyright 2014-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_srp.c	 * Copyright 2014-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/include/crypto/ppc_arch.h	 * Copyright 2014-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistz256.c	 * Copyright 2014-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_dh.c	 * Copyright 2014-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/curve448utils.h	 * Copyright 2015 Cryptography Research, Inc.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/curve448.c	 * Copyright 2015-2016 Cryptography Research, Inc.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/comp/comp_local.h	 * Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/pbelutest.c	 * Copyright 2015-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/async/async_local.h	 * Copyright 2015-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	21	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/vms_decc_argv.c	 * Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/async/arch/async_null.c	 * Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ec_kmeth.c	 * Copyright 2015-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/opt.c	 * Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/demos/bio/server-cmod.c	 * Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/p5_scrypt.c	 * Copyright 2015-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_32/arch_intrinsics.h	 * Copyright 2016 Cryptography Research, Inc.
+line	14	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/vms_term_sock.h	 * Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/vms_term_sock.h	 * Copyright 2016 VMS Software, Inc. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/fuzz/driver.c	 * Copyright 2016-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	19	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/async/async_wait.c	 * Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	34	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/__DECC_INCLUDE_EPILOGUE.H	 * Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bio_sock2.c	 * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/dso/dso_local.h	 * Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	17	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bio_meth.c	 * Copyright 2016-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	23	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/storeutl.c	 * Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	25	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/vms_term_sock.c	 * Copyright 2016-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rsa/rsa_mp.c	 * Copyright 2017 BaishanCloud. All rights reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/e_sm4.c	 * Copyright 2017 Ribose Inc. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ui/ui_null.c	 * Copyright 2017 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_32/arch_intrinsics.h	 * Copyright 2017-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/columns.c	 * Copyright 2017-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/test/cipherbytes_test.c	 * Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aria/aria.c	 * Copyright 2017-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/dh/dh_group_params.c	 * Copyright 2017-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_32/f_impl32.c	 * Copyright 2017-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	14	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/curve448/arch_64/f_impl64.c	 * Copyright 2017-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/include/internal/tlsgroups.h	 * Copyright 2017-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	14	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ctype.c	 * Copyright 2017-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/rsa_complex.c	 * Copyright 2018 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/apps_ui.h	 * Copyright 2018-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/fmt.h	 * Copyright 2018-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/engine_loader.h	 * Copyright 2018-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/include/crypto/sha.h	 * Copyright 2018-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rsa/rsa_sp800_56b_check.c	 * Copyright 2018-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/opt.h	 * Copyright 2018-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/cmp_mock_srv.h	 * Copyright 2018-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/implementations/kdfs/kbkdf.c	 * Copyright 2019 Red Hat, Inc.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/names.h	 * Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
+line	36	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/app_params.h	 * Copyright 2019-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	56	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/kdf.c	 * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bss_core.c	 * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	37	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/legacy_blake2.c	 * Copyright 2019-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	34	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/fipsinstall.c	 * Copyright 2019-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	34	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/names.c	 * Copyright 2019-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	51	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bsearch.c	 * Copyright 2019-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/engine.c	 * Copyright 2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/mkerr.pl	 * Copyright 2020-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	63	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/ec_common.h	 * Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/ec_support.c	 * Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	20	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/log.c	 * Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	26	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ec_backend.c	 * Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	27	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/rsaz_exp_x2.c	 * Copyright 2020-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	26	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/app_provider.c	 * Copyright 2020-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/app_libctx.h	 * Copyright 2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/sm3_internal_test.c	 * Copyright 2021 UnionTech. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/include/internal/safe_math.h	 * Copyright 2021-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	18	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/ossl_core_bio.c	 * Copyright 2021-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bf_readbuff.c	 * Copyright 2021-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/ctrl_params_translate.c	 * Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/x509/t_acert.c	 * Copyright 2021-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	23	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/lib/apps_opt_printf.c	 * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+line	43	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/loongarch_arch.h	 * Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	23	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/deterministic_nonce.c	 * Copyright 2022-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	25	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/mac_meth.c	 * Copyright 2022-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	58	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bss_dgram_pair.c	 * Copyright 2022-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	37	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_s390x.c	 * Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+line	18	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/chacha_riscv.c	 * Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistp384.c	 * Copyright 2023-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	16	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_sm2p256.c	 * Copyright 2023-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	17	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/comp_methods.c	 * Copyright 2024 The OpenSSL Project Authors. All Rights Reserved.
+line	47	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/hmac/hmac_s390x.c	 * Copyright 2024-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	39	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/hashtable/hashtable.c	 * Copyright 2024-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	25	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/evp/s_lib.c	 * Copyright 2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/skeyutl.c	 * Copyright 2025-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rbtree/rbtree.c	 * Copyright 2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/crmf/crmf_lib.c	 * Copyright Nokia 2007-2018
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/cmp.c	 * Copyright Nokia 2007-2019
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_vfy.c	 * Copyright Nokia 2007-2020
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bio/bio_print.c	 * Copyright Patrick Powell 1995
+line	29	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/cmp.c	 * Copyright Siemens AG 2015-2019
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_vfy.c	 * Copyright Siemens AG 2015-2020
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/include/cmp_mock_srv.h	 * Copyright Siemens AG 2018-2020
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/http_test.c	 * Copyright Siemens AG 2020
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/cmp/cmp_genm.c	 * Copyright Siemens AG 2022
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/LPdir_unix.c	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	 Copyright (C) 1989 Free Software Foundation, Inc.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/des/asm/des_enc.m4	! Copyright 2000-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sparccpuid.S	! Copyright 2005-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	"copyright" line and a pointer to where the full notice is found.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# 1. Redistributions of source code must retain the above copyright
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# 2. Redistributions in binary form must reproduce the above copyright
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesni-xts-avx512.pl	# Copyright (C) 2023 Intel Corporation
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/tsget.in	# Copyright (c) 2002 The OpenTSA Project. All rights reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/camellia/asm/cmll-x86.pl	# Copyright (c) 2008 Andy Polyakov <appro@openssl.org>
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-avx2.pl	# Copyright (c) 2012, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistz256-x86_64.pl	# Copyright (c) 2014, Intel Corporation. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistz256-x86_64.pl	# Copyright (c) 2015 CloudFlare, Inc.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/certs/mkcert.sh	# Copyright (c) 2016 Viktor Dukhovni <openssl-users@dukhovni.org>.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/01-test_test.t	# Copyright (c) 2017, Oracle and/or its affiliates.  All rights reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_kdf.t	# Copyright (c) 2018, Oracle and/or its affiliates.  All rights reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_sparse_array.t	# Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-2k-avx512.pl	# Copyright (c) 2020, Intel Corporation. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-3k-avx512.pl	# Copyright (c) 2021, Intel Corporation. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# Copyright (c) 2022, Hongren (Zenithal) Zheng <i@zenithal.me>
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_hpke.t	# Copyright (c) 2022, Oracle and/or its affiliates.  All rights reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv64-zvkned.pl	# Copyright (c) 2023, Christoph Müllner <christoph.muellner@vrull.eu>
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv64-zvbb-zvkg-zvkned.pl	# Copyright (c) 2023, Jerry Shih <jerry.shih@sifive.com>
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv64-zvkned.pl	# Copyright (c) 2023, Phoebe Chen <phoebe.chen@sifive.com>
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-2k-avxifma.pl	# Copyright (c) 2024, Intel Corporation. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/des/asm/desboth.pl	# Copyright 1995-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/x86asm.pl	# Copyright 1995-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bf/asm/bf-586.pl	# Copyright 1995-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/conf/keysets.pl	# Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/progs.pl	# Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/objects/obj_dat.pl	# Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rc4/asm/rc4-586.pl	# Copyright 1998-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/bn_prime.pl	# Copyright 1998-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/perl/OpenSSL/config.pm	# Copyright 1998-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/sha1-586.pl	# Copyright 1998-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/mkerr.pl	# Copyright 1999-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/x86nasm.pl	# Copyright 1999-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/engines/e_dasync.txt	# Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/engines/e_afalg.txt	# Copyright 1999-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/engines/e_capi.txt	# Copyright 1999-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/tools/c_rehash.in	# Copyright 1999-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/err/openssl.txt	# Copyright 1999-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/charmap.pl	# Copyright 2000-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/CA.pl.in	# Copyright 2000-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_aes_ocb.txt	# Copyright 2001-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_aria.txt	# Copyright 2001-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpmac_poly1305.txt	# Copyright 2001-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_chacha.txt	# Copyright 2001-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_sm4.txt	# Copyright 2001-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_des3_common.txt	# Copyright 2001-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_aes_common.txt	# Copyright 2001-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/tsget.in	# Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/find-doc-nits	# Copyright 2002-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/VMS/VMSify-conf.pl	# Copyright 2004-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-586.pl	# Copyright 2004-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/copy.pl	# Copyright 2005-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/x86-mont.pl	# Copyright 2005-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-sparcv9.pl	# Copyright 2005-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/rc4/asm/rc4-x86_64.pl	# Copyright 2005-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-x86_64.pl	# Copyright 2005-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/md5/asm/md5-x86_64.pl	# Copyright 2005-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/sparcv9-mont.pl	# Copyright 2005-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/alpha-mont.pl	# Copyright 2006-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/ppc-xlate.pl	# Copyright 2006-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/sha1-x86_64.pl	# Copyright 2006-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/x86masm.pl	# Copyright 2007-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_asn.t	# Copyright 2007-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-armv4.pl	# Copyright 2007-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/sha1-sparcv9.pl	# Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ppccpuid.pl	# Copyright 2007-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/armv4-mont.pl	# Copyright 2007-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-s390x.pl	# Copyright 2007-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/sha256-586.pl	# Copyright 2007-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/ms/uplink-common.pl	# Copyright 2008-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/ms/uplink-x86.pl	# Copyright 2008-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/camellia/asm/cmll-x86.pl	# Copyright 2008-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/camellia/asm/cmll-x86_64.pl	# Copyright 2008-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-parisc.pl	# Copyright 2009-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesni-x86_64.pl	# Copyright 2009-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-mips.pl	# Copyright 2010-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/ghash-sparcv9.pl	# Copyright 2010-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/mips.pl	# Copyright 2010-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/ghash-armv4.pl	# Copyright 2010-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/vpaes-x86.pl	# Copyright 2011-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/engines/asm/e_padlock-x86.pl	# Copyright 2011-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/bsaes-x86_64.pl	# Copyright 2011-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesni-sha1-x86_64.pl	# Copyright 2011-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-c64xplus.pl	# Copyright 2012-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aest4-sparcv9.pl	# Copyright 2012-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/bsaes-armv7.pl	# Copyright 2012-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/sparcv9_modes.pl	# Copyright 2012-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/lib/Text/Template.pm	# Copyright 2013 M. J. Dominus.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/vpaes-ppc.pl	# Copyright 2013-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/des/asm/dest4-sparcv9.pl	# Copyright 2013-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/smime-certs/mksmime-certs.sh	# Copyright 2013-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesni-mb-x86_64.pl	# Copyright 2013-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesp8-ppc.pl	# Copyright 2014-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aesv8-armx.pl	# Copyright 2014-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistz256-x86_64.pl	# Copyright 2014-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	33	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/01-test_abort.t	# Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/90-test_asn1_time.t	# Copyright 2015-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/03-test_internal_asn1.t	# Copyright 2015-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistz256-armv4.pl	# Copyright 2015-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	17	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistz256-sparcv9.pl	# Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/arm64cpuid.pl	# Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/armv4cpuid.pl	# Copyright 2015-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_strtoul.t	# Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/vpaes-armv8.pl	# Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/25-test_verify.t	# Copyright 2015-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	16	openssl-3.5.9.tar.gz:openssl-3.5.9/VMS/translatesyms.pl	# Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/danetest.in	# Copyright 2016-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/fuzz/helper.py	# Copyright 2016-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-s390x.pl	# Copyright 2016-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-c64xplus.pl	# Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/poly1305/asm/poly1305-sparcv9.pl	# Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/test/dane-cross.in	# Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/Configurations/shared-info.pl	# Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	20	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/poly1305/asm/poly1305-ppc.pl	# Copyright 2016-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-armv8.pl	# Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/Configure	# Copyright 2016-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_mp_rsa.t	# Copyright 2017 BaishanCloud. All rights reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/01-test_test.t	# Copyright 2017 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/03-test_internal_sm4.t	# Copyright 2017 [Ribose Inc.](https://www.ribose.com). All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_internal_ctype.t	# Copyright 2017-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/keccak1600-armv4.pl	# Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/04-test_pem_reading.t	# Copyright 2017-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_localetest.t	# Copyright 2017-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/keccak1600-avx2.pl	# Copyright 2017-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/keccak1600-x86_64.pl	# Copyright 2017-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/keccak1600-armv8.pl	# Copyright 2017-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/sha/asm/keccak1600-s390x.pl	# Copyright 2017-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/04-test_bio_callback.t	# Copyright 2018 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/x25519-ppc64.pl	# Copyright 2018-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/06-test_rdcpu_sanity.t	# Copyright 2018-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/add-depends.pl	# Copyright 2018-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/06-test_algorithmid.t	# Copyright 2018-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_errstr.t	# Copyright 2018-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpciph_aes_gcm_siv.txt	# Copyright 2018-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/x25519-x86_64.pl	# Copyright 2018-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	16	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_internal_context.t	# Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_internal_provider.t	# Copyright 2019-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_internal_keymgmt.t	# Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/04-test_provider_default_search_path.t	# Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/10-test_bn_data/bngcd.txt	# Copyright 2019-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/aes-gcm-armv8_64.pl	# Copyright 2019-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/20-test_rand_config.t	# Copyright 2019-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/config	# Copyright 2020 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/fuzz/mkfuzzoids.pl	# Copyright 2020-$YEAR The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/04-test_encoder_decoder_legacy.t	# Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/aes-gcm-armv8-unroll8_64.pl	# Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_provider_status.t	# Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/bsaes-armv8.pl	# Copyright 2020-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-2k-avx512.pl	# Copyright 2020-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/01-test_fipsmodule_cnf.t	# Copyright 2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/03-test_internal_sm3.t	# Copyright 2021 [UnionTech](https://www.uniontech.com). All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/ppc64-mont-fixed.pl	# Copyright 2021-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistp521-ppc64.pl	# Copyright 2021-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpkdf_kbkdf_counter.txt	# Copyright 2021-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/md5/asm/md5-aarch64.pl	# Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-3k-avx512.pl	# Copyright 2021-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	21	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_internal_exts.t	# Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpmac_sm3.txt	# Copyright 2022-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/ghash-riscv64.pl	# Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evpkdf_kbkdf_kmac.txt	# Copyright 2022-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-armv8-sve.pl	# Copyright 2022-2025  The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/loongarch64cpuid.pl	# Copyright 2022-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# Copyright 2022-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/.ctags.d/add-dir.ctags	# Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-riscv64-v-zbb.pl	# Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-loongarch64.pl	# Copyright 2023-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/.ctags.d/exclude.ctags	# Copyright 2023-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/04-test_nodefltctx.t	# Copyright 2023The OpenSSL Project Authors. All Rights Reserved.
+line	17	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/02-test_windows_registry.t	# Copyright 2024 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/03-test_evp_extra_ml_kem.t	# Copyright 2024-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/rsaz-2k-avxifma.pl	# Copyright 2024-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	24	openssl-3.5.9.tar.gz:openssl-3.5.9/test/mldsa_parse.py	# Copyright 2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/asm/ecp_nistp384-ppc64.pl	# Copyright 2025- IBM Corp.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/modes/asm/aes-gcm-ppc.pl	# Copyright 2025- IBM Corp. All rights reserved
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_data/evppkey_ml_dsa_siggen.txt	# Copyright 2025-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/test/cms-msg/make_missing_kdf_der.py	# Copyright 2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/chacha/asm/chacha-s390x.pl	# Copyright IBM Corp. 2018
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/perlasm/s390x.pm	# Copyright IBM Corp. 2018-2019
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/poly1305/asm/poly1305-s390x.pl	# Copyright IBM Corp. 2019
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_asn.t	# Copyright Nokia 2007-2019
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_server.t	# Copyright Nokia 2007-2020
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_asn.t	# Copyright Siemens AG 2015-2019
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_server.t	# Copyright Siemens AG 2015-2020
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-riscv32-zkn.pl	# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/config.com	$\t! Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OPENSSL_SA.pod	(c) 2019, Oracle and/or its affiliates.  All rights reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/common/der/DIGESTS.asn1	-- Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/providers/common/der/ML_DSA.asn1	-- Copyright 2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/ia64-mont.pl	.type\tcopyright#,\\@object
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/include/crypto/aria.h	/* Copyright (c) 2017 National Security Research Institute.  All rights reserved. */
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistp224.c	/* Copyright 2011 Google Inc.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ec/ecp_nistp384.c	/* Copyright 2023 IBM Corp.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/ia64.S	// Copyright 2001-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/aes-ia64.S	// Copyright 2004-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/ia64cpuid.S	// Copyright 2004-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/s390x.S	// Copyright 2007-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/aes/asm/bsaes-armv8.pl	// Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	8. The name of the Copyright Holder may not be used to endorse or promote
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/bn-c64xplus.asm	;; Copyright 2012-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	958	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/DEFINE_LIST_OF.pod	=head1 COPYRIGHT
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/lib/Text/Template.pm	=head1 COPYRIGHT AND LICENSE
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/README.md	Copyright
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/README.md	Copyright (c) 1995-1998 Eric A. Young, Tim J. Hudson
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/README.md	Copyright (c) 1998-2026 The OpenSSL Project Authors
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/test/certs/acert_bc1.pem	Copyright (c) 2000-2023 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org)
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OSSL_METHOD_STORE.pod	Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PEM_read.pod	Copyright 1998-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/d2i_X509.pod	Copyright 1998-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_f_null.pod	Copyright 2000-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BN_add_word.pod	Copyright 2000-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_should_retry.pod	Copyright 2000-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_default_passwd_cb.pod	Copyright 2000-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-nseq.pod.in	Copyright 2000-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-crl2pkcs7.pod.in	Copyright 2000-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-pkcs7.pod.in	Copyright 2000-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	25	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-asn1parse.pod.in	Copyright 2000-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	28	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-ca.pod.in	Copyright 2000-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/bn_mul_words.pod	Copyright 2000-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	23	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/CA.pl.pod	Copyright 2000-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_BytesToKey.pod	Copyright 2001-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_set_connect_state.pod	Copyright 2001-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_SESSION_get_protocol_version.pod	Copyright 2001-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_COMP_add_compression_method.pod	Copyright 2001-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_sessions.pod	Copyright 2001-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_cert_verify_callback.pod	Copyright 2001-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-ocsp.pod.in	Copyright 2001-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PEM_read_bio_PrivateKey.pod	Copyright 2001-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_options.pod	Copyright 2001-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_msg_callback.pod	Copyright 2001-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man7/ossl_rbtree.pod	Copyright 2002 Niels Provos <provos@citi.umich.edu>
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_OBJECT_new.pod	Copyright 2002-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_STRING_print_ex.pod	Copyright 2002-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	12	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_STRING_length.pod	Copyright 2002-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_generate_nconf.pod	Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_ALGOR_dup.pod	Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_STRING_new.pod	Copyright 2002-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ENGINE_add.pod	Copyright 2002-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_new.pod	Copyright 2002-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PKCS7_decrypt.pod	Copyright 2002-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-ecparam.pod.in	Copyright 2003-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-ec.pod.in	Copyright 2003-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ERR_set_mark.pod	Copyright 2003-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OPENSSL_Applink.pod	Copyright 2004-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-errstr.pod.in	Copyright 2004-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-s_time.pod.in	Copyright 2004-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CONF_modules_load_file.pod	Copyright 2004-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man5/x509v3_config.pod	Copyright 2004-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ECDSA_SIG_new.pod	Copyright 2004-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BN_BLINDING_new.pod	Copyright 2005-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_get_psk_identity.pod	Copyright 2006-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/tsget.pod	Copyright 2006-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-pkeyparam.pod.in	Copyright 2006-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_derive.pod	Copyright 2006-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-pkey.pod.in	Copyright 2006-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_DigestSignInit.pod	Copyright 2006-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-genpkey.pod.in	Copyright 2006-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-pkeyutl.pod.in	Copyright 2006-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PEM_write_bio_PKCS7_stream.pod	Copyright 2007-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cmp_ctx_set1_caPubs.pod	Copyright 2007-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_CMP_HDR_get0_transactionID.pod	Copyright 2007-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cmp_X509_STORE_add1_certs.pod	Copyright 2007-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cmp_hdr_init.pod	Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_CMP_log_open.pod	Copyright 2007-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cmp_certreq_new.pod	Copyright 2007-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/GENERAL_NAME.pod	Copyright 2007-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_CMP_MSG_http_perform.pod	Copyright 2007-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cmp_msg_check_update.pod	Copyright 2007-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_new_CMS.pod	Copyright 2008-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_add1_recipient_cert.pod	Copyright 2008-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_get1_ReceiptRequest.pod	Copyright 2008-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_final.pod	Copyright 2008-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_add0_cert.pod	Copyright 2008-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_get0_SignerInfos.pod	Copyright 2008-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-cms.pod.in	Copyright 2008-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_STORE_set_verify_cb_func.pod	Copyright 2009-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_STORE_CTX_get_error.pod	Copyright 2009-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_STORE_CTX_new.pod	Copyright 2009-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_verify_cert.pod	Copyright 2009-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OPENSSL_instrument_bus.pod	Copyright 2011-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CONF_CTX_new.pod	Copyright 2012-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/X509_check_host.pod	Copyright 2012-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CONF_CTX_set_ssl_ctx.pod	Copyright 2012-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CONF_cmd.pod	Copyright 2012-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_use_serverinfo.pod	Copyright 2013-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EC_GFp_simple_method.pod	Copyright 2013-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ECPKParameters_print.pod	Copyright 2013-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set1_verify_cert_store.pod	Copyright 2013-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EC_GROUP_copy.pod	Copyright 2013-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EC_GROUP_new.pod	Copyright 2013-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set1_curves.pod	Copyright 2013-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_add1_signer.pod	Copyright 2014-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_cert_cb.pod	Copyright 2014-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PKCS12_PBE_keyivgen.pod	Copyright 2014-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_tlsext_ticket_key_cb.pod	Copyright 2014-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_security_level.pod	Copyright 2014-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_tlsext_status_cb.pod	Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EC_KEY_get_enc_flags.pod	Copyright 2015-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_SESSION_has_ticket.pod	Copyright 2015-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_TYPE_get.pod	Copyright 2015-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_get_ex_new_index.pod	Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OCSP_resp_find_status.pod	Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/DTLSv1_listen.pod	Copyright 2015-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASYNC_start_job.pod	Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_TIME_set.pod	Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-rehash.pod.in	Copyright 2015-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_ITEM_lookup.pod	Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_SESSION_get0_cipher.pod	Copyright 2016-2017 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/DSA_get0_pqg.pod	Copyright 2016-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-engine.pod.in	Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_parse_hostserv.pod	Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_connect.pod	Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_STORE_open.pod	Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	24	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-storeutl.pod.in	Copyright 2016-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-list.pod.in	Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_get_data.pod	Copyright 2016-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_sm3.pod	Copyright 2017 Ribose Inc. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_asn1_get_count.pod	Copyright 2017 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/PEM_bytes_read_bio.pod	Copyright 2017-2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BN_security_bits.pod	Copyright 2017-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-prime.pod.in	Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-srp.pod.in	Copyright 2017-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_client_hello_cb.pod	Copyright 2017-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	25	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_bf_cbc.pod	Copyright 2017-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_ASN1_METHOD.pod	Copyright 2017-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/DTLS_set_timer_cb.pod	Copyright 2017-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ADMISSIONS.pod	Copyright 2017-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_stateless_cookie_generate_cb.pod	Copyright 2018 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OPENSSL_FILE.pod	Copyright 2018-2019 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_CTX_set1_pbe_pass.pod	Copyright 2018-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_STORE_expect.pod	Copyright 2018-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-mac.pod.in	Copyright 2018-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_MAC.pod	Copyright 2018-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/EVP_MAC-CMAC.pod	Copyright 2018-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/EVP_KDF-KB.pod	Copyright 2019 Red Hat, Inc.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/cms_add1_signing_cert.pod	Copyright 2019 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/evp_keymgmt_newdata.pod	Copyright 2019-2020 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_method_construct.pod	Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OPENSSL_SA.pod	Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.  Copyright
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OSSL_METHOD_STORE.pod	Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod	Copyright 2019-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	14	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_ASYM_CIPHER_free.pod	Copyright 2019-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/EVP_KDF-SS.pod	Copyright 2019-2024 The OpenSSL Project Authors. All Rights Reserved.  Copyright
+line	16	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/evp_generic_fetch.pod	Copyright 2019-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man7/VERSION.pod	Copyright 2019-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	21	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OSSL_DEPRECATED.pod	Copyright 2020 The OpenSSL Project Authors. All Rights Reserved.
+line	22	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/evp_pkey_export_to_provider.pod	Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_random_add_conf_module.pod	Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_rand_get_entropy.pod	Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	18	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/ASN1_INTEGER_new.pod	Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	14	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man7/EVP_PKEY.pod	Copyright 2020-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	13	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man7/deprecation.pod	Copyright 2020-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	32	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/evp_md_get_number.pod	Copyright 2021 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_s_core.pod	Copyright 2021-2022 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/life_cycle-digest.pod	Copyright 2021-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	10	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/OSSL_IETF_ATTR_SYNTAX.pod	Copyright 2021-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_todata.pod	Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/OPTIONS.pod	Copyright 2021-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/DEFINE_PRIORITY_QUEUE_OF.pod	Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_PKEY_CTX_get0_pkey.pod	Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_get_rpoll_descriptor.pod	Copyright 2022-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/BIO_s_dgram_pair.pod	Copyright 2022-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/DEFINE_LIST_OF.pod	Copyright 2022-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	9	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/DTLSv1_handle_timeout.pod	Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+line	11	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/CMS_signed_get_attr.pod	Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_cms_sign_encrypt.pod	Copyright 2023-2025 - 2024 The OpenSSL Project Authors. All Rights Reserved.
+line	5	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_get0_group_name.pod	Copyright 2023-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_rcu_lock_new.pod	Copyright 2023-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	15	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man3/ossl_bio_print_hex.pod	Copyright 2024 The OpenSSL Project Authors. All Rights Reserved.
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_CTX_set_domain_flags.pod	Copyright 2024-2025 The OpenSSL Project Authors. All Rights Reserved.
+line	8	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/SSL_poll.pod	Copyright 2024-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man1/openssl-skeyutl.pod.in	Copyright 2025 The OpenSSL Project Authors. All Rights Reserved.
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man3/EVP_SKEY.pod	Copyright 2025-2026 The OpenSSL Project Authors. All Rights Reserved.
+line	6	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/internal/man7/ossl_rbtree.pod	Copyright 2026 The OpenSSL Project Authors. All Rights Reserved.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Downloaded.txt	They remain unmodified and retain their copyright and license.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/AUTHORS.md	This is the list of OpenSSL authors for copyright purposes.
+line	2	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	This software is Copyright (c) 2013 by Mark Jason Dominus <mjd@cpan.org>.
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	This software is copyright (c) 2013 by Mark Jason Dominus <mjd@cpan.org>.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	appropriately publish on each copy an appropriate copyright notice and
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	contains a notice placed by the copyright holder saying it may be
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/bn/asm/ia64-mont.pl	copyright:
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	duplicate all of the original copyright notices and associated disclaimers.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	from the Public Domain or from the Copyright Holder. A Package modified in such
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	from the programs of this Package do not automatically fall under the copyright
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	may be copied, such that the Copyright Holder maintains some semblance of
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/objects/obj_dat.pl	my $YEAR = OpenSSL::copyright::latest(($0, $ARGV[0]));
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/objects/objects.pl	my $YEAR = OpenSSL::copyright::latest(($0, $ARGV[1], $ARGV[0]));
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/objects/objxref.pl	my $YEAR = OpenSSL::copyright::latest(($0, $mac_file, $xref_file));
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/fuzz/mkfuzzoids.pl	my $YEAR = OpenSSL::copyright::latest(($0, $obj_dat_h));
+line	3	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/charmap.pl	my $YEAR = OpenSSL::copyright::year_of($0);
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/util/perl/OpenSSL/copyright.pm	package OpenSSL::copyright;
+line	4	openssl-3.5.9.tar.gz:openssl-3.5.9/test/mldsa_parse.py	print("# Copyright " + str(year) + " The OpenSSL Project Authors. All Rights Reserved.")
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	school, if any, to sign a "copyright disclaimer" for the program, if
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/AUTHORS.md	since in some cases, their employer may be the copyright holder.
+line	1	openssl-3.5.9.tar.gz:openssl-3.5.9/external/perl/Text-Template-1.56/LICENSE	to ask for permission.  For software which is copyrighted by the Free
+line	7	openssl-3.5.9.tar.gz:openssl-3.5.9/crypto/asn1/charmap.pl	use OpenSSL::copyright;
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/apps/insta.ca.crt
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/ackm.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/connection-state-machine.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/quic-fifm-cfq.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/quic-fifm-overview.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/quic-fifm-txpim.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/quic-io-arch-1.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/designs/quic-design/images/quic-overview.odg
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/life-cycles/lifecycles.ods
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/cipher.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/digest.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/kdf.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/mac.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/pkey.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/doc/man7/img/rand.png
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/certs/embeddedSCTs1.tlssct
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/certs/v3-certs-RC2.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/certs/v3-certs-TDES.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/cms-msg/missing-kdf.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/d2i-tests/bad-int-pad0.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/d2i-tests/bad_bio.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/d2i-tests/bad_cert.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/d2i-tests/high_tag.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/d2i-tests/int0.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_dsa_codecs_data/sig-44.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_dsa_codecs_data/sig-65.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_dsa_codecs_data/sig-87.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_kem_codecs_data/ct-1024.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_kem_codecs_data/ct-512.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_kem_codecs_data/ct-768.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/15-test_ml_kem_codecs_data/ss-512.dat
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/20-test_dhparam_data/pkcs3-2-1024.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/20-test_dhparam_data/pkcs3-2-2048.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/20-test_dhparam_data/pkcs3-5-1024.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/20-test_dhparam_data/x942-0-1024.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/DH.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/DH.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/DSA.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/DSA.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/EC.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/EC.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/ED25519.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/ED25519.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/ED448.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/ED448.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/RSA.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/RSA.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/X25519.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/X25519.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/X448.priv.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/30-test_evp_pkey_provided/X448.pub.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_client_data/client.csr
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_msg_data/pkcs10.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_protect_data/GENM_protected_Ed.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_protect_data/IP_PBM.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_protect_data/IR_protected.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_protect_data/IR_unprotected.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_server_data/CR_protected_PBM_1234.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IP_waitingStatus_PBM.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IR_protected.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IR_protected_0_extraCerts.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IR_protected_2_extraCerts.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IR_rmprotection.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/65-test_cmp_vfy_data/IR_unprotected.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cmp_http_data/Mock/random.bin
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cmp_http_data/Mock/signer.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/bad_signtime_attr.cms
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/ct_multiple_attr.cms
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/dh-malformed.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/ecdh-malformed.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/no_ct_attr.cms
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/no_md_attr.cms
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cms_data/rsa-malformed.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cmsapi_data/cms_pwri_kek_NoIV.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cmsapi_data/cms_pwri_kek_oob.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_cmsapi_data/encryptedData.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/bad1.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/bad2.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/bad3.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/nomac_parse.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-iter.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-key-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-salt-type.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.bad-salt.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good-shorter-key-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.good.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.negative-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.no-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.no-salt.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.very-big-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_256_256.zero-len.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_512_256.good.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_512_512.good.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_pkcs12_data/pbmac1_sha1_hmac_and_prf.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_tsa_data/all-zero.tsq
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/80-test_tsa_data/sectigo-all-zero.tsr
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/90-test_store_cases_data/test-BER.p12
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/90-test_store_data/testrsa.msb
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/90-test_store_data/testrsa.pvk
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/91-test_pkey_check_data/dsapub_noparam.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/recipes/ocsp-response.der
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/shibboleth.pfx
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/smcont.bin
+binary-head	openssl-3.5.9.tar.gz:openssl-3.5.9/test/testrsa_withattrs.der

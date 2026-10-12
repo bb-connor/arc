@@ -1,0 +1,7 @@
+# chio.attribution-lines.v8 origin=skalibs files=1055 files_with_lines=3 binary_heads=0 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/DCO	Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/COPYING	Copyright (c) 2011-2025 Laurent Bercot <ska-skaware@skarnet.org>
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/src/libposixplz/memmem.c	Copyright © 2005-2017 Rich Felker, Szabolcs Nagy, Timo Teräs, Alexander Monakov
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/src/libposixplz/memmem.c	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/src/libposixplz/memmem.c	The above copyright notice and this permission notice shall be
+line	1	skalibs-2.14.4.0.tar.gz:skalibs-2.14.4.0/COPYING	copyright notice and this permission notice appear in all copies.

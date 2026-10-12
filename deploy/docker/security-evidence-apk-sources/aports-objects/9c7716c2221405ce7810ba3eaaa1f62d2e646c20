@@ -1,0 +1,9 @@
+tree 28fe7391a6e169fc3f3ce86ff8c371d78c90e68e
+parent 4df9d72d61563becf0c333d5b6fa94a3bb553a80
+author Sertonix <sertonix@posteo.net> 1729721929 +0200
+committer Sertonix <sertonix@posteo.net> 1730669024 +0100
+
+main/*: remove --output-on-failure/CTEST_OUTPUT_ON_FAILURE
+
+abuild now exports CTEST_OUTPUT_ON_FAILURE=ON by default which means this
+repetition can be removed from the aports.

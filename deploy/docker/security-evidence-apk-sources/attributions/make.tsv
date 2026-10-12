@@ -1,0 +1,274 @@
+# chio.attribution-lines.v8 origin=make files=395 files_with_lines=203 binary_heads=31 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	2	make-4.4.1.tar.gz:make-4.4.1/po/Makefile.in.in	\t      --copyright-holder='$(COPYRIGHT_HOLDER)' \\
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* <all>: Update copyright notices.
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* all: Update Copyright statements for 2018
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* scripts/copyright-update: Ditto
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* scripts/copyright-update: Maintainer's script for copyright mgmt
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* scripts/copyright-update: Use GNULIB_SRCDIR to find update-copyright.
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\t* scripts/copyright-update: Use git ls-files for controlled files
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate Copyright statements for 2014.
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate Copyright statements for the new year.
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate copyright statements for 2017.
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate copyright statements for 2019
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate copyright statements for 2020
+line	1	make-4.4.1.tar.gz:make-4.4.1/ChangeLog	\tUpdate the copyright year on all files
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	          adjacent to the other copyright notices.
+line	1	make-4.4.1.tar.gz:make-4.4.1/configure	          if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&5 2>&1 &&
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	       Copyright (C)  YEAR  YOUR NAME.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	       D. Preserve all the copyright notices of the Document.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	       E. Add an appropriate copyright notice for your modifications
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	       F. Include, immediately after the copyright notices, a license
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     # Copyright (C) 1991 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/main.c	     (C) to the copyright symbol, but this string is going to change every
+line	1	make-4.4.1.tar.gz:make-4.4.1/configure	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi); then
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/po.m4	     (if $ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null 2>&1 >/dev/null | grep usage >/dev/null; then exit 1; else exit 0; fi)],
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     Copyright (C) 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     Moreover, your license from a particular copyright holder is
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     Print the version of the 'make' program plus a copyright, a list of
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     World Wide Web server that publishes copyrightable works and also
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     copyright holder fails to notify you of the violation by some
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     copyright notices, and the license notice saying this License
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     copyright resulting from the compilation is not used to limit the
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     license from a particular copyright holder is reinstated (a)
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     permission from their copyright holders, but you may include
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     provisionally, unless and until the copyright holder explicitly and
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     reinstated permanently if the copyright holder notifies you of the
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     requiring permission under copyright law.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     site means any set of copyrightable works thus published on the MMC
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     that contains a notice placed by the copyright holder saying it can
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	     that copyright holder, and you cure the violation prior to 30 days
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/main.c	     word "Copyright"), so it hardly seems worth it.  */
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	    <program>  Copyright (C) <year>  <name of author>
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	    Copyright (C) <year>  <name of author>
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/po.m4	    [$ac_dir/$ac_word --omit-header --copyright-holder= --msgid-bugs-address= /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1 &&
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	   * Use the '-v' or '--version' option to print version and copyright
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/getloadavg.c	   Copyright (C) 1985-1989, 1991-1995, 1997, 1999-2000, 2003-2023 Free Software
+line	4	make-4.4.1.tar.gz:make-4.4.1/doc/make.info	   Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
+line	1	make-4.4.1.tar.gz:make-4.4.1/INSTALL	   Copyright (C) 1994-1996, 1999-2002, 2004-2017, 2020-2022 Free
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/alloca.in.h	   Copyright (C) 1995, 1999, 2001-2004, 2006-2023 Free Software Foundation,
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/findprog.h	   Copyright (C) 2001-2003, 2009-2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/lib/concat-filename.c	   Copyright (C) 2001-2004, 2006-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/concat-filename.h	   Copyright (C) 2001-2004, 2007-2023 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/lib/filename.h	   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/warn-on-use.h	   Copyright (C) 2010-2023 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/src/vms_exit.c	   and copyrights. */
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	  "Copyright" also means copyright-like laws that apply to other kinds of
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	  "The Program" refers to any copyrightable work licensed under this
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	  A "contributor" is a copyright holder who authorizes use under this
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	  Copyright (C)  @var{year}  @var{your name}.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	  Moreover, your license from a particular copyright holder is
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	  \\DeclareUnicodeCharacter{00A9}{\\copyright{}}%
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	  \\definedummyword\\copyright
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	  \\do\\copyright{copyright}%
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	  \\gdefchar^^a9{\\copyright{}}
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/main.c	  printf ("%sCopyright (C) 1988-2023 Free Software Foundation, Inc.\\n",
+line	1	make-4.4.1.tar.gz:make-4.4.1/tests/README	 Copyright (C) 1992-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	 Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	"aggregate" if the compilation and its resulting copyright are not
+line	2	make-4.4.1.tar.gz:make-4.4.1/build-aux/config.guess	#   Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/config.rpath	#   Copyright 1996-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# $(DOMAIN).pot file.  Set this to the copyright holder of the surrounding
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.texi	# Copyright (C) 1991 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/tests/test_driver.pl	# Copyright (C) 1991-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/configure	# Copyright (C) 1992-1996, 1998-2017, 2020-2021 Free Software Foundation,
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/getloadavg.m4	# Copyright (C) 1992-1996, 1999-2000, 2002-2003, 2006, 2008-2023 Free
+line	2	make-4.4.1.tar.gz:make-4.4.1/tests/mkshadow	# Copyright (C) 1992-2023 Free Software Foundation, Inc.
+line	4	make-4.4.1.tar.gz:make-4.4.1/build.cfg.in	# Copyright (C) 1993-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/install-sh	# Copyright (C) 1994 X Consortium
+line	3	make-4.4.1.tar.gz:make-4.4.1/Makefile.in	# Copyright (C) 1994-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makefile.in.in	# Copyright (C) 1995-1997, 2000-2007, 2009-2010 by Ulrich Drepper <drepper@gnu.ai.mit.edu>
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/mdate-sh	# Copyright (C) 1995-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/es.po	# Copyright (C) 1996, 2001, 2011, 2013, 2014, 2016, 2019, 2020 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/ko.po	# Copyright (C) 1996, 2001, 2013 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/pl.po	# Copyright (C) 1996, 2002, 2005, 2006, 2010, 2013, 2014, 2016, 2019, 2020, 2022, 2023 Free Software Foundation, Inc.
+line	5	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 1996-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/uk.po	# Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/Makefile.am	# Copyright (C) 1997-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/ru.po	# Copyright (C) 1998, 1999, 2000, 2001, 2002, 2009 Free Software Foundation, Inc.
+line	4	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 1999-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/depcomp	# Copyright (C) 1999-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/pt_BR.po	# Copyright (C) 2000 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/gl.po	# Copyright (C) 2000, 2002 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/doc/Makefile.am	# Copyright (C) 2000-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/ja.po	# Copyright (C) 2001 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/da.po	# Copyright (C) 2001, 2016, 2022 Free Software Foundation, Inc.
+line	6	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2001-2021 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/po/he.po	# Copyright (C) 2002 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/be.po	# Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2002-2021 Free Software Foundation, Inc.
+line	4	make-4.4.1.tar.gz:make-4.4.1/lib/Makefile.am	# Copyright (C) 2002-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/extensions.m4	# Copyright (C) 2003, 2006-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2003-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/po/fi.po	# Copyright (C) 2005 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/po/id.po	# Copyright (C) 2006 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2006-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/lt.po	# Copyright (C) 2008 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2008-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/it.po	# Copyright (C) 2009 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	# Copyright (C) 2009-2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/cs.po	# Copyright (C) 2010 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/gl.po	# Copyright (C) 2012 Leandro Regueiro.
+line	5	make-4.4.1.tar.gz:make-4.4.1/Basic.mk	# Copyright (C) 2017-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/pt.po	# Copyright (C) 2018 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/bg.po	# Copyright (C) 2019, 2020, 2022, 2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/nl.po	# Copyright (C) 2022 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/make.pot	# Copyright (C) YEAR Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/largefile.m4	# Copyright 1992-1996, 1998-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/de.po	# Copyright © 1996, 1997, 2002, 2013, 2016 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/sv.po	# Copyright © 2002, 2007, 2011, 2013, 2014, 2016, 2019, 2020, 2022, 2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/fr.po	# Copyright © 2010 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/po/hr.po	# Copyright © 2016 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/sr.po	# Copyright © 2020 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/ro.po	# Copyright © 2022, 2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/install-sh	# The above copyright notice and this permission notice shall be included in
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# This is the copyright holder that gets inserted into the header of the
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# expected to transfer the copyright for their translations to this person
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/install-sh	# following copyright and license.
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# or entity, or to disclaim their copyright.  The empty string stands for
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# sources, belong to the copyright holder of the package.)  Translators are
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	# their copyright.
+line	2	make-4.4.1.tar.gz:make-4.4.1/po/he.po	#~ "%sCopyright (C) 1988, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 2000\\n"
+line	1	make-4.4.1.tar.gz:make-4.4.1/tests/config_flags_pm.com	$! Copyright (C) 2014-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/makefile.com	$!Copyright (C) 1996-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	% Adapted from the plain.tex definition of \\copyright.
+line	1	make-4.4.1.tar.gz:make-4.4.1/build-aux/texinfo.tex	% Copyright 1985, 1986, 1988, 1990-2022 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	(1) assert copyright on the software, and (2) offer you this License
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.1	.SH "COPYRIGHT"
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/glob.c	/* Copyright (C) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+line	2	make-4.4.1.tar.gz:make-4.4.1/lib/fnmatch.c	/* Copyright (C) 1991, 1992, 1993, 1996, 1997, 1998, 1999, 2023 Free Software
+line	1	make-4.4.1.tar.gz:make-4.4.1/lib/glob.in.h	/* Copyright (C) 1991, 1992, 1995, 1996, 1997, 1998, 2023 Free Software
+line	3	make-4.4.1.tar.gz:make-4.4.1/src/vms_exit.c	/* Copyright (C) 2014-2023 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/src/vms_exit.c	/* Per copyright assignment agreement with the Free Software Foundation
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	11 of the WIPO copyright treaty adopted on 20 December 1996, or
+line	1	make-4.4.1.tar.gz:make-4.4.1/build_w32.bat	:: Copyright (C) 1996-2023 Free Software Foundation, Inc.\r
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/gmk-default.scm	;; Copyright (C) 2011-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make-stds.texi	@c Copyright 1992, 1993, 1994, 1995, 1996, 1997, 1998, 2000, 2001,
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	Add an appropriate copyright notice for your modifications
+line	1	make-4.4.1.tar.gz:make-4.4.1/README	All non-trivial changes require FSF copyright paperwork to be completed
+line	1	make-4.4.1.tar.gz:make-4.4.1/po/Makevars	COPYRIGHT_HOLDER = Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/getopt1.c	Copyright (C) 1987-1994, 1996-2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/src/arscan.c	Copyright (C) 1987-2023 Free Software Foundation, Inc.
+line	27	make-4.4.1.tar.gz:make-4.4.1/NEWS	Copyright (C) 1988-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/getopt.h	Copyright (C) 1989-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/signame.c	Copyright (C) 1990-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/job.h	Copyright (C) 1992-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/configh.dos	Copyright (C) 1994-2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/src/hash.c	Copyright (C) 1995, 1999, 2002, 2010 Free Software Foundation, Inc.
+line	5	make-4.4.1.tar.gz:make-4.4.1/README.Amiga	Copyright (C) 1995-2023 Free Software Foundation, Inc.
+line	18	make-4.4.1.tar.gz:make-4.4.1/README.DOS	Copyright (C) 1996-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/AUTHORS	Copyright (C) 1997-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/README.customs	Copyright (C) 1998-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/debug.h	Copyright (C) 1999-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/README.OS2	Copyright (C) 2003-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/strcache.c	Copyright (C) 2006-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/guile.c	Copyright (C) 2011-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/load.c	Copyright (C) 2012-2023 Free Software Foundation, Inc.
+line	6	make-4.4.1.tar.gz:make-4.4.1/src/gnumake.h	Copyright (C) 2013-2023 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/src/os.h	Copyright (C) 2016-2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/configure	Copyright (C) 2021 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/shuffle.h	Copyright (C) 2022-2022 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/src/mkconfig.h	Copyright (C) 2022-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/src/mkcustom.h	Copyright (C) 2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/build-aux/config.guess	Copyright 1992-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.texi	Copyright @copyright{} 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	Copyright @copyright{} 2000, 2001, 2002, 2007, 2008 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.1	Copyright \\(co 1992-1993, 1996-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/README	GNU Make is copyright by the Free Software Foundation.  Copyright notices
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	Include, immediately after the copyright notices, a license notice
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	Moreover, your license from a particular copyright holder is
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	Preserve all the copyright notices of the Document.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.texi	Print the version of the @code{make} program plus a copyright, a list
+line	1	make-4.4.1.tar.gz:make-4.4.1/NEWS	See the end of this file for copyrights and conditions.
+line	1	make-4.4.1.tar.gz:make-4.4.1/tests/README	This entire test suite, including all test files, are copyright and
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	World Wide Web server that publishes copyrightable works and also
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	add to a covered work, you may (if authorized by the copyright holders of
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	adjacent to the other copyright notices.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	appropriately publish on each copy an appropriate copyright notice;
+line	1	make-4.4.1.tar.gz:make-4.4.1/INSTALL	are permitted in any medium without royalty provided the copyright
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	author or copyright holder as a result of your choosing to follow a
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	contains a notice placed by the copyright holder saying it can be
+line	2	make-4.4.1.tar.gz:make-4.4.1/COPYING	copyright holder, and you cure the violation prior to 30 days after
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.texi	copyright information.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	copyright notices, and the license notice saying this License applies
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	copyright on the Program, and are irrevocable provided the stated
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	distribution medium, is called an ``aggregate'' if the copyright
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/nls.m4	dnl Copyright (C) 1995-2003, 2005-2006, 2008-2014 Free Software Foundation,
+line	2	make-4.4.1.tar.gz:make-4.4.1/m4/gettext.m4	dnl Copyright (C) 1995-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/progtest.m4	dnl Copyright (C) 1996-2003, 2005, 2008-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/lib-ld.m4	dnl Copyright (C) 1996-2003, 2009-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/acinclude.m4	dnl Copyright (C) 1998-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/longlong.m4	dnl Copyright (C) 1999-2007, 2009-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/iconv.m4	dnl Copyright (C) 2000-2002, 2007-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/lib-prefix.m4	dnl Copyright (C) 2001-2005, 2008-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/lib-link.m4	dnl Copyright (C) 2001-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/alloca.m4	dnl Copyright (C) 2002-2004, 2006-2007, 2009-2023 Free Software Foundation,
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/host-cpu-c-abi.m4	dnl Copyright (C) 2002-2023 Free Software Foundation, Inc.
+line	3	make-4.4.1.tar.gz:make-4.4.1/m4/eaccess.m4	dnl Copyright (C) 2003, 2009-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/intlmacosx.m4	dnl Copyright (C) 2004-2014 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/gnulib-common.m4	dnl Copyright (C) 2007-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/00gnulib.m4	dnl Copyright (C) 2009-2023 Free Software Foundation, Inc.
+line	2	make-4.4.1.tar.gz:make-4.4.1/m4/asm-underscore.m4	dnl Copyright (C) 2010-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/zzgnulib.m4	dnl Copyright (C) 2020-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/m4/c-bool.m4	dnl Copyright 2022-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	dnl Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
+line	1	make-4.4.1.tar.gz:make-4.4.1/aclocal.m4	dnl Copyright © 2012-2015 Dan Nicholson <dbn.lists@gmail.com>
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	feature that (1) displays an appropriate copyright notice, and (2)
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	finally terminates your license, and (b) permanently, if the copyright
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	for which you have or can give appropriate copyright permission.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	from a particular copyright holder is reinstated (a) provisionally,
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	if any, to sign a "copyright disclaimer" for the program, if necessary.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	in a fashion requiring copyright permission, other than the making of an
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	infringement under applicable copyright law, except executing it on a
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	license from a particular copyright holder is reinstated (a)
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	modify any covered work.  These actions infringe copyright if you do
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	not control copyright.  Those thus making or running the covered works
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	permission from their copyright holders, but you may include
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.1	program plus a copyright, a list of authors and a notice that there
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	provisionally, unless and until the copyright holder explicitly and
+line	2	make-4.4.1.tar.gz:make-4.4.1/COPYING	reinstated permanently if the copyright holder notifies you of the
+line	1	make-4.4.1.tar.gz:make-4.4.1/builddos.bat	rem Copyright (C) 1998-2023 Free Software Foundation, Inc.\r
+line	1	make-4.4.1.tar.gz:make-4.4.1/tests/run_make_tests.bat	rem Copyright (C) 2017-2023 Free Software Foundation, Inc.
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	rights of fair use or other equivalent, as provided by copyright law.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	site means any set of copyrightable works thus published on the MMC
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	terminates your license, and (b) permanently, if the copyright holder
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	the "copyright" line and a pointer to where the full notice is found.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	the License in the document and put the following copyright and
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-2	the License in the document and put the following copyright and license
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	under copyright law.
+line	1	make-4.4.1.tar.gz:make-4.4.1/doc/fdl.texi	unless and until the copyright holder explicitly and finally
+line	1	make-4.4.1.tar.gz:make-4.4.1/COPYING	your copyrighted material outside their relationship with you.
+binary-head	make-4.4.1.tar.gz:make-4.4.1/doc/make.info-3
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/be.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/bg.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/cs.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/da.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/de.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/es.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/fi.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/fr.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/ga.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/gl.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/he.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/hr.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/id.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/it.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/ja.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/ko.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/lt.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/nl.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/pl.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/pt.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/pt_BR.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/ro.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/ru.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/sr.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/sv.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/tr.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/uk.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/vi.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/zh_CN.gmo
+binary-head	make-4.4.1.tar.gz:make-4.4.1/po/zh_TW.gmo

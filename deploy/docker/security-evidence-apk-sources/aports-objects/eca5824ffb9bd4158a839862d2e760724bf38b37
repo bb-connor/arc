@@ -1,0 +1,6 @@
+tree 098d1237b3bc353cd41518c9464fd050fe00b67f
+parent 0798029a37d74fed7adcaed03e61ddaba5fba867
+author Krassy Boykinov <kboykinov@teamcentrixx.com> 1715077701 +0200
+committer Natanael Copa <ncopa@alpinelinux.org> 1715080084 +0000
+
+main/libcap-ng: upgrade to 0.8.5

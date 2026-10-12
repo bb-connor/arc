@@ -1,0 +1,6 @@
+tree 6db649d60e05ad86e22b049377fdca63de682d97
+parent 15c0998c27676d5220949e62da67db4039784c2d
+author Francesco Colista <fcolista@alpinelinux.org> 1777914586 +0000
+committer Francesco Colista <fcolista@alpinelinux.org> 1777914586 +0000
+
+main/nghttp2: security upgrade to 1.69.0

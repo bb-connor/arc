@@ -1,0 +1,89 @@
+# chio.attribution-lines.v8 origin=lz4 files=208 files_with_lines=78 binary_heads=1 over_member_limit=0 unscanned_members=0 files_with_long_lines=0
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/liblz4-dll.rc.in	            VALUE "LegalCopyright", "Copyright (C) 2013-2020, Yann Collet"
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/build/VS2022/liblz4-dll/liblz4-dll.rc	            VALUE "LegalCopyright", "Copyright (C) 2013-2020, Yann Collet"\r
+line	7	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.c	       * Redistributions of source code must retain the above copyright
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4hc.c	    * Redistributions of source code must retain the above copyright
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4hc.c	    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4hc.c	    Copyright (C) 2011-2020, Yann Collet.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/platform.h	    Copyright (C) 2016-2020, Przemyslaw Skibinski, Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/util.h	    Copyright (C) 2016-2023, Przemyslaw Skibinski, Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/util.c	    Copyright (C) 2023, Yann Collet
+line	5	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/bench.c	    Copyright (C) Yann Collet 2012-2020
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/datagen.c	    Copyright (C) Yann Collet 2012-2024
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/checkFrame.c	    Copyright (C) Yann Collet 2014-2020
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/checkTag.c	    Copyright (C) Yann Collet 2018-2020
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/lorem.c	    Copyright (C) Yann Collet 2024
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4hc.c	    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4hc.c	    copyright notice, this list of conditions and the following disclaimer
+line	7	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.c	   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4frame.h	   Copyright (C) 2011-2020, Yann Collet.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.c	   Copyright (C) 2011-2023, Yann Collet.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.h	   Copyright (C) 2012-2016, Yann Collet.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.h	   Copyright (C) 2022, Xiaomi Inc.
+line	7	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.c	   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	7	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.c	   copyright notice, this list of conditions and the following disclaimer
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/lz4cli.c	  Copyright (C) Yann Collet 2011-2023
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/lz4conf.h	  Copyright (C) Yann Collet 2011-2024
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/programs/threadpool.c	  Copyright (C) Yann Collet 2023
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.c	 *   copyright notice, this list of conditions and the following disclaimer
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4.h	 *  Copyright (C) 2011-2023, Yann Collet.
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.c	 * - Redistributions of source code must retain the above copyright
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.c	 * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/bench_functions.c	 * Copyright  : Kyle Harper
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4frame.c	 * Copyright (C) 2011-2016, Yann Collet.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.c	 * Copyright (C) 2022, Xiaomi Inc.
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/abiTest.c	 * Copyright (c) 2016-2020, Yann Collet, Facebook, Inc.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/ossfuzz/fuzz_helpers.h	 * Copyright (c) 2016-present, Facebook, Inc.
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/lz4file.c	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/liblz4.pc.in	#   Copyright (C) 2011-2020, Yann Collet.
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile	# * Redistributions in binary form must reproduce the above copyright notice, this
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile	# * Redistributions of source code must retain the above copyright notice, this
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/test-lz4-abi.py	# Copyright (C) 2011-present, Takayuki Matsuoka
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/Makefile	# Copyright (C) Przemyslaw Skibinski 2016-present
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/Makefile	# Copyright (C) Yann Collet 2011-2020
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile	# Copyright (C) Yann Collet 2011-2023
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/dll/example/Makefile	# Copyright (C) Yann Collet 2016-2020
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile.inc	# Copyright (C) Yann Collet 2020
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/Makefile	# Copyright (c) 2015, Louis P. Santillan <lpsantil@gmail.com>
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/test-lz4-speed.py	# Copyright (c) 2016-2020, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
+line	8	lz4-1.10.0.tar.gz:lz4-1.10.0/build/meson/meson/contrib/gen_manual/meson.build	# Copyright (c) 2018-present        lzutao <taolzu(at)gmail.com>
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/build/meson/GetLz4LibraryVersion.py	# Copyright (c) 2018-present    lzutao <taolzu(at)gmail.com>
+line	8	lz4-1.10.0.tar.gz:lz4-1.10.0/build/meson/meson/contrib/gen_manual/meson.build	# Copyright (c) 2022-present        Tristan Partin <tristan(at)partin.io>
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile	# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+line	4	lz4-1.10.0.tar.gz:lz4-1.10.0/Makefile	# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/build/cmake/CMakeLists.txt	# copyright and related and neighboring rights to this software to
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.c	*  * Redistributions of source code must retain the above copyright
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.c	*  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.c	*  Copyright (C) 2012-2016, Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.c	*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/xxhash.c	*  copyright notice, this list of conditions and the following disclaimer
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/LICENSE	* Redistributions in binary form must reproduce the above copyright notice,
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/LICENSE	* Redistributions in binary form must reproduce the above copyright notice, this
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/gen_manual.cpp	* Redistributions of source code must retain the above copyright
+line	2	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/LICENSE	* Redistributions of source code must retain the above copyright notice, this
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/blockStreaming_doubleBuffer.c	// Copyright : Takayuki Matsuoka
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	0. This License applies to any program or other work which contains a notice placed by the copyright holder saying it may be distributed under the terms of this General Public License. The "Program", below, refers to any such program or work, and a "work based on the Program" means either the Program or any derivative work under copyright law: that is to say, a work containing the Program or a portion of it, either verbatim or with modifications and/or translated into another language. (Hereinafter, translation is included without limitation in the term "modification".) Each licensee is addressed as "you".
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/doc/lz4_Frame_format.md	0.5 : added copyright notice
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	1. You may copy and distribute verbatim copies of the Program's source code as you receive it, in any medium, provided that you conspicuously and appropriately publish on each copy an appropriate copyright notice and disclaimer of warranty; keep intact all the notices that refer to this License and to the absence of any warranty; and give any other recipients of the Program a copy of this License along with the Program.
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	10. If you wish to incorporate parts of the Program into other free programs whose distribution conditions are different, write to the author to ask for permission. For software which is copyrighted by the Free Software Foundation, write to the Free Software Foundation; we sometimes make exceptions for this. Our decision will be guided by the two goals of preserving the free status of all derivatives of our free software and of promoting the sharing and reuse of software generally.
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	8. If the distribution and/or use of the Program is restricted in certain countries either by patents or by copyrighted interfaces, the original copyright holder who places the Program under this License may add an explicit geographical distribution limitation excluding those countries, so that distribution is permitted only in or among countries not thus excluded. In such case, this License incorporates the limitation as if written in the body of this License.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/gen_manual.cpp	A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	Copyright (C) 1989, 1991 Free Software Foundation, Inc.
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/LICENSE	Copyright (c) 2011-2020, Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/doc/lz4_Frame_format.md	Copyright (c) 2013-2020 Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/LICENSE	Copyright (c) 2014, lpsantil
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/gen_manual.cpp	Copyright (c) 2016-present, Przemyslaw Skibinski
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/debian/copyright	Copyright: (C) 2011-2020 Yann Collet
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/LICENSE	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/LICENSE	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/debian/copyright	Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/gen_manual.cpp	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/djgpp/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/lib/LICENSE	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	We protect your rights with two steps: (1) copyright the software, and (2) offer you this license which gives you legal permission to copy, distribute and/or modify the software.
+line	3	lz4-1.10.0.tar.gz:lz4-1.10.0/examples/COPYING	c) If the modified program normally reads commands interactively when run, you must cause it, when started running for such interactive use in the most ordinary way, to print or display an announcement including an appropriate copyright notice and a notice that there is no warranty (or else, saying that you provide a warranty) and that users may redistribute the program under these conditions, and telling the user how to view a copy of this License. (Exception: if the Program itself is interactive but does not normally print such an announcement, your work based on the Program is not required to print an announcement.)
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/contrib/gen_manual/gen_manual.cpp	copyright notice, this list of conditions and the following disclaimer
+line	1	lz4-1.10.0.tar.gz:lz4-1.10.0/doc/lz4_Frame_format.md	provided that the copyright notice and this notice are preserved,
+binary-head	lz4-1.10.0.tar.gz:lz4-1.10.0/tests/goldenSamples/skip.bin
