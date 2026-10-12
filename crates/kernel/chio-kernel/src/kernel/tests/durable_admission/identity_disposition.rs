@@ -29,7 +29,7 @@ fn unconfirmed_begin_retains_identity_without_dispatch() {
 }
 
 #[test]
-fn conflicting_begin_keeps_the_original_identity_terminal() {
+fn conflicting_begin_preserves_the_live_owner_without_a_terminal_receipt() {
     let (kernel, mut request, store, invocations) =
         durable_admission_fixture("identity-begin-conflict");
     let matching = [MatchingGrant {
@@ -47,15 +47,13 @@ fn conflicting_begin_keeps_the_original_identity_terminal() {
         AdmissionOperationState::BrokerAttemptRegistered
     );
     request.arguments["value"] = serde_json::json!("changed");
-    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("request id conflicts with retained operation")));
+    let error = kernel.evaluate_tool_call_blocking(&request).unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("request id conflicts with retained operation"));
     assert_eq!(admission.operation(), &original);
     assert_eq!(store.operation(), original);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert_disposition(&response, "terminal");
 }
 
 #[test]
