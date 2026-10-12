@@ -208,6 +208,31 @@ pub(super) fn fault_response(receipt: ChioReceipt, request_id: &str) -> Prepared
 }
 
 impl PreparedFaultReceipt {
+    pub(in crate::kernel) fn observe_payment_result(
+        &mut self,
+        authorization: &PaymentAuthorization,
+        result: &crate::payment::PaymentResult,
+        amount: u64,
+        released: bool,
+    ) {
+        let final_state = matches!(
+            result.settlement_status,
+            crate::payment::RailSettlementStatus::Settled
+                | crate::payment::RailSettlementStatus::Released
+                | crate::payment::RailSettlementStatus::Refunded
+        );
+        let financial = serde_json::json!({ "financial": {
+            "authorization_id": authorization.authorization_id,
+            "payment_reference": result.transaction_id,
+            "settlement_status": result.settlement_status.to_receipt_status(),
+            "rail_status": result.settlement_status,
+            "cost_charged": amount,
+            "payment_authorization_retained": !final_state,
+            "payment_release_confirmed": released && final_state,
+            "release_outcome": if released { "acknowledged" } else { "not_released" }
+        }});
+        self.observe_economics(Some(&financial));
+    }
     /// Retain acknowledged economics without importing output, cost breakdowns,
     /// oracle payloads or arbitrary caller metadata into the fault template.
     pub(in crate::kernel) fn observe_economics(&mut self, metadata: Option<&serde_json::Value>) {
@@ -253,6 +278,7 @@ impl PreparedFaultReceipt {
                 "payment_release_reference",
                 "payment_release_confirmed",
                 "payment_release_error_code",
+                "rail_status",
             ] {
                 if let Some(value) = financial.get(key) {
                     retain_bounded_reference(&mut bounded, key, value);

@@ -1762,7 +1762,17 @@ impl ChioKernel {
                         &quoted_currency,
                         &request.request_id,
                     ) {
-                        Ok(result) => result,
+                        Ok(result) => {
+                            if let Some(progress) = fault_progress.as_deref_mut() {
+                                progress.observe_payment_result(
+                                    authorization,
+                                    &result,
+                                    quoted_units,
+                                    false,
+                                );
+                            }
+                            result
+                        }
                         Err(error) => {
                             // A capture error does not establish that no payment
                             // happened and cannot authorize voiding a positive hold.
@@ -1798,10 +1808,12 @@ impl ChioKernel {
                             authorization,
                             &result,
                         );
-                        extra_metadata = merge_metadata_objects(
-                            extra_metadata,
-                            Some(serde_json::json!({ "financial": financial })),
-                        );
+                        let release_metadata = serde_json::json!({ "financial": financial });
+                        if let Some(progress) = fault_progress.as_deref_mut() {
+                            progress.observe_economics(Some(&release_metadata));
+                        }
+                        extra_metadata =
+                            merge_metadata_objects(extra_metadata, Some(release_metadata));
                     }
                     ReceiptSettlement::from_payment_result(&result)
                 };
@@ -1989,8 +2001,47 @@ impl ChioKernel {
             None
         };
 
-        if let Some(progress) = fault_progress.as_deref_mut() {
-            progress.observe_economics(extra_metadata.as_ref());
+        if let (Some(authorization), Some(result)) =
+            (payment_authorization, payment_result.as_ref())
+        {
+            match result {
+                Ok(result) => {
+                    if let Some(progress) = fault_progress.as_deref_mut() {
+                        progress.observe_payment_result(
+                            authorization,
+                            result,
+                            actual_cost,
+                            actual_cost == 0,
+                        );
+                    }
+                }
+                Err(error) if actual_cost > 0 => {
+                    extra_metadata = merge_metadata_objects(
+                        extra_metadata,
+                        Some(retained_payment_capture_metadata(
+                            request,
+                            authorization,
+                            error,
+                        )),
+                    );
+                    if let Some(progress) = fault_progress.as_deref_mut() {
+                        progress.observe_economics(extra_metadata.as_ref());
+                    }
+                }
+                Err(error) => {
+                    if let Some(progress) = fault_progress.as_deref_mut() {
+                        progress.observe_economics(Some(&serde_json::json!({ "financial": {
+                            "authorization_id": authorization.authorization_id,
+                            "payment_reference": authorization.authorization_id,
+                            "settlement_status": SettlementStatus::Failed,
+                            "release_outcome": "outcome_unknown",
+                            "payment_release_error_code": payment_error_code(error),
+                            "payment_authorization_retained": true,
+                            "payment_release_confirmed": false
+                        }})));
+                    }
+                }
+            }
         }
         let settlement = if cross_currency_failed || cost_overrun {
             ReceiptSettlement {
@@ -2006,16 +2057,7 @@ impl ChioKernel {
                 match payment_result {
                     Ok(result) => ReceiptSettlement::from_payment_result(result),
                     Err(error) => {
-                        if actual_cost > 0 {
-                            extra_metadata = merge_metadata_objects(
-                                extra_metadata,
-                                Some(retained_payment_capture_metadata(
-                                    request,
-                                    authorization,
-                                    error,
-                                )),
-                            );
-                        } else {
+                        if actual_cost == 0 {
                             warn!(
                                 request_id = %request.request_id,
                                 reason = %redacted!(&error),
