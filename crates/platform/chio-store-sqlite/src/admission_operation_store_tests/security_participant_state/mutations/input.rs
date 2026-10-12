@@ -356,6 +356,7 @@ fn input_join_cutpoints_recover_exactly_one_intent_without_downgrading_to_raw() 
             lock_root,
             authority,
             store,
+            _clock,
             ..
         } = fixture;
         drop(store);
@@ -368,6 +369,7 @@ fn input_join_cutpoints_recover_exactly_one_intent_without_downgrading_to_raw() 
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),
             authority,
+            _clock,
         };
         let operation = fixture
             .store

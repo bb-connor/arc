@@ -48,6 +48,7 @@ fn reopen(fixture: Fixture) -> TestResult<Fixture> {
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -62,6 +63,7 @@ fn reopen(fixture: Fixture) -> TestResult<Fixture> {
         authority,
         store,
         fence,
+        _clock,
     })
 }
 

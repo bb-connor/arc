@@ -46,7 +46,7 @@ pub(super) fn authorization(
 fn real_budget_authorization_checks_new_authority_but_acknowledges_expired_history(
 ) -> AnchoredTestResult {
     for already_authorized in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let binding = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(
@@ -114,7 +114,7 @@ fn real_budget_authorization_checks_new_authority_but_acknowledges_expired_histo
 fn real_capture_checks_new_authority_but_acknowledges_expired_dispatch_history(
 ) -> AnchoredTestResult {
     for already_captured in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let binding = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn configuring_a_domain_requires_prior_activation_and_cannot_change_it() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
     let domain = super::super::super::activation::domain(&imported)?;

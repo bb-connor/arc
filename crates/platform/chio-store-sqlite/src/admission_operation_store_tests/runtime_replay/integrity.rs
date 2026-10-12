@@ -50,7 +50,7 @@ fn destination_inventory_event_and_tombstone_corruption_is_never_repaired() -> A
         ("runtime_replay_legacy_tombstones", "UPDATE runtime_replay_legacy_tombstones SET expectation_id = 'different-expectation' WHERE participant_kind = 'destructive_lease'"),
         ("runtime_replay_legacy_tombstones", "DELETE FROM runtime_replay_legacy_tombstones WHERE participant_kind = 'destructive_lease'"),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false);
         let expected = pin(&fixture, &source)?;
         import(&fixture, &source, &expected)?;

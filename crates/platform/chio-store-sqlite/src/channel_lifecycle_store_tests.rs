@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::receipt::decision::ToolCallAction;
@@ -32,9 +31,11 @@ struct Fixture {
     authority: SqliteAuthorityStore,
     store: SqliteChannelLifecycleStore,
     fence: StoreMutationFence,
+    _clock: chio_test_support::clock::ClockScope,
 }
 
 fn fixture() -> TestResult<Fixture> {
+    let clock = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let temp = tempfile::tempdir()?;
     secure_temp_directory(temp.path())?;
     let database = temp.path().join("authority.db");
@@ -56,6 +57,7 @@ fn fixture() -> TestResult<Fixture> {
         authority,
         store,
         fence,
+        _clock: clock,
     })
 }
 
@@ -148,9 +150,7 @@ fn begin_operation(fixture: &Fixture, operation: &AdmissionOperationV1) -> TestR
 }
 
 fn now_ms() -> TestResult<u64> {
-    Ok(u64::try_from(
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
-    )?)
+    Ok(chio_test_support::clock::unix_millis())
 }
 
 fn digest(value: &str) -> String {

@@ -153,6 +153,7 @@ fn retained_request_reopens_under_the_current_fence_with_exact_bytes() -> TestRe
         authority,
         store,
         fence,
+        _clock,
     } = fixture();
     let (operation, request) = original(&fence)?;
     let now = now_ms();
@@ -333,6 +334,7 @@ fn retained_request_tampering_or_removal_fails_reads_and_restart() -> TestResult
             authority,
             store,
             fence,
+            _clock,
         } = fixture();
         let (operation, request) = original(&fence)?;
         store.begin_with_retained_tool_request(&operation, &request, &fence, now_ms())?;
@@ -427,6 +429,7 @@ fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_cont
         authority,
         store,
         fence,
+        _clock,
     } = fixture();
     let (operation, request) = original(&fence)?;
     store.begin(&operation, &fence, now_ms())?;
@@ -479,6 +482,7 @@ fn retained_request_orphan_is_rejected_at_restart() -> TestResult {
         authority,
         store,
         fence,
+        _clock,
     } = fixture();
     let (_, request) = original(&fence)?;
     drop(store);
@@ -565,6 +569,7 @@ fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_byt
         authority,
         store,
         fence,
+        _clock,
     } = fixture();
     let (operation, request) = original(&fence)?;
     store.begin_with_retained_tool_request(&operation, &request, &fence, now_ms())?;

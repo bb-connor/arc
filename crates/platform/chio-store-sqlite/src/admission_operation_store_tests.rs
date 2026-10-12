@@ -40,6 +40,7 @@ use chio_kernel::receipt_store::{
     AnchoredAdmissionProjectionStore, ReceiptStore, ReceiptStoreError,
 };
 use chio_kernel::{AdmissionPaymentSettlementBegin, BudgetStore, CanonicalRevocationSet};
+use chio_test_support::clock::ClockScope;
 use rusqlite::types::Value;
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
@@ -107,9 +108,22 @@ struct Fixture {
     authority: SqliteAuthorityStore,
     store: SqliteAdmissionOperationStore,
     fence: StoreMutationFence,
+    _clock: Option<ClockScope>,
 }
 
 fn fixture() -> Fixture {
+    open_fixture(Some(fixed_clock()))
+}
+
+fn fixture_real_time() -> Fixture {
+    open_fixture(None)
+}
+
+fn fixed_clock() -> ClockScope {
+    chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds())
+}
+
+fn open_fixture(clock: Option<ClockScope>) -> Fixture {
     let temp = tempfile::tempdir().expect("tempdir");
     secure_directory(temp.path());
     let database = temp.path().join("authority.db");
@@ -127,6 +141,7 @@ fn fixture() -> Fixture {
         authority,
         store,
         fence,
+        _clock: clock,
     }
 }
 

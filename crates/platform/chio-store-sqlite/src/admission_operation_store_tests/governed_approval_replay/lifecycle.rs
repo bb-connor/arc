@@ -67,6 +67,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);
@@ -78,6 +79,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
         _temp,
         database,
         lock_root,
+        _clock,
     };
     let source = Source::reopen(source_path.clone(), &fixture.store)?;
     assert!(fixture
@@ -98,6 +100,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -110,6 +113,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
         _temp,
         database,
         lock_root,
+        _clock,
     };
     let source = Source::reopen(source_path, &fixture.store)?;
     assert_eq!(load(&fixture)?, Some(imported.clone()));

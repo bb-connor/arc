@@ -757,6 +757,7 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
         authority,
         store,
         fence: first_fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);

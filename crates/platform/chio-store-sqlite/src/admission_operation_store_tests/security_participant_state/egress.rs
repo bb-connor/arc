@@ -218,6 +218,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -230,6 +231,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
         authority,
+        _clock,
     })
 }
 

@@ -123,6 +123,7 @@ fn recovery_status_cas_and_clear_tombstone_survive_new_serving_owner() -> Anchor
         authority,
         store,
         fence: old_fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);

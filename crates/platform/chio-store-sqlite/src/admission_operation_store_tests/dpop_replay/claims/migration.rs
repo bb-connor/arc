@@ -8,7 +8,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
         Some("CREATE TABLE dpop_replay_claim_unqualified(value TEXT)"),
         Some("DROP TRIGGER dpop_replay_authority_activations_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let domain = activate(&fixture, &source)?;
         let (operation, _, credential) = setup(
@@ -27,6 +27,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
             lock_root,
             authority,
             store,
+            _clock,
             ..
         } = fixture;
         drop(store);
@@ -54,6 +55,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
             _temp,
             database,
             lock_root,
+            _clock,
         };
         assert_eq!(load(&fixture)?, Some(expected));
         assert_eq!(global_count(&fixture), before);

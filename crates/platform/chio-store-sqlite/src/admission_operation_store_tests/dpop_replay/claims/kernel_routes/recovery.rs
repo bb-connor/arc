@@ -37,6 +37,7 @@ fn committed_dpop_survives_kernel_reopen_and_rejects_a_fresh_signature_for_the_s
         _temp,
         database,
         lock_root,
+        _clock: Some(_clock),
     };
     let mut kernel = kernel(&fixture, signer)?;
     kernel.set_operation_owned_dpop_authority(domain)?;
@@ -75,7 +76,7 @@ fn startup_releases_expired_pre_dispatch_dpop_without_recreating_the_source() ->
         DpopReplayClaimPhase::NoncePreflight,
         DpopReplayClaimPhase::Dispatch,
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let domain = activate(&fixture, &source)?;
         let (operation, lease, credential) =
@@ -106,6 +107,7 @@ fn startup_releases_expired_pre_dispatch_dpop_without_recreating_the_source() ->
             _temp,
             database,
             lock_root,
+            _clock: Some(_clock),
         };
         let kernel = kernel(&fixture, Keypair::generate())?;
         // Startup cleans historical custody before any fresh serving profile

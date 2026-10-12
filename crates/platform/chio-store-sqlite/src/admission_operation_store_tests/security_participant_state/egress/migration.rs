@@ -36,6 +36,7 @@ fn v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests() -
         lock_root,
         store,
         authority,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -59,6 +60,7 @@ fn v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests() -
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
         authority,
+        _clock,
     };
     assert_eq!(joins(&fixture)?, before_joins);
     pending.operation = fixture
