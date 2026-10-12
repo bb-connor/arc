@@ -444,10 +444,18 @@ jobs:
           CARGO_BUILD_JOBS: "1"
         run: ./scripts/qualify-mobile-kernel.sh
 
+      - name: Install Drogon build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: libssl-dev zlib1g-dev uuid-dev
+
       - name: SDK parity contract lane
         env:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }}"
-        run: ./scripts/check-sdk-parity.sh
+        run: |
+          CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"
+          export CMAKE_PREFIX_PATH
+          ./scripts/check-sdk-parity.sh
 
       - name: Record formal qualification posture
         if: always()
