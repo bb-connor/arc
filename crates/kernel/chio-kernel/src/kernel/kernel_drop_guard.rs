@@ -4,10 +4,10 @@ use chio_log_redact::redacted;
 use tracing::warn;
 
 use crate::admission_operation::AdmissionOperationV1;
-use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
+use crate::{CapabilityToken, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, KernelError,
+    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel,
     PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
