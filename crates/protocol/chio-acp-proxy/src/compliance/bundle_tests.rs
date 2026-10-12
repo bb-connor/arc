@@ -373,37 +373,30 @@ fn compliance_bundle_commits_trace_refusals_without_treating_them_as_invocations
 }
 
 #[test]
-fn compliance_bundle_legacy_is_signature_only_and_never_full() -> TestResult {
-    let (signer, entries, config, mut certificate) = signed_fixture(&[1])?;
-    certificate.body.schema = COMPLIANCE_CERTIFICATE_SCHEMA_V1.into();
-    certificate.body.receipt_set_digest = None;
-    certificate.body.compliance_profile_digest = None;
-    certificate.body.invocation_count = None;
-    certificate.body.checks = None;
-    certificate.body.coverage = None;
-    certificate.body.scope_compliant = true;
-    certificate.body.budget_compliant = true;
-    certificate.body.guards_compliant = true;
-    certificate.signature = signer.sign(&canonical_json_bytes(&certificate.body)?);
-    let bytes = serde_json::to_vec(&certificate)?;
-    let decoded: ComplianceCertificate = serde_json::from_slice(&bytes)?;
-    let limited =
-        verify_compliance_certificate(&decoded, VerificationMode::Lightweight, None, &config);
-    assert!(
-        limited.passed,
-        "legacy signed bytes lost compatibility: {}",
-        limited.summary
-    );
-    assert!(limited.summary.contains("legacy") && limited.summary.contains("not reverified"));
-    assert!(
-        !verify_compliance_certificate(
-            &decoded,
-            VerificationMode::FullBundle,
-            Some(&entries),
-            &config
-        )
-        .passed
-    );
+fn compliance_certificate_without_commitments_is_refused() -> TestResult {
+    let (_, _, _, certificate) = signed_fixture(&[1])?;
+    for field in [
+        "receipt_set_digest",
+        "compliance_profile_digest",
+        "invocation_count",
+        "checks",
+        "coverage",
+    ] {
+        let mut value = serde_json::to_value(&certificate)?;
+        assert_eq!(value["body"]["schema"], COMPLIANCE_CERTIFICATE_SCHEMA);
+        assert!(value["body"]
+            .as_object_mut()
+            .ok_or("certificate body object")?
+            .remove(field)
+            .is_some());
+        let error = serde_json::from_value::<ComplianceCertificate>(value)
+            .err()
+            .ok_or("certificate without commitment decoded")?;
+        assert!(
+            error.to_string().contains(&format!("missing field `{field}`")),
+            "{field}: {error}"
+        );
+    }
     Ok(())
 }
 

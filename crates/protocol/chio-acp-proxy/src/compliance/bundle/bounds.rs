@@ -212,20 +212,13 @@ pub(crate) fn preflight_body(
     let mut budget = ShapeBudget::new();
     budget.string(&body.schema)?;
     budget.string(&body.session_id)?;
-    for value in body
-        .receipt_set_digest
-        .iter()
-        .chain(body.compliance_profile_digest.iter())
-    {
-        budget.string(value)?;
-    }
+    budget.string(&body.receipt_set_digest)?;
+    budget.string(&body.compliance_profile_digest)?;
     budget.nodes(body.anomalies.len())?;
     for anomaly in &body.anomalies {
         budget.string(anomaly)?;
     }
-    if let Some(coverage) = &body.coverage {
-        coverage_shape(coverage, &mut budget)?;
-    }
+    coverage_shape(&body.coverage, &mut budget)?;
     canonical_size(body)?;
     Ok(())
 }

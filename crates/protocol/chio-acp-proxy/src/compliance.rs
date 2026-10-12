@@ -224,9 +224,9 @@ pub struct ComplianceConfig {
     pub budget_limit: u64,
     /// Guard names that must pass on every applicable allowed mediated receipt.
     pub required_guards: Vec<String>,
-    /// Explicit legacy tool-name prefixes. These do not certify resource scopes.
+    /// Explicit tool-name prefixes. These do not certify resource scopes.
     pub authorized_scopes: Vec<String>,
-    /// Exact server/tool identities. Combined with any configured legacy prefixes.
+    /// Exact server/tool identities. Combined with any configured prefixes.
     pub authorized_tool_targets: Vec<ComplianceToolTarget>,
     /// Expected tenant for all receipts. None leaves that profile check unevaluated.
     /// Every committed set must still contain one consistent tenant identity.
@@ -274,20 +274,15 @@ pub struct ComplianceCertificateBody {
     /// The kernel public key that signed the session receipts.
     pub kernel_key: PublicKey,
     /// Ordered, domain-separated commitment to every supplied signed receipt.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub receipt_set_digest: Option<String>,
+    pub receipt_set_digest: String,
     /// Commitment to the exact configured checks, independent of signing pins.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compliance_profile_digest: Option<String>,
+    pub compliance_profile_digest: String,
     /// Count of allowed mediated receipts, not actual dispatch or financial spend.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub invocation_count: Option<u64>,
+    pub invocation_count: u64,
     /// Explicit check applicability; unconfigured checks are not claimed passed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub checks: Option<ComplianceChecks>,
+    pub checks: ComplianceChecks,
     /// A supplied set or descriptive signed snapshot reference, not independent history proof.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coverage: Option<ComplianceCoverage>,
+    pub coverage: ComplianceCoverage,
 }
 
 /// A signed compliance certificate.
@@ -345,8 +340,7 @@ pub struct CertificateVerificationResult {
     pub summary: String,
 }
 
-pub const COMPLIANCE_CERTIFICATE_SCHEMA_V1: &str = "chio.compliance.certificate.v1";
-pub const COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.compliance.certificate.v2";
+pub const COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.compliance.certificate.v1";
 
 #[cfg(test)]
 #[path = "compliance/bundle_tests.rs"]
@@ -512,11 +506,11 @@ pub fn generate_compliance_certificate_with_coverage(
         guards_compliant: summary.checks.required_guards == ComplianceCheckStatus::Passed,
         anomalies: Vec::new(),
         kernel_key: summary.kernel_key,
-        receipt_set_digest: Some(summary.receipt_set_digest),
-        compliance_profile_digest: Some(summary.profile_digest),
-        invocation_count: Some(summary.invocation_count),
-        checks: Some(summary.checks),
-        coverage: Some(coverage),
+        receipt_set_digest: summary.receipt_set_digest,
+        compliance_profile_digest: summary.profile_digest,
+        invocation_count: summary.invocation_count,
+        checks: summary.checks,
+        coverage,
     };
     compliance_bundle::preflight_body(&body)?;
     let body_bytes = canonical_json_bytes(&body)?;
@@ -609,7 +603,6 @@ fn verify_compliance_certificate_at_time(
         .trusted_kernel_keys
         .contains(&cert.signer_key.to_hex());
     let signer_matches_body = cert.signer_key == cert.body.kernel_key;
-    let legacy = cert.body.schema == COMPLIANCE_CERTIFICATE_SCHEMA_V1;
     let body_ok_excluding_signer_match = certificate_body_consistent(cert, now);
     let body_ok = body_ok_excluding_signer_match && signer_matches_body;
     if mode == VerificationMode::Lightweight {
@@ -626,11 +619,7 @@ fn verify_compliance_certificate_at_time(
             receipt_failures: 0,
             passed,
             summary: if passed {
-                if legacy {
-                    "legacy lightweight signature/body assertions verified; receipt set, history and compliance checks not reverified".into()
-                } else {
-                    "lightweight signature/body verification passed; receipt set, history and compliance checks not reverified".into()
-                }
+                "lightweight signature/body verification passed; receipt set, history and compliance checks not reverified".into()
             } else {
                 verification_failure_summary(
                     sig_valid,
@@ -653,7 +642,7 @@ fn verify_compliance_certificate_at_time(
             summary: "full-bundle verification requires a nonempty receipt set".into(),
         };
     };
-    if legacy || cert.body.coverage.is_none() || entries.len() > 100_000 {
+    if entries.len() > 100_000 {
         return CertificateVerificationResult {
             verification_scope: CertificateVerificationScope::Unverified,
             certificate_signature_valid: sig_valid,
@@ -665,35 +654,25 @@ fn verify_compliance_certificate_at_time(
         };
     }
     let mut report = compliance_bundle::ReceiptVerificationReport::default();
-    let validation = cert
-        .body
-        .coverage
-        .as_ref()
-        .ok_or(ComplianceBundleError::MissingCommitment)
-        .map_err(ComplianceCertificateError::from)
-        .and_then(|coverage| {
-            compliance_bundle::validate_set_with_report(
-                &cert.body.session_id,
-                entries,
-                config,
-                cert.body.issued_at,
-                coverage,
-                &mut report,
-            )
-        })
-        .and_then(|summary| {
+    let validation = compliance_bundle::validate_set_with_report(
+        &cert.body.session_id,
+        entries,
+        config,
+        cert.body.issued_at,
+        &cert.body.coverage,
+        &mut report,
+    )
+    .and_then(|summary| {
             if cert.body.receipt_count != summary.receipt_count
-                || cert.body.invocation_count != Some(summary.invocation_count)
+                || cert.body.invocation_count != summary.invocation_count
             {
                 return Err(ComplianceBundleError::CountMismatch.into());
             }
-            if cert.body.receipt_set_digest.as_deref() != Some(summary.receipt_set_digest.as_str())
-            {
+            if cert.body.receipt_set_digest != summary.receipt_set_digest {
                 return Err(ComplianceBundleError::MissingCommitment.into());
             }
-            if cert.body.compliance_profile_digest.as_deref()
-                != Some(summary.profile_digest.as_str())
-                || cert.body.checks.as_ref() != Some(&summary.checks)
+            if cert.body.compliance_profile_digest != summary.profile_digest
+                || cert.body.checks != summary.checks
             {
                 return Err(ComplianceBundleError::ProfileMismatch.into());
             }
@@ -755,21 +734,15 @@ fn certificate_body_consistent(cert: &ComplianceCertificate, now: u64) -> bool {
     {
         return false;
     }
-    if body.schema == COMPLIANCE_CERTIFICATE_SCHEMA_V1 {
-        return body.scope_compliant && body.budget_compliant && body.guards_compliant;
-    }
     if body.schema != COMPLIANCE_CERTIFICATE_SCHEMA
-        || !compliance_bundle::valid_digest(body.receipt_set_digest.as_deref())
-        || !compliance_bundle::valid_digest(body.compliance_profile_digest.as_deref())
-        || body
-            .invocation_count
-            .is_none_or(|count| count > body.receipt_count)
+        || !compliance_bundle::valid_digest(Some(body.receipt_set_digest.as_str()))
+        || !compliance_bundle::valid_digest(Some(body.compliance_profile_digest.as_str()))
+        || body.invocation_count > body.receipt_count
     {
         return false;
     }
-    let (Some(checks), Some(coverage)) = (&body.checks, &body.coverage) else {
-        return false;
-    };
+    let checks = &body.checks;
+    let coverage = &body.coverage;
     body.scope_compliant == (checks.tool_targets == ComplianceCheckStatus::Passed)
         && body.guards_compliant == (checks.required_guards == ComplianceCheckStatus::Passed)
         && body.budget_compliant
