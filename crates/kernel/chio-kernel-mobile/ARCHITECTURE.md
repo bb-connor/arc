@@ -1,105 +1,88 @@
 # chio-kernel-mobile architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-kernel-mobile` is a UniFFI adapter over `chio-kernel-core`: it holds no
-independent evaluation logic and runs in-process inside the mobile app, with
-no IPC boundary between the Rust code and the Swift/Kotlin caller. Its own
-responsibility is the FFI boundary - JSON parsing, hex decoding, platform
-`Clock`/`Rng` adapters, and mapping `chio-kernel-core` / `chio-custody-hw`
-errors onto the flat `[Error]` enum UniFFI projects into each language.
-`crate-type = ["staticlib", "cdylib", "rlib"]` builds one artifact Xcode links
-statically (iOS) and one Android's NDK loads as a shared object, both driven
-from `src/chio_kernel_mobile.udl`, which is the source of truth for the
-generated bindings.
+The crate owns JSON-oriented synchronous Rust APIs and generated UniFFI
+scaffolding for app embedding. `evaluate`, signing functions, capability
+verification, passport verification, attestation challenge/verification functions,
+and receipt-envelope inspection are public. Metadata records and
+`ChioMobileError` cross the language boundary through the UDL definitions.
 
-## Module map
+Calls execute in the app process. The host app owns tool invocation, receipt
+storage/upload, revocation, authoritative budget state, platform evidence
+collection, issuer pins, and challenge/counter lifecycle. Rust-side FFI parity
+alone cannot establish device or operating-system enforcement.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | FFI entry points, request/response JSON shapes, `VerifiedCapability` / `PortablePassportMetadata` records, error mapping. Includes the UniFFI-generated scaffolding via `uniffi::include_scaffolding!`. |
-| `src/clock.rs` | `MobileClock`: `chio_kernel_core::Clock` over `SystemTime::now()`, clamped to `0` if the clock reads before `UNIX_EPOCH`. |
-| `src/errors.rs` | `ChioMobileError`: the flat, string-payload error enum matching the UDL `[Error]` interface variant-for-variant. |
-| `src/rng.rs` | `MobileRng`: `chio_kernel_core::Rng` over `getrandom`, zeroing the buffer on OS entropy failure. |
-| `src/chio_kernel_mobile.udl` | UniFFI interface definition; source of truth for the generated Swift/Kotlin bindings. |
-| `build.rs` | Runs `uniffi::generate_scaffolding` against the UDL at build time; warns if an Android target build is missing NDK env vars. |
+## Structure
 
-## Request lifecycle
+`lib.rs` contains request conversion, context decoding, budget seeding, and API
+entry points. `errors.rs` defines UniFFI-compatible error variants.
+`clock.rs` delegates to the shared `SystemClock`. `rng.rs` wraps getrandom.
+`src/chio_kernel_mobile.udl` defines the language surface; `build.rs` generates
+scaffolding that `include_scaffolding!` incorporates. `examples/bindgen.rs`
+provides the workspace-locked bindings generator. The bindings directory holds
+Swift and Kotlin integration instructions.
 
-1. A mobile host serializes a Chio type (`CapabilityToken`,
-   `PortableToolCallRequest`, `ChioReceiptBody`, `PortablePassportEnvelope`)
-   to JSON with its own Chio SDK and passes the string across the UniFFI
-   boundary.
-2. The matching `pub fn` in `lib.rs` deserializes the JSON and decodes any
-   hex-encoded keys, seeds, challenges, or nonces (`decode_hex_argument`,
-   `decode_canonical_content_hex`), failing closed on malformed input.
-3. Time-bound checks use the caller-supplied `now_secs` when it is a positive
-   value, otherwise `MobileClock::now_unix_secs()`.
-4. The call dispatches into `chio-kernel-core` (`evaluate_with_full_floor`,
-   `verify_capability_full`, `sign_receipt` /
-   `sign_receipt_relaying_trusted_body`, `passport_verify::verify_passport`)
-   or `chio-custody-hw` (`verify_app_attest`, `verify_play_integrity`) for
-   verification. `inspect_mobile_receipt_envelopes` separately calls the bounded
-   envelope parser and returns an explicitly non-authoritative inspection.
-5. Errors from either dependency are mapped onto `ChioMobileError` variants;
-   the result is serialized back to JSON (or a UDL record) and returned, or
-   thrown as `ChioMobileError` on parse or verification failure.
+## Data and control flow
 
-## Invariants and failure modes
+`evaluate` parses JSON and rejects unsupported authorization extensions before
+building the portable request. Positive `now_secs` values select a checked fixed
+clock when representable; other inputs use `MobileClock`. It decodes trusted
+issuers, creates a scope-hash resolver, seeds a fresh registry, and calls
+`evaluate_with_full_floor_and_root` with an allow-classical floor and no guards.
+The adapter also denies matched grants requiring mediated authorization.
+Ordinary denial becomes a JSON response; malformed inputs become FFI errors.
 
-- No entry point performs network or filesystem I/O; every function is safe
-  to call while the device is offline.
-- JSON parse failures stop at the boundary as `InvalidJson`; hex decode
-  failures as `InvalidHex`.
-- `sign_receipt` recomputes `content_hash` over the caller-supplied canonical
-  content preimage inside the trust boundary (WYSIWYS) and refuses to sign on
-  mismatch (`SigningFailed`), and rejects an all-zero signing seed
-  (`WeakEntropy`). `sign_receipt_relaying_trusted_body` is the only entry
-  point that skips the recompute, and only for a body an upstream trusted
-  producer already minted.
-- Both signing entry points require `body.kernel_key` to equal the public key
-  derived from the signing seed, or fail with `KernelKeyMismatch`.
-- `evaluate` and `verify_capability_with_context` seed an
-  `InMemoryBudgetRegistry` from caller-supplied parent-budget snapshots before
-  dispatching to kernel-core, so delegated/attenuated tokens are checked
-  against sibling-sum budget enforcement without fabricating missing parent
-  shares.
-- `evaluate_with_full_floor` and `verify_capability_full` run at
-  `CapabilityCryptoFloor::AllowClassical` and resolve attenuated/delegated
-  tokens against the caller-supplied `capability_trust_roots` map; an
-  attenuated or delegated token whose issuer has no entry in that map fails
-  closed.
-- A kernel-core `PendingApproval` verdict is returned as a fail-closed `deny`
-  in the `evaluate` JSON response; this crate has no approval-flow surface.
-- App Attest and Play Integrity verification always run in production mode
-  (`production: true`, `allow_development_fixture: false`,
-  `allow_caller_supplied_jwks: false`); development fixtures and
-  caller-supplied JWKS are never reachable through this crate.
-- `inspect_mobile_receipt_envelopes` is shape-only: it validates both JSON envelopes and
-  the evidence `platform` tag, but the response is always
-  `"authoritative": false, "authorized": false`. It is not proof of device
-  integrity.
-- The crate's own source contains no `unsafe` code: `clock.rs`, `errors.rs`,
-  and `rng.rs` each carry `#![forbid(unsafe_code)]`. The crate root does not,
-  because it includes UniFFI's generated `extern "C"` scaffolding.
+`sign_receipt` parses a body, decodes a nonzero 32-byte seed and content hex,
+and calls core content-bound signing. The relay function omits the preimage
+check and requires upstream body trust. Capability verification returns a
+snapshot; passport verification returns metadata and encoded payload bytes.
+
+## Trust and platform invariants
+
+Portable admission inherits core refusal of authenticated security context,
+aggregate invocation enforcement, and cumulative approval enforcement.
+Per-call parent snapshots can constrain delegated share admission but do not
+persist usage across calls. The host must preserve trusted time and admission
+context; exposed clock overrides support deterministic testing.
+
+`attest_app_attest` and `attest_play_integrity` emit challenge envelopes with
+`requires_platform_evidence` status. They do not call the device APIs.
+App Attest evidence verification requests production verification and disables
+development fixtures. Play Integrity verification disables caller-supplied JWKS.
+Production Play Integrity verification is currently unavailable: the pinned
+Google key is a synthetic fixture, so the custody verifier rejects it through
+its production-readiness guard. Custody test or `dev-fixtures` builds have a
+separate fixture path; that path establishes only fixture behavior.
+`inspect_mobile_receipt_envelopes` performs non-authoritative shape inspection.
+The app must acquire evidence and manage replay/counter state separately.
+
+`MobileRng` zeroes its buffer on entropy failure because the core RNG trait
+has no error channel. Signing with caller seeds independently rejects all-zero
+seeds. `MobileClock` retains the shared clock's fallible reading contract.
 
 ## Dependencies
 
-- `chio-kernel-core` - portable evaluation, capability verification, budget
-  enforcement, receipt signing, and passport verification; this crate wraps
-  its Rust API rather than reimplementing any of it.
-- `chio-core-types` - `CapabilityToken`, `ChioReceiptBody`,
-  `Ed25519Backend`/`Keypair`/`PublicKey`, and the scope/attenuation types the
-  FFI shapes deserialize into. Pulled with default features, since mobile
-  targets always have `std` available.
-- `chio-custody-hw` - App Attest, Play Integrity, and mobile-receipt-chain
-  verification. Pulled with `default-features = false` so mobile builds skip
-  the `passkey` (webauthn-rs/OpenSSL) and `sqlite-store` (rusqlite) features
-  the issuer-side default build needs.
-- `uniffi` - build-time scaffolding generation (`build-dependencies`, `build`
-  feature) plus the `include_scaffolding!` macro and `[Error]`/record support
-  at the crate root (`cli` feature).
-- `getrandom` - the cross-platform entropy source behind `MobileRng`
-  (`SecRandomCopyBytes` on iOS, `/dev/urandom` or `getrandom(2)` on Android).
-- `hex`, `sha2`, `serde`/`serde_json` - hex codec, challenge/nonce hashing,
-  and JSON envelope (de)serialization at the FFI boundary.
+`chio-kernel-core` supplies admission and signing; `chio-core-types` supplies
+artifacts and crypto. `chio-custody-hw` supplies platform evidence verifiers.
+Serde, serde_json, hex, and sha2 handle wire conversion and challenge hashes.
+UniFFI generates scaffolding and bindings; getrandom supplies native entropy.
+The crate uses hosted shared types and emits staticlib, cdylib, and rlib artifacts.
+
+## Verification
+
+`ffi_roundtrip` tests verdict conversion, malformed input, delegated budgets,
+content/key/seed signing refusal, passport checks, and attestation envelopes.
+`cross_ffi_parity` compares the Rust-facing mobile API with the C ABI adapter.
+`oracle_round_trip` signs mobile receipt fixtures and checks export records with
+a local fixture oracle; it does not contact a hosted service.
+
+```bash
+cargo test -p chio-kernel-mobile
+./scripts/qualify-mobile-kernel.sh
+```
+
+The script requires host FFI tests and at least one passing target-backed lane.
+Apple lanes need Darwin, Apple SDKs, and `aarch64-apple-ios` or
+`aarch64-apple-ios-sim`. Android arm64 needs `aarch64-linux-android`, cargo-ndk,
+and an Android NDK. Missing environments receive explicit lane status.

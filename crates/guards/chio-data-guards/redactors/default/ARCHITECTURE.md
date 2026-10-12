@@ -1,90 +1,82 @@
-# chio-data-guards-redactors-default architecture
+# Default redactor architecture
 
-## Overview
+## Responsibility and boundary
 
-The crate is a pure library: no I/O, no async runtime, no logging dependency.
-It is the default, native-Rust implementation of the `redactor` world declared
-in `wit/chio-guards-redact/world.wit` (package `chio:guards@0.1.0`) - its
-public types (`RedactClass`, `RedactionMatch`, `RedactionManifest`,
-`RedactedPayload`) mirror the WIT `redact-class` flags and
-`redaction-match`/`redaction-manifest`/`redacted-payload` records
-field-for-field, and `redact_payload` mirrors the WIT `redact-payload`
-function. Its dependency set (`regex`, `serde`, `serde_json`, `thiserror`) is
-deliberately narrow so the same source stays viable as a `wasm32-wasip2` guest
-export, but no `crate-type = ["cdylib"]` is configured today: consumers link
-it in-process as an ordinary `rlib`, not as a compiled WASM component.
-`chio-tee`'s `Redactor` trait (`crates/trust/chio-tee/src/redact.rs`) is the
-seam a wasmtime-hosted guest would plug into without call-site changes;
-nothing implements that seam today besides this crate's `DefaultRedactor`.
+`redact_payload` transforms a byte slice into `RedactedPayload`, containing
+output bytes and a `RedactionManifest`. `redact` selects the supported default
+classes and returns bytes alone. `RedactClass` selects pattern groups.
+`PASS_ID` identifies the pass implementation in each manifest.
 
-## Module map
+The crate owns pattern matching and replacement. Callers own buffering,
+persistence, tenant override selection, signing, and handling failed passes.
+A returned manifest contains match metadata and elapsed time; constructing it
+does not sign or authenticate the output. The public structs mirror the
+redaction WIT contract without implementing a component loader.
 
-Single-file crate. `src/lib.rs` holds the WIT-mirrored public types, the
-vetted regex pattern constants and their `LazyLock` statics, the startup
-pattern validator, `redact_payload`/`redact`, and the match-collection,
-overlap-resolution, span-application, and Luhn-filter internals.
+## Structure
 
-## Redaction pass
+The implementation lives in `src/lib.rs`. Shared `PATTERN_*` constants define
+the pattern inventory. `LazyLock<Option<Regex>>` instances compile each pattern
+once. `DEFAULT_PATTERNS` uses those constants for startup validation.
 
-1. `redact_payload` walks the enabled `RedactClass` flags in a fixed order:
-   `secrets` (AWS key, JWT, Stripe secret, Stripe publishable, OpenAI key,
-   high-entropy), then `bearer_tokens`, then `pii_basic` (email, US phone, US
-   SSN, Luhn-checked credit card).
-2. Each pattern runs `Regex::find_iter` over the raw bytes (`(?-u)`; bearer is
-   case-insensitive `(?i-u)`). A candidate is dropped if it overlaps a span an
-   earlier, higher-priority pattern already claimed (`overlaps`), so an
-   OpenAI `sk-proj-...` key claims the whole key before the generic
-   high-entropy pattern can match only its tail.
-3. Credit-card candidates additionally pass `luhn_ok`; structurally
-   card-shaped but Luhn-invalid digit runs are left untouched.
-4. Accepted spans are recorded both as `(start, end, replacement_bytes)` for
-   rewriting and as a `RedactionMatch` carrying the offset and length in the
-   *original* payload's byte coordinates.
-5. `apply_spans` sorts spans by start offset and rewrites the payload once,
-   copying unmatched bytes through and splicing in each class's canonical
-   replacement marker (`[REDACTED-EMAIL]`, `[REDACTED-API-KEY]`, etc.).
-6. Matches are sorted by `(offset, length)` and returned in a
-   `RedactionManifest` stamped with `PASS_ID` and the pass's elapsed time.
+`collect` delegates to `collect_with_filter`, which accepts nonoverlapping
+matches and records replacement spans. `apply_spans` builds output bytes in
+original-offset order. `luhn_ok` validates credit-card candidates after removing
+spaces and hyphens. Unit tests live alongside the implementation;
+`tests/integration.rs` exercises JSON-shaped receipts and HTTP-like logs.
 
-## Invariants and failure modes
+## Data and control flow
 
-- Fail-closed: an `Err(RedactError)` from `redact_payload` carries no bytes.
-  Callers (the tee, `chio-log-redact`) must treat it as pass failure and
-  refuse to persist or emit the payload; the crate has no path that returns
-  partial or unredacted output alongside an error.
-- `RedactError::Overflow` fires if a match offset or length does not fit
-  `u32`, signalling a payload at or above 4 GiB that the caller should refuse.
-- A pattern that fails to compile does not panic: `try_compile` returns `None`
-  and the hot path silently skips that class. `validate_default_redactor_compiles`
-  is the separate, opt-in hard-fail surface for callers that want to refuse
-  startup instead of accepting the soft-skip.
-- `default_pattern_inventory_matches_lazylocks` and
-  `default_patterns_match_runtime_lazylock_sources` (tests) pin
-  `DEFAULT_PATTERNS` and the runtime `LazyLock` statics to the same length and
-  the same source strings per label, so the startup validator cannot silently
-  drift from the hot path it is meant to validate.
-- Manifest byte offsets are always in the original payload's coordinate space,
-  never the redacted output's.
-- Matched spans never split a UTF-8 codepoint: `\b`-anchored patterns fire
-  only at ASCII word edges, which are always valid UTF-8 boundaries; two tests
-  exercise multibyte input directly against this property.
-- `pii_extended` and `custom` are accepted flag values, matching the WIT
-  contract's requirement that a guest accept any flag combination without
-  erroring, but both are no-ops in this implementation.
-- `PASS_ID` is bumped whenever default coverage changes, so tenants can pin
-  redactor behavior to an exact pass id from the manifest.
+The pass scans enabled secret patterns first, Bearer patterns second, and
+basic PII patterns last. A candidate overlapping an accepted span is skipped.
+This makes earlier pattern selection affect the class and replacement recorded
+for overlapping text. Matches always refer to the original input coordinates.
+
+Each accepted span receives a class-specific replacement. API key patterns use
+`[REDACTED-API-KEY]`; long alphanumeric runs use `[REDACTED-BEARER]`. Bearer
+matching accepts a Bearer-shaped substring and does not require an HTTP
+Authorization header. Basic PII replacement markers identify email, phone,
+SSN, or card candidates. The completed manifest sorts matches by offset and
+length and stamps the elapsed microseconds and pass identifier.
+
+`default_full` enables secrets, basic PII, and Bearer tokens. `all` additionally
+sets `pii_extended`, which has no implementation here. Both `pii_extended` and
+`custom` are accepted without extra matching. The derived default flag set
+leaves the payload unchanged.
+
+## Trust and invariants
+
+The byte regex engine accepts non-UTF-8 input. ASCII patterns and replacement
+spans preserve unrelated UTF-8 bytes in tested Unicode payloads. No JSON parse
+or canonical serialization occurs during redaction. Pattern matching detects
+syntactic candidates, including the long-run heuristic; it does not measure
+entropy or prove that all sensitive data has been removed.
+
+`collect_with_filter` converts match offsets and lengths to `u32` and returns
+`RedactError::Overflow` when conversion fails. This checks recorded locations;
+it is not a blanket input-length rejection. `InvalidUtf8` is available to
+callers but is not emitted by the byte-oriented primary pass.
+
+`try_compile` logs and returns `None` on constant compilation failures. The
+runtime consequently skips that pattern. Strict startup behavior requires
+calling `validate_default_redactor_compiles` and rejecting its error. Callers
+must refuse persistence on redaction errors and decide how to handle startup
+validation failures. Neither refusal is enforced inside this library.
 
 ## Dependencies
 
-No internal `chio-*` dependencies. External: `regex` (bytewise pattern
-matching over `&[u8]`, not `&str`), `serde`/`serde_json` (wire-shape
-(de)serialization for the WIT-mirrored types), `thiserror` (`RedactError`).
-`tracing` is deliberately excluded to keep the crate viable as a
-`wasm32-wasip2` guest export; `try_compile` writes pattern-compile failures to
-stderr instead.
+`regex::bytes` supplies compiled byte matching. Serde supports serialization of
+class flags, matches, manifests, and payload structs. `thiserror` defines the
+public error display. Standard-library timing and lazy initialization support
+pass metadata and pattern reuse. No network or database dependency is required.
 
-## Extension points
+## Verification
 
-None. The crate exposes fixed functions and types, not a trait or registry;
-the swap-in seam for an alternative (e.g. wasmtime-hosted) redactor is
-`chio-tee`'s `Redactor` trait, one layer up.
+Unit tests cover common secret formats, card filtering, overlap handling,
+Unicode adjacency, and pattern inventory consistency. Integration fixtures
+check receipt-like payloads, HTTP-like logs, disabled-class behavior, original
+match offsets, replacement markers, and pass identifiers.
+
+Run `cargo test -p chio-data-guards-redactors-default`. Those fixtures verify
+local byte transformations. Caller persistence refusal, component loading,
+and signing require verification in the consuming host.

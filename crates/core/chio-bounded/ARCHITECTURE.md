@@ -1,69 +1,80 @@
 # chio-bounded architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-bounded` is a pure, dependency-free library crate: no I/O, no async
-runtime, and (outside the test-only `cfg(loom)` target) no dependencies at
-all. It sits underneath any Chio serving process that keeps an in-memory
-cache, ring buffer, or receipt mirror, and closes one specific failure mode:
-an unbounded collection with no visibility into its size. Both collections
-own a `SizeGauge` and enforce their capacity on every write.
+This crate owns entry-bounded process-local collections and their size gauges.
+The public surface exports `Ring<T>`, `BoundedMap<K, V>`, and `SizeGauge`.
+The caller selects capacity, supplies timestamps, and decides how to handle
+returned capacity evictions.
 
-## Module map
+Collections require mutable access for mutation.
+Callers own external locking when sharing a collection across threads.
+Persistence, signed records, and authorization are outside this boundary.
+Capacity measures entries; it does not bound the byte size of each value.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate doc and the three public re-exports (`BoundedMap`, `SizeGauge`, `Ring`). |
-| `src/ring.rs` | `Ring<T>`: fixed-capacity append-only buffer, oldest-first eviction. |
-| `src/bounded_map.rs` | `BoundedMap<K, V>`: capacity-bounded, optionally idle-TTL-swept map with approximate-LRU eviction. |
-| `src/gauge.rs` | `SizeGauge`: cloneable atomic live-count handle. |
-| `src/sync.rs` | Private `Arc`/`AtomicUsize`/`Ordering` shim: std types by default, loom's models under `--cfg loom`. |
+## Structure
 
-## Eviction and sweep
+- `ring.rs` stores ordered entries in a `VecDeque`.
+- `bounded_map.rs` combines a `HashMap` with an insertion-position queue.
+- `gauge.rs` wraps an atomic count in a cloneable shared handle.
+- `sync.rs` selects standard or Loom gauge synchronization types.
 
-`BoundedMap` tracks insertion order in a side `VecDeque<(K, u64)>` keyed by a
-monotonic per-insert sequence number, not a linked hash map:
+No unsafe code is permitted in the crate.
+The ordinary implementation has no external runtime dependencies.
 
-1. `insert` assigns the next `seq` and appends `(key, seq)` to `order`, even
-   when the key already exists, so a re-insert becomes the newest entry
-   without removing the old `order` entry.
-2. `evict_oldest` pops from the front of `order` and compares the popped
-   `seq` against the key's current entry. A mismatch means the popped
-   position is a stale duplicate left by a later re-insert, and is skipped.
-3. Once `order` grows past `2 * capacity`, `compact_order` rebuilds it from
-   the live entries sorted by `seq`, reclaiming stale duplicates in
-   O(n log n) amortized over `capacity` inserts.
-4. Every 256 inserts (`sweep_interval`), `sweep_idle` runs; it is a no-op when
-   `idle_ttl_secs == 0`, otherwise it drops entries whose `last_seen_secs` is
-   at or before `now_secs - idle_ttl_secs`. `get` refreshes `last_seen_secs`
-   but does not move the entry in `order`, so a frequently-read key is
-   protected from the TTL sweep but not from oldest-insert eviction.
+## Data and control flow
 
-`Ring<T>` has no analogous state: it is a `VecDeque<T>` that pops the front on
-overflow.
+`Ring::push` evicts the oldest item before appending at capacity.
+Zero capacity returns the incoming item and stores nothing.
+Cloning a ring copies its values and seeds a new independent gauge.
 
-## Invariants and failure modes
+`BoundedMap::insert` sweeps idle entries every 256 insert attempts at nonzero cap.
+A new key at capacity evicts the oldest live insertion position.
+Reinsertion replaces the value and assigns a new saturating sequence number.
+Stale positions are skipped during eviction.
+The position queue is compacted when it exceeds twice the configured capacity.
 
-- `capacity == 0` disables both collections: `push` / `insert` store nothing
-  and hand the item straight back rather than panicking or silently dropping
-  it.
-- `len()` never exceeds `capacity()` on either collection. The property test
-  in `bounded_map.rs` and the stress and loom tests under `tests/` assert
-  this under random operation sequences and concurrent access through an
-  external `Mutex`.
-- `SizeGauge::set` is `pub(crate)`: only `Ring` and `BoundedMap` can mutate a
-  gauge, so a consumer holding a cloned gauge can only read it.
-- `Ring::clone` gives the clone a fresh, independent `SizeGauge` seeded to the
-  current length, so pushing to a cloned snapshot can never corrupt the
-  owner's gauge.
-- Neither collection is internally synchronized; concurrent access requires
-  an external lock, as both the stress test (`tests/stress_bounded_map.rs`)
-  and the loom model (`tests/loom_bounded_map.rs`) do.
+`get` updates `last_seen_secs` without changing insertion order.
+The caller supplies `now_secs` on every read and insert.
+TTL zero disables idle removal.
+
+## Trust and invariants
+
+Capacity eviction returns one removed key and value for caller handling.
+Replacement drops the previous value; idle sweeping also drops removed values.
+A caller needing durable custody must account for those separate drop paths.
+
+An idle sweep retains only timestamps greater than
+`now_secs.saturating_sub(idle_ttl_secs)`.
+Reads do not check expiry, so a read can refresh an unswept stale entry.
+The map is unsuitable as a strict expiration verifier by itself.
+
+Gauge stores and loads use relaxed atomics.
+Use a dedicated initially zero gauge for each collection.
+The gauge is an observational count; it does not synchronize collection access.
+The constructors do not reset a reused gauge, and dropping a collection does
+not reset outstanding gauge handles.
 
 ## Dependencies
 
-None at compile time outside `std`. `loom` is a `cfg(loom)`-gated,
-workspace-pinned dependency used only by the nightly `--cfg loom` build of
-`tests/loom_bounded_map.rs`. `proptest` is a workspace-pinned dev-dependency
-used by the property test in `src/bounded_map.rs`. No `chio-*` crate is a
-dependency; this crate sits at the base of the dependency graph.
+Standard collections provide storage and ordering.
+`proptest` generates mixed read/insert sequences in tests.
+The target-specific Loom dependency replaces gauge atomics under `cfg(loom)`.
+External mutexes in concurrency tests protect the map itself.
+
+## Verification
+
+Unit tests exercise eviction, zero capacity, reinsertion, compaction,
+idle sweeping, and independent ring clone gauges.
+Property tests check capacity and gauge equality after generated operations.
+`stress_bounded_map.rs` drives eight threads through an externally locked map.
+`loom_bounded_map.rs` models a bounded insertion/read interleaving.
+
+```bash
+cargo test -p chio-bounded
+RUSTFLAGS="--cfg loom" cargo test -p chio-bounded --test loom_bounded_map
+```
+
+Without `cfg(loom)`, this integration test runs an empty body.
+The command above enables the model. These checks exercise collection capacity,
+eviction, and gauge behavior. Serving-process integration requires caller verification.

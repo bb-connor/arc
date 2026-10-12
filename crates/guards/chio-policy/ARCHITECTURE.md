@@ -1,222 +1,114 @@
 # chio-policy architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-policy` is Chio's native HushSpec policy engine: a pure-Rust parser,
-validator, evaluator, and compiler for the YAML policy format that governs
-AI-agent tool, egress, filesystem, shell, and computer-use actions. It is
-marked `public_entrypoint = true` and sits between operator-authored policy
-documents and the kernel's runtime enforcement surface (`chio-guards`,
-`chio-kernel`): invalid HushSpec documents must reject before any guard or
-capability scope is materialized. The crate touches the filesystem only in
-`resolve` (walking `extends` chains) and in the detection compiler (loading a
-`threat_intel.pattern_db` JSON asset); parsing, validation, merge, and
-evaluation are pure in-memory transformations.
+`HushSpec` owns a typed policy document. Public functions parse, validate,
+resolve inheritance, merge documents, evaluate actions, analyze policy relations,
+and compile policy into kernel primitives.
+`CompiledPolicy` owns a `GuardPipeline`, `PostInvocationPipeline`, `ChioScope`,
+optional threshold requirement, and ordered guard-name sidecar.
+The caller installs these objects and selects capability issuance behavior.
+The kernel owns enforcement admission, approval execution, and signed receipts.
 
-## Diagram
+The reference evaluator and compiler are separate interfaces with distinct
+coverage. A reference Allow does not create a capability. `DecisionReceipt`
+contains action and policy summaries, timing, and a UUID; it has no signature
+or persistence mechanism.
 
-```mermaid
-flowchart TD
-    subgraph sgIn["Policy sources"]
-        yaml["HushSpec YAML document"]
-        ext["extends targets: filesystem or chio builtin rulesets"]
-    end
-    subgraph sgLoad["Load pipeline"]
-        parse["HushSpec parse: hardened YAML"]
-        resolve["resolve and merge extends chain"]
-        validate["validate: schema and semantic"]
-    end
-    subgraph sgCompile["Compile to guard config"]
-        compile["compile_policy re-validates"]
-        guards["GuardPipeline and PostInvocationPipeline"]
-        scope["default ChioScope from tool_access"]
-    end
-    subgraph sgEval["Evaluate a tool call"]
-        action["EvaluationAction tool call"]
-        panic["panic mode short circuit"]
-        posture["origin profile and posture allowlist"]
-        dispatch["per action rule block evaluator"]
-        decision["Decision allow warn deny"]
-    end
-    subgraph sgWrap["Optional wrappers"]
-        receipt["evaluate_audited DecisionReceipt"]
-        detect["evaluate_with_detection scoring"]
-    end
+## Structure
 
-    yaml --> parse
-    ext -->|extends| resolve
-    parse --> resolve
-    resolve --> validate
-    validate -->|valid| compile
-    resolve -->|assumes valid| action
-    compile --> guards
-    compile --> scope
-    action --> panic
-    panic --> posture
-    posture --> dispatch
-    dispatch --> decision
-    decision --> receipt
-    decision --> detect
-```
+`models.rs` and `models/` define schema, defaults, and YAML safety checks.
+`version.rs` supports HushSpec `0.1.0`. `validate.rs`, `regex_safety.rs`, and
+`glob_pattern.rs` validate semantic and pattern constraints.
+`resolve.rs` handles bounded inheritance and loaders; `merge.rs` applies replace,
+merge, or default deep-merge strategy. Rule blocks generally replace their base
+block when the child supplies that block; extension merging has separate logic.
 
-## Module map
+`evaluate/` separates context selection, matching, outcomes, and engine control.
+`conditions.rs` filters active rules. `detection.rs` supplies content detection.
+`compiler/` separates rules, detection, budgets, scope, pattern overlap, and
+sender-proof enforcement.
+`crypto_floor.rs` and `weights.rs` load specialized policy configuration.
+`rulesets/` embeds seven YAML rulesets.
+`analyze/` lowers policy into an intermediate representation, compares glob
+relations, and produces bounded findings and refinement reports.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate root: re-exports the public API, `is_hushspec_format`. |
-| `src/models.rs` + `models/{enums,extensions,rules,yaml_safety}.rs` | HushSpec schema (`HushSpec`, `Rules` with 14 blocks, `Extensions` with 5 blocks, governance metadata); `HushSpec::parse` hardens against pathological YAML before delegating to `serde_yml`. |
-| `src/validate.rs` | Schema/semantic validation: regex safety, workload-identity shape, posture graphs, detection thresholds, reputation and runtime-assurance tiers. |
-| `src/merge.rs` | `extends` inheritance: replace / merge / deep-merge, field by field. |
-| `src/resolve.rs` | Filesystem `extends` chain resolution with cycle detection. |
-| `src/conditions.rs` | `Condition` predicate tree (`time_window`, `context`, `all_of`/`any_of`/`not`) evaluated against a `RuntimeContext`; gates rule blocks for `evaluate_with_context`. |
-| `src/evaluate.rs` + `evaluate/{context,engine,matchers,outcomes,tests}.rs` | Reference evaluator. The four non-test files are `include!`-d into `evaluate.rs`, not declared as `mod`, so they share one module's namespace and `use` imports rather than being independent submodules. |
-| `src/analyze/{mod,glob,ir,refine,report}.rs` | Bounded analysis IR, exact glob relations, static findings, and evaluator-confirmed policy-refinement witnesses. |
-| `src/compiler.rs` + `compiler/{budgets,detection,patterns,rules,scope,tests}.rs` | HushSpec-to-Chio compiler. Unlike `evaluate`, these are real `mod` submodules reached through `super::`. |
-| `src/detection.rs` | Standalone regex content detectors (`DetectorRegistry`) and `evaluate_with_detection`, layered on `evaluate` rather than wired into the guard compiler. |
-| `src/receipt.rs` | `evaluate_audited`: wraps `evaluate` with timing, SHA-256 policy hashing, and a `DecisionReceipt`. |
-| `src/regex_safety.rs` (private) | Shared regex hardening and a process-wide compiled-pattern cache used by both `validate` and `evaluate`. |
-| `src/crypto_floor.rs` | `CryptoFloor`: kernel-wide minimum signing posture, validated against PQ key provisioning at load time. |
-| `src/weights.rs` | `WeightsCardRequired` / `WeightsCardConfig`: kernel-wide signed model-card binding enforcement, validated at load time. |
-| `src/version.rs` | `HUSHSPEC_VERSION` and the supported-version set `validate` checks against. |
-| `src/rulesets/mod.rs` + 7 `.yaml` files | Built-in rulesets embedded via `include_str!`, exposed as `chio:<name>` / `hushspec:<name>` extends targets. |
+## Data and control flow
 
-## Policy lifecycle
+`HushSpec::parse` performs YAML hazard checks and deserialization, including
+unknown-field rejection. It catches parser panics and returns parse errors.
+Parsing alone does not run semantic validation.
+`validate` accumulates errors and warnings; `is_valid` requires an empty error
+list. Missing rules produce a warning. Compilation checks unsupported execution
+fields and validates before constructing guards.
 
-1. **Parse.** `HushSpec::parse` runs three hardening pre-checks (non-mapping
-   document start, unclosed double-quoted scalars, libyml scalar-join
-   whitespace-run overflow risk) over the raw YAML, then parses through
-   `serde_yml` inside `catch_unwind` so a parser panic becomes an `Err`
-   instead of aborting the process.
-2. **Resolve + merge.** If `extends` is set, `resolve_from_path` (or a
-   caller-supplied loader via `resolve_with_loader`) walks the chain, rejects
-   cycles, and folds each parent into its child with `merge` (`replace`,
-   `merge`, or `deep_merge`, chosen by the child's `merge_strategy`).
-3. **Validate.** `validate` returns errors and non-fatal warnings.
-   `compile_policy` calls it unconditionally before touching guards;
-   `evaluate` does not call it and expects an already-valid document.
-4. **Evaluate.** `evaluate` (or `evaluate_with_context`, which first filters
-   rule blocks through `Condition`s) selects an origin profile, resolves
-   posture, checks the posture's capability allowlist, then dispatches on
-   `EvaluationAction::action_type` to a per-action evaluator that walks the
-   matching rule block(s) to an allow/warn/deny `Decision`. Global panic mode
-   (`activate_panic`) short-circuits every call to `Deny` first.
-5. **Compile.** `compile_policy` re-validates, then translates `rules` and
-   `extensions.detection` / `extensions.origins` into guards plus a default
-   `ChioScope` derived from `tool_access`:
+The compiler processes enabled rule blocks in this order: forbidden paths;
+velocity and agent velocity; shell commands; egress then internal network;
+MCP tools then optional sender proof; secrets; patch integrity; path allowlist;
+computer use; remote desktop; input injection; browser automation; code execution.
+It then processes detection extensions and origin budgets. Secret rules also
+add a separate sanitizer hook. Missing blocks add no corresponding guards.
 
-   | Guard | HushSpec trigger |
-   |---|---|
-   | `ForbiddenPathGuard` | `rules.forbidden_paths` |
-   | `VelocityGuard` | `rules.velocity` (invocation / spend caps) |
-   | `AgentVelocityGuard` | `rules.velocity` (agent / session caps) or `extensions.origins.profiles[].budgets.tool_calls` |
-   | `ShellCommandGuard` | `rules.shell_commands` |
-   | `EgressAllowlistGuard` + `InternalNetworkGuard` | `rules.egress` (allowlist plus an SSRF / RFC1918 companion) |
-   | `McpToolGuard` | `rules.tool_access` |
-   | `SecretLeakGuard` + post-invocation `SanitizerHook` | `rules.secret_patterns` (write-path guard, read-path redaction) |
-   | `PatchIntegrityGuard` | `rules.patch_integrity` |
-   | `PathAllowlistGuard` | `rules.path_allowlist` |
-   | `ComputerUseGuard` | `rules.computer_use` |
-   | `RemoteDesktopSideChannelGuard` | `rules.remote_desktop_channels` |
-   | `InputInjectionCapabilityGuard` | `rules.input_injection` |
-   | `BrowserAutomationGuard` | `rules.browser_automation` |
-   | `CodeExecutionGuard` | `rules.code_execution` |
-   | `PromptInjectionGuard` | `extensions.detection.prompt_injection` |
-   | `JailbreakGuard` | `extensions.detection.jailbreak` |
-   | `EmbeddingAnomalyGuard` | `extensions.detection.threat_intel` |
+Scope compilation requires enabled tool-access rules. It emits representable
+grants and constraints, filters conflicting patterns, and returns an empty scope
+for unsupported authority shapes. Explicit default-allow rules can yield a
+wildcard scope when compatible with the configured constraints.
+Threshold approvers require an authenticated directory; identifier consistency
+and one nonempty directory version are checked before constructing requirements.
 
-   A HushSpec construct a guard or the `ChioScope` model cannot faithfully
-   represent (for example workload-identity gating, or selective confirmation
-   under a wildcard scope) compiles to an empty or minimal grant rather than
-   silently widening access.
+Resolution loads builtins or local files, follows parents, merges, and rejects
+cycles. Default file limits are 4 MiB per document and inheritance depth 32.
+HTTP references return `ResolveError::Http`. Caller-provided loaders own their
+input acquisition and source identities.
 
-   Automatic default grants require an enabled `rules.tool_access` block.
-   Missing rules, a missing tool block, or a disabled tool block produce an
-   empty default scope. Other configured guards still compile. The pure
-   evaluator continues to report no additional restriction for an absent
-   tool rule; it does not mint capability authority. The development
-   `permissive` builtin opts into wildcard tool access explicitly, while
-   `remote-desktop` remains guard-only until a caller supplies tool rules.
-   This replaces the former implicit wildcard default scope without
-   changing enabled tool-rule default/allowlist semantics.
-6. **Optional wrappers.** `evaluate_audited` wraps step 4 with elapsed-time
-   measurement and a SHA-256 hash of the policy's canonical JSON into a
-   `DecisionReceipt`. `detection::evaluate_with_detection` wraps step 4 with
-   regex content-detector scoring; a detector deny can override an
-   allow/warn but never weakens an existing policy deny.
+## Trust and invariants
 
-## Invariants and failure modes
+Validation rejects unsupported versions, invalid or excessive regex patterns,
+invalid budgets, and checked extension constraints. Compilation adds guard
+constructor checks and rejects approval fields without execution enforcement.
+Origin-specific sender proof is rejected by the compiler; global tool-access
+sender proof can compile into a guard and grant requirements.
 
-- Unsupported `hushspec` version, invalid regex, duplicate secret-pattern
-  names, malformed posture graphs, and malformed reputation / runtime-
-  assurance blocks are validation errors, not warnings.
-- All user-supplied and generated-glob regex route through `regex_safety`:
-  capped at 512 characters and a complexity score of 96, built with bounded
-  size/DFA limits, and cached process-wide (capped at 4,096 keys, cleared on
-  overflow).
-- `evaluate`'s default arm for an unrecognized `action_type` denies
-  fail-closed rather than allowing an unmodeled action through.
-- `compile_policy` refuses to emit a pipeline for an invalid policy
-  (`CompileError::Invalid`) rather than compiling a partial one.
-- Workload-identity path-prefix matching is segment-bounded: `/payments`
-  does not match a sibling path such as `/payments-v2/worker`
-  (`evaluate::workload_identity_path_matches_prefix`). `chio-core` owns
-  SPIFFE identity parsing; this crate only matches against it.
-- `CryptoFloor::AllowHybrid` / `PqRequired` and
-  `WeightsCardRequired::RequiredWithPin` reject at load time
-  (`validate_with_pq_key`, `WeightsCardConfig::validate`) when their
-  required key or regex is not provisioned, before any signing or bind call.
-- Panic mode is a process-global `AtomicBool`; every `evaluate` and
-  `evaluate_with_context` call checks it before origin or posture
-  resolution.
-- `evaluate/*` owns the reference allow, warn, and deny evaluator, including
-  condition filtering, posture transitions, and origin profile selection.
-- `analyze/*` owns the bounded analysis IR, exact glob relations, static
-  findings, and evaluator-confirmed policy refinement witnesses. Unsupported
-  rule semantics remain explicit coverage notices.
-- `compiler.rs` owns translation from HushSpec intent into Chio guard
-  pipelines, post-invocation hooks, and default `ChioScope` fragments.
-- `receipt.rs` owns audited evaluation receipts. The crate does not own guard
-  internals, receipt signing, capability verification, or persistent runtime
-  state.
-- `resolve_with_loader`'s composite loader rejects `https://` / `http://`
-  extends targets (`ResolveError::Http`); only filesystem-backed loaders are
-  wired in this crate.
+Reference evaluation denies unknown action types and active panic mode.
+Recognized actions without configured restrictions may allow.
+`evaluate_with_context` rejects unknown condition keys with deny and propagates
+clock errors. `evaluate_audited` checks supplied clock readings and duration.
+These evaluation functions require callers to validate policies before use.
+
+`receipt::compute_policy_hash` hashes `serde_json::to_string` output with SHA-256;
+serialization failure falls back to the empty string. It does not invoke the
+RFC 8785 canonicalizer. Consumers must use the kernel's signed receipt contracts
+when cryptographic enforcement evidence is required.
+
+Static analysis bounds atoms, automata, comparisons, findings, and confirmations.
+Its report distinguishes unhandled policy surfaces and inconclusive refinement.
+An analysis result applies to the modeled policy fragments and configured limits.
 
 ## Dependencies
 
-Internal: `chio-core` supplies the capability-scope, runtime-attestation,
-workload-identity, and trust-policy types the schema and evaluator reference;
-`chio-guards` supplies `GuardPipeline`, `PostInvocationPipeline`, and every
-concrete guard type the compiler emits; `chio-kernel` supplies
-`MemoryBudgetConfig` and the `Guard` trait bound used by the pipeline
-builder. External: `serde_yml` for YAML (de)serialization, `regex` for
-pattern compilation, `sha2` for policy/receipt hashing, `uuid` for receipt
-IDs, `chrono` / `chrono-tz` for time-window conditions and receipt
-timestamps, `thiserror` for error types.
+`chio-guards` supplies concrete enforcement and sanitization; `chio-kernel`
+provides budgets and approver directories; `chio-core` supplies scope and
+threshold types. `chio-security-types` provides clocks and security vocabulary;
+`chio-appraisal` is declared in the manifest; policy source has no direct import.
+Serde, serde_json, and serde_yml handle documents. Regex handles patterns;
+SHA-256 and hex support hashing. UUID identifies decision records; chrono and
+chrono-tz support timestamps and calendar conditions. Proptest is test-only.
+The manifest declares no features; filesystem operations require host access.
 
-## Extension points
+## Verification
 
-- `detection::Detector` - implement to register a custom content scanner
-  with `DetectorRegistry` alongside the built-in prompt-injection / jailbreak
-  / exfiltration detectors.
-- `resolve::resolve_with_loader` - supply a custom
-  `Fn(&str, Option<&str>) -> Result<LoadedSpec, ResolveError>` loader instead
-  of the filesystem-only `create_composite_loader`.
+`tests/validate_boundary.rs` exercises pattern, limit, and semantic rejection.
+`tests/implicit_authority.rs` checks missing/disabled tool rules, explicit grants,
+and constraints. `tests/compile_policy.rs` exercises emitted guard families;
+`compiler_overlap.rs` checks overlap-sensitive scope compilation.
+Approval, clock, builtin ruleset, extension, and property tests cover additional
+boundaries. `analyze/tests.rs` exercises bounded analysis and refinement reports.
 
-## Security and API constraints
+```bash
+cargo test -p chio-policy
+cargo test -p chio-policy --test implicit_authority
+cargo test -p chio-policy --test validate_boundary
+```
 
-- Invalid HushSpec documents must reject before guard or scope materialization.
-- Public parser, validator, compiler, and evaluator APIs are stable.
-- Analysis must fail closed on invalid policies and exhausted atom, pattern,
-  matcher-comparison, finding, automaton-state, or automaton-transition limits.
-  A changed opaque field cannot yield a successful refinement verdict.
-- Workload identity path prefixes match either the exact workload path or a
-  child segment boundary, never a sibling string prefix.
-- The root prefix `/` matches all canonical workload paths.
-- Trailing slash input in policy prefixes normalizes to the same segment
-  boundary.
-- Enabled tool allow/block/default semantics, runtime-assurance checks,
-  warning-only workload identity preferences, posture checks, and conditions
-  retain their existing contracts. Default-scope compilation requires an
-  enabled tool rule; it does not turn omission or disabled enforcement into
-  signed wildcard authority.
+These tests validate local policy behavior and compiler output. Callers own
+runtime installation and acceptance of policy assets and context providers.

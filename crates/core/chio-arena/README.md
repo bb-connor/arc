@@ -1,88 +1,84 @@
 # chio-arena
 
-`chio-arena` is a deterministic scenario runner for the Chio kernel. It parses
-a TOML scenario DSL, schedules and dispatches tool calls against a real
-`ChioKernel`, and records the resulting signed receipts into replay-compatible
-bundles. It also mutates and co-evolves adversary populations against the
-kernel's guard pipeline, and can auto-promote failing scenarios into the
-fixture and adversarial-suite corpora.
+Scenario parsing, deterministic scheduling, kernel evaluation, and replay
+artifact generation for Chio tests. Callers supply configured kernels and
+`ToolCallRequest` values; the arena compares their results with scenario
+expectations and collects the kernel's signed receipts.
 
-## Responsibilities
-
-- Parse and validate the `chio.arena.scenario/v1` TOML DSL, rejecting
-  unsupported schema/scheduler/locale, duplicate ids, dangling agent
-  references, inline secrets, and provider-SDK markers before a run starts.
-- Schedule scenario steps into a deterministic total order and dispatch them
-  to a `ChioKernel` (single-agent, or multi-agent via an in-process kernel
-  link), asserting each step's actual verdict against its declared
-  `expect_verdict`.
-- Generate, mutate, and cross-breed adversary populations (prompt injection,
-  capability overrequest, replay attempt, scope escape) through an
-  N-generation co-evolution loop scored against a toy fail-closed guard
-  evaluator.
-- Write replay-compatible receipt bundles and auto-promote failing runs into
-  the fixture corpus (`CHIO_BLESS`-gated) and the `chio-adversarial-suite`
-  case corpus.
-- Render a ranked leaderboard (`chio.arena.leaderboard/v1`) from a
-  co-evolution fitness report.
-
-## Public API
-
-- **Scenario** - `load_scenario`, `parse_scenario_str` parse and validate the
-  `chio.arena.scenario/v1` DSL into a `Scenario` (`ScenarioStep`,
-  `ScenarioVerdict`, `DeterminismWitness`); `ScenarioError` reports
-  fail-closed validation failures. Agent, budget, guard, and adversary block
-  types live in the `scenario` module.
-- **Determinism primitives** - `VirtualClock` (sole time authority), `ArenaRng`
-  (seeded `ChaCha20Rng` root plus per-agent sub-streams),
-  `DeterministicScheduler` (total order over scenario steps).
-- **Runtime** - `ArenaRuntime::run` / `run_multi_agent` dispatch scenario
-  steps to a `ChioKernel` and return an `ArenaRun` of `ArenaReceipt`s;
-  `KernelStepRequest`, `AgentKernelBinding`, `shared_kernel_bindings`.
-  Multi-agent cross-kernel calls route through `KernelLink` /
-  `KernelMultiplexer`.
-- **Adversary** - the `Adversary` trait, `AdversaryPopulation`,
-  `AdversaryClass`, `population_from_block`, and the four concrete
-  adversaries (`PromptInjectionAdversary`, `CapabilityOverrequestAdversary`,
-  `ReplayAttemptAdversary`, `ScopeEscapeAdversary`). `evaluate_against_guards`
-  is the toy fail-closed guard oracle their unit tests assert against.
-- **Co-evolution** (`coevolve` module) - `run_coevolution` drives generations
-  of `mutate_population`, `crossover_populations`, and `evaluate_population`
-  over `PopulationBlueprint`s, seeded via `load_seed_corpus` from
-  `fuzz/artifacts/` and the replay fixture families.
-- **Promotion and reporting** - `write_arena_bundle` writes a
-  replay-compatible bundle plus `arena.json`; `promote_to_fixtures` /
-  `promote_to_adversarial_suite` auto-promote failing runs (the former gated
-  by `ArenaPromotionGate` / `BlessEnv`); `render_leaderboard` ranks a
-  `FitnessReport` into `chio.arena.leaderboard/v1` JSON and Markdown.
+The crate also provides adversary populations, a toy guard evaluator,
+co-evolution, promotion helpers, and JSON/Markdown leaderboards.
 
 ## Usage
 
-```rust
-use chio_arena::{load_scenario, write_arena_bundle, ArenaRuntime, KernelStepRequest};
+Parse and schedule a scenario without a kernel, services, or file writes:
 
-let scenario = load_scenario("arena/scenarios/walking_skeleton.toml")?;
-// kernel: Arc<ChioKernel>, tool servers and capability already set up by the caller.
-let runtime = ArenaRuntime::new(kernel);
-let run = runtime
-    .run(&scenario, vec![KernelStepRequest { step_id: "step-1".into(), request }])
-    .await?;
-write_arena_bundle("target/arena/walking_skeleton", &scenario, &run)?;
+```rust
+use chio_arena::{parse_scenario_str, DeterministicScheduler};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let scenario = parse_scenario_str(r#"
+schema_version = "chio.arena.scenario/v1"
+id = "example"
+title = "One recorded step"
+rng_seed = 42
+virtual_clock_start = "2026-04-30T00:00:00Z"
+
+[determinism]
+rng_seed = 42
+virtual_clock_start = "2026-04-30T00:00:00Z"
+scheduler = "single-agent-v1"
+locale = "C"
+
+[[agents]]
+id = "agent-a"
+role = "operator"
+model = "recorded:test-agent"
+seed_prompt_ref = "prompts/example.txt"
+
+[[steps]]
+id = "step-1"
+agent = "agent-a"
+server = "filesystem"
+tool = "read_file"
+arguments = { path = "/tmp/example.txt" }
+expect_verdict = "allow"
+"#)?;
+    let scheduler = DeterministicScheduler::from_scenario(&scenario)?;
+    assert_eq!(scheduler.schedule()[0].step_id, "step-1");
+    Ok(())
+}
 ```
 
-## Testing
+For kernel-backed runs, use `ArenaRuntime::run` with one agent or
+`run_multi_agent` with `AgentKernelBinding` values. Construct capabilities,
+guards, tool servers, and requests in the calling harness.
 
-`cargo test -p chio-arena`
+## Guarantees
 
-`tests/determinism_gate.rs` re-runs the three reference scenarios under
-`arena/scenarios/` twice and asserts byte-identical schedules, RNG snapshots,
-clock traces, and verdict traces. CI runs it under `LC_ALL=C` and
-`CARGO_INCREMENTAL=0` via the `chio-arena-determinism.yml` workflow.
+- `parse_scenario_str` calls `validate_scenario`, rejecting unsupported schema,
+  scheduler, locale, mismatched witnesses, duplicate ids, invalid references,
+  and recognized inline-secret and provider markers.
+- `DeterministicScheduler` assigns declaration-order virtual slots and orders
+  by virtual time, agent id, and per-agent step counter.
+- `ArenaRuntime` checks request count, step IDs, and expected verdicts, returning
+  typed errors for mismatches and kernel failures. The harness owns matching
+  each request's server, tool, arguments, and agent content to its scenario step.
+- `write_arena_bundle` checks scenario identity and receipt step membership,
+  canonicalizes receipt data, and writes replay artifacts with `arena.json`.
 
-## See also
+## Status
 
-- `chio-kernel` - the kernel every scenario step is dispatched against.
-- `chio-replay-corpus` - the receipt bundle format `write_arena_bundle` writes.
-- `chio-tee-frame` - the frame schema wrapped around each receipt.
-- `chio-adversarial-suite` - target corpus for `promote_to_adversarial_suite`.
-- `chio-cli` - exposes this crate as `chio arena run/replay/evolve`.
+Implemented test-support library, marked `publish = false`. Co-evolution scores
+against `evaluate_against_guards`, a toy evaluator. Virtual-clock advancement
+in the multi-agent runtime does not replace the kernel's clock or randomness.
+Replay frames carry a synthetic tenant signature. Adversarial promotion emits
+an arena envelope requiring conversion before the suite loader can accept it.
+These artifacts establish test evidence within those boundaries.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [Adversarial suite](../chio-adversarial-suite/README.md)
+- [Kernel](../../kernel/chio-kernel/README.md)
+- [License](../../../LICENSE)

@@ -1,114 +1,72 @@
 # chio-runtime architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-runtime` is a stability facade, not an implementation. `chio-runtime-core`
-implements live runtime admission, trust-floor tracking, orchestration
-planning, evidence and proof handling, and provider health for
-kernel-mediated cross-vendor and swarm workflows; `chio-runtime` forwards
-every call to it. `chio-kernel` is the trusted computing base and owns the
-`RuntimeAdmissionHook` extension point; `chio-runtime`'s
-`ChioRuntimeAdmissionHook<S>` implements that trait so a configured hook can
-be registered with the kernel's admission pipeline. The crate itself performs
-no I/O and holds no state beyond hook configuration; every store operation
-and file/database access happens inside `chio-runtime-core`.
+This crate is the public runtime admission and orchestration facade.
+It owns `ChioRuntimeError`, `ChioRuntimeAdmissionInput`, store wrappers,
+and `ChioRuntimeAdmissionHook` at the application boundary.
+Most report and artifact types alias the runtime-core definitions.
+The facade delegates verification to one implementation in `chio-runtime-core`.
+Native tool dispatch and signed receipts remain kernel responsibilities.
+Applications supply profiles, verifier keys, stored evidence, and host policy.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public facade: 60 `pub type` aliases onto `chio_runtime_core` types, 33 owned `CHIO_RUNTIME_*` schema constants, `ChioRuntimeAdmissionHook<S>`, `ChioRuntimeError`, `ChioRuntimeAdmissionInput`, and 76 wrapped parse / validate / sign / generate / hash functions. |
-| `src/stores.rs` | `ChioRuntimeAdmissionStore` and `ChioRuntimeTrustFloorStore` traits; five store backends (`InMemoryRuntimeAdmissionStore`, `JsonRuntimeAdmissionStore`, `JsonRuntimeTrustFloorStateStore`, `LayeredRuntimeAdmissionStore`, `SqliteRuntimeOrchestrationStore`); the crate-private `RuntimeCoreAdmissionStoreAdapter` that lets a Chio store satisfy `chio_runtime_core::RuntimeAdmissionStore`. |
+- `lib.rs` exports artifact types, schema constants, parsers, and report functions.
+- It translates runtime-core errors into the facade's owned error type.
+- `stores.rs` implements facade store traits and wraps implementation backends.
+- `stores/replay_source.rs` exposes qualified SQLite replay-source operations.
+- `admission_hook.rs` defines the owned hook and delegates kernel hook callbacks.
+- `RuntimeCoreAdmissionStoreAdapter` translates the facade trait into the core trait.
+- Type aliases preserve the underlying artifact representation.
 
-## Call boundary
+## Data and control flow
 
-Every public function, with two exceptions, follows the same shape: call the
-same-named `chio_runtime_core` function, then pass the result through
-`wrap_runtime`, which maps `Err(chio_runtime_core::ChioRuntimeError)` into
-`ChioRuntimeError { code, source }` and preserves `source.code()` as the
-public `code()`. `unwrap_runtime` runs the reverse conversion at the point
-where `chio-runtime-core` calls back into a Chio-owned store through
-`RuntimeCoreAdmissionStoreAdapter`.
+`evaluate_runtime_admission` adapts `ChioRuntimeAdmissionInput` to the core input.
+The store adapter forwards evidence lookup, reservations, and trust-floor transitions.
+The core returns an accepted or rejected admission report, or an error.
+The facade converts errors while preserving their codes.
+Store wrappers forward insertion and orchestration operations to their inner stores.
+The hook retains profile and trust/policy configuration.
+It forwards kernel admission and dispatch-revalidation work to the core verifier.
+`with_swarm_witness_keys` supplies pinned keys for stored swarm evidence.
+`with_operation_owned_runtime_replay` supplies an explicit participant binding.
+JSON and SQLite wrappers expose distinct persistence and concurrency boundaries.
+`LayeredRuntimeAdmissionStore` separates admission evidence from trust-floor storage.
+Its constituent backends still must satisfy the operation's required contract.
 
-`validate_runtime_orchestration_evidence_binding` and
-`validate_runtime_orchestration_evidence_integrity` bypass the wrapper and
-return `RuntimeOrchestrationEvidenceFailure` directly; `runtime_orchestration_evidence_is_fresh`
-is infallible and returns `bool`.
+## Trust and invariants
 
-`runtime_provider_bindings_from_json` adds a step `chio-runtime-core`'s own
-parser does not perform: after `serde_json` deserialization it calls
-`validate_runtime_provider_bindings`, so a well-formed but semantically
-invalid payload (for example two bindings sharing a `providerId`) is
-rejected before it reaches the caller.
-
-Admission hook evaluation rebuilds the core hook on every call.
-`ChioRuntimeAdmissionHook::evaluate` and `::release_reserved` both call a
-private `core_hook()` that clones the current configuration (trust input,
-pheromone policy and peer weights, swarm witness keys, fixed clock) into a
-fresh `chio_runtime_core::ChioRuntimeAdmissionHook` wrapping a
-`RuntimeCoreAdmissionStoreAdapter` that borrows `self.store`, then delegates
-to it.
-
-## Invariants and failure modes
-
-- `#![forbid(unsafe_code)]` at the crate root.
-- No wildcard re-export of `chio_runtime_core` and no direct re-export of its
-  schema constants (`tests/runtime_boundary.rs`, `tests/public_surface.rs`).
-- `ChioRuntimeAdmissionHook<S>` is bounded by the Chio-owned
-  `ChioRuntimeAdmissionStore`, never by `chio_runtime_core`'s store traits.
-- `ChioRuntimeTrustFloorStore` has a blanket impl for any
-  `T: ChioRuntimeAdmissionStore + ?Sized`, so every admission store is usable
-  wherever a trust-floor store is required.
-- `LayeredRuntimeAdmissionStore` routes its three trust-floor methods to a
-  separate `&dyn ChioRuntimeTrustFloorStore` and every other method to a
-  `&dyn ChioRuntimeAdmissionStore`, so admission-bundle and trust-floor state
-  can live in different backends.
-- `JsonRuntimeAdmissionStore` and `SqliteRuntimeOrchestrationStore` share one
-  `ChioRuntimeAdmissionStore` implementation via the
-  `impl_chio_runtime_admission_store_for_inner!` macro.
-- `SqliteRuntimeOrchestrationStore` is the fullest backend: beyond the
-  `ChioRuntimeAdmissionStore` surface it records run and step state and
-  evidence artifacts, reports status, recovery drills, and scheduler ticks,
-  and grants fenced run leases (`acquire_run_lease`, `heartbeat_run_lease`).
-  `register_run` inserts pending work once. Protected run, step and artifact
-  writers require the caller's `RuntimeRunLease`; they validate current durable
-  ownership, integer timestamp storage and exclusive expiry under the committing
-  IMMEDIATE transaction, after observing the store-owned clock. The step's
-  destructive-operation `lease_id` is separate evidence. One-shot consumers use
-  `acquire_current_run_lease` and `complete_run_write` to atomically commit all
-  progress and release ownership. The explicit-time scheduler APIs remain trusted
-  orchestration entry points. Registration never borrows their active token.
-- All five store wrapper types implement `Debug`
-  (`runtime_public_store_wrappers_are_debuggable` in `tests/runtime_boundary.rs`);
-  `JsonRuntimeTrustFloorStateStore`, `LayeredRuntimeAdmissionStore`, and
-  `SqliteRuntimeOrchestrationStore` use a hand-written `finish_non_exhaustive`
-  impl that omits the wrapped internals.
+Facade wrapping preserves the core admission checks.
+`accepted: false` is a valid returned report and must stop caller dispatch.
+The kernel hook performs enforcement at the actual mediated tool boundary.
+Stored swarm evidence must match the request, route, and pinned issuer keys.
+Single-use continuation reservation and destructive lease consumption use store operations.
+Trust-floor updates require atomic validation and recording.
+Process-local memory stores cannot provide restart-safe custody.
+JSON clones coordinate one open instance; separate opens require a serialized backend.
+SQLite replay APIs require sealed source verification and activated participant binding.
+Trait defaults reject unsupported sealed operation-owned replay.
+A configured hook or open database alone grants no tool capability.
+Canonical hashing, signature verification, and bounded parsers delegate to runtime-core.
+The facade does not provision provider services when generating their health reports.
 
 ## Dependencies
 
-- `chio-runtime-core` - the implementation this crate wraps: admission,
-  trust-floor, orchestration, pheromone policy, evidence, provider health,
-  and retention logic, plus the concrete store backends.
-- `chio-core-types` - `crypto::Keypair` for `sign_runtime_admission_report`;
-  `PublicKey` for `ChioRuntimeAdmissionHook::with_swarm_witness_keys`.
-- `chio-kernel` - defines `RuntimeAdmissionHook`, `RuntimeAdmissionContext`,
-  and `RuntimeAdmissionDecision`; `ChioRuntimeAdmissionHook<S>` implements
-  `RuntimeAdmissionHook` so the kernel can call into this crate as an
-  admission-hook plugin.
-- `chio-swarm-authority` - `SwarmAuthorityBundle`, stored and returned by the
-  admission stores for swarm continuation admission.
-- `chio-weights` - `card::ModelCard`, accepted by
-  `generate_runtime_provider_health_report_with_model_cards` and
-  `generate_runtime_provider_health_report_with_model_card_evidence`.
-- `serde` / `serde_json` - the `Serialize` bound on store insert helpers and
-  JSON (de)serialization throughout.
+`chio-runtime-core` owns the verifier and storage implementation.
+`chio-kernel` supplies runtime hook and operation-owned admission contracts.
+`chio-core-types` supplies schemas and cryptographic types.
+`chio-swarm-authority` and `chio-weights` supply exported evidence and policy types.
+Serde supports facade insertion and JSON serialization interfaces.
+There are no declared optional Cargo features.
 
-## Extension points
+## Verification
 
-- Implement `ChioRuntimeAdmissionStore` to back admission bundles, treaty and
-  swarm continuations, destructive leases, and trust-floor entries with a
-  custom backend; `ChioRuntimeTrustFloorStore` comes for free through the
-  blanket impl.
-- Wrap any `ChioRuntimeAdmissionStore` in `ChioRuntimeAdmissionHook::new` and
-  register the hook with `chio-kernel` as a `RuntimeAdmissionHook`
-  implementation.
+`tests/public_surface.rs` checks the source-level schema constant ownership convention.
+`tests/runtime_boundary.rs` checks runtime-owned errors, hooks, and stores.
+It also checks non-consuming immediate dispatch revalidation and replay-source behavior.
+`tests/reserved_caller.rs` covers authenticated reserved caller access.
+Run `cargo test -p chio-runtime` from the workspace root.
+Core integration tests provide the deeper evidence and storage mutation coverage.
+The README sample demonstrates the primary evaluation API's empty-store denial.
+These are local API and integration checks using controlled authority fixtures.

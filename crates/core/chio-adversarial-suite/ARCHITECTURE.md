@@ -1,69 +1,78 @@
 # chio-adversarial-suite architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-adversarial-suite` is a pure data and validation crate: no I/O on its
-default path, no async runtime, `#![forbid(unsafe_code)]`, and no dependency
-on any other `chio-*` crate. It exists so trust-boundary tests across the
-workspace share one corpus of malicious-but-well-formed inputs instead of each
-maintaining private fixtures. `chio-kernel-core`, `chio-attest-verify`, and
-`chio-conformance` each dev-depend on it to assert their guard, attestation,
-and threat-model layers deny every case.
+The public surface defines `AdversarialCase`, `AttackClass`, `ExpectedVerdict`,
+`CoverageCase`, and `CaseError`, plus bundled loaders and manifest types.
+A case owns its expected reason, threat identifier, pending flag, notes, and
+class-specific JSON artifact. The consumer owns attack execution and comparison
+of actual security decisions with those expectations.
 
-## Module map
+The loader validates the common envelope. It does not verify signatures,
+execute tools, enforce capability policy, or interpret each artifact's shape.
+`CoverageCase` wraps a validated non-pending envelope. This eligibility marker
+still requires evidence from a downstream harness before coverage is asserted.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Case envelope (`AdversarialCase`), embedded schema and corpus, semantic validation, `AttackClass`, `ExpectedVerdict`, `CaseError`, the coverage gate (`CoverageCase`), and the bundled-corpus loader functions. |
-| `src/manifest.rs` | `Manifest` / `ManifestEntry`: projects non-pending bundled cases into the cross-SDK manifest and renders it as canonical JSON. |
-| `schema/case.schema.json` | JSON Schema contract for on-disk case files; embedded verbatim as `CASE_SCHEMA_JSON`. |
-| `cases/<class>/*.json` | 40 vector files, 5 per attack class, embedded at compile time into `BUNDLED_CASES`. |
-| `manifest.json` | Checked-in canonical manifest; `tests/manifest_emit.rs` fails if it drifts from `Manifest::from_bundled()`. |
-| `tests/manifest_emit.rs` | Drift detection, per-class coverage checks, and an `#[ignore]`d regenerator. |
+## Structure
 
-## Case lifecycle
+- `src/lib.rs` contains the envelope, attack-class vocabulary, validation,
+  coverage wrapper, loading functions, and unit tests.
+- `src/bundled.rs` defines `BundledCase` and the `BUNDLED_CASES` static list;
+  `include_str!` embeds each listed vector at compile time.
+- `src/manifest.rs` defines `Manifest`, `ManifestEntry`, and stable producer
+  and schema constants, and renders the cross-SDK answer key.
+- `cases/` holds vectors grouped by class. `schema/case.schema.json` is also
+  exposed through `CASE_SCHEMA_JSON`; the Rust loader does not run a JSON
+  Schema validator.
 
-1. A case is authored as JSON under `cases/<class>/` and must satisfy
-   `schema/case.schema.json` (required fields, `additionalProperties: false`,
-   id/reason/threat-id patterns, `expected_verdict` fixed to `"DENY"`).
-2. `include_str!` embeds the file into `BUNDLED_CASES`; its class must already
-   be a variant of `AttackClass`.
-3. `AdversarialCase::from_slice` (or `from_path`, which reads the file from
-   disk) parses with `serde_json` under `deny_unknown_fields`, then `validate`
-   re-checks schema version, id/reason/threat-id character classes, non-empty
-   notes, and a non-empty object `artifact` in Rust, so a malformed case is
-   rejected the same way regardless of which layer sees it first.
-4. `into_coverage_case` rejects `pending: true`, yielding a `CoverageCase`
-   that callers may treat as real threat coverage.
-5. `manifest::Manifest::from_bundled` re-derives the corpus, drops pending
-   cases, checks each case id against its bundled path
-   (`CaseError::ManifestDrift` on mismatch), sorts by id, and hashes each
-   file's bytes into `content_sha256`; `tests/manifest_emit.rs` pins the
-   result against `manifest.json`.
+## Data and control flow
 
-## Invariants and failure modes
+`from_path` reads bytes and delegates to `from_slice`. The byte loader uses
+Serde JSON deserialization and then semantic validation. Errors propagate as
+`CaseError`, retaining I/O, JSON, and semantic failure categories.
 
-- Every bundled, non-pending case has `expected_verdict: DENY`; `ExpectedVerdict`
-  has no `Allow` variant, so any other value fails to parse.
-- `id` allows `^[a-z0-9][a-z0-9._-]*$`; `expected_reason` and `threat_id` both
-  require `^[a-z][a-z0-9_]*$`, enforced identically by the JSON Schema and the
-  Rust validators, so a padded, uppercase, or control-character reason string
-  fails closed in either layer.
-- `artifact` must be a non-empty JSON object; empty objects and non-object
-  values are rejected.
-- `pending: true` cases load for triage but are excluded from both
-  `into_coverage_case` and `Manifest::from_bundled`, so an untriaged
-  libFuzzer-promoted case cannot silently count as coverage.
-- A unit test (`every_non_pending_case_cites_a_known_threat_id` in
-  `src/lib.rs`) cross-checks every non-pending case's `threat_id` against
-  `spec/security/chio-threat-model.v1.json`, so a case cannot cite a threat
-  that does not exist in the workspace threat model.
-- `#[serde(deny_unknown_fields)]` on `AdversarialCase` and the manifest types
-  rejects unrecognized top-level fields.
+`bundled_cases` applies that loader to the embedded list in declaration order.
+`bundled_cases_by_class` loads the whole list before filtering. A malformed
+case in another class therefore also prevents that call from succeeding.
+`bundled_coverage_cases` converts every case through `into_coverage_case` and
+fails when any pending case is encountered.
+
+`Manifest::from_bundled` loads the corpus, checks each path suffix against its
+case id, skips pending entries, and hashes each included file's original bytes.
+It sorts entries by id and records their count. Consumers can use those hashes
+to detect changes to case files, including whitespace changes.
+
+## Trust and invariants
+
+Serde rejects unknown envelope fields and verdicts outside the single `DENY`
+variant. `validate` requires schema version 1, restricted identifier/reason/
+threat-id syntax, nonblank supplied notes, and a nonempty object artifact.
+Direct construction is public; callers should validate before using an envelope.
+`into_coverage_case` repeats validation before granting the coverage wrapper.
+
+The manifest is unsigned metadata. `to_canonical_json` uses Serde's pretty
+serialization in struct field order and appends a newline. Despite the API
+name, this is not an RFC 8785 signing canonicalizer. Its guarantee is stable
+output for the same manifest value under the serializer used here.
+The checked-in manifest's byte equality is enforced by integration tests.
+Deserializing a `Manifest` alone does not recheck counts or content hashes.
 
 ## Dependencies
 
-External only: `serde` and `serde_json` for the case and manifest schema,
-`sha2` and `hex` for manifest content hashing, `thiserror` for `CaseError`. No
-internal `chio-*` dependency. `chio-kernel-core`, `chio-attest-verify`, and
-`chio-conformance` each pull this crate in under `[dev-dependencies]`.
+`serde` and `serde_json` implement envelopes and opaque artifact values.
+`sha2` hashes original case bytes, and `hex` encodes manifest hashes.
+`thiserror` defines load and validation errors. The crate has no Chio runtime
+dependency and declares no Cargo features.
+
+## Verification
+
+Run `cargo test -p chio-adversarial-suite` from the workspace root.
+Unit tests cover malformed envelopes, schema and verdict rejection, pending
+coverage refusal, bundled loading, and manifest ordering and formatting.
+`tests/manifest_emit.rs` checks included classes and ids, bundled paths, and
+byte equality between the emitter and checked-in `manifest.json`.
+
+The ignored `regenerate` test rewrites that file only when explicitly invoked:
+`cargo test -p chio-adversarial-suite --test manifest_emit -- --ignored regenerate`.
+These checks establish corpus consistency. Concrete denial behavior is tested
+by the consuming trust-boundary crates.

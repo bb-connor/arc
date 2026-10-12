@@ -1,66 +1,60 @@
 # chio-external-guards
 
-`chio-external-guards` implements the concrete HTTP-backed guards in Chio's
-guard pipeline: three cloud content-safety guardrails (Azure Content Safety,
-AWS Bedrock, Vertex AI) and three threat-intelligence lookups (Google Safe
-Browsing, Snyk, VirusTotal). Each adapter validates its target endpoint,
-dispatches through a pinned `HttpEgressContract`, and maps the provider's
-response to a `chio_kernel::Verdict`.
+HTTP-backed guard adapters for Chio. Concrete adapters evaluate Bedrock,
+Azure Content Safety, Vertex safety, VirusTotal, Safe Browsing, and Snyk
+responses. Shared retry, cache, rate-limit, and circuit infrastructure comes
+from `chio-guards`.
 
-The generic async-adapter infrastructure (retry, caching, rate limiting,
-circuit breaker) lives in `chio-guards`; this crate supplies the
-provider-specific pieces plus `ScopedAsyncGuard`, the synchronous bridge that
-lets the kernel's synchronous guard pipeline call an async external guard.
+## Usage
 
-## Responsibilities
+Build a concrete adapter and kernel bridge without contacting a provider:
 
-- Implement `ExternalGuard` for six providers: Azure Content Safety, AWS
-  Bedrock `ApplyGuardrail`, Vertex AI safety ratings, Google Safe Browsing
-  v4, Snyk, and VirusTotal v3.
-- Validate every target endpoint before dispatch (scheme; loopback,
-  link-local, private, multicast, and CGNAT denial; live DNS resolution)
-  and pin the validated authority into an `HttpEgressContract` so redirects
-  cannot escape it.
-- Bridge the kernel's synchronous `Guard` trait to an async
-  `AsyncGuardAdapter` via `ScopedAsyncGuard`, with optional tool-name glob
-  scoping.
-- Build a `GuardEvidence` record from each provider's decision
-  (`evidence_from_decision`) for receipt attachment.
+```rust
+use std::sync::Arc;
+use chio_external_guards::{
+    AsyncGuardAdapter, SafeBrowsingConfig, SafeBrowsingGuard, ScopedAsyncGuard,
+};
+use chio_kernel::Guard;
 
-## Public API
+let provider = SafeBrowsingGuard::new(
+    SafeBrowsingConfig::new("example-key").with_base_url("http://127.0.0.1:8080"),
+)?;
+let adapter = AsyncGuardAdapter::builder(Arc::new(provider)).build();
+let guard = ScopedAsyncGuard::new(adapter, vec!["fetch_*".into()]);
+assert!(!guard.name().is_empty());
+# Ok::<(), chio_external_guards::ExternalGuardError>(())
+```
 
-| Guard | Config | Service |
-|-------|--------|---------|
-| `AzureContentSafetyGuard` | `AzureContentSafetyConfig` | Azure AI Content Safety `text:analyze` |
-| `BedrockGuardrailGuard` | `BedrockGuardrailConfig` | AWS Bedrock `ApplyGuardrail` |
-| `VertexSafetyGuard` | `VertexSafetyConfig` | Vertex AI `generateContent` safety ratings |
-| `SafeBrowsingGuard` | `SafeBrowsingConfig` | Google Safe Browsing v4 `threatMatches:find` |
-| `SnykGuard` | `SnykConfig` | Snyk per-package vulnerability lookup |
-| `VirusTotalGuard` | `VirusTotalConfig` | VirusTotal v3 hash/URL reputation |
+The example uses existing package dependencies and performs no request.
+Evaluation requires a service implementing the selected provider contract and
+valid credentials. Loopback HTTP is supported for local test endpoints.
 
-- `ScopedAsyncGuard<E>` - synchronous `chio_kernel::Guard` wrapping an
-  `AsyncGuardAdapter<E>`, scoped to tool-name glob patterns (`*`/`?`).
-- Each guard exposes `evidence_from_decision(verdict, details) ->
-  GuardEvidence`; provider decision-detail types (`AzureDecisionDetails`,
-  `BedrockDecisionDetails`, `VertexDecisionDetails`, and their
-  category/probability breakdowns) are re-exported alongside the guard.
-- `validate_external_guard_url`, `validate_external_guard_url_with_resolver`,
-  `validate_external_guard_url_without_dns`, `denied_external_guard_ip` -
-  endpoint allow/deny checks shared by every adapter.
-- `external::{AsyncGuardAdapter, ExternalGuard, ExternalGuardError,
-  GuardCallContext, CircuitBreaker, TokenBucket, TtlCache, RetryConfig,
-  ...}` - generic async-adapter infrastructure re-exported from
-  `chio-guards`.
+## Guarantees
 
-## Testing
+- `http_egress::send_request_with_contract` routes HTTP dispatch through the
+  shared egress contract with an authority allowlist and bounded responses.
+- `input::arguments` and `input::response` retain bounded original JSON for
+  duplicate-aware contract validation before provider projection.
+- `AsyncGuardAdapter::evaluate` maps exhausted or permanent errors to denial;
+  successful verdicts can be cached and count as circuit successes.
+- `ScopedAsyncGuard` normalizes tool patterns and matches `*` and `?`.
+  An empty pattern set evaluates every tool; unmatched tools pass through.
 
-`cargo test -p chio-external-guards`
+## Status
 
-## See also
+Implemented adapters translate provider responses into local verdicts.
+Repository tests use mock HTTP services and local guard contexts. They do not
+qualify credentials, API compatibility, or behavior against live upstreams.
+Provider thresholds, cache TTLs, and breaker/rate-limit verdicts are caller
+configuration. VirusTotal's recognized unseen response defaults to denial;
+explicit unseen allow is supported as a policy choice.
 
-- `chio-guards` - generic async guard-adapter infrastructure (retry, cache,
-  rate limit, circuit breaker) this crate builds on.
-- `chio-egress-contract` - the HTTP egress contract enforced on every
-  dispatch.
-- `chio-kernel` - the synchronous `Guard` pipeline `ScopedAsyncGuard` plugs
-  into.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Shared guard infrastructure](../chio-guards/README.md)
+- [Protocol HTTP egress contract](../../../spec/PROTOCOL.md#84-http-egress-contract-enforcement-w22)
+
+## License
+
+See [LICENSE](../../../LICENSE).

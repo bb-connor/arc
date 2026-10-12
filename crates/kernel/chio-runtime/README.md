@@ -1,139 +1,70 @@
 # chio-runtime
 
-`chio-runtime` is Chio's runtime admission and orchestration boundary: the
-public facade over `chio-runtime-core`, which implements live runtime
-admission for kernel-mediated cross-vendor and swarm workflows. It forwards
-every call to `chio-runtime-core`, converts its errors into a locally owned
-`ChioRuntimeError`, and owns its own schema constants and store traits so the
-public API can hold still while the implementation crate changes underneath
-it.
-
-Depend on `chio-runtime`, not `chio-runtime-core`, for the stable surface.
-`chio-runtime-core` is the implementation; `chio-kernel` is the trusted
-computing base whose `RuntimeAdmissionHook` extension point this crate's
-`ChioRuntimeAdmissionHook<S>` implements.
-
-## Responsibilities
-
-- Re-export a curated `chio-runtime-core` surface as 60 explicit `pub type`
-  aliases, with no wildcard re-export (`tests/runtime_boundary.rs` enforces
-  this).
-- Own 33 `CHIO_RUNTIME_*` schema constants as locally declared string
-  literals rather than re-exports, decoupling the public wire-schema names
-  from `chio-runtime-core`'s internal schema module (`tests/public_surface.rs`
-  enforces this).
-- Convert every `chio-runtime-core` error into `ChioRuntimeError` so callers
-  never observe a `chio_runtime_core::ChioRuntimeError`.
-- Own `ChioRuntimeAdmissionStore` and `ChioRuntimeTrustFloorStore`, the store
-  traits callers implement, and adapt them into `chio-runtime-core`'s store
-  traits through a private adapter.
-- Implement `chio_kernel::RuntimeAdmissionHook` for `ChioRuntimeAdmissionHook<S>`
-  so a configured hook can be registered with the kernel's admission
-  pipeline.
-- Ship five store backends: in-memory, JSON-file, SQLite-backed
-  orchestration storage, and a layered combinator that splits
-  admission-bundle and trust-floor storage across two backends.
-- Revalidate provider bindings on parse: `runtime_provider_bindings_from_json`
-  calls `validate_runtime_provider_bindings` after deserializing, rejecting
-  duplicates the underlying core parser alone would accept.
-
-## Public API
-
-Re-exported from `chio-runtime-core` as `pub type` aliases (see `src/lib.rs`
-for the complete list):
-
-- Admission - `RuntimeAdmissionProfile`, `RuntimeAdmissionBundle`,
-  `RuntimeAdmissionCheck`, `RuntimeAdmissionReport`, `SignedRuntimeAdmissionReport`.
-- Trust floor - `RuntimeTrustFloorEntry`, `RuntimeTrustFloorState`,
-  `RuntimeVerifierTrustBundleV4`, `SignedRuntimeVerifierTrustBundle`,
-  `RuntimeTrustedVerifierKey`, `RuntimeTrustedVerifierKeysDocument`.
-- Pheromone and peer weights - `RuntimePheromoneAdvisory`,
-  `RuntimePheromonePolicy`, `RuntimePheromonePolicyDecision`,
-  `RuntimePheromonePolicyRule`, `RuntimePeerWeight`, `RuntimePeerWeights`, and
-  their `Signed*` counterparts.
-- Orchestration - `RuntimeOrchestrationProfile`, `RuntimeRunContract`,
-  `RuntimeOrchestrationPlan`, `RuntimeOrchestrationPlannedStep`,
-  `RuntimeOrchestrationRunReport`, `RuntimeOrchestrationResumePlan`,
-  `RuntimeOrchestrationStatusReport`, `RuntimeOrchestrationStepState`.
-- Evidence and proof - `RuntimeEvidenceManifest`, `RuntimeEvidenceManifestEntry`,
-  `RuntimeStepEvidence`, `RuntimeWorkflowRunReport`, `RuntimeOrchestrationEvidence`,
-  `RuntimeOrchestrationEvidenceFailure`, `RuntimeProofRegenerationInput`,
-  `RuntimeProofRegenerationReport`, `RuntimeProofParityReport`,
-  `RuntimeProofParityMismatch`, `RuntimeProofDriftReport`, `RuntimeProofArtifactDrift`.
-- Provider, ops and recovery - `RuntimeProviderBinding`,
-  `RuntimeProviderBindingsDocument`, `RuntimeProviderHealthCheck`,
-  `RuntimeProviderHealthReport`, `RuntimeProviderLoadedWeightsEvidence`,
-  `WeightsBindingMode`, `RuntimeOpsStatusReport`, `RuntimeRecoveryDrillReport`,
-  `RuntimeSchedulerTickReport`, `RuntimeEvidenceSinkHealthReport`.
-- Retention - `RuntimeArtifactRetentionProfile`, `RuntimeArtifactRetentionPlan`,
-  `RuntimeArtifactRetentionAction`.
-- Supervisor and swarm - `RuntimeSupervisorProfile`, `RuntimeRunLease`,
-  `SwarmAuthorityBundle` (from `chio-swarm-authority`), `TreatyRuntimeArtifactRecord`.
-
-Owned in this crate:
-
-- `ChioRuntimeError` - wraps the `chio-runtime-core` error; `code()` returns
-  a stable `&'static str` failure code.
-- `ChioRuntimeAdmissionHook<S: ChioRuntimeAdmissionStore>` - implements
-  `chio_kernel::RuntimeAdmissionHook`; configure with `with_runtime_trust_input`,
-  `with_pheromone_query_report`, `with_runtime_pheromone_policy`,
-  `with_swarm_witness_keys`, `with_fixed_now_unix_ms`.
-- `ChioRuntimeAdmissionInput` - input struct for `evaluate_runtime_admission`.
-- `stores::{ChioRuntimeAdmissionStore, ChioRuntimeTrustFloorStore}` plus five
-  backends: `InMemoryRuntimeAdmissionStore`, `JsonRuntimeAdmissionStore`,
-  `JsonRuntimeTrustFloorStateStore`, `LayeredRuntimeAdmissionStore`,
-  `SqliteRuntimeOrchestrationStore`.
-- 76 `runtime_*_from_json` / `runtime_*_json` / `validate_runtime_*` /
-  `generate_runtime_*` / `*_sha256` free functions, each wrapping the
-  matching `chio-runtime-core` call.
+The public Chio runtime admission and orchestration facade.
+It provides runtime-owned errors, stores, and admission hooks while delegating
+evaluation to `chio-runtime-core`.
+Applications can use this boundary without naming the implementation store traits.
 
 ## Usage
 
-The facade forwards `with_operation_owned_runtime_replay` to the core hook and
-preserves its strict source-verification and cleanup contracts. This opt-in
-profile requires explicit activation in the qualified SQLite admission
-authority after legacy invocations have been quiesced. The setter is not an
-activation operation; unsupported backends and fixed clock overrides reject.
-See [operation-owned replay custody](../chio-runtime-core/README.md#operation-owned-replay-custody)
-for the backend and lifecycle requirements. Broader launch qualification remains
-tracked in the security roadmap.
+Evaluate a request against an empty process-local store to observe closed admission:
 
 ```rust
 use chio_runtime::{
-    ChioRuntimeAdmissionHook, InMemoryRuntimeAdmissionStore, RuntimeAdmissionProfile,
-    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+    evaluate_runtime_admission, ChioRuntimeAdmissionInput, InMemoryRuntimeAdmissionStore,
+    RuntimeAdmissionProfile, RuntimeRequestBinding, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
 };
 
 let store = InMemoryRuntimeAdmissionStore::new();
-let hook = ChioRuntimeAdmissionHook::new(
-    RuntimeAdmissionProfile {
-        schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.to_string(),
-        profile_id: "profile-1".to_string(),
-        local_kernel_id: "kernel.vendor-b".to_string(),
-        verifier_id: "did:chio:buyer-verifier".to_string(),
-        issued_at_unix_ms: 1_800_000_000_000,
-        expires_at_unix_ms: 1_800_003_600_000,
-    },
-    store,
-);
-// `hook` implements `chio_kernel::RuntimeAdmissionHook` and registers with
-// the kernel's admission pipeline.
+let profile = RuntimeAdmissionProfile {
+    schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
+    profile_id: "example".into(), local_kernel_id: "kernel-local".into(),
+    verifier_id: "verifier-local".into(),
+    issued_at_unix_ms: 1_000, expires_at_unix_ms: 3_000,
+};
+let request = RuntimeRequestBinding {
+    request_id: "request-1".into(), capability_id: "capability-1".into(),
+    server_id: "tools".into(), tool_name: "read".into(),
+    tool_args_sha256: "0".repeat(64), origin_kernel_id: None,
+    host_kernel_id: "kernel-local".into(),
+};
+let report = evaluate_runtime_admission(ChioRuntimeAdmissionInput {
+    profile: &profile, store: &store, admission_id: "admission-1", request: &request,
+    action_class_id: None, runtime_trust_input: None, trusted_verifier_keys: &[],
+    pheromone_query_report: None, runtime_pheromone_policy: None,
+    runtime_peer_weights: None, now_unix_ms: 2_000,
+})?;
+assert!(!report.accepted);
+assert_eq!(report.failure_code.as_deref(), Some("missing_admission_bundle"));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Testing
+The sample uses ordinary dependencies, needs no services, and writes no files.
+Admission requires a fresh profile and an exactly bound stored bundle.
+Verifier trust input is optional when the trusted-key set is empty; supplying
+trusted keys requires matching signed trust input. Selected policies can add requirements.
+A kernel host installs `ChioRuntimeAdmissionHook` to mediate actual dispatch.
 
-`cargo test -p chio-runtime`
+## Guarantees
 
-`tests/runtime_boundary.rs` loads swarm-authority fixtures from the repo-root
-`fixtures/proof-room/swarm-authority/` directory via `include_str!`.
+- `evaluate_runtime_admission` checks profile freshness and exact stored request binding.
+- `ChioRuntimeAdmissionHook` resolves treaty and swarm evidence from its store.
+- Trust-floor transitions require atomic validation and recording by the backend.
+- Destructive leases and single-use continuations use store reservation operations.
+- Operation-owned replay requires an explicitly bound, verified replay source.
 
-## See also
+## Status
 
-- `chio-runtime-core` - the implementation this crate wraps; not part of the
-  stable public API.
-- `chio-kernel` - the trusted computing base; defines the `RuntimeAdmissionHook`
-  extension point this crate's `ChioRuntimeAdmissionHook<S>` implements.
-- `chio-swarm-authority` - supplies `SwarmAuthorityBundle`, stored and served
-  by the admission stores.
-- `chio-weights` - supplies `card::ModelCard`, accepted by the
-  model-card-aware provider health report generators.
+Implemented admission and local orchestration APIs with no declared Cargo features.
+Memory stores retain state for one process. JSON stores coordinate clones of one
+instance; independent opens require SQLite for serialized transitions.
+Memory and JSON backends do not qualify sealed operation-owned replay by default.
+Report generation requires caller-supplied evidence and provider observations.
+These APIs do not launch an external provider service or certify a deployment.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Capability verification](../../../spec/PROTOCOL.md#53-verification-rules)
+- [Runtime implementation](../chio-runtime-core/README.md)
+- [License](../../../LICENSE)

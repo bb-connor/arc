@@ -1,69 +1,56 @@
 # chio-adversarial-suite
 
-Curated corpus of malicious-but-well-formed adversarial cases for Chio's trust
-boundary, plus the loader and validation that give the corpus one schema.
-Concrete vectors live under `cases/`, grouped by attack class. The crate has
-no dependency on any other `chio-*` crate: it is pure data and validation,
-consumed by downstream test suites as a deny-assertion answer key.
+Shared adversarial case envelopes, embedded vectors, and a cross-SDK manifest
+for Chio trust-boundary tests. Downstream harnesses use the expected denial
+and reason to exercise their own enforcement code.
 
-## Responsibilities
-
-- Define the on-disk case envelope (`AdversarialCase`) and enforce it two
-  ways: a JSON Schema (`schema/case.schema.json`, exposed as
-  `CASE_SCHEMA_JSON`) and semantic Rust validation (`AdversarialCase::validate`).
-- Embed the full corpus (40 case files, 5 per attack class) at compile time
-  via `include_str!` into `BUNDLED_CASES`, so consumers need no filesystem
-  access.
-- Exclude untriaged (`pending: true`) cases from coverage through
-  `into_coverage_case` / `CoverageCase`.
-- Produce a deterministic cross-SDK manifest (`manifest::Manifest`) pinning
-  each non-pending case's id, class, expected verdict and reason, threat id,
-  path, and content sha256, checked in at `manifest.json`.
-
-## Public API
-
-- `AdversarialCase` - the case envelope; `from_slice`, `from_path`, `validate`,
-  `into_coverage_case`.
-- `CoverageCase` - a validated, non-pending case; `as_case`, `into_inner`.
-- `bundled_cases`, `bundled_coverage_cases`, `bundled_cases_by_class` - load
-  the embedded corpus.
-- `AttackClass` - the 8 attack classes, with `as_str` for the stable
-  snake_case tag; `ATTACK_CLASSES` lists them all.
-- `BUNDLED_CASES`, `CASE_SCHEMA_VERSION`, `CASE_SCHEMA_JSON`.
-- `ExpectedVerdict` - a single `Deny` variant (`"DENY"` on the wire).
-- `CaseError` - load and validation failures, including `ManifestDrift`.
-- `manifest::{Manifest, ManifestEntry, MANIFEST_PRODUCER, MANIFEST_SCHEMA_VERSION}`,
-  re-exported at the crate root.
+The crate loads metadata and payloads; executing an attack and checking a
+security decision belong to the consuming harness.
 
 ## Usage
 
-```rust
-use chio_adversarial_suite::{bundled_cases_by_class, AttackClass, CaseError};
+Load replay cases without reading files or contacting services:
 
-fn kernel_denies_replays() -> Result<(), CaseError> {
-    for case in bundled_cases_by_class(AttackClass::ReplayedNonce)? {
-        let coverage_case = case.into_coverage_case()?;
-        // assert the trust boundary under test denies
-        // `coverage_case.as_case()` with its `expected_reason`.
+```rust
+use chio_adversarial_suite::{bundled_cases_by_class, AttackClass, CaseError, ExpectedVerdict};
+
+fn main() -> Result<(), CaseError> {
+    let cases = bundled_cases_by_class(AttackClass::ReplayedNonce)?;
+    assert!(!cases.is_empty());
+    for case in cases {
+        let coverage = case.into_coverage_case()?;
+        assert_eq!(coverage.as_case().expected_verdict, ExpectedVerdict::Deny);
     }
     Ok(())
 }
 ```
 
-## Testing
+This validates case eligibility. A harness must separately compare its actual
+verdict and reason against the case. `Manifest::from_bundled()` produces the
+non-pending manifest with hashes of the embedded JSON bytes.
 
-`cargo test -p chio-adversarial-suite`
+## Guarantees
 
-`tests/manifest_emit.rs` fails if `manifest.json` drifts from a freshly
-computed `Manifest::from_bundled()`. After adding or editing a case,
-regenerate it with:
+- `AdversarialCase::from_slice` parses an envelope with unknown fields rejected
+  and calls `validate` for schema version, identifier syntax, nonblank supplied notes,
+  and a nonempty object artifact.
+- `ExpectedVerdict` accepts only `DENY` during deserialization.
+- `into_coverage_case` validates again and rejects `pending: true`.
+- `Manifest::from_bundled` rejects path/id drift, skips pending cases, sorts
+  entries by id, and pins raw case bytes with SHA-256.
 
-```
-cargo test -p chio-adversarial-suite --test manifest_emit -- --ignored regenerate
-```
+## Status
 
-## See also
+Implemented test-support library, marked `publish = false`. Class-specific
+artifact interpretation and security enforcement remain in downstream tests.
+The bundled corpus includes pending cases, so loading all coverage cases can
+return `CaseError::PendingCase`. Manifest membership alone establishes no
+release or deployment qualification.
 
-- `chio-kernel-core`, `chio-attest-verify`, `chio-conformance` - dev-depend on
-  this crate to deny-assert their guard, attestation, and threat-model
-  coverage against the bundled corpus.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [Arena](../chio-arena/README.md)
+- [Case schema](schema/case.schema.json)
+- [License](../../../LICENSE)
