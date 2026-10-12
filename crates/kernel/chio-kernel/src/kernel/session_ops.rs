@@ -285,6 +285,7 @@ impl ChioKernel {
 
     pub(crate) fn build_resource_read_deny_receipt(
         &self,
+        request_id: &str,
         operation: &ReadResourceOperation,
         reason: &str,
     ) -> Result<ChioReceipt, KernelError> {
@@ -299,7 +300,7 @@ impl ChioKernel {
         })?;
 
         let receipt = self.build_and_sign_receipt(ReceiptParams {
-            request_id: None,
+            request_id: Some(request_id),
             capability_id: &operation.capability.id,
             tool_name: "resources/read",
             server_id: "session",
@@ -310,7 +311,7 @@ impl ChioKernel {
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
-            metadata: crate::kernel::receipt_identity::with_identity_disposition(
+            metadata: RefusalReceiptMetadata::new(
                 merge_metadata_objects(
                     Some(serde_json::json!({
                         "resource": {
@@ -320,7 +321,8 @@ impl ChioKernel {
                     receipt_attribution_metadata(&operation.capability, None)?,
                 ),
                 IdentityDisposition::Reusable,
-            ),
+            )
+            .into_signed_metadata(self.authenticated_receipt_namespace(request_id)?.digest()),
             timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
@@ -1016,7 +1018,11 @@ impl ChioKernel {
         match self.enforce_resource_roots(context, operation) {
             Ok(()) => {}
             Err(KernelError::ResourceRootDenied { reason, .. }) => {
-                let receipt = self.build_resource_read_deny_receipt(operation, &reason)?;
+                let receipt = self.build_resource_read_deny_receipt(
+                    context.request_id.as_str(),
+                    operation,
+                    &reason,
+                )?;
                 return Ok(SessionOperationResponse::ResourceReadDenied { receipt });
             }
             Err(error) => return Err(error),
