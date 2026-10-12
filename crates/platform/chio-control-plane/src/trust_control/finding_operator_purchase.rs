@@ -738,7 +738,6 @@ impl FindingOperatorPurchaseExecutor {
         self.payment_adapter
             .reconcile_expired_governed_intent(
                 &format!("intent-{}", request.request_id),
-                &request.request_id,
                 &reservation.payer_hex,
                 reservation.amount_units,
                 &reservation.currency,

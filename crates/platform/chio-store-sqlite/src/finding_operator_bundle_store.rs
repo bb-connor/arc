@@ -24,7 +24,7 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
 }
 
 const SCHEMA_KEY: &str = "finding_operator_bundle";
-const SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const SCHEMA_VERSION: i32 = 1;
 const SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_bundles",
     "chio_finding_payloads",
@@ -305,7 +305,7 @@ impl SqliteFindingOperatorBundleStore {
             .pool
             .get()
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        crate::check_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION, SCHEMA_ANCHORS)
+        crate::check_current_schema(&conn, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         conn.execute_batch(
             r#"
@@ -441,7 +441,7 @@ impl SqliteFindingOperatorBundleStore {
             "#,
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        crate::stamp_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION)
+        crate::stamp_schema_version(&conn, SCHEMA_KEY, SCHEMA_VERSION)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         Ok(())
     }

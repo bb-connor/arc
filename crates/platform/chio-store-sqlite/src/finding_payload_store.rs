@@ -30,7 +30,7 @@ use crate::encrypted_blob::{
 };
 
 const FINDING_PAYLOAD_SCHEMA_KEY: &str = "finding_payload";
-const FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const FINDING_PAYLOAD_SCHEMA_VERSION: i32 = 1;
 const FINDING_PAYLOAD_SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_bundles",
     "chio_finding_payloads",
@@ -150,10 +150,10 @@ impl SqliteFindingPayloadStore {
 
     fn run_migrations(&self) -> Result<(), FindingPayloadStoreError> {
         let conn = self.pool.get()?;
-        crate::check_schema_version(
+        crate::check_current_schema(
             &conn,
             FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION,
+            FINDING_PAYLOAD_SCHEMA_VERSION,
             FINDING_PAYLOAD_SCHEMA_ANCHORS,
         )
         .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
@@ -180,7 +180,7 @@ impl SqliteFindingPayloadStore {
         crate::stamp_schema_version(
             &conn,
             FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SUPPORTED_SCHEMA_VERSION,
+            FINDING_PAYLOAD_SCHEMA_VERSION,
         )
         .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
         Ok(())

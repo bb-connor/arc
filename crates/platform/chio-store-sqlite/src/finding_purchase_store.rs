@@ -31,8 +31,7 @@
 //! outcomes, retained without deletion and content-addressed against their
 //! stored digests. `payout_destinations` is the bounded sixteen-slot settled
 //! EVM destination set per allocation, with the community fund in slot zero
-//! and buyer destinations in the remaining slots. Pre-EVM rail destinations
-//! survive upgrades in `legacy_payout_destinations` as non-actionable history.
+//! and buyer destinations in the remaining slots.
 //!
 //! Writes run under `TransactionBehavior::Immediate` behind the
 //! serving-owner fence; reads run `Deferred`; a commit whose outcome
@@ -73,8 +72,7 @@ use crate::{admission_operation_store::verify_active_owner, store_connection::St
 #[path = "finding_purchase_public_request.rs"]
 mod public_request;
 use public_request::{
-    bind_public_terminal_if_present_tx, carry_prebinding_purchase_terminals,
-    insert_public_request_binding_tx, require_public_request_binding_tx,
+    bind_public_terminal_if_present_tx, insert_public_request_binding_tx, require_public_request_binding_tx,
     validate_public_request_binding,
 };
 pub use public_request::{
@@ -88,43 +86,7 @@ use reservation_input::{encumbrance_matches, reservation_matches, validate_reser
 mod operator_recovery;
 
 const FINDING_PURCHASE_SCHEMA_KEY: &str = "finding_purchase";
-/// Revision 12 retains pre-v11 terminals as undisclosable history; revision 11
-/// binds public policy to a reservation and terminal.
-/// Revision 10 records an immutable capture intent before a payment rail can
-/// move funds, preventing expiry from abandoning a captured purchase; revision
-/// 9 retains pre-EVM payout rows as non-actionable history; revision
-/// 8 makes new reservation payout capacity provisional until a settlement-capable
-/// purchase promotes it. Buyer slots already present in revisions 6 and 7 are
-/// retained because those schemas did not record whether a public admission or
-/// an eager reservation created them; revision 7 distinguishes retained legacy terminal
-/// bindings from live EVM bindings; revision 6 made every payout slot an EVM
-/// destination and reserved a buyer destination before funds can move; revision 5 separated the
-/// buyer-signed payout address from agent identity;
-/// revision 4 gave community-fund and buyer payout slots their distinct
-/// durable shapes. The schema batch is a sequence of idempotent guards, so
-/// a revision-1 database adopts the new tables on its next open; a
-/// revision-2 database also carries its listing-keyed blocks across in
-/// [`carry_listing_sales_blocks_across`].
-pub(crate) const FINDING_PURCHASE_SUPPORTED_SCHEMA_VERSION: i32 = 12;
-const FINDING_PURCHASE_PUBLIC_REQUEST_VERSION: i32 = 11;
-/// Revision whose reservation path eagerly admitted payout destinations.
-#[cfg(test)]
-const FINDING_PURCHASE_EAGER_PAYOUT_VERSION: i32 = 7;
-/// First revision with eager reservation payout admission. Its payout-binding
-/// table did not yet carry the revision-7 binding kind.
-#[cfg(test)]
-const FINDING_PURCHASE_UNTYPED_EAGER_PAYOUT_VERSION: i32 = 6;
-/// Revision that introduced the listing-keyed, never-lifted sales block.
-const FINDING_PURCHASE_LISTING_KEYED_BLOCK_VERSION: i32 = 2;
-/// Name the listing-keyed block table is parked under while the episode
-/// line is created beside it.
-const LEGACY_SALES_BLOCK_TABLE: &str = "listing_sales_blocks_legacy";
-/// Name the rail-only payout table is parked under while the slot-aware
-/// definition is created beside it.
-const LEGACY_PAYOUT_DESTINATIONS_TABLE: &str = "payout_destinations_legacy";
-/// Name the pre-v7 payout-binding table is parked under while its explicit
-/// binding-kind representation is created beside it.
-const LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE: &str = "purchase_payout_bindings_legacy";
+pub(crate) const FINDING_PURCHASE_SCHEMA_VERSION: i32 = 1;
 const FINDING_PURCHASE_SCHEMA_ANCHORS: &[&str] = &[
     "purchase_reservations",
     "admission_operations",
@@ -774,8 +736,8 @@ impl SqliteFindingPurchaseStore {
             .execute(
                 r#"
                 INSERT INTO purchase_payout_bindings (
-                    reservation_id, destination, binding_kind
-                ) VALUES (?1, ?2, 'evm')
+                    reservation_id, destination
+                ) VALUES (?1, ?2)
                 "#,
                 params![input.reservation_id, input.payout_destination],
             )
@@ -2052,7 +2014,6 @@ fn reserve_payout_destination_tx(
                 JOIN seller_exposure_encumbrances AS encumbrances
                   ON encumbrances.reservation_id = reservations.reservation_id
                 WHERE encumbrances.allocation_id = ?1
-                  AND bindings.binding_kind = 'evm'
                   AND reservations.state IN ('open', 'slot_reserved')
             )
             SELECT
@@ -2787,413 +2748,30 @@ fn slot_state_from_name(name: &str) -> Result<FindingPurchaseSlotState, FindingP
 pub(crate) fn initialize_finding_purchase_schema(
     connection: &mut Connection,
 ) -> Result<(), FindingPurchaseStoreError> {
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         connection,
         FINDING_PURCHASE_SCHEMA_KEY,
-        FINDING_PURCHASE_SUPPORTED_SCHEMA_VERSION,
+        FINDING_PURCHASE_SCHEMA_VERSION,
         FINDING_PURCHASE_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == FINDING_PURCHASE_SUPPORTED_SCHEMA_VERSION {
+    if state == crate::SchemaState::Current {
         return verify_finding_purchase_invariants(connection);
     }
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    park_listing_keyed_sales_blocks(&transaction, on_disk)?;
-    park_rail_only_payout_destinations(&transaction)?;
-    park_untyped_purchase_payout_bindings(&transaction)?;
     transaction
         .execute_batch(FINDING_PURCHASE_SCHEMA)
         .map_err(sqlite_error)?;
-    carry_prebinding_purchase_terminals(&transaction, on_disk)?;
-    carry_listing_sales_blocks_across(&transaction)?;
-    carry_payout_destinations_across(&transaction)?;
-    carry_legacy_reservation_payout_bindings(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         FINDING_PURCHASE_SCHEMA_KEY,
-        FINDING_PURCHASE_SUPPORTED_SCHEMA_VERSION,
+        FINDING_PURCHASE_SCHEMA_VERSION,
     )
     .map_err(|error| invariant(error.to_string()))?;
     verify_finding_purchase_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
-}
-
-/// Park a listing-keyed sales block table beside the schema batch so the
-/// batch can create the episode line under the canonical name.
-///
-/// `CREATE TABLE IF NOT EXISTS` leaves an existing definition alone and
-/// SQLite cannot re-key a table in place, so a database provisioned when a
-/// block was a single never-lifted row per listing keeps that shape until
-/// its rows are carried across. The two legacy triggers go with it: they
-/// are attached to the parked table under names the episode line reuses,
-/// and a surviving trigger would make the batch's `IF NOT EXISTS` guard
-/// skip the definition that replaces it.
-///
-/// Gated structurally as well as by revision, so it applies at most once
-/// and never touches a database that already carries the episode line.
-fn park_listing_keyed_sales_blocks(
-    transaction: &Transaction<'_>,
-    on_disk_version: i32,
-) -> Result<(), FindingPurchaseStoreError> {
-    if on_disk_version != FINDING_PURCHASE_LISTING_KEYED_BLOCK_VERSION {
-        return Ok(());
-    }
-    let definition: Option<String> = transaction
-        .query_row(
-            r#"
-            SELECT sql FROM sqlite_schema
-            WHERE type = 'table' AND name = 'listing_sales_blocks'
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some(definition) = definition else {
-        return Ok(());
-    };
-    if definition.contains("block_ordinal") {
-        return Ok(());
-    }
-    transaction
-        .execute_batch(&format!(
-            r#"
-            DROP TRIGGER IF EXISTS listing_sales_blocks_immutable;
-            DROP TRIGGER IF EXISTS listing_sales_blocks_no_delete;
-            ALTER TABLE listing_sales_blocks RENAME TO {LEGACY_SALES_BLOCK_TABLE};
-            "#
-        ))
-        .map_err(sqlite_error)?;
-    Ok(())
-}
-
-/// Move every parked block onto the episode line as that listing's first
-/// episode, still blocked, and drop the parked table once its rows are
-/// across.
-///
-/// A listing-keyed block was raised and never lifted, so carrying it as a
-/// live episode is what the listing's sales state already is: no listing
-/// silently starts selling again across the upgrade, and none is stranded
-/// under a block the reversal transition cannot reach. The copy is a plain
-/// `INSERT`, so a row the episode line's constraints reject aborts the
-/// open rather than being dropped.
-fn carry_listing_sales_blocks_across(
-    transaction: &Transaction<'_>,
-) -> Result<(), FindingPurchaseStoreError> {
-    let parked: bool = transaction
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1
-            )
-            "#,
-            [LEGACY_SALES_BLOCK_TABLE],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if !parked {
-        return Ok(());
-    }
-    let expected: i64 = transaction
-        .query_row(
-            &format!("SELECT COUNT(*) FROM {LEGACY_SALES_BLOCK_TABLE}"),
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    let carried = transaction
-        .execute(
-            &format!(
-                r#"
-                INSERT INTO listing_sales_blocks (
-                    listing_id, block_ordinal, state, blocked_at, lifted_at
-                )
-                SELECT listing_id, 1, 'blocked', blocked_at, NULL
-                FROM {LEGACY_SALES_BLOCK_TABLE}
-                "#
-            ),
-            [],
-        )
-        .map_err(sqlite_error)?;
-    if i64::try_from(carried).unwrap_or(i64::MAX) != expected {
-        return Err(invariant(format!(
-            "listing sales block migration carried {carried} of {expected} rows"
-        )));
-    }
-    transaction
-        .execute_batch(&format!("DROP TABLE {LEGACY_SALES_BLOCK_TABLE};"))
-        .map_err(sqlite_error)?;
-    Ok(())
-}
-
-/// Park an earlier payout table so the schema batch can create the
-/// all-EVM slot-aware definition under the canonical name.
-///
-/// The migration is gated by shape rather than only by revision because
-/// unstamped legacy databases also report revision zero. Dropping the
-/// explicit index and triggers before the rename releases the names the
-/// canonical table reuses. All of this runs in the schema transaction, so
-/// a later copy failure restores the old table and its protections.
-fn park_rail_only_payout_destinations(
-    transaction: &Transaction<'_>,
-) -> Result<(), FindingPurchaseStoreError> {
-    let definition: Option<String> = transaction
-        .query_row(
-            r#"
-            SELECT sql FROM sqlite_schema
-            WHERE type = 'table' AND name = 'payout_destinations'
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some(definition) = definition else {
-        return Ok(());
-    };
-    if definition.contains("slot_index BETWEEN 0 AND 15")
-        && definition.contains("substr(destination, 1, 2) = '0x'")
-        && definition.contains("substr(destination, 3) NOT GLOB '*[^0-9a-f]*'")
-    {
-        return Ok(());
-    }
-    transaction
-        .execute_batch(&format!(
-            r#"
-            DROP TRIGGER IF EXISTS payout_destinations_immutable;
-            DROP TRIGGER IF EXISTS payout_destinations_no_delete;
-            DROP INDEX IF EXISTS payout_destinations_slot;
-            ALTER TABLE payout_destinations RENAME TO {LEGACY_PAYOUT_DESTINATIONS_TABLE};
-            "#
-        ))
-        .map_err(sqlite_error)?;
-    Ok(())
-}
-
-/// Retain every destination parked from a pre-EVM schema as non-actionable
-/// history. Syntax alone cannot authenticate an old row as an EVM payout, so
-/// none is promoted into the actionable roster. The parked table is dropped
-/// only after every row is retained.
-fn carry_payout_destinations_across(
-    transaction: &Transaction<'_>,
-) -> Result<(), FindingPurchaseStoreError> {
-    let parked: bool = transaction
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1
-            )
-            "#,
-            [LEGACY_PAYOUT_DESTINATIONS_TABLE],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if !parked {
-        return Ok(());
-    }
-    let expected: i64 = transaction
-        .query_row(
-            &format!("SELECT COUNT(*) FROM {LEGACY_PAYOUT_DESTINATIONS_TABLE}"),
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    let carried = transaction
-        .execute(
-            &format!(
-                r#"
-                INSERT INTO legacy_payout_destinations (
-                    allocation_id, destination, slot_index, admitted_at
-                )
-                SELECT allocation_id, destination, slot_index, admitted_at
-                FROM {LEGACY_PAYOUT_DESTINATIONS_TABLE}
-                "#
-            ),
-            [],
-        )
-        .map_err(sqlite_error)?;
-    if i64::try_from(carried).unwrap_or(i64::MAX) != expected {
-        return Err(invariant(format!(
-            "payout destination migration carried {carried} of {expected} rows"
-        )));
-    }
-    transaction
-        .execute_batch(&format!("DROP TABLE {LEGACY_PAYOUT_DESTINATIONS_TABLE};"))
-        .map_err(sqlite_error)?;
-    Ok(())
-}
-
-/// Park the pre-v7 binding table so the new representation can distinguish
-/// actionable EVM bindings from opaque values retained only for terminal
-/// history.
-fn park_untyped_purchase_payout_bindings(
-    transaction: &Transaction<'_>,
-) -> Result<(), FindingPurchaseStoreError> {
-    let definition: Option<String> = transaction
-        .query_row(
-            r#"
-            SELECT sql FROM sqlite_schema
-            WHERE type = 'table' AND name = 'purchase_payout_bindings'
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some(definition) = definition else {
-        return Ok(());
-    };
-    if definition.contains("binding_kind") {
-        return Ok(());
-    }
-    transaction
-        .execute_batch(&format!(
-            r#"
-            DROP TRIGGER IF EXISTS purchase_payout_bindings_immutable;
-            DROP TRIGGER IF EXISTS purchase_payout_bindings_no_delete;
-            ALTER TABLE purchase_payout_bindings
-                RENAME TO {LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE};
-            "#
-        ))
-        .map_err(sqlite_error)?;
-    Ok(())
-}
-
-/// Recover both the short-lived revision-4 EVM-in-`agent_id` shape and
-/// older retained terminal reservations whose opaque agent identity cannot
-/// supply a live payout address.
-///
-/// Live `open` or `slot_reserved` rows without an authenticated EVM value
-/// still abort the upgrade: they could capture value later, so inventing a
-/// destination would be unsafe. Terminal rows cannot move value again and
-/// retain their historical representation explicitly as `legacy_terminal`.
-fn carry_legacy_reservation_payout_bindings(
-    transaction: &Transaction<'_>,
-) -> Result<(), FindingPurchaseStoreError> {
-    let parked: bool = transaction
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1
-            )
-            "#,
-            [LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if parked {
-        transaction
-            .execute(
-                &format!(
-                    r#"
-                    INSERT INTO purchase_payout_bindings (
-                        reservation_id, destination, binding_kind
-                    )
-                    SELECT bindings.reservation_id, lower(bindings.destination), 'evm'
-                    FROM {LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE} AS bindings
-                    WHERE length(bindings.destination) = 42
-                      AND substr(bindings.destination, 1, 2) = '0x'
-                      AND substr(bindings.destination, 3) NOT GLOB '*[^0-9A-Fa-f]*'
-                      AND lower(bindings.destination)
-                          <> '0x0000000000000000000000000000000000000000'
-                    "#
-                ),
-                [],
-            )
-            .map_err(sqlite_error)?;
-        transaction
-            .execute(
-                &format!(
-                    r#"
-                    INSERT INTO purchase_payout_bindings (
-                        reservation_id, destination, binding_kind
-                    )
-                    SELECT bindings.reservation_id, bindings.destination, 'legacy_terminal'
-                    FROM {LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE} AS bindings
-                    JOIN purchase_reservations AS reservations
-                      ON reservations.reservation_id = bindings.reservation_id
-                    WHERE reservations.state IN ('consumed', 'released', 'expired')
-                      AND NOT (
-                          length(bindings.destination) = 42
-                          AND substr(bindings.destination, 1, 2) = '0x'
-                          AND substr(bindings.destination, 3) NOT GLOB '*[^0-9A-Fa-f]*'
-                          AND lower(bindings.destination)
-                              <> '0x0000000000000000000000000000000000000000'
-                      )
-                    "#
-                ),
-                [],
-            )
-            .map_err(sqlite_error)?;
-        transaction
-            .execute_batch(&format!(
-                "DROP TABLE {LEGACY_PURCHASE_PAYOUT_BINDINGS_TABLE};"
-            ))
-            .map_err(sqlite_error)?;
-    }
-    transaction
-        .execute(
-            r#"
-            INSERT OR IGNORE INTO purchase_payout_bindings (
-                reservation_id, destination, binding_kind
-            )
-            SELECT
-                reservations.reservation_id,
-                CASE
-                    WHEN length(reservations.agent_id) = 42
-                     AND substr(reservations.agent_id, 1, 2) = '0x'
-                     AND substr(reservations.agent_id, 3) NOT GLOB '*[^0-9A-Fa-f]*'
-                     AND lower(reservations.agent_id)
-                         <> '0x0000000000000000000000000000000000000000'
-                    THEN lower(reservations.agent_id)
-                    WHEN reservations.state = 'consumed'
-                    THEN COALESCE(
-                        json_extract(CAST(records.record_json AS TEXT), '$.body.payout_destination'),
-                        reservations.agent_id
-                    )
-                    ELSE reservations.agent_id
-                END,
-                CASE
-                    WHEN length(reservations.agent_id) = 42
-                     AND substr(reservations.agent_id, 1, 2) = '0x'
-                     AND substr(reservations.agent_id, 3) NOT GLOB '*[^0-9A-Fa-f]*'
-                     AND lower(reservations.agent_id)
-                         <> '0x0000000000000000000000000000000000000000'
-                    THEN 'evm'
-                    ELSE 'legacy_terminal'
-                END
-            FROM purchase_reservations AS reservations
-            LEFT JOIN purchase_records AS records
-              ON records.reservation_id = reservations.reservation_id
-            WHERE (
-                length(reservations.agent_id) = 42
-                AND substr(reservations.agent_id, 1, 2) = '0x'
-                AND substr(reservations.agent_id, 3) NOT GLOB '*[^0-9A-Fa-f]*'
-                AND lower(reservations.agent_id)
-                    <> '0x0000000000000000000000000000000000000000'
-            ) OR reservations.state IN ('consumed', 'released', 'expired')
-            "#,
-            [],
-        )
-        .map_err(sqlite_error)?;
-    let reservations: i64 = transaction
-        .query_row("SELECT COUNT(*) FROM purchase_reservations", [], |row| {
-            row.get(0)
-        })
-        .map_err(sqlite_error)?;
-    let bindings: i64 = transaction
-        .query_row("SELECT COUNT(*) FROM purchase_payout_bindings", [], |row| {
-            row.get(0)
-        })
-        .map_err(sqlite_error)?;
-    if bindings != reservations {
-        return Err(invariant(format!(
-            "purchase payout migration bound {bindings} of {reservations} reservations; unresolved live legacy reservations require operator recovery"
-        )));
-    }
-    Ok(())
 }
 
 /// Verify the purchase schema's shape: this database's table, index, and
@@ -3239,8 +2817,6 @@ fn finding_purchase_schema_catalog(
                OR tbl_name GLOB 'purchase_capture_intents*'
                OR name GLOB 'public_purchase_requests*'
                OR tbl_name GLOB 'public_purchase_requests*'
-               OR name GLOB 'prebinding_purchase_terminals*'
-               OR tbl_name GLOB 'prebinding_purchase_terminals*'
                OR name GLOB 'seller_exposure_encumbrances*'
                OR tbl_name GLOB 'seller_exposure_encumbrances*'
                OR name GLOB 'pending_purchase_slots*'
@@ -3250,8 +2826,6 @@ fn finding_purchase_schema_catalog(
                OR tbl_name GLOB 'failed_delivery_records*'
                OR name GLOB 'payout_destinations*'
                OR tbl_name GLOB 'payout_destinations*'
-               OR name GLOB 'legacy_payout_destinations*'
-               OR tbl_name GLOB 'legacy_payout_destinations*'
                OR name GLOB 'listing_sales_blocks*'
                OR tbl_name GLOB 'listing_sales_blocks*'
                ORDER BY type, name, tbl_name
