@@ -195,6 +195,7 @@ fn recovery_claim_retry_returns_the_persisted_lease_when_expiry_changes() {
 
 #[test]
 fn qualified_recovery_rechecks_history_version_fence_and_expiry() {
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
