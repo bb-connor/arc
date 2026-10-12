@@ -1,92 +1,60 @@
 # chio-runtime-harness
 
-Runs a Chio runtime loopback scenario end to end: admission evaluation, live
-`chio-kernel` execution, and proof-package assembly, then checks the regenerated
-proof for parity against a static baseline package and verifier report. It exists
-so a checked-in proof fixture can be validated against what the current kernel and
-runtime-admission code actually produce, and fails closed the moment it doesn't.
-
-The crate does real file I/O: a JSON-backed admission store and temporary SQLite
-receipt/revocation stores under `store_dir`, and evidence JSON under `out_dir`. It
-is driven by `chio-cli`'s runtime-loopback and proof-fixture commands, not by a
-production kernel.
-
-## Responsibilities
-
-- Normalize a scenario file into an ordered list of steps and evaluate each one
-  through `chio_runtime_core::evaluate_runtime_admission`, stopping at the first
-  rejection.
-- Dispatch each accepted step through a real, disposable `ChioKernel` (temp SQLite
-  receipt and revocation stores, a stub tool server) to obtain a live, kernel-signed
-  `ChioReceipt`.
-- Build treaty scope, ladder intersection, continuation, receipt lineage, and
-  bilateral DSSE artifacts for federated steps, and feed them to the kernel's own
-  runtime admission hook.
-- Rebuild the buyer-side federation closure for the first destructive, governed
-  step that produced a treaty context, re-evaluating
-  `evaluate_cross_boundary_admission`.
-- Assemble the live receipts into a proof package, verify it, and diff it
-  field-by-field against a static baseline.
-- Write every intermediate artifact as SHA-256-addressed evidence JSON with a
-  manifest, under a validated relative path.
-
-## Public API
-
-- `run_runtime_loopback_scenario(scenario, store_dir, now_unix_ms, out_dir)` - runs
-  a scenario against the crate's built-in fixture baseline
-  (`chio_attest_loopback::fixture_proof_package` / `fixture_verifier_report`).
-- `run_runtime_loopback_scenario_with_static_artifacts(scenario, store_dir,
-  now_unix_ms, out_dir, static_package_json, static_report_json)` - same, with a
-  caller-supplied static baseline.
-- `runtime_loopback_capability_window(now_unix_ms) -> (u64, u64)` - derives a
-  second-denominated capability `(not_before, not_after)` window from a
-  millisecond scenario clock.
-- `RuntimeLoopbackError` - the crate's single error type.
-
-All other modules (`admission_loop`, `buyer_closure`, `evidence_io`, `kernel`,
-`proof_assembly`, `proof_parity`, `scenario`, `treaty`) are crate-private.
+A live loopback harness for regenerating Chio runtime proof artifacts.
+It combines fixture proof baselines, runtime admission, a local native kernel,
+SQLite authority and receipt stores, and buyer/federation evidence assembly.
+The output is a set of local evidence files for verification and regression work.
 
 ## Usage
 
+`run_runtime_loopback_scenario` takes a scenario JSON path, a private store
+directory, an evaluation time in milliseconds, and an output directory.
+For caller-supplied baselines, use `run_runtime_loopback_scenario_with_static_artifacts`.
+This offline example exercises its early malformed-baseline rejection:
+
 ```rust
 use std::path::Path;
+use chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts;
 
-fn regenerate(scenario: &Path, store_dir: &Path, out_dir: &Path)
-    -> Result<(), chio_runtime_harness::RuntimeLoopbackError>
-{
-    chio_runtime_harness::run_runtime_loopback_scenario(
-        scenario,
-        store_dir,
-        1_800_000_000_000,
-        out_dir,
-    )
-}
+let result = run_runtime_loopback_scenario_with_static_artifacts(
+    Path::new("scenario.json"),
+    Path::new("runtime-store"),
+    1_800_000_000_000,
+    Path::new("runtime-output"),
+    "{",
+    "{",
+);
+assert!(result.is_err());
 ```
 
-## Testing
+This uses the package's ordinary dependencies. Parsing fails before paths are
+opened or created. Successful runs need Unix SQLite authority serving support, a valid scenario,
+and writable local store/output paths. Windows authority startup rejects
+before creating store/output directories.
 
-`cargo test -p chio-runtime-harness`
+## Guarantees
 
-The `src/lib.rs` tests replay
-`examples/chio-3vendor/fixtures/runtime-spine/scenario.json` after rewriting it
-into an executable scenario. The baseline clock (`1_766_000_001_000` ms) must
-produce independently verified proof packages with exact package and verifier
-report hashes matching the checked-in baseline on two fresh stores. A different
-clock deliberately produces `runtime_proof_semantic_parity_mismatch`.
+- `normalize_runtime_loopback_steps` validates scenario step selection.
+- The harness calls `SqliteAuthorityStore::ensure_serving_supported` before setup.
+- Receipt startup waits for the durable writer's head verification.
+- `validate_runtime_relative_path` rejects traversal in emitted evidence paths.
+- `write_runtime_json_artifact_string` hashes the exact bytes written,
+  including the final newline, and records their length in the manifest.
+- Proof assembly validates step/admission bindings and checks baseline parity.
 
-The baseline commits to durable outcome identity, including retained federation
-context and receipt-signing identity. Changing those authenticated inputs changes
-outcome IDs, receipt signatures and dependent proof hashes even when the tool
-results are identical. Refresh fixtures only after explaining that change and
-verifying the regenerated proof; do not relax exact parity to accept it. The CLI's
-recursive-swarm template uses its own clock (`1_800_000_001_000` ms) and baseline.
+## Status
 
-## See also
+Implemented test and proof-regeneration support with deterministic fixture
+identities. Runs are serialized within the process to protect their shared
+artificial authority identity. The harness executes local kernel calls and
+writes files; it does not operate a hosted provider deployment.
+Its fixture keys and baseline evidence are for controlled verification runs.
+A parity failure returns an error after writing rejection reports and evidence.
+There are no declared Cargo features.
 
-- `chio-runtime-core` - the admission evaluator, treaty/ladder types, and evidence
-  schemas this crate drives.
-- `chio-kernel` - the live kernel each accepted step is dispatched through.
-- `chio-attest-buyer-core`, `chio-attest-loopback` - proof package assembly,
-  verification, and fixture signing keys.
-- `chio-cli` - the `runtime run-loopback` and proof-fixture commands that call this
-  crate.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Receipt contract](../../../spec/PROTOCOL.md#6-receipt-contract)
+- [Runtime implementation](../chio-runtime-core/README.md)
+- [License](../../../LICENSE)

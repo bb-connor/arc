@@ -1,112 +1,63 @@
 # chio-kernel-core
 
-The pure-compute subset of Chio capability evaluation: verdict evaluation,
-capability verification, portable scope matching, delegation-budget
-enforcement, and receipt signing, built as a `no_std + alloc` library. The
-same code compiles for the hosted kernel, the browser
-(`wasm32-unknown-unknown`), Cloudflare Workers (`wasm32-wasip1`), and mobile
-(UniFFI) targets because it never performs I/O and never calls into `std`.
+Portable capability evaluation and receipt signing for Chio kernel adapters.
+The library is `no_std + alloc`; default features enable hosted dependencies
+and the revocation snapshot surface. It supplies computation used by browser,
+mobile, and native kernels.
 
-`chio-kernel` wraps this crate with the async dispatch, persistent stores
-(receipt, budget, revocation, DPoP), transport, and session state that turn a
-pure verdict into a governed, audited tool call. Reach for `chio-kernel-core`
-directly when you need enforcement logic on a constrained or non-native
-target; the portable-kernel contract is documented in
-`docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`.
+## Usage
 
-Portable `evaluate` entry points reject signed capabilities carrying
-`BindSecurityContext` before guards or budget admission because `EvaluateInput`
-has no authoritative security invocation context. Pure `verify_capability`
-entry points remain cryptographic verification only and are used by the native
-kernel, which retains the original token and separately enforces its context.
-A `VerifiedCapability` alone does not authorize context-bound dispatch. This
-containment does not add a portable context bridge or alter other caveat checks.
+Verify an incoming portable passport before consuming its payload. This small
+example exercises malformed-envelope rejection with a deterministic clock.
+It runs on the host with the crate's existing dependencies.
 
-## Responsibilities
+```rust
+use chio_kernel_core::{verify_passport, FixedClock, VerifyError};
 
-- Evaluate a `(capability, request, guards)` tuple to an Allow/Deny verdict:
-  capability verification, subject binding, scope match, then the sync guard
-  pipeline, fail-closed at every step (`evaluate`).
-- Verify a capability token's signature, issuer trust, crypto floor, time
-  window, and delegation chain-binding without I/O (`capability_verify`).
-- Match a tool-call request against a `ChioScope`'s grants; constraints the
-  portable matcher cannot safely evaluate return an explicit error instead of
-  widening scope (`scope`).
-- Enforce sibling-sum delegation budgets so children of a delegated
-  capability cannot jointly oversubscribe the parent's share (`budget_split`).
-- Sign receipts with WYSIWYS content-hash recomputation inside the trust
-  boundary (`receipts`).
-- Verify portable passport envelopes offline for browser/mobile/edge
-  adapters (`passport_verify`).
-- Project verified capabilities and verdicts into the proof-facing
-  normalized AST used by the bounded verified core (`normalized`).
-- Cache the latest signed revocation epoch root for lock-free dispatch reads
-  (`revocation_view`, feature-gated).
-
-## Public API
-
-| Module | Key items |
-|--------|-----------|
-| `evaluate` | `evaluate`, `evaluate_with_crypto_floor`, `evaluate_with_crypto_floor_and_budgets`, `evaluate_with_full_floor`, `EvaluateInput`, `EvaluationVerdict`, `KernelCoreError` |
-| `capability_verify` | `verify_capability`, `verify_capability_with_floor`, `verify_capability_with_floor_and_trust_root`, `verify_capability_with_floor_and_resolver`, `verify_capability_full`, `VerifiedCapability`, `CapabilityError`, `TrustRootResolver` |
-| `guard` | `Guard`, `GuardContext`, `PortableToolCallRequest` |
-| `scope` | `resolve_matching_grants`, `resolve_capability_grants`, `MatchedGrant`, `ScopeMatchError` |
-| `budget_split` | `BudgetRegistry`, `BudgetSplit`, `InMemoryBudgetRegistry`, `NoopBudgetRegistry`, `MAX_BUDGET_SHARE_BPS`, `MAX_CHILDREN_PER_PARENT`, `MAX_RETAINED_CHILD_ID_BYTES`, `MAX_BUDGET_PARENTS`, `MAX_REGISTRY_CHILD_EDGES`, `MAX_REGISTRY_RETAINED_ID_BYTES`, `BudgetSplitError` |
-| `receipts` | `sign_receipt`, `sign_receipt_with_handle`, `sign_receipt_relaying_trusted_body`, `ReceiptSigningError` |
-| `passport_verify` | `verify_passport`, `verify_parsed_passport`, `PortablePassportEnvelope`, `VerifiedPassport`, `VerifyError`, `PORTABLE_PASSPORT_SCHEMA` |
-| `normalized` | `NormalizedEvaluationVerdict`, `NormalizedVerifiedCapability`, `NormalizedScope`, `NormalizedCapability`, `NormalizationError` |
-| `clock`, `rng` | `Clock`, `FixedClock`, `Rng`, `NullRng` |
-| `revocation_view` (feature `revocation-view`) | `RevocationView`, `RevocationSnapshot`, `RevocationViewError`, `RevocationViewSubject` |
-
-`Verdict` (`Allow` / `Deny` / `PendingApproval`) lives at the crate root; the
-core itself only ever produces the first two.
-
-`verify_capability_full_with_evidence` accepts a `CapabilityEvidenceContext`
-containing original signed ancestors for narrowed recursive chains. It checks
-each ancestor and scope transition before admitting a budget. The matching
-`evaluate_with_full_floor_and_evidence` entry point also evaluates subject,
-scope and guards. Existing entry points continue to reject narrowed multi-hop
-chains without this evidence. See `tests/signed_lineage.rs`; these behavioral
-tests do not extend the bounded formal-proof claims to the new lineage code.
-
-## Feature flags
-
-| Flag | Effect |
-|------|--------|
-| `std` (default) | Forwards to `chio-core-types/std`, `serde/std`, `serde_json/std` for hosted builds. |
-| `revocation-view` (default) | Enables the `revocation_view` module. Implies `std` (`arc-swap` needs a hosted runtime). |
-| `fuzz` | Exposes the `fuzz` module, the libFuzzer entry point for receipt-log replay. Implies `std`; pulls in `arbitrary`. Enabled only by the standalone `chio-fuzz` workspace. |
-| `dudect` | Enables the `dudect_mac_eq` / `dudect_scope_subset` constant-time harnesses under `tests/dudect/`. Implies `std`; pulls in `dudect-bencher`. |
-
-## Testing
-
-```
-cargo test -p chio-kernel-core
+let clock = FixedClock::new(1_700_000_000);
+let result = verify_passport(b"{}", &[], &clock);
+assert!(matches!(result, Err(VerifyError::InvalidEnvelope(_))));
 ```
 
-The portable-kernel proof builds this crate for the host and for
-`wasm32-unknown-unknown`, both with `--no-default-features`:
+For tool calls, supply `EvaluateInput` to `evaluate` and inspect its returned
+`EvaluationVerdict`. Configure a crypto floor, trust-root resolver, and budget
+registry through the corresponding `evaluate_with_full_floor*` APIs when needed.
 
-```
-scripts/check-portable-kernel.sh
-```
+## Features
 
-Timing-leak harnesses run separately, feature-gated and in release mode:
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Yes | Enables `std` and `revocation-view`. |
+| `std` | Yes, via `default` | Enables hosted support in shared types and Serde. |
+| `revocation-view` | Yes, via `default` | Adds the `arc-swap` snapshot cache; implies `std`. |
+| `kani` | No | Enables the shared types' Kani hash backend. |
+| `fuzz` | No | Exposes receipt replay fuzz helpers; implies `std`. |
+| `dudect` | No | Enables the two timing harnesses; implies `std`. |
 
-```
-cargo test -p chio-kernel-core --features dudect --release dudect_mac_eq
-cargo test -p chio-kernel-core --features dudect --release dudect_scope_subset
-```
+## Guarantees
 
-Kani proofs (`src/kani_harnesses.rs`, `src/kani_public_harnesses.rs`) compile
-only under `cfg(kani)` and run through the Kani toolchain, not `cargo test`.
+- `evaluate` checks issuer/signature/time, subject binding, scope, and ordered
+  synchronous guards. Guard errors and denial produce a deny verdict.
+- `sign_receipt` checks the supplied content bytes against `content_hash` and
+  checks the signing key. `sign_receipt_with_handle` consumes a signing handle.
+- `sign_receipt_relaying_trusted_body` trusts the upstream content hash; callers
+  own the integrity of that upstream body.
+- `verify_passport` checks envelope/schema, pinned issuer, canonical signature,
+  subject presence, and the validity window.
 
-## See also
+## Status
 
-- `chio-core-types` - defines the capability, receipt, and crypto types this
-  crate verifies, matches, and signs against.
-- `chio-kernel` - the hosted runtime kernel; wraps this crate's pure
-  evaluation with async dispatch, persistent stores, and transport.
-- `chio-kernel-browser`, `chio-kernel-mobile`, `chio-cpp-kernel-ffi`,
-  `chio-ag-ui-proxy` - portable adapters that call `evaluate_with_full_floor`
-  directly on their target platform.
+Implemented pure kernels and bounded formal helper surfaces. Tool transport,
+receipt persistence, authoritative revocation lookup, invocation accounting,
+and DPoP replay state belong to the host. Portable evaluation denies security
+bindings requiring authenticated host context. Full portable evaluation also
+denies aggregate invocation and cumulative approval enforcement requirements.
+The portability script covers host and `wasm32-unknown-unknown` builds with
+`--no-default-features`; other target acceptance needs separate evidence.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Capability contract](../../../spec/PROTOCOL.md#5-capability-contract)
+- [Native kernel](../chio-kernel/README.md)
+- [License](../../../LICENSE)

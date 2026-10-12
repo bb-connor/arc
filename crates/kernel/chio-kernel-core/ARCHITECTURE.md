@@ -1,112 +1,85 @@
 # chio-kernel-core architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-kernel-core` is the pure-compute subset of Chio capability evaluation,
-built `no_std + alloc` so the same verdict-producing code runs inside the
-browser, mobile apps, C++ FFI hosts, and the hosted sidecar (`chio-kernel`)
-without modification. It sits inside the trust boundary:
-`formal/proof-manifest.toml` names `evaluate.rs`, `capability_verify.rs`,
-`scope.rs`, `normalized.rs`, and `receipts.rs` as covered surface for the
-bounded verified core. The crate performs no I/O and holds no state beyond
-what a caller explicitly supplies (a `BudgetRegistry`, a `RevocationView`);
-revocation-store lookups, budget persistence, DPoP nonce replay,
-governed-transaction policy, payment authorization, and tool dispatch all
-stay in `chio-kernel`.
+This crate owns portable computation for capability admission, scope matching,
+synchronous guard evaluation, receipt signing, and portable passport verification.
+`EvaluateInput` borrows requests, tokens, trusted keys, a clock, and guards.
+`EvaluationVerdict` contains the verdict, optional reason, matched grant index,
+and optional verified capability snapshot. A snapshot can survive a later denial;
+callers must inspect the verdict before exercising authority.
 
-## Module map
+Host orchestration owns transport, storage, asynchronous authorization, replay
+state, and invocation mutation. `evaluate` returns a value directly, rather than
+an `Ok` or `Err` wrapper. The core emits Allow or Deny; PendingApproval belongs
+to the native shell.
 
-| Path | Responsibility |
-|------|-----------------|
-| `src/lib.rs` | Crate root (`#![no_std]`, `extern crate alloc`, `#![deny(unsafe_code)]`); declares modules, re-exports the public API, defines `Verdict`. |
-| `src/evaluate.rs` | Pure hot path: capability verification, subject binding, scope match, guard pipeline, deferred sibling-budget admission. |
-| `src/capability_verify.rs` | Signature, issuer trust, crypto floor, time window, and delegation chain-binding verification. |
-| `src/scope.rs` | Fail-closed portable matcher for tool grants; constraints it cannot evaluate return an explicit error. |
-| `src/budget_split.rs` | Sibling-sum delegation budget registry (`BudgetSplit`, `BudgetRegistry`, `InMemoryBudgetRegistry`). |
-| `src/guard.rs` | `Guard` trait, `GuardContext`, `PortableToolCallRequest`. |
-| `src/receipts.rs` | WYSIWYS receipt signing over a `SigningBackend`. |
-| `src/passport_verify.rs` | Minimal signed-envelope verifier for portable passport projections. |
-| `src/normalized.rs` | Proof-facing normalized AST and `is_subset_of` mirrors for the bounded verified core. |
-| `src/revocation_view.rs` | (feature `revocation-view`) Arc-swap-backed read-only revocation epoch snapshot. |
-| `src/clock.rs` | `Clock` trait + `FixedClock`; abstracts wall-clock time. |
-| `src/rng.rs` | `Rng` trait + `NullRng`; abstracts entropy. |
-| `src/formal_core.rs` | `pub(crate)` pure helpers shared by runtime code and formal verification lanes. |
-| `src/formal_aeneas.rs` | `pub(crate)` Aeneas-extraction-safe decision core behind `formal_core`. |
-| `src/kani_harnesses.rs`, `src/kani_public_harnesses.rs` | Kani proof harnesses; compiled only under `cfg(kani)`. |
-| `src/fuzz.rs` | (feature `fuzz`) libFuzzer entry point for receipt-log replay. |
+## Structure
 
-## Evaluation ordering
+- `capability_verify` and its `lineage` module verify tokens and chain bindings.
+- `evaluate` sequences admission, subject binding, scope, and guards.
+- `scope`, `guard`, and `normalized` define matching, requests, and projections.
+- `receipts` implements content-bound and upstream-trusted relay signing.
+- `passport_verify` verifies the portable passport envelope.
+- `budget_split` and `budget_split/registry` check delegated budget shares.
+- `accounting` exposes checked counters and monetary balances.
+- `clock` reexports typed, fallible clock interfaces; `rng` defines entropy input.
+- `formal_core` and internal `formal_aeneas` hold shared proof-facing predicates.
+- `revocation_view` and `fuzz` are feature-gated modules.
 
-`evaluate_with_full_floor` (the path production kernels use) runs, in order:
+## Data and control flow
 
-1. Capability base verification: issuer trust, signature under the
-   configured crypto floor, time window.
-2. Delegation chain shape, when the token carries a delegation chain:
-   per-link signatures and the final delegatee against the token subject.
-   Attenuated tokens additionally bind `attenuation_proof.parent_scope_hash`
-   to the trust root via a `TrustRootResolver`, gated by the negotiated
-   `DELEGATION_CHAIN_BINDING` feature.
-3. Subject binding: `request.agent_id` must equal the verified capability's
-   subject.
-4. Portable scope match: `scope::resolve_matching_grants` picks the most
-   specific grant covering `(server, tool)`; an unevaluable constraint fails
-   closed with `ConstraintError`.
-5. Guard pipeline: every `&dyn Guard` runs in order; `Deny`,
-   `PendingApproval`, or `Err` from any guard fails the whole evaluation.
-6. Sibling-budget admission, last: only after steps 1-5 pass does
-   `admit_delegated_budget` mutate the caller's real `BudgetRegistry`, so a
-   forged or out-of-scope token never consumes a sibling's share.
+`evaluate` selects an allow-classical crypto floor and a no-op budget registry.
+Configured entry points accept stronger floors, negotiation evidence, a root
+capability or trust-root resolver, and a registry. Verification precedes request
+subject matching; matching precedes ordered guards. Guard errors deny access.
+The registry-aware path can reject delegated sibling-share oversubscription.
+The host must retain authoritative registry state when coordinating calls.
 
-`evaluate` and `evaluate_with_crypto_floor` run the same shape without chain
-binding (no `TrustRootResolver`) and deny any token that carries an
-`attenuation_proof`.
+`sign_receipt` hashes the supplied byte preimage and compares `content_hash`
+before relay signing validates the key and signs the receipt body.
+`sign_receipt_with_handle` consumes a move-only handle. Relay signing alone
+accepts the caller's content hash, making upstream body integrity a caller duty.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- No module reaches into `std`, wall-clock globals, filesystem, network,
-  async runtimes, stores, or policy engines; hosted-only surfaces
-  (`revocation_view`, `fuzz`, the `dudect` test harnesses) are feature-gated.
-- Every verification and matching path fails closed: unknown budget
-  parents, unsupported scope constraints, missing chain-binding trust roots,
-  and clock values outside `[issued_at, expires_at)` all deny.
-- `BudgetSplit` tracks a `holders` refcount per child edge rather than a
-  boolean owner. Overlapping evaluations of the same delegated capability
-  each take a lease; the edge frees, returning its share to the parent, only
-  when the last holder releases. `verify_child_admission` (verifier-only
-  callers with no release path) commits a fresh child's share for
-  sibling-sum accounting without taking a lease.
-- `receipts::sign_receipt` recomputes `sha256_hex(canonical_content)` inside
-  the trust boundary and refuses to sign on a mismatch with the caller's
-  `content_hash`, closing the render-A / sign-B forgery.
-  `sign_receipt_relaying_trusted_body` is the narrower, explicit trust seam
-  for FFI/WASM adapters that cannot hold the content preimage.
-- `RevocationView::install_if_newer` only installs a snapshot whose `epoch`
-  strictly exceeds the current one, so a stale or replayed gossip frame
-  cannot rewind a verifier's view.
-- Public API compatibility is load-bearing: `chio-kernel` and the
-  browser/mobile/FFI/AG-UI-proxy adapters all import these types directly.
+Portable evaluation refuses authenticated security bindings before guards and
+budget admission because it lacks the authoritative security context. The full
+portable evaluation path refuses aggregate invocation and cumulative approval
+requirements. Offline capability verification is a distinct inspection surface;
+its success cannot substitute for stateful host admission.
+
+Passport verification decodes signed JSON with duplicate-aware parsing and
+checks schema, subject, issuer trust, signature, and a fallible clock reading.
+`ExposureUnits` and `InvocationCount` use checked arithmetic; storage adapters
+must additionally enforce their representable ranges. `RevocationView` supplies
+snapshot installation/read helpers, while callers own signature authentication
+and freshness policy. Pure evaluation performs no revocation store lookup.
+
+Proof-facing predicates describe bounded computation and projections. Their
+presence does not prove tool isolation, persistence, cryptographic backend
+correctness, or operating-system enforcement.
 
 ## Dependencies
 
-`chio-core-types` (path dependency, `default-features = false`) supplies the
-capability, scope, receipt, and crypto types this crate verifies, matches,
-and signs against; this crate forwards its own `std` feature to
-`chio-core-types/std` rather than depending on the `chio-core` facade, which
-would pull in the economic and trust domain crates. `serde` / `serde_json`
-(both `alloc`-only) handle canonical JSON and the normalized AST. `arc-swap`
-(optional, `revocation-view`) backs the lock-free snapshot cache. `arbitrary`
-(optional, `fuzz`) and `dudect-bencher` (optional, `dudect`) are dev/CI-only
-instrumentation kept out of production builds.
+`chio-core-types` supplies canonical artifacts and cryptographic primitives.
+`chio-security-types` supplies the shared security clock. Serde and serde_json
+supply allocation-compatible wire handling. Optional arc-swap enables atomic
+revocation snapshots; arbitrary and dudect-bencher support fuzzing and timing
+experiments. Default features enable hosted support despite the `no_std` source.
 
-## Extension points
+## Verification
 
-- `Guard` - synchronous guard trait; adapters plug in domain-specific checks
-  that run inside the hot path.
-- `Clock` / `Rng` - inject platform time and entropy instead of calling
-  `std` directly.
-- `TrustRootResolver` - per-issuer trust-root scope-hash lookup for
-  delegation chain-binding; blanket-implemented for
-  `Fn(&PublicKey) -> Option<ScopeHash>`.
-- `BudgetRegistry` - sibling-sum delegation budget accounting;
-  `InMemoryBudgetRegistry` and `NoopBudgetRegistry` are the in-crate
-  implementations.
+`portable_build` exercises evaluation and receipt APIs; `security_binding` checks
+portable refusal of host-bound authority; `signed_lineage` checks chain binding.
+`property_evaluate`, scope/normalized property tests, and `mutation_boundaries`
+exercise verdict and projection behavior. Accounting and registry modules have
+unit tests. Feature-gated Kani harnesses and dudect binaries have separate runners.
+
+```bash
+cargo test -p chio-kernel-core
+./scripts/check-portable-kernel.sh
+```
+
+The script installs `wasm32-unknown-unknown` and builds host and wasm without
+default features. It establishes those build boundaries when actually run.

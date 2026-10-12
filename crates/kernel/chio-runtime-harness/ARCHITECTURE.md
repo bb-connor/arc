@@ -1,89 +1,73 @@
 # chio-runtime-harness architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-runtime-harness` is a tooling crate, not a production kernel component. It
-replays a scenario file through the same primitives a deployment uses (the
-`chio-runtime-core` admission evaluator, a live `chio-kernel` instance, and the
-`chio-attest-buyer-core` proof verifier) so a hand-maintained fixture proof package
-can be checked against what the current code actually produces. It forbids
-`unsafe` (`#![forbid(unsafe_code)]`) and does real, temporary file I/O rather than
-running in-memory only.
+The harness executes local runtime scenarios and assembles proof-regeneration output.
+Its public entrypoints accept paths, evaluation time, and optional static baseline JSON.
+`RuntimeLoopbackError` wraps parsing, filesystem, runtime, and verification failures.
+The native kernel still owns capability admission, effects, and signed receipts.
+The harness owns deterministic fixture composition and output manifests.
+Fixture evidence and artificial authority identities define its test-support boundary.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public entry points (`run_runtime_loopback_scenario[_with_static_artifacts]`), `RuntimeLoopbackError`, module wiring. |
-| `src/scenario.rs` | `RuntimeLoopbackScenario` / `RuntimeLoopbackStep` deserialization and single-step-vs-`steps` normalization. |
-| `src/admission_loop.rs` | Per-step admission evaluation against a `JsonRuntimeAdmissionStore`, admission-report evidence, and dispatch into `kernel.rs` on acceptance. |
-| `src/kernel.rs` | Builds and drives one disposable `ChioKernel` per step: capability signing, policy-input signing, federation peer pinning, and the live tool-call evaluation that produces a signed `ChioReceipt`. |
-| `src/treaty.rs` | Builds and persists cross-kernel treaty scope, ladder intersection, continuation, receipt lineage, and bilateral DSSE artifacts for federated steps. |
-| `src/buyer_closure.rs` | Rebuilds the buyer-side federation closure (cross-boundary admission, lineage, bilateral invocation, strict DSSE) for the qualifying destructive/governed step. |
-| `src/proof_assembly.rs` | Top-level orchestration: assembles the live `ChioProofPackage`, verifies it, writes all evidence artifacts, and computes final acceptance. |
-| `src/proof_parity.rs` | Field-by-field structural comparison between the static baseline package/report and the live-regenerated package. |
-| `src/evidence_io.rs` | Safe relative-path validation, content-addressed JSON artifact writes, canonical-JSON hashing, and the public `runtime_loopback_capability_window`. |
+- `lib.rs` loads baselines, qualifies the platform, and creates stores.
+- `scenario.rs` parses and normalizes scenario steps.
+- `kernel.rs` constructs the local kernel and fixture tool connection.
+- `admission_loop.rs` evaluates runtime admission and invokes local tool calls.
+- `treaty.rs` constructs signed treaty context for the fixture.
+- `buyer_closure.rs` prepares buyer-side closure evidence.
+- `proof_assembly.rs` binds runtime outputs to proof artifacts.
+- `proof_parity.rs` compares regenerated evidence with the static baseline.
+- `evidence_io.rs` validates paths, writes files, and computes artifact hashes.
 
-## Scenario replay
+## Data and control flow
 
-1. `scenario.rs` parses and normalizes the scenario into `(run_id, Vec<RuntimeLoopbackStep>)`;
-   a scenario carries either one top-level step or an explicit `steps` list, never both.
-2. `lib.rs` opens a `JsonRuntimeAdmissionStore` at `store_dir/admission-store.json`.
-3. `admission_loop.rs` evaluates each step in order through `evaluate_runtime_admission`,
-   writing an admission-report artifact per step, and stops at the first rejection.
-4. Each accepted step is dispatched through a fresh `ChioKernel` (`kernel.rs`). A step with
-   an `origin_kernel_id` also gets a treaty context (`treaty.rs`), which is fed into the
-   kernel's own runtime admission hook and retained for buyer closure.
-5. `proof_assembly.rs` builds a `ChioProofPackage` from the captured live receipts, splices
-   in a buyer closure (`buyer_closure.rs`) for the first destructive step that carries a
-   governance receipt and a treaty context, and verifies the package with
-   `chio_attest_buyer_core::report::verify_package_report`.
-6. `proof_parity.rs` diffs the live package against the static baseline package and verifier
-   report across proof claims, workflow and step semantics, tool receipt targets and
-   semantics, bilateral DSSE predicate semantics, lease scope, governance-receipt presence,
-   and destructive flags.
-7. `proof_assembly.rs` writes every artifact as evidence JSON under `out_dir`
-   (`evidence_io.rs`), then the run returns `Ok(())` only if the workflow run report itself
-   accepted.
+`run_runtime_loopback_scenario` loads built-in proof and verifier fixtures.
+`run_runtime_loopback_scenario_with_static_artifacts` parses caller baselines first.
+Both delegate to one baseline runner.
+A process-local mutex serializes runs that use the artificial authority identity.
+Scenario normalization precedes store and output directory creation.
+The runner checks that SQLite authority serving is supported on this platform.
+It prepares private store directories and provisions a SQLite authority.
+It opens the receipt store and waits for the writer's durable head verification.
+The admission loop inserts each step's bundle and prepares signed policy inputs.
+Runtime admission produces reports; local kernel execution produces live receipts.
+Assembly combines those receipts, treaty evidence, buyer closure, and baseline proofs.
+The result includes workflow reports, proof-regeneration artifacts, and an evidence manifest.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- Scenario `runId` must be non-empty and unpadded; top-level single-step fields and an
-  explicit `steps` list are mutually exclusive; both scenario structs deny unknown fields.
-- Evidence relative paths must be plain and safe: no absolute path, no `\`, no `:`, no `//`,
-  no `.`/`..` segment. Every write is content-addressed by the SHA-256 of the exact bytes
-  written, including the trailing newline (`evidence_io.rs`).
-- `kernel.rs` verifies a step's `server_id` / `tool_name` / `host_kernel_id` against
-  `chio_attest_loopback::runtime_vendor_binding` and its recomputed argument hash against the
-  request's declared `tool_args_sha256` before dispatch; kernel dispatch requires
-  `Verdict::Allow`.
-- `buyer_closure.rs` and `treaty.rs` each recompute the bilateral invocation binding hash
-  after the lineage statement back-fill and reject if it drifted from the pre-backfill hash.
-- `evaluate_cross_boundary_admission` must accept the buyer closure; rejection fails the run
-  closed with its failure code.
-- The final proof package must reproduce the exact live receipt hashes captured during
-  execution, checked both after the baseline build and again after the buyer-closure splice.
-- Workflow step count must exactly match both the admission-hash count and the admission-id
-  count (`validate_step_admission_binding_counts`).
-- Overall acceptance requires the live verifier report to accept and every compared parity
-  field to match; the buyer-closure treaty-binding delta is the one tolerated difference. Any
-  other mismatch fails closed with `runtime_proof_semantic_parity_mismatch`.
-- The loopback kernel always installs durable (temp-file) SQLite receipt and revocation
-  stores (`allow_ephemeral_receipt_log: false`, `allow_ephemeral_revocation_store: false`):
-  the kernel dispatches fail-closed against ephemeral revocation state, so an isolated
-  proof-regeneration kernel needs a durable store of its own even though it is temporary.
+Malformed baseline JSON fails before the runner opens scenario or output paths.
+The supported-platform check precedes authority provisioning.
+Unix store directories receive mode 0700.
+Successful receipt startup is required before evaluation begins.
+`validate_runtime_relative_path` rejects absolute paths, traversal components,
+backslashes, colons, repeated separators, and surrounding whitespace.
+`write_runtime_json_artifact_string` adds a newline, hashes the actual bytes,
+and records the byte count alongside each relative evidence path.
+Canonical hashes identify structured runtime artifacts separately from file hashes.
+Step admission binding validates counts and exact indexes.
+Baseline parity checks reject regenerated package drift.
+A rejected run may already have emitted evidence files and failure reports.
+These checks support reproducible local evidence; operators supply deployment trust.
 
 ## Dependencies
 
-`chio-kernel` supplies the live `ChioKernel`, `ToolServerConnection`, and tool-call
-evaluation this crate drives. `chio-runtime-core` supplies the admission evaluator, treaty
-and evidence types, and the `CHIO_RUNTIME_*` / `CHIO_FEDERATION_*` schema constants.
-`chio-federation` supplies bilateral DSSE signing and trust establishment.
-`chio-attest-buyer-core` supplies proof-package assembly and verification;
-`chio-attest-loopback` supplies fixture signing keys, fixture baselines, and package
-construction from live receipts. `chio-core` / `chio-core-types` supply canonical JSON
-hashing, keypairs, capability tokens, and receipt signing. `chio-store-sqlite` supplies the
-temporary receipt and revocation stores. No dependency is package-aliased. `tokio` runs one
-current-thread executor per step to call the async kernel evaluation synchronously;
-`async-trait` backs the stub `ToolServerConnection` implementation; `thiserror` backs
-`RuntimeLoopbackError`.
+`chio-runtime-core` supplies admission, policy, and proof report structures.
+`chio-kernel` mediates local tool effects.
+`chio-store-sqlite` supplies authority and receipt persistence.
+`chio-attest-loopback` supplies fixture baselines.
+`chio-attest-buyer-core` parses and verifies buyer-facing evidence.
+`chio-federation` supplies treaty artifacts; Tokio drives local asynchronous execution.
+
+## Verification
+
+Unit tests in `lib.rs` cover startup rejection before path mutation,
+step-binding cardinality and exact indexing, and report-hash preservation.
+They also check native output schemas, static-package drift rejection,
+and semantic determinism of regenerated proof packages.
+Run `cargo test -p chio-runtime-harness` from the workspace root.
+Successful scenarios create local stores and evidence files.
+The README sample only exercises malformed-baseline parsing and creates no files.
+Platform-dependent authority support is checked at runtime.

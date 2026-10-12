@@ -1,102 +1,83 @@
 # chio-kernel-browser architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-kernel-browser` is the `wasm-bindgen` boundary crate for
-`chio-kernel-core`: an edge that accepts JSON from browser JavaScript and
-returns JSON, while every evaluation, signing, and verification decision still
-runs inside the portable `no_std + alloc` kernel core. It supplies exactly what
-a pure-compute crate cannot supply itself, wall-clock time and CSPRNG entropy,
-plus the wasm-bindgen / JSON marshalling layer around them. All `wasm-bindgen`
-and Web platform dependencies stay behind `cfg(target_arch = "wasm32")`, so the
-crate also builds and tests as an ordinary host-native `no_std` crate. `[lib]`
-declares `crate-type = ["cdylib", "rlib"]`: `cdylib` for `wasm-pack`, `rlib` so
-`cargo test` and `cargo doc` work natively.
+This crate adapts portable Chio operations to a browser wasm-bindgen boundary
+and exports Rust helpers for native tests and embedding. Its public surface
+includes wire structs, `evaluate_pure`, capability and receipt verification,
+content-bound signing, trusted-body relay signing, `BrowserClock`, and
+`WebCryptoRng`. The wasm-only module exports JavaScript entry points.
 
-## Module map
+The facade owns JSON conversion and platform clock/entropy adapters.
+Applications supply trusted issuers, trust roots, and parent-budget snapshots.
+Applications also own tool execution, revocation, persistent accounting, and
+receipt-log storage. A local allow result describes portable admission only.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate root: `no_std + alloc` setup, `#![deny(unsafe_code)]`, module wiring, and the public re-export surface. Gates `wasm` (wasm32) and `tests` (native test) modules by cfg. |
-| `src/clock.rs` | `BrowserClock`: `chio_kernel_core::Clock` over `js_sys::Date::now()` (wasm32) or a `0`-returning stub (native). |
-| `src/rng.rs` | `WebCryptoRng` / `WebCryptoRngError`: `chio_kernel_core::Rng` over `window.crypto.getRandomValues` (wasm32) or an always-erroring stub (native). |
-| `src/wire.rs` | JSON DTOs exchanged across the wasm boundary and their conversions to/from `chio-kernel-core` / `chio-core-types`. |
-| `src/pure.rs` | Target-independent evaluate / sign / verify logic shared by the wasm entry points and the native tests: budget-registry seeding, the WYSIWYS signer, the trusted-body relay signer, receipt verification, hex and authority parsing. |
-| `src/wasm.rs` | `#[wasm_bindgen]` entry points and JSON/`JsValue` parsing, encoding, and error shaping. Compiled for `wasm32` only. |
-| `src/tests.rs` | Native-only regression suite over the `pure.rs` paths. |
+## Structure
 
-## Call lifecycle
+`lib.rs` exports helpers and gates `wasm` on `target_arch = "wasm32"`.
+`wire.rs` defines requests, verdicts, context snapshots, and `BindingError`.
+`pure.rs` performs evaluation, signing, receipt checks, and authority/hex decoding.
+`clock.rs` implements fallible browser time and a regression fence.
+`rng.rs` supplies Web Crypto entropy and native stubs.
+`wasm.rs` handles JSON strings, JavaScript values, and structured error conversion.
 
-### Evaluate and verify
+The crate declares `no_std` but explicitly links `std`; its browser clock uses
+thread-local state. The kernel dependency disables defaults and remains the
+portable computational dependency. The browser facade's dependencies have their
+own target and runtime requirements.
 
-1. JS calls `evaluate`, `verify_capability`, `verify_capability_with_context`,
-   or `verify_receipt` with JSON (or, for `verify_receipt`, raw envelope bytes
-   plus a `JsValue` issuer list).
-2. `wasm.rs` parses the input into the matching `wire.rs` DTO, returning a
-   `BindingError`-shaped `JsValue` on failure.
-3. `wasm.rs` constructs a `BrowserClock` and calls the paired `pure.rs`
-   function.
-4. `pure.rs` decodes trusted-issuer hex, seeds an `InMemoryBudgetRegistry` from
-   any parent-budget snapshots, and calls the portable kernel function
-   (`evaluate_with_full_floor`, `verify_capability_full`) - or, for receipts,
-   runs the embedded-key signature, parameter-hash, and receipt-id checks
-   directly.
-5. The result is mapped into a wire DTO; `EvaluationVerdictJson::from_core`
-   downgrades a raw kernel `Allow` to `"pending_approval"`.
-6. `wasm.rs` serializes the DTO to `JsValue` via `serde-wasm-bindgen` and
-   returns it.
+## Data and control flow
 
-### Sign
+`evaluate_pure` checks authorization extensions, decodes issuers, builds a trust
+resolver, and seeds an in-memory registry from caller snapshots. It evaluates
+with an allow-classical floor, negotiation context, optional direct root, and
+empty guards. A supplied clock override uses `FixedClock`; otherwise evaluation
+reads the injected clock. Core denial is serialized as a verdict.
 
-1. JS calls `sign_receipt` or `sign_receipt_relaying_trusted_body` with a JSON
-   body and a hex signing seed (optionally minted first by
-   `mint_signing_seed_hex`, which reads `WebCryptoRng`).
-2. `wasm.rs` parses the body and decodes the seed.
-3. `pure.rs` refuses an all-zero seed, builds an `Ed25519Backend` from it, and
-   overwrites `body.kernel_key` with the derived public key.
-4. `sign_receipt_pure` requires the `canonical_content` preimage and signs
-   through `chio_kernel_core::sign_receipt`, which recomputes `content_hash`
-   and refuses on mismatch; `sign_receipt_relaying_trusted_body_pure` trusts
-   the supplied `content_hash` and signs through
-   `sign_receipt_relaying_trusted_body` instead.
-5. `wasm.rs` serializes the resulting `ChioReceipt`, or a `BindingError`, to
-   `JsValue`.
+Public signing requires canonical content bytes in the request and a decoded,
+nonzero seed. It delegates content-hash and kernel-key checks to core signing.
+The relay function explicitly accepts an upstream-trusted body without a
+preimage. `verify_receipt_pure` decodes original signed JSON, recomputes receipt
+identity, and returns individual signature, parameter, and trust results.
+An empty issuer set permits inspection but never a trusted `ok` result.
 
-## Invariants and failure modes
+## Trust and platform invariants
 
-- Browser evaluation never returns authoritative `allow`: `evaluate_pure`
-  always runs with `guards: &[]`, and `EvaluationVerdictJson::from_core`
-  hardcodes `authorized: false`.
-- The default signer (`sign_receipt_pure`) requires the `canonical_content`
-  preimage and refuses to sign without it (`canonical_content_required`); the
-  recompute-free trusted-body relay is reachable only through the separately
-  named `sign_receipt_relaying_trusted_body_pure` /
-  `sign_receipt_relaying_trusted_body`, never as a fallback.
-- Both signers refuse an all-zero 32-byte seed (`weak_entropy`) before
-  constructing an `Ed25519Backend`.
-- `WebCryptoRng::fill_bytes` zeroes its destination on a `getRandomValues`
-  failure rather than erroring (the `Rng` trait has no error channel); callers
-  detect the all-zero result and refuse to use it. `WebCryptoRng::try_new`
-  fails closed when no `Window` / `Crypto` global exists.
-- `BrowserClock::now_unix_secs` fails closed to `0` on a non-finite or
-  non-positive `Date.now()`, which biases every time-bound check toward "not
-  yet valid".
-- `verify_receipt_pure`'s `ok` requires signature validity, parameter-hash
-  validity, receipt-id validity, and explicit issuer trust; an empty
-  `trusted_issuers` slice still reports signature and hash status but leaves
-  `signer_trusted` and `ok` false.
-- Attenuated, budget-shared, or delegated capability tokens fail closed when
-  `capability_trust_roots` omits the issuer's `ScopeHash`.
+`BrowserClock` reads wall time from `Date.now()` and monotonic time from
+`performance.now()`. It rejects nonfinite, negative, overflowing, or regressing
+readings. The native adapter returns `ClockError::Unavailable`.
+`WebCryptoRng::try_new` requires `window.crypto`; native construction fails.
+A getRandomValues failure zeroes the destination because `Rng` has no error
+return; `mint_signing_seed_hex` rejects an all-zero seed.
+
+These requirements cover a Window-backed browser environment. A wasm worker,
+WASI host, or other wasm runtime cannot acquire that Window through this API.
+The pure evaluation path inherits core denial of security bindings and
+unsupported stateful enforcement. Caller snapshots are per-call inputs and
+provide no durable cross-call counter updates. No registered guards run here.
 
 ## Dependencies
 
-Internal: `chio-kernel-core` (`default-features = false`) supplies the
-portable evaluation, signing, verification, and budget-registry logic plus the
-`Clock` / `Rng` traits this crate implements; `chio-core-types`
-(`default-features = false`) supplies the capability, receipt, and crypto
-types the wire DTOs wrap. External: `serde` / `serde_json` (alloc-only) drive
-DTO (de)serialization on every target. On `wasm32` only: `wasm-bindgen`,
-`js-sys`, and `web-sys` (`Crypto`, `Window`, `Performance`) provide the JS FFI
-and platform globals, and `serde-wasm-bindgen` converts DTOs to/from
-`JsValue`; `wasm-bindgen-test` is a `wasm32` dev-dependency driving
-`tests/*_wasm.rs`.
+`chio-kernel-core` implements portable admission and signing. `chio-core-types`
+supplies cryptographic artifacts, canonical decoding, and receipt identity.
+Serde and serde_json handle the Rust wire structs. On wasm, wasm-bindgen,
+js-sys, web-sys, and serde-wasm-bindgen implement JavaScript interoperability.
+The manifest disables wasm-opt in the wasm-pack release profile.
+
+## Verification
+
+Native `src/tests.rs` covers portable verdicts, delegated budget snapshots,
+unsupported extensions, receipt hash/preimage refusal, duplicate keys, trusted
+signers, and malformed input. Clock unit tests exercise numeric boundaries.
+Wasm integration files cover binding roundtrips, verdict matrix cases, and
+receipt verification in a browser.
+
+```bash
+cargo test -p chio-kernel-browser
+wasm-pack test --headless --chrome crates/kernel/chio-kernel-browser
+```
+
+The second command requires wasm tooling and Chrome. Native tests compile
+without wasm bindings and establish only native helper behavior. Browser
+qualification must execute the wasm tests in the required browser environment.

@@ -1,89 +1,84 @@
 # chio-runtime-proof-parity architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-runtime-proof-parity` is a pure data-validation crate: parsing
-caller-supplied JSON bytes is its only I/O, it holds no runtime state, and it
-forbids unsafe code. It lives in `crates/kernel` as a shared contract between
-`chio-runtime-core` and `chio-proof-room` rather than inside either, so both
-can check the same report and artifact-bundle shapes against one fail-closed
-implementation. It does not regenerate proofs, read evidence stores, or run
-workflows; it only defines and checks the shapes of artifacts that describe
-those processes.
+This crate owns typed parity report schemas and consistency validation for
+runtime proof regeneration artifacts. `RuntimeProofParityReport` and
+`RuntimeProofParityMismatch` describe declarations. `RuntimeProofRegenerationArtifacts`
+borrows seven byte slices, allowing the caller to retain artifact ownership.
+The two public validators return `RuntimeProofParityError::Rejected` with a
+stable code and a detail string when a checked condition fails.
 
-## Module map
+The boundary is evidence consistency. Callers supply artifacts and obtain
+trusted provenance themselves. Validation does not invoke a proof engine,
+verify workflow signatures, fetch evidence, or grant runtime authority.
+Proof-model conclusions and actual host enforcement require their own evidence.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Schema constants; `RuntimeProofParityReport`, `RuntimeProofParityMismatch`, and `RuntimeProofRegenerationArtifacts` types; `RuntimeProofParityError`; `validate_runtime_proof_parity_report` and `validate_runtime_proof_regeneration_artifacts` plus their private schema/hash/run-id helpers. |
+## Structure
 
-## Validation flow
+`src/lib.rs` reexports schema constants from shared core types, defines report
+records and errors, and implements both validators. Private helpers enforce
+schema tags, fields, hash syntax, canonical hashing, manifest binding, and
+workflow-step matching. `src/tests.rs` contains fixtures and regressions.
+The crate has no Cargo feature switches and no platform-specific modules.
 
-`validate_runtime_proof_parity_report`:
+## Data and control flow
 
-1. Check `schema` equals `CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA`.
-2. Check the four package/report sha256 fields are 64 lowercase hex characters.
-3. Check `accepted` and `failure_code` are consistent in both directions
-   (accepted cannot carry a code, rejected must carry one).
-4. Check `compared_fields` is non-empty.
-5. If `accepted`, check `mismatches` is empty and the static/runtime package
-   hashes and static/runtime verifier-report hashes are pairwise equal.
-6. Check every `RuntimeProofParityMismatch` has a non-empty `field` and valid
-   sha256 hashes.
+`validate_runtime_proof_parity_report` receives an already decoded report.
+It validates schema, four lowercase 64-character hashes, acceptance/failure-code
+consistency, and a nonempty compared-fields collection. Accepted reports must
+have equal static/runtime package hashes, equal verifier-report hashes, and
+no mismatches. Each mismatch requires a nonblank field and two valid hashes.
 
-`validate_runtime_proof_regeneration_artifacts` (all seven artifacts arrive as
-raw `&[u8]`):
+`validate_runtime_proof_regeneration_artifacts` parses four JSON records,
+checks their schema tags and matching nonempty run IDs, and requires accepted
+regeneration and workflow reports without failure-code fields. It computes
+canonical JSON hashes for reports, manifest, proof package, verifier report,
+and workflow receipt, then checks their declared cross-links.
 
-1. Parse the four JSON-typed artifacts (proof regeneration report and input,
-   evidence manifest, workflow run report) and check each against its schema
-   constant.
-2. Check all four share one `runId` (the report is the anchor; input,
-   manifest, and workflow report must match it).
-3. Check the proof regeneration report and the workflow run report are each
-   `accepted` with no `failureCode`; reject if either is not accepted.
-4. Canonically hash (RFC 8785 JSON, sha256) the report, manifest, and
-   workflow report values parsed in step 1, then parse and canonically hash
-   the proof package, verifier report, and workflow receipt bytes the same
-   way.
-5. Check the cross-artifact hash fields agree with those canonical hashes:
-   the workflow report and manifest both bind the proof report's hash; the
-   manifest and input both bind the workflow report's hash; the input binds
-   the manifest's hash; the proof report itself binds the proof package,
-   verifier report, and workflow receipt hashes.
-6. Check `sourceRecords` on the input and the report are identical, then bind
-   each source record's `stepIndex` to the workflow report's matching
-   `stepEvidence` entry and check the four evidence-hash fields
-   (`admissionReportSha256`, `toolReceiptSha256`, `bilateralDsseSha256`,
-   `workflowStepSha256`) are present, non-empty, and equal on both sides.
-7. Check every byte-bearing artifact (proof package, verifier report,
-   workflow receipt, and the raw proof-regeneration-report and
-   workflow-run-report bytes) against its `entries[]` record in the evidence
-   manifest, this time by raw-byte sha256 and byte count rather than
-   canonical hash.
+The source-record arrays in the input and report must match. Every source
+record must identify a workflow step and match its admission report, tool
+receipt, bilateral DSSE, and workflow-step binding strings. Required arrays
+must be nonempty. Required manifest roles are found by role and compared to
+raw byte SHA-256 hashes and byte counts for supplied artifacts.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- Every check fails closed: unsupported schema, malformed or wrong-case
-  sha256 hex, missing required fields, mismatched run IDs, hash drift, and
-  unbound step evidence all produce a `RuntimeProofParityError::Rejected`
-  with a stable `code`.
-- `RuntimeProofParityReport` validation is fail-closed both ways: `accepted`
-  reports cannot carry mismatches or hash drift, and non-accepted reports
-  must carry a `failure_code`.
-- Regeneration bundle validation only requires the proof regeneration report
-  and workflow run report to be `accepted` with no `failureCode`; anything
-  else is rejected before any hash binding is checked.
-- Source-record and workflow-step evidence-hash fields must be present and
-  non-empty on both sides; a missing or blank field is rejected rather than
-  treated as a skippable non-match.
-- Cross-artifact binding hashes are RFC 8785 canonical-JSON sha256 of each
-  artifact's parsed value; evidence-manifest entries instead check raw-byte
-  sha256 and byte count of the exact bytes the caller supplied.
+Typed parity structs use camelCase Serde names and deny unknown fields.
+The regeneration path parses generic JSON values with serde_json and checks
+specific fields; this path does not promise duplicate-key rejection or a
+closed vocabulary for every evidence record.
+
+Canonical hashes bind decoded JSON content; manifest entry hashes bind exact
+bytes. These checks have different purposes and both must remain coherent.
+Parity report validation checks declared hashes without receiving the underlying
+packages. Bundle validation recomputes selected hashes but cannot establish
+that a proof verifier executed honestly or that a workflow signer is trusted.
+
+The parity validator does not validate `run_id` contents, timestamp freshness,
+or individual compared-field strings. Callers apply any required policy to
+those fields. A rejected parity declaration can be structurally valid and
+return success from validation; consumers must inspect its `accepted` flag.
 
 ## Dependencies
 
-`chio-core-types` supplies `crypto::canonical_json_bytes` (RFC 8785 canonical
-JSON) and `crypto::sha256_hex`, the hashing primitives every check is built
-on. `serde` and `serde_json` (de)serialize the typed parity report and parse
-the untyped regeneration artifacts as `serde_json::Value`. `thiserror`
-derives `RuntimeProofParityError`.
+`chio-core-types` provides schema constants, canonical JSON bytes, and SHA-256.
+Serde derives the typed wire records. serde_json supplies the generic evidence
+value tree. thiserror formats the stable rejected error surface.
+All evidence is supplied in memory; no persistence or network layer is owned
+by this crate.
+
+## Verification
+
+Tests exercise uppercase digest rejection, accepted package-hash drift,
+a valid regeneration bundle, source/workflow binding mismatch, omitted binding
+hash fields, accepted reports carrying failure codes, and run-ID mismatch.
+Fixtures synthesize JSON and hash links to check validator behavior.
+
+```bash
+cargo test -p chio-runtime-proof-parity
+```
+
+These regressions establish the checked consistency rules when executed.
+They do not execute a theorem prover or qualify the host runtime's isolation,
+receipt persistence, or authorization enforcement.

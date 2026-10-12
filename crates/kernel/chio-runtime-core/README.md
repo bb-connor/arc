@@ -1,87 +1,70 @@
 # chio-runtime-core
 
-`chio-runtime-core` is the implementation crate behind Chio's live runtime admission layer: kernel-mediated admission, trust-floor enforcement, treaty and swarm evidence verification, buyer-attestation review, and orchestration bookkeeping for cross-vendor, cross-kernel workflows. It implements `chio_kernel::RuntimeAdmissionHook`, the extension point `chio-kernel` calls into during tool-call dispatch to decide runtime-level admission. `chio-runtime` is the public facade over this crate and the one most callers should depend on; `chio-kernel-core` is an unrelated crate, the portable single-request capability/scope/guard evaluation kernel.
-
-## Responsibilities
-
-- Evaluate a runtime admission request (`evaluate_runtime_admission`) against a `RuntimeAdmissionProfile`, an admission bundle, a runtime trust bundle, and an optional pheromone-policy decision, returning a structured, receipt-embeddable `RuntimeAdmissionReport`.
-- Implement `ChioRuntimeAdmissionHook`, the `chio_kernel::RuntimeAdmissionHook` the kernel calls: extracts `chioAdmission` / `chioTreaty` / `chioSwarm` governed-intent context from a tool-call request, verifies treaty and swarm-authority evidence against a store, and reserves/releases destructive leases and continuations.
-- Own the federation treaty and governance-ladder data model and validators: treaty scope, governance ladder manifest, ladder intersection, cross-boundary admission, receipt lineage, bilateral invocation.
-- Verify buyer-attestation packets and the 14-artifact buyer-attestation review package end to end (lineage, continuation, admission report, bilateral invocation/DSSE, workflow and proof-regeneration reports, evidence manifest).
-- Build and validate orchestration artifacts: run contracts, orchestration plans, run/resume/status reports, run leases, scheduler ticks, recovery drills, evidence-sink health, proof-drift and proof-parity reports, provider health, artifact retention plans.
-- Provide four `RuntimeAdmissionStore` backends behind one trait (in-memory, JSON file, SQLite, plus a JSON trust-floor-only store), and a `LayeredRuntimeAdmissionStore` that composes an admission store with a separate trust-floor store.
-
-## Public API
-
-### Live swarm authority
-
-The hook uses `verify_swarm_authority_for_admission`: fan-out does not require
-future join or terminal results. `chioSwarm.joinReceipt` may be absent for a
-direct continuation. A fan-in continuation still requires its exact signed
-join reference, and malformed supplied references reject. Existing complete
-references retain their canonical binding. No request can supply its own trust
-roots, capability identity or trusted route metadata.
-
-This verifies live authority, not completed execution. The complete-artifact
-verifier remains strict about every graph join and terminal evidence. M5 must
-join actual worker outcomes and durable accounting before claiming completion.
-
-### Operation-owned replay custody
-
-`ChioRuntimeAdmissionHook::with_operation_owned_runtime_replay` opts into the
-kernel's operation-scoped claim port. The binding is configuration data, not
-activation evidence. Every accepted request needs a complete prepared runtime
-plan and a qualified durable operation, including read-only tools. The kernel
-supplies the original request binding, selected grant, phase and episode ID;
-the verifier supplies the validated plan digest and complete resource set.
-
-The SQLite authority must first pin and import the exact runtime source, then
-record explicit activation (admission schema v21). Activation verifies the
-existing physical source seal without repairing it. Operators must quiesce
-previously admitted legacy invocations before activating. Setting the hook
-alone never activates a source. In-memory, JSON, layered and unrelated SQLite
-backends reject this profile; fixed runtime clock overrides also reject.
-
-The runtime still performs the real trust-floor compare-and-set. It never calls
-legacy replay consume/release methods on this path. Source and artifact checks
-run again before dispatch. Cleanup uses the operation lease and fenced physical
-history, not signed receipt metadata. Dispatch commitment retains replay custody
-even when the outcome is unknown. This opt-in integration is not launch
-qualification; see [the security launch plan](../../../docs/security/launch-plan.md).
-
-| Area | Key items |
-|------|-----------|
-| Admission | `evaluate_runtime_admission`, `RuntimeAdmissionInput`, `ChioRuntimeAdmissionHook` |
-| Buyer attestation | `verify_buyer_attestation_packet`, `verify_buyer_attestation_review_package`, `verify_buyer_attestation_review_package_with_trust`, `verify_receipt_lineage_bundle` |
-| Treaty / federation | `evaluate_cross_boundary_admission`, `compute_ladder_intersection`, `validate_treaty_scope`, `validate_governance_ladder_manifest`, `validate_ladder_intersection`, `validate_cross_boundary_admission_report`, and `*_sha256` binding helpers |
-| Orchestration | `build_runtime_orchestration_plan`, `load_runtime_orchestration_evidence`, `validate_runtime_orchestration_evidence_binding`, `validate_runtime_orchestration_evidence_integrity`, `RuntimeOrchestrationEvidence` |
-| Ops | `generate_runtime_artifact_retention_plan`, `generate_runtime_evidence_sink_health_report`, `generate_runtime_provider_health_report` (+ `_with_model_cards` / `_with_model_card_evidence`), `generate_runtime_proof_drift_report` |
-| Stores | `InMemoryRuntimeAdmissionStore`, `JsonRuntimeAdmissionStore`, `SqliteRuntimeOrchestrationStore`, `JsonRuntimeTrustFloorStateStore`, `LayeredRuntimeAdmissionStore`, traits `RuntimeAdmissionStore` / `RuntimeTrustFloorStore` |
-| Serde I/O | Matched `*_from_json` / `*_json` pairs for every artifact type; `sign_runtime_admission_report`, `verify_signed_runtime_admission_report` |
-| Validation | `validate_runtime_*` for every profile, plan, and report type |
-| Types | `Runtime*`, `BuyerAttestation*`, and treaty/federation structs (`types.rs`); `CHIO_RUNTIME_*_SCHEMA` constants and `CHIO_RUNTIME_FAILURE_CODES` (`schema.rs`) |
-| Errors | `ChioRuntimeError` |
+The implementation of Chio runtime admission, verifier trust floors,
+orchestration state, and local operations reports.
+It supplies the kernel admission hook and the stores used to bind verified
+evidence to a concrete tool request.
 
 ## Usage
 
-```rust
-use chio_runtime_core::{ChioRuntimeAdmissionHook, InMemoryRuntimeAdmissionStore};
+Evaluate a request against an empty process-local store to observe closed admission:
 
-let hook = ChioRuntimeAdmissionHook::new(profile, InMemoryRuntimeAdmissionStore::new())
-    .with_runtime_trust_input(runtime_trust_bundle, trusted_verifier_keys);
-// register `hook` with the kernel as a `chio_kernel::RuntimeAdmissionHook`
+```rust
+use chio_runtime_core::{
+    evaluate_runtime_admission, RuntimeAdmissionInput, InMemoryRuntimeAdmissionStore,
+    RuntimeAdmissionProfile, RuntimeRequestBinding, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+};
+
+let store = InMemoryRuntimeAdmissionStore::new();
+let profile = RuntimeAdmissionProfile {
+    schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
+    profile_id: "example".into(), local_kernel_id: "kernel-local".into(),
+    verifier_id: "verifier-local".into(),
+    issued_at_unix_ms: 1_000, expires_at_unix_ms: 3_000,
+};
+let request = RuntimeRequestBinding {
+    request_id: "request-1".into(), capability_id: "capability-1".into(),
+    server_id: "tools".into(), tool_name: "read".into(),
+    tool_args_sha256: "0".repeat(64), origin_kernel_id: None,
+    host_kernel_id: "kernel-local".into(),
+};
+let report = evaluate_runtime_admission(RuntimeAdmissionInput {
+    profile: &profile, store: &store, admission_id: "admission-1", request: &request,
+    action_class_id: None, runtime_trust_input: None, trusted_verifier_keys: &[],
+    pheromone_query_report: None, runtime_pheromone_policy: None,
+    runtime_peer_weights: None, now_unix_ms: 2_000,
+})?;
+assert!(!report.accepted);
+assert_eq!(report.failure_code.as_deref(), Some("missing_admission_bundle"));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Testing
+The sample uses ordinary dependencies, needs no services, and writes no files.
+Admission requires a fresh profile and an exactly bound stored bundle.
+Verifier trust input is optional when the trusted-key set is empty; supplying
+trusted keys requires matching signed trust input. Selected policies can add requirements.
+A kernel host installs `ChioRuntimeAdmissionHook` to mediate actual dispatch.
 
-`cargo test -p chio-runtime-core`
+## Guarantees
 
-## See also
+- `evaluate_runtime_admission` checks profile freshness and exact stored request binding.
+- `ChioRuntimeAdmissionHook` resolves treaty and swarm evidence from its store.
+- Trust-floor transitions require atomic validation and recording by the backend.
+- Destructive leases and single-use continuations use store reservation operations.
+- Operation-owned replay requires an explicitly bound, verified replay source.
 
-- `chio-runtime` - the public facade; wraps this crate's error type and re-exports a narrowed admission/orchestration/validation surface (no buyer attestation, no treaty/federation, no store trait).
-- `chio-kernel` - supplies the `RuntimeAdmissionHook` trait, `ToolCallRequest`, and `KernelError` this crate implements against.
-- `chio-kernel-core` - unrelated: the portable `no_std + alloc` single-request evaluation and receipt-signing kernel.
-- `chio-swarm-authority` - supplies `SwarmAuthorityBundle` and the delegation-chain verification the swarm admission path calls.
-- `chio-federation` - supplies `bilateral_dsse` / `bilateral_verifier` used by treaty and buyer-attestation verification.
-- `chio-attest-buyer-core` - supplies proof-package/trust-bundle parsing and `verify_package_report` used by buyer review verification.
-- `chio-runtime-proof-parity` - supplies the `RuntimeProofParityReport` type and validator re-exported here.
+## Status
+
+Implemented admission and local orchestration APIs with no declared Cargo features.
+Memory stores retain state for one process. JSON stores coordinate clones of one
+instance; independent opens require SQLite for serialized transitions.
+Memory and JSON backends do not qualify sealed operation-owned replay by default.
+Report generation requires caller-supplied evidence and provider observations.
+These APIs do not launch an external provider service or certify a deployment.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Capability verification](../../../spec/PROTOCOL.md#53-verification-rules)
+- [Public runtime facade](../chio-runtime/README.md)
+- [License](../../../LICENSE)
