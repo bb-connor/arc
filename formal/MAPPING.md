@@ -594,9 +594,10 @@ mandatory symbol inventory prevents a wrapper-only renewal from omitting the
 reviewed helper bodies.
 The guard now owns only pre-dispatch cleanup. Receipt binding is checked by
 `DischargeBinding::validate_receipt` before the owning terminal commit; the
-redundant discharge recheck is removed. Dedicated private-construction and
-affinity proof tests remain an unfulfilled plan item. These source anchors
-do not supply that coverage.
+redundant discharge recheck is removed. Compiler-checked controls reject `Clone` and `Default` for both owners and
+pin the consuming post-effect return signature. Field and module privacy are
+source-reviewed; there is no separate UI compile-fail suite. These model
+anchors do not prove the Rust ownership boundary.
 
 ## Apalache named invariants (kernel-state subset)
 
